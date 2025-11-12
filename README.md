@@ -18,13 +18,16 @@ Kotlin Multiplatform проект для Android и iOS, построенный 
 
 - [SETUP_NAVIGATION.md](SETUP_NAVIGATION.md) - Инструкция по навигации
 - [NAVIGATION.md](NAVIGATION.md) - Подробная документация по структуре навигации
+- [KOIN_SETUP.md](KOIN_SETUP.md) - Настройка и использование Koin DI
 
 ## 🏗️ Структура проекта
 
 * [/composeApp](./composeApp/src) - общий код для всех платформ
   - [commonMain](./composeApp/src/commonMain/kotlin) - код для всех платформ
     - `screens/` - экраны приложения
+    - `viewmodels/` - ViewModels для управления состоянием
     - `navigation/` - навигационные маршруты
+    - `di/` - модули Koin для Dependency Injection
   - [androidMain](./composeApp/src/androidMain/kotlin) - Android-специфичный код
   - [iosMain](./composeApp/src/iosMain/kotlin) - iOS-специфичный код
 
@@ -71,6 +74,7 @@ Kotlin Multiplatform проект для Android и iOS, построенный 
 - **Material Design 3** - дизайн система
 - **Navigation Compose** - навигация
 - **Kotlin Serialization** - сериализация данных
+- **Koin** - dependency injection (DI) для multiplatform
 
 ## 📖 Дополнительно
 

@@ -45,6 +45,11 @@ kotlin {
             // Navigation Compose для Multiplatform
             implementation(libs.androidx.navigation.compose)
             implementation(libs.kotlinx.serialization.core)
+            
+            // Koin для Multiplatform
+            implementation(libs.koin.core)
+            implementation(libs.koin.compose)
+            implementation(libs.koin.compose.viewmodel)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

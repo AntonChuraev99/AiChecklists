@@ -9,12 +9,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.antonchuraev.homesearchchecklist.viewmodels.FutureTabViewModel
+import org.koin.compose.viewmodel.koinViewModel
 
 /**
  * Заглушка для будущего функционала
  */
 @Composable
-fun FutureTabScreen() {
+fun FutureTabScreen(
+    viewModel: FutureTabViewModel = koinViewModel()
+) {
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center

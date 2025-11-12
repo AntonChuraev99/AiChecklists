@@ -7,6 +7,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.antonchuraev.homesearchchecklist.viewmodels.OnboardingViewModel
+import org.koin.compose.viewmodel.koinViewModel
 
 /**
  * Экран онбординга
@@ -15,7 +17,8 @@ import androidx.compose.ui.unit.dp
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OnboardingScreen(
-    onComplete: () -> Unit
+    onComplete: () -> Unit,
+    viewModel: OnboardingViewModel = koinViewModel()
 ) {
     Scaffold(
         topBar = {
@@ -63,7 +66,10 @@ fun OnboardingScreen(
             
             // Кнопка завершения
             Button(
-                onClick = onComplete,
+                onClick = {
+                    viewModel.onComplete()
+                    onComplete()
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp)

@@ -11,6 +11,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.antonchuraev.homesearchchecklist.viewmodels.DebugViewModel
+import org.koin.compose.viewmodel.koinViewModel
 
 /**
  * Дебаг меню для разработки
@@ -18,9 +21,10 @@ import androidx.compose.ui.unit.dp
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DebugScreen(
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    viewModel: DebugViewModel = koinViewModel()
 ) {
-    var showDialog by remember { mutableStateOf(false) }
+    val showDialog by viewModel.showInfoDialog.collectAsStateWithLifecycle()
     
     Scaffold(
         topBar = {
@@ -57,7 +61,7 @@ fun DebugScreen(
                     icon = Icons.Default.Info,
                     title = "Информация о приложении",
                     description = "Версия, билд и другие данные",
-                    onClick = { showDialog = true }
+                    onClick = { viewModel.showInfoDialog() }
                 )
             }
             
@@ -66,7 +70,7 @@ fun DebugScreen(
                     icon = Icons.Default.Refresh,
                     title = "Сбросить онбординг",
                     description = "Показать экран приветствия снова",
-                    onClick = { /* TODO: Реализовать */ }
+                    onClick = { viewModel.resetOnboarding() }
                 )
             }
             
@@ -75,7 +79,7 @@ fun DebugScreen(
                     icon = Icons.Default.Delete,
                     title = "Очистить данные",
                     description = "Удалить все локальные данные",
-                    onClick = { /* TODO: Реализовать */ }
+                    onClick = { viewModel.clearData() }
                 )
             }
             
@@ -96,14 +100,14 @@ fun DebugScreen(
                     icon = Icons.Default.Add,
                     title = "Создать тестовые чек-листы",
                     description = "Добавить демо-данные для тестирования",
-                    onClick = { /* TODO: Реализовать */ }
+                    onClick = { viewModel.createTestChecklists() }
                 )
             }
         }
         
         if (showDialog) {
             AlertDialog(
-                onDismissRequest = { showDialog = false },
+                onDismissRequest = { viewModel.hideInfoDialog() },
                 title = { Text("Информация о приложении") },
                 text = {
                     Column {
@@ -113,7 +117,7 @@ fun DebugScreen(
                     }
                 },
                 confirmButton = {
-                    TextButton(onClick = { showDialog = false }) {
+                    TextButton(onClick = { viewModel.hideInfoDialog() }) {
                         Text("OK")
                     }
                 }

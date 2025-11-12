@@ -1,5 +1,33 @@
 # 📝 Изменения в проекте
 
+## ✅ Последнее обновление: Добавление Koin DI
+
+### 🆕 Добавлен Koin Multiplatform (v4.0.0)
+
+**Что добавлено:**
+1. **Зависимости Koin** в `libs.versions.toml` и `build.gradle.kts`
+2. **ViewModels** для всех экранов:
+   - `OnboardingViewModel` - управление онбордингом
+   - `MainViewModel` - управление главным экраном и табами
+   - `DebugViewModel` - управление дебаг меню
+   - `HomeTabViewModel` - управление списком чек-листов
+   - `FutureTabViewModel` - заглушка для будущего функционала
+
+3. **Koin модуль** (`di/AppModule.kt`) с регистрацией всех ViewModels
+4. **Инициализация Koin** в `App.kt` через `KoinApplication`
+5. **Интеграция `koinViewModel()`** во всех экранах
+
+**Преимущества:**
+- ✅ Dependency Injection для Multiplatform
+- ✅ Разделение бизнес-логики и UI
+- ✅ Управление жизненным циклом ViewModels
+- ✅ Упрощенное тестирование
+- ✅ Единая точка конфигурации зависимостей
+
+**Документация:** См. [KOIN_SETUP.md](KOIN_SETUP.md)
+
+---
+
 ## ✅ Что было сделано
 
 ### 1. Заменена библиотека навигации
@@ -96,13 +124,15 @@ implementation(compose.materialIconsExtended)
 
 ## 🔄 Следующие шаги
 
-1. Реализовать сохранение состояния онбординга (SharedPreferences/DataStore)
-2. Добавить модель данных для чек-листов
-3. Реализовать CRUD операции для чек-листов
-4. Добавить локальную базу данных (Room/SQLDelight)
-5. Реализовать функции дебаг меню
-6. Добавить экран создания/редактирования чек-листа
-7. Добавить детальный просмотр чек-листа
+1. ✅ ~~Добавить Dependency Injection (Koin)~~ **ВЫПОЛНЕНО**
+2. ✅ ~~Создать ViewModels для экранов~~ **ВЫПОЛНЕНО**
+3. Реализовать сохранение состояния онбординга (SharedPreferences/DataStore)
+4. Добавить модель данных для чек-листов
+5. Реализовать CRUD операции для чек-листов
+6. Добавить локальную базу данных (Room/SQLDelight)
+7. Реализовать функции дебаг меню
+8. Добавить экран создания/редактирования чек-листа
+9. Добавить детальный просмотр чек-листа
 
 ## 🛠️ Технологии
 
@@ -111,10 +141,13 @@ implementation(compose.materialIconsExtended)
 - Navigation Compose 2.8.0-alpha10
 - Material Design 3
 - Kotlin Serialization 1.8.1
+- Koin 4.0.0 (DI)
 
 ## 📚 Полезные ссылки
 
 - [Navigation Compose Guide](https://www.jetbrains.com/help/kotlin-multiplatform-dev/compose-navigation-routing.html)
 - [Compose Multiplatform](https://www.jetbrains.com/lp/compose-multiplatform/)
 - [Material Design 3](https://m3.material.io/)
+- [Koin Documentation](https://insert-koin.io/)
+- [Koin Multiplatform](https://insert-koin.io/docs/reference/koin-mp/kmp)
 

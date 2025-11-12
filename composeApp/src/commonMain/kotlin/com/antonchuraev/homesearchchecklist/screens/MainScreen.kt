@@ -7,6 +7,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.antonchuraev.homesearchchecklist.viewmodels.MainViewModel
+import org.koin.compose.viewmodel.koinViewModel
 
 /**
  * Главный экран с нижней навигацией
@@ -14,9 +17,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
-    onDebugClick: () -> Unit
+    onDebugClick: () -> Unit,
+    viewModel: MainViewModel = koinViewModel()
 ) {
-    var selectedTab by remember { mutableStateOf(BottomNavTab.HOME) }
+    val selectedTabIndex by viewModel.selectedTabIndex.collectAsStateWithLifecycle()
+    val selectedTab = BottomNavTab.entries[selectedTabIndex]
     
     Scaffold(
         topBar = {
@@ -34,10 +39,10 @@ fun MainScreen(
         },
         bottomBar = {
             NavigationBar {
-                BottomNavTab.entries.forEach { tab ->
+                BottomNavTab.entries.forEachIndexed { index, tab ->
                     NavigationBarItem(
                         selected = selectedTab == tab,
-                        onClick = { selectedTab = tab },
+                        onClick = { viewModel.onTabSelected(index) },
                         icon = {
                             Icon(
                                 imageVector = tab.icon,

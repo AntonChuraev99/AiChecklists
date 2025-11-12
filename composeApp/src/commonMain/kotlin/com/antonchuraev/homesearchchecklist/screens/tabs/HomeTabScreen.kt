@@ -5,16 +5,23 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.antonchuraev.homesearchchecklist.viewmodels.HomeTabViewModel
+import org.koin.compose.viewmodel.koinViewModel
 
 /**
  * Главный таб - список чек-листов
  */
 @Composable
-fun HomeTabScreen() {
+fun HomeTabScreen(
+    viewModel: HomeTabViewModel = koinViewModel()
+) {
+    val checklists by viewModel.checklists.collectAsStateWithLifecycle()
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
@@ -51,7 +58,7 @@ fun HomeTabScreen() {
             Spacer(modifier = Modifier.height(24.dp))
             
             FilledTonalButton(
-                onClick = { /* TODO: Добавить создание чек-листа */ }
+                onClick = { viewModel.createChecklist() }
             ) {
                 Icon(
                     imageVector = Icons.Default.Add,
