@@ -24,5 +24,12 @@ class MainViewModel(
     fun onTabSelected(index: Int) {
         _selectedTabIndex.value = index
     }
+
+    /**
+     * Скрыть bottom sheet создания чеклиста
+     */
+    fun hideCreateChecklistBottomSheet() {
+        createChecklistBottomSheetRepository.hide()
+    }
 }
 
