@@ -20,13 +20,11 @@ fun MainScreen(
     onDebugClick: () -> Unit,
     viewModel: MainViewModel = koinViewModel()
 ) {
-    val selectedTabIndex by viewModel.selectedTabIndex.collectAsStateWithLifecycle()
-    val selectedTab = BottomNavTab.entries[selectedTabIndex]
-    
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(selectedTab.title) },
+                title = {},
                 actions = {
                     IconButton(onClick = onDebugClick) {
                         Icon(
@@ -37,34 +35,15 @@ fun MainScreen(
                 }
             )
         },
-        /*bottomBar = {
-            NavigationBar {
-                BottomNavTab.entries.forEachIndexed { index, tab ->
-                    NavigationBarItem(
-                        selected = selectedTab == tab,
-                        onClick = { viewModel.onTabSelected(index) },
-                        icon = {
-                            Icon(
-                                imageVector = tab.icon,
-                                contentDescription = tab.title
-                            )
-                        },
-                        label = { Text(tab.title) }
-                    )
-                }
-            }
-        }*/
     ) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
-            HomeTabScreen()
+            MainScreenContent()
         }
     }
 }
 
-/**
- * Табы нижней навигации
- */
-private enum class BottomNavTab(
+
+/*private enum class BottomNavTab(
     val title: String,
     val icon: ImageVector
 ) {
@@ -76,5 +55,5 @@ private enum class BottomNavTab(
         title = "Будущее",
         icon = Icons.Default.Star
     )
-}
+}*/
 

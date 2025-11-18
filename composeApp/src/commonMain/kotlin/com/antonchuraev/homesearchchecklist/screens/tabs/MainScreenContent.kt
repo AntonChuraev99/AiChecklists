@@ -18,10 +18,11 @@ import org.koin.compose.viewmodel.koinViewModel
  * Главный таб - список чек-листов
  */
 @Composable
-fun HomeTabScreen(
+fun MainScreenContent(
     viewModel: HomeTabViewModel = koinViewModel()
 ) {
     val checklists by viewModel.checklists.collectAsStateWithLifecycle()
+
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
