@@ -37,7 +37,7 @@ fun MainScreen(
                 }
             )
         },
-        bottomBar = {
+        /*bottomBar = {
             NavigationBar {
                 BottomNavTab.entries.forEachIndexed { index, tab ->
                     NavigationBarItem(
@@ -53,13 +53,10 @@ fun MainScreen(
                     )
                 }
             }
-        }
+        }*/
     ) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
-            when (selectedTab) {
-                BottomNavTab.HOME -> HomeTabScreen()
-                BottomNavTab.FUTURE -> FutureTabScreen()
-            }
+            HomeTabScreen()
         }
     }
 }
