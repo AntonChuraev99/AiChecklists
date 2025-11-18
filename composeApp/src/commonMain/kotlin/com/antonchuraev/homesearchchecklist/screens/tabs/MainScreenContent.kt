@@ -59,7 +59,7 @@ fun MainScreenContent(
             Spacer(modifier = Modifier.height(24.dp))
             
             FilledTonalButton(
-                onClick = { viewModel.createChecklist() }
+                onClick = { viewModel.createChecklistClick() }
             ) {
                 Icon(
                     imageVector = Icons.Default.Add,

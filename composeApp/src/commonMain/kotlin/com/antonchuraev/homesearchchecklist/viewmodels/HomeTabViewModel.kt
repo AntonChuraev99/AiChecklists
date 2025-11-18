@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.viewmodels
 
 import androidx.lifecycle.ViewModel
+import com.antonchuraev.homesearchchecklist.data.repository.CreateChecklistBottomSheetRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -8,7 +9,9 @@ import kotlinx.coroutines.flow.asStateFlow
 /**
  * ViewModel для главного таба со списком чек-листов
  */
-class HomeTabViewModel : ViewModel() {
+class HomeTabViewModel(
+    private val createChecklistBottomSheetRepository: CreateChecklistBottomSheetRepository
+) : ViewModel() {
     
     private val _checklists = MutableStateFlow<List<String>>(emptyList())
     val checklists: StateFlow<List<String>> = _checklists.asStateFlow()
@@ -16,8 +19,8 @@ class HomeTabViewModel : ViewModel() {
     /**
      * Создание нового чек-листа
      */
-    fun createChecklist() {
-        // TODO: Реализовать создание чек-листа
+    fun createChecklistClick() {
+        createChecklistBottomSheetRepository.show()
     }
     
     /**

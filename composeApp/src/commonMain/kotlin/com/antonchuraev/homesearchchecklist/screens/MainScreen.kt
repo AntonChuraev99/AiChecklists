@@ -21,6 +21,8 @@ fun MainScreen(
     viewModel: MainViewModel = koinViewModel()
 ) {
 
+    val isShowCreateBottomSheet by viewModel.isShowCreateChecklistBottomSheet.collectAsStateWithLifecycle()
+
     Scaffold(
         topBar = {
             TopAppBar(
