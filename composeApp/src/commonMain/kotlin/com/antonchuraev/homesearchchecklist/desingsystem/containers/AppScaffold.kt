@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 fun AppScaffold(
     title:String? = null,
     onBackButtonClick: (() -> Unit)? = null,
+    bottomBar: @Composable () -> Unit = {},
     content: @Composable () -> Unit
 ) {
 
@@ -51,7 +52,8 @@ fun AppScaffold(
                     }
                 )
             }
-        }
+        },
+        bottomBar = bottomBar
     ) {
         Box(
             Modifier.padding(it),
