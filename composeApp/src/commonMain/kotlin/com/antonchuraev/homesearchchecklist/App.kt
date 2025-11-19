@@ -59,20 +59,22 @@ fun App() {
                     )
                 }
 
-                composable<Screen.CreateChecklist.CreateChecklist>(){
-                    CreateChecklistScreen()
+                composable<Screen.CreateChecklist.CreateChecklist>{
+                    CreateChecklistScreen(
+                        onBackButtonClick = navController::popBackStack
+                    )
                 }
 
-                composable<Screen.CreateChecklist.Templates>(){
-                    TemplatesScreen()
+                composable<Screen.CreateChecklist.Templates>{
+                    TemplatesScreen(
+                        onBackButtonClick = navController::popBackStack
+                    )
                 }
 
                 // Дебаг меню
                 composable(Screen.Debug.route) {
                     DebugScreen(
-                        onBack = {
-                            navController.popBackStack()
-                        }
+                        onBack = navController::popBackStack
                     )
                 }
             }

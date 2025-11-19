@@ -1,8 +1,11 @@
 package com.antonchuraev.homesearchchecklist.navigation
 
+import kotlinx.serialization.Serializable
+
 /**
  * Навигационные маршруты приложения
  */
+@Serializable
 sealed class Screen(val route: String) {
     /**
      * Экран онбординга
@@ -14,12 +17,15 @@ sealed class Screen(val route: String) {
      */
     data object Main : Screen("main")
 
-    sealed class CreateChecklist(route: String): Screen(route){
+    @Serializable
+    sealed class CreateChecklist(private val routeParam: String): Screen(routeParam){
 
+        @Serializable
         data class CreateChecklist(
             val templateId: Int?
         ): Screen.CreateChecklist("create_checklist")
 
+        @Serializable
         data object Templates: Screen.CreateChecklist("templates")
     }
 

@@ -41,7 +41,11 @@ fun MainScreen(
             )
         },
     ) { paddingValues ->
-        Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
             MainScreenContent()
         }
     }
