@@ -58,7 +58,8 @@ fun MainScreen(
                     Text("Создать чек-лист")
                 }
             }
-        }
+        },
+        modifier = Modifier.navigationBarsPadding()
     ) { paddingValues ->
 
         //todo loading state
