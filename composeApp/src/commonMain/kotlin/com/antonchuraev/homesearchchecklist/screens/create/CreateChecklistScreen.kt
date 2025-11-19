@@ -74,12 +74,9 @@ fun CreateChecklistScreen(
                 Text("Добавить Пункт")
             }
 
-            for (index in 0..elements.size){
-
-                val text = elements[index]
-
+            elements.forEachIndexed {  index , item ->
                 TextField(
-                    text,
+                    item,
                     onValueChange = {
                         elements[index] = it
                     }
