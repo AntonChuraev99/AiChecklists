@@ -7,6 +7,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBackIos
 import androidx.compose.material.icons.filled.ArrowBackIos
 import androidx.compose.material.icons.filled.BackHand
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -27,7 +28,7 @@ fun AppScaffold(
     Scaffold(
         topBar = {
             if (title != null || onBackButtonClick != null) {
-                TopAppBar(
+                CenterAlignedTopAppBar(
                     title = {
                         title?.let {
                             Text(
@@ -35,7 +36,7 @@ fun AppScaffold(
                             )
                         }
                     },
-                    actions = {
+                    navigationIcon = {
                         onBackButtonClick?.let {
                             IconButton(onClick = onBackButtonClick) {
                                 Icon(
@@ -44,6 +45,8 @@ fun AppScaffold(
                                 )
                             }
                         }
+                    },
+                    actions = {
 
                     }
                 )
