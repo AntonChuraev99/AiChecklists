@@ -23,7 +23,6 @@ val appModule = module {
     viewModelOf(::OnboardingViewModel)
     viewModelOf(::MainViewModel)
     viewModelOf(::DebugViewModel)
-    viewModelOf(::HomeTabViewModel)
     viewModelOf(::FutureTabViewModel)
     viewModelOf(::CreateChecklistViewModel)
 }

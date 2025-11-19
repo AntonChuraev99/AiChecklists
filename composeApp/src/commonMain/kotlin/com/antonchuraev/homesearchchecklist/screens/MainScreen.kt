@@ -8,6 +8,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.antonchuraev.homesearchchecklist.viewmodels.MainScreenState
 import com.antonchuraev.homesearchchecklist.viewmodels.MainViewModel
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -22,6 +23,7 @@ fun MainScreen(
     openSelectFromTemplatesScreen: () -> Unit,
     viewModel: MainViewModel = koinViewModel()
 ) {
+    val screenState: MainScreenState by viewModel.screenState.collectAsStateWithLifecycle()
 
     val isShowCreateBottomSheet by viewModel.isShowCreateChecklistBottomSheet.collectAsStateWithLifecycle()
     val sheetState = rememberModalBottomSheetState()
@@ -40,13 +42,39 @@ fun MainScreen(
                 }
             )
         },
+        bottomBar = {
+            if (screenState is MainScreenState.Success && (screenState as MainScreenState.Success).checkLists.isNotEmpty()){
+                FilledTonalButton(
+                    onClick = {
+                        openCreateNewChecklistScreen.invoke()
+                    }
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Создать чек-лист")
+                }
+            }
+        }
     ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            MainScreenContent()
+
+        //todo loading state
+        if (screenState is MainScreenState.Success){
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+            ) {
+                MainScreenContent(
+                    screenState = screenState as MainScreenState.Success,
+                    onAddChecklistClick = {
+                        openCreateNewChecklistScreen.invoke()
+                    }
+                )
+            }
         }
     }
 
