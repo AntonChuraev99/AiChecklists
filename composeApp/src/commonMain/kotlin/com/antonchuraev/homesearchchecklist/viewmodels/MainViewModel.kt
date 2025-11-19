@@ -38,16 +38,12 @@ class MainViewModel(
 
     val isShowCreateChecklistBottomSheet = createChecklistBottomSheetRepository.isVisible
 
-    /**
-     * Изменение выбранного таба
-     */
-    fun onTabSelected(index: Int) {
-        _selectedTabIndex.value = index
+
+    fun showCreateChecklistClick() {
+        createChecklistBottomSheetRepository.show()
     }
 
-    /**
-     * Скрыть bottom sheet создания чеклиста
-     */
+
     fun hideCreateChecklistBottomSheet() {
         createChecklistBottomSheetRepository.hide()
     }

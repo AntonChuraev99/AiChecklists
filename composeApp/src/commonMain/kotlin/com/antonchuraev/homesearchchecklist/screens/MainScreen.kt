@@ -46,7 +46,7 @@ fun MainScreen(
             if (screenState is MainScreenState.Success && (screenState as MainScreenState.Success).checkLists.isNotEmpty()){
                 FilledTonalButton(
                     onClick = {
-                        openCreateNewChecklistScreen.invoke()
+                        viewModel.showCreateChecklistClick()
                     }
                 ) {
                     Icon(
@@ -72,7 +72,7 @@ fun MainScreen(
                 MainScreenContent(
                     screenState = screenState as MainScreenState.Success,
                     onAddChecklistClick = {
-                        openCreateNewChecklistScreen.invoke()
+                        viewModel.showCreateChecklistClick()
                     }
                 )
             }
