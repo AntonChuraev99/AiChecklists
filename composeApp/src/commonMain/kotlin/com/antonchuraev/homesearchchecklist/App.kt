@@ -10,6 +10,8 @@ import com.antonchuraev.homesearchchecklist.navigation.Screen
 import com.antonchuraev.homesearchchecklist.screens.DebugScreen
 import com.antonchuraev.homesearchchecklist.screens.MainScreen
 import com.antonchuraev.homesearchchecklist.screens.OnboardingScreen
+import com.antonchuraev.homesearchchecklist.screens.create.CreateChecklistScreen
+import com.antonchuraev.homesearchchecklist.screens.create.TemplatesScreen
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.koin.compose.KoinApplication
 
@@ -47,8 +49,22 @@ fun App() {
                     MainScreen(
                         onDebugClick = {
                             navController.navigate(Screen.Debug.route)
+                        },
+                        openCreateNewChecklistScreen = {
+                            navController.navigate(Screen.CreateChecklist.CreateChecklist(null))
+                        },
+                        openSelectFromTemplatesScreen = {
+                            navController.navigate(Screen.CreateChecklist.Templates)
                         }
                     )
+                }
+
+                composable<Screen.CreateChecklist.CreateChecklist>(){
+                    CreateChecklistScreen()
+                }
+
+                composable<Screen.CreateChecklist.Templates>(){
+                    TemplatesScreen()
                 }
 
                 // Дебаг меню

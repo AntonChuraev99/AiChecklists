@@ -6,7 +6,6 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.antonchuraev.homesearchchecklist.viewmodels.MainViewModel
@@ -19,6 +18,8 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun MainScreen(
     onDebugClick: () -> Unit,
+    openCreateNewChecklistScreen: () -> Unit,
+    openSelectFromTemplatesScreen: () -> Unit,
     viewModel: MainViewModel = koinViewModel()
 ) {
 
@@ -56,7 +57,9 @@ fun MainScreen(
             CreateChecklistBottomSheetContent(
                 onDismiss = {
                     viewModel.hideCreateChecklistBottomSheet()
-                }
+                },
+                onCreateNewChecklistClick = openCreateNewChecklistScreen,
+                onSelectFromTemplatesClick = openSelectFromTemplatesScreen
             )
         }
     }
@@ -68,7 +71,9 @@ fun MainScreen(
  */
 @Composable
 private fun CreateChecklistBottomSheetContent(
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onCreateNewChecklistClick: () -> Unit,
+    onSelectFromTemplatesClick: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -84,7 +89,7 @@ private fun CreateChecklistBottomSheetContent(
         // Кнопка: Создать с нуля
         Button(
             onClick = {
-                // TODO: Открыть экран создания чеклиста с нуля
+                onCreateNewChecklistClick.invoke()
                 onDismiss()
             },
             modifier = Modifier
@@ -108,7 +113,7 @@ private fun CreateChecklistBottomSheetContent(
         // Кнопка: Выбрать из шаблона
         OutlinedButton(
             onClick = {
-                // TODO: Открыть экран выбора шаблона
+                onSelectFromTemplatesClick.invoke()
                 onDismiss()
             },
             modifier = Modifier.fillMaxWidth()
@@ -131,18 +136,4 @@ private fun CreateChecklistBottomSheetContent(
         Spacer(modifier = Modifier.height(16.dp))
     }
 }
-
-/*private enum class BottomNavTab(
-    val title: String,
-    val icon: ImageVector
-) {
-    HOME(
-        title = "Главная",
-        icon = Icons.Default.Home
-    ),
-    FUTURE(
-        title = "Будущее",
-        icon = Icons.Default.Star
-    )
-}*/
 
