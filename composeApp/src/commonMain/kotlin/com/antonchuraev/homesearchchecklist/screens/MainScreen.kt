@@ -94,7 +94,7 @@ private fun CreateChecklistBottomSheetContent(
         Button(
             onClick = {
                 onCreateNewChecklistClick.invoke()
-                onDismiss()
+                //onDismiss()
             },
             modifier = Modifier
                 .fillMaxWidth()
@@ -118,7 +118,7 @@ private fun CreateChecklistBottomSheetContent(
         OutlinedButton(
             onClick = {
                 onSelectFromTemplatesClick.invoke()
-                onDismiss()
+                //onDismiss()
             },
             modifier = Modifier.fillMaxWidth()
         ) {
