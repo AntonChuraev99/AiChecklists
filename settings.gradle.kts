@@ -31,3 +31,5 @@ dependencyResolutionManagement {
 include(":composeApp")
 include(":core:common:api")
 include(":core:common:impl")
+include(":core:database")
+include(":feature:checklist")

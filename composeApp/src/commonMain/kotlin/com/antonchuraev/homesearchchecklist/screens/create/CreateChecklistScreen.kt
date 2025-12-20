@@ -18,14 +18,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
+import com.antonchuraev.homesearchchecklist.feature.checklist.CreateChecklistViewModel
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun CreateChecklistScreen(
     viewModel: CreateChecklistViewModel = koinViewModel(),
     onBackButtonClick: () -> Unit
-){
-    val screenState by viewModel.screenState.collectAsStateWithLifecycle()
+) {
+    val screenState by viewModel.state.collectAsStateWithLifecycle()
 
     var showDialog by remember {
         mutableStateOf(false)

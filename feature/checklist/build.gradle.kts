@@ -3,7 +3,8 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidLibrary)
-    alias(libs.plugins.jetbrains.kotlin.serialization)
+    alias(libs.plugins.composeMultiplatform)
+    alias(libs.plugins.composeCompiler)
 }
 
 kotlin {
@@ -15,24 +16,31 @@ kotlin {
     
     listOf(iosArm64(), iosSimulatorArm64()).forEach {
         it.binaries.framework {
-            baseName = "CommonApi"
+            baseName = "FeatureChecklist"
             isStatic = true
         }
     }
     
     sourceSets {
         commonMain.dependencies {
+            implementation(projects.core.common.api)
+            implementation(projects.core.database)
+            
+            implementation(compose.runtime)
+            implementation(compose.foundation)
+            implementation(compose.material3)
+            implementation(compose.ui)
+            
+            implementation(libs.androidx.navigation.compose)
+            implementation(libs.koin.core)
+            implementation(libs.koin.compose.viewmodel)
             implementation(libs.kotlinx.coroutines.core)
-            implementation(libs.kotlinx.serialization.json)
-        }
-        commonTest.dependencies {
-            implementation(libs.kotlin.test)
         }
     }
 }
 
 android {
-    namespace = "com.antonchuraev.homesearchchecklist.core.common.api"
+    namespace = "com.antonchuraev.homesearchchecklist.feature.checklist"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
     defaultConfig {
         minSdk = libs.versions.android.minSdk.get().toInt()
@@ -42,3 +50,4 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
 }
+

@@ -16,7 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.antonchuraev.homesearchchecklist.viewmodels.MainScreenState
+import com.antonchuraev.homesearchchecklist.feature.checklist.MainScreenState
 import org.koin.compose.viewmodel.koinViewModel
 
 /**

@@ -19,9 +19,7 @@ import org.koin.compose.KoinApplication
 @Preview
 fun App() {
     KoinApplication(
-        application = {
-            modules(appModule)
-        }
+        application = { modules(appModule) }
     ) {
         MaterialTheme {
             val navController = rememberNavController()
@@ -30,26 +28,19 @@ fun App() {
                 navController = navController,
                 startDestination = Screen.Onboarding.route
             ) {
-                // Экран онбординга
                 composable(Screen.Onboarding.route) {
                     OnboardingScreen(
                         onComplete = {
                             navController.navigate(Screen.Main.route) {
-                                // Удаляем онбординг из стека
-                                popUpTo(Screen.Onboarding.route) {
-                                    inclusive = true
-                                }
+                                popUpTo(Screen.Onboarding.route) { inclusive = true }
                             }
                         }
                     )
                 }
 
-                // Главный экран с нижней навигацией
                 composable(Screen.Main.route) {
                     MainScreen(
-                        onDebugClick = {
-                            navController.navigate(Screen.Debug.route)
-                        },
+                        onDebugClick = { navController.navigate(Screen.Debug.route) },
                         openCreateNewChecklistScreen = {
                             navController.navigate(Screen.CreateChecklist.CreateChecklist(null))
                         },
@@ -59,23 +50,16 @@ fun App() {
                     )
                 }
 
-                composable<Screen.CreateChecklist.CreateChecklist>{
-                    CreateChecklistScreen(
-                        onBackButtonClick = navController::popBackStack
-                    )
+                composable<Screen.CreateChecklist.CreateChecklist> {
+                    CreateChecklistScreen(onBackButtonClick = navController::popBackStack)
                 }
 
-                composable<Screen.CreateChecklist.Templates>{
-                    TemplatesScreen(
-                        onBackButtonClick = navController::popBackStack
-                    )
+                composable<Screen.CreateChecklist.Templates> {
+                    TemplatesScreen(onBackButtonClick = navController::popBackStack)
                 }
 
-                // Дебаг меню
                 composable(Screen.Debug.route) {
-                    DebugScreen(
-                        onBack = navController::popBackStack
-                    )
+                    DebugScreen(onBack = navController::popBackStack)
                 }
             }
         }

@@ -3,6 +3,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidLibrary)
+    alias(libs.plugins.ksp)
     alias(libs.plugins.jetbrains.kotlin.serialization)
 }
 
@@ -15,24 +16,30 @@ kotlin {
     
     listOf(iosArm64(), iosSimulatorArm64()).forEach {
         it.binaries.framework {
-            baseName = "CommonApi"
+            baseName = "CoreDatabase"
             isStatic = true
         }
     }
     
     sourceSets {
         commonMain.dependencies {
+            implementation(projects.core.common.api)
+            implementation(libs.room.runtime)
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)
+            implementation(libs.koin.core)
         }
-        commonTest.dependencies {
-            implementation(libs.kotlin.test)
+        androidMain.dependencies {
+            implementation(libs.room.ktx)
+        }
+        iosMain.dependencies {
+            implementation(libs.sqlite.bundled)
         }
     }
 }
 
 android {
-    namespace = "com.antonchuraev.homesearchchecklist.core.common.api"
+    namespace = "com.antonchuraev.homesearchchecklist.core.database"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
     defaultConfig {
         minSdk = libs.versions.android.minSdk.get().toInt()
@@ -42,3 +49,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
 }
+
+dependencies {
+    add("kspAndroid", libs.room.compiler)
+    add("kspIosArm64", libs.room.compiler)
+    add("kspIosSimulatorArm64", libs.room.compiler)
+}
+
