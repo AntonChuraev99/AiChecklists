@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.map
 class ChecklistRepositoryImpl(
     private val dao: ChecklistDao
 ) : ChecklistRepository {
+
     override val checklists: Flow<List<Checklist>> = dao.observeChecklists().map { list ->
         list.map { it.toDomain() }
     }

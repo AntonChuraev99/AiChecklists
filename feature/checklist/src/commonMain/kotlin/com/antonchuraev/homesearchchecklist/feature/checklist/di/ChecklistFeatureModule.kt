@@ -1,11 +1,12 @@
 package com.antonchuraev.homesearchchecklist.feature.checklist.di
 
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.di.checklistDao
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.repository.ChecklistRepositoryImpl
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import org.koin.dsl.module
 
-public val checklistFeatureModule = module {
-    single(){
-        checklistDao
-    }
+val checklistFeatureModule = module {
+    single { checklistDao }
+    single<ChecklistRepository> { ChecklistRepositoryImpl(checklistDao) }
 }
 
