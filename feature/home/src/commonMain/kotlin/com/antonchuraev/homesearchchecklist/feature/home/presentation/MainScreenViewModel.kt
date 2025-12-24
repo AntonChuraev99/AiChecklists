@@ -11,7 +11,8 @@ import kotlinx.coroutines.flow.stateIn
 class MainScreenViewModel(
     private val repository: ChecklistRepository
 ) : ViewModel() {
-    val state = repository.checklists.map { MainScreenState.Success(it) }
+    val state = repository.checklists
+        .map { MainScreenState.Success(it) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), MainScreenState.Loading)
 }
 

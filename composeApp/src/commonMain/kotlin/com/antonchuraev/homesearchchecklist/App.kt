@@ -11,7 +11,7 @@ import com.antonchuraev.homesearchchecklist.feature.create.presentation.Template
 import com.antonchuraev.homesearchchecklist.feature.debug.presentation.DebugScreen
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.MainScreen
 import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.OnboardingScreen
-import com.antonchuraev.homesearchchecklist.navigation.Screen
+import com.antonchuraev.homesearchchecklist.navigation.AppNavRoute
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.koin.compose.KoinApplication
 
@@ -26,39 +26,39 @@ fun App() {
 
             NavHost(
                 navController = navController,
-                startDestination = Screen.Onboarding.route
+                startDestination = AppNavRoute.Onboarding
             ) {
-                composable(Screen.Onboarding.route) {
+                composable<AppNavRoute.Onboarding> {
                     OnboardingScreen(
                         onComplete = {
-                            navController.navigate(Screen.Main.route) {
-                                popUpTo(Screen.Onboarding.route) { inclusive = true }
+                            navController.navigate(AppNavRoute.Main) {
+                                popUpTo(AppNavRoute.Onboarding) { inclusive = true }
                             }
                         }
                     )
                 }
 
-                composable(Screen.Main.route) {
+                composable<AppNavRoute.Main> {
                     MainScreen(
-                        onDebugClick = { navController.navigate(Screen.Debug.route) },
+                        onDebugClick = { navController.navigate(AppNavRoute.Debug) },
                         openCreateNewChecklistScreen = {
-                            navController.navigate(Screen.CreateChecklist.CreateChecklist(null))
+                            navController.navigate(AppNavRoute.CreateChecklistRoute.CreateChecklist(null))
                         },
                         openSelectFromTemplatesScreen = {
-                            navController.navigate(Screen.CreateChecklist.Templates)
+                            navController.navigate(AppNavRoute.CreateChecklistRoute.Templates)
                         }
                     )
                 }
 
-                composable<Screen.CreateChecklist.CreateChecklist> {
+                composable<AppNavRoute.CreateChecklistRoute.CreateChecklist> {
                     CreateChecklistScreen(onBackButtonClick = navController::popBackStack)
                 }
 
-                composable<Screen.CreateChecklist.Templates> {
+                composable<AppNavRoute.CreateChecklistRoute.Templates> {
                     TemplatesScreen(onBackButtonClick = navController::popBackStack)
                 }
 
-                composable(Screen.Debug.route) {
+                composable<AppNavRoute.Debug> {
                     DebugScreen(onBack = navController::popBackStack)
                 }
             }
