@@ -11,31 +11,26 @@ kotlin {
             jvmTarget.set(JvmTarget.JVM_11)
         }
     }
-    
+
     listOf(iosArm64(), iosSimulatorArm64()).forEach {
         it.binaries.framework {
-            baseName = "CommonImpl"
+            baseName = "DatastoreApi"
             isStatic = true
         }
     }
-    
+
     sourceSets {
         commonMain.dependencies {
             implementation(projects.core.common.api)
 
-            implementation(libs.bundles.koin.library)
+            implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.datastore.preferences.core)
         }
-        commonTest.dependencies {
-            implementation(libs.kotlin.test)
-        }
-    }
-    sourceSets.commonMain.dependencies {
-        implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
     }
 }
 
 android {
-    namespace = "com.antonchuraev.homesearchchecklist.core.common.impl"
+    namespace = "com.antonchuraev.homesearchchecklist.core.datastore.api"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
     defaultConfig {
         minSdk = libs.versions.android.minSdk.get().toInt()
@@ -45,3 +40,4 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
 }
+

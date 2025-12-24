@@ -3,6 +3,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidLibrary)
+    alias(libs.plugins.jetbrains.kotlin.serialization)
 }
 
 kotlin {
@@ -11,31 +12,24 @@ kotlin {
             jvmTarget.set(JvmTarget.JVM_11)
         }
     }
-    
-    listOf(iosArm64(), iosSimulatorArm64()).forEach {
-        it.binaries.framework {
-            baseName = "CommonImpl"
-            isStatic = true
-        }
-    }
-    
+
     sourceSets {
         commonMain.dependencies {
-            implementation(projects.core.common.api)
+            implementation(projects.core.datastore.api)
+
+            implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.datastore.preferences.core)
 
             implementation(libs.bundles.koin.library)
         }
-        commonTest.dependencies {
-            implementation(libs.kotlin.test)
+        androidMain.dependencies {
+            implementation(libs.datastore.preferences)
         }
-    }
-    sourceSets.commonMain.dependencies {
-        implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
     }
 }
 
 android {
-    namespace = "com.antonchuraev.homesearchchecklist.core.common.impl"
+    namespace = "com.antonchuraev.homesearchchecklist.core.datastore.impl"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
     defaultConfig {
         minSdk = libs.versions.android.minSdk.get().toInt()
@@ -45,3 +39,4 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
 }
+
