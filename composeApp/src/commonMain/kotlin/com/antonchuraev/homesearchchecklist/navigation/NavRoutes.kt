@@ -22,8 +22,3 @@ sealed class Screen(val route: String) {
     @Serializable
     data object Debug : Screen("debug")
 }
-
-enum class MainTab {
-    HOME,
-    FUTURE
-}

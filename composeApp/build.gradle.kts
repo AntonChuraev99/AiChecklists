@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.jetbrains.kotlin.serialization)
+    alias(libs.plugins.ksp)
 }
 
 kotlin {
@@ -21,6 +22,7 @@ kotlin {
         iosSimulatorArm64()
     ).forEach { iosTarget ->
         iosTarget.binaries.framework {
+            //todo rename
             baseName = "ComposeApp"
             isStatic = true
         }
@@ -32,9 +34,15 @@ kotlin {
             implementation(libs.androidx.activity.compose)
         }
         commonMain.dependencies {
+            implementation(projects.core.common.api)
             implementation(projects.core.common.impl)
-            implementation(projects.core.database)
+            implementation(projects.core.designsystem)
+
             implementation(projects.feature.checklist)
+            implementation(projects.feature.create)
+            implementation(projects.feature.onboarding)
+            implementation(projects.feature.debug)
+            implementation(projects.feature.home)
             
             implementation(compose.runtime)
             implementation(compose.foundation)
@@ -50,6 +58,8 @@ kotlin {
             implementation(libs.koin.core)
             implementation(libs.koin.compose)
             implementation(libs.koin.compose.viewmodel)
+
+            implementation(libs.bundles.room)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
@@ -86,5 +96,6 @@ android {
 
 dependencies {
     debugImplementation(compose.uiTooling)
+    ksp(libs.room.compiler)
 }
 

@@ -1,14 +1,11 @@
 package com.antonchuraev.homesearchchecklist.feature.checklist.di
 
-import com.antonchuraev.homesearchchecklist.feature.checklist.ChecklistRepository
-import com.antonchuraev.homesearchchecklist.feature.checklist.CreateChecklistViewModel
-import com.antonchuraev.homesearchchecklist.feature.checklist.MainViewModel
-import org.koin.core.module.dsl.viewModelOf
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.di.checklistDao
 import org.koin.dsl.module
 
-val checklistFeatureModule = module {
-    single { ChecklistRepository(get()) }
-    viewModelOf(::MainViewModel)
-    viewModelOf(::CreateChecklistViewModel)
+public val checklistFeatureModule = module {
+    single(){
+        checklistDao
+    }
 }
 

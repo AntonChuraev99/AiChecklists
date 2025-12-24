@@ -6,12 +6,12 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.antonchuraev.homesearchchecklist.di.appModule
+import com.antonchuraev.homesearchchecklist.feature.create.presentation.CreateChecklistScreen
+import com.antonchuraev.homesearchchecklist.feature.create.presentation.TemplatesScreen
+import com.antonchuraev.homesearchchecklist.feature.debug.presentation.DebugScreen
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.MainScreen
+import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.OnboardingScreen
 import com.antonchuraev.homesearchchecklist.navigation.Screen
-import com.antonchuraev.homesearchchecklist.screens.DebugScreen
-import com.antonchuraev.homesearchchecklist.screens.MainScreen
-import com.antonchuraev.homesearchchecklist.screens.OnboardingScreen
-import com.antonchuraev.homesearchchecklist.screens.create.CreateChecklistScreen
-import com.antonchuraev.homesearchchecklist.screens.create.TemplatesScreen
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.koin.compose.KoinApplication
 
