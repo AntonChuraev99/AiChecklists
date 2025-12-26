@@ -6,6 +6,7 @@ import com.antonchuraev.homesearchchecklist.feature.create.di.createFeatureModul
 import com.antonchuraev.homesearchchecklist.feature.debug.di.debugFeatureModule
 import com.antonchuraev.homesearchchecklist.feature.home.di.homeFeatureModule
 import com.antonchuraev.homesearchchecklist.feature.onboarding.di.onboardingFeatureModule
+import com.antonchuraev.homesearchchecklist.feature.splash.di.splashFeatureModule
 import com.antonchuraev.homesearchchecklist.feature.user.di.userFeatureModule
 import org.koin.core.module.Module
 import org.koin.dsl.module
@@ -18,6 +19,7 @@ val appModule = module {
         onboardingFeatureModule,
         debugFeatureModule,
         homeFeatureModule,
+        splashFeatureModule,
         userFeatureModule,
         platformModule()
     )

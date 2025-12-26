@@ -5,6 +5,9 @@ import kotlinx.serialization.Serializable
 @Serializable
 sealed class AppNavRoute(val route: String) {
     @Serializable
+    data object Splash : AppNavRoute("splash")
+
+    @Serializable
     data object Onboarding : AppNavRoute("onboarding")
     
     @Serializable

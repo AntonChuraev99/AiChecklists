@@ -14,7 +14,7 @@ class UserDataRepositoryImpl(
     private val appScope: CoroutineScope
 ) : UserDataRepository {
 
-    private val appDatastore: AppDatastore = AppDatastore("user.datastore")
+    private val appDatastore: AppDatastore = AppDatastore("user/datastore")
 
     private val userDataFlow = combine(
         flow = appDatastore.observeBoolean(IS_ONBOARDING_PASSED_KEY, false),

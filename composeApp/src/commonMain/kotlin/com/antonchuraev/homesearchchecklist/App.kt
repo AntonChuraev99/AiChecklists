@@ -11,6 +11,7 @@ import com.antonchuraev.homesearchchecklist.feature.create.presentation.Template
 import com.antonchuraev.homesearchchecklist.feature.debug.presentation.DebugScreen
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.MainScreen
 import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.OnboardingScreen
+import com.antonchuraev.homesearchchecklist.feature.splash.presentation.SplashScreen
 import com.antonchuraev.homesearchchecklist.navigation.AppNavRoute
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.koin.compose.KoinApplication
@@ -26,8 +27,12 @@ fun App() {
 
             NavHost(
                 navController = navController,
-                startDestination = AppNavRoute.Onboarding
+                startDestination = AppNavRoute.Splash
             ) {
+                composable<AppNavRoute.Splash> {
+                    SplashScreen()
+                }
+
                 composable<AppNavRoute.Onboarding> {
                     OnboardingScreen(
                         onComplete = {

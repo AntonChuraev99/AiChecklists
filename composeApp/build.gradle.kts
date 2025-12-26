@@ -38,6 +38,7 @@ kotlin {
             implementation(projects.core.common.impl)
             implementation(projects.core.designsystem)
 
+            implementation(projects.feature.splash)
             implementation(projects.feature.checklist)
             implementation(projects.feature.create)
             implementation(projects.feature.onboarding)
