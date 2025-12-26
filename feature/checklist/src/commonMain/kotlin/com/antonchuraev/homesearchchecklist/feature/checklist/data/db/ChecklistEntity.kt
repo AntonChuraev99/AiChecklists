@@ -1,4 +1,4 @@
-package com.antonchuraev.homesearchchecklist.feature.checklist.data.local
+package com.antonchuraev.homesearchchecklist.feature.checklist.data.db
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey

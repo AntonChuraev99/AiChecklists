@@ -1,8 +1,8 @@
-package com.antonchuraev.homesearchchecklist.feature.checklist.data.di
+package com.antonchuraev.homesearchchecklist.feature.checklist.di
 
 import com.antonchuraev.homesearchchecklist.core.common.api.getDatabaseBuilder
-import com.antonchuraev.homesearchchecklist.feature.checklist.data.local.ChecklistDao
-import com.antonchuraev.homesearchchecklist.feature.checklist.data.local.ChecklistDatabase
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistDao
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistDatabase
 
 
 internal val database: ChecklistDatabase = ChecklistDatabase.getRoomDatabase(

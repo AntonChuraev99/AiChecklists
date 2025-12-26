@@ -1,8 +1,8 @@
 package com.antonchuraev.homesearchchecklist.feature.checklist.data.repository
 
-import com.antonchuraev.homesearchchecklist.feature.checklist.data.local.ChecklistDao
-import com.antonchuraev.homesearchchecklist.feature.checklist.data.local.toDomain
-import com.antonchuraev.homesearchchecklist.feature.checklist.data.local.toEntity
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistDao
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.toDomain
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.toEntity
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import kotlinx.coroutines.flow.Flow

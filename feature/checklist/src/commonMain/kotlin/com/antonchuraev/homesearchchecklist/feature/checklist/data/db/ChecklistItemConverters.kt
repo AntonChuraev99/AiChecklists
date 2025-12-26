@@ -1,4 +1,4 @@
-package com.antonchuraev.homesearchchecklist.feature.checklist.data.local
+package com.antonchuraev.homesearchchecklist.feature.checklist.data.db
 
 import androidx.room.TypeConverter
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
