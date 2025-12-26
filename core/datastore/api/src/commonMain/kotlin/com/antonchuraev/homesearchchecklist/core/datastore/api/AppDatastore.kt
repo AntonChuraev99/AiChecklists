@@ -17,7 +17,12 @@ expect fun createDataStore(name: String): DataStore<Preferences>
 
 fun createDataStore(producePath: () -> String): DataStore<Preferences> =
     PreferenceDataStoreFactory.createWithPath(
-        produceFile = { producePath().toPath() }
+        produceFile = {
+            val path = producePath()
+            val normalizedPath =
+                if (path.endsWith(".preferences_pb")) path else "$path.preferences_pb"
+            normalizedPath.toPath()
+        }
     )
 
 class AppDatastore(
