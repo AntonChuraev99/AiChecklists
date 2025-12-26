@@ -4,23 +4,27 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import kotlinx.cinterop.ExperimentalForeignApi
 import platform.Foundation.NSApplicationSupportDirectory
+import platform.Foundation.NSDocumentDirectory
 import platform.Foundation.NSFileManager
 import platform.Foundation.NSUserDomainMask
+
+@OptIn(ExperimentalForeignApi::class)
+fun documentDirectory(): String {
+    val documentDirectory = NSFileManager.defaultManager.URLForDirectory(
+        directory = NSDocumentDirectory,
+        inDomain = NSUserDomainMask,
+        appropriateForURL = null,
+        create = false,
+        error = null,
+    )
+    return requireNotNull(documentDirectory?.path)
+}
 
 
 @OptIn(ExperimentalForeignApi::class)
 actual inline fun <reified T : RoomDatabase> getDatabaseBuilder(databaseName: String): RoomDatabase.Builder<T> {
-    val dbDirectory = NSFileManager.defaultManager.URLForDirectory(
-        directory = NSApplicationSupportDirectory,
-        inDomain = NSUserDomainMask,
-        appropriateForURL = null,
-        create = true,
-        error = null,
-    )?.path ?: NSFileManager.defaultManager.currentDirectoryPath
-
+    val dbFilePath = documentDirectory() + "/${databaseName}.db"
     return Room.databaseBuilder<T>(
-        name = dbDirectory + "/${databaseName}.db",
-    ){
-        TODO()
-    }
+        name = dbFilePath,
+    )
 }
