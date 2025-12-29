@@ -22,15 +22,12 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(projects.core.common.api)
-
+            implementation(libs.kotlinx.coroutines.core)
             implementation(libs.bundles.koin.library)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
         }
-    }
-    sourceSets.commonMain.dependencies {
-        implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
     }
 }
 
