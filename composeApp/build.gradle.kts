@@ -32,6 +32,7 @@ kotlin {
         androidMain.dependencies {
             implementation(compose.preview)
             implementation(libs.androidx.activity.compose)
+            implementation(libs.room.ktx)
         }
         commonMain.dependencies {
             implementation(projects.core.common.api)
@@ -61,7 +62,8 @@ kotlin {
             implementation(libs.koin.compose)
             implementation(libs.koin.compose.viewmodel)
 
-            implementation(libs.bundles.room)
+            implementation(libs.room.runtime)
+            implementation(libs.sqlite.bundled)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
@@ -98,6 +100,9 @@ android {
 
 dependencies {
     debugImplementation(compose.uiTooling)
-    ksp(libs.room.compiler)
+    // KSP для Room под каждую целевую платформу
+    add("kspAndroid", libs.room.compiler)
+    add("kspIosSimulatorArm64", libs.room.compiler)
+    add("kspIosArm64", libs.room.compiler)
 }
 

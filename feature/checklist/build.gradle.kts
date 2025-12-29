@@ -29,13 +29,11 @@ kotlin {
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)
 
-            implementation(libs.bundles.room)
+            implementation(libs.room.runtime)
+            implementation(libs.sqlite.bundled)
         }
         androidMain.dependencies {
-            //implementation(libs.room.ktx)
-        }
-        iosMain.dependencies {
-            implementation(libs.sqlite.bundled)
+            implementation(libs.room.ktx)
         }
     }
 }
@@ -52,15 +50,9 @@ android {
     }
 }
 dependencies {
-    ksp(libs.room.compiler)
-}
-
-/*
-dependencies {
-
+    // KSP для Room под каждую целевую платформу
     add("kspAndroid", libs.room.compiler)
     add("kspIosArm64", libs.room.compiler)
     add("kspIosSimulatorArm64", libs.room.compiler)
 }
-*/
 

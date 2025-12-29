@@ -25,10 +25,14 @@ kotlin {
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)
 
-            implementation(libs.bundles.room)
+            implementation(libs.room.runtime)
+            implementation(libs.sqlite.bundled)
 
             implementation(libs.androidx.lifecycle.runtimeCompose)
             implementation(libs.androidx.lifecycle.viewmodelCompose)
+        }
+        androidMain.dependencies {
+            implementation(libs.room.ktx)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

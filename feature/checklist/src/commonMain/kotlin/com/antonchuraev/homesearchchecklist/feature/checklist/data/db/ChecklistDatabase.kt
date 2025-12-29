@@ -1,7 +1,9 @@
 package com.antonchuraev.homesearchchecklist.feature.checklist.data.db
 
+import androidx.room.ConstructedBy
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import androidx.room.RoomDatabaseConstructor
 import androidx.room.TypeConverters
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -12,12 +14,12 @@ import kotlinx.coroutines.IO
     exportSchema = false
 )
 @TypeConverters(ChecklistItemConverters::class)
-public abstract class ChecklistDatabase : RoomDatabase() {
-    public abstract fun checklistDao(): ChecklistDao
+@ConstructedBy(ChecklistDatabaseConstructor::class)
+abstract class ChecklistDatabase : RoomDatabase() {
+    abstract fun checklistDao(): ChecklistDao
 
-    public companion object {
-
-        public fun getRoomDatabase(
+    companion object {
+        fun getRoomDatabase(
             builder: Builder<ChecklistDatabase>
         ): ChecklistDatabase {
             return builder
@@ -26,6 +28,10 @@ public abstract class ChecklistDatabase : RoomDatabase() {
                 .build()
         }
     }
+}
 
+@Suppress("NO_ACTUAL_FOR_EXPECT")
+expect object ChecklistDatabaseConstructor : RoomDatabaseConstructor<ChecklistDatabase>{
+    override fun initialize(): ChecklistDatabase
 }
 
