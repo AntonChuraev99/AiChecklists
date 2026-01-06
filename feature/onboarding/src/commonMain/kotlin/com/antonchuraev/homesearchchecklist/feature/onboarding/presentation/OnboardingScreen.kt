@@ -23,7 +23,6 @@ import org.koin.compose.viewmodel.koinViewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OnboardingScreen(
-    onComplete: () -> Unit,
     viewModel: OnboardingViewModel = koinViewModel()
 ) {
     Scaffold(
@@ -71,8 +70,7 @@ fun OnboardingScreen(
 
             Button(
                 onClick = {
-                    viewModel.onComplete()
-                    onComplete()
+                    viewModel.sendIntent(OnboardingIntent.OnComplete)
                 },
                 modifier = Modifier
                     .fillMaxWidth()
