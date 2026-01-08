@@ -1,23 +1,32 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation
 
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
+import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
+import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
-import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
 
 class MainScreenViewModel(
-    private val repository: ChecklistRepository
-) : ViewModel() {
-    val state = repository.checklists
-        .map { MainScreenState.Success(it) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), MainScreenState.Loading)
+    private val repository: ChecklistRepository,
+    private val appNavigator: AppNavigator,
+) : AppViewModel<MainScreenState, MainScreenIntent, Nothing>() {
+
+    override val screenState: StateFlow<MainScreenState>
+        get() = repository.checklists
+            .map { MainScreenState.Success(it) }
+            .defaultStateIn(MainScreenState.Loading)
+
+    override fun onIntent(intent: MainScreenIntent) {
+        when (intent) {
+            MainScreenIntent.OnAddChecklistClick -> appNavigator.navigateToCreateChecklistScreen(
+                null
+            )
+
+            MainScreenIntent.OnAddChecklistFromTemplatesClick -> appNavigator.navigateToTemplatesScreen()
+            is MainScreenIntent.OnChecklistClick -> TODO()
+        }
+    }
+
 }
 
-sealed interface MainScreenState {
-    data object Loading : MainScreenState
-    data class Success(val checklists: List<Checklist>) : MainScreenState
-}
 

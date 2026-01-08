@@ -1,4 +1,3 @@
-import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -38,6 +37,8 @@ kotlin {
             implementation(projects.core.common.api)
             implementation(projects.core.common.impl)
             implementation(projects.core.designsystem)
+            implementation(projects.core.navigation.api)
+            implementation(projects.core.navigation.impl)
 
             implementation(projects.feature.splash)
             implementation(projects.feature.checklist)

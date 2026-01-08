@@ -23,8 +23,11 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            implementation(projects.feature.checklist)
+            implementation(projects.core.common.api)
             implementation(projects.core.designsystem)
+            implementation(projects.core.navigation.api)
+
+            implementation(projects.feature.checklist)
 
             implementation(compose.runtime)
             implementation(compose.foundation)

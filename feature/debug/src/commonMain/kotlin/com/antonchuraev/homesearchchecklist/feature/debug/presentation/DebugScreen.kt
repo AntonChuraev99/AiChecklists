@@ -1,14 +1,12 @@
 package com.antonchuraev.homesearchchecklist.feature.debug.presentation
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -40,23 +38,22 @@ import org.koin.compose.viewmodel.koinViewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DebugScreen(
-    onBack: () -> Unit,
     viewModel: DebugViewModel = koinViewModel()
 ) {
-    val showDialog by viewModel.showInfoDialog.collectAsStateWithLifecycle()
+    val screenState by viewModel.screenState.collectAsStateWithLifecycle()
 
     val items = listOf(
         DebugItem(Icons.Default.Info, "Информация о приложении", "Версия, билд и другие данные") {
-            viewModel.showInfoDialog()
+            viewModel.sendIntent(DebugScreenIntent.ShowInfoDialog)
         },
         DebugItem(Icons.Default.Refresh, "Сбросить онбординг", "Показать экран приветствия снова") {
-            viewModel.resetOnboarding()
+            viewModel.sendIntent(DebugScreenIntent.ResetOnboarding)
         },
         DebugItem(Icons.Default.Delete, "Очистить данные", "Удалить все локальные данные") {
-            viewModel.clearData()
+            viewModel.sendIntent(DebugScreenIntent.ClearData)
         },
         DebugItem(Icons.Default.Add, "Создать тестовые чек-листы", "Добавить демо-данные для тестирования") {
-            viewModel.createTestChecklists()
+            viewModel.sendIntent(DebugScreenIntent.CreateTestChecklists)
         }
     )
 
@@ -65,7 +62,7 @@ fun DebugScreen(
             TopAppBar(
                 title = { Text("Дебаг меню") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = { viewModel.sendIntent(DebugScreenIntent.OnBackClick) }) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Назад"
@@ -100,9 +97,9 @@ fun DebugScreen(
             }
         }
 
-        if (showDialog) {
+        if (screenState.showInfoDialog) {
             AlertDialog(
-                onDismissRequest = { viewModel.hideInfoDialog() },
+                onDismissRequest = { viewModel.sendIntent(DebugScreenIntent.HideInfoDialog) },
                 title = { Text("Информация о приложении") },
                 text = {
                     Column {
@@ -112,7 +109,7 @@ fun DebugScreen(
                     }
                 },
                 confirmButton = {
-                    TextButton(onClick = { viewModel.hideInfoDialog() }) {
+                    TextButton(onClick = { viewModel.sendIntent(DebugScreenIntent.HideInfoDialog) }) {
                         Text("OK")
                     }
                 }

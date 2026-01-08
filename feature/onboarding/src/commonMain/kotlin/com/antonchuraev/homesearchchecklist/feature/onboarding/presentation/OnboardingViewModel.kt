@@ -1,10 +1,21 @@
 package com.antonchuraev.homesearchchecklist.feature.onboarding.presentation
 
-import androidx.lifecycle.ViewModel
+import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
+import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
-class OnboardingViewModel : ViewModel() {
-    fun onComplete() {
-        // TODO: persist onboarding completion flag if needed
+class OnboardingViewModel(
+    private val navigator: AppNavigator
+) : AppViewModel<OnboardingState, OnboardingIntent, Nothing>() {
+
+    override val screenState: StateFlow<OnboardingState>
+        get() = MutableStateFlow(OnboardingState)
+
+    override fun onIntent(intent: OnboardingIntent) {
+        when (intent) {
+            OnboardingIntent.OnComplete -> navigator.navigateToMainScreen()
+        }
     }
 }
 
