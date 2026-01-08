@@ -3,8 +3,6 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidLibrary)
-    alias(libs.plugins.composeMultiplatform)
-    alias(libs.plugins.composeCompiler)
 }
 
 kotlin {
@@ -16,7 +14,7 @@ kotlin {
 
     listOf(iosArm64(), iosSimulatorArm64()).forEach {
         it.binaries.framework {
-            baseName = "FeatureOnboarding"
+            baseName = "NavigationImpl"
             isStatic = true
         }
     }
@@ -24,25 +22,18 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(projects.core.navigation.api)
-            implementation(projects.core.common.api)
-
-            implementation(compose.runtime)
-            implementation(compose.foundation)
-            implementation(compose.material3)
-            implementation(compose.ui)
-
-            implementation(libs.androidx.lifecycle.runtimeCompose)
-            implementation(libs.androidx.lifecycle.viewmodelCompose)
-            implementation(libs.bundles.koin.feature)
+            implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.bundles.koin.library)
+            implementation(libs.androidx.navigation.compose)
         }
-        androidMain.dependencies {
-            implementation(libs.androidx.activity.compose)
+        commonTest.dependencies {
+            implementation(libs.kotlin.test)
         }
     }
 }
 
 android {
-    namespace = "com.antonchuraev.homesearchchecklist.feature.onboarding"
+    namespace = "com.antonchuraev.homesearchchecklist.core.navigation.impl"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
     defaultConfig {
         minSdk = libs.versions.android.minSdk.get().toInt()

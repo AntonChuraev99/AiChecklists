@@ -2,8 +2,10 @@ package com.antonchuraev.homesearchchecklist.core.common.api
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
@@ -29,6 +31,12 @@ abstract class AppViewModel<S : State, I : Intent, SE : SideEffect> : ViewModel(
     final fun sendIntent(intent: I) {
         _intent.tryEmit(intent)
     }
+
+    fun Flow<S>.defaultStateIn(initial: S): StateFlow<S> = stateIn(
+        viewModelScope,
+        kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000),
+        initial
+    )
 }
 
 interface State

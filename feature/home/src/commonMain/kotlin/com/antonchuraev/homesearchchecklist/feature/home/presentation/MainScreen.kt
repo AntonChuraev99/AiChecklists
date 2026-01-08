@@ -8,14 +8,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -26,30 +23,18 @@ import org.koin.compose.viewmodel.koinViewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
-    onDebugClick: () -> Unit,
-    openCreateNewChecklistScreen: () -> Unit,
-    openSelectFromTemplatesScreen: () -> Unit,
-    viewModel: MainScreenViewModel = koinViewModel()
+    viewModel: MainScreenViewModel = koinViewModel(),
 ) {
-    val screenState: MainScreenState by viewModel.state.collectAsStateWithLifecycle()
+    val screenState: MainScreenState by viewModel.screenState.collectAsStateWithLifecycle()
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {},
-                actions = {
-                    IconButton(onClick = onDebugClick) {
-                        Icon(
-                            imageVector = Icons.Filled.Settings,
-                            contentDescription = "Дебаг меню"
-                        )
-                    }
-                }
-            )
-        },
         bottomBar = {
             if (screenState is MainScreenState.Success && (screenState as MainScreenState.Success).checklists.isNotEmpty()) {
-                FilledTonalButton(onClick = openCreateNewChecklistScreen) {
+                FilledTonalButton(
+                    onClick = {
+                        viewModel.sendIntent(MainScreenIntent.OnAddChecklistClick)
+                    }
+                ) {
                     Icon(
                         imageVector = Icons.Filled.Add,
                         contentDescription = null,
@@ -70,7 +55,9 @@ fun MainScreen(
             ) {
                 MainScreenContent(
                     screenState = screenState as MainScreenState.Success,
-                    onAddChecklistClick = openCreateNewChecklistScreen
+                    onAddChecklistClick = {
+                        viewModel.sendIntent(MainScreenIntent.OnAddChecklistClick)
+                    }
                 )
             }
         }

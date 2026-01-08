@@ -3,8 +3,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidLibrary)
-    alias(libs.plugins.composeMultiplatform)
-    alias(libs.plugins.composeCompiler)
+    alias(libs.plugins.jetbrains.kotlin.serialization)
 }
 
 kotlin {
@@ -16,34 +15,25 @@ kotlin {
 
     listOf(iosArm64(), iosSimulatorArm64()).forEach {
         it.binaries.framework {
-            baseName = "FeatureSplash"
+            baseName = "NavigationApi"
             isStatic = true
         }
     }
 
     sourceSets {
         commonMain.dependencies {
-            implementation(projects.core.navigation.api)
-            implementation(projects.feature.user)
-
-            implementation(compose.runtime)
-            implementation(compose.foundation)
-            implementation(compose.material3)
-            implementation(compose.ui)
-
-            implementation(libs.androidx.lifecycle.runtimeCompose)
-            implementation(libs.androidx.lifecycle.viewmodelCompose)
-            implementation(libs.bundles.koin.feature)
+            implementation(libs.kotlinx.serialization.core)
             implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.androidx.navigation.compose)
         }
-        androidMain.dependencies {
-            implementation(libs.androidx.activity.compose)
+        commonTest.dependencies {
+            implementation(libs.kotlin.test)
         }
     }
 }
 
 android {
-    namespace = "com.antonchuraev.homesearchchecklist.feature.splash"
+    namespace = "com.antonchuraev.homesearchchecklist.core.navigation.api"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
     defaultConfig {
         minSdk = libs.versions.android.minSdk.get().toInt()
@@ -53,5 +43,4 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
 }
-
 

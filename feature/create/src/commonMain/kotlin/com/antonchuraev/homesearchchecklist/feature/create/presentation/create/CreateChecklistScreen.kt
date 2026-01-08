@@ -1,4 +1,4 @@
-package com.antonchuraev.homesearchchecklist.feature.create.presentation
+package com.antonchuraev.homesearchchecklist.feature.create.presentation.create
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -22,19 +22,18 @@ import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun CreateChecklistScreen(
-    viewModel: CreateChecklistViewModel = koinViewModel(),
-    onBackButtonClick: () -> Unit
+    viewModel: CreateChecklistViewModel = koinViewModel()
 ) {
-    val screenState by viewModel.state.collectAsStateWithLifecycle()
+    val screenState by viewModel.screenState.collectAsStateWithLifecycle()
 
     var showDialog by remember { mutableStateOf(false) }
     var dialogText by remember { mutableStateOf("") }
 
     AppScaffold(
         title = "Создание",
-        onBackButtonClick = onBackButtonClick,
+        onBackButtonClick = { viewModel.sendIntent(CreateChecklistIntent.OnBackClick) },
         bottomBar = {
-            Button(onClick = { viewModel.onSaveClick() }) {
+            Button(onClick = { viewModel.sendIntent(CreateChecklistIntent.OnSaveClick) }) {
                 Text("Сохранить")
             }
         }
@@ -46,7 +45,7 @@ fun CreateChecklistScreen(
             Text("Название")
             TextField(
                 screenState.name,
-                onValueChange = viewModel::onNameChange
+                onValueChange = { viewModel.sendIntent(CreateChecklistIntent.OnNameChange(it)) }
             )
 
             Text("Элементы")
@@ -75,7 +74,7 @@ fun CreateChecklistScreen(
                     TextButton(
                         onClick = {
                             if (dialogText.isNotBlank()) {
-                                viewModel.onAddItem(dialogText)
+                                viewModel.sendIntent(CreateChecklistIntent.OnAddItem(dialogText))
                                 dialogText = ""
                                 showDialog = false
                             }
