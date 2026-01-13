@@ -45,5 +45,9 @@ class AppNavigatorImpl() : AppNavigator {
     override fun navigateToAnalyzeScreen() {
         navController.navigate(AppNavRoute.Analyze)
     }
+
+    override fun navigateToChecklistDetail(checklistId: Long) {
+        navController.navigate(AppNavRoute.ChecklistDetail(checklistId))
+    }
 }
 

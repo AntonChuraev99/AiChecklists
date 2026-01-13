@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 fun AppScaffold(
     title: String? = null,
     onBackButtonClick: (() -> Unit)? = null,
+    actions: @Composable () -> Unit = {},
     bottomBar: @Composable () -> Unit = {},
     content: @Composable () -> Unit
 ) {
@@ -52,7 +53,7 @@ fun AppScaffold(
                         containerColor = MaterialTheme.colorScheme.background,
                         titleContentColor = MaterialTheme.colorScheme.onBackground
                     ),
-                    actions = {}
+                    actions = { actions() }
                 )
             }
         },

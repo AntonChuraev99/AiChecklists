@@ -6,6 +6,8 @@ import kotlinx.coroutines.flow.Flow
 interface ChecklistRepository {
     val checklists: Flow<List<Checklist>>
     suspend fun addChecklist(checklist: Checklist)
+    suspend fun updateChecklist(checklist: Checklist)
     suspend fun deleteChecklist(checklist: Checklist)
+    suspend fun getChecklistById(id: Long): Checklist?
 }
 

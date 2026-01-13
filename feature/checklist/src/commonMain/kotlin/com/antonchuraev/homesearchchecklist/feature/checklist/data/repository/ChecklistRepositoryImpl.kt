@@ -20,8 +20,16 @@ class ChecklistRepositoryImpl(
         dao.insert(checklist.toEntity())
     }
 
+    override suspend fun updateChecklist(checklist: Checklist) {
+        dao.insert(checklist.toEntity())
+    }
+
     override suspend fun deleteChecklist(checklist: Checklist) {
         dao.deleteById(checklist.id)
+    }
+
+    override suspend fun getChecklistById(id: Long): Checklist? {
+        return dao.getById(id)?.toDomain()
     }
 }
 

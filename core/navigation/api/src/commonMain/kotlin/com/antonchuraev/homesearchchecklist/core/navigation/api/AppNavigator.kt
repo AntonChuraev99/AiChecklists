@@ -25,5 +25,7 @@ interface AppNavigator {
     fun navigateToTemplatesScreen()
 
     fun navigateToAnalyzeScreen()
+
+    fun navigateToChecklistDetail(checklistId: Long)
 }
 

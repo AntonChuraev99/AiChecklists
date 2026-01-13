@@ -14,6 +14,8 @@ import com.antonchuraev.homesearchchecklist.feature.home.presentation.MainScreen
 import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.OnboardingScreen
 import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.AnalyzeScreen
 import com.antonchuraev.homesearchchecklist.feature.splash.presentation.SplashScreen
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.ChecklistDetailScreen
+import androidx.navigation.toRoute
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.koin.compose.KoinApplication
 import org.koin.compose.viewmodel.koinViewModel
@@ -65,6 +67,11 @@ fun App() {
 
                 composable<AppNavRoute.Analyze> {
                     AnalyzeScreen()
+                }
+
+                composable<AppNavRoute.ChecklistDetail> { backStackEntry ->
+                    val route = backStackEntry.toRoute<AppNavRoute.ChecklistDetail>()
+                    ChecklistDetailScreen(checklistId = route.checklistId)
                 }
             }
         }

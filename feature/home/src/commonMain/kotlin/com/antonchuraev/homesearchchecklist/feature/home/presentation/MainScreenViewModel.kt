@@ -24,7 +24,7 @@ class MainScreenViewModel(
 
             MainScreenIntent.OnAddChecklistFromTemplatesClick -> appNavigator.navigateToTemplatesScreen()
             MainScreenIntent.OnAiAnalyzeClick -> appNavigator.navigateToAnalyzeScreen()
-            is MainScreenIntent.OnChecklistClick -> TODO()
+            is MainScreenIntent.OnChecklistClick -> appNavigator.navigateToChecklistDetail(intent.checklist.id)
         }
     }
 
