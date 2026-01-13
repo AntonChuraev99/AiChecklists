@@ -1,4 +1,4 @@
-rootProject.name = "HomeSearchChecklist"
+rootProject.name = "AIChecklists"
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 pluginManagement {

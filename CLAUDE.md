@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-HomeSearchChecklist is a Kotlin Multiplatform (KMP) application targeting Android and iOS. It uses Jetpack Compose Multiplatform for the UI layer. The app simplifies entering checklists and validating data against them.
+AI Checklists is a Kotlin Multiplatform (KMP) application targeting Android and iOS. It uses Jetpack Compose Multiplatform for the UI layer. The app helps users create smart checklists powered by AI - paste text, upload files, or share links and AI extracts the key points automatically.
 
 **Main features:**
-- Entering and managing a list of checklists
-- Tracking progress within checklists (supports multiple objects per checklist)
+- Creating and managing checklists
+- Tracking progress within checklists
 - Creating checklists from templates
-- AI-powered automatic checklist filling from uploaded data
+- AI-powered automatic checklist generation from uploaded data (photos, PDFs, text files, web links, or pasted text)
 
 ## Build Commands
 
@@ -45,7 +45,7 @@ feature/
   splash/            # Launch screen
   debug/             # Developer tools
   user/              # User profile
-  analyze/           # AI-powered data analysis and checklist filling
+  analyze/           # AI-powered data analysis and checklist generation
 ```
 
 ### MVI Pattern
@@ -101,7 +101,7 @@ Wrap app in `AppTheme { }` (see App.kt). Use `MaterialTheme.colorScheme`, `Mater
 
 ## AI Analyze Feature
 
-Located in `feature/analyze/`. Allows users to input data (photo, PDF, text file, web link, or raw text) for AI analysis that auto-fills checklists.
+Located in `feature/analyze/`. Allows users to input data (photo, PDF, text file, web link, or raw text) for AI analysis that generates checklist items automatically.
 
 ### Architecture
 
@@ -118,6 +118,7 @@ feature/analyze/
     AnalyzeScreen.kt   # UI for input selection and analysis
     AnalyzeViewModel.kt
     AnalyzeScreenContract.kt
+    picker/            # Platform-specific file picker (expect/actual)
   di/
     AnalyzeFeatureModule.kt
 ```
@@ -126,7 +127,7 @@ feature/analyze/
 - `Photo` - Image file path
 - `PdfDocument` - PDF file path
 - `TextFile` - Text file path
-- `WebLink` - URL to property listing
+- `WebLink` - URL to analyze
 - `RawText` - User-entered text
 
 ### AI Analyzer Interface
@@ -135,7 +136,7 @@ feature/analyze/
 2. Replace binding in `analyzeFeatureModule`
 
 ### Integration
-- Access via "AI анализ" button on MainScreen
+- Access via "AI Analysis" button on MainScreen
 - Results can create new checklist or add items to existing one
 
 ## Localization & String Resources
@@ -144,8 +145,8 @@ All user-facing strings are externalized to `core/designsystem/src/commonMain/co
 
 ### Adding New Strings
 1. Add entry to `strings.xml` with descriptive key
-2. Import: `import homesearchchecklist.core.designsystem.generated.resources.Res`
-3. Import: `import homesearchchecklist.core.designsystem.generated.resources.*`
+2. Import: `import aichecklists.core.designsystem.generated.resources.Res`
+3. Import: `import aichecklists.core.designsystem.generated.resources.*`
 4. Import: `import org.jetbrains.compose.resources.stringResource`
 5. Use: `stringResource(Res.string.your_key)`
 
@@ -175,7 +176,7 @@ Splash → Onboarding → Main (Home) ↔ [Create, Analyze, Debug]
 
 #### Onboarding Screen
 - Good value proposition communication
-- Single clear CTA ("Start" button)
+- Single clear CTA ("Get Started" button)
 - Proper spacing hierarchy
 
 #### Main Screen (Home)
@@ -203,7 +204,6 @@ Splash → Onboarding → Main (Home) ↔ [Create, Analyze, Debug]
 - Result dialog with item list
 
 **Issues Identified**:
-- File picker is stubbed (not implemented)
 - Result preview limited to 5 items without scroll
 
 ### Critical UX Issues
@@ -247,12 +247,12 @@ Splash → Onboarding → Main (Home) ↔ [Create, Analyze, Debug]
 ## Product Copy Guidelines
 
 ### Target Audience
-People searching for homes/apartments (renters, buyers). The home search process is stressful - users visit multiple properties and forget important details. This app reduces anxiety by providing structured checklists.
+Anyone who needs to create structured checklists from unstructured data. Users may have meeting notes, articles, requirements documents, or any text that needs to be converted into actionable checklist items.
 
 ### Core Value Proposition
-1. **Never miss important details** when viewing properties
-2. **AI-powered analysis** extracts key points from listings automatically
-3. **Track progress** across multiple properties with a single app
+1. **AI-powered extraction** - paste any text and get a structured checklist
+2. **Multiple input formats** - photos, PDFs, text files, web links, or raw text
+3. **Track progress** - manage and complete checklist items
 
 ### Copy Principles
 - **Simple & Clear**: Match the minimal design with concise language
@@ -263,8 +263,7 @@ People searching for homes/apartments (renters, buyers). The home search process
 
 ### Tone of Voice
 - Friendly but professional
-- Reassuring (reduce anxiety about missing details)
-- Encouraging (motivate users to create first checklist)
+- Encouraging (motivate users to try AI analysis)
 - No exclamation marks except in empty states
 
 ### Button Label Guidelines
