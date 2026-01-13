@@ -16,7 +16,7 @@ abstract class AppViewModel<S : State, I : Intent, SE : SideEffect> : ViewModel(
 
     abstract val screenState: StateFlow<S>
 
-    private val _intent: MutableSharedFlow<I> = MutableSharedFlow()
+    private val _intent: MutableSharedFlow<I> = MutableSharedFlow(extraBufferCapacity = 64)
 
     init {
         viewModelScope.launch {
