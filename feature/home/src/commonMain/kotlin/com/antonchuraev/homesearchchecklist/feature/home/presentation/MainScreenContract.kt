@@ -15,5 +15,7 @@ sealed interface MainScreenIntent : Intent {
 
     object OnAddChecklistFromTemplatesClick : MainScreenIntent
 
+    object OnAiAnalyzeClick : MainScreenIntent
+
     data class OnChecklistClick(val checklist: Checklist) : MainScreenIntent
 }

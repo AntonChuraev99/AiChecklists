@@ -1,6 +1,6 @@
 package com.antonchuraev.homesearchchecklist
 
-import androidx.compose.material3.MaterialTheme
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppTheme
 import androidx.compose.runtime.Composable
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -12,6 +12,7 @@ import com.antonchuraev.homesearchchecklist.feature.create.presentation.template
 import com.antonchuraev.homesearchchecklist.feature.debug.presentation.DebugScreen
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.MainScreen
 import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.OnboardingScreen
+import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.AnalyzeScreen
 import com.antonchuraev.homesearchchecklist.feature.splash.presentation.SplashScreen
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.koin.compose.KoinApplication
@@ -30,7 +31,7 @@ fun App() {
             viewModel.installNavController(it)
         }
 
-        MaterialTheme {
+        AppTheme {
             NavHost(
                 navController = navController,
                 startDestination = AppNavRoute.Splash
@@ -60,6 +61,10 @@ fun App() {
                  */
                 composable<AppNavRoute.Debug> {
                     DebugScreen()
+                }
+
+                composable<AppNavRoute.Analyze> {
+                    AnalyzeScreen()
                 }
             }
         }

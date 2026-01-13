@@ -24,4 +24,7 @@ sealed interface AppNavRoute {
 
     @Serializable
     data object Debug : AppNavRoute
+
+    @Serializable
+    data object Analyze : AppNavRoute
 }

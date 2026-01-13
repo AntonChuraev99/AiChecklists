@@ -7,77 +7,78 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
+import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import homesearchchecklist.core.designsystem.generated.resources.Res
+import homesearchchecklist.core.designsystem.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OnboardingScreen(
     viewModel: OnboardingViewModel = koinViewModel()
 ) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Добро пожаловать") }
-            )
-        }
-    ) { paddingValues ->
+    AppScaffold(
+        title = stringResource(Res.string.onboarding_title)
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
-                .padding(24.dp),
+                .padding(horizontal = AppDimens.ScreenPaddingHorizontal),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(AppDimens.SpacingXxl))
 
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
                 modifier = Modifier.weight(1f)
             ) {
-                Text(
-                    text = "🏠",
-                    style = MaterialTheme.typography.displayLarge,
-                    modifier = Modifier.padding(bottom = 24.dp)
+                Icon(
+                    imageVector = Icons.Outlined.Home,
+                    contentDescription = null,
+                    modifier = Modifier.size(AppDimens.IconSizeXxl),
+                    tint = MaterialTheme.colorScheme.primary
                 )
 
-                Text(
-                    text = "Home Search Checklist",
-                    style = MaterialTheme.typography.headlineMedium,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(bottom = 16.dp)
-                )
+                Spacer(modifier = Modifier.height(AppDimens.SpacingXl))
 
                 Text(
-                    text = "Приложение для упрощения поиска жилья.\nСоздавайте чек-листы и не забывайте важные детали!",
+                    text = stringResource(Res.string.onboarding_app_name),
+                    style = MaterialTheme.typography.headlineLarge,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(AppDimens.SpacingLg))
+
+                Text(
+                    text = stringResource(Res.string.onboarding_description),
                     style = MaterialTheme.typography.bodyLarge,
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
-            Button(
-                onClick = {
-                    viewModel.sendIntent(OnboardingIntent.OnComplete)
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-            ) {
-                Text("Начать")
-            }
+            AppButton(
+                text = stringResource(Res.string.onboarding_get_started),
+                onClick = { viewModel.sendIntent(OnboardingIntent.OnComplete) },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(AppDimens.SpacingXl))
         }
     }
 }

@@ -45,6 +45,7 @@ feature/
   splash/            # Launch screen
   debug/             # Developer tools
   user/              # User profile
+  analyze/           # AI-powered data analysis and checklist filling
 ```
 
 ### MVI Pattern
@@ -67,6 +68,30 @@ Type-safe navigation using Kotlinx Serialization. Routes are defined as `@Serial
 
 Room 2.8 with KSP for code generation. Database classes are in `feature:checklist`. Platform-specific `DatabaseBuilder` implementations use `expect/actual` pattern.
 
+## Design System
+
+Located in `core/designsystem/`. Style: **Minimal & Clean** with white background and blue accents.
+
+### Colors (theme/Color.kt)
+- **Primary**: Blue (#2196F3) - buttons, icons, accents
+- **Background/Surface**: White (#FFFFFF)
+- **Text Primary**: Gray900 (#212121)
+- **Text Secondary**: Gray600 (#757575)
+- **Outline/Dividers**: Gray300 (#E0E0E0)
+
+### Spacing (theme/Dimens.kt)
+Use `AppDimens` constants: `SpacingXs` (4dp), `SpacingSm` (8dp), `SpacingMd` (12dp), `SpacingLg` (16dp), `SpacingXl` (24dp), `SpacingXxl` (32dp). Screen padding: 16dp horizontal, 24dp vertical.
+
+### Components (components/)
+- `AppButton` / `AppButtonSecondary` / `AppButtonText` - styled buttons
+- `AppCard` - card with subtle shadow (12dp corners, 2dp elevation)
+- `AppTextField` - outlined text field
+- `EmptyState` - centered icon + title + description
+- `AppScaffold` - standard screen wrapper with top bar
+
+### Usage
+Wrap app in `AppTheme { }` (see App.kt). Use `MaterialTheme.colorScheme`, `MaterialTheme.typography`, and `AppDimens` for consistent styling.
+
 ## Key Patterns
 
 - **API/impl split**: Core modules expose interfaces in `api`, implementations in `impl`
@@ -74,8 +99,201 @@ Room 2.8 with KSP for code generation. Database classes are in `feature:checklis
 - **StateFlow**: All reactive state management uses Kotlin Flow
 - **Typesafe project accessors**: Reference modules as `projects.core.common.api` in Gradle
 
+## AI Analyze Feature
+
+Located in `feature/analyze/`. Allows users to input data (photo, PDF, text file, web link, or raw text) for AI analysis that auto-fills checklists.
+
+### Architecture
+
+```
+feature/analyze/
+  domain/
+    model/             # AnalyzeInputData (sealed interface), AnalyzeResult
+    analyzer/          # AiAnalyzer interface
+    repository/        # AnalyzeRepository interface
+  data/
+    analyzer/          # StubAiAnalyzer (mock implementation)
+    repository/        # AnalyzeRepositoryImpl
+  presentation/
+    AnalyzeScreen.kt   # UI for input selection and analysis
+    AnalyzeViewModel.kt
+    AnalyzeScreenContract.kt
+  di/
+    AnalyzeFeatureModule.kt
+```
+
+### Input Types (AnalyzeInputData)
+- `Photo` - Image file path
+- `PdfDocument` - PDF file path
+- `TextFile` - Text file path
+- `WebLink` - URL to property listing
+- `RawText` - User-entered text
+
+### AI Analyzer Interface
+`AiAnalyzer` defines the contract for AI analysis. Currently uses `StubAiAnalyzer` that returns mock data. To implement real AI:
+1. Create new class implementing `AiAnalyzer`
+2. Replace binding in `analyzeFeatureModule`
+
+### Integration
+- Access via "AI анализ" button on MainScreen
+- Results can create new checklist or add items to existing one
+
+## Localization & String Resources
+
+All user-facing strings are externalized to `core/designsystem/src/commonMain/composeResources/values/strings.xml`. Use `stringResource(Res.string.key_name)` from `org.jetbrains.compose.resources` package.
+
+### Adding New Strings
+1. Add entry to `strings.xml` with descriptive key
+2. Import: `import homesearchchecklist.core.designsystem.generated.resources.Res`
+3. Import: `import homesearchchecklist.core.designsystem.generated.resources.*`
+4. Import: `import org.jetbrains.compose.resources.stringResource`
+5. Use: `stringResource(Res.string.your_key)`
+
+### String Naming Convention
+- Prefix with screen name: `main_`, `create_`, `analyze_`, `onboarding_`
+- Common strings use generic names: `save`, `cancel`, `ok`, `error`
+- Use snake_case: `main_empty_description`
+
 ## Dependencies
 
 Versions are centralized in `gradle/libs.versions.toml`. Key dependencies:
 - Kotlin 2.3.0, Compose Multiplatform 1.9.3
 - Koin 4.1.1 (DI), Room 2.8.4 (database), Navigation Compose 2.9.1
+
+## UX Research Findings
+
+### Navigation Flow
+```
+Splash → Onboarding → Main (Home) ↔ [Create, Analyze, Debug]
+```
+
+### Screen-by-Screen Analysis
+
+#### Splash Screen
+- Clean loading with progress indicator
+- Clear branding with app title
+
+#### Onboarding Screen
+- Good value proposition communication
+- Single clear CTA ("Start" button)
+- Proper spacing hierarchy
+
+#### Main Screen (Home)
+**Empty State**: Shows icon, title, description, dual CTAs (Create + AI Analyze)
+**Success State**: Lists checklists as simple cards
+
+**Issues Identified**:
+- Checklist cards show only name - missing item count, progress, timestamps
+- Cards lack visual feedback for clickability
+- Duplicate CTAs in empty state AND bottom bar
+
+#### Create Checklist Screen
+- Title input + items list + save button
+- Dialog for adding items
+
+**Issues Identified**:
+- No edit/delete UI for items (only add)
+- No validation feedback for empty inputs
+- Items displayed without checkboxes or delete buttons
+
+#### Analyze Screen
+- 5 input type cards (Photo, PDF, Text File, Web Link, Raw Text)
+- Context-sensitive input area
+- Loading state with spinner
+- Result dialog with item list
+
+**Issues Identified**:
+- File picker is stubbed (not implemented)
+- Result preview limited to 5 items without scroll
+
+### Critical UX Issues
+
+1. **Missing Interactivity**: Checklist cards appear clickable but navigation not implemented
+2. **Incomplete Item Management**: Create screen lacks edit/delete actions for items
+3. **No Input Validation**: Empty checklist names allowed without feedback
+4. **Redundant UI**: Duplicate Create/Analyze buttons in multiple locations
+5. **Limited Data Display**: Checklists show only names without counts or progress
+
+### Recommended Improvements
+
+1. **Enhance Checklist Cards**:
+   - Add item count badge
+   - Show completion progress indicator
+   - Add timestamps or last-modified dates
+   - Make cards visually clickable (chevron indicator)
+
+2. **Improve Create Screen**:
+   - Add swipe-to-delete or delete buttons for items
+   - Add inline edit capability
+   - Show validation errors
+   - Add item reordering via drag handles
+
+3. **Streamline Navigation**:
+   - Remove duplicate CTAs - keep only in bottom bar
+   - Add proper back stack management
+   - Add confirmation dialogs for destructive actions
+
+4. **Visual Enhancements**:
+   - Add checkboxes to item cards
+   - Show progress bars on checklist cards
+   - Add empty state animations
+   - Improve loading states with skeletons
+
+5. **Accessibility**:
+   - Add content descriptions to all icons
+   - Ensure 48dp minimum touch targets
+   - Verify color contrast ratios
+
+## Product Copy Guidelines
+
+### Target Audience
+People searching for homes/apartments (renters, buyers). The home search process is stressful - users visit multiple properties and forget important details. This app reduces anxiety by providing structured checklists.
+
+### Core Value Proposition
+1. **Never miss important details** when viewing properties
+2. **AI-powered analysis** extracts key points from listings automatically
+3. **Track progress** across multiple properties with a single app
+
+### Copy Principles
+- **Simple & Clear**: Match the minimal design with concise language
+- **Benefit-focused**: Tell users what they gain, not just what the feature does
+- **Action-oriented**: Use active verbs for buttons (Create, Analyze, Save)
+- **Helpful empty states**: Guide users to the next action when content is missing
+- **No jargon**: Avoid technical terms; use everyday language
+
+### Tone of Voice
+- Friendly but professional
+- Reassuring (reduce anxiety about missing details)
+- Encouraging (motivate users to create first checklist)
+- No exclamation marks except in empty states
+
+### Button Label Guidelines
+| Do | Don't |
+|----|----|
+| Create Checklist | Add New |
+| AI Analysis | AI Analyze |
+| Save | Submit |
+| Get Started | Continue |
+
+### Implemented UX Improvements (January 2026)
+
+1. **Enhanced Checklist Cards** (`MainScreenContent.kt`):
+   - Added progress bar showing completion status (checked/total items)
+   - Added item count display (e.g., "3/5")
+   - Added chevron icon indicating card is clickable
+   - Shows "No elements" text for empty checklists
+
+2. **Streamlined CTA Buttons** (`MainScreen.kt`, `MainScreenContent.kt`):
+   - Removed duplicate Create/Analyze buttons from empty state
+   - Bottom bar now shows consistently for both empty and non-empty states
+   - Single source of truth for action buttons
+
+3. **Item Management in Create Screen** (`CreateChecklistScreen.kt`):
+   - Added delete button (X icon) to each checklist item
+   - Users can now remove items they've added
+
+4. **Input Validation** (`CreateChecklistViewModel.kt`, `CreateChecklistScreenContract.kt`):
+   - Added `nameError` field to state
+   - Validates checklist name is not blank before saving
+   - Shows inline error message on text field when validation fails
+   - Clears error when user starts typing
