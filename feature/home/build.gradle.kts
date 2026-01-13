@@ -25,6 +25,7 @@ kotlin {
         commonMain.dependencies {
             implementation(projects.core.common.api)
             implementation(projects.core.navigation.api)
+            implementation(projects.core.designsystem)
 
             implementation(projects.feature.checklist)
 

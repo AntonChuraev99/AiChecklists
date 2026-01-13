@@ -24,6 +24,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(projects.core.navigation.api)
+            implementation(projects.core.designsystem)
             implementation(projects.feature.user)
 
             implementation(compose.runtime)
