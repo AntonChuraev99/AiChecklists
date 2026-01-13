@@ -23,6 +23,7 @@ class MainScreenViewModel(
             )
 
             MainScreenIntent.OnAddChecklistFromTemplatesClick -> appNavigator.navigateToTemplatesScreen()
+            MainScreenIntent.OnAiAnalyzeClick -> appNavigator.navigateToAnalyzeScreen()
             is MainScreenIntent.OnChecklistClick -> TODO()
         }
     }

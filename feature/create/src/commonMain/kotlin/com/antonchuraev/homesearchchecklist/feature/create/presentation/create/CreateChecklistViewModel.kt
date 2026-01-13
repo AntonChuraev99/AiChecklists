@@ -24,7 +24,9 @@ class CreateChecklistViewModel(
         when (intent) {
             CreateChecklistIntent.OnBackClick -> appNavigator.onBack()
             CreateChecklistIntent.OnSaveClick -> onSaveClick()
-            is CreateChecklistIntent.OnNameChange -> _screenState.update { it.copy(name = intent.name) }
+            is CreateChecklistIntent.OnNameChange -> _screenState.update {
+                it.copy(name = intent.name, nameError = null)
+            }
             is CreateChecklistIntent.OnAddItem -> _screenState.update {
                 it.copy(items = it.items + ChecklistItem(intent.itemText, false))
             }
@@ -36,9 +38,16 @@ class CreateChecklistViewModel(
     }
 
     private fun onSaveClick() {
+        val currentState = _screenState.value
+
+        if (currentState.name.isBlank()) {
+            _screenState.update { it.copy(nameError = "Введите название чек-листа") }
+            return
+        }
+
         viewModelScope.launch {
             checklistRepository.addChecklist(
-                Checklist(name = _screenState.value.name, items = _screenState.value.items)
+                Checklist(name = currentState.name.trim(), items = currentState.items)
             )
             appNavigator.onBack()
         }

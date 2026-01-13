@@ -10,32 +10,30 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonText
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
+import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import homesearchchecklist.core.designsystem.generated.resources.Res
+import homesearchchecklist.core.designsystem.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DebugScreen(
     viewModel: DebugViewModel = koinViewModel()
@@ -43,47 +41,35 @@ fun DebugScreen(
     val screenState by viewModel.screenState.collectAsStateWithLifecycle()
 
     val items = listOf(
-        DebugItem(Icons.Default.Info, "Информация о приложении", "Версия, билд и другие данные") {
+        DebugItem(Icons.Default.Info, stringResource(Res.string.debug_app_info), stringResource(Res.string.debug_app_info_description)) {
             viewModel.sendIntent(DebugScreenIntent.ShowInfoDialog)
         },
-        DebugItem(Icons.Default.Refresh, "Сбросить онбординг", "Показать экран приветствия снова") {
+        DebugItem(Icons.Default.Refresh, stringResource(Res.string.debug_reset_onboarding), stringResource(Res.string.debug_reset_onboarding_description)) {
             viewModel.sendIntent(DebugScreenIntent.ResetOnboarding)
         },
-        DebugItem(Icons.Default.Delete, "Очистить данные", "Удалить все локальные данные") {
+        DebugItem(Icons.Default.Delete, stringResource(Res.string.debug_clear_data), stringResource(Res.string.debug_clear_data_description)) {
             viewModel.sendIntent(DebugScreenIntent.ClearData)
         },
-        DebugItem(Icons.Default.Add, "Создать тестовые чек-листы", "Добавить демо-данные для тестирования") {
+        DebugItem(Icons.Default.Add, stringResource(Res.string.debug_create_test), stringResource(Res.string.debug_create_test_description)) {
             viewModel.sendIntent(DebugScreenIntent.CreateTestChecklists)
         }
     )
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Дебаг меню") },
-                navigationIcon = {
-                    IconButton(onClick = { viewModel.sendIntent(DebugScreenIntent.OnBackClick) }) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Назад"
-                        )
-                    }
-                }
-            )
-        }
-    ) { paddingValues ->
+    AppScaffold(
+        title = stringResource(Res.string.debug_title),
+        onBackButtonClick = { viewModel.sendIntent(DebugScreenIntent.OnBackClick) }
+    ) {
         LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(AppDimens.ScreenPaddingHorizontal),
+            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
         ) {
             item {
                 Text(
-                    text = "Инструменты разработчика",
+                    text = stringResource(Res.string.debug_developer_tools),
                     style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(vertical = 8.dp)
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.padding(vertical = AppDimens.SpacingSm)
                 )
             }
 
@@ -100,19 +86,27 @@ fun DebugScreen(
         if (screenState.showInfoDialog) {
             AlertDialog(
                 onDismissRequest = { viewModel.sendIntent(DebugScreenIntent.HideInfoDialog) },
-                title = { Text("Информация о приложении") },
+                title = {
+                    Text(
+                        text = stringResource(Res.string.debug_app_info_dialog_title),
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                },
                 text = {
                     Column {
-                        InfoRow("Название", "Home Search Checklist")
-                        InfoRow("Версия", "1.0.0")
-                        InfoRow("Билд", "Debug")
+                        InfoRow(stringResource(Res.string.debug_label_name), stringResource(Res.string.app_name))
+                        InfoRow(stringResource(Res.string.debug_label_version), "1.0.0")
+                        InfoRow(stringResource(Res.string.debug_label_build), "Debug")
                     }
                 },
                 confirmButton = {
-                    TextButton(onClick = { viewModel.sendIntent(DebugScreenIntent.HideInfoDialog) }) {
-                        Text("OK")
-                    }
-                }
+                    AppButtonText(
+                        text = stringResource(Res.string.ok),
+                        onClick = { viewModel.sendIntent(DebugScreenIntent.HideInfoDialog) }
+                    )
+                },
+                containerColor = MaterialTheme.colorScheme.surface,
+                shape = MaterialTheme.shapes.large
             )
         }
     }
@@ -132,15 +126,10 @@ private fun DebugMenuItem(
     description: String,
     onClick: () -> Unit
 ) {
-    Card(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth()
-    ) {
+    AppCard(onClick = onClick) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingLg),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
@@ -152,7 +141,8 @@ private fun DebugMenuItem(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleSmall
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = description,
@@ -175,7 +165,7 @@ private fun InfoRow(label: String, value: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
+            .padding(vertical = AppDimens.SpacingXs),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Text(
@@ -185,7 +175,8 @@ private fun InfoRow(label: String, value: String) {
         )
         Text(
             text = value,
-            style = MaterialTheme.typography.bodyMedium
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface
         )
     }
 }

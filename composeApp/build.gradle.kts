@@ -47,6 +47,7 @@ kotlin {
             implementation(projects.feature.debug)
             implementation(projects.feature.home)
             implementation(projects.feature.user)
+            implementation(projects.feature.analyze)
             
             implementation(compose.runtime)
             implementation(compose.foundation)

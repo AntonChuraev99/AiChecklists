@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App -->
+    <string name="app_name">Home Search Checklist</string>
+
+    <!-- Common -->
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="ok">OK</string>
+    <string name="error">Error</string>
+    <string name="selected">Selected:</string>
+    <string name="select">Select</string>
+    <string name="delete">Delete</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_title">Welcome</string>
+    <string name="onboarding_app_name">Home Search Checklist</string>
+    <string name="onboarding_description">Never forget what to check when viewing properties.\nStay organized and find your perfect home.</string>
+    <string name="onboarding_get_started">Get Started</string>
+
+    <!-- Main Screen -->
+    <string name="main_title">My Checklists</string>
+    <string name="main_empty_title">Start your home search</string>
+    <string name="main_empty_description">Create a checklist to track what matters most when viewing properties.</string>
+    <string name="main_create_checklist">Create Checklist</string>
+    <string name="main_ai_analysis">AI Analysis</string>
+    <string name="main_no_items">No items yet</string>
+
+    <!-- Create Screen -->
+    <string name="create_title">New Checklist</string>
+    <string name="create_name_section">Checklist Name</string>
+    <string name="create_name_placeholder">e.g., Downtown Apartment</string>
+    <string name="create_items_section">What to Check</string>
+    <string name="create_add_item">Add Item</string>
+    <string name="create_add_item_dialog_title">Add Item</string>
+    <string name="create_item_name_label">What should you check?</string>
+
+    <!-- Templates Screen -->
+    <string name="templates_title">Templates</string>
+    <string name="templates_empty_title">Templates coming soon</string>
+    <string name="templates_empty_description">Pre-made checklists for apartments, houses, and more will be available here.</string>
+
+    <!-- Analyze Screen -->
+    <string name="analyze_title">AI Analysis</string>
+    <string name="analyze_button">Analyze</string>
+    <string name="analyze_loading">Extracting key details...</string>
+    <string name="analyze_select_source">Choose your data source</string>
+    <string name="analyze_enter_data">Provide the data</string>
+    <string name="analyze_source_photo">Photo</string>
+    <string name="analyze_source_pdf">PDF</string>
+    <string name="analyze_source_text_file">Text File</string>
+    <string name="analyze_source_link">Web Link</string>
+    <string name="analyze_source_text">Paste Text</string>
+    <string name="analyze_url_label">Property listing URL</string>
+    <string name="analyze_url_placeholder">https://example.com/listing</string>
+    <string name="analyze_text_placeholder">Paste the property listing or description here...</string>
+    <string name="analyze_text_label">Property description</string>
+    <string name="analyze_select_photo">Choose Photo</string>
+    <string name="analyze_select_pdf">Choose PDF</string>
+    <string name="analyze_select_file">Choose File</string>
+    <string name="analyze_result_title">Analysis Complete</string>
+    <string name="analyze_items_found">Items found:</string>
+    <string name="analyze_and_more">... and %1$d more</string>
+    <string name="analyze_checklist_name_label">Checklist name</string>
+    <string name="analyze_checklist_name_placeholder">New Checklist</string>
+    <string name="analyze_create_checklist">Create Checklist</string>
+    <string name="analyze_error_no_input">Please select a data source</string>
+    <string name="analyze_error_empty_url">Please enter a URL</string>
+    <string name="analyze_error_invalid_url">Please enter a valid URL</string>
+    <string name="analyze_error_empty_text">Please enter text to analyze</string>
+    <string name="analyze_error_no_file">Please select a file</string>
+    <string name="analyze_error_empty_name">Please enter a checklist name</string>
+
+    <!-- Debug Screen -->
+    <string name="debug_title">Debug Menu</string>
+    <string name="debug_developer_tools">Developer Tools</string>
+    <string name="debug_app_info">App Info</string>
+    <string name="debug_app_info_description">Version, build, and other details</string>
+    <string name="debug_reset_onboarding">Reset Onboarding</string>
+    <string name="debug_reset_onboarding_description">Show welcome screen again</string>
+    <string name="debug_clear_data">Clear Data</string>
+    <string name="debug_clear_data_description">Delete all local data</string>
+    <string name="debug_create_test">Create Test Checklists</string>
+    <string name="debug_create_test_description">Add demo data for testing</string>
+    <string name="debug_app_info_dialog_title">App Info</string>
+    <string name="debug_label_name">Name</string>
+    <string name="debug_label_version">Version</string>
+    <string name="debug_label_build">Build</string>
+</resources>

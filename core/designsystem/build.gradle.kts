@@ -7,6 +7,11 @@ plugins {
     alias(libs.plugins.composeCompiler)
 }
 
+compose.resources {
+    publicResClass = true
+    generateResClass = always
+}
+
 kotlin {
     androidTarget {
         compilerOptions {
@@ -28,6 +33,7 @@ kotlin {
             implementation(compose.material3)
             implementation(compose.materialIconsExtended)
             implementation(compose.ui)
+            implementation(compose.components.resources)
         }
     }
 }
