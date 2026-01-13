@@ -71,6 +71,15 @@
     <string name="analyze_error_no_file">Please select a file</string>
     <string name="analyze_error_empty_name">Please enter a checklist name</string>
 
+    <!-- Checklist Detail Screen -->
+    <string name="checklist_not_found">Checklist not found</string>
+    <string name="checklist_edit_title">Edit Checklist</string>
+    <string name="checklist_edit">Edit</string>
+    <string name="checklist_progress">Progress</string>
+    <string name="checklist_no_items">No items in this checklist.\nTap + to add items.</string>
+    <string name="checklist_delete_title">Delete Checklist?</string>
+    <string name="checklist_delete_message">Are you sure you want to delete "%1$s"? This action cannot be undone.</string>
+
     <!-- Debug Screen -->
     <string name="debug_title">Debug Menu</string>
     <string name="debug_developer_tools">Developer Tools</string>
