@@ -46,8 +46,8 @@ import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.Analyze
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.InputDataType
 import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.picker.FilePickerType
 import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.picker.rememberFilePickerLauncher
-import homesearchchecklist.core.designsystem.generated.resources.Res
-import homesearchchecklist.core.designsystem.generated.resources.*
+import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 

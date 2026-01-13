@@ -5,8 +5,8 @@ import androidx.compose.material.icons.outlined.Description
 import androidx.compose.runtime.Composable
 import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
-import homesearchchecklist.core.designsystem.generated.resources.Res
-import homesearchchecklist.core.designsystem.generated.resources.*
+import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 

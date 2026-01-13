@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- App -->
-    <string name="app_name">Home Search Checklist</string>
+    <string name="app_name">AI Checklists</string>
 
     <!-- Common -->
     <string name="save">Save</string>
@@ -14,14 +14,14 @@
 
     <!-- Onboarding -->
     <string name="onboarding_title">Welcome</string>
-    <string name="onboarding_app_name">Home Search Checklist</string>
-    <string name="onboarding_description">Never forget what to check when viewing properties.\nStay organized and find your perfect home.</string>
+    <string name="onboarding_app_name">AI Checklists</string>
+    <string name="onboarding_description">Create smart checklists powered by AI.\nPaste text, upload files, or share links — AI extracts the key points for you.</string>
     <string name="onboarding_get_started">Get Started</string>
 
     <!-- Main Screen -->
     <string name="main_title">My Checklists</string>
-    <string name="main_empty_title">Start your home search</string>
-    <string name="main_empty_description">Create a checklist to track what matters most when viewing properties.</string>
+    <string name="main_empty_title">No checklists yet</string>
+    <string name="main_empty_description">Create a checklist manually or let AI generate one from your data.</string>
     <string name="main_create_checklist">Create Checklist</string>
     <string name="main_ai_analysis">AI Analysis</string>
     <string name="main_no_items">No items yet</string>
@@ -29,21 +29,21 @@
     <!-- Create Screen -->
     <string name="create_title">New Checklist</string>
     <string name="create_name_section">Checklist Name</string>
-    <string name="create_name_placeholder">e.g., Downtown Apartment</string>
-    <string name="create_items_section">What to Check</string>
+    <string name="create_name_placeholder">e.g., Project Tasks</string>
+    <string name="create_items_section">Items</string>
     <string name="create_add_item">Add Item</string>
     <string name="create_add_item_dialog_title">Add Item</string>
-    <string name="create_item_name_label">What should you check?</string>
+    <string name="create_item_name_label">Item text</string>
 
     <!-- Templates Screen -->
     <string name="templates_title">Templates</string>
     <string name="templates_empty_title">Templates coming soon</string>
-    <string name="templates_empty_description">Pre-made checklists for apartments, houses, and more will be available here.</string>
+    <string name="templates_empty_description">Pre-made checklists for various tasks will be available here.</string>
 
     <!-- Analyze Screen -->
     <string name="analyze_title">AI Analysis</string>
     <string name="analyze_button">Analyze</string>
-    <string name="analyze_loading">Extracting key details...</string>
+    <string name="analyze_loading">Analyzing with AI...</string>
     <string name="analyze_select_source">Choose your data source</string>
     <string name="analyze_enter_data">Provide the data</string>
     <string name="analyze_source_photo">Photo</string>
@@ -51,10 +51,10 @@
     <string name="analyze_source_text_file">Text File</string>
     <string name="analyze_source_link">Web Link</string>
     <string name="analyze_source_text">Paste Text</string>
-    <string name="analyze_url_label">Property listing URL</string>
-    <string name="analyze_url_placeholder">https://example.com/listing</string>
-    <string name="analyze_text_placeholder">Paste the property listing or description here...</string>
-    <string name="analyze_text_label">Property description</string>
+    <string name="analyze_url_label">URL</string>
+    <string name="analyze_url_placeholder">https://example.com/article</string>
+    <string name="analyze_text_placeholder">Paste any text here and AI will extract checklist items...</string>
+    <string name="analyze_text_label">Text to analyze</string>
     <string name="analyze_select_photo">Choose Photo</string>
     <string name="analyze_select_pdf">Choose PDF</string>
     <string name="analyze_select_file">Choose File</string>
