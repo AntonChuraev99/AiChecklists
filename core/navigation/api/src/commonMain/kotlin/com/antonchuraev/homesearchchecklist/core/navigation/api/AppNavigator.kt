@@ -31,5 +31,7 @@ interface AppNavigator {
     fun navigateToFillDetail(fillId: Long)
 
     fun navigateToPaywall()
+
+    fun navigateToSubscriptionStatus()
 }
 

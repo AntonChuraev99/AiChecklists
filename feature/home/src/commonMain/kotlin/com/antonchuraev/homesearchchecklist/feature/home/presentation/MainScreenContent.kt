@@ -1,10 +1,13 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -25,6 +28,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
 import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.components.PremiumBanner
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
@@ -34,29 +38,47 @@ fun MainScreenContent(
     screenState: MainScreenState.Success,
     onChecklistClick: (Checklist) -> Unit,
     onAddChecklistClick: () -> Unit,
-    onAiAnalyzeClick: () -> Unit
+    onAiAnalyzeClick: () -> Unit,
+    onPremiumBannerClick: () -> Unit
 ) {
-    if (screenState.checklists.isEmpty()) {
-        EmptyState(
-            icon = Icons.Outlined.Checklist,
-            title = stringResource(Res.string.main_empty_title),
-            description = stringResource(Res.string.main_empty_description)
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
+            .padding(top = AppDimens.SpacingLg, bottom = AppDimens.SpacingXxl)
+            .verticalScroll(rememberScrollState())
+    ) {
+        PremiumBanner(
+            isActive = screenState.subscriptionStatus.isActive,
+            formattedExpirationDate = screenState.formattedExpirationDate,
+            onUpgradeClick = onPremiumBannerClick,
+            onSubscriptionClick = onPremiumBannerClick
         )
-    } else {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd),
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
-                .padding(top = AppDimens.SpacingLg, bottom = AppDimens.SpacingXxl)
-                .verticalScroll(rememberScrollState())
-        ) {
-            screenState.checklists.forEach { checklist ->
-                ChecklistCard(
-                    checklist = checklist,
-                    onClick = { onChecklistClick(checklist) }
+
+        Spacer(modifier = Modifier.height(AppDimens.SpacingLg))
+
+        if (screenState.checklists.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                EmptyState(
+                    icon = Icons.Outlined.Checklist,
+                    title = stringResource(Res.string.main_empty_title),
+                    description = stringResource(Res.string.main_empty_description)
                 )
+            }
+        } else {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
+            ) {
+                screenState.checklists.forEach { checklist ->
+                    ChecklistCard(
+                        checklist = checklist,
+                        onClick = { onChecklistClick(checklist) }
+                    )
+                }
             }
         }
     }

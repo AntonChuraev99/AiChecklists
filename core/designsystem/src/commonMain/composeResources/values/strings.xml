@@ -110,6 +110,19 @@
     <string name="fill_cover_change">Change Cover</string>
     <string name="fill_cover_remove">Remove Cover</string>
 
+    <!-- Premium Banner -->
+    <string name="premium_banner_title">Unlock Premium</string>
+    <string name="premium_banner_description">Unlimited checklists and AI analysis</string>
+    <string name="premium_banner_upgrade">Upgrade</string>
+    <string name="premium_banner_active_title">Premium Active</string>
+    <string name="premium_banner_valid_until">Valid until %1$s</string>
+
+    <!-- Subscription Status Screen -->
+    <string name="subscription_status_title">Subscription Status</string>
+    <string name="subscription_status_active">Premium Active</string>
+    <string name="subscription_status_valid_until">Your subscription is valid until</string>
+    <string name="subscription_status_manage">Manage Subscription</string>
+
     <!-- Paywall Screen -->
     <string name="paywall_title">Unlock Premium</string>
     <string name="paywall_subtitle">Get access to all features and remove limitations</string>

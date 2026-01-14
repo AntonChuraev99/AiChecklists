@@ -57,5 +57,9 @@ class AppNavigatorImpl() : AppNavigator {
     override fun navigateToPaywall() {
         navController.navigate(AppNavRoute.Paywall)
     }
+
+    override fun navigateToSubscriptionStatus() {
+        navController.navigate(AppNavRoute.SubscriptionStatus)
+    }
 }
 

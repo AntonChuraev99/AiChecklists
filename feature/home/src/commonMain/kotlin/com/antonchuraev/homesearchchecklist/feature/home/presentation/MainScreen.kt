@@ -69,6 +69,9 @@ fun MainScreen(
                     },
                     onAiAnalyzeClick = {
                         viewModel.sendIntent(MainScreenIntent.OnAiAnalyzeClick)
+                    },
+                    onPremiumBannerClick = {
+                        viewModel.sendIntent(MainScreenIntent.OnPremiumBannerClick)
                     }
                 )
             }

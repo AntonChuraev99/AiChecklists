@@ -7,6 +7,7 @@ import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetSu
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.PurchaseProductUseCase
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.RestorePurchasesUseCase
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.PaywallViewModel
+import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.SubscriptionStatusViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -27,6 +28,7 @@ val paywallFeatureModule = module {
     factory { PurchaseProductUseCase(get()) }
     factory { RestorePurchasesUseCase(get()) }
 
-    // ViewModel
+    // ViewModels
     viewModelOf(::PaywallViewModel)
+    viewModelOf(::SubscriptionStatusViewModel)
 }
