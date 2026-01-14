@@ -110,6 +110,16 @@
     <string name="fill_cover_change">Change Cover</string>
     <string name="fill_cover_remove">Remove Cover</string>
 
+    <!-- Paywall Screen -->
+    <string name="paywall_title">Unlock Premium</string>
+    <string name="paywall_subtitle">Get access to all features and remove limitations</string>
+    <string name="paywall_feature_checklists">Unlimited checklists</string>
+    <string name="paywall_feature_ai">Unlimited AI analysis</string>
+    <string name="paywall_feature_sync">Cloud sync across devices</string>
+    <string name="paywall_continue">Continue</string>
+    <string name="paywall_restore">Restore Purchases</string>
+    <string name="paywall_best_value">Best Value</string>
+
     <!-- Debug Screen -->
     <string name="debug_title">Debug Menu</string>
     <string name="debug_developer_tools">Developer Tools</string>

@@ -48,6 +48,7 @@ kotlin {
             implementation(projects.feature.home)
             implementation(projects.feature.user)
             implementation(projects.feature.analyze)
+            implementation(projects.feature.paywall)
             
             implementation(compose.runtime)
             implementation(compose.foundation)

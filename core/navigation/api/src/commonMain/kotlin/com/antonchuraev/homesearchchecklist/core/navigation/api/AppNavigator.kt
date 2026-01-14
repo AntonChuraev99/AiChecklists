@@ -29,5 +29,7 @@ interface AppNavigator {
     fun navigateToChecklistDetail(checklistId: Long)
 
     fun navigateToFillDetail(fillId: Long)
+
+    fun navigateToPaywall()
 }
 
