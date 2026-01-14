@@ -36,4 +36,7 @@ sealed interface AppNavRoute {
 
     @Serializable
     data object Paywall : AppNavRoute
+
+    @Serializable
+    data object SubscriptionStatus : AppNavRoute
 }

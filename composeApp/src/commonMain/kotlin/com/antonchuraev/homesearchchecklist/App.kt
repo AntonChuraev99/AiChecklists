@@ -17,6 +17,7 @@ import com.antonchuraev.homesearchchecklist.feature.splash.presentation.SplashSc
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.ChecklistDetailScreen
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.fill.FillDetailScreen
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.PaywallScreen
+import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.SubscriptionStatusScreen
 import androidx.navigation.toRoute
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.koin.compose.KoinApplication
@@ -83,6 +84,10 @@ fun App() {
 
                 composable<AppNavRoute.Paywall> {
                     PaywallScreen()
+                }
+
+                composable<AppNavRoute.SubscriptionStatus> {
+                    SubscriptionStatusScreen()
                 }
             }
         }
