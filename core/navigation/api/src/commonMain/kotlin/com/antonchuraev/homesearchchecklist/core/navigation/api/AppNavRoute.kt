@@ -33,4 +33,7 @@ sealed interface AppNavRoute {
 
     @Serializable
     data class FillDetail(val fillId: Long) : AppNavRoute
+
+    @Serializable
+    data object Paywall : AppNavRoute
 }

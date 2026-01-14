@@ -16,6 +16,7 @@ import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.Analyze
 import com.antonchuraev.homesearchchecklist.feature.splash.presentation.SplashScreen
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.ChecklistDetailScreen
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.fill.FillDetailScreen
+import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.PaywallScreen
 import androidx.navigation.toRoute
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.koin.compose.KoinApplication
@@ -78,6 +79,10 @@ fun App() {
                 composable<AppNavRoute.FillDetail> { backStackEntry ->
                     val route = backStackEntry.toRoute<AppNavRoute.FillDetail>()
                     FillDetailScreen(fillId = route.fillId)
+                }
+
+                composable<AppNavRoute.Paywall> {
+                    PaywallScreen()
                 }
             }
         }

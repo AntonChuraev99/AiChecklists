@@ -53,5 +53,9 @@ class AppNavigatorImpl() : AppNavigator {
     override fun navigateToFillDetail(fillId: Long) {
         navController.navigate(AppNavRoute.FillDetail(fillId))
     }
+
+    override fun navigateToPaywall() {
+        navController.navigate(AppNavRoute.Paywall)
+    }
 }
 

@@ -25,6 +25,7 @@ sqlite = "2.6.2"
 kotlinxCoroutines = "1.10.2"
 datastore = "1.2.0"
 ksp = "2.3.4"
+revenuecat = "2.2.17+17.26.1"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -56,6 +57,11 @@ sqlite-bundled = { module = "androidx.sqlite:sqlite-bundled", version.ref = "sql
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
 datastore-preferences-core = { module = "androidx.datastore:datastore-preferences-core", version.ref = "datastore" }
 datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
+
+# RevenueCat
+revenuecat-purchases-core = { module = "com.revenuecat.purchases:purchases-kmp-core", version.ref = "revenuecat" }
+revenuecat-purchases-ui = { module = "com.revenuecat.purchases:purchases-kmp-ui", version.ref = "revenuecat" }
+revenuecat-purchases-result = { module = "com.revenuecat.purchases:purchases-kmp-result", version.ref = "revenuecat" }
 
 [bundles]
 koin-feature = [
