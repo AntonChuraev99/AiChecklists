@@ -11,9 +11,16 @@ struct ComposeView: UIViewControllerRepresentable {
 }
 
 struct ContentView: View {
+    @StateObject private var volumeObserver = VolumeButtonObserver()
+
     var body: some View {
         ComposeView()
             .ignoresSafeArea()
+            .onAppear {
+                volumeObserver.onDebugMenuTriggered = {
+                    MainViewControllerKt.navigateToDebugMenu()
+                }
+            }
     }
 }
 
