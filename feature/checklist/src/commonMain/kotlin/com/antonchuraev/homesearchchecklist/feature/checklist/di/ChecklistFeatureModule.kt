@@ -6,6 +6,7 @@ import org.koin.dsl.module
 
 val checklistFeatureModule = module {
     single { checklistDao }
-    single<ChecklistRepository> { ChecklistRepositoryImpl(checklistDao) }
+    single { checklistFillDao }
+    single<ChecklistRepository> { ChecklistRepositoryImpl(checklistDao, checklistFillDao) }
 }
 

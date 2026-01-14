@@ -30,4 +30,7 @@ sealed interface AppNavRoute {
 
     @Serializable
     data class ChecklistDetail(val checklistId: Long) : AppNavRoute
+
+    @Serializable
+    data class FillDetail(val fillId: Long) : AppNavRoute
 }

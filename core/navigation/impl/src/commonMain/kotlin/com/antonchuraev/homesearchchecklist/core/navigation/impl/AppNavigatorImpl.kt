@@ -49,5 +49,9 @@ class AppNavigatorImpl() : AppNavigator {
     override fun navigateToChecklistDetail(checklistId: Long) {
         navController.navigate(AppNavRoute.ChecklistDetail(checklistId))
     }
+
+    override fun navigateToFillDetail(fillId: Long) {
+        navController.navigate(AppNavRoute.FillDetail(fillId))
+    }
 }
 
