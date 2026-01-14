@@ -9,14 +9,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 
 @Database(
-    entities = [ChecklistEntity::class],
-    version = 1,
+    entities = [ChecklistEntity::class, ChecklistFillEntity::class],
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(ChecklistItemConverters::class)
 @ConstructedBy(ChecklistDatabaseConstructor::class)
 abstract class ChecklistDatabase : RoomDatabase() {
     abstract fun checklistDao(): ChecklistDao
+    abstract fun checklistFillDao(): ChecklistFillDao
 
     companion object {
         fun getRoomDatabase(

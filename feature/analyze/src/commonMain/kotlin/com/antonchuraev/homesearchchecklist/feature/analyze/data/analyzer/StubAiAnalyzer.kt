@@ -5,6 +5,7 @@ import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.Analyze
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeResult
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
+import kotlin.reflect.KClass
 import kotlinx.coroutines.delay
 
 /**
@@ -37,12 +38,12 @@ class StubAiAnalyzer : AiAnalyzer {
 
     override suspend fun isAvailable(): Boolean = true
 
-    override fun getSupportedInputTypes(): Set<Class<out AnalyzeInputData>> = setOf(
-        AnalyzeInputData.Photo::class.java,
-        AnalyzeInputData.PdfDocument::class.java,
-        AnalyzeInputData.TextFile::class.java,
-        AnalyzeInputData.WebLink::class.java,
-        AnalyzeInputData.RawText::class.java
+    override fun getSupportedInputTypes(): Set<KClass<out AnalyzeInputData>> = setOf(
+        AnalyzeInputData.Photo::class,
+        AnalyzeInputData.PdfDocument::class,
+        AnalyzeInputData.TextFile::class,
+        AnalyzeInputData.WebLink::class,
+        AnalyzeInputData.RawText::class
     )
 
     private fun generateMockItems(inputData: AnalyzeInputData): List<ChecklistItem> {

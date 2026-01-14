@@ -3,6 +3,7 @@ package com.antonchuraev.homesearchchecklist.feature.analyze.domain.analyzer
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeInputData
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeResult
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
+import kotlin.reflect.KClass
 
 /**
  * Interface for AI-powered analysis of property data.
@@ -34,5 +35,5 @@ interface AiAnalyzer {
     /**
      * Returns supported input types by this analyzer implementation.
      */
-    fun getSupportedInputTypes(): Set<Class<out AnalyzeInputData>>
+    fun getSupportedInputTypes(): Set<KClass<out AnalyzeInputData>>
 }

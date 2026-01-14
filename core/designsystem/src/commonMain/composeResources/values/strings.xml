@@ -13,10 +13,21 @@
     <string name="delete">Delete</string>
 
     <!-- Onboarding -->
-    <string name="onboarding_title">Welcome</string>
-    <string name="onboarding_app_name">AI Checklists</string>
-    <string name="onboarding_description">Create smart checklists powered by AI.\nPaste text, upload files, or share links — AI extracts the key points for you.</string>
+    <string name="onboarding_skip">Skip</string>
+    <string name="onboarding_continue">Continue</string>
     <string name="onboarding_get_started">Get Started</string>
+
+    <!-- Onboarding Page 1 - Tasks -->
+    <string name="onboarding_page1_title">Tasks</string>
+    <string name="onboarding_page1_description">Write down what you need to do, set reminders, reduce mental load, and easily manage everything.</string>
+
+    <!-- Onboarding Page 2 - AI Analysis -->
+    <string name="onboarding_page2_title">AI Analysis</string>
+    <string name="onboarding_page2_description">Paste text, upload photos or files — AI automatically extracts checklist items for you.</string>
+
+    <!-- Onboarding Page 3 - Track Progress -->
+    <string name="onboarding_page3_title">Track Progress</string>
+    <string name="onboarding_page3_description">Check off completed tasks, track your progress, and see how much you\'ve accomplished.</string>
 
     <!-- Main Screen -->
     <string name="main_title">My Checklists</string>
@@ -79,6 +90,25 @@
     <string name="checklist_no_items">No items in this checklist.\nTap + to add items.</string>
     <string name="checklist_delete_title">Delete Checklist?</string>
     <string name="checklist_delete_message">Are you sure you want to delete "%1$s"? This action cannot be undone.</string>
+    <string name="checklist_template_items">Template items: %1$d</string>
+    <string name="checklist_fills_section">Fills</string>
+    <string name="checklist_no_fills">No fills yet.\nCreate a new fill to start checking items.</string>
+    <string name="checklist_add_fill">New Fill</string>
+    <string name="checklist_add_fill_ai">Fill via AI</string>
+    <string name="checklist_add_fill_dialog_title">New Fill</string>
+    <string name="checklist_fill_name_label">Fill name</string>
+    <string name="checklist_fill_name_placeholder">e.g., Apartment on Main St</string>
+    <string name="checklist_fill_delete_title">Delete Fill?</string>
+    <string name="checklist_fill_delete_message">Are you sure you want to delete "%1$s"? This action cannot be undone.</string>
+
+    <!-- Fill Detail Screen -->
+    <string name="fill_not_found">Fill not found</string>
+    <string name="fill_edit_title">Edit Fill</string>
+    <string name="fill_add_note">Add note</string>
+    <string name="fill_note_dialog_title">Note</string>
+    <string name="fill_note_placeholder">Add a note about this item...</string>
+    <string name="fill_cover_change">Change Cover</string>
+    <string name="fill_cover_remove">Remove Cover</string>
 
     <!-- Debug Screen -->
     <string name="debug_title">Debug Menu</string>
