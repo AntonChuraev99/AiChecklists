@@ -1,14 +1,18 @@
 package com.antonchuraev.homesearchchecklist.feature.onboarding.presentation
 
+import androidx.lifecycle.viewModelScope
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
+import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.CompleteOnboardingUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 class OnboardingViewModel(
-    private val navigator: AppNavigator
+    private val navigator: AppNavigator,
+    private val completeOnboardingUseCase: CompleteOnboardingUseCase
 ) : AppViewModel<OnboardingState, OnboardingIntent, Nothing>() {
 
     private val _screenState = MutableStateFlow(OnboardingState())
@@ -17,7 +21,7 @@ class OnboardingViewModel(
     override fun onIntent(intent: OnboardingIntent) {
         when (intent) {
             OnboardingIntent.OnNextPage -> handleNextPage()
-            OnboardingIntent.OnSkip -> navigateToMain()
+            OnboardingIntent.OnSkip -> completeOnboarding()
             is OnboardingIntent.OnPageSelected -> updatePage(intent.page)
         }
     }
@@ -27,7 +31,7 @@ class OnboardingViewModel(
         if (currentState.currentPage < currentState.totalPages - 1) {
             _screenState.update { it.copy(currentPage = it.currentPage + 1) }
         } else {
-            navigateToMain()
+            completeOnboarding()
         }
     }
 
@@ -35,7 +39,10 @@ class OnboardingViewModel(
         _screenState.update { it.copy(currentPage = page) }
     }
 
-    private fun navigateToMain() {
-        navigator.navigateToMainScreen()
+    private fun completeOnboarding() {
+        viewModelScope.launch {
+            completeOnboardingUseCase()
+            navigator.navigateToMainScreen()
+        }
     }
 }
