@@ -6,8 +6,8 @@ import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserD
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
 class UserDataRepositoryImpl(
@@ -16,13 +16,9 @@ class UserDataRepositoryImpl(
 
     private val appDatastore: AppDatastore = AppDatastore("user/datastore")
 
-    private val userDataFlow = combine(
-        flow = appDatastore.observeBoolean(IS_ONBOARDING_PASSED_KEY, false),
-        emptyFlow<Nothing>()
-    ) { isOnboardingPassed, _ ->
-
-        UserData(isOnboardingPassed)
-    }
+    private val userDataFlow = appDatastore
+        .observeBoolean(IS_ONBOARDING_PASSED_KEY, false)
+        .map { isOnboardingPassed -> UserData(isOnboardingPassed) }
         .stateIn(
             appScope,
             SharingStarted.Eagerly,
@@ -34,7 +30,10 @@ class UserDataRepositoryImpl(
     }
 
     override suspend fun getUserData(): UserData {
-        return userDataFlow.value
+        return appDatastore
+            .observeBoolean(IS_ONBOARDING_PASSED_KEY, false)
+            .map { isOnboardingPassed -> UserData(isOnboardingPassed) }
+            .first()
     }
 
     override suspend fun update(userData: UserData) {
