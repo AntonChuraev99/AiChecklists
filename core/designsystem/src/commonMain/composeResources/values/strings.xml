@@ -18,24 +18,24 @@
     <string name="onboarding_get_started">Get Started</string>
 
     <!-- Onboarding Page 1 - Tasks -->
-    <string name="onboarding_page1_title">Tasks</string>
-    <string name="onboarding_page1_description">Write down what you need to do, set reminders, reduce mental load, and easily manage everything.</string>
+    <string name="onboarding_page1_title">Capture Everything</string>
+    <string name="onboarding_page1_description">Turn chaos into clarity. Create checklists for any task — from daily routines to complex projects.</string>
 
     <!-- Onboarding Page 2 - AI Analysis -->
-    <string name="onboarding_page2_title">AI Analysis</string>
-    <string name="onboarding_page2_description">Paste text, upload photos or files — AI automatically extracts checklist items for you.</string>
+    <string name="onboarding_page2_title">AI Does the Work</string>
+    <string name="onboarding_page2_description">Drop a photo, PDF, or text — our AI instantly creates a ready-to-use checklist. Magic in seconds.</string>
 
     <!-- Onboarding Page 3 - Track Progress -->
-    <string name="onboarding_page3_title">Track Progress</string>
-    <string name="onboarding_page3_description">Check off completed tasks, track your progress, and see how much you\'ve accomplished.</string>
+    <string name="onboarding_page3_title">Never Miss a Thing</string>
+    <string name="onboarding_page3_description">Stay on top of everything. Track progress, celebrate wins, and feel the satisfaction of checking things off.</string>
 
     <!-- Main Screen -->
     <string name="main_title">My Checklists</string>
-    <string name="main_empty_title">No checklists yet</string>
-    <string name="main_empty_description">Create a checklist manually or let AI generate one from your data.</string>
+    <string name="main_empty_title">Ready to get organized?</string>
+    <string name="main_empty_description">Create your first checklist or let AI build one from any text, photo, or document.</string>
     <string name="main_create_checklist">Create Checklist</string>
     <string name="main_ai_analysis">AI Analysis</string>
-    <string name="main_no_items">No items yet</string>
+    <string name="main_no_items">Empty</string>
 
     <!-- Create Screen -->
     <string name="create_title">New Checklist</string>
@@ -54,9 +54,9 @@
     <!-- Analyze Screen -->
     <string name="analyze_title">AI Analysis</string>
     <string name="analyze_button">Analyze</string>
-    <string name="analyze_loading">Analyzing with AI...</string>
-    <string name="analyze_select_source">Choose your data source</string>
-    <string name="analyze_enter_data">Provide the data</string>
+    <string name="analyze_loading">AI is working its magic...</string>
+    <string name="analyze_select_source">What would you like to analyze?</string>
+    <string name="analyze_enter_data">Add your content</string>
     <string name="analyze_source_photo">Photo</string>
     <string name="analyze_source_pdf">PDF</string>
     <string name="analyze_source_text_file">Text File</string>
@@ -64,23 +64,23 @@
     <string name="analyze_source_text">Paste Text</string>
     <string name="analyze_url_label">URL</string>
     <string name="analyze_url_placeholder">https://example.com/article</string>
-    <string name="analyze_text_placeholder">Paste any text here and AI will extract checklist items...</string>
-    <string name="analyze_text_label">Text to analyze</string>
+    <string name="analyze_text_placeholder">Paste meeting notes, articles, instructions — anything you want to turn into a checklist...</string>
+    <string name="analyze_text_label">Your text</string>
     <string name="analyze_select_photo">Choose Photo</string>
     <string name="analyze_select_pdf">Choose PDF</string>
     <string name="analyze_select_file">Choose File</string>
-    <string name="analyze_result_title">Analysis Complete</string>
-    <string name="analyze_items_found">Items found:</string>
+    <string name="analyze_result_title">Here\'s your checklist!</string>
+    <string name="analyze_items_found">Items extracted:</string>
     <string name="analyze_and_more">... and %1$d more</string>
     <string name="analyze_checklist_name_label">Checklist name</string>
-    <string name="analyze_checklist_name_placeholder">New Checklist</string>
+    <string name="analyze_checklist_name_placeholder">My Checklist</string>
     <string name="analyze_create_checklist">Create Checklist</string>
-    <string name="analyze_error_no_input">Please select a data source</string>
-    <string name="analyze_error_empty_url">Please enter a URL</string>
-    <string name="analyze_error_invalid_url">Please enter a valid URL</string>
-    <string name="analyze_error_empty_text">Please enter text to analyze</string>
-    <string name="analyze_error_no_file">Please select a file</string>
-    <string name="analyze_error_empty_name">Please enter a checklist name</string>
+    <string name="analyze_error_no_input">Select a source to analyze</string>
+    <string name="analyze_error_empty_url">Enter a URL to analyze</string>
+    <string name="analyze_error_invalid_url">Enter a valid URL</string>
+    <string name="analyze_error_empty_text">Enter some text to analyze</string>
+    <string name="analyze_error_no_file">Select a file to analyze</string>
+    <string name="analyze_error_empty_name">Give your checklist a name</string>
 
     <!-- Checklist Detail Screen -->
     <string name="checklist_not_found">Checklist not found</string>
@@ -111,24 +111,24 @@
     <string name="fill_cover_remove">Remove Cover</string>
 
     <!-- Premium Banner -->
-    <string name="premium_banner_title">Unlock Premium</string>
-    <string name="premium_banner_description">Unlimited checklists and AI analysis</string>
+    <string name="premium_banner_title">Go Premium</string>
+    <string name="premium_banner_description">Unlimited AI power and no limits</string>
     <string name="premium_banner_upgrade">Upgrade</string>
-    <string name="premium_banner_active_title">Premium Active</string>
-    <string name="premium_banner_valid_until">Valid until %1$s</string>
+    <string name="premium_banner_active_title">Premium Member</string>
+    <string name="premium_banner_valid_until">Active until %1$s</string>
 
     <!-- Subscription Status Screen -->
-    <string name="subscription_status_title">Subscription Status</string>
-    <string name="subscription_status_active">Premium Active</string>
-    <string name="subscription_status_valid_until">Your subscription is valid until</string>
+    <string name="subscription_status_title">Your Subscription</string>
+    <string name="subscription_status_active">Premium Member</string>
+    <string name="subscription_status_valid_until">Your premium access is valid until</string>
     <string name="subscription_status_manage">Manage Subscription</string>
 
     <!-- Paywall Screen -->
-    <string name="paywall_title">Unlock Premium</string>
-    <string name="paywall_subtitle">Get access to all features and remove limitations</string>
-    <string name="paywall_feature_checklists">Unlimited checklists</string>
-    <string name="paywall_feature_ai">Unlimited AI analysis</string>
-    <string name="paywall_feature_sync">Cloud sync across devices</string>
+    <string name="paywall_title">Unlock Your Full Potential</string>
+    <string name="paywall_subtitle">Get unlimited access to all AI features</string>
+    <string name="paywall_feature_checklists">Create unlimited checklists</string>
+    <string name="paywall_feature_ai">Unlimited AI-powered analysis</string>
+    <string name="paywall_feature_sync">Sync across all your devices</string>
     <string name="paywall_continue">Continue</string>
     <string name="paywall_restore">Restore Purchases</string>
     <string name="paywall_best_value">Best Value</string>

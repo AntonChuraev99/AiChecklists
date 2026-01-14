@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "27698629989",
+    "project_id": "aichecklists-40230",
+    "storage_bucket": "aichecklists-40230.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:27698629989:android:0c8de87edfa71a3ac8258c",
+        "android_client_info": {
+          "package_name": "com.antonchuraev.aichecklists"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyARBOXYuETAF3DNC87YqHDmbQy3rT4CwBI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
