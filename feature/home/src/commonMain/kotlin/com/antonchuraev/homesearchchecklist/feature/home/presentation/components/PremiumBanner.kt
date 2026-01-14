@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -21,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -33,7 +35,9 @@ import aichecklists.core.designsystem.generated.resources.premium_banner_valid_u
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import org.jetbrains.compose.resources.stringResource
 
-private val Blue500 = Color(0xFF2196F3)
+// Premium gradient colors
+private val PremiumGradientStart = Color(0xFF667EEA)
+private val PremiumGradientEnd = Color(0xFF764BA2)
 
 @Composable
 fun PremiumBanner(
@@ -62,13 +66,16 @@ private fun InactivePremiumBanner(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val shape = RoundedCornerShape(12.dp)
+    val shape = RoundedCornerShape(16.dp)
+    val gradientBrush = Brush.horizontalGradient(
+        colors = listOf(PremiumGradientStart, PremiumGradientEnd)
+    )
 
     Box(
         modifier = modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(Blue500)
+            .background(gradientBrush)
             .clickable(onClick = onClick)
             .padding(AppDimens.SpacingLg)
     ) {
@@ -83,10 +90,10 @@ private fun InactivePremiumBanner(
                 modifier = Modifier.weight(1f)
             ) {
                 Icon(
-                    imageVector = Icons.Filled.Star,
+                    imageVector = Icons.Outlined.AutoAwesome,
                     contentDescription = null,
                     tint = Color.White,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(28.dp)
                 )
                 Column(
                     verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs)
@@ -132,7 +139,7 @@ private fun ActivePremiumBanner(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val shape = RoundedCornerShape(12.dp)
+    val shape = RoundedCornerShape(16.dp)
 
     Box(
         modifier = modifier
