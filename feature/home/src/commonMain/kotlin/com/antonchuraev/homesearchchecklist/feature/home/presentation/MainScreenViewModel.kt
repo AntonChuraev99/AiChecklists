@@ -14,19 +14,18 @@ class MainScreenViewModel(
     private val getSubscriptionStatusUseCase: GetSubscriptionStatusUseCase,
 ) : AppViewModel<MainScreenState, MainScreenIntent, Nothing>() {
 
-    override val screenState: StateFlow<MainScreenState>
-        get() = combine(
-            repository.checklists,
-            getSubscriptionStatusUseCase()
-        ) { checklists, subscriptionStatus ->
-            MainScreenState.Success(
-                checklists = checklists,
-                subscriptionStatus = subscriptionStatus,
-                formattedExpirationDate = subscriptionStatus.expirationDate?.let {
-                    formatExpirationDate(it)
-                }
-            )
-        }.defaultStateIn(MainScreenState.Loading)
+    override val screenState: StateFlow<MainScreenState> = combine(
+        repository.checklists,
+        getSubscriptionStatusUseCase()
+    ) { checklists, subscriptionStatus ->
+        MainScreenState.Success(
+            checklists = checklists,
+            subscriptionStatus = subscriptionStatus,
+            formattedExpirationDate = subscriptionStatus.expirationDate?.let {
+                formatExpirationDate(it)
+            }
+        )
+    }.defaultStateIn(MainScreenState.Loading)
 
     override fun onIntent(intent: MainScreenIntent) {
         when (intent) {
