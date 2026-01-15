@@ -21,7 +21,12 @@ data class AnalyzeScreenState(
     val showResultDialog: Boolean = false,
     val aiCredits: Int = 0,
     val aiActionCost: Int = 30,
-    val isPremium: Boolean = false
+    val isPremium: Boolean = false,
+    // Fill mode - when filling an existing checklist
+    val isFillMode: Boolean = false,
+    val targetChecklist: Checklist? = null,
+    val fillName: String = "",
+    val isSavingFill: Boolean = false
 ) : State
 
 sealed interface AnalyzeScreenIntent : Intent {
@@ -40,6 +45,10 @@ sealed interface AnalyzeScreenIntent : Intent {
     // Checklist selection
     data class OnChecklistSelected(val checklistId: Long?) : AnalyzeScreenIntent
     data class OnChecklistNameChanged(val name: String) : AnalyzeScreenIntent
+
+    // Fill mode
+    data class OnFillNameChanged(val name: String) : AnalyzeScreenIntent
+    data object OnCreateFillClick : AnalyzeScreenIntent
 
     // Actions
     data object OnAnalyzeClick : AnalyzeScreenIntent

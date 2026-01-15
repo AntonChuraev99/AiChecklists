@@ -3,6 +3,7 @@ package com.antonchuraev.homesearchchecklist.feature.analyze.domain.repository
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeInputData
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeResult
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
 
 /**
  * Repository interface for managing AI analysis operations.
@@ -44,6 +45,21 @@ interface AnalyzeRepository {
         name: String,
         result: AnalyzeResult
     ): Result<Checklist>
+
+    /**
+     * Creates a new Fill for a checklist from analysis results.
+     * This fills an existing checklist with checked/unchecked items based on AI analysis.
+     *
+     * @param checklistId The ID of the checklist to fill
+     * @param fillName Name for the new fill
+     * @param result Analysis result containing items with checked states
+     * @return Result containing the fill ID
+     */
+    suspend fun createFillFromResult(
+        checklistId: Long,
+        fillName: String,
+        result: AnalyzeResult
+    ): Result<Long>
 
     /**
      * Checks if analyzer is available.

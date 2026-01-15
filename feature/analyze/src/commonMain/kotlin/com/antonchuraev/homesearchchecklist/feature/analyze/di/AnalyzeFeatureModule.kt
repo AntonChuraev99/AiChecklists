@@ -5,8 +5,7 @@ import com.antonchuraev.homesearchchecklist.feature.analyze.data.remote.Firebase
 import com.antonchuraev.homesearchchecklist.feature.analyze.data.repository.AnalyzeRepositoryImpl
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.repository.AnalyzeRepository
 import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.AnalyzeViewModel
-import org.koin.core.module.dsl.viewModelOf
-import org.koin.dsl.bind
+import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
 
 val analyzeFeatureModule = module {
@@ -22,6 +21,15 @@ val analyzeFeatureModule = module {
         )
     }
 
-    // ViewModel
-    viewModelOf(::AnalyzeViewModel)
+    // ViewModel with optional checklistId parameter
+    viewModel { (checklistId: Long?) ->
+        AnalyzeViewModel(
+            checklistId = checklistId,
+            analyzeRepository = get(),
+            checklistRepository = get(),
+            appNavigator = get(),
+            userDataRepository = get(),
+            getSubscriptionStatusUseCase = get()
+        )
+    }
 }

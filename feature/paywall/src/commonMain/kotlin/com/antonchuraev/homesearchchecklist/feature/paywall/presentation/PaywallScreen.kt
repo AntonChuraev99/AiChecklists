@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.paywall.presentation
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,8 +19,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -49,10 +48,11 @@ import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.Paywall
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
-// Colors for the paywall
+// Colors matching the reference design
 private val PaywallOrange = Color(0xFFFF9500)
-private val PaywallOrangeLight = Color(0xFFFFF3E0)
-private val PaywallOrangeDark = Color(0xFFE68600)
+private val PaywallOrangeBackground = Color(0xFFFFF8F0)
+private val BackgroundGray = Color(0xFFF8F8F8)
+private val PhoneFrameColor = Color(0xFF1C1C1E)
 
 @Composable
 fun PaywallScreen(
@@ -70,44 +70,54 @@ fun PaywallScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF5F5F5))
+            .background(BackgroundGray)
     ) {
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
-            // Top section with close button and preview
+            // Top section with phone mockup
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
             ) {
-                // Close button
+                // Close button in top right
                 IconButton(
                     onClick = { viewModel.sendIntent(PaywallIntent.Close) },
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(AppDimens.SpacingMd)
+                        .padding(8.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Close",
-                        tint = Color.Gray
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(Color.Gray.copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close",
+                            tint = Color.Gray,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                 }
 
-                // App preview mockup
+                // Phone mockup centered
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 32.dp)
-                        .padding(top = 60.dp, bottom = 24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                        .padding(horizontal = 40.dp)
+                        .padding(top = 48.dp, bottom = 16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
-                    AppPreviewMockup()
+                    PhoneMockup()
                 }
             }
 
-            // Bottom card with subscription info
+            // Bottom subscription card
             val product = state.products.firstOrNull()
             SubscriptionCard(
                 product = product,
@@ -138,91 +148,234 @@ fun PaywallScreen(
 }
 
 @Composable
-private fun AppPreviewMockup() {
-    // Phone-like container with app preview
+private fun PhoneMockup() {
+    // iPhone-like frame
     Box(
         modifier = Modifier
             .shadow(
-                elevation = 20.dp,
-                shape = RoundedCornerShape(24.dp),
-                spotColor = Color.Black.copy(alpha = 0.15f)
+                elevation = 24.dp,
+                shape = RoundedCornerShape(40.dp),
+                spotColor = Color.Black.copy(alpha = 0.25f)
             )
-            .clip(RoundedCornerShape(24.dp))
-            .background(Color.White)
-            .padding(16.dp)
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth()
+        // Phone outer frame (black)
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(40.dp))
+                .background(PhoneFrameColor)
+                .padding(8.dp)
         ) {
-            // App header
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(bottom = 16.dp)
+            // Phone screen (white with content)
+            Column(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(32.dp))
+                    .background(Color.White)
+                    .width(260.dp)
             ) {
+                // Status bar with notch
+                StatusBarWithNotch()
+
+                // App content
+                AppContentPreview(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 12.dp)
+                )
+
+                // Overlay text and pagination at bottom
                 Box(
                     modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary),
-                    contentAlignment = Alignment.Center
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.AutoAwesome,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(24.dp)
-                    )
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        // Tagline text
+                        Text(
+                            text = "All your favorite recipes\nin one place",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            color = Color.Black,
+                            lineHeight = 22.sp
+                        )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Pagination dots
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            PaginationDot(isSelected = false)
+                            PaginationDot(isSelected = true)
+                            PaginationDot(isSelected = false)
+                        }
+                    }
                 }
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = stringResource(Res.string.app_name),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
             }
-
-            // Sample checklist items
-            Column(
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                SampleChecklistItem(text = stringResource(Res.string.paywall_preview_item1), checked = true)
-                SampleChecklistItem(text = stringResource(Res.string.paywall_preview_item2), checked = true)
-                SampleChecklistItem(text = stringResource(Res.string.paywall_preview_item3), checked = false)
-                SampleChecklistItem(text = stringResource(Res.string.paywall_preview_item4), checked = false)
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // Tagline
-            Text(
-                text = stringResource(Res.string.paywall_preview_tagline),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
         }
     }
 }
 
 @Composable
-private fun SampleChecklistItem(text: String, checked: Boolean) {
+private fun StatusBarWithNotch() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(44.dp)
+            .background(Color.White)
+    ) {
+        // Time on left
+        Text(
+            text = "9:41",
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.SemiBold,
+            color = Color.Black,
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .padding(start = 24.dp)
+        )
+
+        // Notch/Dynamic Island in center
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 8.dp)
+                .width(90.dp)
+                .height(24.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(PhoneFrameColor)
+        )
+
+        // Signal/battery icons on right (simplified)
+        Row(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Signal bars
+            Row(horizontalArrangement = Arrangement.spacedBy(1.dp)) {
+                repeat(4) { index ->
+                    Box(
+                        modifier = Modifier
+                            .width(3.dp)
+                            .height((6 + index * 2).dp)
+                            .background(Color.Black, RoundedCornerShape(1.dp))
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppContentPreview(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+    ) {
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Recipe title row
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Food image placeholder
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFFFFE4C4))
+            )
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Text(
+                text = "Beef Chow Fun",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = Color.Black
+            )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Section label
+        Text(
+            text = "For the beef:",
+            style = MaterialTheme.typography.bodySmall,
+            color = Color.Gray
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Checklist items
+        ChecklistPreviewItem(text = "400-500g skirt/flank beef steak", isChecked = true)
+        ChecklistPreviewItem(text = "1 tsp light soy sauce", isChecked = true)
+        ChecklistPreviewItem(text = "1 tsp white pepper", isChecked = true)
+        ChecklistPreviewItem(text = "1 tsp cornstarch", isChecked = true)
+        ChecklistPreviewItem(text = "1 tsp sugar", isChecked = false)
+        ChecklistPreviewItem(text = "1 tbsp vegetable oil", isChecked = false)
+
+        Spacer(modifier = Modifier.height(8.dp))
+    }
+}
+
+@Composable
+private fun ChecklistPreviewItem(text: String, isChecked: Boolean) {
     Row(
+        modifier = Modifier.padding(vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = if (checked) Icons.Default.Check else Icons.Outlined.Checklist,
-            contentDescription = null,
-            tint = if (checked) MaterialTheme.colorScheme.primary else Color.Gray,
-            modifier = Modifier.size(20.dp)
-        )
+        // Checkbox
+        Box(
+            modifier = Modifier
+                .size(16.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .then(
+                    if (isChecked) {
+                        Modifier.background(PaywallOrange)
+                    } else {
+                        Modifier.border(1.dp, Color.Gray.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                    }
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            if (isChecked) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(12.dp)
+                )
+            }
+        }
+
         Spacer(modifier = Modifier.width(8.dp))
+
         Text(
             text = text,
-            style = MaterialTheme.typography.bodyMedium,
-            color = if (checked) Color.Black else Color.Gray
+            style = MaterialTheme.typography.bodySmall,
+            color = if (isChecked) Color.Black else Color.Gray,
+            fontSize = 11.sp
         )
     }
+}
+
+@Composable
+private fun PaginationDot(isSelected: Boolean) {
+    Box(
+        modifier = Modifier
+            .size(6.dp)
+            .clip(CircleShape)
+            .background(
+                if (isSelected) Color.Black.copy(alpha = 0.8f)
+                else Color.Black.copy(alpha = 0.2f)
+            )
+    )
 }
 
 @Composable
@@ -237,58 +390,62 @@ private fun SubscriptionCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
-            .background(PaywallOrangeLight)
+            .background(PaywallOrangeBackground)
             .padding(horizontal = 24.dp)
-            .padding(top = 32.dp, bottom = 16.dp)
+            .padding(top = 28.dp, bottom = 12.dp)
             .navigationBarsPadding(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         if (isLoading) {
             CircularProgressIndicator(
-                modifier = Modifier.size(48.dp),
+                modifier = Modifier.size(40.dp),
                 color = PaywallOrange
             )
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(20.dp))
         } else if (product != null) {
-            // Trial headline
+            // Main headline - "7 Days for Free"
+            Text(
+                text = if (product.hasFreeTrial) {
+                    "${product.freeTrialDays} Days for Free"
+                } else {
+                    "Go Premium"
+                },
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = PaywallOrange,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Price line 1: "then $4.99 / month"
+            Text(
+                text = "then ${product.priceString} / month",
+                style = MaterialTheme.typography.bodyLarge,
+                color = Color.Black.copy(alpha = 0.7f),
+                textAlign = TextAlign.Center
+            )
+
+            // Price line 2: "($59.99 billed annually after trial)"
             if (product.hasFreeTrial) {
                 Text(
-                    text = stringResource(Res.string.paywall_days_free, product.freeTrialDays),
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.Black,
-                    textAlign = TextAlign.Center
-                )
-            } else {
-                Text(
-                    text = stringResource(Res.string.paywall_go_premium),
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.Black,
+                    text = "(\$59.99 billed annually after trial)",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.Black.copy(alpha = 0.5f),
                     textAlign = TextAlign.Center
                 )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
-            // Price info
-            Text(
-                text = stringResource(Res.string.paywall_then_price, product.priceString),
-                style = MaterialTheme.typography.bodyLarge,
-                color = Color.Black.copy(alpha = 0.8f),
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // CTA Button
+            // CTA Button - "Start your FREE week"
             Button(
                 onClick = onSubscribe,
                 enabled = !isPurchasing,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(28.dp),
+                    .height(52.dp),
+                shape = RoundedCornerShape(26.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = PaywallOrange,
                     contentColor = Color.White,
@@ -297,16 +454,16 @@ private fun SubscriptionCard(
             ) {
                 if (isPurchasing) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
+                        modifier = Modifier.size(22.dp),
                         color = Color.White,
                         strokeWidth = 2.dp
                     )
                 } else {
                     Text(
                         text = if (product.hasFreeTrial) {
-                            stringResource(Res.string.paywall_start_free_trial)
+                            "Start your FREE week"
                         } else {
-                            stringResource(Res.string.paywall_subscribe_now)
+                            "Subscribe Now"
                         },
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
@@ -314,9 +471,9 @@ private fun SubscriptionCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // No payment due now
+            // "No payment due now" with checkmark
             if (product.hasFreeTrial) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -325,19 +482,19 @@ private fun SubscriptionCard(
                     Icon(
                         imageVector = Icons.Default.Check,
                         contentDescription = null,
-                        tint = Color.Black.copy(alpha = 0.7f),
-                        modifier = Modifier.size(18.dp)
+                        tint = Color.Black.copy(alpha = 0.6f),
+                        modifier = Modifier.size(16.dp)
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = stringResource(Res.string.paywall_no_payment_now),
+                        text = "No payment due now",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Color.Black.copy(alpha = 0.7f)
+                        color = Color.Black.copy(alpha = 0.6f)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(16.dp))
         }
 
         // Footer links
@@ -347,26 +504,26 @@ private fun SubscriptionCard(
         ) {
             TextButton(onClick = { /* Terms */ }) {
                 Text(
-                    text = stringResource(Res.string.paywall_terms),
+                    text = "Terms of Use",
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.Gray,
-                    fontSize = 12.sp
+                    fontSize = 11.sp
                 )
             }
             TextButton(onClick = onRestore) {
                 Text(
-                    text = stringResource(Res.string.paywall_restore),
+                    text = "Restore Purchase",
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.Gray,
-                    fontSize = 12.sp
+                    fontSize = 11.sp
                 )
             }
             TextButton(onClick = { /* Privacy */ }) {
                 Text(
-                    text = stringResource(Res.string.paywall_privacy),
+                    text = "Privacy Policy",
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.Gray,
-                    fontSize = 12.sp
+                    fontSize = 11.sp
                 )
             }
         }

@@ -68,8 +68,9 @@ fun App() {
                     DebugScreen()
                 }
 
-                composable<AppNavRoute.Analyze> {
-                    AnalyzeScreen()
+                composable<AppNavRoute.Analyze> { backStackEntry ->
+                    val route = backStackEntry.toRoute<AppNavRoute.Analyze>()
+                    AnalyzeScreen(checklistId = route.checklistId)
                 }
 
                 composable<AppNavRoute.ChecklistDetail> { backStackEntry ->
