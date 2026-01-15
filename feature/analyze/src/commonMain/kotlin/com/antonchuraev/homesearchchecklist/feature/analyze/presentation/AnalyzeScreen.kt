@@ -51,15 +51,23 @@ import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
+import org.koin.core.parameter.parametersOf
 
 @Composable
 fun AnalyzeScreen(
-    viewModel: AnalyzeViewModel = koinViewModel()
+    checklistId: Long? = null,
+    viewModel: AnalyzeViewModel = koinViewModel { parametersOf(checklistId) }
 ) {
     val screenState by viewModel.screenState.collectAsStateWithLifecycle()
 
+    val title = if (screenState.isFillMode) {
+        stringResource(Res.string.analyze_fill_title)
+    } else {
+        stringResource(Res.string.analyze_title)
+    }
+
     AppScaffold(
-        title = stringResource(Res.string.analyze_title),
+        title = title,
         onBackButtonClick = { viewModel.sendIntent(AnalyzeScreenIntent.OnBackClick) },
         bottomBar = {
             if (screenState.selectedInputType != null && !screenState.isAnalyzing) {
@@ -112,15 +120,29 @@ fun AnalyzeScreen(
 
         // Result dialog
         if (screenState.showResultDialog && screenState.analyzeResult != null) {
-            ResultDialog(
-                result = screenState.analyzeResult!!,
-                checklistName = screenState.checklistName,
-                onChecklistNameChanged = {
-                    viewModel.sendIntent(AnalyzeScreenIntent.OnChecklistNameChanged(it))
-                },
-                onCreateNew = { viewModel.sendIntent(AnalyzeScreenIntent.OnCreateNewChecklistClick) },
-                onDismiss = { viewModel.sendIntent(AnalyzeScreenIntent.OnDismissResult) }
-            )
+            if (screenState.isFillMode) {
+                FillResultDialog(
+                    result = screenState.analyzeResult!!,
+                    checklistName = screenState.targetChecklist?.name ?: "",
+                    fillName = screenState.fillName,
+                    onFillNameChanged = {
+                        viewModel.sendIntent(AnalyzeScreenIntent.OnFillNameChanged(it))
+                    },
+                    onCreateFill = { viewModel.sendIntent(AnalyzeScreenIntent.OnCreateFillClick) },
+                    onDismiss = { viewModel.sendIntent(AnalyzeScreenIntent.OnDismissResult) },
+                    isSaving = screenState.isSavingFill
+                )
+            } else {
+                ResultDialog(
+                    result = screenState.analyzeResult!!,
+                    checklistName = screenState.checklistName,
+                    onChecklistNameChanged = {
+                        viewModel.sendIntent(AnalyzeScreenIntent.OnChecklistNameChanged(it))
+                    },
+                    onCreateNew = { viewModel.sendIntent(AnalyzeScreenIntent.OnCreateNewChecklistClick) },
+                    onDismiss = { viewModel.sendIntent(AnalyzeScreenIntent.OnDismissResult) }
+                )
+            }
         }
 
         // Error dialog
@@ -433,6 +455,117 @@ private fun FileInputSection(
             }
         }
     }
+}
+
+@Composable
+private fun FillResultDialog(
+    result: AnalyzeResult,
+    checklistName: String,
+    fillName: String,
+    onFillNameChanged: (String) -> Unit,
+    onCreateFill: () -> Unit,
+    onDismiss: () -> Unit,
+    isSaving: Boolean
+) {
+    val checkedCount = result.suggestedItems.count { it.checked }
+    val totalCount = result.suggestedItems.size
+
+    AlertDialog(
+        onDismissRequest = { if (!isSaving) onDismiss() },
+        title = {
+            Text(
+                text = stringResource(Res.string.analyze_fill_result_title),
+                style = MaterialTheme.typography.titleLarge
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
+            ) {
+                // Checklist being filled
+                Text(
+                    text = stringResource(Res.string.analyze_fill_for_checklist, checklistName),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                result.summary?.let { summary ->
+                    Text(
+                        text = summary,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                // Stats
+                Text(
+                    text = stringResource(Res.string.analyze_fill_stats, checkedCount, totalCount),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+
+                // Items preview with check marks
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs)
+                ) {
+                    result.suggestedItems.take(7).forEach { item ->
+                        val icon = if (item.checked) "✓" else "○"
+                        val color = if (item.checked) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                        Text(
+                            text = "$icon ${item.text}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = color
+                        )
+                    }
+                    if (result.suggestedItems.size > 7) {
+                        val remaining = result.suggestedItems.size - 7
+                        Text(
+                            text = stringResource(Res.string.analyze_and_more, remaining),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
+
+                // Fill name input
+                AppTextField(
+                    value = fillName,
+                    onValueChange = onFillNameChanged,
+                    label = stringResource(Res.string.analyze_fill_name_label),
+                    placeholder = stringResource(Res.string.analyze_fill_name_placeholder),
+                    enabled = !isSaving
+                )
+            }
+        },
+        confirmButton = {
+            AppButtonText(
+                text = if (isSaving) {
+                    stringResource(Res.string.analyze_saving)
+                } else {
+                    stringResource(Res.string.analyze_create_fill)
+                },
+                onClick = onCreateFill,
+                enabled = !isSaving
+            )
+        },
+        dismissButton = {
+            if (!isSaving) {
+                AppButtonText(
+                    text = stringResource(Res.string.cancel),
+                    onClick = onDismiss
+                )
+            }
+        },
+        containerColor = MaterialTheme.colorScheme.surface,
+        shape = MaterialTheme.shapes.large
+    )
 }
 
 @Composable

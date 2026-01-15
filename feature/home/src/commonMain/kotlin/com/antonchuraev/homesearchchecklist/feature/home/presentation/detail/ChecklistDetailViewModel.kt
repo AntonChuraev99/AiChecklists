@@ -132,7 +132,7 @@ class ChecklistDetailViewModel(
         if (limits != null && !limits.canCreateFill(state.fills.size)) {
             updateContentState { it.copy(showFillLimitDialog = true) }
         } else {
-            navigator.navigateToAnalyzeScreen()
+            navigator.navigateToAnalyzeScreen(checklistId)
         }
     }
 

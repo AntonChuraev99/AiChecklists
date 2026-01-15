@@ -5,7 +5,10 @@ import com.antonchuraev.homesearchchecklist.feature.analyze.data.remote.Firebase
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeInputData
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeResult
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.repository.AnalyzeRepository
+import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
@@ -133,6 +136,35 @@ class AnalyzeRepositoryImpl(
             )
             checklistRepository.addChecklist(newChecklist)
             Result.success(newChecklist)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun createFillFromResult(
+        checklistId: Long,
+        fillName: String,
+        result: AnalyzeResult
+    ): Result<Long> {
+        return try {
+            // Convert checklist items to fill items with checked state from AI analysis
+            val fillItems = result.suggestedItems.map { item ->
+                ChecklistFillItem(
+                    text = item.text,
+                    checked = item.checked,
+                    note = null
+                )
+            }
+
+            val newFill = ChecklistFill(
+                checklistId = checklistId,
+                name = fillName,
+                items = fillItems,
+                createdAt = currentTimeMillis()
+            )
+
+            val fillId = checklistRepository.addFill(newFill)
+            Result.success(fillId)
         } catch (e: Exception) {
             Result.failure(e)
         }

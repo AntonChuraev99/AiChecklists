@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class AnalyzeViewModel(
+    private val checklistId: Long?,
     private val analyzeRepository: AnalyzeRepository,
     private val checklistRepository: ChecklistRepository,
     private val appNavigator: AppNavigator,
@@ -23,12 +24,33 @@ class AnalyzeViewModel(
     private val getSubscriptionStatusUseCase: GetSubscriptionStatusUseCase
 ) : AppViewModel<AnalyzeScreenState, AnalyzeScreenIntent, Nothing>() {
 
-    private val _screenState = MutableStateFlow(AnalyzeScreenState())
+    private val _screenState = MutableStateFlow(AnalyzeScreenState(
+        isFillMode = checklistId != null,
+        selectedChecklistId = checklistId
+    ))
     override val screenState: StateFlow<AnalyzeScreenState> = _screenState.asStateFlow()
 
     init {
-        loadChecklists()
+        if (checklistId != null) {
+            loadTargetChecklist(checklistId)
+        } else {
+            loadChecklists()
+        }
         observeUserData()
+    }
+
+    private fun loadTargetChecklist(checklistId: Long) {
+        viewModelScope.launch {
+            val checklist = checklistRepository.getChecklistById(checklistId)
+            if (checklist != null) {
+                _screenState.update {
+                    it.copy(
+                        targetChecklist = checklist,
+                        selectedChecklistId = checklistId
+                    )
+                }
+            }
+        }
     }
 
     private fun loadChecklists() {
@@ -95,6 +117,12 @@ class AnalyzeViewModel(
                 _screenState.update { it.copy(checklistName = intent.name) }
             }
 
+            is AnalyzeScreenIntent.OnFillNameChanged -> {
+                _screenState.update { it.copy(fillName = intent.name) }
+            }
+
+            AnalyzeScreenIntent.OnCreateFillClick -> createFill()
+
             AnalyzeScreenIntent.OnAnalyzeClick -> analyzeInput()
 
             AnalyzeScreenIntent.OnApplyToChecklistClick -> applyToExistingChecklist()
@@ -134,8 +162,13 @@ class AnalyzeViewModel(
         viewModelScope.launch {
             _screenState.update { it.copy(isAnalyzing = true, error = null) }
 
-            val targetChecklist = state.selectedChecklistId?.let { id ->
-                state.availableChecklists.find { it.id == id }
+            // In fill mode, use the target checklist; otherwise look in available checklists
+            val targetChecklist = if (state.isFillMode) {
+                state.targetChecklist
+            } else {
+                state.selectedChecklistId?.let { id ->
+                    state.availableChecklists.find { it.id == id }
+                }
             }
 
             analyzeRepository.analyzeData(inputData, targetChecklist)
@@ -223,6 +256,34 @@ class AnalyzeViewModel(
                 .onFailure { error ->
                     _screenState.update {
                         it.copy(error = error.message ?: "Ошибка создания чек-листа")
+                    }
+                }
+        }
+    }
+
+    private fun createFill() {
+        val state = _screenState.value
+        val checklistId = state.selectedChecklistId ?: return
+        val result = state.analyzeResult ?: return
+        val fillName = state.fillName.takeIf { it.isNotBlank() } ?: "AI Fill"
+
+        if (state.isSavingFill) return
+
+        viewModelScope.launch {
+            _screenState.update { it.copy(isSavingFill = true) }
+
+            analyzeRepository.createFillFromResult(checklistId, fillName, result)
+                .onSuccess { fillId ->
+                    _screenState.update { it.copy(showResultDialog = false, isSavingFill = false) }
+                    appNavigator.onBack()
+                    appNavigator.navigateToFillDetail(fillId)
+                }
+                .onFailure { error ->
+                    _screenState.update {
+                        it.copy(
+                            error = error.message ?: "Ошибка создания заполнения",
+                            isSavingFill = false
+                        )
                     }
                 }
         }

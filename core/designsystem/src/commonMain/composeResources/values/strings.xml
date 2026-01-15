@@ -84,6 +84,16 @@
     <string name="analyze_cost_info">This action costs %1$d credits</string>
     <string name="analyze_not_enough_credits">Not enough credits. Get more to continue.</string>
 
+    <!-- Fill mode (Fill via AI) -->
+    <string name="analyze_fill_title">Fill via AI</string>
+    <string name="analyze_fill_result_title">AI Fill Ready!</string>
+    <string name="analyze_fill_for_checklist">Filling checklist: %1$s</string>
+    <string name="analyze_fill_stats">%1$d of %2$d items checked</string>
+    <string name="analyze_fill_name_label">Fill name</string>
+    <string name="analyze_fill_name_placeholder">e.g. Apartment on Main St</string>
+    <string name="analyze_create_fill">Create Fill</string>
+    <string name="analyze_saving">Saving...</string>
+
     <!-- Checklist Detail Screen -->
     <string name="checklist_not_found">Checklist not found</string>
     <string name="checklist_edit_title">Edit Checklist</string>
