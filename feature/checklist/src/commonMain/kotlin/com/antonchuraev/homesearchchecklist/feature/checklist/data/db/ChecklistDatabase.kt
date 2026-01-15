@@ -10,7 +10,7 @@ import kotlinx.coroutines.IO
 
 @Database(
     entities = [ChecklistEntity::class, ChecklistFillEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 @TypeConverters(ChecklistItemConverters::class)
