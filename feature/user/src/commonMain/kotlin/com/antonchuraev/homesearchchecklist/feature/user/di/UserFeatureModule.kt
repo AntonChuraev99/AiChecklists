@@ -10,14 +10,15 @@ import org.koin.dsl.module
 
 val userFeatureModule = module {
     // User API Service for registration
-    single<UserApiService> { UserApiServiceImpl() }
+    single<UserApiService> { UserApiServiceImpl(logger = get()) }
 
     // Repository with DeviceIdProvider (from platform module) and UserApiService
     single {
         UserDataRepositoryImpl(
             appScope = get(),
             deviceIdProvider = get(),
-            userApiService = get()
+            userApiService = get(),
+            logger = get()
         )
     } bind UserDataRepository::class
 

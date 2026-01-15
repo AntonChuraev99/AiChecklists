@@ -1,9 +1,11 @@
 package com.antonchuraev.homesearchchecklist.feature.analyze.data.remote
 
+import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
 import io.ktor.client.*
 import io.ktor.client.call.*
+import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -18,6 +20,7 @@ import kotlinx.serialization.json.Json
  * Calls Firebase Cloud Functions for AI operations.
  */
 class FirebaseAiServiceImpl(
+    private val logger: AppLogger,
     private val baseUrl: String = DEFAULT_BASE_URL
 ) : FirebaseAiService {
 
@@ -37,6 +40,11 @@ class FirebaseAiServiceImpl(
         install(ContentNegotiation) {
             json(json)
         }
+        install(HttpTimeout) {
+            requestTimeoutMillis = 120_000 // 2 minutes for AI operations
+            connectTimeoutMillis = 30_000  // 30 seconds to connect
+            socketTimeoutMillis = 120_000  // 2 minutes socket timeout
+        }
     }
 
     override suspend fun analyzeAndFillChecklist(
@@ -46,6 +54,8 @@ class FirebaseAiServiceImpl(
         inputType: AiInputType,
         inputData: String
     ): Result<AiServiceResponse<FillChecklistResult>> = runCatching {
+        logger.debug(TAG, "analyzeAndFillChecklist: userId=$userId, checklistId=${checklist.id}, inputType=$inputType")
+
         val request = FillChecklistRequest(
             userId = userId,
             isPremium = isPremium,
@@ -58,14 +68,17 @@ class FirebaseAiServiceImpl(
             inputData = inputData
         )
 
+        logger.debug(TAG, "analyzeAndFillChecklist: calling $baseUrl/analyze_and_fill_checklist")
         val response: HttpResponse = httpClient.post("$baseUrl/analyze_and_fill_checklist") {
             contentType(ContentType.Application.Json)
             setBody(request)
         }
+        logger.debug(TAG, "analyzeAndFillChecklist: response status=${response.status}")
 
         val responseBody = response.body<FillChecklistResponseDto>()
 
         if (responseBody.success) {
+            logger.info(TAG, "analyzeAndFillChecklist: SUCCESS - filledItems=${responseBody.filledItems?.size}, aiCredits=${responseBody.aiCredits}")
             AiServiceResponse(
                 success = true,
                 data = FillChecklistResult(
@@ -79,6 +92,7 @@ class FirebaseAiServiceImpl(
                 usage = responseBody.usage?.toUsageInfo()
             )
         } else {
+            logger.error(TAG, "analyzeAndFillChecklist: FAILED - ${responseBody.error}")
             AiServiceResponse(
                 success = false,
                 error = responseBody.error ?: "Unknown error"
@@ -93,6 +107,8 @@ class FirebaseAiServiceImpl(
         inputType: AiInputType,
         inputData: String?
     ): Result<AiServiceResponse<GenerateChecklistResult>> = runCatching {
+        logger.debug(TAG, "generateChecklist: userId=$userId, inputType=$inputType, promptLength=${prompt.length}")
+
         val request = GenerateChecklistRequest(
             userId = userId,
             isPremium = isPremium,
@@ -101,14 +117,17 @@ class FirebaseAiServiceImpl(
             inputData = inputData
         )
 
+        logger.debug(TAG, "generateChecklist: calling $baseUrl/generate_checklist")
         val response: HttpResponse = httpClient.post("$baseUrl/generate_checklist") {
             contentType(ContentType.Application.Json)
             setBody(request)
         }
+        logger.debug(TAG, "generateChecklist: response status=${response.status}")
 
         val responseBody = response.body<GenerateChecklistResponseDto>()
 
         if (responseBody.success) {
+            logger.info(TAG, "generateChecklist: SUCCESS - checklistName=${responseBody.checklistName}, items=${responseBody.items?.size}, aiCredits=${responseBody.aiCredits}")
             AiServiceResponse(
                 success = true,
                 data = GenerateChecklistResult(
@@ -123,6 +142,7 @@ class FirebaseAiServiceImpl(
                 usage = responseBody.usage?.toUsageInfo()
             )
         } else {
+            logger.error(TAG, "generateChecklist: FAILED - ${responseBody.error}")
             AiServiceResponse(
                 success = false,
                 error = responseBody.error ?: "Unknown error"
@@ -134,24 +154,30 @@ class FirebaseAiServiceImpl(
         userId: String,
         isPremium: Boolean
     ): Result<AiServiceResponse<UsageInfo>> = runCatching {
+        logger.debug(TAG, "getUsageStats: userId=$userId, isPremium=$isPremium")
+
         val request = UsageStatsRequest(
             userId = userId,
             isPremium = isPremium
         )
 
+        logger.debug(TAG, "getUsageStats: calling $baseUrl/get_usage_stats")
         val response: HttpResponse = httpClient.post("$baseUrl/get_usage_stats") {
             contentType(ContentType.Application.Json)
             setBody(request)
         }
+        logger.debug(TAG, "getUsageStats: response status=${response.status}")
 
         val responseBody = response.body<UsageStatsResponseDto>()
 
         if (responseBody.success && responseBody.usage != null) {
+            logger.info(TAG, "getUsageStats: SUCCESS - count=${responseBody.usage.count}, limit=${responseBody.usage.limit}")
             AiServiceResponse(
                 success = true,
                 data = responseBody.usage.toUsageInfo()
             )
         } else {
+            logger.error(TAG, "getUsageStats: FAILED - ${responseBody.error}")
             AiServiceResponse(
                 success = false,
                 error = responseBody.error ?: "Failed to get usage stats"
@@ -164,7 +190,7 @@ class FirebaseAiServiceImpl(
         appVersion: String?,
         platform: String?
     ): Result<AiServiceResponse<RegisterUserResult>> = runCatching {
-        println("[$TAG] registerUser: deviceId=$deviceId, platform=$platform")
+        logger.debug(TAG, "registerUser: deviceId=$deviceId, platform=$platform")
 
         val request = RegisterUserRequest(
             deviceId = deviceId,
@@ -172,15 +198,15 @@ class FirebaseAiServiceImpl(
             platform = platform
         )
 
-        println("[$TAG] registerUser: calling $baseUrl/register_user")
+        logger.debug(TAG, "registerUser: calling $baseUrl/register_user")
         val response: HttpResponse = httpClient.post("$baseUrl/register_user") {
             contentType(ContentType.Application.Json)
             setBody(request)
         }
-        println("[$TAG] registerUser: response status=${response.status}")
+        logger.debug(TAG, "registerUser: response status=${response.status}")
 
         val responseBody = response.body<RegisterUserResponseDto>()
-        println("[$TAG] registerUser: success=${responseBody.success}, userId=${responseBody.userId}, aiCredits=${responseBody.aiCredits}, error=${responseBody.error}")
+        logger.debug(TAG, "registerUser: success=${responseBody.success}, userId=${responseBody.userId}, aiCredits=${responseBody.aiCredits}, error=${responseBody.error}")
 
         if (responseBody.success && responseBody.userId != null) {
             AiServiceResponse(
