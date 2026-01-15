@@ -2,6 +2,7 @@
 
 # Keep application classes
 -keep class com.antonchuraev.aichecklists.** { *; }
+-keep class com.antonchuraev.homesearchchecklist.** { *; }
 
 # Kotlin Serialization
 -keepattributes *Annotation*, InnerClasses
