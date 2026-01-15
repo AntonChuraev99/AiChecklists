@@ -25,7 +25,8 @@ data class ChecklistFillEntity(
     val name: String,
     val coverImagePath: String?,
     val items: List<ChecklistFillItem>,
-    val createdAt: Long
+    val createdAt: Long,
+    val isDefault: Boolean = false
 )
 
 fun ChecklistFillEntity.toDomain() = ChecklistFill(
@@ -34,7 +35,8 @@ fun ChecklistFillEntity.toDomain() = ChecklistFill(
     name = name,
     coverImagePath = coverImagePath,
     items = items,
-    createdAt = createdAt
+    createdAt = createdAt,
+    isDefault = isDefault
 )
 
 fun ChecklistFill.toEntity() = ChecklistFillEntity(
@@ -43,5 +45,6 @@ fun ChecklistFill.toEntity() = ChecklistFillEntity(
     name = name,
     coverImagePath = coverImagePath,
     items = items,
-    createdAt = createdAt
+    createdAt = createdAt,
+    isDefault = isDefault
 )

@@ -11,14 +11,17 @@ sealed interface ChecklistDetailState : State {
     data object NotFound : ChecklistDetailState
     data class Content(
         val checklist: Checklist,
-        val fills: List<ChecklistFill>,
+        val defaultFill: ChecklistFill?,
+        val additionalFillsCount: Int = 0,
         val showDeleteConfirmation: Boolean = false,
         val showAddFillDialog: Boolean = false,
         val newFillName: String = "",
         val fillNameError: String? = null,
         val isCreatingFill: Boolean = false,
         val userLimits: UserLimits? = null,
-        val showFillLimitDialog: Boolean = false
+        val showFillLimitDialog: Boolean = false,
+        val noteDialogItemIndex: Int? = null,
+        val editingNote: String = ""
     ) : ChecklistDetailState
 }
 
@@ -31,9 +34,15 @@ sealed interface ChecklistDetailIntent : Intent {
     data object OnConfirmDeleteChecklist : ChecklistDetailIntent
     data object OnDismissDeleteConfirmation : ChecklistDetailIntent
 
-    // Fill actions
-    data class OnFillClick(val fill: ChecklistFill) : ChecklistDetailIntent
-    data class OnDeleteFillClick(val fill: ChecklistFill) : ChecklistDetailIntent
+    // Item actions (for default fill)
+    data class OnItemCheckedChange(val index: Int, val checked: Boolean) : ChecklistDetailIntent
+    data class OnAddNoteClick(val index: Int) : ChecklistDetailIntent
+    data class OnNoteChanged(val note: String) : ChecklistDetailIntent
+    data object OnSaveNote : ChecklistDetailIntent
+    data object OnDismissNoteDialog : ChecklistDetailIntent
+
+    // View all fills
+    data object OnViewAllFillsClick : ChecklistDetailIntent
 
     // Add new fill
     data object OnAddFillClick : ChecklistDetailIntent

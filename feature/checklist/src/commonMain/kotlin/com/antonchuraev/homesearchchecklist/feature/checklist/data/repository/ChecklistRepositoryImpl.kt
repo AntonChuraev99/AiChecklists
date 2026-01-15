@@ -1,11 +1,13 @@
 package com.antonchuraev.homesearchchecklist.feature.checklist.data.repository
 
+import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistDao
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistFillDao
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.toDomain
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.toEntity
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -21,7 +23,25 @@ class ChecklistRepositoryImpl(
     }
 
     override suspend fun addChecklist(checklist: Checklist): Long {
-        return checklistDao.insert(checklist.toEntity())
+        val checklistId = checklistDao.insert(checklist.toEntity())
+
+        // Create default fill automatically
+        val defaultFill = ChecklistFill(
+            checklistId = checklistId,
+            name = "",
+            items = checklist.items.map { item ->
+                ChecklistFillItem(
+                    text = item.text,
+                    checked = false,
+                    note = null
+                )
+            },
+            createdAt = currentTimeMillis(),
+            isDefault = true
+        )
+        fillDao.insert(defaultFill.toEntity())
+
+        return checklistId
     }
 
     override suspend fun updateChecklist(checklist: Checklist) {
@@ -39,6 +59,16 @@ class ChecklistRepositoryImpl(
     // Fills (instances)
     override fun getFillsByChecklistId(checklistId: Long): Flow<List<ChecklistFill>> {
         return fillDao.observeFillsByChecklistId(checklistId).map { list ->
+            list.map { it.toDomain() }
+        }
+    }
+
+    override fun getDefaultFillByChecklistId(checklistId: Long): Flow<ChecklistFill?> {
+        return fillDao.observeDefaultFillByChecklistId(checklistId).map { it?.toDomain() }
+    }
+
+    override fun getAdditionalFillsByChecklistId(checklistId: Long): Flow<List<ChecklistFill>> {
+        return fillDao.observeAdditionalFillsByChecklistId(checklistId).map { list ->
             list.map { it.toDomain() }
         }
     }

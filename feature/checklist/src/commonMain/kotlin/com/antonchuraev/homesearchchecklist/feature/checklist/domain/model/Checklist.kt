@@ -24,6 +24,7 @@ data class ChecklistItem(
 /**
  * A filled instance of a checklist
  * Each fill represents one "session" of using the checklist (e.g., viewing a specific apartment)
+ * isDefault = true means this is the primary fill created automatically with the checklist
  */
 @Serializable
 data class ChecklistFill(
@@ -32,7 +33,8 @@ data class ChecklistFill(
     val name: String,
     val coverImagePath: String? = null,
     val items: List<ChecklistFillItem>,
-    val createdAt: Long = 0L
+    val createdAt: Long = 0L,
+    val isDefault: Boolean = false
 )
 
 /**
