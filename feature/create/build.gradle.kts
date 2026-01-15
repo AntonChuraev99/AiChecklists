@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.androidLibrary)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
+    alias(libs.plugins.jetbrains.kotlin.serialization)
 }
 
 kotlin {
@@ -26,6 +27,7 @@ kotlin {
             implementation(projects.core.common.api)
             implementation(projects.core.designsystem)
             implementation(projects.core.navigation.api)
+            implementation(projects.core.remoteconfig.api)
 
             implementation(projects.feature.checklist)
 
@@ -41,6 +43,7 @@ kotlin {
             implementation(libs.koin.core)
             implementation(libs.koin.compose.viewmodel)
             implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.kotlinx.serialization.json)
         }
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)
