@@ -43,6 +43,9 @@ kotlin {
             implementation(libs.koin.compose.viewmodel)
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)
+
+            // Generative AI (Gemini) for KMP
+            implementation(libs.generative.ai.google)
         }
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)

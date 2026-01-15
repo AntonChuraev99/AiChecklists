@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -86,6 +87,18 @@ android {
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 1
         versionName = "1.0"
+
+        // Read Gemini API key from local.properties
+        val localProperties = project.rootProject.file("local.properties")
+        val properties = Properties()
+        if (localProperties.exists()) {
+            properties.load(localProperties.inputStream())
+        }
+        buildConfigField("String", "GEMINI_API_KEY", "\"${properties.getProperty("GEMINI_API_KEY", "")}\"")
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
     packaging {
         resources {
