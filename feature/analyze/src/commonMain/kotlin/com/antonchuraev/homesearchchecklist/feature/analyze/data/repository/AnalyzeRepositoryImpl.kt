@@ -1,23 +1,88 @@
 package com.antonchuraev.homesearchchecklist.feature.analyze.data.repository
 
-import com.antonchuraev.homesearchchecklist.feature.analyze.domain.analyzer.AiAnalyzer
+import com.antonchuraev.homesearchchecklist.feature.analyze.data.remote.AiInputType
+import com.antonchuraev.homesearchchecklist.feature.analyze.data.remote.FirebaseAiService
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeInputData
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeResult
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.repository.AnalyzeRepository
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
+import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import kotlinx.coroutines.flow.first
 
 class AnalyzeRepositoryImpl(
-    private val aiAnalyzer: AiAnalyzer,
-    private val checklistRepository: ChecklistRepository
+    private val firebaseAiService: FirebaseAiService,
+    private val checklistRepository: ChecklistRepository,
+    private val userDataRepository: UserDataRepository
 ) : AnalyzeRepository {
 
     override suspend fun analyzeData(
         inputData: AnalyzeInputData,
         targetChecklist: Checklist?
     ): Result<AnalyzeResult> {
-        return aiAnalyzer.analyze(inputData, targetChecklist)
+        val userData = userDataRepository.getUserData()
+        val userId = userData.userId
+        val isPremium = userData.isPremium
+
+        // Convert input data to API format
+        val (inputType, inputDataString) = convertInputData(inputData)
+
+        return if (targetChecklist != null) {
+            // Use analyze_and_fill_checklist for existing checklists
+            firebaseAiService.analyzeAndFillChecklist(
+                userId = userId,
+                isPremium = isPremium,
+                checklist = targetChecklist,
+                inputType = inputType,
+                inputData = inputDataString
+            ).fold(
+                onSuccess = { response ->
+                    if (response.success && response.data != null) {
+                        val filledItems = response.data.filledItems.map { filled ->
+                            ChecklistItem(
+                                text = filled.note?.let { "${filled.text} - $it" } ?: filled.text,
+                                checked = filled.checked
+                            )
+                        }
+                        Result.success(
+                            AnalyzeResult(
+                                suggestedItems = filledItems,
+                                confidence = response.data.confidence,
+                                summary = response.data.summary
+                            )
+                        )
+                    } else {
+                        Result.failure(Exception(response.error ?: "Analysis failed"))
+                    }
+                },
+                onFailure = { Result.failure(it) }
+            )
+        } else {
+            // Use generate_checklist for new checklists
+            firebaseAiService.generateChecklist(
+                userId = userId,
+                isPremium = isPremium,
+                prompt = getPromptFromInput(inputData),
+                inputType = inputType,
+                inputData = inputDataString
+            ).fold(
+                onSuccess = { response ->
+                    if (response.success && response.data != null) {
+                        Result.success(
+                            AnalyzeResult(
+                                suggestedItems = response.data.items,
+                                confidence = response.data.confidence,
+                                summary = response.data.summary
+                            )
+                        )
+                    } else {
+                        Result.failure(Exception(response.error ?: "Generation failed"))
+                    }
+                },
+                onFailure = { Result.failure(it) }
+            )
+        }
     }
 
     override suspend fun applyToChecklist(
@@ -62,6 +127,40 @@ class AnalyzeRepositoryImpl(
     }
 
     override suspend fun isAnalyzerAvailable(): Boolean {
-        return aiAnalyzer.isAvailable()
+        // Firebase AI service is always available (server-side)
+        return true
+    }
+
+    private fun convertInputData(inputData: AnalyzeInputData): Pair<AiInputType, String> {
+        return when (inputData) {
+            is AnalyzeInputData.Photo -> {
+                // For images, we would need to encode to base64
+                // For now, return the path and let the service handle it
+                AiInputType.IMAGE_BASE64 to inputData.filePath
+            }
+            is AnalyzeInputData.PdfDocument -> {
+                // PDFs would need to be extracted as text or encoded
+                AiInputType.TEXT to "PDF content from: ${inputData.fileName}"
+            }
+            is AnalyzeInputData.TextFile -> {
+                AiInputType.TEXT to (inputData.content ?: "Text file: ${inputData.filePath}")
+            }
+            is AnalyzeInputData.WebLink -> {
+                AiInputType.URL to inputData.url
+            }
+            is AnalyzeInputData.RawText -> {
+                AiInputType.TEXT to inputData.text
+            }
+        }
+    }
+
+    private fun getPromptFromInput(inputData: AnalyzeInputData): String {
+        return when (inputData) {
+            is AnalyzeInputData.Photo -> "Create a checklist based on this image"
+            is AnalyzeInputData.PdfDocument -> "Create a checklist from this document: ${inputData.fileName}"
+            is AnalyzeInputData.TextFile -> "Create a checklist from this text file"
+            is AnalyzeInputData.WebLink -> "Create a checklist from the content at: ${inputData.url}"
+            is AnalyzeInputData.RawText -> "Create a checklist based on: ${inputData.text}"
+        }
     }
 }

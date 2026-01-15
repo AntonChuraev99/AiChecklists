@@ -6,6 +6,8 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class UserData(
-    val isOnboardingPassed: Boolean
+    val userId: String = "",
+    val isOnboardingPassed: Boolean = false,
+    val isPremium: Boolean = false
 )
 

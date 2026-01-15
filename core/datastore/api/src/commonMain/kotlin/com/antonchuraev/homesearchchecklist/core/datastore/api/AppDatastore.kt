@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -42,6 +43,17 @@ class AppDatastore(
 
     fun observeBoolean(key: String, defaultValue: Boolean): Flow<Boolean> =
         dataStore.data.map { prefs -> prefs[booleanPreferencesKey(key)] ?: defaultValue }
+
+    suspend fun saveString(key: String, value: String) {
+        withContext(dispatcher) {
+            dataStore.edit { prefs ->
+                prefs[stringPreferencesKey(key)] = value
+            }
+        }
+    }
+
+    fun observeString(key: String, defaultValue: String): Flow<String> =
+        dataStore.data.map { prefs -> prefs[stringPreferencesKey(key)] ?: defaultValue }
 
     suspend fun clear() {
         withContext(dispatcher) {
