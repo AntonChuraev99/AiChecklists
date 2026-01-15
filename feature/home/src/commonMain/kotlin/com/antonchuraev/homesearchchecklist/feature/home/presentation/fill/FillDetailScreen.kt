@@ -1,5 +1,11 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation.fill
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,12 +19,17 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.NoteAdd
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
@@ -202,10 +213,20 @@ private fun ProgressHeader(fill: ChecklistFill) {
     val checkedCount = fill.items.count { it.checked }
     val totalCount = fill.items.size
     val progress = if (totalCount > 0) checkedCount.toFloat() / totalCount else 0f
+    val isComplete = totalCount > 0 && checkedCount == totalCount
 
     Column(
         modifier = Modifier.fillMaxWidth()
     ) {
+        // Completion celebration banner
+        AnimatedVisibility(
+            visible = isComplete,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically()
+        ) {
+            CompletionBanner()
+        }
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -219,7 +240,7 @@ private fun ProgressHeader(fill: ChecklistFill) {
             Text(
                 text = "$checkedCount / $totalCount",
                 style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary
+                color = if (isComplete) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary
             )
         }
         Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
@@ -228,10 +249,49 @@ private fun ProgressHeader(fill: ChecklistFill) {
             modifier = Modifier
                 .fillMaxWidth()
                 .height(8.dp),
-            color = MaterialTheme.colorScheme.primary,
+            color = if (isComplete) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
             trackColor = MaterialTheme.colorScheme.surfaceVariant,
         )
         Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
+    }
+}
+
+@Composable
+private fun CompletionBanner() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = AppDimens.SpacingLg),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .size(64.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.tertiaryContainer),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Filled.CheckCircle,
+                contentDescription = null,
+                modifier = Modifier.size(40.dp),
+                tint = MaterialTheme.colorScheme.tertiary
+            )
+        }
+        Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
+        Text(
+            text = stringResource(Res.string.fill_complete_title),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.tertiary,
+            textAlign = TextAlign.Center
+        )
+        Text(
+            text = stringResource(Res.string.fill_complete_description),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
     }
 }
 

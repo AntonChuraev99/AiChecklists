@@ -19,6 +19,7 @@ import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -37,6 +38,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonSec
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonText
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppTextField
+import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
@@ -273,18 +275,12 @@ private fun TemplateInfo(checklist: Checklist) {
 
 @Composable
 private fun EmptyFillsMessage() {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = AppDimens.SpacingXxl),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = stringResource(Res.string.checklist_no_fills),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
+    EmptyState(
+        icon = Icons.Outlined.FolderOpen,
+        title = stringResource(Res.string.checklist_no_fills_title),
+        description = stringResource(Res.string.checklist_no_fills_description),
+        modifier = Modifier.padding(vertical = AppDimens.SpacingLg)
+    )
 }
 
 @Composable
