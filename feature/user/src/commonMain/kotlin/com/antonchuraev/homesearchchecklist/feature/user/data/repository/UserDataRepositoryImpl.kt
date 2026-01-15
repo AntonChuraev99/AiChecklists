@@ -90,29 +90,41 @@ class UserDataRepositoryImpl(
         println("[$TAG] ensureUserRegistered: currentUserId='$currentUserId'")
 
         if (currentUserId.isNotBlank()) {
-            // User already registered, return cached data
-            val cachedData = getUserData()
-            println("[$TAG] ensureUserRegistered: user already registered, cached credits=${cachedData.aiCredits}")
-            return Result.success(cachedData)
+            // User already registered, sync with server to get fresh data
+            println("[$TAG] ensureUserRegistered: user exists, syncing with server...")
+            return syncWithServer()
         }
 
         // User not registered, call the server
         val deviceId = deviceIdProvider.getDeviceId()
         println("[$TAG] ensureUserRegistered: registering new user with deviceId=$deviceId")
 
+        return registerAndSave(deviceId)
+    }
+
+    override suspend fun syncWithServer(): Result<UserData> {
+        println("[$TAG] syncWithServer: starting...")
+
+        val deviceId = deviceIdProvider.getDeviceId()
+        println("[$TAG] syncWithServer: deviceId=$deviceId")
+
+        return registerAndSave(deviceId)
+    }
+
+    private suspend fun registerAndSave(deviceId: String): Result<UserData> {
         return userApiService.registerUser(
             deviceId = deviceId,
-            appVersion = null, // TODO: Add app version from BuildConfig
+            appVersion = null,
             platform = getPlatformName()
         ).onSuccess { result ->
-            println("[$TAG] ensureUserRegistered: SUCCESS - userId=${result.userId}, aiCredits=${result.aiCredits}, isPremium=${result.isPremium}")
+            println("[$TAG] registerAndSave: SUCCESS - userId=${result.userId}, aiCredits=${result.aiCredits}, isPremium=${result.isPremium}")
             // Save user data locally
             appDatastore.saveString(USER_ID_KEY, result.userId)
             appDatastore.saveBoolean(IS_PREMIUM_KEY, result.isPremium)
             appDatastore.saveInt(AI_CREDITS_KEY, result.aiCredits)
-            println("[$TAG] ensureUserRegistered: saved to datastore")
+            println("[$TAG] registerAndSave: saved to datastore")
         }.onFailure { error ->
-            println("[$TAG] ensureUserRegistered: FAILED - ${error.message}")
+            println("[$TAG] registerAndSave: FAILED - ${error.message}")
         }.map { result ->
             UserData(
                 userId = result.userId,
