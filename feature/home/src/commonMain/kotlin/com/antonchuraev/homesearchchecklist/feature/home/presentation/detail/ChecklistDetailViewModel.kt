@@ -84,7 +84,7 @@ class ChecklistDetailViewModel(
             }
 
             is ChecklistDetailIntent.OnNewFillNameChanged -> {
-                updateContentState { it.copy(newFillName = intent.name) }
+                updateContentState { it.copy(newFillName = intent.name, fillNameError = null) }
             }
 
             ChecklistDetailIntent.OnConfirmAddFill -> createNewFill()
@@ -94,9 +94,15 @@ class ChecklistDetailViewModel(
     private fun createNewFill() {
         val state = _screenState.value
         if (state !is ChecklistDetailState.Content) return
+        if (state.isCreatingFill) return
 
         val name = state.newFillName.trim()
-        if (name.isEmpty()) return
+        if (name.isEmpty()) {
+            updateContentState { it.copy(fillNameError = "Введите название") }
+            return
+        }
+
+        updateContentState { it.copy(isCreatingFill = true, fillNameError = null) }
 
         viewModelScope.launch {
             val fillItems = state.checklist.items.map { item ->
@@ -115,7 +121,7 @@ class ChecklistDetailViewModel(
             )
 
             val fillId = repository.addFill(newFill)
-            updateContentState { it.copy(showAddFillDialog = false) }
+            updateContentState { it.copy(showAddFillDialog = false, isCreatingFill = false) }
 
             navigator.navigateToFillDetail(fillId)
         }

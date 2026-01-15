@@ -13,7 +13,9 @@ sealed interface ChecklistDetailState : State {
         val fills: List<ChecklistFill>,
         val showDeleteConfirmation: Boolean = false,
         val showAddFillDialog: Boolean = false,
-        val newFillName: String = ""
+        val newFillName: String = "",
+        val fillNameError: String? = null,
+        val isCreatingFill: Boolean = false
     ) : ChecklistDetailState
 }
 

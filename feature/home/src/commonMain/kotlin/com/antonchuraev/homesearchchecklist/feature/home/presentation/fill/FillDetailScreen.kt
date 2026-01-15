@@ -138,12 +138,23 @@ private fun FillDetailContent(
 
             if (state.isEditing) {
                 item {
-                    AppTextField(
-                        value = state.editingName,
-                        onValueChange = { onIntent(FillDetailIntent.OnNameChanged(it)) },
-                        label = stringResource(Res.string.checklist_fill_name_label),
-                        placeholder = stringResource(Res.string.checklist_fill_name_placeholder)
-                    )
+                    Column {
+                        AppTextField(
+                            value = state.editingName,
+                            onValueChange = { onIntent(FillDetailIntent.OnNameChanged(it)) },
+                            label = stringResource(Res.string.checklist_fill_name_label),
+                            placeholder = stringResource(Res.string.checklist_fill_name_placeholder),
+                            isError = state.editingNameError != null
+                        )
+                        state.editingNameError?.let { error ->
+                            Spacer(modifier = Modifier.height(AppDimens.SpacingXs))
+                            Text(
+                                text = error,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
                     Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
                 }
             }

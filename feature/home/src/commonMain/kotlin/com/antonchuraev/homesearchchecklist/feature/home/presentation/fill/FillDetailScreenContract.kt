@@ -11,6 +11,7 @@ sealed interface FillDetailState : State {
         val fill: ChecklistFill,
         val isEditing: Boolean = false,
         val editingName: String = "",
+        val editingNameError: String? = null,
         val showDeleteConfirmation: Boolean = false,
         val noteDialogItemIndex: Int? = null,
         val editingNote: String = ""
