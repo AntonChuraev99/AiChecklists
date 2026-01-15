@@ -8,6 +8,7 @@ import kotlinx.serialization.Serializable
 data class UserData(
     val userId: String = "",
     val isOnboardingPassed: Boolean = false,
-    val isPremium: Boolean = false
+    val isPremium: Boolean = false,
+    val aiCredits: Int = 0
 )
 

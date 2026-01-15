@@ -26,6 +26,7 @@ data class RegisterUserResult(
     val userId: String,
     val isNewUser: Boolean,
     val isPremium: Boolean,
+    val aiCredits: Int,
     val createdAt: String
 )
 
@@ -35,7 +36,8 @@ data class RegisterUserResult(
 data class FillChecklistResult(
     val filledItems: List<FilledItem>,
     val summary: String,
-    val confidence: Float
+    val confidence: Float,
+    val aiCredits: Int = 0 // Remaining credits after action
 )
 
 data class FilledItem(
@@ -52,7 +54,8 @@ data class GenerateChecklistResult(
     val checklistName: String,
     val items: List<ChecklistItem>,
     val summary: String,
-    val confidence: Float
+    val confidence: Float,
+    val aiCredits: Int = 0 // Remaining credits after action
 )
 
 /**

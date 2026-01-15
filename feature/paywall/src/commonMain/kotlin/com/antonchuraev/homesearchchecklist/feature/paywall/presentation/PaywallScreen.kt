@@ -1,9 +1,6 @@
 package com.antonchuraev.homesearchchecklist.feature.paywall.presentation
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,18 +9,19 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Checklist
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -38,26 +36,23 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import aichecklists.core.designsystem.generated.resources.Res
-import aichecklists.core.designsystem.generated.resources.paywall_best_value
-import aichecklists.core.designsystem.generated.resources.paywall_continue
-import aichecklists.core.designsystem.generated.resources.paywall_feature_ai
-import aichecklists.core.designsystem.generated.resources.paywall_feature_checklists
-import aichecklists.core.designsystem.generated.resources.paywall_feature_sync
-import aichecklists.core.designsystem.generated.resources.paywall_restore
-import aichecklists.core.designsystem.generated.resources.paywall_subtitle
-import aichecklists.core.designsystem.generated.resources.paywall_title
-import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
+import aichecklists.core.designsystem.generated.resources.*
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallProduct
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
+
+// Colors for the paywall
+private val PaywallOrange = Color(0xFFFF9500)
+private val PaywallOrangeLight = Color(0xFFFFF3E0)
+private val PaywallOrangeDark = Color(0xFFE68600)
 
 @Composable
 fun PaywallScreen(
@@ -75,137 +70,52 @@ fun PaywallScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(Color(0xFFF5F5F5))
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
+            modifier = Modifier.fillMaxSize()
         ) {
-            // Close button
-            Row(
+            // Top section with close button and preview
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = AppDimens.SpacingLg),
-                horizontalArrangement = Arrangement.End
+                    .weight(1f)
             ) {
-                IconButton(onClick = { viewModel.sendIntent(PaywallIntent.Close) }) {
+                // Close button
+                IconButton(
+                    onClick = { viewModel.sendIntent(PaywallIntent.Close) },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(AppDimens.SpacingMd)
+                ) {
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "Close",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = Color.Gray
                     )
                 }
-            }
 
-            Spacer(modifier = Modifier.height(AppDimens.SpacingLg))
-
-            // Premium icon with gradient background
-            Box(
-                modifier = Modifier
-                    .size(80.dp)
-                    .clip(CircleShape)
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(Color(0xFF667EEA), Color(0xFF764BA2))
-                        )
-                    )
-                    .align(Alignment.CenterHorizontally),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.AutoAwesome,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(40.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(AppDimens.SpacingXl))
-
-            // Title
-            Text(
-                text = stringResource(Res.string.paywall_title),
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
-
-            // Subtitle
-            Text(
-                text = stringResource(Res.string.paywall_subtitle),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.height(AppDimens.SpacingXl))
-
-            // Features list
-            FeaturesList()
-
-            Spacer(modifier = Modifier.height(AppDimens.SpacingXl))
-
-            // Products
-            if (state.isLoading) {
-                Box(
+                // App preview mockup
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp),
-                    contentAlignment = Alignment.Center
+                        .fillMaxSize()
+                        .padding(horizontal = 32.dp)
+                        .padding(top = 60.dp, bottom = 24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    CircularProgressIndicator()
+                    AppPreviewMockup()
                 }
-            } else {
-                ProductsList(
-                    products = state.products,
-                    selectedProductId = state.selectedProductId,
-                    onProductSelected = { viewModel.sendIntent(PaywallIntent.SelectProduct(it)) }
-                )
             }
 
-            Spacer(modifier = Modifier.height(AppDimens.SpacingXl))
-
-            // Continue button
-            AppButton(
-                text = stringResource(Res.string.paywall_continue),
-                onClick = { viewModel.sendIntent(PaywallIntent.Purchase) },
-                enabled = state.selectedProductId != null && !state.isPurchasing,
-                modifier = Modifier.fillMaxWidth()
+            // Bottom card with subscription info
+            val product = state.products.firstOrNull()
+            SubscriptionCard(
+                product = product,
+                isLoading = state.isLoading,
+                isPurchasing = state.isPurchasing,
+                onSubscribe = { viewModel.sendIntent(PaywallIntent.Purchase) },
+                onRestore = { viewModel.sendIntent(PaywallIntent.RestorePurchases) }
             )
-
-            if (state.isPurchasing) {
-                Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
-                Box(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                }
-            }
-
-            Spacer(modifier = Modifier.height(AppDimens.SpacingLg))
-
-            // Restore purchases
-            TextButton(
-                onClick = { viewModel.sendIntent(PaywallIntent.RestorePurchases) },
-                modifier = Modifier.align(Alignment.CenterHorizontally)
-            ) {
-                Text(
-                    text = stringResource(Res.string.paywall_restore),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    textDecoration = TextDecoration.Underline
-                )
-            }
-
-            Spacer(modifier = Modifier.height(AppDimens.SpacingXxl))
         }
 
         // Error snackbar
@@ -213,7 +123,8 @@ fun PaywallScreen(
             Snackbar(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(AppDimens.SpacingLg),
+                    .padding(AppDimens.SpacingLg)
+                    .navigationBarsPadding(),
                 action = {
                     TextButton(onClick = { viewModel.sendIntent(PaywallIntent.DismissError) }) {
                         Text("OK")
@@ -227,146 +138,237 @@ fun PaywallScreen(
 }
 
 @Composable
-private fun FeaturesList() {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
+private fun AppPreviewMockup() {
+    // Phone-like container with app preview
+    Box(
+        modifier = Modifier
+            .shadow(
+                elevation = 20.dp,
+                shape = RoundedCornerShape(24.dp),
+                spotColor = Color.Black.copy(alpha = 0.15f)
+            )
+            .clip(RoundedCornerShape(24.dp))
+            .background(Color.White)
+            .padding(16.dp)
     ) {
-        FeatureItem(text = stringResource(Res.string.paywall_feature_checklists))
-        FeatureItem(text = stringResource(Res.string.paywall_feature_ai))
-        FeatureItem(text = stringResource(Res.string.paywall_feature_sync))
-    }
-}
+        Column(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            // App header
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(bottom = 16.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.AutoAwesome,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = stringResource(Res.string.app_name),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
 
-@Composable
-private fun FeatureItem(text: String) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Icon(
-            imageVector = Icons.Default.Check,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(24.dp)
-        )
-        Spacer(modifier = Modifier.width(AppDimens.SpacingMd))
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-    }
-}
+            // Sample checklist items
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                SampleChecklistItem(text = stringResource(Res.string.paywall_preview_item1), checked = true)
+                SampleChecklistItem(text = stringResource(Res.string.paywall_preview_item2), checked = true)
+                SampleChecklistItem(text = stringResource(Res.string.paywall_preview_item3), checked = false)
+                SampleChecklistItem(text = stringResource(Res.string.paywall_preview_item4), checked = false)
+            }
 
-@Composable
-private fun ProductsList(
-    products: List<PaywallProduct>,
-    selectedProductId: String?,
-    onProductSelected: (String) -> Unit
-) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
-    ) {
-        products.forEach { product ->
-            ProductCard(
-                product = product,
-                isSelected = product.id == selectedProductId,
-                onClick = { onProductSelected(product.id) }
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Tagline
+            Text(
+                text = stringResource(Res.string.paywall_preview_tagline),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
             )
         }
     }
 }
 
 @Composable
-private fun ProductCard(
-    product: PaywallProduct,
-    isSelected: Boolean,
-    onClick: () -> Unit
+private fun SampleChecklistItem(text: String, checked: Boolean) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = if (checked) Icons.Default.Check else Icons.Outlined.Checklist,
+            contentDescription = null,
+            tint = if (checked) MaterialTheme.colorScheme.primary else Color.Gray,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (checked) Color.Black else Color.Gray
+        )
+    }
+}
+
+@Composable
+private fun SubscriptionCard(
+    product: PaywallProduct?,
+    isLoading: Boolean,
+    isPurchasing: Boolean,
+    onSubscribe: () -> Unit,
+    onRestore: () -> Unit
 ) {
-    val borderColor = if (isSelected) {
-        MaterialTheme.colorScheme.primary
-    } else {
-        MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-    }
-
-    val backgroundColor = if (isSelected) {
-        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)
-    } else {
-        MaterialTheme.colorScheme.surface
-    }
-
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(backgroundColor)
-            .border(
-                BorderStroke(
-                    width = if (isSelected) 2.dp else 1.dp,
-                    color = borderColor
-                ),
-                RoundedCornerShape(16.dp)
-            )
-            .clickable(onClick = onClick)
-            .padding(AppDimens.SpacingLg)
+            .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
+            .background(PaywallOrangeLight)
+            .padding(horizontal = 24.dp)
+            .padding(top = 32.dp, bottom = 16.dp)
+            .navigationBarsPadding(),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = product.title,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(48.dp),
+                color = PaywallOrange
+            )
+            Spacer(modifier = Modifier.height(24.dp))
+        } else if (product != null) {
+            // Trial headline
+            if (product.hasFreeTrial) {
+                Text(
+                    text = stringResource(Res.string.paywall_days_free, product.freeTrialDays),
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black,
+                    textAlign = TextAlign.Center
+                )
+            } else {
+                Text(
+                    text = stringResource(Res.string.paywall_go_premium),
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black,
+                    textAlign = TextAlign.Center
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Price info
+            Text(
+                text = stringResource(Res.string.paywall_then_price, product.priceString),
+                style = MaterialTheme.typography.bodyLarge,
+                color = Color.Black.copy(alpha = 0.8f),
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // CTA Button
+            Button(
+                onClick = onSubscribe,
+                enabled = !isPurchasing,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(28.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = PaywallOrange,
+                    contentColor = Color.White,
+                    disabledContainerColor = PaywallOrange.copy(alpha = 0.5f)
+                )
+            ) {
+                if (isPurchasing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = Color.White,
+                        strokeWidth = 2.dp
                     )
-                    if (product.isPopular) {
-                        Spacer(modifier = Modifier.width(AppDimens.SpacingSm))
-                        PopularBadge()
-                    }
-                }
-                product.periodString?.let { period ->
+                } else {
                     Text(
-                        text = period,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = if (product.hasFreeTrial) {
+                            stringResource(Res.string.paywall_start_free_trial)
+                        } else {
+                            stringResource(Res.string.paywall_subscribe_now)
+                        },
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
 
-            Text(
-                text = product.priceString,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-        }
-    }
-}
+            Spacer(modifier = Modifier.height(16.dp))
 
-@Composable
-private fun PopularBadge() {
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(4.dp))
-            .background(MaterialTheme.colorScheme.primary)
-            .padding(horizontal = 6.dp, vertical = 2.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = Icons.Default.Star,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onPrimary,
-            modifier = Modifier.size(12.dp)
-        )
-        Spacer(modifier = Modifier.width(2.dp))
-        Text(
-            text = stringResource(Res.string.paywall_best_value),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onPrimary
-        )
+            // No payment due now
+            if (product.hasFreeTrial) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        tint = Color.Black.copy(alpha = 0.7f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = stringResource(Res.string.paywall_no_payment_now),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.Black.copy(alpha = 0.7f)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+        }
+
+        // Footer links
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            TextButton(onClick = { /* Terms */ }) {
+                Text(
+                    text = stringResource(Res.string.paywall_terms),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.Gray,
+                    fontSize = 12.sp
+                )
+            }
+            TextButton(onClick = onRestore) {
+                Text(
+                    text = stringResource(Res.string.paywall_restore),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.Gray,
+                    fontSize = 12.sp
+                )
+            }
+            TextButton(onClick = { /* Privacy */ }) {
+                Text(
+                    text = stringResource(Res.string.paywall_privacy),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.Gray,
+                    fontSize = 12.sp
+                )
+            }
+        }
     }
 }

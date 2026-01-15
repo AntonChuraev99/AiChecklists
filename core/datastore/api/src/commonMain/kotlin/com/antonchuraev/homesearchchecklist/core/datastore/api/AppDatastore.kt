@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -54,6 +55,17 @@ class AppDatastore(
 
     fun observeString(key: String, defaultValue: String): Flow<String> =
         dataStore.data.map { prefs -> prefs[stringPreferencesKey(key)] ?: defaultValue }
+
+    suspend fun saveInt(key: String, value: Int) {
+        withContext(dispatcher) {
+            dataStore.edit { prefs ->
+                prefs[intPreferencesKey(key)] = value
+            }
+        }
+    }
+
+    fun observeInt(key: String, defaultValue: Int): Flow<Int> =
+        dataStore.data.map { prefs -> prefs[intPreferencesKey(key)] ?: defaultValue }
 
     suspend fun clear() {
         withContext(dispatcher) {

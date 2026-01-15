@@ -55,6 +55,25 @@ fun MainScreenContent(
             onSubscriptionClick = onPremiumBannerClick
         )
 
+        // Show limit indicator for free users
+        val userLimits = screenState.userLimits
+        if (userLimits != null && !userLimits.isPremium) {
+            Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
+            Text(
+                text = stringResource(
+                    Res.string.limit_checklist_count,
+                    userLimits.currentChecklistCount,
+                    userLimits.maxChecklists
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = if (userLimits.canCreateChecklist) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.error
+                }
+            )
+        }
+
         Spacer(modifier = Modifier.height(AppDimens.SpacingLg))
 
         if (screenState.checklists.isEmpty()) {

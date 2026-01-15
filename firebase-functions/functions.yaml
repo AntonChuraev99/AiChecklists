@@ -1,0 +1,37 @@
+specVersion: v1alpha1
+endpoints:
+  register_user:
+    entryPoint: register_user
+    httpsTrigger: {}
+    region: us-central1
+    platform: gcfv2
+
+  analyze_and_fill_checklist:
+    entryPoint: analyze_and_fill_checklist
+    httpsTrigger: {}
+    region: us-central1
+    platform: gcfv2
+
+  generate_checklist:
+    entryPoint: generate_checklist
+    httpsTrigger: {}
+    region: us-central1
+    platform: gcfv2
+
+  get_usage_stats:
+    entryPoint: get_usage_stats
+    httpsTrigger: {}
+    region: us-central1
+    platform: gcfv2
+
+  refill_premium_credits:
+    entryPoint: refill_premium_credits
+    httpsTrigger: {}
+    region: us-central1
+    platform: gcfv2
+
+  get_credits_info:
+    entryPoint: get_credits_info
+    httpsTrigger: {}
+    region: us-central1
+    platform: gcfv2

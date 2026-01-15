@@ -7,17 +7,20 @@ import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetUserLimitsUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class ChecklistDetailViewModel(
     private val checklistId: Long,
     private val repository: ChecklistRepository,
-    private val navigator: AppNavigator
+    private val navigator: AppNavigator,
+    private val getUserLimitsUseCase: GetUserLimitsUseCase
 ) : AppViewModel<ChecklistDetailState, ChecklistDetailIntent, Nothing>() {
 
     private val _screenState = MutableStateFlow<ChecklistDetailState>(ChecklistDetailState.Loading)
@@ -35,11 +38,25 @@ class ChecklistDetailViewModel(
                 return@launch
             }
 
-            repository.getFillsByChecklistId(checklistId).collect { fills ->
-                _screenState.value = ChecklistDetailState.Content(
-                    checklist = checklist,
-                    fills = fills
-                )
+            combine(
+                repository.getFillsByChecklistId(checklistId),
+                getUserLimitsUseCase()
+            ) { fills, userLimits ->
+                fills to userLimits
+            }.collect { (fills, userLimits) ->
+                val currentState = _screenState.value
+                if (currentState is ChecklistDetailState.Content) {
+                    _screenState.value = currentState.copy(
+                        fills = fills,
+                        userLimits = userLimits
+                    )
+                } else {
+                    _screenState.value = ChecklistDetailState.Content(
+                        checklist = checklist,
+                        fills = fills,
+                        userLimits = userLimits
+                    )
+                }
             }
         }
     }
@@ -70,14 +87,9 @@ class ChecklistDetailViewModel(
                 deleteFill(intent.fill)
             }
 
-            ChecklistDetailIntent.OnAddFillClick -> {
-                updateContentState { it.copy(showAddFillDialog = true, newFillName = "") }
-            }
+            ChecklistDetailIntent.OnAddFillClick -> handleAddFillClick()
 
-            ChecklistDetailIntent.OnAddFillViaAiClick -> {
-                // Navigate to AI analyze screen with checklist context
-                navigator.navigateToAnalyzeScreen()
-            }
+            ChecklistDetailIntent.OnAddFillViaAiClick -> handleAddFillViaAiClick()
 
             ChecklistDetailIntent.OnDismissAddFillDialog -> {
                 updateContentState { it.copy(showAddFillDialog = false) }
@@ -88,6 +100,39 @@ class ChecklistDetailViewModel(
             }
 
             ChecklistDetailIntent.OnConfirmAddFill -> createNewFill()
+
+            ChecklistDetailIntent.OnDismissFillLimitDialog -> {
+                updateContentState { it.copy(showFillLimitDialog = false) }
+            }
+
+            ChecklistDetailIntent.OnUpgradeToPremiumClick -> {
+                updateContentState { it.copy(showFillLimitDialog = false) }
+                navigator.navigateToPaywall()
+            }
+        }
+    }
+
+    private fun handleAddFillClick() {
+        val state = _screenState.value
+        if (state !is ChecklistDetailState.Content) return
+
+        val limits = state.userLimits
+        if (limits != null && !limits.canCreateFill(state.fills.size)) {
+            updateContentState { it.copy(showFillLimitDialog = true) }
+        } else {
+            updateContentState { it.copy(showAddFillDialog = true, newFillName = "") }
+        }
+    }
+
+    private fun handleAddFillViaAiClick() {
+        val state = _screenState.value
+        if (state !is ChecklistDetailState.Content) return
+
+        val limits = state.userLimits
+        if (limits != null && !limits.canCreateFill(state.fills.size)) {
+            updateContentState { it.copy(showFillLimitDialog = true) }
+        } else {
+            navigator.navigateToAnalyzeScreen()
         }
     }
 

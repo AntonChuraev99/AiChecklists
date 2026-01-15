@@ -132,11 +132,34 @@ private fun ChecklistDetailContent(
 
             item {
                 Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
-                Text(
-                    text = stringResource(Res.string.checklist_fills_section),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = stringResource(Res.string.checklist_fills_section),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    // Show limit indicator for free users
+                    val limits = state.userLimits
+                    if (limits != null && !limits.isPremium) {
+                        Text(
+                            text = stringResource(
+                                Res.string.limit_fill_count,
+                                state.fills.size,
+                                limits.maxFillsPerChecklist
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (limits.canCreateFill(state.fills.size)) {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            } else {
+                                MaterialTheme.colorScheme.error
+                            }
+                        )
+                    }
+                }
                 Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
             }
 
@@ -200,6 +223,14 @@ private fun ChecklistDetailContent(
             checklistName = state.checklist.name,
             onConfirm = { onIntent(ChecklistDetailIntent.OnConfirmDeleteChecklist) },
             onDismiss = { onIntent(ChecklistDetailIntent.OnDismissDeleteConfirmation) }
+        )
+    }
+
+    if (state.showFillLimitDialog && state.userLimits != null) {
+        FillLimitDialog(
+            maxFills = state.userLimits.maxFillsPerChecklist,
+            onDismiss = { onIntent(ChecklistDetailIntent.OnDismissFillLimitDialog) },
+            onUpgrade = { onIntent(ChecklistDetailIntent.OnUpgradeToPremiumClick) }
         )
     }
 }
@@ -386,6 +417,35 @@ private fun DeleteConfirmationDialog(
             AppButton(
                 text = stringResource(Res.string.delete),
                 onClick = onConfirm
+            )
+        },
+        dismissButton = {
+            AppButtonText(
+                text = stringResource(Res.string.cancel),
+                onClick = onDismiss
+            )
+        },
+        containerColor = MaterialTheme.colorScheme.surface,
+        shape = MaterialTheme.shapes.large
+    )
+}
+
+@Composable
+private fun FillLimitDialog(
+    maxFills: Int,
+    onDismiss: () -> Unit,
+    onUpgrade: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(Res.string.limit_fill_reached_title)) },
+        text = {
+            Text(stringResource(Res.string.limit_fill_reached_message, maxFills))
+        },
+        confirmButton = {
+            AppButtonText(
+                text = stringResource(Res.string.limit_upgrade),
+                onClick = onUpgrade
             )
         },
         dismissButton = {

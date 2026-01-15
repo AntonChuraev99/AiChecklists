@@ -81,6 +81,8 @@
     <string name="analyze_error_empty_text">Enter some text to analyze</string>
     <string name="analyze_error_no_file">Select a file to analyze</string>
     <string name="analyze_error_empty_name">Give your checklist a name</string>
+    <string name="analyze_cost_info">This action costs %1$d credits</string>
+    <string name="analyze_not_enough_credits">Not enough credits. Get more to continue.</string>
 
     <!-- Checklist Detail Screen -->
     <string name="checklist_not_found">Checklist not found</string>
@@ -112,26 +114,64 @@
 
     <!-- Premium Banner -->
     <string name="premium_banner_title">Go Premium</string>
-    <string name="premium_banner_description">Unlimited AI power and no limits</string>
+    <string name="premium_banner_description">Daily AI credits refill</string>
     <string name="premium_banner_upgrade">Upgrade</string>
     <string name="premium_banner_active_title">Premium Member</string>
     <string name="premium_banner_valid_until">Active until %1$s</string>
+
+    <!-- Limits -->
+    <string name="limit_reached_title">Checklist Limit Reached</string>
+    <string name="limit_reached_message">You\'ve reached the maximum of %1$d checklists on the free plan. Upgrade to Premium for unlimited checklists.</string>
+    <string name="limit_upgrade">Upgrade to Premium</string>
+    <string name="limit_fill_reached_title">Fill Limit Reached</string>
+    <string name="limit_fill_reached_message">You\'ve reached the maximum of %1$d fills for this checklist. Upgrade to Premium for unlimited fills.</string>
+    <string name="limit_checklist_count">%1$d/%2$d checklists</string>
+    <string name="limit_fill_count">%1$d/%2$d fills</string>
+
+    <!-- AI Credits -->
+    <string name="credits_display">%1$d credits</string>
+    <string name="credits_get_more">Get More</string>
+    <string name="credits_your_credits">Your AI Credits</string>
+    <string name="credits_refill_info">Refills daily at 12:00 CET</string>
+    <string name="credits_refill_to">up to %1$d</string>
+    <string name="credits_premium_benefit">Premium: daily refill to %1$d credits</string>
 
     <!-- Subscription Status Screen -->
     <string name="subscription_status_title">Your Subscription</string>
     <string name="subscription_status_active">Premium Member</string>
     <string name="subscription_status_valid_until">Your premium access is valid until</string>
     <string name="subscription_status_manage">Manage Subscription</string>
+    <string name="subscription_status_credits_section">AI Credits</string>
+    <string name="subscription_status_credits_info">Your credits refill daily at 12:00 CET</string>
+    <string name="subscription_status_daily_cap">Daily refill: up to %1$d credits</string>
 
     <!-- Paywall Screen -->
     <string name="paywall_title">Unlock Your Full Potential</string>
-    <string name="paywall_subtitle">Get unlimited access to all AI features</string>
-    <string name="paywall_feature_checklists">Create unlimited checklists</string>
-    <string name="paywall_feature_ai">Unlimited AI-powered analysis</string>
-    <string name="paywall_feature_sync">Sync across all your devices</string>
-    <string name="paywall_continue">Continue</string>
-    <string name="paywall_restore">Restore Purchases</string>
+    <string name="paywall_subtitle">Get unlimited access to all features</string>
+    <string name="paywall_feature_checklists">Unlimited checklists and fills</string>
+    <string name="paywall_feature_ai">Daily AI credits refill (up to 300)</string>
+    <string name="paywall_feature_sync">Priority support</string>
+    <string name="paywall_continue">Subscribe Now</string>
+    <string name="paywall_restore">Restore Purchase</string>
     <string name="paywall_best_value">Best Value</string>
+    <string name="paywall_free_trial_badge">%1$d Days Free</string>
+    <string name="paywall_start_trial">Start Free Trial</string>
+    <string name="paywall_per_month">per month</string>
+    <string name="paywall_trial_terms">%1$d-day free trial, then %2$s/month. Cancel anytime.</string>
+    <string name="paywall_no_subscription_found">No active subscription found</string>
+    <string name="paywall_days_free">%1$d Days for Free</string>
+    <string name="paywall_go_premium">Go Premium</string>
+    <string name="paywall_then_price">then %1$s / month</string>
+    <string name="paywall_start_free_trial">Start your FREE trial</string>
+    <string name="paywall_subscribe_now">Subscribe Now</string>
+    <string name="paywall_no_payment_now">No payment due now</string>
+    <string name="paywall_terms">Terms of Use</string>
+    <string name="paywall_privacy">Privacy Policy</string>
+    <string name="paywall_preview_item1">Create unlimited checklists</string>
+    <string name="paywall_preview_item2">AI-powered analysis</string>
+    <string name="paywall_preview_item3">Daily credits refill</string>
+    <string name="paywall_preview_item4">Priority support</string>
+    <string name="paywall_preview_tagline">All your tasks\nin one place</string>
 
     <!-- Debug Screen -->
     <string name="debug_title">Debug Menu</string>

@@ -18,6 +18,7 @@ data class RegisterUserResult(
     val userId: String,
     val isNewUser: Boolean,
     val isPremium: Boolean,
+    val aiCredits: Int,
     val createdAt: String
 )
 
@@ -86,6 +87,7 @@ class UserApiServiceImpl(
                 userId = responseBody.userId,
                 isNewUser = responseBody.isNewUser ?: true,
                 isPremium = responseBody.isPremium ?: false,
+                aiCredits = responseBody.aiCredits ?: 0,
                 createdAt = responseBody.createdAt ?: ""
             )
         } else {
@@ -108,5 +110,6 @@ private data class RegisterUserResponseDto(
     @SerialName("user_id") val userId: String? = null,
     @SerialName("is_new_user") val isNewUser: Boolean? = null,
     @SerialName("is_premium") val isPremium: Boolean? = null,
+    @SerialName("ai_credits") val aiCredits: Int? = null,
     @SerialName("created_at") val createdAt: String? = null
 )

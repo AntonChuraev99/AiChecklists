@@ -72,7 +72,8 @@ class FirebaseAiServiceImpl(
                         FilledItem(it.index, it.text, it.checked, it.note)
                     } ?: emptyList(),
                     summary = responseBody.summary ?: "",
-                    confidence = responseBody.confidence ?: 0.8f
+                    confidence = responseBody.confidence ?: 0.8f,
+                    aiCredits = responseBody.aiCredits ?: -1
                 ),
                 usage = responseBody.usage?.toUsageInfo()
             )
@@ -115,7 +116,8 @@ class FirebaseAiServiceImpl(
                         ChecklistItem(text = it.text, checked = it.checked)
                     } ?: emptyList(),
                     summary = responseBody.summary ?: "",
-                    confidence = responseBody.confidence ?: 0.8f
+                    confidence = responseBody.confidence ?: 0.8f,
+                    aiCredits = responseBody.aiCredits ?: -1
                 ),
                 usage = responseBody.usage?.toUsageInfo()
             )
@@ -181,6 +183,7 @@ class FirebaseAiServiceImpl(
                     userId = responseBody.userId,
                     isNewUser = responseBody.isNewUser ?: true,
                     isPremium = responseBody.isPremium ?: false,
+                    aiCredits = responseBody.aiCredits ?: 0,
                     createdAt = responseBody.createdAt ?: ""
                 )
             )
@@ -239,6 +242,7 @@ private data class FillChecklistResponseDto(
     @SerialName("filled_items") val filledItems: List<FilledItemDto>? = null,
     val summary: String? = null,
     val confidence: Float? = null,
+    @SerialName("ai_credits") val aiCredits: Int? = null,
     val usage: UsageDto? = null
 )
 
@@ -267,6 +271,7 @@ private data class GenerateChecklistResponseDto(
     val items: List<ItemDto>? = null,
     val summary: String? = null,
     val confidence: Float? = null,
+    @SerialName("ai_credits") val aiCredits: Int? = null,
     val usage: UsageDto? = null
 )
 
@@ -313,5 +318,6 @@ private data class RegisterUserResponseDto(
     @SerialName("user_id") val userId: String? = null,
     @SerialName("is_new_user") val isNewUser: Boolean? = null,
     @SerialName("is_premium") val isPremium: Boolean? = null,
+    @SerialName("ai_credits") val aiCredits: Int? = null,
     @SerialName("created_at") val createdAt: String? = null
 )
