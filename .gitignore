@@ -28,3 +28,6 @@ secrets.properties
 *.keystore
 *.jks
 release.keystore
+
+# Firebase service account (NEVER commit!)
+*firebase-adminsdk*.json
