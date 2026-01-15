@@ -42,6 +42,8 @@ kotlin {
             implementation(projects.core.designsystem)
             implementation(projects.core.navigation.api)
             implementation(projects.core.navigation.impl)
+            implementation(projects.core.remoteconfig.api)
+            implementation(projects.core.remoteconfig.impl)
 
             implementation(projects.feature.splash)
             implementation(projects.feature.checklist)
