@@ -187,6 +187,8 @@ private fun ChecklistDetailContent(
     if (state.showAddFillDialog) {
         AddFillDialog(
             fillName = state.newFillName,
+            error = state.fillNameError,
+            isLoading = state.isCreatingFill,
             onNameChanged = { onIntent(ChecklistDetailIntent.OnNewFillNameChanged(it)) },
             onDismiss = { onIntent(ChecklistDetailIntent.OnDismissAddFillDialog) },
             onConfirm = { onIntent(ChecklistDetailIntent.OnConfirmAddFill) }
@@ -313,32 +315,55 @@ private fun FillCard(
 @Composable
 private fun AddFillDialog(
     fillName: String,
+    error: String?,
+    isLoading: Boolean,
     onNameChanged: (String) -> Unit,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { if (!isLoading) onDismiss() },
         title = { Text(stringResource(Res.string.checklist_add_fill_dialog_title)) },
         text = {
-            AppTextField(
-                value = fillName,
-                onValueChange = onNameChanged,
-                label = stringResource(Res.string.checklist_fill_name_label),
-                placeholder = stringResource(Res.string.checklist_fill_name_placeholder)
-            )
+            Column {
+                AppTextField(
+                    value = fillName,
+                    onValueChange = onNameChanged,
+                    label = stringResource(Res.string.checklist_fill_name_label),
+                    placeholder = stringResource(Res.string.checklist_fill_name_placeholder),
+                    isError = error != null,
+                    enabled = !isLoading
+                )
+                if (error != null) {
+                    Spacer(modifier = Modifier.height(AppDimens.SpacingXs))
+                    Text(
+                        text = error,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
         },
         confirmButton = {
-            AppButtonText(
-                text = stringResource(Res.string.save),
-                onClick = onConfirm
-            )
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    strokeWidth = 2.dp
+                )
+            } else {
+                AppButtonText(
+                    text = stringResource(Res.string.save),
+                    onClick = onConfirm
+                )
+            }
         },
         dismissButton = {
-            AppButtonText(
-                text = stringResource(Res.string.cancel),
-                onClick = onDismiss
-            )
+            if (!isLoading) {
+                AppButtonText(
+                    text = stringResource(Res.string.cancel),
+                    onClick = onDismiss
+                )
+            }
         },
         containerColor = MaterialTheme.colorScheme.surface,
         shape = MaterialTheme.shapes.large

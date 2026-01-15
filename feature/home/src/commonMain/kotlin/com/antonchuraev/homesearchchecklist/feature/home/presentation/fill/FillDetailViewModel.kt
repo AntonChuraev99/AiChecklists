@@ -58,7 +58,7 @@ class FillDetailViewModel(
             }
 
             is FillDetailIntent.OnNameChanged -> {
-                updateContentState { it.copy(editingName = intent.name) }
+                updateContentState { it.copy(editingName = intent.name, editingNameError = null) }
             }
 
             FillDetailIntent.OnDeleteClick -> {
@@ -123,10 +123,17 @@ class FillDetailViewModel(
     private fun saveChanges() {
         val state = _screenState.value
         if (state is FillDetailState.Content) {
-            val updatedFill = state.fill.copy(name = state.editingName)
+            val name = state.editingName.trim()
+            if (name.isEmpty()) {
+                _screenState.value = state.copy(editingNameError = "Введите название")
+                return
+            }
+
+            val updatedFill = state.fill.copy(name = name)
             _screenState.value = state.copy(
                 fill = updatedFill,
-                isEditing = false
+                isEditing = false,
+                editingNameError = null
             )
 
             viewModelScope.launch {
