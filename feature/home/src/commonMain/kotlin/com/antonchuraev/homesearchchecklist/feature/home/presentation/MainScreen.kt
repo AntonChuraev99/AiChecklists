@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,7 +27,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
-import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonSecondary
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import aichecklists.core.designsystem.generated.resources.Res
@@ -56,24 +54,17 @@ fun MainScreen(
         },
         bottomBar = {
             if (screenState is MainScreenState.Success) {
-                Column(
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(AppDimens.ScreenPaddingHorizontal)
                         .padding(bottom = AppDimens.SpacingLg)
-                        .navigationBarsPadding(),
-                    verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
+                        .navigationBarsPadding()
                 ) {
                     AppButton(
                         text = stringResource(Res.string.main_create_checklist),
                         onClick = { viewModel.sendIntent(MainScreenIntent.OnAddChecklistClick) },
                         icon = Icons.Filled.Add,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    AppButtonSecondary(
-                        text = stringResource(Res.string.main_ai_analysis),
-                        onClick = { viewModel.sendIntent(MainScreenIntent.OnAiAnalyzeClick) },
-                        icon = Icons.Outlined.AutoAwesome,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }

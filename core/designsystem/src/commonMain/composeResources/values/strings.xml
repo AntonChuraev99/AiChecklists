@@ -54,6 +54,10 @@
     <string name="templates_preview_items">This template includes %1$d items:</string>
     <string name="templates_and_more">... and %1$d more items</string>
     <string name="templates_use_template">Use Template</string>
+    <string name="templates_section_title">Choose a template</string>
+    <string name="templates_tap_to_use">Tap to use</string>
+    <string name="templates_create_manually">Create Manually</string>
+    <string name="templates_create_with_ai">Create with AI</string>
 
     <!-- Analyze Screen -->
     <string name="analyze_title">AI Analysis</string>

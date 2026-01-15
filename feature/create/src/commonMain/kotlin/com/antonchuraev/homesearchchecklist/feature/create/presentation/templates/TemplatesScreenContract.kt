@@ -20,4 +20,8 @@ sealed interface TemplatesScreenIntent : Intent {
     data object OnDismissPreview : TemplatesScreenIntent
     data object OnCreateFromTemplate : TemplatesScreenIntent
     data object OnDismissError : TemplatesScreenIntent
+
+    // Bottom action buttons
+    data object OnCreateManuallyClick : TemplatesScreenIntent
+    data object OnCreateWithAiClick : TemplatesScreenIntent
 }
