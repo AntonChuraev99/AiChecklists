@@ -49,6 +49,7 @@ class UserApiServiceImpl(
 ) : UserApiService {
 
     companion object {
+        private const val TAG = "UserApiService"
         private const val DEFAULT_BASE_URL = "https://us-central1-aichecklists-40230.cloudfunctions.net"
     }
 
@@ -69,28 +70,36 @@ class UserApiServiceImpl(
         appVersion: String?,
         platform: String?
     ): Result<RegisterUserResult> = runCatching {
+        println("[$TAG] registerUser: deviceId=$deviceId, platform=$platform")
+
         val request = RegisterUserRequest(
             deviceId = deviceId,
             appVersion = appVersion,
             platform = platform
         )
 
+        println("[$TAG] registerUser: calling $baseUrl/register_user")
         val response: HttpResponse = httpClient.post("$baseUrl/register_user") {
             contentType(ContentType.Application.Json)
             setBody(request)
         }
+        println("[$TAG] registerUser: response status=${response.status}")
 
         val responseBody = response.body<RegisterUserResponseDto>()
+        println("[$TAG] registerUser: response body - success=${responseBody.success}, userId=${responseBody.userId}, aiCredits=${responseBody.aiCredits}, isPremium=${responseBody.isPremium}, error=${responseBody.error}")
 
         if (responseBody.success && responseBody.userId != null) {
-            RegisterUserResult(
+            val result = RegisterUserResult(
                 userId = responseBody.userId,
                 isNewUser = responseBody.isNewUser ?: true,
                 isPremium = responseBody.isPremium ?: false,
                 aiCredits = responseBody.aiCredits ?: 0,
                 createdAt = responseBody.createdAt ?: ""
             )
+            println("[$TAG] registerUser: SUCCESS - returning aiCredits=${result.aiCredits}")
+            result
         } else {
+            println("[$TAG] registerUser: FAILED - ${responseBody.error}")
             throw Exception(responseBody.error ?: "Failed to register user")
         }
     }

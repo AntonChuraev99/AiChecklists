@@ -19,6 +19,22 @@ class UserDataRepositoryImpl(
     private val userApiService: UserApiService
 ) : UserDataRepository {
 
+    companion object {
+        private const val TAG = "UserDataRepository"
+
+        private const val USER_ID_KEY = "user_id"
+        private const val IS_ONBOARDING_PASSED_KEY = "is_onboarding_passed"
+        private const val IS_PREMIUM_KEY = "is_premium"
+        private const val AI_CREDITS_KEY = "ai_credits"
+
+        private val DEFAULT_USER_DATA = UserData(
+            userId = "",
+            isOnboardingPassed = false,
+            isPremium = false,
+            aiCredits = 0
+        )
+    }
+
     private val appDatastore: AppDatastore = AppDatastore("user/datastore")
 
     private val userDataFlow = combine(
@@ -67,26 +83,37 @@ class UserDataRepositoryImpl(
     }
 
     override suspend fun ensureUserRegistered(): Result<UserData> {
+        println("[$TAG] ensureUserRegistered: starting...")
+
         // Check if user is already registered locally
         val currentUserId = appDatastore.observeString(USER_ID_KEY, "").first()
+        println("[$TAG] ensureUserRegistered: currentUserId='$currentUserId'")
+
         if (currentUserId.isNotBlank()) {
             // User already registered, return cached data
-            return Result.success(getUserData())
+            val cachedData = getUserData()
+            println("[$TAG] ensureUserRegistered: user already registered, cached credits=${cachedData.aiCredits}")
+            return Result.success(cachedData)
         }
 
         // User not registered, call the server
         val deviceId = deviceIdProvider.getDeviceId()
+        println("[$TAG] ensureUserRegistered: registering new user with deviceId=$deviceId")
 
         return userApiService.registerUser(
             deviceId = deviceId,
             appVersion = null, // TODO: Add app version from BuildConfig
             platform = getPlatformName()
-        ).map { result ->
+        ).onSuccess { result ->
+            println("[$TAG] ensureUserRegistered: SUCCESS - userId=${result.userId}, aiCredits=${result.aiCredits}, isPremium=${result.isPremium}")
             // Save user data locally
             appDatastore.saveString(USER_ID_KEY, result.userId)
             appDatastore.saveBoolean(IS_PREMIUM_KEY, result.isPremium)
             appDatastore.saveInt(AI_CREDITS_KEY, result.aiCredits)
-
+            println("[$TAG] ensureUserRegistered: saved to datastore")
+        }.onFailure { error ->
+            println("[$TAG] ensureUserRegistered: FAILED - ${error.message}")
+        }.map { result ->
             UserData(
                 userId = result.userId,
                 isOnboardingPassed = appDatastore.observeBoolean(IS_ONBOARDING_PASSED_KEY, false).first(),
@@ -94,22 +121,6 @@ class UserDataRepositoryImpl(
                 aiCredits = result.aiCredits
             )
         }
-    }
-
-    companion object {
-
-        private const val USER_ID_KEY = "user_id"
-        private const val IS_ONBOARDING_PASSED_KEY = "is_onboarding_passed"
-        private const val IS_PREMIUM_KEY = "is_premium"
-        private const val AI_CREDITS_KEY = "ai_credits"
-
-        private val DEFAULT_USER_DATA = UserData(
-            userId = "",
-            isOnboardingPassed = false,
-            isPremium = false,
-            aiCredits = 0
-        )
-
     }
 }
 
