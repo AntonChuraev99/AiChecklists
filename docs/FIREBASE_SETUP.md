@@ -36,6 +36,22 @@ FirebaseApp.configure()
 | `feature_paywall_enabled` | Boolean | false | Enable paywall |
 | `max_checklist_items` | Long | 100 | Max items per checklist |
 | `ai_analysis_max_input_length` | Long | 10000 | Max input length for AI |
+| `min_app_version` | String | "1.0.0" | Minimum supported app version |
+| `maintenance_mode` | Boolean | false | Enable maintenance mode |
+
+## Managing Remote Config via Script
+
+Use the Python script to manage Remote Config:
+
+```bash
+# Show current config
+python scripts/firebase_remote_config.py get
+
+# Set up default parameters
+python scripts/firebase_remote_config.py setup
+```
+
+Requires: `pip install google-auth google-auth-oauthlib requests`
 
 ## Setting Up Remote Config in Firebase Console
 
