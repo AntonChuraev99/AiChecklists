@@ -19,5 +19,14 @@ interface UserDataRepository {
      * @return Result with UserData or error
      */
     suspend fun ensureUserRegistered(): Result<UserData>
+
+    /**
+     * Syncs user data with the server.
+     * Always calls the server to get fresh data (credits, premium status).
+     * Updates local cache with server data.
+     *
+     * @return Result with UserData or error
+     */
+    suspend fun syncWithServer(): Result<UserData>
 }
 
