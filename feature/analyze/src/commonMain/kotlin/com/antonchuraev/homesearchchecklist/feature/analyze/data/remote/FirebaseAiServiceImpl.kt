@@ -156,6 +156,42 @@ class FirebaseAiServiceImpl(
         }
     }
 
+    override suspend fun registerUser(
+        deviceId: String,
+        appVersion: String?,
+        platform: String?
+    ): Result<AiServiceResponse<RegisterUserResult>> = runCatching {
+        val request = RegisterUserRequest(
+            deviceId = deviceId,
+            appVersion = appVersion,
+            platform = platform
+        )
+
+        val response: HttpResponse = httpClient.post("$baseUrl/register_user") {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }
+
+        val responseBody = response.body<RegisterUserResponseDto>()
+
+        if (responseBody.success && responseBody.userId != null) {
+            AiServiceResponse(
+                success = true,
+                data = RegisterUserResult(
+                    userId = responseBody.userId,
+                    isNewUser = responseBody.isNewUser ?: true,
+                    isPremium = responseBody.isPremium ?: false,
+                    createdAt = responseBody.createdAt ?: ""
+                )
+            )
+        } else {
+            AiServiceResponse(
+                success = false,
+                error = responseBody.error ?: "Failed to register user"
+            )
+        }
+    }
+
     private fun AiInputType.toApiString(): String = when (this) {
         AiInputType.TEXT -> "text"
         AiInputType.URL -> "url"
@@ -261,4 +297,21 @@ private data class RequestLogDto(
     val function: String? = null,
     @SerialName("input_type") val inputType: String? = null,
     val timestamp: String? = null
+)
+
+@Serializable
+private data class RegisterUserRequest(
+    @SerialName("device_id") val deviceId: String,
+    @SerialName("app_version") val appVersion: String? = null,
+    val platform: String? = null
+)
+
+@Serializable
+private data class RegisterUserResponseDto(
+    val success: Boolean,
+    val error: String? = null,
+    @SerialName("user_id") val userId: String? = null,
+    @SerialName("is_new_user") val isNewUser: Boolean? = null,
+    @SerialName("is_premium") val isPremium: Boolean? = null,
+    @SerialName("created_at") val createdAt: String? = null
 )

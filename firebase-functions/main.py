@@ -1,15 +1,18 @@
 """
 Firebase Cloud Functions for AI Checklists App.
 
-Two main functions:
-1. analyze_and_fill_checklist - Auto-fill existing checklist based on user data
-2. generate_checklist - Create new checklist from prompt + user data
+Functions:
+1. register_user - Register or retrieve user by device ID
+2. analyze_and_fill_checklist - Auto-fill existing checklist based on user data
+3. generate_checklist - Create new checklist from prompt + user data
+4. get_usage_stats - Get user's AI usage statistics
 
 All AI calls go through these functions for usage control and monitoring.
 """
 
 import json
 import os
+import uuid
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -118,7 +121,92 @@ def create_success_response(data: dict):
 
 
 # ============================================================================
-# FUNCTION 1: Auto-fill existing checklist
+# FUNCTION 1: Register or retrieve user by device ID
+# ============================================================================
+
+@functions_framework.http
+def register_user(request: Request):
+    """
+    Register a new user or retrieve existing user by device ID.
+
+    This prevents abuse by reinstalling the app - same device always gets same user_id.
+
+    Request body:
+    {
+        "device_id": "string (unique device identifier)"
+    }
+
+    Response:
+    {
+        "success": true,
+        "user_id": "string (UUID)",
+        "is_new_user": boolean,
+        "is_premium": boolean,
+        "created_at": "ISO datetime string"
+    }
+    """
+    if request.method != "POST":
+        return create_error_response("Only POST method is allowed")
+
+    try:
+        data = request.get_json()
+    except Exception:
+        return create_error_response("Invalid JSON body")
+
+    if not data:
+        return create_error_response("Request body is required")
+
+    device_id = data.get("device_id")
+    if not device_id or not isinstance(device_id, str) or len(device_id) < 10:
+        return create_error_response("Valid device_id is required (min 10 characters)")
+
+    # Normalize device_id (trim, lowercase for consistency)
+    device_id = device_id.strip().lower()
+
+    try:
+        # Check if user with this device_id already exists
+        users_ref = db.collection("users")
+        existing_users = users_ref.where("device_id", "==", device_id).limit(1).get()
+
+        for user_doc in existing_users:
+            # User exists - return existing data
+            user_data = user_doc.to_dict()
+            return create_success_response({
+                "user_id": user_doc.id,
+                "is_new_user": False,
+                "is_premium": user_data.get("is_premium", False),
+                "created_at": user_data.get("created_at", "")
+            })
+
+        # User doesn't exist - create new user
+        new_user_id = str(uuid.uuid4())
+        now = datetime.utcnow().isoformat()
+
+        user_data = {
+            "device_id": device_id,
+            "is_premium": False,
+            "created_at": now,
+            "updated_at": now,
+            "app_version": data.get("app_version", ""),
+            "platform": data.get("platform", ""),
+        }
+
+        # Save to Firestore with user_id as document ID
+        users_ref.document(new_user_id).set(user_data)
+
+        return create_success_response({
+            "user_id": new_user_id,
+            "is_new_user": True,
+            "is_premium": False,
+            "created_at": now
+        })
+
+    except Exception as e:
+        return create_error_response(f"Failed to register user: {str(e)}", 500)
+
+
+# ============================================================================
+# FUNCTION 2: Auto-fill existing checklist
 # ============================================================================
 
 FILL_CHECKLIST_PROMPT = """You are an AI assistant that helps fill checklists based on provided data.

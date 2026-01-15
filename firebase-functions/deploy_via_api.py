@@ -35,6 +35,12 @@ SCOPES = [
 # Functions to deploy
 FUNCTIONS = [
     {
+        "name": "register_user",
+        "entry_point": "register_user",
+        "memory": "256M",
+        "timeout": "30s",
+    },
+    {
         "name": "analyze_and_fill_checklist",
         "entry_point": "analyze_and_fill_checklist",
         "memory": "512M",
