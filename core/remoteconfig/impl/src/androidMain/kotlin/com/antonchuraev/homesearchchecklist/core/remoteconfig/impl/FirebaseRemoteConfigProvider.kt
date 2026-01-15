@@ -27,6 +27,13 @@ class FirebaseRemoteConfigProvider : RemoteConfigProvider {
         RemoteConfigKeys.FEATURE_PAYWALL_ENABLED to RemoteConfigDefaults.FEATURE_PAYWALL_ENABLED,
         RemoteConfigKeys.MAX_CHECKLIST_ITEMS to RemoteConfigDefaults.MAX_CHECKLIST_ITEMS,
         RemoteConfigKeys.AI_ANALYSIS_MAX_INPUT_LENGTH to RemoteConfigDefaults.AI_ANALYSIS_MAX_INPUT_LENGTH,
+        RemoteConfigKeys.MIN_APP_VERSION to RemoteConfigDefaults.MIN_APP_VERSION,
+        RemoteConfigKeys.MAINTENANCE_MODE to RemoteConfigDefaults.MAINTENANCE_MODE,
+        RemoteConfigKeys.AI_FUNCTIONS_BASE_URL to RemoteConfigDefaults.AI_FUNCTIONS_BASE_URL,
+        RemoteConfigKeys.AI_DAILY_LIMIT_FREE to RemoteConfigDefaults.AI_DAILY_LIMIT_FREE,
+        RemoteConfigKeys.AI_DAILY_LIMIT_PREMIUM to RemoteConfigDefaults.AI_DAILY_LIMIT_PREMIUM,
+        RemoteConfigKeys.MAX_CHECKLISTS_FREE to RemoteConfigDefaults.MAX_CHECKLISTS_FREE,
+        RemoteConfigKeys.MAX_FILLS_FREE to RemoteConfigDefaults.MAX_FILLS_FREE,
     )
 
     override suspend fun fetchAndActivate(): Boolean {
