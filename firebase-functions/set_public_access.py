@@ -13,6 +13,7 @@ SERVICE_ACCOUNT_FILE = Path(__file__).parent.parent / "aichecklists-40230-fireba
 SCOPES = ["https://www.googleapis.com/auth/cloud-platform"]
 
 FUNCTIONS = [
+    "register_user",
     "analyze_and_fill_checklist",
     "generate_checklist",
     "get_usage_stats",

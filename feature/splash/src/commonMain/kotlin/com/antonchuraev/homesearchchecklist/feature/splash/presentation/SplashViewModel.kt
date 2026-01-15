@@ -13,7 +13,12 @@ class SplashViewModel(
 
     init {
         viewModelScope.launch {
-            val userData = userDataRepository.getUserData()
+            // Ensure user is registered with the server (or retrieve existing user)
+            // This uses device ID to prevent abuse from reinstalling the app
+            val registrationResult = userDataRepository.ensureUserRegistered()
+
+            // Get user data (either from registration or cached)
+            val userData = registrationResult.getOrNull() ?: userDataRepository.getUserData()
 
             with(appNavigator) {
                 when (userData.isOnboardingPassed) {

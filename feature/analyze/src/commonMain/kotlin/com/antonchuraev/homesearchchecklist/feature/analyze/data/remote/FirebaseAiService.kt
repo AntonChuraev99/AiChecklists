@@ -20,6 +20,16 @@ data class UsageInfo(
 )
 
 /**
+ * Result of user registration.
+ */
+data class RegisterUserResult(
+    val userId: String,
+    val isNewUser: Boolean,
+    val isPremium: Boolean,
+    val createdAt: String
+)
+
+/**
  * Result of auto-filling a checklist.
  */
 data class FillChecklistResult(
@@ -60,6 +70,21 @@ enum class AiInputType {
  * All AI operations go through Firebase Functions for usage control.
  */
 interface FirebaseAiService {
+
+    /**
+     * Register a new user or retrieve existing user by device ID.
+     * This prevents abuse by reinstalling the app.
+     *
+     * @param deviceId Unique device identifier
+     * @param appVersion Optional app version for analytics
+     * @param platform Optional platform identifier (android/ios)
+     * @return Result with user data or error
+     */
+    suspend fun registerUser(
+        deviceId: String,
+        appVersion: String? = null,
+        platform: String? = null
+    ): Result<AiServiceResponse<RegisterUserResult>>
 
     /**
      * Auto-fill an existing checklist based on user-provided data.
