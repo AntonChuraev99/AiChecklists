@@ -41,6 +41,10 @@ kotlin {
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.bundles.koin.feature)
         }
+        commonTest.dependencies {
+            implementation(libs.kotlin.test)
+            implementation(libs.kotlinx.coroutines.test)
+        }
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)
         }
