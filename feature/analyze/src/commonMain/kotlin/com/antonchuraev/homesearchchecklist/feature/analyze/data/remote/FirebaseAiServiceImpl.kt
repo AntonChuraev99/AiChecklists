@@ -22,6 +22,7 @@ class FirebaseAiServiceImpl(
 ) : FirebaseAiService {
 
     companion object {
+        private const val TAG = "FirebaseAiService"
         // Default Cloud Functions URL - update after deployment
         private const val DEFAULT_BASE_URL = "https://us-central1-aichecklists-40230.cloudfunctions.net"
     }
@@ -163,18 +164,23 @@ class FirebaseAiServiceImpl(
         appVersion: String?,
         platform: String?
     ): Result<AiServiceResponse<RegisterUserResult>> = runCatching {
+        println("[$TAG] registerUser: deviceId=$deviceId, platform=$platform")
+
         val request = RegisterUserRequest(
             deviceId = deviceId,
             appVersion = appVersion,
             platform = platform
         )
 
+        println("[$TAG] registerUser: calling $baseUrl/register_user")
         val response: HttpResponse = httpClient.post("$baseUrl/register_user") {
             contentType(ContentType.Application.Json)
             setBody(request)
         }
+        println("[$TAG] registerUser: response status=${response.status}")
 
         val responseBody = response.body<RegisterUserResponseDto>()
+        println("[$TAG] registerUser: success=${responseBody.success}, userId=${responseBody.userId}, aiCredits=${responseBody.aiCredits}, error=${responseBody.error}")
 
         if (responseBody.success && responseBody.userId != null) {
             AiServiceResponse(
