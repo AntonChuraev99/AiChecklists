@@ -1,6 +1,7 @@
 [versions]
 agp = "8.11.2"
 generativeAiKmp = "0.9.0-1.1.0"
+ktor = "3.0.3"
 
 android-compileSdk = "36"
 android-minSdk = "24"
@@ -76,6 +77,13 @@ firebase-config = { module = "com.google.firebase:firebase-config" }
 
 # Generative AI (Kotlin Multiplatform)
 generative-ai-google = { module = "dev.shreyaspatil.generativeai:generativeai-google", version.ref = "generativeAiKmp" }
+
+# Ktor HTTP Client
+ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
+ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
+ktor-serialization-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
+ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
+ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "ktor" }
 
 [bundles]
 koin-feature = [
