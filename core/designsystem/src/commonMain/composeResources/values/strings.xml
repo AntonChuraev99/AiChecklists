@@ -62,7 +62,8 @@
     <!-- Analyze Screen -->
     <string name="analyze_title">AI Analysis</string>
     <string name="analyze_button">Analyze</string>
-    <string name="analyze_loading">AI is working its magic...</string>
+    <string name="analyze_loading">Analyzing your content</string>
+    <string name="analyze_loading_description">AI is extracting checklist items...</string>
     <string name="analyze_select_source">What would you like to analyze?</string>
     <string name="analyze_enter_data">Add your content</string>
     <string name="analyze_source_photo">Photo</string>
@@ -113,6 +114,8 @@
     <string name="checklist_template_items">Template items: %1$d</string>
     <string name="checklist_fills_section">Fills</string>
     <string name="checklist_no_fills">No fills yet.\nCreate a new fill to start checking items.</string>
+    <string name="checklist_no_fills_title">No fills yet</string>
+    <string name="checklist_no_fills_description">Create a fill to start checking items off your list. Each fill tracks your progress separately.</string>
     <string name="checklist_add_fill">New Fill</string>
     <string name="checklist_add_fill_ai">Fill via AI</string>
     <string name="checklist_add_fill_dialog_title">New Fill</string>
@@ -123,6 +126,8 @@
 
     <!-- Fill Detail Screen -->
     <string name="fill_not_found">Fill not found</string>
+    <string name="fill_complete_title">All done!</string>
+    <string name="fill_complete_description">Great job completing this checklist</string>
     <string name="fill_edit_title">Edit Fill</string>
     <string name="fill_add_note">Add note</string>
     <string name="fill_note_dialog_title">Note</string>
@@ -190,6 +195,9 @@
     <string name="paywall_preview_item3">Daily credits refill</string>
     <string name="paywall_preview_item4">Priority support</string>
     <string name="paywall_preview_tagline">All your tasks\nin one place</string>
+
+    <!-- Splash Screen -->
+    <string name="splash_loading">Getting things ready...</string>
 
     <!-- Debug Screen -->
     <string name="debug_title">Debug Menu</string>
