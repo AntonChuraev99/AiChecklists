@@ -14,6 +14,8 @@ interface ChecklistRepository {
 
     // Fills (instances)
     fun getFillsByChecklistId(checklistId: Long): Flow<List<ChecklistFill>>
+    fun getDefaultFillByChecklistId(checklistId: Long): Flow<ChecklistFill?>
+    fun getAdditionalFillsByChecklistId(checklistId: Long): Flow<List<ChecklistFill>>
     suspend fun getFillById(id: Long): ChecklistFill?
     suspend fun getFillCountByChecklistId(checklistId: Long): Int
     suspend fun addFill(fill: ChecklistFill): Long

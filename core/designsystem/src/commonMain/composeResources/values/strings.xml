@@ -118,6 +118,11 @@
     <string name="checklist_no_fills_description">Create a fill to start checking items off your list. Each fill tracks your progress separately.</string>
     <string name="checklist_add_fill">New Fill</string>
     <string name="checklist_add_fill_ai">Fill via AI</string>
+    <string name="checklist_new_fill">Create New Fill</string>
+    <string name="checklist_view_all_fills">View All Fills</string>
+    <string name="checklist_fills_count">%1$d additional fills</string>
+    <string name="fills_list_title">All Fills</string>
+    <string name="fills_default_name">Main</string>
     <string name="checklist_add_fill_dialog_title">New Fill</string>
     <string name="checklist_fill_name_label">Fill name</string>
     <string name="checklist_fill_name_placeholder">e.g., Apartment on Main St</string>

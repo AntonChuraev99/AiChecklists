@@ -1,5 +1,11 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation.detail
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,24 +18,33 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.outlined.NoteAdd
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -38,11 +53,10 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonSec
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonText
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppTextField
-import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
-import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
@@ -118,97 +132,83 @@ private fun ChecklistDetailContent(
             }
         }
     ) {
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = AppDimens.ScreenPaddingHorizontal),
-            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
-        ) {
-            item {
-                Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
-            }
+        val defaultFill = state.defaultFill
 
-            item {
-                TemplateInfo(checklist = state.checklist)
+        if (defaultFill == null) {
+            // This shouldn't happen normally, but handle gracefully
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
             }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = AppDimens.ScreenPaddingHorizontal),
+                verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
+            ) {
+                item {
+                    Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
+                }
 
-            item {
-                Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = stringResource(Res.string.checklist_fills_section),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    // Show limit indicator for free users
-                    val limits = state.userLimits
-                    if (limits != null && !limits.isPremium) {
-                        Text(
-                            text = stringResource(
-                                Res.string.limit_fill_count,
-                                state.fills.size,
-                                limits.maxFillsPerChecklist
-                            ),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (limits.canCreateFill(state.fills.size)) {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            } else {
-                                MaterialTheme.colorScheme.error
-                            }
+                // Progress header with completion celebration
+                item {
+                    ProgressHeader(fill = defaultFill)
+                }
+
+                // View all fills button (if there are additional fills)
+                if (state.additionalFillsCount > 0) {
+                    item {
+                        ViewAllFillsCard(
+                            fillsCount = state.additionalFillsCount,
+                            onClick = { onIntent(ChecklistDetailIntent.OnViewAllFillsClick) }
                         )
+                        Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
                     }
                 }
-                Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
-            }
 
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
-                ) {
-                    AppButton(
-                        text = stringResource(Res.string.checklist_add_fill),
-                        onClick = { onIntent(ChecklistDetailIntent.OnAddFillClick) },
-                        modifier = Modifier.weight(1f),
-                        icon = Icons.Outlined.Add
-                    )
-                    AppButtonSecondary(
-                        text = stringResource(Res.string.checklist_add_fill_ai),
-                        onClick = { onIntent(ChecklistDetailIntent.OnAddFillViaAiClick) },
-                        modifier = Modifier.weight(1f),
-                        icon = Icons.Outlined.AutoAwesome
+                // Checklist items
+                itemsIndexed(defaultFill.items) { index, item ->
+                    ChecklistItemCard(
+                        item = item,
+                        onCheckedChange = { checked ->
+                            onIntent(ChecklistDetailIntent.OnItemCheckedChange(index, checked))
+                        },
+                        onNoteClick = { onIntent(ChecklistDetailIntent.OnAddNoteClick(index)) }
                     )
                 }
-            }
 
-            item {
-                Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
-            }
-
-            if (state.fills.isEmpty()) {
+                // New fill button at the bottom
                 item {
-                    EmptyFillsMessage()
-                }
-            } else {
-                items(state.fills, key = { it.id }) { fill ->
-                    FillCard(
-                        fill = fill,
-                        onClick = { onIntent(ChecklistDetailIntent.OnFillClick(fill)) },
-                        onDeleteClick = { onIntent(ChecklistDetailIntent.OnDeleteFillClick(fill)) }
+                    Spacer(modifier = Modifier.height(AppDimens.SpacingLg))
+                    AppButtonSecondary(
+                        text = stringResource(Res.string.checklist_new_fill),
+                        onClick = { onIntent(ChecklistDetailIntent.OnAddFillClick) },
+                        icon = Icons.Outlined.ContentCopy,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
-            }
 
-            item {
-                Spacer(modifier = Modifier.height(AppDimens.SpacingXxl))
+                item {
+                    Spacer(modifier = Modifier.height(AppDimens.SpacingXxl))
+                }
             }
         }
     }
 
+    // Note dialog
+    if (state.noteDialogItemIndex != null) {
+        NoteDialog(
+            note = state.editingNote,
+            onNoteChanged = { onIntent(ChecklistDetailIntent.OnNoteChanged(it)) },
+            onDismiss = { onIntent(ChecklistDetailIntent.OnDismissNoteDialog) },
+            onConfirm = { onIntent(ChecklistDetailIntent.OnSaveNote) }
+        )
+    }
+
+    // Add fill dialog
     if (state.showAddFillDialog) {
         AddFillDialog(
             fillName = state.newFillName,
@@ -220,6 +220,7 @@ private fun ChecklistDetailContent(
         )
     }
 
+    // Delete confirmation dialog
     if (state.showDeleteConfirmation) {
         DeleteConfirmationDialog(
             checklistName = state.checklist.name,
@@ -228,6 +229,7 @@ private fun ChecklistDetailContent(
         )
     }
 
+    // Fill limit dialog
     if (state.showFillLimitDialog && state.userLimits != null) {
         FillLimitDialog(
             maxFills = state.userLimits.maxFillsPerChecklist,
@@ -238,105 +240,215 @@ private fun ChecklistDetailContent(
 }
 
 @Composable
-private fun TemplateInfo(checklist: Checklist) {
-    AppCard {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    Icons.Outlined.Description,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp)
-                )
-                Spacer(modifier = Modifier.width(AppDimens.SpacingSm))
+private fun ProgressHeader(fill: ChecklistFill) {
+    val checkedCount = fill.items.count { it.checked }
+    val totalCount = fill.items.size
+    val progress = if (totalCount > 0) checkedCount.toFloat() / totalCount else 0f
+    val isComplete = totalCount > 0 && checkedCount == totalCount
+
+    Column(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        // Completion celebration banner
+        AnimatedVisibility(
+            visible = isComplete,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically()
+        ) {
+            CompletionBanner()
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = stringResource(Res.string.checklist_progress),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Text(
+                text = "$checkedCount / $totalCount",
+                style = MaterialTheme.typography.titleMedium,
+                color = if (isComplete) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary
+            )
+        }
+        Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
+        LinearProgressIndicator(
+            progress = { progress },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp)
+                .clip(RoundedCornerShape(4.dp)),
+            color = if (isComplete) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
+            trackColor = MaterialTheme.colorScheme.surfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
+    }
+}
+
+@Composable
+private fun CompletionBanner() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = AppDimens.SpacingLg),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .size(64.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.tertiaryContainer),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Filled.CheckCircle,
+                contentDescription = null,
+                modifier = Modifier.size(40.dp),
+                tint = MaterialTheme.colorScheme.tertiary
+            )
+        }
+        Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
+        Text(
+            text = stringResource(Res.string.fill_complete_title),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.tertiary,
+            textAlign = TextAlign.Center
+        )
+        Text(
+            text = stringResource(Res.string.fill_complete_description),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+private fun ViewAllFillsCard(
+    fillsCount: Int,
+    onClick: () -> Unit
+) {
+    AppCard(onClick = onClick) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
                 Text(
-                    text = stringResource(Res.string.checklist_template_items, checklist.items.size),
+                    text = stringResource(Res.string.checklist_view_all_fills),
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-            }
-
-            if (checklist.items.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
                 Text(
-                    text = checklist.items.take(3).joinToString(", ") { it.text } +
-                            if (checklist.items.size > 3) "..." else "",
+                    text = stringResource(Res.string.checklist_fills_count, fillsCount),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
 
 @Composable
-private fun EmptyFillsMessage() {
-    EmptyState(
-        icon = Icons.Outlined.FolderOpen,
-        title = stringResource(Res.string.checklist_no_fills_title),
-        description = stringResource(Res.string.checklist_no_fills_description),
-        modifier = Modifier.padding(vertical = AppDimens.SpacingLg)
-    )
-}
-
-@Composable
-private fun FillCard(
-    fill: ChecklistFill,
-    onClick: () -> Unit,
-    onDeleteClick: () -> Unit
+private fun ChecklistItemCard(
+    item: ChecklistFillItem,
+    onCheckedChange: (Boolean) -> Unit,
+    onNoteClick: () -> Unit
 ) {
-    val checkedCount = fill.items.count { it.checked }
-    val totalCount = fill.items.size
-    val progress = if (totalCount > 0) checkedCount.toFloat() / totalCount else 0f
-
-    AppCard(onClick = onClick) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = fill.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+    AppCard(
+        onClick = { onCheckedChange(!item.checked) }
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Checkbox(
+                    checked = item.checked,
+                    onCheckedChange = onCheckedChange
                 )
-                Spacer(modifier = Modifier.height(AppDimens.SpacingXs))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    androidx.compose.material3.LinearProgressIndicator(
-                        progress = { progress },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(6.dp),
-                        color = MaterialTheme.colorScheme.primary,
-                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                    )
-                    Spacer(modifier = Modifier.width(AppDimens.SpacingSm))
-                    Text(
-                        text = "$checkedCount / $totalCount",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                Text(
+                    text = item.text,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (item.checked) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+                    textDecoration = if (item.checked) TextDecoration.LineThrough else null,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(onClick = onNoteClick) {
+                    Icon(
+                        Icons.Outlined.NoteAdd,
+                        contentDescription = stringResource(Res.string.fill_add_note),
+                        tint = if (item.note != null) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
 
-            IconButton(onClick = onDeleteClick) {
-                Icon(
-                    Icons.Outlined.Delete,
-                    contentDescription = stringResource(Res.string.delete),
-                    tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(20.dp)
+            item.note?.let { note ->
+                Text(
+                    text = note,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(start = 48.dp, end = 48.dp, bottom = AppDimens.SpacingSm)
                 )
             }
         }
     }
+}
+
+@Composable
+private fun NoteDialog(
+    note: String,
+    onNoteChanged: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(Res.string.fill_note_dialog_title)) },
+        text = {
+            AppTextField(
+                value = note,
+                onValueChange = onNoteChanged,
+                label = "",
+                placeholder = stringResource(Res.string.fill_note_placeholder)
+            )
+        },
+        confirmButton = {
+            AppButtonText(
+                text = stringResource(Res.string.save),
+                onClick = onConfirm
+            )
+        },
+        dismissButton = {
+            AppButtonText(
+                text = stringResource(Res.string.cancel),
+                onClick = onDismiss
+            )
+        },
+        containerColor = MaterialTheme.colorScheme.surface,
+        shape = MaterialTheme.shapes.large
+    )
 }
 
 @Composable

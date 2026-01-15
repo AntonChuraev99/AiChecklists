@@ -16,6 +16,7 @@ import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.Analyze
 import com.antonchuraev.homesearchchecklist.feature.splash.presentation.SplashScreen
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.ChecklistDetailScreen
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.fill.FillDetailScreen
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.fills.FillsListScreen
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.PaywallScreen
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.SubscriptionStatusScreen
 import androidx.navigation.toRoute
@@ -81,6 +82,11 @@ fun App() {
                 composable<AppNavRoute.FillDetail> { backStackEntry ->
                     val route = backStackEntry.toRoute<AppNavRoute.FillDetail>()
                     FillDetailScreen(fillId = route.fillId)
+                }
+
+                composable<AppNavRoute.FillsList> { backStackEntry ->
+                    val route = backStackEntry.toRoute<AppNavRoute.FillsList>()
+                    FillsListScreen(checklistId = route.checklistId)
                 }
 
                 composable<AppNavRoute.Paywall> {

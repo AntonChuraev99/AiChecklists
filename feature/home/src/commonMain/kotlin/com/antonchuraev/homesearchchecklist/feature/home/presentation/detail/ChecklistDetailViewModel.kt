@@ -12,7 +12,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -39,21 +38,24 @@ class ChecklistDetailViewModel(
             }
 
             combine(
-                repository.getFillsByChecklistId(checklistId),
+                repository.getDefaultFillByChecklistId(checklistId),
+                repository.getAdditionalFillsByChecklistId(checklistId),
                 getUserLimitsUseCase()
-            ) { fills, userLimits ->
-                fills to userLimits
-            }.collect { (fills, userLimits) ->
+            ) { defaultFill, additionalFills, userLimits ->
+                Triple(defaultFill, additionalFills, userLimits)
+            }.collect { (defaultFill, additionalFills, userLimits) ->
                 val currentState = _screenState.value
                 if (currentState is ChecklistDetailState.Content) {
                     _screenState.value = currentState.copy(
-                        fills = fills,
+                        defaultFill = defaultFill,
+                        additionalFillsCount = additionalFills.size,
                         userLimits = userLimits
                     )
                 } else {
                     _screenState.value = ChecklistDetailState.Content(
                         checklist = checklist,
-                        fills = fills,
+                        defaultFill = defaultFill,
+                        additionalFillsCount = additionalFills.size,
                         userLimits = userLimits
                     )
                 }
@@ -79,12 +81,32 @@ class ChecklistDetailViewModel(
                 updateContentState { it.copy(showDeleteConfirmation = false) }
             }
 
-            is ChecklistDetailIntent.OnFillClick -> {
-                navigator.navigateToFillDetail(intent.fill.id)
+            is ChecklistDetailIntent.OnItemCheckedChange -> {
+                updateItemChecked(intent.index, intent.checked)
             }
 
-            is ChecklistDetailIntent.OnDeleteFillClick -> {
-                deleteFill(intent.fill)
+            is ChecklistDetailIntent.OnAddNoteClick -> {
+                val state = _screenState.value
+                if (state is ChecklistDetailState.Content && state.defaultFill != null) {
+                    val currentNote = state.defaultFill.items.getOrNull(intent.index)?.note ?: ""
+                    updateContentState {
+                        it.copy(noteDialogItemIndex = intent.index, editingNote = currentNote)
+                    }
+                }
+            }
+
+            is ChecklistDetailIntent.OnNoteChanged -> {
+                updateContentState { it.copy(editingNote = intent.note) }
+            }
+
+            ChecklistDetailIntent.OnSaveNote -> saveNote()
+
+            ChecklistDetailIntent.OnDismissNoteDialog -> {
+                updateContentState { it.copy(noteDialogItemIndex = null, editingNote = "") }
+            }
+
+            ChecklistDetailIntent.OnViewAllFillsClick -> {
+                navigator.navigateToFillsList(checklistId)
             }
 
             ChecklistDetailIntent.OnAddFillClick -> handleAddFillClick()
@@ -112,12 +134,50 @@ class ChecklistDetailViewModel(
         }
     }
 
+    private fun updateItemChecked(index: Int, checked: Boolean) {
+        val state = _screenState.value
+        if (state !is ChecklistDetailState.Content || state.defaultFill == null) return
+
+        val updatedItems = state.defaultFill.items.mapIndexed { i, item ->
+            if (i == index) item.copy(checked = checked) else item
+        }
+
+        val updatedFill = state.defaultFill.copy(items = updatedItems)
+
+        viewModelScope.launch {
+            repository.updateFill(updatedFill)
+        }
+    }
+
+    private fun saveNote() {
+        val state = _screenState.value
+        if (state !is ChecklistDetailState.Content || state.defaultFill == null) return
+        val itemIndex = state.noteDialogItemIndex ?: return
+
+        val updatedItems = state.defaultFill.items.mapIndexed { i, item ->
+            if (i == itemIndex) {
+                item.copy(note = state.editingNote.takeIf { it.isNotBlank() })
+            } else {
+                item
+            }
+        }
+
+        val updatedFill = state.defaultFill.copy(items = updatedItems)
+
+        viewModelScope.launch {
+            repository.updateFill(updatedFill)
+            updateContentState { it.copy(noteDialogItemIndex = null, editingNote = "") }
+        }
+    }
+
     private fun handleAddFillClick() {
         val state = _screenState.value
         if (state !is ChecklistDetailState.Content) return
 
         val limits = state.userLimits
-        if (limits != null && !limits.canCreateFill(state.fills.size)) {
+        // +1 for the default fill
+        val totalFills = state.additionalFillsCount + 1
+        if (limits != null && !limits.canCreateFill(totalFills)) {
             updateContentState { it.copy(showFillLimitDialog = true) }
         } else {
             updateContentState { it.copy(showAddFillDialog = true, newFillName = "") }
@@ -129,7 +189,8 @@ class ChecklistDetailViewModel(
         if (state !is ChecklistDetailState.Content) return
 
         val limits = state.userLimits
-        if (limits != null && !limits.canCreateFill(state.fills.size)) {
+        val totalFills = state.additionalFillsCount + 1
+        if (limits != null && !limits.canCreateFill(totalFills)) {
             updateContentState { it.copy(showFillLimitDialog = true) }
         } else {
             navigator.navigateToAnalyzeScreen(checklistId)
@@ -162,19 +223,14 @@ class ChecklistDetailViewModel(
                 checklistId = checklistId,
                 name = name,
                 items = fillItems,
-                createdAt = currentTimeMillis()
+                createdAt = currentTimeMillis(),
+                isDefault = false
             )
 
             val fillId = repository.addFill(newFill)
             updateContentState { it.copy(showAddFillDialog = false, isCreatingFill = false) }
 
             navigator.navigateToFillDetail(fillId)
-        }
-    }
-
-    private fun deleteFill(fill: ChecklistFill) {
-        viewModelScope.launch {
-            repository.deleteFill(fill)
         }
     }
 

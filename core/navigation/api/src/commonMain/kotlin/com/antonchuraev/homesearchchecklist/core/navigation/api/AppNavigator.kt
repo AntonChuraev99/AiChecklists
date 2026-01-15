@@ -30,6 +30,8 @@ interface AppNavigator {
 
     fun navigateToFillDetail(fillId: Long)
 
+    fun navigateToFillsList(checklistId: Long)
+
     fun navigateToPaywall()
 
     fun navigateToSubscriptionStatus()
