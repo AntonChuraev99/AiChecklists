@@ -1,5 +1,6 @@
 package com.antonchuraev.homesearchchecklist.feature.user.data.repository
 
+import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppDatastore
 import com.antonchuraev.homesearchchecklist.feature.user.data.device.DeviceIdProvider
 import com.antonchuraev.homesearchchecklist.feature.user.data.device.getPlatformName
@@ -16,7 +17,8 @@ import kotlinx.coroutines.flow.stateIn
 class UserDataRepositoryImpl(
     private val appScope: CoroutineScope,
     private val deviceIdProvider: DeviceIdProvider,
-    private val userApiService: UserApiService
+    private val userApiService: UserApiService,
+    private val logger: AppLogger
 ) : UserDataRepository {
 
     companion object {
@@ -83,30 +85,30 @@ class UserDataRepositoryImpl(
     }
 
     override suspend fun ensureUserRegistered(): Result<UserData> {
-        println("[$TAG] ensureUserRegistered: starting...")
+        logger.debug(TAG, "ensureUserRegistered: starting...")
 
         // Check if user is already registered locally
         val currentUserId = appDatastore.observeString(USER_ID_KEY, "").first()
-        println("[$TAG] ensureUserRegistered: currentUserId='$currentUserId'")
+        logger.debug(TAG, "ensureUserRegistered: currentUserId='$currentUserId'")
 
         if (currentUserId.isNotBlank()) {
             // User already registered, sync with server to get fresh data
-            println("[$TAG] ensureUserRegistered: user exists, syncing with server...")
+            logger.debug(TAG, "ensureUserRegistered: user exists, syncing with server...")
             return syncWithServer()
         }
 
         // User not registered, call the server
         val deviceId = deviceIdProvider.getDeviceId()
-        println("[$TAG] ensureUserRegistered: registering new user with deviceId=$deviceId")
+        logger.debug(TAG, "ensureUserRegistered: registering new user with deviceId=$deviceId")
 
         return registerAndSave(deviceId)
     }
 
     override suspend fun syncWithServer(): Result<UserData> {
-        println("[$TAG] syncWithServer: starting...")
+        logger.debug(TAG, "syncWithServer: starting...")
 
         val deviceId = deviceIdProvider.getDeviceId()
-        println("[$TAG] syncWithServer: deviceId=$deviceId")
+        logger.debug(TAG, "syncWithServer: deviceId=$deviceId")
 
         return registerAndSave(deviceId)
     }
@@ -117,14 +119,14 @@ class UserDataRepositoryImpl(
             appVersion = null,
             platform = getPlatformName()
         ).onSuccess { result ->
-            println("[$TAG] registerAndSave: SUCCESS - userId=${result.userId}, aiCredits=${result.aiCredits}, isPremium=${result.isPremium}")
+            logger.info(TAG, "registerAndSave: SUCCESS - userId=${result.userId}, aiCredits=${result.aiCredits}, isPremium=${result.isPremium}")
             // Save user data locally
             appDatastore.saveString(USER_ID_KEY, result.userId)
             appDatastore.saveBoolean(IS_PREMIUM_KEY, result.isPremium)
             appDatastore.saveInt(AI_CREDITS_KEY, result.aiCredits)
-            println("[$TAG] registerAndSave: saved to datastore")
+            logger.debug(TAG, "registerAndSave: saved to datastore")
         }.onFailure { error ->
-            println("[$TAG] registerAndSave: FAILED - ${error.message}")
+            logger.error(TAG, "registerAndSave: FAILED - ${error.message}", error)
         }.map { result ->
             UserData(
                 userId = result.userId,

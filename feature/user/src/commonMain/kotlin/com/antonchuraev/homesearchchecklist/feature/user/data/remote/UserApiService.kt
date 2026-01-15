@@ -1,7 +1,9 @@
 package com.antonchuraev.homesearchchecklist.feature.user.data.remote
 
+import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import io.ktor.client.*
 import io.ktor.client.call.*
+import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -45,6 +47,7 @@ interface UserApiService {
  * Implementation of UserApiService using Ktor HTTP client.
  */
 class UserApiServiceImpl(
+    private val logger: AppLogger,
     private val baseUrl: String = DEFAULT_BASE_URL
 ) : UserApiService {
 
@@ -63,6 +66,11 @@ class UserApiServiceImpl(
         install(ContentNegotiation) {
             json(json)
         }
+        install(HttpTimeout) {
+            requestTimeoutMillis = 60_000 // 1 minute for user operations
+            connectTimeoutMillis = 30_000 // 30 seconds to connect
+            socketTimeoutMillis = 60_000  // 1 minute socket timeout
+        }
     }
 
     override suspend fun registerUser(
@@ -70,7 +78,7 @@ class UserApiServiceImpl(
         appVersion: String?,
         platform: String?
     ): Result<RegisterUserResult> = runCatching {
-        println("[$TAG] registerUser: deviceId=$deviceId, platform=$platform")
+        logger.debug(TAG, "registerUser: deviceId=$deviceId, platform=$platform")
 
         val request = RegisterUserRequest(
             deviceId = deviceId,
@@ -78,15 +86,15 @@ class UserApiServiceImpl(
             platform = platform
         )
 
-        println("[$TAG] registerUser: calling $baseUrl/register_user")
+        logger.debug(TAG, "registerUser: calling $baseUrl/register_user")
         val response: HttpResponse = httpClient.post("$baseUrl/register_user") {
             contentType(ContentType.Application.Json)
             setBody(request)
         }
-        println("[$TAG] registerUser: response status=${response.status}")
+        logger.debug(TAG, "registerUser: response status=${response.status}")
 
         val responseBody = response.body<RegisterUserResponseDto>()
-        println("[$TAG] registerUser: response body - success=${responseBody.success}, userId=${responseBody.userId}, aiCredits=${responseBody.aiCredits}, isPremium=${responseBody.isPremium}, error=${responseBody.error}")
+        logger.debug(TAG, "registerUser: response body - success=${responseBody.success}, userId=${responseBody.userId}, aiCredits=${responseBody.aiCredits}, isPremium=${responseBody.isPremium}, error=${responseBody.error}")
 
         if (responseBody.success && responseBody.userId != null) {
             val result = RegisterUserResult(
@@ -96,10 +104,10 @@ class UserApiServiceImpl(
                 aiCredits = responseBody.aiCredits ?: 0,
                 createdAt = responseBody.createdAt ?: ""
             )
-            println("[$TAG] registerUser: SUCCESS - returning aiCredits=${result.aiCredits}")
+            logger.info(TAG, "registerUser: SUCCESS - aiCredits=${result.aiCredits}")
             result
         } else {
-            println("[$TAG] registerUser: FAILED - ${responseBody.error}")
+            logger.error(TAG, "registerUser: FAILED - ${responseBody.error}")
             throw Exception(responseBody.error ?: "Failed to register user")
         }
     }

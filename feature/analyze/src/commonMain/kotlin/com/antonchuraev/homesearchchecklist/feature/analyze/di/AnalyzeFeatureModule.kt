@@ -11,7 +11,7 @@ import org.koin.dsl.module
 
 val analyzeFeatureModule = module {
     // Firebase AI Service - all AI operations go through Firebase Functions
-    single<FirebaseAiService> { FirebaseAiServiceImpl() }
+    single<FirebaseAiService> { FirebaseAiServiceImpl(logger = get()) }
 
     // Repository - uses Firebase AI Service for all AI operations
     single<AnalyzeRepository> {

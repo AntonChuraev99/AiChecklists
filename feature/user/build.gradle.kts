@@ -22,6 +22,7 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
+            implementation(projects.core.common.api)
             implementation(projects.core.datastore.api)
             implementation(projects.core.datastore.impl)
 
