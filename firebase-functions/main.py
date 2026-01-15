@@ -221,7 +221,7 @@ def analyze_and_fill_checklist(request: Request):
 
     try:
         # Call Gemini API
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel("gemini-2.0-flash-lite")
 
         if input_type == "image_base64":
             import base64
@@ -354,7 +354,7 @@ def generate_checklist(request: Request):
 
     try:
         # Call Gemini API
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel("gemini-2.0-flash-lite")
 
         if input_type == "image_base64" and input_data:
             import base64
