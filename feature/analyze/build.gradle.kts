@@ -46,13 +46,22 @@ kotlin {
 
             // Generative AI (Gemini) for KMP
             implementation(libs.generative.ai.google)
+
+            // Ktor HTTP Client
+            implementation(libs.ktor.client.core)
+            implementation(libs.ktor.client.content.negotiation)
+            implementation(libs.ktor.serialization.json)
         }
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)
+            implementation(libs.ktor.client.okhttp)
         }
 
         val iosMain by creating {
             dependsOn(commonMain.get())
+            dependencies {
+                implementation(libs.ktor.client.darwin)
+            }
         }
         iosArm64Main {
             dependsOn(iosMain)

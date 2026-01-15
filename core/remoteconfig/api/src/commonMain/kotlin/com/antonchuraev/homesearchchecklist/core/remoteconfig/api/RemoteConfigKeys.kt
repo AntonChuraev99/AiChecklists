@@ -10,6 +10,9 @@ object RemoteConfigKeys {
     const val AI_ANALYSIS_MAX_INPUT_LENGTH = "ai_analysis_max_input_length"
     const val MIN_APP_VERSION = "min_app_version"
     const val MAINTENANCE_MODE = "maintenance_mode"
+    const val AI_FUNCTIONS_BASE_URL = "ai_functions_base_url"
+    const val AI_DAILY_LIMIT_FREE = "ai_daily_limit_free"
+    const val AI_DAILY_LIMIT_PREMIUM = "ai_daily_limit_premium"
 }
 
 /**
@@ -22,4 +25,7 @@ object RemoteConfigDefaults {
     const val AI_ANALYSIS_MAX_INPUT_LENGTH = 10000L
     const val MIN_APP_VERSION = "1.0.0"
     const val MAINTENANCE_MODE = false
+    const val AI_FUNCTIONS_BASE_URL = "https://us-central1-aichecklists-40230.cloudfunctions.net"
+    const val AI_DAILY_LIMIT_FREE = 10L
+    const val AI_DAILY_LIMIT_PREMIUM = 100L
 }
