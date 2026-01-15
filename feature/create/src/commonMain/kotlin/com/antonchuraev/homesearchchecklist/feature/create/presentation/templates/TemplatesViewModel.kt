@@ -34,6 +34,8 @@ class TemplatesViewModel(
             TemplatesScreenIntent.OnDismissPreview -> dismissPreview()
             TemplatesScreenIntent.OnCreateFromTemplate -> createFromTemplate()
             TemplatesScreenIntent.OnDismissError -> dismissError()
+            TemplatesScreenIntent.OnCreateManuallyClick -> appNavigator.navigateToCreateChecklistScreen(null)
+            TemplatesScreenIntent.OnCreateWithAiClick -> appNavigator.navigateToAnalyzeScreen()
         }
     }
 

@@ -65,7 +65,9 @@ class MainScreenViewModel(
             if (limits != null && !limits.canCreateChecklist) {
                 _showLimitDialog.update { true }
             } else {
-                appNavigator.navigateToCreateChecklistScreen(null)
+                // Navigate to Templates screen where user can choose template,
+                // create manually, or create with AI
+                appNavigator.navigateToTemplatesScreen()
             }
         }
     }
