@@ -1,6 +1,10 @@
 package com.antonchuraev.homesearchchecklist.feature.analyze.di
 
+import com.antonchuraev.homesearchchecklist.feature.analyze.data.analyzer.GeminiAiAnalyzer
 import com.antonchuraev.homesearchchecklist.feature.analyze.data.analyzer.StubAiAnalyzer
+import com.antonchuraev.homesearchchecklist.feature.analyze.data.config.ApiKeyProvider
+import com.antonchuraev.homesearchchecklist.feature.analyze.data.config.DefaultApiKeyProvider
+import com.antonchuraev.homesearchchecklist.feature.analyze.data.config.GeminiConfig
 import com.antonchuraev.homesearchchecklist.feature.analyze.data.repository.AnalyzeRepositoryImpl
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.analyzer.AiAnalyzer
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.repository.AnalyzeRepository
@@ -11,8 +15,19 @@ import org.koin.dsl.bind
 import org.koin.dsl.module
 
 val analyzeFeatureModule = module {
-    // AI Analyzer - use stub for now, replace with real implementation later
-    singleOf(::StubAiAnalyzer) bind AiAnalyzer::class
+    // ApiKeyProvider - uses GeminiConfig from app module
+    single<ApiKeyProvider> { DefaultApiKeyProvider(get()) }
+
+    // AI Analyzer - use Gemini if API key is configured, otherwise fall back to Stub
+    single<AiAnalyzer> {
+        val apiKeyProvider: ApiKeyProvider = get()
+        val apiKey = apiKeyProvider.getGeminiApiKey()
+        if (apiKey.isNotBlank()) {
+            GeminiAiAnalyzer(apiKeyProvider)
+        } else {
+            StubAiAnalyzer()
+        }
+    }
 
     // Repository
     singleOf(::AnalyzeRepositoryImpl) bind AnalyzeRepository::class
