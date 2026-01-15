@@ -18,6 +18,7 @@ import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.PictureAsPdf
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.TextFields
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -62,18 +63,40 @@ fun AnalyzeScreen(
         onBackButtonClick = { viewModel.sendIntent(AnalyzeScreenIntent.OnBackClick) },
         bottomBar = {
             if (screenState.selectedInputType != null && !screenState.isAnalyzing) {
-                Box(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(AppDimens.ScreenPaddingHorizontal)
                         .padding(bottom = AppDimens.SpacingLg)
-                        .navigationBarsPadding()
+                        .navigationBarsPadding(),
+                    verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
                 ) {
+                    // Credits info
+                    CostInfoRow(
+                        aiCredits = screenState.aiCredits,
+                        aiActionCost = screenState.aiActionCost,
+                        isPremium = screenState.isPremium
+                    )
+
+                    // All users (including premium) need enough credits
+                    val hasEnoughCredits = screenState.aiCredits >= screenState.aiActionCost
+
                     AppButton(
                         text = stringResource(Res.string.analyze_button),
                         onClick = { viewModel.sendIntent(AnalyzeScreenIntent.OnAnalyzeClick) },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = hasEnoughCredits
                     )
+
+                    if (!hasEnoughCredits) {
+                        Text(
+                            text = stringResource(Res.string.analyze_not_enough_credits),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
             }
         }
@@ -504,4 +527,46 @@ private fun ResultDialog(
         containerColor = MaterialTheme.colorScheme.surface,
         shape = MaterialTheme.shapes.large
     )
+}
+
+@Composable
+private fun CostInfoRow(
+    aiCredits: Int,
+    aiActionCost: Int,
+    isPremium: Boolean,
+    modifier: Modifier = Modifier
+) {
+    // All users (including premium) now use credits
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.AutoAwesome,
+            contentDescription = null,
+            modifier = Modifier.size(16.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.size(4.dp))
+        Text(
+            text = stringResource(Res.string.analyze_cost_info, aiActionCost),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = " • ",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = stringResource(Res.string.credits_display, aiCredits),
+            style = MaterialTheme.typography.bodySmall,
+            color = if (aiCredits >= aiActionCost) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.error
+            }
+        )
+    }
 }

@@ -7,7 +7,9 @@ data class PaywallProduct(
     val priceString: String,
     val periodString: String?,
     val packageId: String,
-    val isPopular: Boolean = false
+    val isPopular: Boolean = false,
+    val hasFreeTrial: Boolean = false,
+    val freeTrialDays: Int = 0
 )
 
 data class PaywallOffering(

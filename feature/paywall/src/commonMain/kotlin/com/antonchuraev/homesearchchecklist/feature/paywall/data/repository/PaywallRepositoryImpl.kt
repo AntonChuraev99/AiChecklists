@@ -57,16 +57,31 @@ class PaywallRepositoryImpl(
 
                     val products = currentOffering.availablePackages.map { pkg ->
                         val storeProduct = pkg.storeProduct
+
+                        // Check for free trial in introductory price
+                        val introPrice = storeProduct.introductoryDiscount
+                        val hasFreeTrial = introPrice?.price?.amountMicros == 0L
+                        val freeTrialDays = if (hasFreeTrial && introPrice != null) {
+                            when (introPrice.subscriptionPeriod.unit.name.lowercase()) {
+                                "day" -> introPrice.subscriptionPeriod.value
+                                "week" -> introPrice.subscriptionPeriod.value * 7
+                                "month" -> introPrice.subscriptionPeriod.value * 30
+                                else -> 0
+                            }
+                        } else 0
+
                         PaywallProduct(
                             id = storeProduct.id,
                             title = storeProduct.title,
-                            description = storeProduct.title, // Use title as fallback
+                            description = storeProduct.title,
                             priceString = storeProduct.price.formatted,
                             periodString = storeProduct.period?.let { period ->
                                 "${period.value} ${period.unit.name.lowercase()}"
                             },
                             packageId = pkg.identifier,
-                            isPopular = pkg.identifier == "annual" || pkg.identifier == "\$rc_annual"
+                            isPopular = pkg.identifier == "monthly" || pkg.identifier == "\$rc_monthly",
+                            hasFreeTrial = hasFreeTrial,
+                            freeTrialDays = freeTrialDays
                         )
                     }
 

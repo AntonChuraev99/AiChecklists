@@ -30,6 +30,7 @@ kotlin {
 
             implementation(projects.feature.checklist)
             implementation(projects.feature.user)
+            implementation(projects.feature.paywall)
 
             implementation(compose.runtime)
             implementation(compose.foundation)

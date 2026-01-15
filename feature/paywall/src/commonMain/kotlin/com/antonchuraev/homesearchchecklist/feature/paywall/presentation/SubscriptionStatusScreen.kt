@@ -27,10 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
-import aichecklists.core.designsystem.generated.resources.subscription_status_active
-import aichecklists.core.designsystem.generated.resources.subscription_status_manage
-import aichecklists.core.designsystem.generated.resources.subscription_status_title
-import aichecklists.core.designsystem.generated.resources.subscription_status_valid_until
+import aichecklists.core.designsystem.generated.resources.*
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonSecondary
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
@@ -57,6 +54,8 @@ fun SubscriptionStatusScreen(
         } else {
             SubscriptionStatusContent(
                 formattedExpirationDate = state.formattedExpirationDate,
+                aiCredits = state.aiCredits,
+                isPremium = state.subscriptionStatus.isActive,
                 onManageClick = { viewModel.sendIntent(SubscriptionStatusIntent.OnManageSubscriptionClick) }
             )
         }
@@ -66,6 +65,8 @@ fun SubscriptionStatusScreen(
 @Composable
 private fun SubscriptionStatusContent(
     formattedExpirationDate: String?,
+    aiCredits: Int,
+    isPremium: Boolean,
     onManageClick: () -> Unit
 ) {
     Column(
@@ -120,6 +121,50 @@ private fun SubscriptionStatusContent(
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.primary,
+                textAlign = TextAlign.Center
+            )
+        }
+
+        Spacer(modifier = Modifier.height(AppDimens.SpacingXl))
+
+        // AI Credits section
+        Text(
+            text = stringResource(Res.string.subscription_status_credits_section),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onBackground,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
+
+        // Show actual credits for all users
+        Text(
+            text = stringResource(Res.string.credits_display, aiCredits),
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+            textAlign = TextAlign.Center
+        )
+
+        if (isPremium) {
+            Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
+
+            // Refill info for premium users
+            Text(
+                text = stringResource(Res.string.subscription_status_credits_info),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(AppDimens.SpacingXs))
+
+            // Daily cap info
+            Text(
+                text = stringResource(Res.string.subscription_status_daily_cap, 300),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
         }

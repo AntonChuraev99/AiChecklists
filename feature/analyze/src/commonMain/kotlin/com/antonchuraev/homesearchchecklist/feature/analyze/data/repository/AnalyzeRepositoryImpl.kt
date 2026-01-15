@@ -39,6 +39,12 @@ class AnalyzeRepositoryImpl(
             ).fold(
                 onSuccess = { response ->
                     if (response.success && response.data != null) {
+                        // Update local free generations count if provided
+                        val newGenerations = response.data.aiCredits
+                        if (newGenerations >= 0) {
+                            userDataRepository.update(userData.copy(aiCredits = newGenerations))
+                        }
+
                         val filledItems = response.data.filledItems.map { filled ->
                             ChecklistItem(
                                 text = filled.note?.let { "${filled.text} - $it" } ?: filled.text,
@@ -69,6 +75,12 @@ class AnalyzeRepositoryImpl(
             ).fold(
                 onSuccess = { response ->
                     if (response.success && response.data != null) {
+                        // Update local free generations count if provided
+                        val newGenerations = response.data.aiCredits
+                        if (newGenerations >= 0) {
+                            userDataRepository.update(userData.copy(aiCredits = newGenerations))
+                        }
+
                         Result.success(
                             AnalyzeResult(
                                 suggestedItems = response.data.items,

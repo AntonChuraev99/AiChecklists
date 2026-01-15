@@ -7,7 +7,8 @@ import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.Subscri
 data class SubscriptionStatusState(
     val isLoading: Boolean = true,
     val subscriptionStatus: SubscriptionStatus = SubscriptionStatus.FREE,
-    val formattedExpirationDate: String? = null
+    val formattedExpirationDate: String? = null,
+    val aiCredits: Int = 0
 ) : State
 
 sealed interface SubscriptionStatusIntent : Intent {

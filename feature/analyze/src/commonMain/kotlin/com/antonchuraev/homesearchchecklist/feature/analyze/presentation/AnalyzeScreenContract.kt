@@ -18,7 +18,10 @@ data class AnalyzeScreenState(
     val checklistName: String = "",
     val availableChecklists: List<Checklist> = emptyList(),
     val selectedChecklistId: Long? = null,
-    val showResultDialog: Boolean = false
+    val showResultDialog: Boolean = false,
+    val aiCredits: Int = 0,
+    val aiActionCost: Int = 30,
+    val isPremium: Boolean = false
 ) : State
 
 sealed interface AnalyzeScreenIntent : Intent {

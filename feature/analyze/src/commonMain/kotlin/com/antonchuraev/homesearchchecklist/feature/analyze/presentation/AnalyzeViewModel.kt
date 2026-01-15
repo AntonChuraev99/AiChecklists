@@ -7,6 +7,8 @@ import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.Analyze
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.InputDataType
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.repository.AnalyzeRepository
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetSubscriptionStatusUseCase
+import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -16,7 +18,9 @@ import kotlinx.coroutines.launch
 class AnalyzeViewModel(
     private val analyzeRepository: AnalyzeRepository,
     private val checklistRepository: ChecklistRepository,
-    private val appNavigator: AppNavigator
+    private val appNavigator: AppNavigator,
+    private val userDataRepository: UserDataRepository,
+    private val getSubscriptionStatusUseCase: GetSubscriptionStatusUseCase
 ) : AppViewModel<AnalyzeScreenState, AnalyzeScreenIntent, Nothing>() {
 
     private val _screenState = MutableStateFlow(AnalyzeScreenState())
@@ -24,12 +28,30 @@ class AnalyzeViewModel(
 
     init {
         loadChecklists()
+        observeUserData()
     }
 
     private fun loadChecklists() {
         viewModelScope.launch {
             checklistRepository.checklists.collect { checklists ->
                 _screenState.update { it.copy(availableChecklists = checklists) }
+            }
+        }
+    }
+
+    private fun observeUserData() {
+        viewModelScope.launch {
+            userDataRepository.getUserDataFlow().collect { userData ->
+                _screenState.update {
+                    it.copy(aiCredits = userData.aiCredits)
+                }
+            }
+        }
+        viewModelScope.launch {
+            getSubscriptionStatusUseCase().collect { status ->
+                _screenState.update {
+                    it.copy(isPremium = status.isActive)
+                }
             }
         }
     }

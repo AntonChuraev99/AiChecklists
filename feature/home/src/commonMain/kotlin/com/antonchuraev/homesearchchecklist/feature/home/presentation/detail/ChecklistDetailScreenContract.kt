@@ -4,6 +4,7 @@ import com.antonchuraev.homesearchchecklist.core.common.api.Intent
 import com.antonchuraev.homesearchchecklist.core.common.api.State
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.UserLimits
 
 sealed interface ChecklistDetailState : State {
     data object Loading : ChecklistDetailState
@@ -15,7 +16,9 @@ sealed interface ChecklistDetailState : State {
         val showAddFillDialog: Boolean = false,
         val newFillName: String = "",
         val fillNameError: String? = null,
-        val isCreatingFill: Boolean = false
+        val isCreatingFill: Boolean = false,
+        val userLimits: UserLimits? = null,
+        val showFillLimitDialog: Boolean = false
     ) : ChecklistDetailState
 }
 
@@ -38,4 +41,8 @@ sealed interface ChecklistDetailIntent : Intent {
     data object OnDismissAddFillDialog : ChecklistDetailIntent
     data class OnNewFillNameChanged(val name: String) : ChecklistDetailIntent
     data object OnConfirmAddFill : ChecklistDetailIntent
+
+    // Limits
+    data object OnDismissFillLimitDialog : ChecklistDetailIntent
+    data object OnUpgradeToPremiumClick : ChecklistDetailIntent
 }

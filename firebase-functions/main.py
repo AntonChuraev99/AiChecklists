@@ -6,8 +6,11 @@ Functions:
 2. analyze_and_fill_checklist - Auto-fill existing checklist based on user data
 3. generate_checklist - Create new checklist from prompt + user data
 4. get_usage_stats - Get user's AI usage statistics
+5. refill_premium_credits - Daily credits refill for premium users (called by Cloud Scheduler at 12:00 CET)
+6. get_credits_info - Get credits configuration and user's current credits
 
 All AI calls go through these functions for usage control and monitoring.
+Credits are deducted for all users (including premium). Premium users get daily refill to cap.
 """
 
 import json
@@ -37,6 +40,12 @@ if GEMINI_API_KEY:
 DEFAULT_DAILY_LIMIT_FREE = 10
 DEFAULT_DAILY_LIMIT_PREMIUM = 100
 DEFAULT_MAX_INPUT_LENGTH = 10000
+
+# AI Credits system (configurable via remote_config collection in Firestore)
+# Default values - can be changed remotely without redeploying
+DEFAULT_INITIAL_CREDITS = 100  # Credits given to new users
+DEFAULT_AI_ACTION_COST = 30    # Cost per AI action (analyze/generate)
+DEFAULT_PREMIUM_DAILY_CREDITS_CAP = 300  # Max credits premium users get refilled to daily
 
 
 def get_user_usage(user_id: str) -> dict:
@@ -121,6 +130,94 @@ def create_success_response(data: dict):
 
 
 # ============================================================================
+# AI Credits management (lifetime credits for AI usage)
+# ============================================================================
+
+def get_credits_config() -> dict:
+    """
+    Get AI credits configuration from remote config.
+    This allows changing values without redeploying.
+
+    To change remotely, update the Firestore document:
+    remote_config/current with fields:
+    - initial_ai_credits: int (credits for new users)
+    - ai_action_cost: int (cost per AI action)
+    - premium_daily_credits_cap: int (max credits for premium daily refill)
+    """
+    return {
+        "initial_credits": get_remote_config_value("initial_ai_credits", DEFAULT_INITIAL_CREDITS),
+        "action_cost": get_remote_config_value("ai_action_cost", DEFAULT_AI_ACTION_COST),
+        "premium_daily_credits_cap": get_remote_config_value("premium_daily_credits_cap", DEFAULT_PREMIUM_DAILY_CREDITS_CAP)
+    }
+
+
+def get_user_data(user_id: str) -> dict | None:
+    """Get user data from Firestore."""
+    try:
+        doc = db.collection("users").document(user_id).get()
+        if doc.exists:
+            return doc.to_dict()
+    except Exception:
+        pass
+    return None
+
+
+def get_user_credits(user_id: str) -> int:
+    """Get user's remaining AI credits."""
+    user_data = get_user_data(user_id)
+    if user_data is None:
+        return 0
+    return user_data.get("ai_credits", 0)
+
+
+def check_credits_available(user_id: str, is_premium: bool = False) -> tuple[bool, int, str]:
+    """
+    Check if user has enough credits for an AI action.
+
+    Premium users also use credits now (they get daily refills instead of unlimited).
+
+    Returns: (is_allowed, remaining_credits, error_message)
+    """
+    config = get_credits_config()
+    credits = get_user_credits(user_id)
+    action_cost = config["action_cost"]
+
+    if credits < action_cost:
+        if is_premium:
+            return False, credits, f"Not enough credits. You have {credits}, but need {action_cost}. Your credits will be refilled at 12:00 CET."
+        else:
+            return False, credits, f"Not enough credits. You have {credits}, but need {action_cost}. Purchase premium for daily credits refill."
+
+    return True, credits, ""
+
+
+def deduct_user_credits(user_id: str) -> int:
+    """
+    Deduct credits for an AI action.
+    Returns the new remaining credits count.
+    """
+    try:
+        user_ref = db.collection("users").document(user_id)
+        user_data = get_user_data(user_id)
+
+        if user_data is None:
+            return 0
+
+        config = get_credits_config()
+        current = user_data.get("ai_credits", 0)
+        new_count = max(0, current - config["action_cost"])
+
+        user_ref.update({
+            "ai_credits": new_count,
+            "updated_at": datetime.utcnow().isoformat()
+        })
+
+        return new_count
+    except Exception:
+        return 0
+
+
+# ============================================================================
 # FUNCTION 1: Register or retrieve user by device ID
 # ============================================================================
 
@@ -142,6 +239,7 @@ def register_user(request: Request):
         "user_id": "string (UUID)",
         "is_new_user": boolean,
         "is_premium": boolean,
+        "ai_credits": number,
         "created_at": "ISO datetime string"
     }
     """
@@ -164,6 +262,10 @@ def register_user(request: Request):
     device_id = device_id.strip().lower()
 
     try:
+        # Get credits config (allows remote configuration)
+        config = get_credits_config()
+        initial_credits = config["initial_credits"]
+
         # Check if user with this device_id already exists
         users_ref = db.collection("users")
         existing_users = users_ref.where("device_id", "==", device_id).limit(1).get()
@@ -175,6 +277,7 @@ def register_user(request: Request):
                 "user_id": user_doc.id,
                 "is_new_user": False,
                 "is_premium": user_data.get("is_premium", False),
+                "ai_credits": user_data.get("ai_credits", 0),
                 "created_at": user_data.get("created_at", "")
             })
 
@@ -185,6 +288,7 @@ def register_user(request: Request):
         user_data = {
             "device_id": device_id,
             "is_premium": False,
+            "ai_credits": initial_credits,
             "created_at": now,
             "updated_at": now,
             "app_version": data.get("app_version", ""),
@@ -198,6 +302,7 @@ def register_user(request: Request):
             "user_id": new_user_id,
             "is_new_user": True,
             "is_premium": False,
+            "ai_credits": initial_credits,
             "created_at": now
         })
 
@@ -286,10 +391,10 @@ def analyze_and_fill_checklist(request: Request):
     if not get_remote_config_value("feature_ai_analysis_enabled", True):
         return create_error_response("AI analysis is currently disabled", 503)
 
-    # Check usage limit
-    allowed, limit_message = check_usage_limit(user_id, is_premium)
+    # Check if user has enough credits
+    allowed, remaining, credits_error = check_credits_available(user_id, is_premium)
     if not allowed:
-        return create_error_response(limit_message, 429)
+        return create_error_response(credits_error, 402)  # 402 Payment Required
 
     # Check input length
     max_length = get_remote_config_value("ai_analysis_max_input_length", DEFAULT_MAX_INPUT_LENGTH)
@@ -331,15 +436,17 @@ def analyze_and_fill_checklist(request: Request):
 
         result = json.loads(response_text.strip())
 
-        # Increment usage
+        # Deduct credits for all users (premium users also use credits now)
+        new_remaining = deduct_user_credits(user_id)
+
+        # Increment usage stats
         usage = increment_usage(user_id, "analyze_and_fill_checklist", input_type)
-        limit = DEFAULT_DAILY_LIMIT_PREMIUM if is_premium else DEFAULT_DAILY_LIMIT_FREE
 
         return create_success_response({
             "filled_items": result.get("filled_items", []),
             "summary": result.get("summary", ""),
             "confidence": result.get("confidence", 0.8),
-            "usage": {"count": usage["count"], "limit": limit}
+            "ai_credits": new_remaining
         })
 
     except json.JSONDecodeError as e:
@@ -349,7 +456,7 @@ def analyze_and_fill_checklist(request: Request):
 
 
 # ============================================================================
-# FUNCTION 2: Generate checklist from prompt + data
+# FUNCTION 3: Generate checklist from prompt + data
 # ============================================================================
 
 GENERATE_CHECKLIST_PROMPT = """You are an AI assistant that creates checklists based on user requirements.
@@ -419,10 +526,10 @@ def generate_checklist(request: Request):
     if not get_remote_config_value("feature_ai_analysis_enabled", True):
         return create_error_response("AI analysis is currently disabled", 503)
 
-    # Check usage limit
-    allowed, limit_message = check_usage_limit(user_id, is_premium)
+    # Check if user has enough credits
+    allowed, remaining, credits_error = check_credits_available(user_id, is_premium)
     if not allowed:
-        return create_error_response(limit_message, 429)
+        return create_error_response(credits_error, 402)  # 402 Payment Required
 
     # Check input length
     max_length = get_remote_config_value("ai_analysis_max_input_length", DEFAULT_MAX_INPUT_LENGTH)
@@ -464,16 +571,18 @@ def generate_checklist(request: Request):
 
         result = json.loads(response_text.strip())
 
-        # Increment usage
+        # Deduct credits for all users (premium users also use credits now)
+        new_remaining = deduct_user_credits(user_id)
+
+        # Increment usage stats
         usage = increment_usage(user_id, "generate_checklist", input_type)
-        limit = DEFAULT_DAILY_LIMIT_PREMIUM if is_premium else DEFAULT_DAILY_LIMIT_FREE
 
         return create_success_response({
             "checklist_name": result.get("checklist_name", "New Checklist"),
             "items": result.get("items", []),
             "summary": result.get("summary", ""),
             "confidence": result.get("confidence", 0.8),
-            "usage": {"count": usage["count"], "limit": limit}
+            "ai_credits": new_remaining
         })
 
     except json.JSONDecodeError as e:
@@ -483,7 +592,7 @@ def generate_checklist(request: Request):
 
 
 # ============================================================================
-# FUNCTION 3: Get user usage stats
+# FUNCTION 4: Get user usage stats
 # ============================================================================
 
 @functions_framework.http
@@ -525,4 +634,127 @@ def get_usage_stats(request: Request):
             "remaining": max(0, limit - usage["count"]),
             "requests": usage.get("requests", [])[-10:]  # Last 10 requests
         }
+    })
+
+
+# ============================================================================
+# FUNCTION 5: Daily credits refill for premium users (scheduled)
+# ============================================================================
+
+@functions_framework.http
+def refill_premium_credits(request: Request):
+    """
+    Refill credits for all premium users.
+
+    This function should be called daily at 12:00 CET by Cloud Scheduler.
+
+    Logic:
+    - Find all users with is_premium = True
+    - For each user, if their credits < premium_daily_credits_cap, set to cap
+    - If credits >= cap, don't change (don't accumulate beyond cap)
+
+    Request body (optional, for manual trigger):
+    {
+        "admin_key": "string (optional admin key for manual trigger)"
+    }
+
+    Response:
+    {
+        "success": true,
+        "users_updated": number,
+        "users_skipped": number,
+        "credits_cap": number
+    }
+    """
+    # This can be called by Cloud Scheduler (no body) or manually with admin key
+    # For Cloud Scheduler invocation via HTTP, we allow it
+
+    try:
+        config = get_credits_config()
+        credits_cap = config["premium_daily_credits_cap"]
+
+        # Query all premium users
+        users_ref = db.collection("users")
+        premium_users = users_ref.where("is_premium", "==", True).get()
+
+        users_updated = 0
+        users_skipped = 0
+
+        for user_doc in premium_users:
+            user_data = user_doc.to_dict()
+            current_credits = user_data.get("ai_credits", 0)
+
+            if current_credits < credits_cap:
+                # Refill to cap
+                user_doc.reference.update({
+                    "ai_credits": credits_cap,
+                    "credits_refilled_at": datetime.utcnow().isoformat(),
+                    "updated_at": datetime.utcnow().isoformat()
+                })
+                users_updated += 1
+            else:
+                # Already at or above cap, skip
+                users_skipped += 1
+
+        # Log the refill operation
+        db.collection("credits_refill_log").add({
+            "timestamp": datetime.utcnow().isoformat(),
+            "users_updated": users_updated,
+            "users_skipped": users_skipped,
+            "credits_cap": credits_cap
+        })
+
+        return create_success_response({
+            "users_updated": users_updated,
+            "users_skipped": users_skipped,
+            "credits_cap": credits_cap
+        })
+
+    except Exception as e:
+        return create_error_response(f"Failed to refill credits: {str(e)}", 500)
+
+
+# ============================================================================
+# FUNCTION 6: Get credits config (for client to display correct info)
+# ============================================================================
+
+@functions_framework.http
+def get_credits_info(request: Request):
+    """
+    Get current credits configuration for the client.
+
+    This allows the app to display correct values without hardcoding.
+
+    Request body:
+    {
+        "user_id": "string"
+    }
+
+    Response:
+    {
+        "success": true,
+        "config": {
+            "action_cost": number,
+            "premium_daily_credits_cap": number,
+            "refill_time": "12:00 CET"
+        },
+        "user_credits": number
+    }
+    """
+    data, error = validate_request(request)
+    if error:
+        return create_error_response(error)
+
+    user_id = data["user_id"]
+
+    config = get_credits_config()
+    credits = get_user_credits(user_id)
+
+    return create_success_response({
+        "config": {
+            "action_cost": config["action_cost"],
+            "premium_daily_credits_cap": config["premium_daily_credits_cap"],
+            "refill_time": "12:00 CET"
+        },
+        "user_credits": credits
     })

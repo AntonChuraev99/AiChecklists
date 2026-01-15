@@ -13,6 +13,10 @@ object RemoteConfigKeys {
     const val AI_FUNCTIONS_BASE_URL = "ai_functions_base_url"
     const val AI_DAILY_LIMIT_FREE = "ai_daily_limit_free"
     const val AI_DAILY_LIMIT_PREMIUM = "ai_daily_limit_premium"
+
+    // Free user limits
+    const val MAX_CHECKLISTS_FREE = "max_checklists_free"
+    const val MAX_FILLS_FREE = "max_fills_free"
 }
 
 /**
@@ -28,4 +32,8 @@ object RemoteConfigDefaults {
     const val AI_FUNCTIONS_BASE_URL = "https://us-central1-aichecklists-40230.cloudfunctions.net"
     const val AI_DAILY_LIMIT_FREE = 10L
     const val AI_DAILY_LIMIT_PREMIUM = 100L
+
+    // Free user limits
+    const val MAX_CHECKLISTS_FREE = 3L
+    const val MAX_FILLS_FREE = 5L
 }
