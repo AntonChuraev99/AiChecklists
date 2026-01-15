@@ -1,7 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.paywall.presentation
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -35,7 +37,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -44,7 +45,11 @@ import androidx.compose.ui.unit.sp
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.AiAnalysisIllustration
+import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.ProgressIllustration
+import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.TasksIllustration
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallProduct
+import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -52,8 +57,14 @@ import org.koin.compose.viewmodel.koinViewModel
 private val PaywallOrange = Color(0xFFFF9500)
 private val PaywallOrangeBackground = Color(0xFFFFF8F0)
 private val BackgroundGray = Color(0xFFF8F8F8)
-private val PhoneFrameColor = Color(0xFF1C1C1E)
 
+private data class PaywallPage(
+    val titleRes: StringResource,
+    val descriptionRes: StringResource,
+    val illustration: @Composable () -> Unit
+)
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun PaywallScreen(
     viewModel: PaywallViewModel = koinViewModel(),
@@ -67,6 +78,30 @@ fun PaywallScreen(
         }
     }
 
+    // Same pages as onboarding
+    val pages = listOf(
+        PaywallPage(
+            titleRes = Res.string.onboarding_page1_title,
+            descriptionRes = Res.string.onboarding_page1_description,
+            illustration = { TasksIllustration() }
+        ),
+        PaywallPage(
+            titleRes = Res.string.onboarding_page2_title,
+            descriptionRes = Res.string.onboarding_page2_description,
+            illustration = { AiAnalysisIllustration() }
+        ),
+        PaywallPage(
+            titleRes = Res.string.onboarding_page3_title,
+            descriptionRes = Res.string.onboarding_page3_description,
+            illustration = { ProgressIllustration() }
+        )
+    )
+
+    val pagerState = rememberPagerState(
+        initialPage = 0,
+        pageCount = { pages.size }
+    )
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -75,45 +110,69 @@ fun PaywallScreen(
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
-            // Top section with phone mockup
+            // Top section with close button and pager
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
             ) {
-                // Close button in top right
-                IconButton(
-                    onClick = { viewModel.sendIntent(PaywallIntent.Close) },
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(8.dp)
+                Column(
+                    modifier = Modifier.fillMaxSize()
                 ) {
-                    Box(
+                    // Close button row
+                    Row(
                         modifier = Modifier
-                            .size(32.dp)
-                            .clip(CircleShape)
-                            .background(Color.Gray.copy(alpha = 0.2f)),
-                        contentAlignment = Alignment.Center
+                            .fillMaxWidth()
+                            .padding(8.dp),
+                        horizontalArrangement = Arrangement.End
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Close",
-                            tint = Color.Gray,
-                            modifier = Modifier.size(18.dp)
+                        IconButton(
+                            onClick = { viewModel.sendIntent(PaywallIntent.Close) }
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.Gray.copy(alpha = 0.2f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = stringResource(Res.string.cancel),
+                                    tint = Color.Gray,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    // Pager with illustrations
+                    HorizontalPager(
+                        state = pagerState,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                    ) { pageIndex ->
+                        PaywallPageContent(
+                            page = pages[pageIndex],
+                            modifier = Modifier.fillMaxSize()
                         )
                     }
-                }
 
-                // Phone mockup centered
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 40.dp)
-                        .padding(top = 48.dp, bottom = 16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    PhoneMockup()
+                    // Page indicators
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = AppDimens.SpacingLg),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        repeat(pages.size) { index ->
+                            PageIndicator(
+                                isSelected = index == pagerState.currentPage,
+                                modifier = Modifier.padding(horizontal = 4.dp)
+                            )
+                        }
+                    }
                 }
             }
 
@@ -137,7 +196,7 @@ fun PaywallScreen(
                     .navigationBarsPadding(),
                 action = {
                     TextButton(onClick = { viewModel.sendIntent(PaywallIntent.DismissError) }) {
-                        Text("OK")
+                        Text(stringResource(Res.string.ok))
                     }
                 }
             ) {
@@ -148,232 +207,67 @@ fun PaywallScreen(
 }
 
 @Composable
-private fun PhoneMockup() {
-    // iPhone-like frame
-    Box(
-        modifier = Modifier
-            .shadow(
-                elevation = 24.dp,
-                shape = RoundedCornerShape(40.dp),
-                spotColor = Color.Black.copy(alpha = 0.25f)
-            )
-    ) {
-        // Phone outer frame (black)
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(40.dp))
-                .background(PhoneFrameColor)
-                .padding(8.dp)
-        ) {
-            // Phone screen (white with content)
-            Column(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(32.dp))
-                    .background(Color.White)
-                    .width(260.dp)
-            ) {
-                // Status bar with notch
-                StatusBarWithNotch()
-
-                // App content
-                AppContentPreview(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = 12.dp)
-                )
-
-                // Overlay text and pagination at bottom
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 16.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        // Tagline text
-                        Text(
-                            text = "All your favorite recipes\nin one place",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center,
-                            color = Color.Black,
-                            lineHeight = 22.sp
-                        )
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        // Pagination dots
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            PaginationDot(isSelected = false)
-                            PaginationDot(isSelected = true)
-                            PaginationDot(isSelected = false)
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun StatusBarWithNotch() {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(44.dp)
-            .background(Color.White)
-    ) {
-        // Time on left
-        Text(
-            text = "9:41",
-            style = MaterialTheme.typography.bodySmall,
-            fontWeight = FontWeight.SemiBold,
-            color = Color.Black,
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .padding(start = 24.dp)
-        )
-
-        // Notch/Dynamic Island in center
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 8.dp)
-                .width(90.dp)
-                .height(24.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(PhoneFrameColor)
-        )
-
-        // Signal/battery icons on right (simplified)
-        Row(
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .padding(end = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Signal bars
-            Row(horizontalArrangement = Arrangement.spacedBy(1.dp)) {
-                repeat(4) { index ->
-                    Box(
-                        modifier = Modifier
-                            .width(3.dp)
-                            .height((6 + index * 2).dp)
-                            .background(Color.Black, RoundedCornerShape(1.dp))
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun AppContentPreview(modifier: Modifier = Modifier) {
+private fun PaywallPageContent(
+    page: PaywallPage,
+    modifier: Modifier = Modifier
+) {
     Column(
-        modifier = modifier
+        modifier = modifier.padding(horizontal = AppDimens.ScreenPaddingHorizontal),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Recipe title row
-        Row(
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Food image placeholder
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFFFFE4C4))
-            )
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Text(
-                text = "Beef Chow Fun",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = Color.Black
-            )
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Section label
-        Text(
-            text = "For the beef:",
-            style = MaterialTheme.typography.bodySmall,
-            color = Color.Gray
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Checklist items
-        ChecklistPreviewItem(text = "400-500g skirt/flank beef steak", isChecked = true)
-        ChecklistPreviewItem(text = "1 tsp light soy sauce", isChecked = true)
-        ChecklistPreviewItem(text = "1 tsp white pepper", isChecked = true)
-        ChecklistPreviewItem(text = "1 tsp cornstarch", isChecked = true)
-        ChecklistPreviewItem(text = "1 tsp sugar", isChecked = false)
-        ChecklistPreviewItem(text = "1 tbsp vegetable oil", isChecked = false)
-
-        Spacer(modifier = Modifier.height(8.dp))
-    }
-}
-
-@Composable
-private fun ChecklistPreviewItem(text: String, isChecked: Boolean) {
-    Row(
-        modifier = Modifier.padding(vertical = 3.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Checkbox
+        // Illustration container
         Box(
             modifier = Modifier
-                .size(16.dp)
-                .clip(RoundedCornerShape(4.dp))
-                .then(
-                    if (isChecked) {
-                        Modifier.background(PaywallOrange)
-                    } else {
-                        Modifier.border(1.dp, Color.Gray.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
-                    }
-                ),
+                .weight(1f)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(24.dp))
+                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)),
             contentAlignment = Alignment.Center
         ) {
-            if (isChecked) {
-                Icon(
-                    imageVector = Icons.Default.Check,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(12.dp)
-                )
-            }
+            page.illustration()
         }
 
-        Spacer(modifier = Modifier.width(8.dp))
+        Spacer(modifier = Modifier.height(AppDimens.SpacingLg))
 
+        // Title
         Text(
-            text = text,
-            style = MaterialTheme.typography.bodySmall,
-            color = if (isChecked) Color.Black else Color.Gray,
-            fontSize = 11.sp
+            text = stringResource(page.titleRes),
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground,
+            textAlign = TextAlign.Center
         )
+
+        Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
+
+        // Description
+        Text(
+            text = stringResource(page.descriptionRes),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = AppDimens.SpacingLg)
+        )
+
+        Spacer(modifier = Modifier.height(AppDimens.SpacingLg))
     }
 }
 
 @Composable
-private fun PaginationDot(isSelected: Boolean) {
+private fun PageIndicator(
+    isSelected: Boolean,
+    modifier: Modifier = Modifier
+) {
     Box(
-        modifier = Modifier
-            .size(6.dp)
+        modifier = modifier
+            .size(if (isSelected) 10.dp else 8.dp)
             .clip(CircleShape)
             .background(
-                if (isSelected) Color.Black.copy(alpha = 0.8f)
-                else Color.Black.copy(alpha = 0.2f)
+                if (isSelected) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                }
             )
     )
 }
@@ -403,12 +297,12 @@ private fun SubscriptionCard(
             )
             Spacer(modifier = Modifier.height(20.dp))
         } else if (product != null) {
-            // Main headline - "7 Days for Free"
+            // Main headline
             Text(
                 text = if (product.hasFreeTrial) {
-                    "${product.freeTrialDays} Days for Free"
+                    stringResource(Res.string.paywall_days_free, product.freeTrialDays)
                 } else {
-                    "Go Premium"
+                    stringResource(Res.string.paywall_go_premium)
                 },
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
@@ -418,27 +312,17 @@ private fun SubscriptionCard(
 
             Spacer(modifier = Modifier.height(6.dp))
 
-            // Price line 1: "then $4.99 / month"
+            // Price line
             Text(
-                text = "then ${product.priceString} / month",
+                text = stringResource(Res.string.paywall_then_price, product.priceString),
                 style = MaterialTheme.typography.bodyLarge,
                 color = Color.Black.copy(alpha = 0.7f),
                 textAlign = TextAlign.Center
             )
 
-            // Price line 2: "($59.99 billed annually after trial)"
-            if (product.hasFreeTrial) {
-                Text(
-                    text = "(\$59.99 billed annually after trial)",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.Black.copy(alpha = 0.5f),
-                    textAlign = TextAlign.Center
-                )
-            }
-
             Spacer(modifier = Modifier.height(20.dp))
 
-            // CTA Button - "Start your FREE week"
+            // CTA Button
             Button(
                 onClick = onSubscribe,
                 enabled = !isPurchasing,
@@ -461,9 +345,9 @@ private fun SubscriptionCard(
                 } else {
                     Text(
                         text = if (product.hasFreeTrial) {
-                            "Start your FREE week"
+                            stringResource(Res.string.paywall_start_free_trial)
                         } else {
-                            "Subscribe Now"
+                            stringResource(Res.string.paywall_subscribe_now)
                         },
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
@@ -487,7 +371,7 @@ private fun SubscriptionCard(
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = "No payment due now",
+                        text = stringResource(Res.string.paywall_no_payment_now),
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color.Black.copy(alpha = 0.6f)
                     )
@@ -504,7 +388,7 @@ private fun SubscriptionCard(
         ) {
             TextButton(onClick = { /* Terms */ }) {
                 Text(
-                    text = "Terms of Use",
+                    text = stringResource(Res.string.paywall_terms),
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.Gray,
                     fontSize = 11.sp
@@ -512,7 +396,7 @@ private fun SubscriptionCard(
             }
             TextButton(onClick = onRestore) {
                 Text(
-                    text = "Restore Purchase",
+                    text = stringResource(Res.string.paywall_restore),
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.Gray,
                     fontSize = 11.sp
@@ -520,7 +404,7 @@ private fun SubscriptionCard(
             }
             TextButton(onClick = { /* Privacy */ }) {
                 Text(
-                    text = "Privacy Policy",
+                    text = stringResource(Res.string.paywall_privacy),
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.Gray,
                     fontSize = 11.sp
