@@ -139,6 +139,70 @@ feature/analyze/
 - Access via "AI Analysis" button on MainScreen
 - Results can create new checklist or add items to existing one
 
+## Templates Feature
+
+Located in `feature/create/`. Allows users to create checklists from pre-defined templates fetched from Firebase Remote Config.
+
+### Architecture
+
+```
+feature/create/
+  domain/
+    model/
+      ChecklistTemplate.kt    # Template model, TemplatesConfig, TemplateCategory
+    repository/
+      TemplatesRepository.kt  # Interface for fetching templates
+  data/
+    repository/
+      TemplatesRepositoryImpl.kt  # Fetches from Remote Config with fallback defaults
+  presentation/
+    templates/
+      TemplatesScreen.kt      # UI with category sections and template cards
+      TemplatesViewModel.kt   # Loads templates, handles selection
+      TemplatesScreenContract.kt  # State and Intents
+```
+
+### Template Data Model
+```kotlin
+@Serializable
+data class ChecklistTemplate(
+    val id: String,           // Unique identifier
+    val name: String,         // Display name
+    val icon: String,         // Material icon name (e.g., "apartment", "home")
+    val category: String,     // Category ID for grouping
+    val items: List<String>   // Checklist item texts
+)
+```
+
+### Remote Config Integration
+- Templates JSON stored in `templates_json` Remote Config key
+- Falls back to default templates if Remote Config is empty or fails
+- JSON format: `{ "templates": [...] }`
+- Example JSON in `firebase-config/templates.json`
+
+### Adding New Templates
+1. Edit `firebase-config/templates.json` with new template
+2. Upload to Firebase Remote Config using `scripts/firebase_remote_config.py`
+3. Or add to default templates in `TemplatesRepositoryImpl.getDefaultTemplates()`
+
+### Supported Icons
+The following Material Icons are supported in templates:
+- `apartment`, `home`, `luggage`, `flight_takeoff`
+- `shopping_cart`, `groups`, `rocket_launch`
+- `celebration`, `local_shipping`, `medical_services`, `cleaning_services`
+
+### Default Categories
+- Real Estate, Travel, Shopping, Work & Productivity
+- Events & Planning, Health & Wellness, Home & Garden
+
+### User Flow
+1. User taps "Templates" on MainScreen
+2. Templates screen shows categories with horizontal scrolling cards
+3. User taps a template card to see preview dialog
+4. Preview shows template name, icon, and first 5 items
+5. User taps "Use Template" to create checklist
+6. Navigates to checklist detail screen with new checklist
+
 ## Localization & String Resources
 
 All user-facing strings are externalized to `core/designsystem/src/commonMain/composeResources/values/strings.xml`. Use `stringResource(Res.string.key_name)` from `org.jetbrains.compose.resources` package.
@@ -165,7 +229,9 @@ Versions are centralized in `gradle/libs.versions.toml`. Key dependencies:
 
 ### Navigation Flow
 ```
-Splash → Onboarding → Main (Home) ↔ [Create, Analyze, Debug]
+Splash → Onboarding → Main (Home) ↔ [Create, Templates, Analyze, Debug]
+                                           ↓
+                                    Checklist Detail
 ```
 
 ### Screen-by-Screen Analysis
@@ -296,3 +362,11 @@ Anyone who needs to create structured checklists from unstructured data. Users m
    - Validates checklist name is not blank before saving
    - Shows inline error message on text field when validation fails
    - Clears error when user starts typing
+
+5. **Templates Feature** (`feature/create/presentation/templates/`):
+   - Fetches templates from Firebase Remote Config
+   - Groups templates by category (Real Estate, Travel, Shopping, etc.)
+   - Horizontal scrolling cards for each category
+   - Preview dialog shows template details before creating
+   - Falls back to default templates when offline
+   - 11 default templates covering common use cases

@@ -17,6 +17,9 @@ object RemoteConfigKeys {
     // Free user limits
     const val MAX_CHECKLISTS_FREE = "max_checklists_free"
     const val MAX_FILLS_FREE = "max_fills_free"
+
+    // Templates
+    const val TEMPLATES_JSON = "templates_json"
 }
 
 /**
@@ -36,4 +39,7 @@ object RemoteConfigDefaults {
     // Free user limits
     const val MAX_CHECKLISTS_FREE = 3L
     const val MAX_FILLS_FREE = 5L
+
+    // Templates - default empty, populated from Remote Config
+    const val TEMPLATES_JSON = ""
 }

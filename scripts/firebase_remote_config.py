@@ -64,6 +64,21 @@ DEFAULT_PARAMETERS = {
         "defaultValue": {"value": "100"},
         "description": "Daily AI request limit for premium users",
         "valueType": "NUMBER"
+    },
+    "max_checklists_free": {
+        "defaultValue": {"value": "3"},
+        "description": "Maximum checklists for free users",
+        "valueType": "NUMBER"
+    },
+    "max_fills_free": {
+        "defaultValue": {"value": "5"},
+        "description": "Maximum fills per checklist for free users",
+        "valueType": "NUMBER"
+    },
+    "templates_json": {
+        "defaultValue": {"value": ""},
+        "description": "JSON with checklist templates (see firebase-config/templates.json)",
+        "valueType": "JSON"
     }
 }
 

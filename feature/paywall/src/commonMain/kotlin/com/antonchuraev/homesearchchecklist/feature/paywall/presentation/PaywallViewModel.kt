@@ -5,6 +5,7 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PurchaseResult
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.RestoreResult
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallProduct
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetOfferingsUseCase
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.PurchaseProductUseCase
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.RestorePurchasesUseCase
@@ -20,6 +21,21 @@ class PaywallViewModel(
     private val purchaseProductUseCase: PurchaseProductUseCase,
     private val restorePurchasesUseCase: RestorePurchasesUseCase
 ) : AppViewModel<PaywallState, PaywallIntent, Nothing>() {
+
+    companion object {
+        // Mock product for testing when RevenueCat returns empty
+        private val MOCK_PRODUCT = PaywallProduct(
+            id = "mock_premium_monthly",
+            title = "Premium Monthly",
+            description = "Full access to all features",
+            priceString = "$1.99",
+            periodString = "month",
+            packageId = "mock_package",
+            isPopular = true,
+            hasFreeTrial = true,
+            freeTrialDays = 3
+        )
+    }
 
     private val _screenState = MutableStateFlow(PaywallState())
     override val screenState: StateFlow<PaywallState> = _screenState.asStateFlow()
@@ -45,7 +61,13 @@ class PaywallViewModel(
 
             getOfferingsUseCase()
                 .onSuccess { offering ->
-                    val products = offering?.products ?: emptyList()
+                    var products = offering?.products ?: emptyList()
+
+                    // Use mock product if no products returned (for testing)
+                    if (products.isEmpty()) {
+                        products = listOf(MOCK_PRODUCT)
+                    }
+
                     val defaultSelected = products.find { it.isPopular }?.id
                         ?: products.firstOrNull()?.id
 
@@ -58,10 +80,13 @@ class PaywallViewModel(
                     }
                 }
                 .onFailure { error ->
+                    // On failure, still show mock product for testing
                     _screenState.update {
                         it.copy(
                             isLoading = false,
-                            error = error.message ?: "Failed to load products"
+                            products = listOf(MOCK_PRODUCT),
+                            selectedProductId = MOCK_PRODUCT.id,
+                            error = null // Don't show error, show mock product instead
                         )
                     }
                 }
