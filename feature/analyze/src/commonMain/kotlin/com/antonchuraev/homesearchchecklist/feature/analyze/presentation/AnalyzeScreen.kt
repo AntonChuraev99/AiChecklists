@@ -24,6 +24,11 @@ import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.TextFields
+import androidx.compose.material.icons.outlined.Mic
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Stop
+import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -31,6 +36,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -51,6 +59,8 @@ import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.Analyze
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.InputDataType
 import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.picker.FilePickerType
 import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.picker.rememberFilePickerLauncher
+import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.recorder.rememberAudioRecorderLauncher
+import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.recorder.rememberAudioPlayerLauncher
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
@@ -272,9 +282,17 @@ private fun AnalyzeContent(
                     inputUrl = screenState.inputUrl,
                     selectedFilePath = screenState.selectedFilePath,
                     selectedFileName = screenState.selectedFileName,
+                    isRecording = screenState.isRecording,
+                    recordedAudioPath = screenState.recordedAudioPath,
+                    recordedAudioDuration = screenState.recordedAudioDuration,
                     onTextChanged = { onIntent(AnalyzeScreenIntent.OnTextInputChanged(it)) },
                     onUrlChanged = { onIntent(AnalyzeScreenIntent.OnUrlInputChanged(it)) },
-                    onFileSelected = { path, name -> onIntent(AnalyzeScreenIntent.OnFileSelected(path, name)) }
+                    onFileSelected = { path, name -> onIntent(AnalyzeScreenIntent.OnFileSelected(path, name)) },
+                    onStartRecording = { onIntent(AnalyzeScreenIntent.OnStartRecording) },
+                    onStopRecording = { onIntent(AnalyzeScreenIntent.OnStopRecording) },
+                    onRecordingComplete = { path, duration -> onIntent(AnalyzeScreenIntent.OnRecordingComplete(path, duration)) },
+                    onRecordingError = { error -> onIntent(AnalyzeScreenIntent.OnRecordingError(error)) },
+                    onDeleteRecording = { onIntent(AnalyzeScreenIntent.OnDeleteRecording) }
                 )
             }
         }
@@ -331,13 +349,25 @@ private fun InputTypeSelector(
                 modifier = Modifier.weight(1f)
             )
         }
-        InputTypeCard(
-            icon = Icons.Outlined.TextFields,
-            title = stringResource(Res.string.analyze_source_text),
-            isSelected = selectedType == InputDataType.RAW_TEXT,
-            onClick = { onTypeSelected(InputDataType.RAW_TEXT) },
-            modifier = Modifier.fillMaxWidth()
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
+        ) {
+            InputTypeCard(
+                icon = Icons.Outlined.TextFields,
+                title = stringResource(Res.string.analyze_source_text),
+                isSelected = selectedType == InputDataType.RAW_TEXT,
+                onClick = { onTypeSelected(InputDataType.RAW_TEXT) },
+                modifier = Modifier.weight(1f)
+            )
+            InputTypeCard(
+                icon = Icons.Outlined.Mic,
+                title = stringResource(Res.string.analyze_source_voice),
+                isSelected = selectedType == InputDataType.VOICE,
+                onClick = { onTypeSelected(InputDataType.VOICE) },
+                modifier = Modifier.weight(1f)
+            )
+        }
     }
 }
 
@@ -401,9 +431,17 @@ private fun InputSection(
     inputUrl: String,
     selectedFilePath: String?,
     selectedFileName: String?,
+    isRecording: Boolean,
+    recordedAudioPath: String?,
+    recordedAudioDuration: Long,
     onTextChanged: (String) -> Unit,
     onUrlChanged: (String) -> Unit,
-    onFileSelected: (filePath: String, fileName: String) -> Unit
+    onFileSelected: (filePath: String, fileName: String) -> Unit,
+    onStartRecording: () -> Unit,
+    onStopRecording: () -> Unit,
+    onRecordingComplete: (filePath: String, durationMs: Long) -> Unit,
+    onRecordingError: (String) -> Unit,
+    onDeleteRecording: () -> Unit
 ) {
     when (type) {
         InputDataType.PHOTO, InputDataType.PDF, InputDataType.TEXT_FILE -> {
@@ -432,6 +470,19 @@ private fun InputSection(
                 label = stringResource(Res.string.analyze_text_label),
                 singleLine = false,
                 maxLines = 10
+            )
+        }
+
+        InputDataType.VOICE -> {
+            VoiceInputSection(
+                isRecording = isRecording,
+                recordedAudioPath = recordedAudioPath,
+                recordedAudioDuration = recordedAudioDuration,
+                onStartRecording = onStartRecording,
+                onStopRecording = onStopRecording,
+                onRecordingComplete = onRecordingComplete,
+                onRecordingError = onRecordingError,
+                onDeleteRecording = onDeleteRecording
             )
         }
     }
@@ -492,6 +543,235 @@ private fun FileInputSection(
             }
         }
     }
+}
+
+@Composable
+private fun VoiceInputSection(
+    isRecording: Boolean,
+    recordedAudioPath: String?,
+    recordedAudioDuration: Long,
+    onStartRecording: () -> Unit,
+    onStopRecording: () -> Unit,
+    onRecordingComplete: (filePath: String, durationMs: Long) -> Unit,
+    onRecordingError: (String) -> Unit,
+    onDeleteRecording: () -> Unit
+) {
+    var permissionDeniedPermanently by remember { mutableStateOf(false) }
+
+    // Pre-fetch the permission denied string for use in callback
+    val permissionDeniedMessage = stringResource(Res.string.analyze_voice_permission_denied)
+
+    val audioRecorderLauncher = rememberAudioRecorderLauncher(
+        onResult = { result ->
+            if (result != null) {
+                onRecordingComplete(result.filePath, result.durationMs)
+            }
+        },
+        onError = { error ->
+            when (error) {
+                "PERMISSION_DENIED" -> {
+                    // User denied but can try again - don't show permanent error
+                    onRecordingError(permissionDeniedMessage)
+                }
+                "PERMISSION_DENIED_PERMANENTLY" -> {
+                    permissionDeniedPermanently = true
+                }
+                else -> onRecordingError(error)
+            }
+        }
+    )
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
+    ) {
+        if (permissionDeniedPermanently) {
+            // Permission permanently denied - show message and settings button
+            AppCard(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(AppDimens.SpacingLg),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Mic,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(48.dp)
+                    )
+                    Text(
+                        text = stringResource(Res.string.analyze_voice_permission_denied_settings),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center
+                    )
+                    AppButton(
+                        text = stringResource(Res.string.analyze_voice_open_settings),
+                        onClick = { audioRecorderLauncher.openAppSettings() },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        } else if (recordedAudioPath != null) {
+            // Show recorded audio info with playback controls
+            var isPlayingAudio by remember { mutableStateOf(false) }
+
+            val audioPlayerLauncher = rememberAudioPlayerLauncher(
+                onPlaybackComplete = {
+                    isPlayingAudio = false
+                },
+                onError = { error ->
+                    isPlayingAudio = false
+                    onRecordingError(error)
+                }
+            )
+
+            AppCard(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(AppDimens.SpacingMd),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        // Play/Pause button
+                        androidx.compose.material3.IconButton(
+                            onClick = {
+                                if (isPlayingAudio) {
+                                    audioPlayerLauncher.stop()
+                                    isPlayingAudio = false
+                                } else {
+                                    audioPlayerLauncher.play(recordedAudioPath)
+                                    isPlayingAudio = true
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = if (isPlayingAudio) Icons.Outlined.Stop else Icons.Outlined.PlayArrow,
+                                contentDescription = if (isPlayingAudio) {
+                                    stringResource(Res.string.analyze_voice_stop)
+                                } else {
+                                    stringResource(Res.string.analyze_voice_play)
+                                },
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                        Column {
+                            Text(
+                                text = stringResource(Res.string.analyze_voice_recorded),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = formatDuration(recordedAudioDuration),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    // Delete button
+                    androidx.compose.material3.IconButton(
+                        onClick = {
+                            audioPlayerLauncher.stop()
+                            onDeleteRecording()
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Delete,
+                            contentDescription = stringResource(Res.string.analyze_voice_delete),
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            }
+        } else {
+            // Recording button
+            Box(
+                modifier = Modifier
+                    .size(120.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (isRecording) {
+                            MaterialTheme.colorScheme.error.copy(alpha = 0.1f)
+                        } else {
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                        }
+                    )
+                    .border(
+                        width = 3.dp,
+                        color = if (isRecording) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.primary
+                        },
+                        shape = CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                androidx.compose.material3.IconButton(
+                    onClick = {
+                        if (isRecording) {
+                            audioRecorderLauncher.stop()
+                            onStopRecording()
+                        } else {
+                            onStartRecording()
+                            audioRecorderLauncher.start()
+                        }
+                    },
+                    modifier = Modifier.size(80.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isRecording) Icons.Outlined.Stop else Icons.Outlined.Mic,
+                        contentDescription = if (isRecording) {
+                            stringResource(Res.string.analyze_voice_stop)
+                        } else {
+                            stringResource(Res.string.analyze_voice_tap_to_record)
+                        },
+                        modifier = Modifier.size(48.dp),
+                        tint = if (isRecording) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.primary
+                        }
+                    )
+                }
+            }
+
+            Text(
+                text = if (isRecording) {
+                    stringResource(Res.string.analyze_voice_recording)
+                } else {
+                    stringResource(Res.string.analyze_voice_tap_to_record)
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (isRecording) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            )
+        }
+    }
+}
+
+private fun formatDuration(durationMs: Long): String {
+    val totalSeconds = durationMs / 1000
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return "$minutes:${seconds.toString().padStart(2, '0')}"
 }
 
 @Composable

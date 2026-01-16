@@ -59,6 +59,17 @@ sealed interface AnalyzeInputData {
     data class RawText(
         val text: String
     ) : AnalyzeInputData
+
+    /**
+     * Audio input - user records voice message for analysis
+     * @param filePath Local file path to the audio file
+     * @param mimeType Audio MIME type (e.g., "audio/m4a", "audio/mp4")
+     */
+    @Serializable
+    data class Audio(
+        val filePath: String,
+        val mimeType: String = "audio/m4a"
+    ) : AnalyzeInputData
 }
 
 /**
@@ -69,5 +80,6 @@ enum class InputDataType {
     PDF,
     TEXT_FILE,
     WEB_LINK,
-    RAW_TEXT
+    RAW_TEXT,
+    VOICE
 }

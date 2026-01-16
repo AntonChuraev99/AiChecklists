@@ -50,6 +50,7 @@ class GeminiAiAnalyzer(
                 is AnalyzeInputData.Photo -> analyzePhoto(inputData, targetChecklist)
                 is AnalyzeInputData.PdfDocument -> analyzePdf(inputData, targetChecklist)
                 is AnalyzeInputData.TextFile -> analyzeTextFile(inputData, targetChecklist)
+                is AnalyzeInputData.Audio -> analyzeAudio(inputData, targetChecklist)
             }
             Result.success(response)
         } catch (e: Exception) {
@@ -66,7 +67,8 @@ class GeminiAiAnalyzer(
         AnalyzeInputData.PdfDocument::class,
         AnalyzeInputData.TextFile::class,
         AnalyzeInputData.WebLink::class,
-        AnalyzeInputData.RawText::class
+        AnalyzeInputData.RawText::class,
+        AnalyzeInputData.Audio::class
     )
 
     private suspend fun analyzeText(text: String, targetChecklist: Checklist?): AnalyzeResult {
@@ -157,6 +159,46 @@ class GeminiAiAnalyzer(
         return analyzeText(content, targetChecklist)
     }
 
+    private suspend fun analyzeAudio(audio: AnalyzeInputData.Audio, targetChecklist: Checklist?): AnalyzeResult {
+        val audioBytes = readFileBytes(audio.filePath)
+        if (audioBytes == null) {
+            return AnalyzeResult(
+                suggestedItems = emptyList(),
+                confidence = 0f,
+                summary = "Не удалось прочитать аудиофайл",
+                warnings = listOf("Файл не найден или недоступен: ${audio.filePath}")
+            )
+        }
+
+        val contextPrompt = if (targetChecklist != null) {
+            "Контекст: существующий чек-лист '${targetChecklist.name}' с пунктами: ${targetChecklist.items.joinToString { it.text }}"
+        } else ""
+
+        val inputContent = content {
+            blob(audio.mimeType, audioBytes)
+            text("""
+                Прослушай эту голосовую запись и создай список пунктов для проверки (чек-лист) на основе сказанного.
+
+                $contextPrompt
+
+                Требования:
+                1. Внимательно прослушай запись и извлеки все упомянутые задачи, пункты или действия
+                2. Каждый пункт должен быть конкретным и проверяемым
+                3. Пункты должны быть на русском языке
+                4. Формат ответа - каждый пункт с новой строки, начиная с "- "
+                5. Только список пунктов, без дополнительного текста
+                6. Максимум 15 пунктов
+
+                Пример формата:
+                - Проверить состояние стен
+                - Осмотреть окна
+            """.trimIndent())
+        }
+
+        val response = visionModel.generateContent(inputContent)
+        return parseResponse(response.text ?: "")
+    }
+
     private fun buildPrompt(
         contentDescription: String,
         content: String,
@@ -234,21 +276,10 @@ class GeminiAiAnalyzer(
     }
 
     private fun readFileBytes(filePath: String): ByteArray? {
-        return try {
-            // Platform-specific file reading would go here
-            // For now, return null - will be implemented per platform
-            null
-        } catch (e: Exception) {
-            null
-        }
+        return com.antonchuraev.homesearchchecklist.feature.analyze.data.util.FileReader.readBytes(filePath)
     }
 
     private fun readFileText(filePath: String): String? {
-        return try {
-            // Platform-specific file reading would go here
-            null
-        } catch (e: Exception) {
-            null
-        }
+        return com.antonchuraev.homesearchchecklist.feature.analyze.data.util.FileReader.readText(filePath)
     }
 }

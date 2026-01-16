@@ -12,7 +12,10 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Check
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
+import com.antonchuraev.homesearchchecklist.feature.analyze.data.util.FileReader
 import kotlinx.coroutines.flow.first
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 class AnalyzeRepositoryImpl(
     private val firebaseAiService: FirebaseAiService,
@@ -175,25 +178,38 @@ class AnalyzeRepositoryImpl(
         return true
     }
 
+    @OptIn(ExperimentalEncodingApi::class)
     private fun convertInputData(inputData: AnalyzeInputData): Pair<AiInputType, String> {
         return when (inputData) {
             is AnalyzeInputData.Photo -> {
-                // For images, we would need to encode to base64
-                // For now, return the path and let the service handle it
-                AiInputType.IMAGE_BASE64 to inputData.filePath
+                val bytes = FileReader.readBytes(inputData.filePath)
+                if (bytes != null) {
+                    AiInputType.IMAGE_BASE64 to Base64.encode(bytes)
+                } else {
+                    AiInputType.TEXT to "Failed to read image: ${inputData.filePath}"
+                }
             }
             is AnalyzeInputData.PdfDocument -> {
                 // PDFs would need to be extracted as text or encoded
                 AiInputType.TEXT to "PDF content from: ${inputData.fileName}"
             }
             is AnalyzeInputData.TextFile -> {
-                AiInputType.TEXT to (inputData.content ?: "Text file: ${inputData.filePath}")
+                val content = inputData.content ?: FileReader.readText(inputData.filePath)
+                AiInputType.TEXT to (content ?: "Failed to read text file: ${inputData.filePath}")
             }
             is AnalyzeInputData.WebLink -> {
                 AiInputType.URL to inputData.url
             }
             is AnalyzeInputData.RawText -> {
                 AiInputType.TEXT to inputData.text
+            }
+            is AnalyzeInputData.Audio -> {
+                val bytes = FileReader.readBytes(inputData.filePath)
+                if (bytes != null) {
+                    AiInputType.AUDIO_BASE64 to Base64.encode(bytes)
+                } else {
+                    AiInputType.TEXT to "Failed to read audio: ${inputData.filePath}"
+                }
             }
         }
     }
@@ -205,6 +221,7 @@ class AnalyzeRepositoryImpl(
             is AnalyzeInputData.TextFile -> "Create a checklist from this text file"
             is AnalyzeInputData.WebLink -> "Create a checklist from the content at: ${inputData.url}"
             is AnalyzeInputData.RawText -> "Create a checklist based on: ${inputData.text}"
+            is AnalyzeInputData.Audio -> "Create a checklist from this voice recording"
         }
     }
 }

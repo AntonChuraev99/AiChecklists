@@ -145,7 +145,46 @@ class AnalyzeViewModel(
                         selectedFilePath = null,
                         selectedFileName = null,
                         analyzeResult = null,
-                        error = null
+                        error = null,
+                        recordedAudioPath = null,
+                        recordedAudioDuration = 0L
+                    )
+                }
+            }
+
+            // Voice recording intents
+            AnalyzeScreenIntent.OnStartRecording -> {
+                _screenState.update { it.copy(isRecording = true, error = null) }
+            }
+
+            AnalyzeScreenIntent.OnStopRecording -> {
+                _screenState.update { it.copy(isRecording = false) }
+            }
+
+            is AnalyzeScreenIntent.OnRecordingComplete -> {
+                _screenState.update {
+                    it.copy(
+                        isRecording = false,
+                        recordedAudioPath = intent.filePath,
+                        recordedAudioDuration = intent.durationMs
+                    )
+                }
+            }
+
+            is AnalyzeScreenIntent.OnRecordingError -> {
+                _screenState.update {
+                    it.copy(
+                        isRecording = false,
+                        error = intent.error
+                    )
+                }
+            }
+
+            AnalyzeScreenIntent.OnDeleteRecording -> {
+                _screenState.update {
+                    it.copy(
+                        recordedAudioPath = null,
+                        recordedAudioDuration = 0L
                     )
                 }
             }
@@ -214,6 +253,10 @@ class AnalyzeViewModel(
 
             InputDataType.RAW_TEXT -> {
                 state.inputText.takeIf { it.isNotBlank() }?.let { AnalyzeInputData.RawText(it) }
+            }
+
+            InputDataType.VOICE -> {
+                state.recordedAudioPath?.let { AnalyzeInputData.Audio(it) }
             }
 
             null -> null

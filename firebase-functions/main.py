@@ -13,6 +13,7 @@ All AI calls go through these functions for usage control and monitoring.
 Credits are deducted for all users (including premium). Premium users get daily refill to cap.
 """
 
+import base64
 import json
 import os
 import uuid
@@ -357,8 +358,8 @@ def analyze_and_fill_checklist(request: Request):
             "name": "string",
             "items": [{"text": "string", "checked": boolean}]
         },
-        "input_type": "text" | "url" | "image_base64",
-        "input_data": "string (text content, URL, or base64 image)"
+        "input_type": "text" | "url" | "image_base64" | "audio_base64",
+        "input_data": "string (text content, URL, base64 image, or base64 audio)"
     }
 
     Response:
@@ -396,10 +397,11 @@ def analyze_and_fill_checklist(request: Request):
     if not allowed:
         return create_error_response(credits_error, 402)  # 402 Payment Required
 
-    # Check input length
-    max_length = get_remote_config_value("ai_analysis_max_input_length", DEFAULT_MAX_INPUT_LENGTH)
-    if len(input_data) > max_length:
-        return create_error_response(f"Input data exceeds maximum length of {max_length} characters")
+    # Check input length (skip for binary data types)
+    if input_type not in ("image_base64", "audio_base64"):
+        max_length = get_remote_config_value("ai_analysis_max_input_length", DEFAULT_MAX_INPUT_LENGTH)
+        if len(input_data) > max_length:
+            return create_error_response(f"Input data exceeds maximum length of {max_length} characters")
 
     # Build prompt
     checklist_items = "\n".join([
@@ -407,9 +409,17 @@ def analyze_and_fill_checklist(request: Request):
         for i, item in enumerate(checklist["items"])
     ])
 
+    # Prepare user data text for prompt
+    if input_type == "image_base64":
+        user_data_for_prompt = "[Image data provided]"
+    elif input_type == "audio_base64":
+        user_data_for_prompt = "[Audio data provided - transcribe and analyze the voice recording]"
+    else:
+        user_data_for_prompt = input_data
+
     prompt = FILL_CHECKLIST_PROMPT.format(
         checklist_items=checklist_items,
-        user_data=input_data if input_type != "image_base64" else "[Image data provided]"
+        user_data=user_data_for_prompt
     )
 
     try:
@@ -417,11 +427,16 @@ def analyze_and_fill_checklist(request: Request):
         model = genai.GenerativeModel("gemini-2.0-flash-lite")
 
         if input_type == "image_base64":
-            import base64
             image_bytes = base64.b64decode(input_data)
             response = model.generate_content([
                 prompt,
                 {"mime_type": "image/jpeg", "data": image_bytes}
+            ])
+        elif input_type == "audio_base64":
+            audio_bytes = base64.b64decode(input_data)
+            response = model.generate_content([
+                prompt,
+                {"mime_type": "audio/mp4", "data": audio_bytes}
             ])
         else:
             response = model.generate_content(prompt)
@@ -493,8 +508,8 @@ def generate_checklist(request: Request):
         "user_id": "string",
         "is_premium": boolean (optional),
         "prompt": "string (user's description of what checklist they need)",
-        "input_type": "text" | "url" | "image_base64" | "none" (optional),
-        "input_data": "string (additional context data)" (optional)
+        "input_type": "text" | "url" | "image_base64" | "audio_base64" | "none" (optional),
+        "input_data": "string (additional context data, base64 image, or base64 audio)" (optional)
     }
 
     Response:
@@ -531,16 +546,24 @@ def generate_checklist(request: Request):
     if not allowed:
         return create_error_response(credits_error, 402)  # 402 Payment Required
 
-    # Check input length
+    # Check input length (skip binary data in length calculation)
     max_length = get_remote_config_value("ai_analysis_max_input_length", DEFAULT_MAX_INPUT_LENGTH)
-    total_input = user_prompt + (input_data or "")
+    if input_type in ("image_base64", "audio_base64"):
+        total_input = user_prompt  # Only check prompt length for binary inputs
+    else:
+        total_input = user_prompt + (input_data or "")
     if len(total_input) > max_length:
         return create_error_response(f"Input exceeds maximum length of {max_length} characters")
 
     # Build prompt
-    user_data_text = input_data if input_data and input_type != "image_base64" else "No additional data provided"
     if input_type == "image_base64":
         user_data_text = "[Image data provided - analyze the image for context]"
+    elif input_type == "audio_base64":
+        user_data_text = "[Audio data provided - transcribe and analyze the voice recording for context]"
+    elif input_data and input_type not in ("image_base64", "audio_base64"):
+        user_data_text = input_data
+    else:
+        user_data_text = "No additional data provided"
 
     prompt = GENERATE_CHECKLIST_PROMPT.format(
         user_prompt=user_prompt,
@@ -552,11 +575,16 @@ def generate_checklist(request: Request):
         model = genai.GenerativeModel("gemini-2.0-flash-lite")
 
         if input_type == "image_base64" and input_data:
-            import base64
             image_bytes = base64.b64decode(input_data)
             response = model.generate_content([
                 prompt,
                 {"mime_type": "image/jpeg", "data": image_bytes}
+            ])
+        elif input_type == "audio_base64" and input_data:
+            audio_bytes = base64.b64decode(input_data)
+            response = model.generate_content([
+                prompt,
+                {"mime_type": "audio/mp4", "data": audio_bytes}
             ])
         else:
             response = model.generate_content(prompt)
