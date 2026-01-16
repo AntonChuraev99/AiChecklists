@@ -9,6 +9,7 @@ import kotlinx.serialization.Serializable
 data class ChecklistTemplate(
     val id: String,
     val name: String,
+    val description: String = "",
     val icon: String,
     val category: String,
     val items: List<String>
