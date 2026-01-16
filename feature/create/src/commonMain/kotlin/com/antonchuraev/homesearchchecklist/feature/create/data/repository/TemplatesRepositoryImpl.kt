@@ -83,6 +83,7 @@ class TemplatesRepositoryImpl(
             ChecklistTemplate(
                 id = "apartment_viewing",
                 name = "Apartment Viewing",
+                description = "Check everything before signing a lease",
                 icon = "apartment",
                 category = "real_estate",
                 items = listOf(
@@ -101,6 +102,7 @@ class TemplatesRepositoryImpl(
             ChecklistTemplate(
                 id = "house_inspection",
                 name = "House Inspection",
+                description = "Thorough home inspection guide",
                 icon = "home",
                 category = "real_estate",
                 items = listOf(
@@ -121,6 +123,7 @@ class TemplatesRepositoryImpl(
             ChecklistTemplate(
                 id = "travel_packing",
                 name = "Travel Packing",
+                description = "Never forget essentials again",
                 icon = "luggage",
                 category = "travel",
                 items = listOf(
@@ -139,6 +142,7 @@ class TemplatesRepositoryImpl(
             ChecklistTemplate(
                 id = "vacation_prep",
                 name = "Vacation Preparation",
+                description = "Get ready before your trip",
                 icon = "flight_takeoff",
                 category = "travel",
                 items = listOf(
@@ -159,6 +163,7 @@ class TemplatesRepositoryImpl(
             ChecklistTemplate(
                 id = "grocery_essentials",
                 name = "Grocery Essentials",
+                description = "Weekly shopping basics",
                 icon = "shopping_cart",
                 category = "shopping",
                 items = listOf(
@@ -179,6 +184,7 @@ class TemplatesRepositoryImpl(
             ChecklistTemplate(
                 id = "meeting_prep",
                 name = "Meeting Preparation",
+                description = "Run effective meetings",
                 icon = "groups",
                 category = "work",
                 items = listOf(
@@ -197,6 +203,7 @@ class TemplatesRepositoryImpl(
             ChecklistTemplate(
                 id = "project_launch",
                 name = "Project Launch",
+                description = "Launch projects successfully",
                 icon = "rocket_launch",
                 category = "work",
                 items = listOf(
@@ -217,6 +224,7 @@ class TemplatesRepositoryImpl(
             ChecklistTemplate(
                 id = "party_planning",
                 name = "Party Planning",
+                description = "Host memorable events",
                 icon = "celebration",
                 category = "events",
                 items = listOf(
@@ -235,6 +243,7 @@ class TemplatesRepositoryImpl(
             ChecklistTemplate(
                 id = "moving_house",
                 name = "Moving House",
+                description = "Stress-free relocation guide",
                 icon = "local_shipping",
                 category = "events",
                 items = listOf(
@@ -255,6 +264,7 @@ class TemplatesRepositoryImpl(
             ChecklistTemplate(
                 id = "doctor_visit",
                 name = "Doctor Visit Prep",
+                description = "Make the most of your visit",
                 icon = "medical_services",
                 category = "health",
                 items = listOf(
@@ -275,6 +285,7 @@ class TemplatesRepositoryImpl(
             ChecklistTemplate(
                 id = "spring_cleaning",
                 name = "Spring Cleaning",
+                description = "Refresh your living space",
                 icon = "cleaning_services",
                 category = "home",
                 items = listOf(

@@ -262,7 +262,8 @@ private fun TemplateCard(
 ) {
     Card(
         modifier = Modifier
-            .width(180.dp)
+            .width(160.dp)
+            .height(140.dp)
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
@@ -271,7 +272,9 @@ private fun TemplateCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
-            modifier = Modifier.padding(AppDimens.SpacingLg)
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(AppDimens.SpacingMd)
         ) {
             // Header with icon and item count
             Row(
@@ -282,8 +285,8 @@ private fun TemplateCard(
                 // Icon
                 Box(
                     modifier = Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(10.dp))
                         .background(getIconBackgroundColor(template.category)),
                     contentAlignment = Alignment.Center
                 ) {
@@ -291,16 +294,16 @@ private fun TemplateCard(
                         imageVector = getIconForTemplate(template.icon),
                         contentDescription = null,
                         tint = getIconColor(template.category),
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
 
                 // Item count badge
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(6.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
                         text = "${template.items.size}",
@@ -311,30 +314,29 @@ private fun TemplateCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
+            Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
 
             // Template name
             Text(
                 text = template.name,
-                style = MaterialTheme.typography.titleSmall,
+                style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
-                maxLines = 2,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurface
             )
 
             Spacer(modifier = Modifier.height(AppDimens.SpacingXs))
 
-            // Preview of first item
+            // Description with auto-fit
             Text(
-                text = template.items.firstOrNull() ?: "",
+                text = template.description,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
             )
-
-            Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
 
             // "Use" indicator
             Row(
