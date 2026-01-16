@@ -13,12 +13,36 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class CreateChecklistViewModel(
+    private val editChecklistId: Long?,
     private val checklistRepository: ChecklistRepository,
     private val appNavigator: AppNavigator
 ) : AppViewModel<CreateChecklistState, CreateChecklistIntent, Nothing>() {
 
-    private val _screenState = MutableStateFlow(CreateChecklistState())
+    private val _screenState = MutableStateFlow(CreateChecklistState(
+        isEditMode = editChecklistId != null,
+        editChecklistId = editChecklistId
+    ))
     override val screenState: StateFlow<CreateChecklistState> = _screenState.asStateFlow()
+
+    init {
+        if (editChecklistId != null) {
+            loadChecklist(editChecklistId)
+        }
+    }
+
+    private fun loadChecklist(checklistId: Long) {
+        viewModelScope.launch {
+            val checklist = checklistRepository.getChecklistById(checklistId)
+            if (checklist != null) {
+                _screenState.update {
+                    it.copy(
+                        name = checklist.name,
+                        items = checklist.items
+                    )
+                }
+            }
+        }
+    }
 
     override fun onIntent(intent: CreateChecklistIntent) {
         when (intent) {
@@ -46,10 +70,21 @@ class CreateChecklistViewModel(
         }
 
         viewModelScope.launch {
-            checklistRepository.addChecklist(
-                Checklist(name = currentState.name.trim(), items = currentState.items)
-            )
-            appNavigator.navigateToMainScreen(clearBackStack = true)
+            if (currentState.isEditMode && currentState.editChecklistId != null) {
+                checklistRepository.updateChecklist(
+                    Checklist(
+                        id = currentState.editChecklistId,
+                        name = currentState.name.trim(),
+                        items = currentState.items
+                    )
+                )
+                appNavigator.onBack()
+            } else {
+                checklistRepository.addChecklist(
+                    Checklist(name = currentState.name.trim(), items = currentState.items)
+                )
+                appNavigator.navigateToMainScreen(clearBackStack = true)
+            }
         }
     }
 }

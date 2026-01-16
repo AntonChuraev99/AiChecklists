@@ -48,6 +48,9 @@
 
     <!-- Templates Screen -->
     <string name="templates_title">Templates</string>
+    <string name="templates_search_placeholder">Search templates...</string>
+    <string name="templates_no_results">No templates found</string>
+    <string name="templates_no_results_description">Try a different search term</string>
     <string name="templates_empty_title">No templates available</string>
     <string name="templates_empty_description">Check back later for pre-made checklists.</string>
     <string name="templates_item_count">%1$d items</string>

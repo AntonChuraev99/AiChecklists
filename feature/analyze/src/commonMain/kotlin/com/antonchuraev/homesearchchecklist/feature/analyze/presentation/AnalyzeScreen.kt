@@ -428,7 +428,8 @@ private fun InputSection(
                 value = inputUrl,
                 onValueChange = onUrlChanged,
                 placeholder = stringResource(Res.string.analyze_url_placeholder),
-                label = stringResource(Res.string.analyze_url_label)
+                label = stringResource(Res.string.analyze_url_label),
+                showClearButton = true
             )
         }
 
@@ -439,7 +440,8 @@ private fun InputSection(
                 placeholder = stringResource(Res.string.analyze_text_placeholder),
                 label = stringResource(Res.string.analyze_text_label),
                 singleLine = false,
-                maxLines = 10
+                maxLines = 10,
+                showClearButton = true
             )
         }
 

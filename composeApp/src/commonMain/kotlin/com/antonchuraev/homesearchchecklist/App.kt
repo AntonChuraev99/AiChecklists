@@ -56,8 +56,9 @@ fun App() {
                     MainScreen()
                 }
 
-                composable<AppNavRoute.CreateChecklistRoute.CreateChecklist> {
-                    CreateChecklistScreen()
+                composable<AppNavRoute.CreateChecklistRoute.CreateChecklist> { backStackEntry ->
+                    val route = backStackEntry.toRoute<AppNavRoute.CreateChecklistRoute.CreateChecklist>()
+                    CreateChecklistScreen(editChecklistId = route.editChecklistId)
                 }
 
                 composable<AppNavRoute.CreateChecklistRoute.Templates> {

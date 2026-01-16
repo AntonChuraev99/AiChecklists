@@ -43,6 +43,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppTextField
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import aichecklists.core.designsystem.generated.resources.Res
@@ -180,20 +181,15 @@ private fun AnalyzeResultPreviewContent(
 
         // Checklist name input
         item {
-            OutlinedTextField(
+            AppTextField(
                 value = state.checklistName,
                 onValueChange = onChecklistNameChanged,
-                label = {
-                    Text(
-                        if (state.isFillMode)
-                            stringResource(Res.string.analyze_preview_fill_name_label)
-                        else
-                            stringResource(Res.string.analyze_preview_name_label)
-                    )
-                },
+                label = if (state.isFillMode)
+                    stringResource(Res.string.analyze_preview_fill_name_label)
+                else
+                    stringResource(Res.string.analyze_preview_name_label),
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp)
+                showClearButton = true
             )
             Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
         }

@@ -14,11 +14,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material3.Surface
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -131,6 +133,35 @@ private fun ChecklistDetailContent(
                     tint = MaterialTheme.colorScheme.error
                 )
             }
+        },
+        bottomBar = {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shadowElevation = 8.dp,
+                color = MaterialTheme.colorScheme.surface
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
+                        .padding(top = AppDimens.SpacingMd, bottom = AppDimens.SpacingLg)
+                        .navigationBarsPadding(),
+                    verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
+                ) {
+                    AppButtonSecondary(
+                        text = stringResource(Res.string.checklist_new_fill),
+                        onClick = { onIntent(ChecklistDetailIntent.OnAddFillClick) },
+                        icon = Icons.Outlined.ContentCopy,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    AppButton(
+                        text = stringResource(Res.string.checklist_add_fill_ai),
+                        onClick = { onIntent(ChecklistDetailIntent.OnAddFillViaAiClick) },
+                        icon = Icons.Outlined.AutoAwesome,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
         }
     ) {
         val defaultFill = state.defaultFill
@@ -181,26 +212,9 @@ private fun ChecklistDetailContent(
                     )
                 }
 
-                // New fill buttons at the bottom
+                // Bottom spacing for the fixed buttons
                 item {
-                    Spacer(modifier = Modifier.height(AppDimens.SpacingLg))
-                    AppButtonSecondary(
-                        text = stringResource(Res.string.checklist_new_fill),
-                        onClick = { onIntent(ChecklistDetailIntent.OnAddFillClick) },
-                        icon = Icons.Outlined.ContentCopy,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
-                    AppButtonSecondary(
-                        text = stringResource(Res.string.checklist_add_fill_ai),
-                        onClick = { onIntent(ChecklistDetailIntent.OnAddFillViaAiClick) },
-                        icon = Icons.Outlined.AutoAwesome,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-
-                item {
-                    Spacer(modifier = Modifier.height(AppDimens.SpacingXxl))
+                    Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
                 }
             }
         }
@@ -479,7 +493,8 @@ private fun AddFillDialog(
                     label = stringResource(Res.string.checklist_fill_name_label),
                     placeholder = stringResource(Res.string.checklist_fill_name_placeholder),
                     isError = error != null,
-                    enabled = !isLoading
+                    enabled = !isLoading,
+                    showClearButton = true
                 )
                 if (error != null) {
                     Spacer(modifier = Modifier.height(AppDimens.SpacingXs))

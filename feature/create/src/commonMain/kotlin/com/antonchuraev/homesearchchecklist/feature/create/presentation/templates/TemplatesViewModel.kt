@@ -34,6 +34,7 @@ class TemplatesViewModel(
             TemplatesScreenIntent.OnDismissPreview -> dismissPreview()
             TemplatesScreenIntent.OnCreateFromTemplate -> createFromTemplate()
             TemplatesScreenIntent.OnDismissError -> dismissError()
+            is TemplatesScreenIntent.OnSearchQueryChange -> onSearchQueryChange(intent.query)
             TemplatesScreenIntent.OnCreateManuallyClick -> appNavigator.navigateToCreateChecklistScreen(null)
             TemplatesScreenIntent.OnCreateWithAiClick -> appNavigator.navigateToAnalyzeScreen()
         }
@@ -46,13 +47,35 @@ class TemplatesViewModel(
             try {
                 val categories = templatesRepository.getTemplatesByCategory()
                 _screenState.update {
-                    it.copy(isLoading = false, categories = categories)
+                    it.copy(isLoading = false, categories = categories, filteredCategories = categories)
                 }
             } catch (e: Exception) {
                 _screenState.update {
                     it.copy(isLoading = false, error = e.message ?: "Failed to load templates")
                 }
             }
+        }
+    }
+
+    private fun onSearchQueryChange(query: String) {
+        val filteredCategories = if (query.isBlank()) {
+            _screenState.value.categories
+        } else {
+            _screenState.value.categories.mapNotNull { category ->
+                val filteredTemplates = category.templates.filter { template ->
+                    template.name.contains(query, ignoreCase = true) ||
+                    template.description.contains(query, ignoreCase = true) ||
+                    template.items.any { it.contains(query, ignoreCase = true) }
+                }
+                if (filteredTemplates.isEmpty()) {
+                    null
+                } else {
+                    category.copy(templates = filteredTemplates)
+                }
+            }
+        }
+        _screenState.update {
+            it.copy(searchQuery = query, filteredCategories = filteredCategories)
         }
     }
 

@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.Luggage
 import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.RocketLaunch
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Description
@@ -62,6 +63,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonSecondary
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppTextField
 import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
@@ -84,6 +86,25 @@ fun TemplatesScreen(
         onBackButtonClick = { viewModel.sendIntent(TemplatesScreenIntent.OnBackClick) }
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
+            // Search field
+            AppTextField(
+                value = state.searchQuery,
+                onValueChange = { viewModel.sendIntent(TemplatesScreenIntent.OnSearchQueryChange(it)) },
+                placeholder = stringResource(Res.string.templates_search_placeholder),
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                },
+                showClearButton = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
+                    .padding(top = AppDimens.SpacingMd)
+            )
+
             // Main content area (scrollable)
             Box(
                 modifier = Modifier
@@ -103,9 +124,16 @@ fun TemplatesScreen(
                             description = stringResource(Res.string.templates_empty_description)
                         )
                     }
+                    state.filteredCategories.isEmpty() && state.searchQuery.isNotEmpty() -> {
+                        EmptyState(
+                            icon = Icons.Default.Search,
+                            title = stringResource(Res.string.templates_no_results),
+                            description = stringResource(Res.string.templates_no_results_description)
+                        )
+                    }
                     else -> {
                         TemplatesContent(
-                            categories = state.categories,
+                            categories = state.filteredCategories,
                             onTemplateClick = { viewModel.sendIntent(TemplatesScreenIntent.OnTemplateClick(it)) }
                         )
                     }

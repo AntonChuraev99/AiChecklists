@@ -68,7 +68,7 @@ class ChecklistDetailViewModel(
             ChecklistDetailIntent.OnBackClick -> navigator.onBack()
 
             ChecklistDetailIntent.OnEditChecklistClick -> {
-                // Navigate to edit checklist (could reuse CreateChecklistScreen)
+                navigator.navigateToEditChecklist(checklistId)
             }
 
             ChecklistDetailIntent.OnDeleteChecklistClick -> {
@@ -237,6 +237,8 @@ class ChecklistDetailViewModel(
     private fun deleteChecklist() {
         val state = _screenState.value
         if (state is ChecklistDetailState.Content) {
+            // Dismiss dialog immediately to prevent double-click
+            updateContentState { it.copy(showDeleteConfirmation = false) }
             viewModelScope.launch {
                 repository.deleteChecklist(state.checklist)
                 navigator.onBack()

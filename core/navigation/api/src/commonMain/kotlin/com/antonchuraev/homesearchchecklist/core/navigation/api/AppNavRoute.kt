@@ -16,7 +16,7 @@ sealed interface AppNavRoute {
     @Serializable
     sealed interface CreateChecklistRoute : AppNavRoute {
         @Serializable
-        data class CreateChecklist(val templateId: Int?) : CreateChecklistRoute
+        data class CreateChecklist(val templateId: Int? = null, val editChecklistId: Long? = null) : CreateChecklistRoute
 
         @Serializable
         data object Templates : CreateChecklistRoute

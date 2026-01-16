@@ -8,6 +8,8 @@ import com.antonchuraev.homesearchchecklist.feature.create.domain.model.Template
 data class TemplatesScreenState(
     val isLoading: Boolean = true,
     val categories: List<TemplateCategory> = emptyList(),
+    val filteredCategories: List<TemplateCategory> = emptyList(),
+    val searchQuery: String = "",
     val selectedTemplate: ChecklistTemplate? = null,
     val showPreviewDialog: Boolean = false,
     val isCreating: Boolean = false,
@@ -20,6 +22,7 @@ sealed interface TemplatesScreenIntent : Intent {
     data object OnDismissPreview : TemplatesScreenIntent
     data object OnCreateFromTemplate : TemplatesScreenIntent
     data object OnDismissError : TemplatesScreenIntent
+    data class OnSearchQueryChange(val query: String) : TemplatesScreenIntent
 
     // Bottom action buttons
     data object OnCreateManuallyClick : TemplatesScreenIntent

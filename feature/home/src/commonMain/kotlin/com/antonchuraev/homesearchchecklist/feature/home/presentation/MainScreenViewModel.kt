@@ -63,7 +63,8 @@ class MainScreenViewModel(
         if (currentState is MainScreenState.Success) {
             val limits = currentState.userLimits
             if (limits != null && !limits.canCreateChecklist) {
-                _showLimitDialog.update { true }
+                // Navigate directly to paywall when limit reached
+                appNavigator.navigateToPaywall()
             } else {
                 // Navigate to Templates screen where user can choose template,
                 // create manually, or create with AI
