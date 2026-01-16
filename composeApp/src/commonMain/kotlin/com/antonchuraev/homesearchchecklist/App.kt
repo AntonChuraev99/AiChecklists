@@ -14,6 +14,7 @@ import com.antonchuraev.homesearchchecklist.feature.debug.presentation.DebugScre
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.MainScreen
 import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.OnboardingScreen
 import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.AnalyzeScreen
+import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.preview.AnalyzeResultPreviewScreen
 import com.antonchuraev.homesearchchecklist.feature.splash.presentation.SplashScreen
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.ChecklistDetailScreen
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.fill.FillDetailScreen
@@ -78,6 +79,10 @@ fun App() {
                 composable<AppNavRoute.Analyze> { backStackEntry ->
                     val route = backStackEntry.toRoute<AppNavRoute.Analyze>()
                     AnalyzeScreen(checklistId = route.checklistId)
+                }
+
+                composable<AppNavRoute.AnalyzeResultPreview> {
+                    AnalyzeResultPreviewScreen()
                 }
 
                 composable<AppNavRoute.ChecklistDetail> { backStackEntry ->

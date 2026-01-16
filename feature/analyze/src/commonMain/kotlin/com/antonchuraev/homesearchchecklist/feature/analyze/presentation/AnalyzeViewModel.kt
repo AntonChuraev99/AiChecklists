@@ -4,6 +4,7 @@ import androidx.lifecycle.viewModelScope
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeInputData
+import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeResultHolder
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.InputDataType
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.repository.AnalyzeRepository
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
@@ -215,10 +216,20 @@ class AnalyzeViewModel(
                     _screenState.update {
                         it.copy(
                             isAnalyzing = false,
-                            analyzeResult = result,
-                            showResultDialog = true
+                            analyzeResult = result
                         )
                     }
+
+                    // Store result in holder and navigate to preview screen
+                    AnalyzeResultHolder.set(
+                        items = result.suggestedItems,
+                        suggestedName = if (state.isFillMode) "AI Fill" else "New Checklist",
+                        summary = result.summary,
+                        isFillMode = state.isFillMode,
+                        targetChecklistId = state.selectedChecklistId,
+                        targetChecklistName = targetChecklist?.name
+                    )
+                    appNavigator.navigateToAnalyzeResultPreview()
                 }
                 .onFailure { error ->
                     _screenState.update {

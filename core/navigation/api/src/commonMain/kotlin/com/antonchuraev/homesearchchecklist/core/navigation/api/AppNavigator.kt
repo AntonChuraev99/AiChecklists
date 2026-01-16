@@ -28,6 +28,8 @@ interface AppNavigator {
 
     fun navigateToAnalyzeScreen(checklistId: Long? = null)
 
+    fun navigateToAnalyzeResultPreview()
+
     /**
      * Navigate to checklist detail. If clearBackStack is true, clears back stack to main screen.
      */
