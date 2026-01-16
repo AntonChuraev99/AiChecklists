@@ -5,6 +5,7 @@ import com.antonchuraev.homesearchchecklist.feature.analyze.data.remote.Firebase
 import com.antonchuraev.homesearchchecklist.feature.analyze.data.repository.AnalyzeRepositoryImpl
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.repository.AnalyzeRepository
 import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.AnalyzeViewModel
+import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.preview.AnalyzeResultPreviewViewModel
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
 
@@ -30,6 +31,14 @@ val analyzeFeatureModule = module {
             appNavigator = get(),
             userDataRepository = get(),
             getSubscriptionStatusUseCase = get()
+        )
+    }
+
+    // AnalyzeResultPreviewViewModel
+    viewModel {
+        AnalyzeResultPreviewViewModel(
+            appNavigator = get(),
+            checklistRepository = get()
         )
     }
 }

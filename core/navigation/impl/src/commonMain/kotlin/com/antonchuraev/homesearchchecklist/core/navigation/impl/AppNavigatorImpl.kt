@@ -50,6 +50,10 @@ class AppNavigatorImpl() : AppNavigator {
         navController.navigate(AppNavRoute.Analyze(checklistId))
     }
 
+    override fun navigateToAnalyzeResultPreview() {
+        navController.navigate(AppNavRoute.AnalyzeResultPreview)
+    }
+
     override fun navigateToChecklistDetail(checklistId: Long, clearBackStack: Boolean) {
         if (clearBackStack) {
             navController.navigate(AppNavRoute.ChecklistDetail(checklistId)) {

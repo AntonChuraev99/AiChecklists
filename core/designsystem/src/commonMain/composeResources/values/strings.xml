@@ -68,6 +68,20 @@
     <string name="template_preview_add_item">Add item</string>
     <string name="template_preview_add_item_hint">Add new item...</string>
 
+    <!-- Analyze Result Preview Screen -->
+    <string name="analyze_preview_title">AI Result</string>
+    <string name="analyze_preview_fill_title">AI Fill Result</string>
+    <string name="analyze_preview_for_checklist">For checklist: %1$s</string>
+    <string name="analyze_preview_name_label">Checklist name</string>
+    <string name="analyze_preview_fill_name_label">Fill name</string>
+    <string name="analyze_preview_items_count">%1$d items</string>
+    <string name="analyze_preview_create_button">Create Checklist (%1$d items)</string>
+    <string name="analyze_preview_create_fill_button">Create Fill (%1$d items)</string>
+    <string name="analyze_preview_creating">Creating...</string>
+    <string name="analyze_preview_remove_item">Remove item</string>
+    <string name="analyze_preview_add_item">Add item</string>
+    <string name="analyze_preview_add_item_hint">Add new item...</string>
+
     <!-- Analyze Screen -->
     <string name="analyze_title">AI Analysis</string>
     <string name="analyze_button">Analyze</string>

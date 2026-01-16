@@ -45,8 +45,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.border
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonSecondary
@@ -55,7 +53,6 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppTextField
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
-import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeResult
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.InputDataType
 import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.picker.FilePickerType
 import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.picker.rememberFilePickerLauncher
@@ -130,33 +127,6 @@ fun AnalyzeScreen(
                 screenState = screenState,
                 onIntent = viewModel::sendIntent
             )
-        }
-
-        // Result dialog
-        if (screenState.showResultDialog && screenState.analyzeResult != null) {
-            if (screenState.isFillMode) {
-                FillResultDialog(
-                    result = screenState.analyzeResult!!,
-                    checklistName = screenState.targetChecklist?.name ?: "",
-                    fillName = screenState.fillName,
-                    onFillNameChanged = {
-                        viewModel.sendIntent(AnalyzeScreenIntent.OnFillNameChanged(it))
-                    },
-                    onCreateFill = { viewModel.sendIntent(AnalyzeScreenIntent.OnCreateFillClick) },
-                    onDismiss = { viewModel.sendIntent(AnalyzeScreenIntent.OnDismissResult) },
-                    isSaving = screenState.isSavingFill
-                )
-            } else {
-                ResultDialog(
-                    result = screenState.analyzeResult!!,
-                    checklistName = screenState.checklistName,
-                    onChecklistNameChanged = {
-                        viewModel.sendIntent(AnalyzeScreenIntent.OnChecklistNameChanged(it))
-                    },
-                    onCreateNew = { viewModel.sendIntent(AnalyzeScreenIntent.OnCreateNewChecklistClick) },
-                    onDismiss = { viewModel.sendIntent(AnalyzeScreenIntent.OnDismissResult) }
-                )
-            }
         }
 
         // Error dialog
@@ -772,211 +742,6 @@ private fun formatDuration(durationMs: Long): String {
     val minutes = totalSeconds / 60
     val seconds = totalSeconds % 60
     return "$minutes:${seconds.toString().padStart(2, '0')}"
-}
-
-@Composable
-private fun FillResultDialog(
-    result: AnalyzeResult,
-    checklistName: String,
-    fillName: String,
-    onFillNameChanged: (String) -> Unit,
-    onCreateFill: () -> Unit,
-    onDismiss: () -> Unit,
-    isSaving: Boolean
-) {
-    val checkedCount = result.suggestedItems.count { it.checked }
-    val totalCount = result.suggestedItems.size
-
-    AlertDialog(
-        onDismissRequest = { if (!isSaving) onDismiss() },
-        title = {
-            Text(
-                text = stringResource(Res.string.analyze_fill_result_title),
-                style = MaterialTheme.typography.titleLarge
-            )
-        },
-        text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
-            ) {
-                // Checklist being filled
-                Text(
-                    text = stringResource(Res.string.analyze_fill_for_checklist, checklistName),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                result.summary?.let { summary ->
-                    Text(
-                        text = summary,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                // Stats
-                Text(
-                    text = stringResource(Res.string.analyze_fill_stats, checkedCount, totalCount),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                // Items preview with check marks
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs)
-                ) {
-                    result.suggestedItems.take(7).forEach { item ->
-                        val icon = if (item.checked) "✓" else "○"
-                        val color = if (item.checked) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        }
-                        Text(
-                            text = "$icon ${item.text}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = color
-                        )
-                    }
-                    if (result.suggestedItems.size > 7) {
-                        val remaining = result.suggestedItems.size - 7
-                        Text(
-                            text = stringResource(Res.string.analyze_and_more, remaining),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
-
-                // Fill name input
-                AppTextField(
-                    value = fillName,
-                    onValueChange = onFillNameChanged,
-                    label = stringResource(Res.string.analyze_fill_name_label),
-                    placeholder = stringResource(Res.string.analyze_fill_name_placeholder),
-                    enabled = !isSaving
-                )
-            }
-        },
-        confirmButton = {
-            AppButtonText(
-                text = if (isSaving) {
-                    stringResource(Res.string.analyze_saving)
-                } else {
-                    stringResource(Res.string.analyze_create_fill)
-                },
-                onClick = onCreateFill,
-                enabled = !isSaving
-            )
-        },
-        dismissButton = {
-            if (!isSaving) {
-                AppButtonText(
-                    text = stringResource(Res.string.cancel),
-                    onClick = onDismiss
-                )
-            }
-        },
-        containerColor = MaterialTheme.colorScheme.surface,
-        shape = MaterialTheme.shapes.large
-    )
-}
-
-@Composable
-private fun ResultDialog(
-    result: AnalyzeResult,
-    checklistName: String,
-    onChecklistNameChanged: (String) -> Unit,
-    onCreateNew: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    val itemsFoundText = stringResource(Res.string.analyze_items_found)
-    val remainingCount = result.suggestedItems.size - 5
-    val andMoreText = stringResource(Res.string.analyze_and_more, remainingCount)
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                text = stringResource(Res.string.analyze_result_title),
-                style = MaterialTheme.typography.titleLarge
-            )
-        },
-        text = {
-            Column(
-                modifier = Modifier
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
-            ) {
-                result.summary?.let { summary ->
-                    Text(
-                        text = summary,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                Text(
-                    text = "$itemsFoundText ${result.suggestedItems.size}",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs)
-                ) {
-                    result.suggestedItems.take(5).forEach { item ->
-                        Text(
-                            text = "• ${item.text}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    if (result.suggestedItems.size > 5) {
-                        Text(
-                            text = andMoreText,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
-
-                AppTextField(
-                    value = checklistName,
-                    onValueChange = onChecklistNameChanged,
-                    label = stringResource(Res.string.analyze_checklist_name_label),
-                    placeholder = stringResource(Res.string.analyze_checklist_name_placeholder)
-                )
-
-                result.warnings.forEach { warning ->
-                    Text(
-                        text = warning,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            AppButtonText(
-                text = stringResource(Res.string.analyze_create_checklist),
-                onClick = onCreateNew
-            )
-        },
-        dismissButton = {
-            AppButtonText(
-                text = stringResource(Res.string.cancel),
-                onClick = onDismiss
-            )
-        },
-        containerColor = MaterialTheme.colorScheme.surface,
-        shape = MaterialTheme.shapes.large
-    )
 }
 
 @Composable

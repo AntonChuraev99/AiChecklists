@@ -32,6 +32,9 @@ sealed interface AppNavRoute {
     data class Analyze(val checklistId: Long? = null) : AppNavRoute
 
     @Serializable
+    data object AnalyzeResultPreview : AppNavRoute
+
+    @Serializable
     data class ChecklistDetail(val checklistId: Long) : AppNavRoute
 
     @Serializable
