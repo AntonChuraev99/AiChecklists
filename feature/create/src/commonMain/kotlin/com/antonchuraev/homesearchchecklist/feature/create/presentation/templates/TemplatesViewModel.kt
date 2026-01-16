@@ -84,8 +84,8 @@ class TemplatesViewModel(
                     it.copy(isCreating = false, showPreviewDialog = false, selectedTemplate = null)
                 }
 
-                // Navigate to the created checklist
-                appNavigator.navigateToChecklistDetail(checklistId)
+                // Navigate to the created checklist, clearing back stack
+                appNavigator.navigateToChecklistDetail(checklistId, clearBackStack = true)
             } catch (e: Exception) {
                 _screenState.update {
                     it.copy(isCreating = false, error = e.message ?: "Failed to create checklist")

@@ -11,9 +11,9 @@ interface AppNavigator {
     fun navigateToOnboarding()
 
     /**
-     * todo clear back stack
+     * Navigate to main screen, clearing all screens from back stack.
      */
-    fun navigateToMainScreen()
+    fun navigateToMainScreen(clearBackStack: Boolean = false)
 
     fun navigateToDebugMenu()
 
@@ -28,9 +28,15 @@ interface AppNavigator {
 
     fun navigateToAnalyzeScreen(checklistId: Long? = null)
 
-    fun navigateToChecklistDetail(checklistId: Long)
+    /**
+     * Navigate to checklist detail. If clearBackStack is true, clears back stack to main screen.
+     */
+    fun navigateToChecklistDetail(checklistId: Long, clearBackStack: Boolean = false)
 
-    fun navigateToFillDetail(fillId: Long)
+    /**
+     * Navigate to fill detail. If clearBackStack is true, clears back stack to main screen.
+     */
+    fun navigateToFillDetail(fillId: Long, clearBackStack: Boolean = false)
 
     fun navigateToFillsList(checklistId: Long)
 

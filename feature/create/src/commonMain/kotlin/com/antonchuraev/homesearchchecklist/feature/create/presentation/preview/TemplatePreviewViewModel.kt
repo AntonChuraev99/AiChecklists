@@ -112,7 +112,7 @@ class TemplatePreviewViewModel(
 
                 _screenState.update { it.copy(isCreating = false) }
 
-                appNavigator.navigateToChecklistDetail(checklistId)
+                appNavigator.navigateToChecklistDetail(checklistId, clearBackStack = true)
             } catch (e: Exception) {
                 _screenState.update {
                     it.copy(isCreating = false, error = e.message ?: "Failed to create checklist")
