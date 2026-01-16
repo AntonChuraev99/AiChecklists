@@ -41,7 +41,7 @@ fun MainScreen(
     val screenState: MainScreenState by viewModel.screenState.collectAsStateWithLifecycle()
 
     AppScaffold(
-        title = stringResource(Res.string.main_title),
+        title = "",
         actions = {
             if (screenState is MainScreenState.Success) {
                 val state = screenState as MainScreenState.Success
