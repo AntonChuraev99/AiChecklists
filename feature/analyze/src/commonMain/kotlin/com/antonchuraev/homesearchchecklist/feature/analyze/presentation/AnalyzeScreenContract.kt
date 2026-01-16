@@ -26,7 +26,11 @@ data class AnalyzeScreenState(
     val isFillMode: Boolean = false,
     val targetChecklist: Checklist? = null,
     val fillName: String = "",
-    val isSavingFill: Boolean = false
+    val isSavingFill: Boolean = false,
+    // Voice recording
+    val isRecording: Boolean = false,
+    val recordedAudioPath: String? = null,
+    val recordedAudioDuration: Long = 0L
 ) : State
 
 sealed interface AnalyzeScreenIntent : Intent {
@@ -41,6 +45,13 @@ sealed interface AnalyzeScreenIntent : Intent {
 
     // File selection (photo, PDF, text file)
     data class OnFileSelected(val filePath: String, val fileName: String) : AnalyzeScreenIntent
+
+    // Voice recording
+    data object OnStartRecording : AnalyzeScreenIntent
+    data object OnStopRecording : AnalyzeScreenIntent
+    data class OnRecordingComplete(val filePath: String, val durationMs: Long) : AnalyzeScreenIntent
+    data class OnRecordingError(val error: String) : AnalyzeScreenIntent
+    data object OnDeleteRecording : AnalyzeScreenIntent
 
     // Checklist selection
     data class OnChecklistSelected(val checklistId: Long?) : AnalyzeScreenIntent

@@ -231,6 +231,7 @@ class FirebaseAiServiceImpl(
         AiInputType.TEXT -> "text"
         AiInputType.URL -> "url"
         AiInputType.IMAGE_BASE64 -> "image_base64"
+        AiInputType.AUDIO_BASE64 -> "audio_base64"
         AiInputType.NONE -> "none"
     }
 

@@ -43,7 +43,8 @@ class StubAiAnalyzer : AiAnalyzer {
         AnalyzeInputData.PdfDocument::class,
         AnalyzeInputData.TextFile::class,
         AnalyzeInputData.WebLink::class,
-        AnalyzeInputData.RawText::class
+        AnalyzeInputData.RawText::class,
+        AnalyzeInputData.Audio::class
     )
 
     private fun generateMockItems(inputData: AnalyzeInputData): List<ChecklistItem> {
@@ -80,6 +81,13 @@ class StubAiAnalyzer : AiAnalyzer {
                 ChecklistItem("Проверить транспортную доступность", false),
                 ChecklistItem("Найти отзывы о застройщике/доме", false)
             )
+
+            is AnalyzeInputData.Audio -> listOf(
+                ChecklistItem("Первый пункт из голосовой записи", false),
+                ChecklistItem("Второй пункт из голосовой записи", false),
+                ChecklistItem("Третий пункт из голосовой записи", false),
+                ChecklistItem("Уточнить детали из аудио", false)
+            )
         }
     }
 
@@ -99,6 +107,9 @@ class StubAiAnalyzer : AiAnalyzer {
 
             is AnalyzeInputData.RawText ->
                 "Текст проанализирован. Выделены основные пункты для проверки."
+
+            is AnalyzeInputData.Audio ->
+                "Голосовая запись расшифрована. Извлечены упомянутые задачи."
         }
     }
 }

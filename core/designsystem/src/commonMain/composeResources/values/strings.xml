@@ -80,6 +80,7 @@
     <string name="analyze_source_text_file">Text File</string>
     <string name="analyze_source_link">Web Link</string>
     <string name="analyze_source_text">Paste Text</string>
+    <string name="analyze_source_voice">Voice</string>
     <string name="analyze_url_label">URL</string>
     <string name="analyze_url_placeholder">https://example.com/article</string>
     <string name="analyze_text_placeholder">Paste meeting notes, articles, instructions — anything you want to turn into a checklist...</string>
@@ -101,6 +102,19 @@
     <string name="analyze_error_empty_name">Give your checklist a name</string>
     <string name="analyze_cost_info">This action costs %1$d credits</string>
     <string name="analyze_not_enough_credits">Not enough credits. Get more to continue.</string>
+
+    <!-- Voice recording -->
+    <string name="analyze_voice_tap_to_record">Tap to record</string>
+    <string name="analyze_voice_recording">Recording...</string>
+    <string name="analyze_voice_stop">Stop</string>
+    <string name="analyze_voice_recorded">Recorded</string>
+    <string name="analyze_voice_play">Play recording</string>
+    <string name="analyze_voice_delete">Delete recording</string>
+    <string name="analyze_voice_permission_required">Microphone permission is required</string>
+    <string name="analyze_voice_permission_denied">Microphone access was denied. Please grant permission to record voice.</string>
+    <string name="analyze_voice_permission_denied_settings">Microphone access is disabled. Please enable it in Settings to record voice.</string>
+    <string name="analyze_voice_open_settings">Open Settings</string>
+    <string name="analyze_error_no_recording">Record a voice message to analyze</string>
 
     <!-- Fill mode (Fill via AI) -->
     <string name="analyze_fill_title">Fill via AI</string>

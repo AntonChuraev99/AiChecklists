@@ -65,6 +65,7 @@ enum class AiInputType {
     TEXT,
     URL,
     IMAGE_BASE64,
+    AUDIO_BASE64,
     NONE
 }
 
