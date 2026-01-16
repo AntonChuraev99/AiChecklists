@@ -3,6 +3,7 @@ package com.antonchuraev.homesearchchecklist.feature.create.di
 import com.antonchuraev.homesearchchecklist.feature.create.data.repository.TemplatesRepositoryImpl
 import com.antonchuraev.homesearchchecklist.feature.create.domain.repository.TemplatesRepository
 import com.antonchuraev.homesearchchecklist.feature.create.presentation.create.CreateChecklistViewModel
+import com.antonchuraev.homesearchchecklist.feature.create.presentation.preview.TemplatePreviewViewModel
 import com.antonchuraev.homesearchchecklist.feature.create.presentation.templates.TemplatesViewModel
 import org.koin.core.module.dsl.singleOf
 import org.koin.core.module.dsl.viewModelOf
@@ -16,5 +17,6 @@ val createFeatureModule = module {
     // ViewModels
     viewModelOf(::CreateChecklistViewModel)
     viewModelOf(::TemplatesViewModel)
+    viewModelOf(::TemplatePreviewViewModel)
 }
 

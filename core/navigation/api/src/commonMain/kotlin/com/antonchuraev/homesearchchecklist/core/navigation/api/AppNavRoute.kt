@@ -20,6 +20,9 @@ sealed interface AppNavRoute {
 
         @Serializable
         data object Templates : CreateChecklistRoute
+
+        @Serializable
+        data class TemplatePreview(val templateId: String) : CreateChecklistRoute
     }
 
     @Serializable

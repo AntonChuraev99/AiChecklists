@@ -30,7 +30,7 @@ class TemplatesViewModel(
     override fun onIntent(intent: TemplatesScreenIntent) {
         when (intent) {
             TemplatesScreenIntent.OnBackClick -> appNavigator.onBack()
-            is TemplatesScreenIntent.OnTemplateClick -> showTemplatePreview(intent.template)
+            is TemplatesScreenIntent.OnTemplateClick -> navigateToTemplatePreview(intent.template)
             TemplatesScreenIntent.OnDismissPreview -> dismissPreview()
             TemplatesScreenIntent.OnCreateFromTemplate -> createFromTemplate()
             TemplatesScreenIntent.OnDismissError -> dismissError()
@@ -56,10 +56,8 @@ class TemplatesViewModel(
         }
     }
 
-    private fun showTemplatePreview(template: ChecklistTemplate) {
-        _screenState.update {
-            it.copy(selectedTemplate = template, showPreviewDialog = true)
-        }
+    private fun navigateToTemplatePreview(template: ChecklistTemplate) {
+        appNavigator.navigateToTemplatePreview(template.id)
     }
 
     private fun dismissPreview() {
