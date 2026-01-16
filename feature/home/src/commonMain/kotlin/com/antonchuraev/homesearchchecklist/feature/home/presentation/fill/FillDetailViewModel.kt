@@ -179,6 +179,8 @@ class FillDetailViewModel(
     private fun deleteFill() {
         val state = _screenState.value
         if (state is FillDetailState.Content) {
+            // Dismiss dialog immediately to prevent double-click
+            updateContentState { it.copy(showDeleteConfirmation = false) }
             viewModelScope.launch {
                 repository.deleteFill(state.fill)
                 navigator.onBack()

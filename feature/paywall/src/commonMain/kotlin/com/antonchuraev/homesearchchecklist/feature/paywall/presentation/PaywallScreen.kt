@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -41,7 +43,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
@@ -53,9 +54,7 @@ import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
-// Colors matching the reference design
-private val PaywallOrange = Color(0xFFFF9500)
-private val PaywallOrangeBackground = Color(0xFFFFF8F0)
+// Background color for paywall
 private val BackgroundGray = Color(0xFFF8F8F8)
 
 private data class PaywallPage(
@@ -123,6 +122,7 @@ fun PaywallScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .statusBarsPadding()
                             .padding(8.dp),
                         horizontalArrangement = Arrangement.End
                     ) {
@@ -280,20 +280,23 @@ private fun SubscriptionCard(
     onSubscribe: () -> Unit,
     onRestore: () -> Unit
 ) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val primaryContainerColor = MaterialTheme.colorScheme.primaryContainer
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
-            .background(PaywallOrangeBackground)
+            .background(primaryContainerColor.copy(alpha = 0.3f))
             .padding(horizontal = 24.dp)
-            .padding(top = 28.dp, bottom = 12.dp)
+            .padding(top = 28.dp, bottom = 8.dp)
             .navigationBarsPadding(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         if (isLoading) {
             CircularProgressIndicator(
                 modifier = Modifier.size(40.dp),
-                color = PaywallOrange
+                color = primaryColor
             )
             Spacer(modifier = Modifier.height(20.dp))
         } else if (product != null) {
@@ -306,7 +309,7 @@ private fun SubscriptionCard(
                 },
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
-                color = PaywallOrange,
+                color = primaryColor,
                 textAlign = TextAlign.Center
             )
 
@@ -316,7 +319,7 @@ private fun SubscriptionCard(
             Text(
                 text = stringResource(Res.string.paywall_then_price, product.priceString),
                 style = MaterialTheme.typography.bodyLarge,
-                color = Color.Black.copy(alpha = 0.7f),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                 textAlign = TextAlign.Center
             )
 
@@ -331,9 +334,9 @@ private fun SubscriptionCard(
                     .height(52.dp),
                 shape = RoundedCornerShape(26.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = PaywallOrange,
+                    containerColor = primaryColor,
                     contentColor = Color.White,
-                    disabledContainerColor = PaywallOrange.copy(alpha = 0.5f)
+                    disabledContainerColor = primaryColor.copy(alpha = 0.5f)
                 )
             ) {
                 if (isPurchasing) {
@@ -366,48 +369,65 @@ private fun SubscriptionCard(
                     Icon(
                         imageVector = Icons.Default.Check,
                         contentDescription = null,
-                        tint = Color.Black.copy(alpha = 0.6f),
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = stringResource(Res.string.paywall_no_payment_now),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Color.Black.copy(alpha = 0.6f)
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
         }
 
-        // Footer links
+        // Footer links - more compact
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            TextButton(onClick = { /* Terms */ }) {
+            TextButton(
+                onClick = { /* Terms */ },
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+            ) {
                 Text(
                     text = stringResource(Res.string.paywall_terms),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.Gray,
-                    fontSize = 11.sp
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            TextButton(onClick = onRestore) {
+            Text(
+                text = "•",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            TextButton(
+                onClick = onRestore,
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+            ) {
                 Text(
                     text = stringResource(Res.string.paywall_restore),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.Gray,
-                    fontSize = 11.sp
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            TextButton(onClick = { /* Privacy */ }) {
+            Text(
+                text = "•",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            TextButton(
+                onClick = { /* Privacy */ },
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+            ) {
                 Text(
                     text = stringResource(Res.string.paywall_privacy),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.Gray,
-                    fontSize = 11.sp
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }

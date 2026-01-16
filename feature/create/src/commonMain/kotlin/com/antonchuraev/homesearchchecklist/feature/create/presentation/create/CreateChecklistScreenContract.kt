@@ -7,7 +7,9 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Check
 data class CreateChecklistState(
     val name: String = "",
     val items: List<ChecklistItem> = emptyList(),
-    val nameError: String? = null
+    val nameError: String? = null,
+    val isEditMode: Boolean = false,
+    val editChecklistId: Long? = null
 ) : State
 
 sealed interface CreateChecklistIntent : Intent {

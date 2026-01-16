@@ -14,11 +14,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -91,42 +89,8 @@ fun MainScreen(
                 )
             }
 
-            if (state.showLimitReachedDialog && state.userLimits != null) {
-                LimitReachedDialog(
-                    maxChecklists = state.userLimits.maxChecklists,
-                    onDismiss = { viewModel.sendIntent(MainScreenIntent.OnDismissLimitDialog) },
-                    onUpgrade = { viewModel.sendIntent(MainScreenIntent.OnUpgradeToPremiumClick) }
-                )
-            }
         }
     }
-}
-
-@Composable
-private fun LimitReachedDialog(
-    maxChecklists: Int,
-    onDismiss: () -> Unit,
-    onUpgrade: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(stringResource(Res.string.limit_reached_title))
-        },
-        text = {
-            Text(stringResource(Res.string.limit_reached_message, maxChecklists))
-        },
-        confirmButton = {
-            TextButton(onClick = onUpgrade) {
-                Text(stringResource(Res.string.limit_upgrade))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(Res.string.cancel))
-            }
-        }
-    )
 }
 
 @Composable

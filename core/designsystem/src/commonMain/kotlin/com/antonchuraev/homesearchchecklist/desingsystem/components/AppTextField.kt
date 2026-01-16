@@ -1,12 +1,18 @@
 package com.antonchuraev.homesearchchecklist.desingsystem.components
 
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 
 @Composable
 fun AppTextField(
@@ -19,8 +25,28 @@ fun AppTextField(
     isError: Boolean = false,
     errorMessage: String? = null,
     singleLine: Boolean = true,
-    maxLines: Int = if (singleLine) 1 else Int.MAX_VALUE
+    maxLines: Int = if (singleLine) 1 else Int.MAX_VALUE,
+    leadingIcon: @Composable (() -> Unit)? = null,
+    trailingIcon: @Composable (() -> Unit)? = null,
+    showClearButton: Boolean = false
 ) {
+    val effectiveTrailingIcon: @Composable (() -> Unit)? = when {
+        showClearButton && value.isNotEmpty() -> {
+            {
+                IconButton(onClick = { onValueChange("") }) {
+                    Icon(
+                        imageVector = Icons.Default.Clear,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+        trailingIcon != null -> trailingIcon
+        else -> null
+    }
+
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
@@ -35,6 +61,8 @@ fun AppTextField(
                 )
             }
         },
+        leadingIcon = leadingIcon,
+        trailingIcon = effectiveTrailingIcon,
         isError = isError,
         supportingText = if (isError && errorMessage != null) {
             {

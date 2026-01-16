@@ -38,18 +38,26 @@ import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
+import org.koin.core.parameter.parametersOf
 
 @Composable
 fun CreateChecklistScreen(
-    viewModel: CreateChecklistViewModel = koinViewModel()
+    editChecklistId: Long? = null,
+    viewModel: CreateChecklistViewModel = koinViewModel { parametersOf(editChecklistId) }
 ) {
     val screenState by viewModel.screenState.collectAsStateWithLifecycle()
 
     var showDialog by remember { mutableStateOf(false) }
     var dialogText by remember { mutableStateOf("") }
 
+    val title = if (screenState.isEditMode) {
+        stringResource(Res.string.checklist_edit_title)
+    } else {
+        stringResource(Res.string.create_title)
+    }
+
     AppScaffold(
-        title = stringResource(Res.string.create_title),
+        title = title,
         onBackButtonClick = { viewModel.sendIntent(CreateChecklistIntent.OnBackClick) },
         bottomBar = {
             Box(
@@ -85,7 +93,8 @@ fun CreateChecklistScreen(
                     onValueChange = { viewModel.sendIntent(CreateChecklistIntent.OnNameChange(it)) },
                     placeholder = stringResource(Res.string.create_name_placeholder),
                     isError = screenState.nameError != null,
-                    errorMessage = screenState.nameError
+                    errorMessage = screenState.nameError,
+                    showClearButton = true
                 )
             }
 
