@@ -20,14 +20,14 @@ class AppNavigatorImpl() : AppNavigator {
         navController.navigate(AppNavRoute.Onboarding)
     }
 
-    /**
-     * todo clear back stack
-     */
-    override fun navigateToMainScreen() {
-        navController.navigate(AppNavRoute.Main)
-        /*navController.navigate(AppNavRoute.Main) {
-            popUpTo(AppNavRoute.Onboarding) { inclusive = true }
-        }*/
+    override fun navigateToMainScreen(clearBackStack: Boolean) {
+        if (clearBackStack) {
+            navController.navigate(AppNavRoute.Main) {
+                popUpTo(0) { inclusive = true }
+            }
+        } else {
+            navController.navigate(AppNavRoute.Main)
+        }
     }
 
     override fun navigateToDebugMenu() {
@@ -50,12 +50,24 @@ class AppNavigatorImpl() : AppNavigator {
         navController.navigate(AppNavRoute.Analyze(checklistId))
     }
 
-    override fun navigateToChecklistDetail(checklistId: Long) {
-        navController.navigate(AppNavRoute.ChecklistDetail(checklistId))
+    override fun navigateToChecklistDetail(checklistId: Long, clearBackStack: Boolean) {
+        if (clearBackStack) {
+            navController.navigate(AppNavRoute.ChecklistDetail(checklistId)) {
+                popUpTo(AppNavRoute.Main) { inclusive = false }
+            }
+        } else {
+            navController.navigate(AppNavRoute.ChecklistDetail(checklistId))
+        }
     }
 
-    override fun navigateToFillDetail(fillId: Long) {
-        navController.navigate(AppNavRoute.FillDetail(fillId))
+    override fun navigateToFillDetail(fillId: Long, clearBackStack: Boolean) {
+        if (clearBackStack) {
+            navController.navigate(AppNavRoute.FillDetail(fillId)) {
+                popUpTo(AppNavRoute.Main) { inclusive = false }
+            }
+        } else {
+            navController.navigate(AppNavRoute.FillDetail(fillId))
+        }
     }
 
     override fun navigateToFillsList(checklistId: Long) {

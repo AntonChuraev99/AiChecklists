@@ -22,7 +22,7 @@ class SplashViewModel(
 
             with(appNavigator) {
                 when (userData.isOnboardingPassed) {
-                    true -> navigateToMainScreen()
+                    true -> navigateToMainScreen(clearBackStack = true)
                     false -> navigateToOnboarding()
                 }
             }

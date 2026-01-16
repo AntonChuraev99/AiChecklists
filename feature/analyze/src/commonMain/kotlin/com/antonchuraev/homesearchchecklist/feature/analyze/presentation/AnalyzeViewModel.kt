@@ -251,7 +251,7 @@ class AnalyzeViewModel(
             analyzeRepository.createChecklistFromResult(name, result)
                 .onSuccess {
                     _screenState.update { it.copy(showResultDialog = false) }
-                    appNavigator.onBack()
+                    appNavigator.navigateToMainScreen(clearBackStack = true)
                 }
                 .onFailure { error ->
                     _screenState.update {
@@ -275,8 +275,7 @@ class AnalyzeViewModel(
             analyzeRepository.createFillFromResult(checklistId, fillName, result)
                 .onSuccess { fillId ->
                     _screenState.update { it.copy(showResultDialog = false, isSavingFill = false) }
-                    appNavigator.onBack()
-                    appNavigator.navigateToFillDetail(fillId)
+                    appNavigator.navigateToFillDetail(fillId, clearBackStack = true)
                 }
                 .onFailure { error ->
                     _screenState.update {

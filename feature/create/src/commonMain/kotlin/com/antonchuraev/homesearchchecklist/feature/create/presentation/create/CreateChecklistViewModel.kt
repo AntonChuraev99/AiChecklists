@@ -49,7 +49,7 @@ class CreateChecklistViewModel(
             checklistRepository.addChecklist(
                 Checklist(name = currentState.name.trim(), items = currentState.items)
             )
-            appNavigator.onBack()
+            appNavigator.navigateToMainScreen(clearBackStack = true)
         }
     }
 }

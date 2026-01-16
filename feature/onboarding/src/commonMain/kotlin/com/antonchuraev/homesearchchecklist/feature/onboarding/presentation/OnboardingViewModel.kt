@@ -42,7 +42,7 @@ class OnboardingViewModel(
     private fun completeOnboarding() {
         viewModelScope.launch {
             completeOnboardingUseCase()
-            navigator.navigateToMainScreen()
+            navigator.navigateToMainScreen(clearBackStack = true)
         }
     }
 }
