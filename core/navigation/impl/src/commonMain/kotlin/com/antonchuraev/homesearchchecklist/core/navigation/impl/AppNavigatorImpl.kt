@@ -42,6 +42,10 @@ class AppNavigatorImpl() : AppNavigator {
         navController.navigate(AppNavRoute.CreateChecklistRoute.Templates)
     }
 
+    override fun navigateToTemplatePreview(templateId: String) {
+        navController.navigate(AppNavRoute.CreateChecklistRoute.TemplatePreview(templateId))
+    }
+
     override fun navigateToAnalyzeScreen(checklistId: Long?) {
         navController.navigate(AppNavRoute.Analyze(checklistId))
     }

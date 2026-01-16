@@ -59,6 +59,15 @@
     <string name="templates_create_manually">Create Manually</string>
     <string name="templates_create_with_ai">Create with AI</string>
 
+    <!-- Template Preview Screen -->
+    <string name="template_preview_title">Preview</string>
+    <string name="template_preview_items_count">%1$d items</string>
+    <string name="template_preview_create_button">Create Checklist (%1$d items)</string>
+    <string name="template_preview_creating">Creating...</string>
+    <string name="template_preview_remove_item">Remove item</string>
+    <string name="template_preview_add_item">Add item</string>
+    <string name="template_preview_add_item_hint">Add new item...</string>
+
     <!-- Analyze Screen -->
     <string name="analyze_title">AI Analysis</string>
     <string name="analyze_button">Analyze</string>

@@ -38,8 +38,6 @@ import androidx.compose.material.icons.filled.RocketLaunch
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Description
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -134,16 +132,6 @@ fun TemplatesScreen(
             BottomActionButtons(
                 onCreateManually = { viewModel.sendIntent(TemplatesScreenIntent.OnCreateManuallyClick) },
                 onCreateWithAi = { viewModel.sendIntent(TemplatesScreenIntent.OnCreateWithAiClick) }
-            )
-        }
-
-        // Template preview dialog
-        if (state.showPreviewDialog && state.selectedTemplate != null) {
-            TemplatePreviewDialog(
-                template = state.selectedTemplate!!,
-                isCreating = state.isCreating,
-                onDismiss = { viewModel.sendIntent(TemplatesScreenIntent.OnDismissPreview) },
-                onCreate = { viewModel.sendIntent(TemplatesScreenIntent.OnCreateFromTemplate) }
             )
         }
     }
@@ -363,114 +351,6 @@ private fun TemplateCard(
             }
         }
     }
-}
-
-@Composable
-private fun TemplatePreviewDialog(
-    template: ChecklistTemplate,
-    isCreating: Boolean,
-    onDismiss: () -> Unit,
-    onCreate: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(getIconBackgroundColor(template.category)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = getIconForTemplate(template.icon),
-                        contentDescription = null,
-                        tint = getIconColor(template.category),
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.width(AppDimens.SpacingMd))
-                Text(
-                    text = template.name,
-                    style = MaterialTheme.typography.titleLarge
-                )
-            }
-        },
-        text = {
-            Column {
-                Text(
-                    text = stringResource(Res.string.templates_preview_items, template.items.size),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
-
-                // Show preview items (max 5)
-                template.items.take(5).forEach { item ->
-                    Row(
-                        modifier = Modifier.padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(20.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            // Empty checkbox placeholder
-                        }
-                        Spacer(modifier = Modifier.width(AppDimens.SpacingSm))
-                        Text(
-                            text = item,
-                            style = MaterialTheme.typography.bodyMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-
-                // Show "and X more" if there are more items
-                if (template.items.size > 5) {
-                    Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
-                    Text(
-                        text = stringResource(Res.string.templates_and_more, template.items.size - 5),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = onCreate,
-                enabled = !isCreating
-            ) {
-                if (isCreating) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        strokeWidth = 2.dp
-                    )
-                    Spacer(modifier = Modifier.width(AppDimens.SpacingSm))
-                }
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(AppDimens.SpacingXs))
-                Text(stringResource(Res.string.templates_use_template))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(Res.string.cancel))
-            }
-        }
-    )
 }
 
 /**

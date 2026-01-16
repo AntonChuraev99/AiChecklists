@@ -8,6 +8,7 @@ import androidx.navigation.compose.rememberNavController
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavRoute
 import com.antonchuraev.homesearchchecklist.di.appModule
 import com.antonchuraev.homesearchchecklist.feature.create.presentation.create.CreateChecklistScreen
+import com.antonchuraev.homesearchchecklist.feature.create.presentation.preview.TemplatePreviewScreen
 import com.antonchuraev.homesearchchecklist.feature.create.presentation.templates.TemplatesScreen
 import com.antonchuraev.homesearchchecklist.feature.debug.presentation.DebugScreen
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.MainScreen
@@ -60,6 +61,11 @@ fun App() {
 
                 composable<AppNavRoute.CreateChecklistRoute.Templates> {
                     TemplatesScreen()
+                }
+
+                composable<AppNavRoute.CreateChecklistRoute.TemplatePreview> { backStackEntry ->
+                    val route = backStackEntry.toRoute<AppNavRoute.CreateChecklistRoute.TemplatePreview>()
+                    TemplatePreviewScreen(templateId = route.templateId)
                 }
 
                 /**
