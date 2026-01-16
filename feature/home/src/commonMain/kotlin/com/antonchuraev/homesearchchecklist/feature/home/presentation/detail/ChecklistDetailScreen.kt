@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
@@ -180,13 +181,20 @@ private fun ChecklistDetailContent(
                     )
                 }
 
-                // New fill button at the bottom
+                // New fill buttons at the bottom
                 item {
                     Spacer(modifier = Modifier.height(AppDimens.SpacingLg))
                     AppButtonSecondary(
                         text = stringResource(Res.string.checklist_new_fill),
                         onClick = { onIntent(ChecklistDetailIntent.OnAddFillClick) },
                         icon = Icons.Outlined.ContentCopy,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
+                    AppButtonSecondary(
+                        text = stringResource(Res.string.checklist_add_fill_ai),
+                        onClick = { onIntent(ChecklistDetailIntent.OnAddFillViaAiClick) },
+                        icon = Icons.Outlined.AutoAwesome,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
