@@ -70,6 +70,7 @@ import com.antonchuraev.homesearchchecklist.feature.create.domain.model.Checklis
 import com.antonchuraev.homesearchchecklist.feature.create.domain.model.TemplateCategory
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
+import androidx.compose.foundation.text.TextAutoSize
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -262,8 +263,8 @@ private fun TemplateCard(
 ) {
     Card(
         modifier = Modifier
-            .width(160.dp)
-            .height(140.dp)
+            .width(200.dp)
+            .height(180.dp)
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
@@ -321,7 +322,7 @@ private fun TemplateCard(
                 text = template.name,
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurface
             )
@@ -333,6 +334,7 @@ private fun TemplateCard(
                 text = template.description,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                autoSize = TextAutoSize.StepBased(),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
