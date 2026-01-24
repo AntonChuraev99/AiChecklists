@@ -1,7 +1,6 @@
 package com.antonchuraev.homesearchchecklist.feature.sharing.presentation.pdf
 
-import android.app.Application
-import android.graphics.Canvas
+import android.content.Context
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Typeface
@@ -16,7 +15,7 @@ import java.io.FileOutputStream
 
 actual class PdfGenerator : KoinComponent {
 
-    private val application: Application by inject()
+    private val context: Context by inject()
 
     actual suspend fun generatePdf(content: PdfContent, fileName: String): String? {
         return withContext(Dispatchers.IO) {
@@ -195,7 +194,7 @@ actual class PdfGenerator : KoinComponent {
                 }
 
                 // Save to cache directory
-                val cacheDir = File(application.cacheDir, "shared_pdfs").apply {
+                val cacheDir = File(context.cacheDir, "shared_pdfs").apply {
                     if (!exists()) mkdirs()
                 }
                 val file = File(cacheDir, "$fileName.pdf")
