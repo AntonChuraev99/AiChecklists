@@ -8,10 +8,12 @@ data class SubscriptionStatusState(
     val isLoading: Boolean = true,
     val subscriptionStatus: SubscriptionStatus = SubscriptionStatus.FREE,
     val formattedExpirationDate: String? = null,
-    val aiCredits: Int = 0
+    val aiCredits: Int = 0,
+    val showSuccessMessage: Boolean = false
 ) : State
 
 sealed interface SubscriptionStatusIntent : Intent {
     data object OnBackClick : SubscriptionStatusIntent
     data object OnManageSubscriptionClick : SubscriptionStatusIntent
+    data object DismissSuccessMessage : SubscriptionStatusIntent
 }

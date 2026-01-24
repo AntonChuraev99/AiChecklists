@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -16,8 +17,11 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -31,33 +35,66 @@ import aichecklists.core.designsystem.generated.resources.*
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonSecondary
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun SubscriptionStatusScreen(
+    showSuccessMessage: Boolean = false,
     viewModel: SubscriptionStatusViewModel = koinViewModel()
 ) {
     val state by viewModel.screenState.collectAsState()
+
+    // Handle success message: set from nav param and auto-dismiss after 3s
+    LaunchedEffect(showSuccessMessage, state.showSuccessMessage) {
+        if (showSuccessMessage && !state.showSuccessMessage) {
+            viewModel.setShowSuccessMessage(true)
+        } else if (state.showSuccessMessage) {
+            delay(3000)
+            viewModel.sendIntent(SubscriptionStatusIntent.DismissSuccessMessage)
+        }
+    }
 
     AppScaffold(
         title = stringResource(Res.string.subscription_status_title),
         onBackButtonClick = { viewModel.sendIntent(SubscriptionStatusIntent.OnBackClick) }
     ) {
-        if (state.isLoading) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator()
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (state.isLoading) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
+            } else {
+                SubscriptionStatusContent(
+                    formattedExpirationDate = state.formattedExpirationDate,
+                    aiCredits = state.aiCredits,
+                    isPremium = state.subscriptionStatus.isActive,
+                    onManageClick = { viewModel.sendIntent(SubscriptionStatusIntent.OnManageSubscriptionClick) }
+                )
             }
-        } else {
-            SubscriptionStatusContent(
-                formattedExpirationDate = state.formattedExpirationDate,
-                aiCredits = state.aiCredits,
-                isPremium = state.subscriptionStatus.isActive,
-                onManageClick = { viewModel.sendIntent(SubscriptionStatusIntent.OnManageSubscriptionClick) }
-            )
+
+            // Success snackbar
+            if (state.showSuccessMessage) {
+                Snackbar(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(AppDimens.SpacingLg)
+                        .navigationBarsPadding(),
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    action = {
+                        TextButton(onClick = { viewModel.sendIntent(SubscriptionStatusIntent.DismissSuccessMessage) }) {
+                            Text(stringResource(Res.string.ok))
+                        }
+                    }
+                ) {
+                    Text(stringResource(Res.string.subscription_purchase_success))
+                }
+            }
         }
     }
 }

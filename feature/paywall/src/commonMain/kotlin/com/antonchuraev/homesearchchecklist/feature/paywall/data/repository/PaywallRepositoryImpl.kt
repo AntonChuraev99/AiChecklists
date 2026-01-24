@@ -8,8 +8,11 @@ import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.Restore
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.SubscriptionStatus
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.repository.PaywallRepository
 import com.revenuecat.purchases.kmp.Purchases
+import com.revenuecat.purchases.kmp.PurchasesDelegate
+import com.revenuecat.purchases.kmp.models.PurchasesError
 import com.revenuecat.purchases.kmp.models.CustomerInfo
 import com.revenuecat.purchases.kmp.models.Package
+import com.revenuecat.purchases.kmp.models.StoreProduct
 import com.revenuecat.purchases.kmp.models.StoreTransaction
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,11 +26,38 @@ class PaywallRepositoryImpl : PaywallRepository {
     override val subscriptionStatus: Flow<SubscriptionStatus> = _subscriptionStatus.asStateFlow()
 
     private var cachedPackages: Map<String, Package> = emptyMap()
+    private var listenerRegistered = false
+
+    /**
+     * Set up listener for customer info changes.
+     * This is important for handling pending purchases that become active later.
+     * RevenueCat checks pending purchases on app start and notifies through this listener.
+     */
+    private fun setupCustomerInfoListener() {
+        if (listenerRegistered || !isConfigured()) return
+
+        Purchases.sharedInstance.delegate = object : PurchasesDelegate {
+            override fun onCustomerInfoUpdated(customerInfo: CustomerInfo) {
+                _subscriptionStatus.value = customerInfo.toSubscriptionStatus()
+            }
+
+            override fun onPurchasePromoProduct(
+                product: StoreProduct,
+                startPurchase: (onError: (error: PurchasesError, userCancelled: Boolean) -> Unit, onSuccess: (storeTransaction: StoreTransaction, customerInfo: CustomerInfo) -> Unit) -> Unit
+            ) {
+                // App Store promotional purchases - not needed for this app
+            }
+        }
+        listenerRegistered = true
+    }
 
     override suspend fun getOfferings(): Result<PaywallOffering?> {
         if (!isConfigured()) {
             return Result.failure(IllegalStateException("RevenueCat not configured"))
         }
+
+        // Ensure listener is set up for pending purchase updates
+        setupCustomerInfoListener()
 
         return suspendCancellableCoroutine { continuation ->
             Purchases.sharedInstance.getOfferings(
@@ -153,6 +183,9 @@ class PaywallRepositoryImpl : PaywallRepository {
 
     override suspend fun refreshSubscriptionStatus() {
         if (!isConfigured()) return
+
+        // Ensure listener is set up for pending purchase updates
+        setupCustomerInfoListener()
 
         suspendCancellableCoroutine { continuation ->
             Purchases.sharedInstance.getCustomerInfo(

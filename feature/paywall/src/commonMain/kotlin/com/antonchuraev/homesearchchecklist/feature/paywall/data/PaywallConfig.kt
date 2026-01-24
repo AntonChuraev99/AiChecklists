@@ -17,4 +17,7 @@ object PaywallConfig {
 
     // Default free trial days (fallback when RevenueCat doesn't return trial info)
     const val DEFAULT_FREE_TRIAL_DAYS = 3
+
+    // Support email
+    const val SUPPORT_EMAIL = "churaevanton@gmail.com"
 }

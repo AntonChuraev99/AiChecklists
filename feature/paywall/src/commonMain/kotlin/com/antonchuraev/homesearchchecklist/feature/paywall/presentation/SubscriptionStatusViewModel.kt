@@ -26,6 +26,10 @@ class SubscriptionStatusViewModel(
         observeData()
     }
 
+    fun setShowSuccessMessage(show: Boolean) {
+        _screenState.update { it.copy(showSuccessMessage = show) }
+    }
+
     override fun onIntent(intent: SubscriptionStatusIntent) {
         when (intent) {
             SubscriptionStatusIntent.OnBackClick -> navigator.onBack()
@@ -33,6 +37,9 @@ class SubscriptionStatusViewModel(
                 // TODO: Open platform-specific subscription management
                 // Android: Play Store subscriptions
                 // iOS: App Store subscriptions
+            }
+            SubscriptionStatusIntent.DismissSuccessMessage -> {
+                _screenState.update { it.copy(showSuccessMessage = false) }
             }
         }
     }
