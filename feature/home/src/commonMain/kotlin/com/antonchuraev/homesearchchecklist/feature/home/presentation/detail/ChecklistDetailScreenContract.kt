@@ -30,6 +30,7 @@ sealed interface ChecklistDetailIntent : Intent {
 
     // Checklist actions
     data object OnEditChecklistClick : ChecklistDetailIntent
+    data object OnShareClick : ChecklistDetailIntent
     data object OnDeleteChecklistClick : ChecklistDetailIntent
     data object OnConfirmDeleteChecklist : ChecklistDetailIntent
     data object OnDismissDeleteConfirmation : ChecklistDetailIntent

@@ -71,6 +71,10 @@ class ChecklistDetailViewModel(
                 navigator.navigateToEditChecklist(checklistId)
             }
 
+            ChecklistDetailIntent.OnShareClick -> {
+                navigator.navigateToShareChecklist(checklistId)
+            }
+
             ChecklistDetailIntent.OnDeleteChecklistClick -> {
                 updateContentState { it.copy(showDeleteConfirmation = true) }
             }

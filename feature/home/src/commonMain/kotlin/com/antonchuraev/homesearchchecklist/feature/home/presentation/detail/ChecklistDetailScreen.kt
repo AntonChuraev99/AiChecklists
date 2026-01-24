@@ -32,6 +32,7 @@ import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.NoteAdd
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
@@ -123,6 +124,9 @@ private fun ChecklistDetailContent(
         title = state.checklist.name,
         onBackButtonClick = { onIntent(ChecklistDetailIntent.OnBackClick) },
         actions = {
+            IconButton(onClick = { onIntent(ChecklistDetailIntent.OnShareClick) }) {
+                Icon(Icons.Outlined.Share, contentDescription = stringResource(Res.string.share))
+            }
             IconButton(onClick = { onIntent(ChecklistDetailIntent.OnEditChecklistClick) }) {
                 Icon(Icons.Outlined.Edit, contentDescription = stringResource(Res.string.checklist_edit))
             }
