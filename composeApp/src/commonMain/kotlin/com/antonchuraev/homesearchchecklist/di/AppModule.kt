@@ -12,6 +12,7 @@ import com.antonchuraev.homesearchchecklist.feature.splash.di.splashFeatureModul
 import com.antonchuraev.homesearchchecklist.feature.user.di.userFeatureModule
 import com.antonchuraev.homesearchchecklist.feature.analyze.di.analyzeFeatureModule
 import com.antonchuraev.homesearchchecklist.feature.paywall.di.paywallFeatureModule
+import com.antonchuraev.homesearchchecklist.feature.sharing.di.sharingFeatureModule
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.impl.di.remoteConfigModule
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.viewModelOf
@@ -31,6 +32,7 @@ val appModule = module {
         userFeatureModule,
         analyzeFeatureModule,
         paywallFeatureModule,
+        sharingFeatureModule,
         platformModule()
     )
     viewModelOf(::AppViewModel)

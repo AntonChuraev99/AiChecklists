@@ -89,5 +89,9 @@ class AppNavigatorImpl() : AppNavigator {
     override fun navigateToSubscriptionStatus() {
         navController.navigate(AppNavRoute.SubscriptionStatus)
     }
+
+    override fun navigateToShareChecklist(checklistId: Long) {
+        navController.navigate(AppNavRoute.ShareChecklist(checklistId))
+    }
 }
 

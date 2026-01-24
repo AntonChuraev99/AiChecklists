@@ -21,6 +21,7 @@ import com.antonchuraev.homesearchchecklist.feature.home.presentation.fill.FillD
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.fills.FillsListScreen
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.PaywallScreen
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.SubscriptionStatusScreen
+import com.antonchuraev.homesearchchecklist.feature.sharing.presentation.ShareScreen
 import androidx.navigation.toRoute
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.koin.compose.KoinApplication
@@ -107,6 +108,11 @@ fun App() {
 
                 composable<AppNavRoute.SubscriptionStatus> {
                     SubscriptionStatusScreen()
+                }
+
+                composable<AppNavRoute.ShareChecklist> { backStackEntry ->
+                    val route = backStackEntry.toRoute<AppNavRoute.ShareChecklist>()
+                    ShareScreen(checklistId = route.checklistId)
                 }
             }
         }

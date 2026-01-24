@@ -48,4 +48,7 @@ sealed interface AppNavRoute {
 
     @Serializable
     data object SubscriptionStatus : AppNavRoute
+
+    @Serializable
+    data class ShareChecklist(val checklistId: Long) : AppNavRoute
 }

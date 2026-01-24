@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- App -->
-    <string name="app_name">AI Checklists</string>
+    <string name="app_name">Gisti - AI Checklists</string>
 
     <!-- Common -->
     <string name="save">Save</string>
@@ -243,6 +243,18 @@
 
     <!-- Splash Screen -->
     <string name="splash_loading">Getting things ready...</string>
+
+    <!-- Share Screen -->
+    <string name="share">Share</string>
+    <string name="share_screen_title">Share Checklist</string>
+    <string name="share_select_format">Select format</string>
+    <string name="share_as_text">Plain Text</string>
+    <string name="share_as_text_description">Copy-friendly format for messages</string>
+    <string name="share_as_pdf">PDF Document</string>
+    <string name="share_as_pdf_description">Formatted document with checkboxes</string>
+    <string name="share_button">Share</string>
+    <string name="share_generating_pdf">Generating PDF...</string>
+    <string name="share_error">Failed to share</string>
 
     <!-- Debug Screen -->
     <string name="debug_title">Debug Menu</string>
