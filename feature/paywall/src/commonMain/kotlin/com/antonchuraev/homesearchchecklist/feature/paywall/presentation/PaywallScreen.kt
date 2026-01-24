@@ -188,7 +188,8 @@ fun PaywallScreen(
                 onSubscribe = { viewModel.sendIntent(PaywallIntent.Purchase) },
                 onRestore = { viewModel.sendIntent(PaywallIntent.RestorePurchases) },
                 onTermsClick = { uriHandler.openUri(PaywallConfig.TERMS_OF_USE_URL) },
-                onPrivacyClick = { uriHandler.openUri(PaywallConfig.PRIVACY_POLICY_URL) }
+                onPrivacyClick = { uriHandler.openUri(PaywallConfig.PRIVACY_POLICY_URL) },
+                onSupportClick = { uriHandler.openUri("mailto:${PaywallConfig.SUPPORT_EMAIL}") }
             )
         }
 
@@ -240,7 +241,8 @@ private fun PaywallPageContent(
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
         )
 
         Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
@@ -251,7 +253,7 @@ private fun PaywallPageContent(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
-            modifier = Modifier.padding(horizontal = AppDimens.SpacingLg)
+            modifier = Modifier.fillMaxWidth()
         )
 
         Spacer(modifier = Modifier.height(AppDimens.SpacingLg))
@@ -285,7 +287,8 @@ private fun SubscriptionCard(
     onSubscribe: () -> Unit,
     onRestore: () -> Unit,
     onTermsClick: () -> Unit,
-    onPrivacyClick: () -> Unit
+    onPrivacyClick: () -> Unit,
+    onSupportClick: () -> Unit
 ) {
     val primaryColor = MaterialTheme.colorScheme.primary
     val primaryContainerColor = MaterialTheme.colorScheme.primaryContainer
@@ -433,6 +436,21 @@ private fun SubscriptionCard(
             ) {
                 Text(
                     text = stringResource(Res.string.paywall_privacy),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Text(
+                text = "•",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            TextButton(
+                onClick = onSupportClick,
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = stringResource(Res.string.paywall_support),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
