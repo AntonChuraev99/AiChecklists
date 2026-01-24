@@ -309,9 +309,9 @@ feature/paywall/
     repository/          # PaywallRepository interface
     usecase/             # GetSubscriptionStatus, GetOfferings, Purchase, Restore, GetUserLimits
   data/
-    repository/          # PaywallRepositoryImpl
+    repository/          # PaywallRepositoryImpl (includes PurchasesDelegate for pending transactions)
     RevenueCatInitializer.kt  # Platform-specific init (expect/actual)
-    PaywallConfig.kt
+    PaywallConfig.kt     # Product IDs, URLs, support email
   presentation/
     PaywallScreen.kt     # Subscription purchase UI with pager
     PaywallViewModel.kt
@@ -421,38 +421,6 @@ Splash → Onboarding → Main
 
 ---
 
-## TODO
-
-### Настроить товары (In-App Products)
-
-Необходимо настроить подписки в Google Play Console и RevenueCat:
-
-1. **Google Play Console** ✅ DONE
-   - ✅ Создать подписку `premium_monthly` ($1.99/мес)
-   - ✅ Настроить 3-day free trial (`free-trial-3d`)
-   - ✅ Добавить base plan `monthly`
-
-2. **RevenueCat Dashboard** ✅ DONE
-   - ✅ Подключить Google Play credentials (Service Account JSON)
-   - ✅ Создать Product `premium_monthly:monthly`
-   - ✅ Привязать к Entitlement `AiChecklists Pro`
-   - ✅ Создать Offering `default` с пакетом `Monthly`
-
-3. **Код приложения**
-   - Проверить `PaywallConfig.kt` — ID продуктов
-   - Проверить `feature/paywall/` — интеграция
-
-См. документацию: `docs/SUBSCRIPTION_SETUP.md`
-
-### Добавить специальный оффер $0.99
-
-Создать introductory offer с ценой $0.99 для привлечения новых пользователей:
-- Google Play: добавить Offer с ценой $0.99 на первый месяц
-- App Store: добавить Promotional Offer $0.99
-- RevenueCat: настроить Offering с promotional package
-
----
-
 ## Unit-экономика подписки
 
 ### Ключевые параметры
@@ -468,7 +436,7 @@ Splash → Onboarding → Main
 
 | Параметр | Free | Premium |
 |----------|------|---------|
-| AI запросов/день | 10 | 100 |
+| AI запросов/день | 10 | 300 |
 | Max чек-листов | 3 | ∞ |
 | Max fills/чек-лист | 5 | ∞ |
 

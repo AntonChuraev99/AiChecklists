@@ -1,5 +1,14 @@
 # Claude Code TODO
 
+## Completed
+
+- [x] Text overflow fix in HorizontalPager (PaywallScreen, OnboardingScreen)
+- [x] PurchasesDelegate for pending transactions
+- [x] Support email button in MainScreen and PaywallScreen
+- [x] Success snackbar after purchase
+- [x] Navigation with showSuccessMessage param
+- [x] CLAUDE.md UI best practices documentation
+
 ## Planned Improvements
 
 ### UX Analysis Agent
@@ -12,14 +21,12 @@
   - Propose and implement UX improvements
   - Document findings in CLAUDE.md
 
-### Implementation Ideas
-- auto commit after edit
-- Agent could be triggered after successful build
-- Should analyze changed files to understand feature scope
-- Compare against UX guidelines in CLAUDE.md
-- Auto-generate UX improvement tasks
+### iOS Setup
+- [ ] Configure iOS subscription in App Store Connect
+- [ ] Add RevenueCat iOS API key
+- [ ] Test sandbox purchases on iOS
 
-### Priority
-High - this will ensure consistent UX quality across all new features
-
-
+### Future Features
+- [ ] $0.99 introductory offer
+- [ ] Referral program
+- [ ] Checklist sharing between users
