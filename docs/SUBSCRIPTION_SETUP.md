@@ -1,6 +1,6 @@
 # Subscription Setup Guide
 
-This guide explains how to set up the subscription product for AI Checklists app.
+This guide explains how to set up the subscription product for Gisti app.
 
 ## Product Configuration
 
@@ -19,7 +19,7 @@ This guide explains how to set up the subscription product for AI Checklists app
 ### Step 1: Create Subscription
 
 1. Go to [Google Play Console](https://play.google.com/console)
-2. Select your app: **AI Checklists**
+2. Select your app: **Gisti**
 3. Navigate to: **Monetize** → **Products** → **Subscriptions**
 4. Click **Create subscription**
 5. Fill in:
@@ -60,7 +60,7 @@ This guide explains how to set up the subscription product for AI Checklists app
 ### Step 1: Create Subscription Group
 
 1. Go to [App Store Connect](https://appstoreconnect.apple.com)
-2. Select your app: **AI Checklists**
+2. Select your app: **Gisti**
 3. Navigate to: **Features** → **Subscriptions**
 4. Click **Create** under "Subscription Groups"
 5. Enter group name: `Premium`
@@ -111,7 +111,7 @@ This guide explains how to set up the subscription product for AI Checklists app
 ### Step 1: Add Products
 
 1. Go to [RevenueCat Dashboard](https://app.revenuecat.com)
-2. Select your project: **AI Checklists**
+2. Select your project: **Gisti**
 3. Navigate to: **Products**
 4. Click **+ New**
 5. Configure:

@@ -54,6 +54,7 @@ kotlin {
             implementation(projects.feature.user)
             implementation(projects.feature.analyze)
             implementation(projects.feature.paywall)
+            implementation(projects.feature.sharing)
             
             implementation(compose.runtime)
             implementation(compose.foundation)
@@ -114,13 +115,19 @@ android {
     }
     signingConfigs {
         create("release") {
-            // For store release, you'll need to create a keystore:
-            // keytool -genkey -v -keystore release.keystore -alias aichecklists -keyalg RSA -keysize 2048 -validity 10000
-            // Then uncomment and configure these lines:
-            // storeFile = file("release.keystore")
-            // storePassword = System.getenv("KEYSTORE_PASSWORD") ?: ""
-            // keyAlias = "aichecklists"
-            // keyPassword = System.getenv("KEY_PASSWORD") ?: ""
+            val localProperties = project.rootProject.file("local.properties")
+            val properties = Properties()
+            if (localProperties.exists()) {
+                properties.load(localProperties.inputStream())
+            }
+
+            val keystorePath = properties.getProperty("KEYSTORE_FILE", "")
+            if (keystorePath.isNotEmpty()) {
+                storeFile = file(keystorePath)
+                storePassword = properties.getProperty("KEYSTORE_PASSWORD", "")
+                keyAlias = properties.getProperty("KEY_ALIAS", "gisti")
+                keyPassword = properties.getProperty("KEY_PASSWORD", "")
+            }
         }
     }
     buildTypes {
@@ -131,7 +138,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // signingConfig = signingConfigs.getByName("release")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {
