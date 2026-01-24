@@ -4,13 +4,38 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-AI Checklists is a Kotlin Multiplatform (KMP) application targeting Android and iOS. It uses Jetpack Compose Multiplatform for the UI layer. The app helps users create smart checklists powered by AI - paste text, upload files, or share links and AI extracts the key points automatically.
+**Gisti - AI Checklists** is a Kotlin Multiplatform (KMP) application for Android and iOS. Built with Jetpack Compose Multiplatform.
 
-**Main features:**
-- Creating and managing checklists
-- Tracking progress within checklists
-- Creating checklists from templates
-- AI-powered automatic checklist generation from uploaded data (photos, PDFs, text files, web links, or pasted text)
+### Product Concept
+
+Gisti transforms any content into actionable checklists using AI. The app has **three core AI-powered features**:
+
+| Feature | Description | Input Formats |
+|---------|-------------|---------------|
+| **1. Create via AI** | Generate a new checklist from any content | Photo, PDF, Text, Link, Voice |
+| **2. Fill via AI** | Auto-fill an existing checklist based on new content | Photo, PDF, Text, Link, Voice |
+| **3. Export** | Share your checklist in convenient formats | PDF, Plain Text |
+
+### Use Cases
+
+- **Home buyer**: Create a checklist "Apartment Inspection", then fill it via AI for each property visited (photo of listing → auto-checked items)
+- **Student**: Create a checklist from syllabus PDF, fill progress from lecture notes
+- **Project manager**: Generate task list from meeting recording, export as PDF for team
+
+### Key Value Proposition
+
+> "Get the gist of anything — turn chaos into a clear checklist"
+
+- **Any input** → Photo, PDF, text, web link, voice recording
+- **AI extracts** → Key points, action items, requirements
+- **You check off** → Track progress across multiple "fills"
+- **Share results** → Export as PDF or text
+
+### Business Model
+
+- **Free tier**: Limited checklists and fills, daily AI credits
+- **Premium** ($1.99/mo): Unlimited checklists/fills, 300 AI credits daily, priority support
+- 3-day free trial for new users
 
 ## Build Commands
 
@@ -27,346 +52,351 @@ For iOS, open `iosApp/iosApp.xcodeproj` in Xcode.
 
 ### Module Structure
 
-The project follows a modular architecture with API/impl separation for core modules:
+The project follows a modular architecture with API/impl separation:
 
 ```
-composeApp/          # Main application entry points (Android/iOS)
+composeApp/              # Main application entry points (Android/iOS)
+
 core/
-  common/api         # AppViewModel base class, AppDispatchersProvider, AppLogger interfaces
-  common/impl        # Platform-specific implementations
-  designsystem/      # Compose theme and reusable UI components
-  datastore/api|impl # Preferences persistence abstraction
-  navigation/api|impl # AppNavigator and AppNavRoute definitions
+  common/api|impl        # AppViewModel, AppDispatchersProvider, AppLogger
+  designsystem/          # Compose theme and reusable UI components
+  datastore/api|impl     # Preferences persistence
+  navigation/api|impl    # AppNavigator and AppNavRoute definitions
+  remoteconfig/api|impl  # Firebase Remote Config abstraction
+
 feature/
-  checklist/         # Domain models, Room database, repository
-  create/            # Create checklist screen
-  home/              # Main screen
-  onboarding/        # First-run experience
-  splash/            # Launch screen
-  debug/             # Developer tools
-  user/              # User profile
-  analyze/           # AI-powered data analysis and checklist generation
+  checklist/             # Domain models, Room database, repository
+  create/                # Create checklist + templates screens
+  home/                  # Main screen, checklist detail, fills
+  onboarding/            # First-run experience
+  splash/                # Launch screen
+  analyze/               # AI-powered analysis (Gemini integration)
+  paywall/               # Subscriptions (RevenueCat)
+  sharing/               # Export checklists (text/PDF)
+  user/                  # User profile, device ID
+  debug/                 # Developer tools
 ```
 
 ### MVI Pattern
 
-ViewModels extend `AppViewModel<State, Intent, SideEffect>` from `core:common:api`. Each feature screen follows this pattern:
+ViewModels extend `AppViewModel<State, Intent, SideEffect>` from `core:common:api`:
 
 - `*ScreenContract.kt` - defines `State` and `Intent` sealed interfaces
 - `*ViewModel.kt` - extends `AppViewModel`, implements `onIntent()`
-- `*Screen.kt` - Composable that observes `screenState` and calls `sendIntent()`
+- `*Screen.kt` - Composable observing `screenState`, calls `sendIntent()`
 
 ### Dependency Injection
 
-Uses Koin 4.1. Each module defines its own Koin module, aggregated in `appModule`. ViewModels are injected via `koinViewModel()`.
+Uses Koin 4.1. Each module defines its own Koin module, aggregated in `appModule`. ViewModels injected via `koinViewModel()`.
 
 ### Navigation
 
-Type-safe navigation using Kotlinx Serialization. Routes are defined as `@Serializable` objects implementing `AppNavRoute` in `core:navigation:api`. `AppNavigator` interface handles navigation actions.
+Type-safe navigation using Kotlinx Serialization. Routes defined as `@Serializable` objects implementing `AppNavRoute`:
+
+```kotlin
+// Main routes
+Splash, Onboarding, Main, Debug
+
+// Checklist routes
+ChecklistDetail(checklistId), FillDetail(fillId), FillsList(checklistId)
+
+// Create routes
+CreateChecklistRoute.CreateChecklist(templateId?, editChecklistId?)
+CreateChecklistRoute.Templates
+CreateChecklistRoute.TemplatePreview(templateId)
+
+// Feature routes
+Analyze(checklistId?), AnalyzeResultPreview
+Paywall, SubscriptionStatus
+ShareChecklist(checklistId)
+```
 
 ### Database
 
-Room 2.8 with KSP for code generation. Database classes are in `feature:checklist`. Platform-specific `DatabaseBuilder` implementations use `expect/actual` pattern.
+Room 2.8 with KSP. Database classes in `feature:checklist`. Platform-specific `DatabaseBuilder` uses `expect/actual`.
 
 ## Design System
 
 Located in `core/designsystem/`. Style: **Minimal & Clean** with white background and blue accents.
 
 ### Colors (theme/Color.kt)
-- **Primary**: Blue (#2196F3) - buttons, icons, accents
+- **Primary**: Blue (#2196F3)
 - **Background/Surface**: White (#FFFFFF)
 - **Text Primary**: Gray900 (#212121)
 - **Text Secondary**: Gray600 (#757575)
-- **Outline/Dividers**: Gray300 (#E0E0E0)
+- **Outline**: Gray300 (#E0E0E0)
 
 ### Spacing (theme/Dimens.kt)
-Use `AppDimens` constants: `SpacingXs` (4dp), `SpacingSm` (8dp), `SpacingMd` (12dp), `SpacingLg` (16dp), `SpacingXl` (24dp), `SpacingXxl` (32dp). Screen padding: 16dp horizontal, 24dp vertical.
+`AppDimens` constants: `SpacingXs` (4dp), `SpacingSm` (8dp), `SpacingMd` (12dp), `SpacingLg` (16dp), `SpacingXl` (24dp), `SpacingXxl` (32dp).
 
-### Components (components/)
-- `AppButton` / `AppButtonSecondary` / `AppButtonText` - styled buttons
-- `AppCard` - card with subtle shadow (12dp corners, 2dp elevation)
+### Components
+- `AppButton` / `AppButtonSecondary` / `AppButtonText`
+- `AppCard` - 12dp corners, 2dp elevation
 - `AppTextField` - outlined text field
 - `EmptyState` - centered icon + title + description
-- `AppScaffold` - standard screen wrapper with top bar
-
-### Usage
-Wrap app in `AppTheme { }` (see App.kt). Use `MaterialTheme.colorScheme`, `MaterialTheme.typography`, and `AppDimens` for consistent styling.
+- `AppScaffold` - screen wrapper with top bar
 
 ## Key Patterns
 
 - **API/impl split**: Core modules expose interfaces in `api`, implementations in `impl`
-- **expect/actual**: Used for platform-specific code (logging, database builders)
-- **StateFlow**: All reactive state management uses Kotlin Flow
-- **Typesafe project accessors**: Reference modules as `projects.core.common.api` in Gradle
+- **expect/actual**: Platform-specific code (logging, database, file pickers, audio)
+- **StateFlow**: All reactive state management
+- **Typesafe project accessors**: Reference modules as `projects.core.common.api`
 
-## AI Analyze Feature
+## Feature: AI Analyze
 
-Located in `feature/analyze/`. Allows users to input data (photo, PDF, text file, web link, or raw text) for AI analysis that generates checklist items automatically.
+Located in `feature/analyze/`. Generates checklist items from various inputs using Gemini AI.
 
 ### Architecture
 
 ```
 feature/analyze/
   domain/
-    model/             # AnalyzeInputData (sealed interface), AnalyzeResult
-    analyzer/          # AiAnalyzer interface
-    repository/        # AnalyzeRepository interface
+    model/               # AnalyzeInputData, AnalyzeResult, AnalyzeResultHolder
+    analyzer/            # AiAnalyzer interface
+    repository/          # AnalyzeRepository interface
   data/
-    analyzer/          # StubAiAnalyzer (mock implementation)
-    repository/        # AnalyzeRepositoryImpl
+    analyzer/            # GeminiAiAnalyzer (production), StubAiAnalyzer (mock)
+    config/              # GeminiConfig, ApiKeyProvider
+    remote/              # FirebaseAiService
+    repository/          # AnalyzeRepositoryImpl
+    util/                # FileReader
   presentation/
-    AnalyzeScreen.kt   # UI for input selection and analysis
+    AnalyzeScreen.kt     # Input selection UI
     AnalyzeViewModel.kt
-    AnalyzeScreenContract.kt
-    picker/            # Platform-specific file picker (expect/actual)
+    picker/              # FilePicker (expect/actual)
+    recorder/            # AudioRecorder, AudioPlayer (expect/actual)
+    preview/             # AnalyzeResultPreviewScreen
   di/
     AnalyzeFeatureModule.kt
 ```
 
 ### Input Types (AnalyzeInputData)
-- `Photo` - Image file path
-- `PdfDocument` - PDF file path
-- `TextFile` - Text file path
-- `WebLink` - URL to analyze
-- `RawText` - User-entered text
+- `Photo` - Image analysis
+- `PdfDocument` - PDF extraction
+- `TextFile` - Text file parsing
+- `WebLink` - URL content analysis
+- `RawText` - Direct text input
+- `VoiceRecording` - Audio transcription
 
-### AI Analyzer Interface
-`AiAnalyzer` defines the contract for AI analysis. Currently uses `StubAiAnalyzer` that returns mock data. To implement real AI:
-1. Create new class implementing `AiAnalyzer`
-2. Replace binding in `analyzeFeatureModule`
+### Gemini Integration
+`GeminiAiAnalyzer` uses the Generative AI SDK. API key provided via `GeminiConfig` injected from app module. Results displayed in `AnalyzeResultPreviewScreen`.
 
-### Integration
-- Access via "AI Analysis" button on MainScreen
-- Results can create new checklist or add items to existing one
+## Feature: Templates
 
-## Templates Feature
+Located in `feature/create/`. Pre-defined checklist templates from Firebase Remote Config.
 
-Located in `feature/create/`. Allows users to create checklists from pre-defined templates fetched from Firebase Remote Config.
+### Template Model
+```kotlin
+@Serializable
+data class ChecklistTemplate(
+    val id: String,
+    val name: String,
+    val icon: String,        // Material icon name
+    val category: String,
+    val items: List<String>
+)
+```
+
+### Flow
+1. User opens Templates screen
+2. Categories displayed with horizontal scrolling cards
+3. Tap card → TemplatePreviewScreen (full-screen preview)
+4. "Use Template" → creates checklist, navigates to detail
+
+### Remote Config
+- Key: `templates_json`
+- Falls back to default templates if unavailable
+
+## Feature: Paywall
+
+Located in `feature/paywall/`. Premium subscriptions via RevenueCat.
 
 ### Architecture
 
 ```
-feature/create/
+feature/paywall/
   domain/
-    model/
-      ChecklistTemplate.kt    # Template model, TemplatesConfig, TemplateCategory
-    repository/
-      TemplatesRepository.kt  # Interface for fetching templates
+    model/               # SubscriptionStatus, PurchaseResult, UserLimits, PaywallProduct
+    repository/          # PaywallRepository interface
+    usecase/             # GetSubscriptionStatus, GetOfferings, Purchase, Restore, GetUserLimits
   data/
-    repository/
-      TemplatesRepositoryImpl.kt  # Fetches from Remote Config with fallback defaults
+    repository/          # PaywallRepositoryImpl
+    RevenueCatInitializer.kt  # Platform-specific init (expect/actual)
+    PaywallConfig.kt
   presentation/
-    templates/
-      TemplatesScreen.kt      # UI with category sections and template cards
-      TemplatesViewModel.kt   # Loads templates, handles selection
-      TemplatesScreenContract.kt  # State and Intents
+    PaywallScreen.kt     # Subscription purchase UI with pager
+    PaywallViewModel.kt
+    SubscriptionStatusScreen.kt  # Current subscription info
+    DateFormatter.kt     # Platform-specific date formatting
+  di/
+    PaywallFeatureModule.kt
 ```
 
-### Template Data Model
+### User Limits
+Free users have limits on checklists and fills per checklist. Premium users have unlimited access.
+
 ```kotlin
-@Serializable
-data class ChecklistTemplate(
-    val id: String,           // Unique identifier
-    val name: String,         // Display name
-    val icon: String,         // Material icon name (e.g., "apartment", "home")
-    val category: String,     // Category ID for grouping
-    val items: List<String>   // Checklist item texts
+data class UserLimits(
+    val maxChecklists: Int,
+    val maxFillsPerChecklist: Int,
+    val currentChecklistCount: Int,
+    val isPremium: Boolean
 )
 ```
 
-### Remote Config Integration
-- Templates JSON stored in `templates_json` Remote Config key
-- Falls back to default templates if Remote Config is empty or fails
-- JSON format: `{ "templates": [...] }`
-- Example JSON in `firebase-config/templates.json`
+## Feature: Sharing
 
-### Adding New Templates
-1. Edit `firebase-config/templates.json` with new template
-2. Upload to Firebase Remote Config using `scripts/firebase_remote_config.py`
-3. Or add to default templates in `TemplatesRepositoryImpl.getDefaultTemplates()`
+Located in `feature/sharing/`. Export checklists to share with others.
 
-### Supported Icons
-The following Material Icons are supported in templates:
-- `apartment`, `home`, `luggage`, `flight_takeoff`
-- `shopping_cart`, `groups`, `rocket_launch`
-- `celebration`, `local_shipping`, `medical_services`, `cleaning_services`
+### Formats
+- `ShareFormat.Text` - Plain text list
+- `ShareFormat.Pdf` - PDF document
 
-### Default Categories
-- Real Estate, Travel, Shopping, Work & Productivity
-- Events & Planning, Health & Wellness, Home & Garden
+### Architecture
+```
+feature/sharing/
+  domain/
+    model/               # ShareFormat
+    formatter/           # ChecklistFormatter
+  presentation/
+    ShareScreen.kt       # Format selection UI
+    share/               # ShareLauncher (expect/actual)
+    pdf/                 # PdfGenerator (expect/actual)
+  di/
+    SharingFeatureModule.kt
+```
 
-### User Flow
-1. User taps "Templates" on MainScreen
-2. Templates screen shows categories with horizontal scrolling cards
-3. User taps a template card to see preview dialog
-4. Preview shows template name, icon, and first 5 items
-5. User taps "Use Template" to create checklist
-6. Navigates to checklist detail screen with new checklist
+## Localization
 
-## Localization & String Resources
+Strings in `core/designsystem/src/commonMain/composeResources/values/strings.xml`.
 
-All user-facing strings are externalized to `core/designsystem/src/commonMain/composeResources/values/strings.xml`. Use `stringResource(Res.string.key_name)` from `org.jetbrains.compose.resources` package.
+```kotlin
+import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
-### Adding New Strings
-1. Add entry to `strings.xml` with descriptive key
-2. Import: `import aichecklists.core.designsystem.generated.resources.Res`
-3. Import: `import aichecklists.core.designsystem.generated.resources.*`
-4. Import: `import org.jetbrains.compose.resources.stringResource`
-5. Use: `stringResource(Res.string.your_key)`
+// Usage
+stringResource(Res.string.your_key)
+```
 
-### String Naming Convention
-- Prefix with screen name: `main_`, `create_`, `analyze_`, `onboarding_`
-- Common strings use generic names: `save`, `cancel`, `ok`, `error`
-- Use snake_case: `main_empty_description`
+### Naming Convention
+- Prefix with screen: `main_`, `create_`, `analyze_`, `paywall_`
+- Common: `save`, `cancel`, `ok`, `error`
+- Use snake_case
 
 ## Dependencies
 
-Versions are centralized in `gradle/libs.versions.toml`. Key dependencies:
-- Kotlin 2.3.0, Compose Multiplatform 1.9.3
-- Koin 4.1.1 (DI), Room 2.8.4 (database), Navigation Compose 2.9.1
+Versions in `gradle/libs.versions.toml`:
 
-## UX Research Findings
+| Dependency | Version | Purpose |
+|------------|---------|---------|
+| Kotlin | 2.3.0 | Language |
+| Compose Multiplatform | 1.9.3 | UI Framework |
+| Koin | 4.1.1 | Dependency Injection |
+| Room | 2.8.4 | Database |
+| Navigation Compose | 2.9.1 | Navigation |
+| RevenueCat | 2.2.17 | Subscriptions |
+| Firebase BOM | 33.7.0 | Analytics, Crashlytics, Remote Config |
+| Ktor | 3.0.3 | HTTP Client |
+| Generative AI KMP | 0.9.0 | Gemini AI |
 
-### Navigation Flow
+## Navigation Flow
+
 ```
-Splash → Onboarding → Main (Home) ↔ [Create, Templates, Analyze, Debug]
-                                           ↓
-                                    Checklist Detail
+Splash → Onboarding → Main
+                        ├─→ ChecklistDetail → FillDetail
+                        │                   → FillsList
+                        │                   → ShareChecklist
+                        ├─→ Templates → TemplatePreview
+                        ├─→ CreateChecklist
+                        ├─→ Analyze → AnalyzeResultPreview
+                        ├─→ Paywall
+                        ├─→ SubscriptionStatus
+                        └─→ Debug
 ```
 
-### Screen-by-Screen Analysis
+## Copy Guidelines
 
-#### Splash Screen
-- Clean loading with progress indicator
-- Clear branding with app title
+### Tone
+- Simple, clear, benefit-focused
+- Action-oriented button labels
+- No jargon
 
-#### Onboarding Screen
-- Good value proposition communication
-- Single clear CTA ("Get Started" button)
-- Proper spacing hierarchy
-
-#### Main Screen (Home)
-**Empty State**: Shows icon, title, description, dual CTAs (Create + AI Analyze)
-**Success State**: Lists checklists as simple cards
-
-**Issues Identified**:
-- Checklist cards show only name - missing item count, progress, timestamps
-- Cards lack visual feedback for clickability
-- Duplicate CTAs in empty state AND bottom bar
-
-#### Create Checklist Screen
-- Title input + items list + save button
-- Dialog for adding items
-
-**Issues Identified**:
-- No edit/delete UI for items (only add)
-- No validation feedback for empty inputs
-- Items displayed without checkboxes or delete buttons
-
-#### Analyze Screen
-- 5 input type cards (Photo, PDF, Text File, Web Link, Raw Text)
-- Context-sensitive input area
-- Loading state with spinner
-- Result dialog with item list
-
-**Issues Identified**:
-- Result preview limited to 5 items without scroll
-
-### Critical UX Issues
-
-1. **Missing Interactivity**: Checklist cards appear clickable but navigation not implemented
-2. **Incomplete Item Management**: Create screen lacks edit/delete actions for items
-3. **No Input Validation**: Empty checklist names allowed without feedback
-4. **Redundant UI**: Duplicate Create/Analyze buttons in multiple locations
-5. **Limited Data Display**: Checklists show only names without counts or progress
-
-### Recommended Improvements
-
-1. **Enhance Checklist Cards**:
-   - Add item count badge
-   - Show completion progress indicator
-   - Add timestamps or last-modified dates
-   - Make cards visually clickable (chevron indicator)
-
-2. **Improve Create Screen**:
-   - Add swipe-to-delete or delete buttons for items
-   - Add inline edit capability
-   - Show validation errors
-   - Add item reordering via drag handles
-
-3. **Streamline Navigation**:
-   - Remove duplicate CTAs - keep only in bottom bar
-   - Add proper back stack management
-   - Add confirmation dialogs for destructive actions
-
-4. **Visual Enhancements**:
-   - Add checkboxes to item cards
-   - Show progress bars on checklist cards
-   - Add empty state animations
-   - Improve loading states with skeletons
-
-5. **Accessibility**:
-   - Add content descriptions to all icons
-   - Ensure 48dp minimum touch targets
-   - Verify color contrast ratios
-
-## Product Copy Guidelines
-
-### Target Audience
-Anyone who needs to create structured checklists from unstructured data. Users may have meeting notes, articles, requirements documents, or any text that needs to be converted into actionable checklist items.
-
-### Core Value Proposition
-1. **AI-powered extraction** - paste any text and get a structured checklist
-2. **Multiple input formats** - photos, PDFs, text files, web links, or raw text
-3. **Track progress** - manage and complete checklist items
-
-### Copy Principles
-- **Simple & Clear**: Match the minimal design with concise language
-- **Benefit-focused**: Tell users what they gain, not just what the feature does
-- **Action-oriented**: Use active verbs for buttons (Create, Analyze, Save)
-- **Helpful empty states**: Guide users to the next action when content is missing
-- **No jargon**: Avoid technical terms; use everyday language
-
-### Tone of Voice
-- Friendly but professional
-- Encouraging (motivate users to try AI analysis)
-- No exclamation marks except in empty states
-
-### Button Label Guidelines
+### Button Labels
 | Do | Don't |
-|----|----|
+|----|-------|
 | Create Checklist | Add New |
-| AI Analysis | AI Analyze |
+| Fill via AI | AI Analyze |
 | Save | Submit |
 | Get Started | Continue |
 
-### Implemented UX Improvements (January 2026)
+---
 
-1. **Enhanced Checklist Cards** (`MainScreenContent.kt`):
-   - Added progress bar showing completion status (checked/total items)
-   - Added item count display (e.g., "3/5")
-   - Added chevron icon indicating card is clickable
-   - Shows "No elements" text for empty checklists
+## TODO
 
-2. **Streamlined CTA Buttons** (`MainScreen.kt`, `MainScreenContent.kt`):
-   - Removed duplicate Create/Analyze buttons from empty state
-   - Bottom bar now shows consistently for both empty and non-empty states
-   - Single source of truth for action buttons
+### Настроить товары (In-App Products)
 
-3. **Item Management in Create Screen** (`CreateChecklistScreen.kt`):
-   - Added delete button (X icon) to each checklist item
-   - Users can now remove items they've added
+Необходимо настроить подписки в Google Play Console и RevenueCat:
 
-4. **Input Validation** (`CreateChecklistViewModel.kt`, `CreateChecklistScreenContract.kt`):
-   - Added `nameError` field to state
-   - Validates checklist name is not blank before saving
-   - Shows inline error message on text field when validation fails
-   - Clears error when user starts typing
+1. **Google Play Console** ✅ DONE
+   - ✅ Создать подписку `premium_monthly` ($1.99/мес)
+   - ✅ Настроить 3-day free trial (`free-trial-3d`)
+   - ✅ Добавить base plan `monthly`
 
-5. **Templates Feature** (`feature/create/presentation/templates/`):
-   - Fetches templates from Firebase Remote Config
-   - Groups templates by category (Real Estate, Travel, Shopping, etc.)
-   - Horizontal scrolling cards for each category
-   - Preview dialog shows template details before creating
-   - Falls back to default templates when offline
-   - 11 default templates covering common use cases
+2. **RevenueCat Dashboard** ✅ DONE
+   - ✅ Подключить Google Play credentials (Service Account JSON)
+   - ✅ Создать Product `premium_monthly:monthly`
+   - ✅ Привязать к Entitlement `AiChecklists Pro`
+   - ✅ Создать Offering `default` с пакетом `Monthly`
+
+3. **Код приложения**
+   - Проверить `PaywallConfig.kt` — ID продуктов
+   - Проверить `feature/paywall/` — интеграция
+
+См. документацию: `docs/SUBSCRIPTION_SETUP.md`
+
+### Добавить специальный оффер $0.99
+
+Создать introductory offer с ценой $0.99 для привлечения новых пользователей:
+- Google Play: добавить Offer с ценой $0.99 на первый месяц
+- App Store: добавить Promotional Offer $0.99
+- RevenueCat: настроить Offering с promotional package
+
+---
+
+## Unit-экономика подписки
+
+### Ключевые параметры
+
+| Параметр | Значение |
+|----------|----------|
+| Цена подписки | $1.99/мес |
+| Комиссия Google (Small Business) | 15% |
+| Чистый доход | $1.69/мес |
+| AI модель | gemini-1.5-flash (в коде) |
+
+### Лимиты (Remote Config)
+
+| Параметр | Free | Premium |
+|----------|------|---------|
+| AI запросов/день | 10 | 100 |
+| Max чек-листов | 3 | ∞ |
+| Max fills/чек-лист | 5 | ∞ |
+
+### Себестоимость AI
+
+Расчёт на основе gemini-2.0-flash (консервативная оценка):
+- Input: $0.10/1M tokens
+- Output: $0.40/1M tokens
+- **~$0.0002 за запрос** (5,000 запросов на $1)
+
+### Сценарии прибыльности
+
+| Использование | Себестоимость AI | Прибыль | Маржа |
+|---------------|------------------|---------|-------|
+| 100 req/день (MAX) | $0.60/мес | $1.09 | 65% |
+| 30 req/день (средний) | $0.18/мес | $1.51 | 89% |
+| 10 req/день (лёгкий) | $0.06/мес | $1.63 | 96% |
+
+**Вывод:** Unit-экономика положительная даже при максимальном использовании
