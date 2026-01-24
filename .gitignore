@@ -31,3 +31,30 @@ release.keystore
 
 # Firebase service account (NEVER commit!)
 *firebase-adminsdk*.json
+
+# Google Service Account keys (NEVER commit!)
+*-service-account*.json
+*serviceaccount*.json
+service-account*.json
+aichecklists-*.json
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# Python virtual environment
+venv/
+__pycache__/
+*.pyc
+
+# Release builds (signed APKs/AABs)
+composeApp/release/
+
+# Firebase hosting build
+hosting/public/
+
+# Temp images in root (move to proper location)
+*.png
+!composeApp/**/*.png
+!iosApp/**/*.png
+!core/**/*.png
+!feature/**/*.png

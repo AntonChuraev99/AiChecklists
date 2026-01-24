@@ -174,15 +174,15 @@ This guide explains how to set up the subscription product for Gisti app.
 
 ## 5. Verification Checklist
 
-- [ ] Google Play subscription created with product ID `premium_monthly`
-- [ ] Google Play base plan has correct price ($1.99)
-- [ ] Google Play free trial offer configured (3 days)
+- [x] Google Play subscription created with product ID `premium_monthly`
+- [x] Google Play base plan has correct price ($1.99)
+- [x] Google Play free trial offer configured (3 days)
 - [ ] App Store subscription created with product ID `premium_monthly`
 - [ ] App Store subscription price set ($1.99 / Tier 2)
 - [ ] App Store introductory offer configured (3 days free)
-- [ ] RevenueCat product added with correct store IDs
-- [ ] RevenueCat `premium` entitlement attached to product
-- [ ] RevenueCat `default` offering contains the package
+- [x] RevenueCat product added with correct store IDs
+- [x] RevenueCat `premium` entitlement attached to product
+- [x] RevenueCat `default` offering contains the package
 - [ ] Sandbox testing successful on both platforms
 
 ---

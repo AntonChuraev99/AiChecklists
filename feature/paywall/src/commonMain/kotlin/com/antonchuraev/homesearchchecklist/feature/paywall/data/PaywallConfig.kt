@@ -1,9 +1,9 @@
 package com.antonchuraev.homesearchchecklist.feature.paywall.data
 
 object PaywallConfig {
-    // RevenueCat API keys (test key works for both platforms)
-    const val ANDROID_API_KEY = "test_BpmLKytcnMzPKqqsltbfcyVgFIH"
-    const val IOS_API_KEY = "test_BpmLKytcnMzPKqqsltbfcyVgFIH"
+    // RevenueCat API keys
+    const val ANDROID_API_KEY = "goog_tpOemOyrsIGCbUGnmCWVeRhRZUT"
+    const val IOS_API_KEY = "" // TODO: Add iOS key when App Store is configured
 
     // Offering identifier (configure in RevenueCat dashboard)
     const val DEFAULT_OFFERING_ID = "default"

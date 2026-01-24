@@ -9,19 +9,11 @@ import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.Purch
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.RestorePurchasesUseCase
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.PaywallViewModel
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.SubscriptionStatusViewModel
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
 
 val paywallFeatureModule = module {
-    // Repository
-    single<PaywallRepository> {
-        PaywallRepositoryImpl(
-            scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-        )
-    }
+    single<PaywallRepository> { PaywallRepositoryImpl() }
 
     // Use cases
     factory { GetSubscriptionStatusUseCase(get()) }
