@@ -106,8 +106,9 @@ fun App() {
                     PaywallScreen()
                 }
 
-                composable<AppNavRoute.SubscriptionStatus> {
-                    SubscriptionStatusScreen()
+                composable<AppNavRoute.SubscriptionStatus> { backStackEntry ->
+                    val route = backStackEntry.toRoute<AppNavRoute.SubscriptionStatus>()
+                    SubscriptionStatusScreen(showSuccessMessage = route.showSuccessMessage)
                 }
 
                 composable<AppNavRoute.ShareChecklist> { backStackEntry ->
