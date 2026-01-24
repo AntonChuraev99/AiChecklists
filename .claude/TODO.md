@@ -27,6 +27,40 @@
 - [ ] Test sandbox purchases on iOS
 
 ### Future Features
-- [ ] $0.99 introductory offer
 - [ ] Referral program
 - [ ] Checklist sharing between users
+
+### Store Promotions
+
+#### Annual Subscription Promo (30% margin guaranteed)
+
+**Расчёт цены:**
+| Параметр | Значение |
+|----------|----------|
+| Месячная цена | $1.99 |
+| Годовая без скидки | $23.88 |
+| Комиссия Google | 15% |
+| Себестоимость AI (max) | $7.20/год |
+| **Целевая маржа** | **≥30%** |
+
+**Формула:** `(Цена × 0.85 - Себестоимость) / Цена ≥ 30%`
+
+**Результат:**
+| Параметр | Значение |
+|----------|----------|
+| **Годовая цена** | **$12.99** |
+| Скидка | 45% |
+| Эквивалент в месяц | $1.08/мес |
+| Чистый доход | $11.04/год |
+| Маржа (max usage) | 31% |
+| Маржа (avg usage) | 72% |
+
+**TODO:**
+- [ ] Создать годовую подписку в Google Play Console
+  - Product ID: `premium_annual`
+  - Base plan: `annual`
+  - Цена: $12.99/год
+- [ ] Создать в App Store Connect
+- [ ] Добавить в RevenueCat Offering
+- [ ] Обновить PaywallScreen с выбором плана
+- [ ] Маркетинг: "Save 45% with annual plan!"
