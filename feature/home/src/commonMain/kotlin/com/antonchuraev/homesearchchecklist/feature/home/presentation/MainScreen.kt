@@ -14,7 +14,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
@@ -32,15 +35,29 @@ import aichecklists.core.designsystem.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
+private const val SUPPORT_EMAIL = "churaevanton@gmail.com"
+
 @Composable
 fun MainScreen(
     viewModel: MainScreenViewModel = koinViewModel(),
 ) {
     val screenState: MainScreenState by viewModel.screenState.collectAsStateWithLifecycle()
+    val uriHandler = LocalUriHandler.current
 
     AppScaffold(
         title = "",
         actions = {
+            // Support button
+            IconButton(
+                onClick = { uriHandler.openUri("mailto:$SUPPORT_EMAIL") }
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Email,
+                    contentDescription = stringResource(Res.string.paywall_support),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
             if (screenState is MainScreenState.Success) {
                 val state = screenState as MainScreenState.Success
                 CreditsChip(
@@ -100,12 +117,6 @@ private fun CreditsChip(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // All users (including premium) now see their actual credits
-    val displayText = stringResource(Res.string.credits_display, credits)
-
-    // Show "Get More" when credits = 0
-    // For premium users, clicking opens subscription status (shows refill info)
-    // For non-premium users, clicking opens paywall
     val showGetMore = credits == 0
 
     Row(
@@ -128,7 +139,8 @@ private fun CreditsChip(
                    else MaterialTheme.colorScheme.primary
         )
         Text(
-            text = if (showGetMore) stringResource(Res.string.credits_get_more) else displayText,
+            text = if (showGetMore) stringResource(Res.string.credits_get_more)
+                   else stringResource(Res.string.credits_display, credits),
             style = MaterialTheme.typography.labelMedium,
             color = if (showGetMore) MaterialTheme.colorScheme.onPrimary
                     else MaterialTheme.colorScheme.onPrimaryContainer
