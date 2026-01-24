@@ -17,17 +17,17 @@
     <string name="onboarding_continue">Continue</string>
     <string name="onboarding_get_started">Get Started</string>
 
-    <!-- Onboarding Page 1 - Tasks -->
-    <string name="onboarding_page1_title">Capture Everything</string>
-    <string name="onboarding_page1_description">Turn chaos into clarity. Create checklists for any task — from daily routines to complex projects.</string>
+    <!-- Onboarding Page 1 - Create via AI -->
+    <string name="onboarding_page1_title">Create via AI</string>
+    <string name="onboarding_page1_description">Photo, PDF, link, text, or voice — AI instantly turns any content into a clear checklist.</string>
 
-    <!-- Onboarding Page 2 - AI Analysis -->
-    <string name="onboarding_page2_title">AI Does the Work</string>
-    <string name="onboarding_page2_description">Drop a photo, PDF, or text — our AI instantly creates a ready-to-use checklist. Magic in seconds.</string>
+    <!-- Onboarding Page 2 - Fill via AI -->
+    <string name="onboarding_page2_title">Fill via AI</string>
+    <string name="onboarding_page2_description">Visiting apartments? Inspecting cars? Drop a photo and AI auto-fills your checklist for each scenario.</string>
 
-    <!-- Onboarding Page 3 - Track Progress -->
-    <string name="onboarding_page3_title">Never Miss a Thing</string>
-    <string name="onboarding_page3_description">Stay on top of everything. Track progress, celebrate wins, and feel the satisfaction of checking things off.</string>
+    <!-- Onboarding Page 3 - Export & Share -->
+    <string name="onboarding_page3_title">Export &amp; Share</string>
+    <string name="onboarding_page3_description">Share your progress as PDF or text. Perfect for reports, clients, or just keeping records.</string>
 
     <!-- Main Screen -->
     <string name="main_title">My Checklists</string>
@@ -235,11 +235,11 @@
     <string name="paywall_no_payment_now">No payment due now</string>
     <string name="paywall_terms">Terms of Use</string>
     <string name="paywall_privacy">Privacy Policy</string>
-    <string name="paywall_preview_item1">Create unlimited checklists</string>
-    <string name="paywall_preview_item2">AI-powered analysis</string>
-    <string name="paywall_preview_item3">Daily credits refill</string>
-    <string name="paywall_preview_item4">Priority support</string>
-    <string name="paywall_preview_tagline">All your tasks\nin one place</string>
+    <string name="paywall_preview_item1">Unlimited Create via AI</string>
+    <string name="paywall_preview_item2">Unlimited Fill via AI</string>
+    <string name="paywall_preview_item3">PDF &amp; Text Export</string>
+    <string name="paywall_preview_item4">300 AI credits daily</string>
+    <string name="paywall_preview_tagline">Get the gist\nof anything</string>
 
     <!-- Splash Screen -->
     <string name="splash_loading">Getting things ready...</string>

@@ -47,14 +47,25 @@ class PaywallRepositoryImpl : PaywallRepository {
                     val products = currentOffering.availablePackages.map { pkg ->
                         val storeProduct = pkg.storeProduct
 
+                        // Determine free trial from introductoryDiscount
+                        // RevenueCat returns introductoryDiscount for free trials
                         val introPrice = storeProduct.introductoryDiscount
-                        val hasFreeTrial = introPrice?.price?.amountMicros == 0L
-                        val freeTrialDays = if (hasFreeTrial) {
-                            val period = introPrice!!.subscriptionPeriod
+
+                        // Check if it's a free trial:
+                        // 1. introductoryDiscount exists AND price is 0 (free)
+                        // 2. OR introductoryDiscount exists AND has "free" in phase type
+                        val hasFreeTrial = introPrice != null && (
+                            introPrice.price.amountMicros == 0L ||
+                            introPrice.subscriptionPeriod.value > 0
+                        )
+
+                        val freeTrialDays = if (introPrice != null) {
+                            val period = introPrice.subscriptionPeriod
                             when (period.unit.name.lowercase()) {
                                 "day" -> period.value
                                 "week" -> period.value * 7
                                 "month" -> period.value * 30
+                                "year" -> period.value * 365
                                 else -> 0
                             }
                         } else {

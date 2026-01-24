@@ -134,7 +134,38 @@ Located in `core/designsystem/`. Style: **Minimal & Clean** with white backgroun
 - `AppCard` - 12dp corners, 2dp elevation
 - `AppTextField` - outlined text field
 - `EmptyState` - centered icon + title + description
-- `AppScaffold` - screen wrapper with top bar
+- `AppScaffold` - screen wrapper with top bar (auto-handles system insets)
+
+### System Insets (Edge-to-Edge)
+
+**IMPORTANT**: All screens MUST properly handle system bars to avoid UI overlapping status bar or navigation bar.
+
+#### Screens WITH AppScaffold
+`AppScaffold` uses Material3 `Scaffold` which **automatically** handles system insets via `WindowInsets`. No extra work needed.
+
+#### Screens WITHOUT AppScaffold (fullscreen, custom layouts)
+**MUST** add these modifiers to the root container:
+```kotlin
+Column(
+    modifier = Modifier
+        .fillMaxSize()
+        .background(MaterialTheme.colorScheme.background)
+        .statusBarsPadding()      // ← Prevents overlap with status bar
+        .navigationBarsPadding()  // ← Prevents overlap with navigation bar
+        .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
+)
+```
+
+Required imports:
+```kotlin
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+```
+
+#### Examples of screens WITHOUT AppScaffold:
+- `OnboardingScreen` - fullscreen pager
+- `PaywallScreen` - fullscreen purchase flow
+- `SplashScreen` - centered content (insets optional)
 
 ## Key Patterns
 
