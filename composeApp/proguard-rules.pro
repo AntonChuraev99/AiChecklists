@@ -51,6 +51,23 @@
     volatile <fields>;
 }
 
+# Ktor
+-keep class io.ktor.** { *; }
+-keep class kotlinx.coroutines.** { *; }
+-dontwarn io.ktor.**
+-dontwarn kotlinx.atomicfu.**
+
+# OkHttp (used by Ktor)
+-dontwarn okhttp3.**
+-dontwarn okio.**
+-keep class okhttp3.** { *; }
+-keep class okio.** { *; }
+
+# Generative AI (Gemini)
+-keep class dev.shreyaspatil.** { *; }
+-keep class com.google.ai.** { *; }
+-dontwarn dev.shreyaspatil.**
+
 # General
 -keepattributes Signature
 -keepattributes SourceFile,LineNumberTable
