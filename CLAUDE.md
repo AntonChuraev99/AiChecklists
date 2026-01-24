@@ -48,6 +48,24 @@ Gisti transforms any content into actionable checklists using AI. The app has **
 
 For iOS, open `iosApp/iosApp.xcodeproj` in Xcode.
 
+### Running on Emulator
+
+```bash
+# List available emulators
+$ANDROID_SDK/emulator/emulator -list-avds
+
+# Start emulator
+$ANDROID_SDK/emulator/emulator -avd Pixel_9 &
+
+# Build and install
+./gradlew composeApp:installDebug
+
+# Launch app
+adb shell am start -n com.antonchuraev.aichecklists/com.antonchuraev.homesearchchecklist.MainActivity
+```
+
+Available emulators: `Pixel_9`, `Medium_Phone_API_36.1`
+
 ## Architecture
 
 ### Module Structure
@@ -173,6 +191,45 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 - **expect/actual**: Platform-specific code (logging, database, file pickers, audio)
 - **StateFlow**: All reactive state management
 - **Typesafe project accessors**: Reference modules as `projects.core.common.api`
+
+## UI Best Practices
+
+### Text in HorizontalPager
+
+**IMPORTANT**: Text elements inside `HorizontalPager` MUST have `fillMaxWidth()` modifier to prevent overflow.
+
+```kotlin
+// ✅ Correct
+Text(
+    text = stringResource(Res.string.description),
+    textAlign = TextAlign.Center,
+    modifier = Modifier.fillMaxWidth()  // Required!
+)
+
+// ❌ Wrong - text may overflow on swipe
+Text(
+    text = stringResource(Res.string.description),
+    textAlign = TextAlign.Center,
+    modifier = Modifier.padding(horizontal = 16.dp)  // Not enough!
+)
+```
+
+**Why**: `textAlign = TextAlign.Center` only works correctly when the text knows its width. Without `fillMaxWidth()`, text in a pager can extend beyond screen boundaries.
+
+### Avoid Double Padding
+
+When a parent container already has horizontal padding (e.g., `ScreenPaddingHorizontal`), child elements should NOT add their own horizontal padding:
+
+```kotlin
+// Parent already has padding
+Column(modifier = Modifier.padding(horizontal = AppDimens.ScreenPaddingHorizontal)) {
+    // ✅ Correct - use fillMaxWidth, no extra padding
+    Text(modifier = Modifier.fillMaxWidth())
+
+    // ❌ Wrong - double padding reduces available space
+    Text(modifier = Modifier.padding(horizontal = AppDimens.SpacingLg))
+}
+```
 
 ## Feature: AI Analyze
 
