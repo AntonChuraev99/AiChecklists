@@ -42,13 +42,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
-import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.AiAnalysisIllustration
-import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.ProgressIllustration
-import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.TasksIllustration
+import com.antonchuraev.homesearchchecklist.desingsystem.illustrations.CreateViaAiIllustration
+import com.antonchuraev.homesearchchecklist.desingsystem.illustrations.FillViaAiIllustration
+import com.antonchuraev.homesearchchecklist.desingsystem.illustrations.ExportShareIllustration
+import com.antonchuraev.homesearchchecklist.feature.paywall.data.PaywallConfig
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallProduct
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
@@ -70,6 +72,7 @@ fun PaywallScreen(
     onPurchaseSuccess: () -> Unit = {}
 ) {
     val state by viewModel.screenState.collectAsState()
+    val uriHandler = LocalUriHandler.current
 
     LaunchedEffect(state.purchaseSuccess) {
         if (state.purchaseSuccess) {
@@ -82,17 +85,17 @@ fun PaywallScreen(
         PaywallPage(
             titleRes = Res.string.onboarding_page1_title,
             descriptionRes = Res.string.onboarding_page1_description,
-            illustration = { TasksIllustration() }
+            illustration = { CreateViaAiIllustration() }
         ),
         PaywallPage(
             titleRes = Res.string.onboarding_page2_title,
             descriptionRes = Res.string.onboarding_page2_description,
-            illustration = { AiAnalysisIllustration() }
+            illustration = { FillViaAiIllustration() }
         ),
         PaywallPage(
             titleRes = Res.string.onboarding_page3_title,
             descriptionRes = Res.string.onboarding_page3_description,
-            illustration = { ProgressIllustration() }
+            illustration = { ExportShareIllustration() }
         )
     )
 
@@ -183,7 +186,9 @@ fun PaywallScreen(
                 isLoading = state.isLoading,
                 isPurchasing = state.isPurchasing,
                 onSubscribe = { viewModel.sendIntent(PaywallIntent.Purchase) },
-                onRestore = { viewModel.sendIntent(PaywallIntent.RestorePurchases) }
+                onRestore = { viewModel.sendIntent(PaywallIntent.RestorePurchases) },
+                onTermsClick = { uriHandler.openUri(PaywallConfig.TERMS_OF_USE_URL) },
+                onPrivacyClick = { uriHandler.openUri(PaywallConfig.PRIVACY_POLICY_URL) }
             )
         }
 
@@ -278,7 +283,9 @@ private fun SubscriptionCard(
     isLoading: Boolean,
     isPurchasing: Boolean,
     onSubscribe: () -> Unit,
-    onRestore: () -> Unit
+    onRestore: () -> Unit,
+    onTermsClick: () -> Unit,
+    onPrivacyClick: () -> Unit
 ) {
     val primaryColor = MaterialTheme.colorScheme.primary
     val primaryContainerColor = MaterialTheme.colorScheme.primaryContainer
@@ -391,7 +398,7 @@ private fun SubscriptionCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             TextButton(
-                onClick = { /* Terms */ },
+                onClick = onTermsClick,
                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
             ) {
                 Text(
@@ -421,7 +428,7 @@ private fun SubscriptionCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             TextButton(
-                onClick = { /* Privacy */ },
+                onClick = onPrivacyClick,
                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
             ) {
                 Text(

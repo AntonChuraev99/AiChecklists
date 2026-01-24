@@ -29,7 +29,6 @@ kotlin {
             implementation(projects.core.remoteconfig.api)
             implementation(projects.feature.user)
             implementation(projects.feature.checklist)
-            implementation(projects.feature.onboarding)
 
             implementation(compose.runtime)
             implementation(compose.foundation)

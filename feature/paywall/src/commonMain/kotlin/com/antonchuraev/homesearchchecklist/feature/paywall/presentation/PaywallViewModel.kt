@@ -3,6 +3,7 @@ package com.antonchuraev.homesearchchecklist.feature.paywall.presentation
 import androidx.lifecycle.viewModelScope
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
+import com.antonchuraev.homesearchchecklist.feature.paywall.data.PaywallConfig
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PurchaseResult
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.RestoreResult
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallProduct
@@ -66,6 +67,20 @@ class PaywallViewModel(
                     // Use mock product if no products returned (for testing)
                     if (products.isEmpty()) {
                         products = listOf(MOCK_PRODUCT)
+                    } else {
+                        // Apply default free trial if RevenueCat didn't return trial info
+                        // This allows testing different trial configurations in Google Play Console
+                        products = products.map { product ->
+                            if (!product.hasFreeTrial && product.freeTrialDays == 0) {
+                                // Use default trial days from config
+                                product.copy(
+                                    hasFreeTrial = true,
+                                    freeTrialDays = PaywallConfig.DEFAULT_FREE_TRIAL_DAYS
+                                )
+                            } else {
+                                product
+                            }
+                        }
                     }
 
                     val defaultSelected = products.find { it.isPopular }?.id

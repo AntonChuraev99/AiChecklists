@@ -10,4 +10,11 @@ object PaywallConfig {
 
     // Entitlement identifier (configure in RevenueCat dashboard)
     const val PREMIUM_ENTITLEMENT_ID = "AiChecklists Pro"
+
+    // Legal pages URLs (Firebase Hosting)
+    const val TERMS_OF_USE_URL = "https://gisti-app.web.app/terms"
+    const val PRIVACY_POLICY_URL = "https://gisti-app.web.app/privacy-policy"
+
+    // Default free trial days (fallback when RevenueCat doesn't return trial info)
+    const val DEFAULT_FREE_TRIAL_DAYS = 3
 }
