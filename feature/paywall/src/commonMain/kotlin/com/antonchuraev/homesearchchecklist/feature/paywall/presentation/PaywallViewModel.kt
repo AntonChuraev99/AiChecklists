@@ -125,6 +125,8 @@ class PaywallViewModel(
                     _screenState.update {
                         it.copy(isPurchasing = false, purchaseSuccess = true)
                     }
+                    // Navigate to subscription status after successful purchase
+                    navigator.navigateToSubscriptionStatus(showSuccessMessage = true)
                 }
                 is PurchaseResult.Cancelled -> {
                     _screenState.update { it.copy(isPurchasing = false) }
@@ -147,6 +149,8 @@ class PaywallViewModel(
                     _screenState.update {
                         it.copy(isPurchasing = false, purchaseSuccess = true)
                     }
+                    // Navigate to subscription status after successful restore
+                    navigator.navigateToSubscriptionStatus()
                 }
                 is RestoreResult.NoActiveSubscription -> {
                     _screenState.update {

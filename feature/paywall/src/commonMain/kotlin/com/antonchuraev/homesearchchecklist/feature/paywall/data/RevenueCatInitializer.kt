@@ -17,6 +17,9 @@ object RevenueCatInitializer {
 
         val configuration = PurchasesConfiguration(apiKey) {
             appUserId?.let { this.appUserId = it }
+            // Enable support for Google Play's pending prepaid plans
+            // This helps handle delayed payment methods properly
+            pendingTransactionsForPrepaidPlansEnabled = true
         }
         Purchases.configure(configuration)
 
