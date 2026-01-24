@@ -33,11 +33,16 @@ FirebaseApp.configure()
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `feature_ai_analysis_enabled` | Boolean | true | Enable AI analysis feature |
-| `feature_paywall_enabled` | Boolean | false | Enable paywall |
+| `feature_paywall_enabled` | Boolean | true | Enable paywall |
 | `max_checklist_items` | Long | 100 | Max items per checklist |
 | `ai_analysis_max_input_length` | Long | 10000 | Max input length for AI |
 | `min_app_version` | String | "1.0.0" | Minimum supported app version |
 | `maintenance_mode` | Boolean | false | Enable maintenance mode |
+| `templates_json` | JSON | [] | Checklist templates (see feature/create) |
+| `free_daily_ai_credits` | Long | 10 | Daily AI credits for free users |
+| `premium_daily_ai_credits` | Long | 300 | Daily AI credits for premium users |
+| `max_free_checklists` | Long | 3 | Max checklists for free users |
+| `max_free_fills_per_checklist` | Long | 5 | Max fills per checklist for free users |
 
 ## Managing Remote Config via Script
 
