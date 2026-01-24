@@ -21,7 +21,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Apartment
 import androidx.compose.material.icons.filled.Celebration
 import androidx.compose.material.icons.filled.Check
@@ -39,8 +38,6 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Description
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -71,7 +68,6 @@ import com.antonchuraev.homesearchchecklist.feature.create.domain.model.Checklis
 import com.antonchuraev.homesearchchecklist.feature.create.domain.model.TemplateCategory
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
-import androidx.compose.foundation.text.TextAutoSize
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -170,37 +166,35 @@ private fun BottomActionButtons(
     onCreateManually: () -> Unit,
     onCreateWithAi: () -> Unit
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shadowElevation = 8.dp,
-        color = MaterialTheme.colorScheme.surface
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface)
+            .navigationBarsPadding()
+            .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
+            .padding(top = AppDimens.SpacingLg, bottom = AppDimens.SpacingLg),
+        verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
-                .padding(top = AppDimens.SpacingLg, bottom = AppDimens.SpacingLg)
-                .navigationBarsPadding(),
-            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
-        ) {
-            // Create manually button
-            AppButton(
-                text = stringResource(Res.string.templates_create_manually),
-                onClick = onCreateManually,
-                icon = Icons.Default.Edit,
-                modifier = Modifier.fillMaxWidth()
-            )
+        // Create manually button
+        AppButton(
+            text = stringResource(Res.string.templates_create_manually),
+            onClick = onCreateManually,
+            icon = Icons.Default.Edit,
+            modifier = Modifier.fillMaxWidth()
+        )
 
-            // Create with AI button
-            AppButtonSecondary(
-                text = stringResource(Res.string.templates_create_with_ai),
-                onClick = onCreateWithAi,
-                icon = Icons.Outlined.AutoAwesome,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
+        // Create with AI button
+        AppButtonSecondary(
+            text = stringResource(Res.string.templates_create_with_ai),
+            onClick = onCreateWithAi,
+            icon = Icons.Outlined.AutoAwesome,
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }
+
+// Height of bottom buttons section (2 buttons + spacing + padding)
+private val BottomButtonsSectionHeight = 160.dp
 
 @Composable
 private fun TemplatesContent(
@@ -209,7 +203,10 @@ private fun TemplatesContent(
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(vertical = AppDimens.SpacingLg)
+        contentPadding = PaddingValues(
+            top = AppDimens.SpacingLg,
+            bottom = BottomButtonsSectionHeight
+        )
     ) {
         // Section header
         item {
@@ -231,11 +228,6 @@ private fun TemplatesContent(
                 onTemplateClick = onTemplateClick
             )
             Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
-        }
-
-        // Bottom spacing for buttons
-        item {
-            Spacer(modifier = Modifier.height(AppDimens.SpacingLg))
         }
     }
 }
@@ -278,21 +270,17 @@ private fun TemplateCard(
     template: ChecklistTemplate,
     onClick: () -> Unit
 ) {
-    Card(
+    Surface(
         modifier = Modifier
-            .width(200.dp)
-            .height(180.dp)
+            .width(180.dp)
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 4.dp,
+        tonalElevation = 1.dp
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(AppDimens.SpacingMd)
+            modifier = Modifier.padding(AppDimens.SpacingMd)
         ) {
             // Header with icon and item count
             Row(
@@ -303,8 +291,8 @@ private fun TemplateCard(
                 // Icon
                 Box(
                     modifier = Modifier
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(10.dp))
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(12.dp))
                         .background(getIconBackgroundColor(template.category)),
                     contentAlignment = Alignment.Center
                 ) {
@@ -312,54 +300,51 @@ private fun TemplateCard(
                         imageVector = getIconForTemplate(template.icon),
                         contentDescription = null,
                         tint = getIconColor(template.category),
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                 }
 
                 // Item count badge
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
+                        .clip(RoundedCornerShape(8.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     Text(
                         text = "${template.items.size}",
                         style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Medium,
+                        fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
+            Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
 
             // Template name
             Text(
                 text = template.name,
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 2,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurface
             )
 
             Spacer(modifier = Modifier.height(AppDimens.SpacingXs))
 
-            // Description with auto-fit
+            // Description
             Text(
                 text = template.description,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                autoSize = TextAutoSize.StepBased(
-                    minFontSize = 10.sp,
-                    maxFontSize = 14.sp,
-                    stepSize = 1.sp
-                ),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
+                lineHeight = 16.sp
             )
+
+            Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
 
             // "Use" indicator
             Row(
@@ -367,14 +352,15 @@ private fun TemplateCard(
             ) {
                 Text(
                     text = stringResource(Res.string.templates_tap_to_use),
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.primary
                 )
                 Icon(
                     imageVector = Icons.Default.ChevronRight,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(14.dp)
+                    modifier = Modifier.size(16.dp)
                 )
             }
         }
