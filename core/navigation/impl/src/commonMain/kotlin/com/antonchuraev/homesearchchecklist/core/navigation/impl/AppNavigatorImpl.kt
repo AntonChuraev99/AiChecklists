@@ -86,8 +86,8 @@ class AppNavigatorImpl() : AppNavigator {
         navController.navigate(AppNavRoute.Paywall)
     }
 
-    override fun navigateToSubscriptionStatus() {
-        navController.navigate(AppNavRoute.SubscriptionStatus)
+    override fun navigateToSubscriptionStatus(showSuccessMessage: Boolean) {
+        navController.navigate(AppNavRoute.SubscriptionStatus(showSuccessMessage))
     }
 
     override fun navigateToShareChecklist(checklistId: Long) {

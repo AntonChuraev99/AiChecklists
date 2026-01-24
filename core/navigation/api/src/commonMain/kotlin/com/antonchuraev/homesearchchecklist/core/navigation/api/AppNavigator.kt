@@ -46,7 +46,7 @@ interface AppNavigator {
 
     fun navigateToPaywall()
 
-    fun navigateToSubscriptionStatus()
+    fun navigateToSubscriptionStatus(showSuccessMessage: Boolean = false)
 
     fun navigateToShareChecklist(checklistId: Long)
 }
