@@ -35,6 +35,7 @@ class DebugViewModel(
             DebugScreenIntent.ResetOnboarding -> resetOnboarding()
             DebugScreenIntent.ClearData -> clearData()
             DebugScreenIntent.CreateTestChecklists -> createTestChecklists()
+            DebugScreenIntent.OpenStoreScreenshot -> appNavigator.navigateToStoreScreenshot()
         }
     }
 

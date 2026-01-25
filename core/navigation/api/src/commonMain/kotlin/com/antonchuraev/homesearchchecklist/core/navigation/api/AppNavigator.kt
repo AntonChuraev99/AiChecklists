@@ -17,6 +17,8 @@ interface AppNavigator {
 
     fun navigateToDebugMenu()
 
+    fun navigateToStoreScreenshot()
+
     /**
      * todo change templateId to template class
      */

@@ -13,8 +13,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.outlined.Screenshot
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -52,6 +53,9 @@ fun DebugScreen(
         },
         DebugItem(Icons.Default.Add, stringResource(Res.string.debug_create_test), stringResource(Res.string.debug_create_test_description)) {
             viewModel.sendIntent(DebugScreenIntent.CreateTestChecklists)
+        },
+        DebugItem(Icons.Outlined.Screenshot, "Store Screenshots", "Preview screens for App Store/Play Store") {
+            viewModel.sendIntent(DebugScreenIntent.OpenStoreScreenshot)
         }
     )
 
@@ -152,7 +156,7 @@ private fun DebugMenuItem(
             }
 
             Icon(
-                imageVector = Icons.Default.KeyboardArrowRight,
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )

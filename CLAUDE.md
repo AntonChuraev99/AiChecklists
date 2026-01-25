@@ -74,6 +74,7 @@ The project follows a modular architecture with API/impl separation:
 
 ```
 composeApp/              # Main application entry points (Android/iOS)
+                         # Contains AppBuildConfig (expect/actual) for debug detection
 
 core/
   common/api|impl        # AppViewModel, AppDispatchersProvider, AppLogger
@@ -92,7 +93,7 @@ feature/
   paywall/               # Subscriptions (RevenueCat)
   sharing/               # Export checklists (text/PDF)
   user/                  # User profile, device ID
-  debug/                 # Developer tools
+  debug/                 # Developer tools (debug builds only)
 ```
 
 ### MVI Pattern
@@ -113,7 +114,7 @@ Type-safe navigation using Kotlinx Serialization. Routes defined as `@Serializab
 
 ```kotlin
 // Main routes
-Splash, Onboarding, Main, Debug
+Splash, Onboarding, Main, Debug, StoreScreenshot
 
 // Checklist routes
 ChecklistDetail(checklistId), FillDetail(fillId), FillsList(checklistId)
@@ -188,9 +189,10 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 ## Key Patterns
 
 - **API/impl split**: Core modules expose interfaces in `api`, implementations in `impl`
-- **expect/actual**: Platform-specific code (logging, database, file pickers, audio)
+- **expect/actual**: Platform-specific code (logging, database, file pickers, audio, build config)
 - **StateFlow**: All reactive state management
 - **Typesafe project accessors**: Reference modules as `projects.core.common.api`
+- **AppBuildConfig**: Debug/release build detection via expect/actual pattern
 
 ## UI Best Practices
 
@@ -389,6 +391,54 @@ Versions in `gradle/libs.versions.toml`:
 | Ktor | 3.0.3 | HTTP Client |
 | Generative AI KMP | 0.9.0 | Gemini AI |
 
+## Feature: Debug
+
+Located in `feature/debug/`. Developer tools available **only in debug builds**.
+
+### Debug Menu Access
+
+**Android**: Volume Up → Volume Down → Volume Up (within 500ms)
+**iOS**: Called from Swift code via `navigateToDebugMenu()`
+
+### AppBuildConfig (expect/actual)
+
+Controls debug-only features across platforms:
+
+```kotlin
+// commonMain
+expect object AppBuildConfig {
+    val isDebug: Boolean
+}
+
+// androidMain - uses BuildConfig.DEBUG
+actual object AppBuildConfig {
+    actual val isDebug: Boolean = BuildConfig.DEBUG
+}
+
+// iosMain - uses Platform.isDebugBinary
+actual object AppBuildConfig {
+    actual val isDebug: Boolean = Platform.isDebugBinary
+}
+```
+
+### Debug Screens
+
+| Screen | Purpose |
+|--------|---------|
+| `DebugScreen` | Reset onboarding, clear data, create test checklists |
+| `StoreScreenshotScreen` | Preview 4 pages for App Store/Play Store screenshots |
+
+### Store Screenshots
+
+`StoreScreenshotScreen` displays 4 swipeable pages for marketing screenshots:
+
+1. **Create via AI** - `CreateViaAiIllustration`
+2. **Fill via AI** - `FillViaAiIllustration`
+3. **Export & Share** - `ExportShareIllustration`
+4. **Unlock Your Full Potential** - `PremiumBenefitsIllustration`
+
+Screenshots are saved to `store_screenshots/` folder.
+
 ## Navigation Flow
 
 ```
@@ -401,7 +451,7 @@ Splash → Onboarding → Main
                         ├─→ Analyze → AnalyzeResultPreview
                         ├─→ Paywall
                         ├─→ SubscriptionStatus
-                        └─→ Debug
+                        └─→ Debug → StoreScreenshot (debug only)
 ```
 
 ## Copy Guidelines
