@@ -1,0 +1,128 @@
+# GitLeaks Configuration for Gisti (AI Checklists)
+# Detects Firebase API keys, Gemini keys, and other sensitive credentials
+# Usage: gitleaks detect --config .gitleaks.toml --source git --recursive
+
+title = "Gisti Security Scan"
+description = "Detects Firebase API keys, Gemini API keys, and sensitive configuration"
+
+[[rules]]
+id = "firebase-api-key"
+description = "Firebase API Key (AIzaSy prefix)"
+regex = "AIzaSy[A-Za-z0-9_-]{35}"
+severity = "CRITICAL"
+entropy = 4.0
+keywords = ["AIzaSy", "firebase"]
+
+[[rules]]
+id = "firebase-project-id"
+description = "Firebase Project ID (aichecklists pattern)"
+regex = "aichecklists-[0-9]{5}"
+severity = "HIGH"
+
+[[rules]]
+id = "firebase-storage-bucket"
+description = "Firebase Storage Bucket URL"
+regex = "[a-z0-9-]+\.firebasestorage\.app"
+severity = "HIGH"
+
+[[rules]]
+id = "gemini-api-key"
+description = "Gemini API Key (Google AI Studio)"
+regex = "AIzaSy[A-Za-z0-9_-]{35}"
+severity = "CRITICAL"
+keywords = ["GEMINI_API_KEY", "gemini"]
+
+[[rules]]
+id = "google-cloud-api-key"
+description = "Google Cloud API Key"
+regex = "AIza[0-9A-Za-z\\-_]{35}"
+severity = "CRITICAL"
+
+[[rules]]
+id = "firebase-service-account"
+description = "Firebase Service Account JSON pattern"
+regex = '"type":\s*"service_account"'
+severity = "CRITICAL"
+keywords = ["service_account", "firebase-adminsdk"]
+
+[[rules]]
+id = "gcp-service-account-private-key"
+description = "GCP Service Account Private Key"
+regex = '"private_key":\s*"-----BEGIN PRIVATE KEY-----'
+severity = "CRITICAL"
+
+[[rules]]
+id = "google-services-json-api-key"
+description = "API Key in google-services.json"
+regex = '"current_key":\s*"AIza[A-Za-z0-9_-]{35}"'
+severity = "CRITICAL"
+keywords = ["google-services.json", "current_key"]
+
+[[rules]]
+id = "env-api-key-assignment"
+description = "Environment variable assignment with API key value"
+regex = 'GEMINI_API_KEY\s*=\s*["\']?AIza[A-Za-z0-9_-]{35}'
+severity = "CRITICAL"
+keywords = ["GEMINI_API_KEY", "="]
+
+[[rules]]
+id = "project-number-exposure"
+description = "Firebase project number (27698629989)"
+regex = "27698629989"
+severity = "HIGH"
+keywords = ["project_number", "27698629989"]
+
+[[rules]]
+id = "firebase-app-id"
+description = "Firebase Mobile SDK App ID pattern"
+regex = '"mobilesdk_app_id":\s*"1:[0-9]{11}:android:[a-f0-9]{16}'
+severity = "HIGH"
+
+[[rules]]
+id = "google-services-json-file"
+description = "google-services.json file content"
+regex = '"configuration_version":\s*"[0-9]"'
+severity = "HIGH"
+keywords = ["google-services.json", "project_info"]
+
+# Allowlist for .example files and documentation
+[[rules.allowlist]]
+description = "Allow .example files (templates)"
+paths = ["google-services\\.json\\.example", "\\.env\\.example", "local\\.properties\\.example"]
+
+[[rules.allowlist]]
+description = "Allow documentation mentioning keys"
+paths = ["SECURITY\\.md", "CLAUDE\\.md", "README\\.md", "docs/"]
+
+# Additional rules for common secrets patterns
+[[rules]]
+id = "private-key-pem"
+description = "Private key (PEM format)"
+regex = '-----BEGIN\\s?(RSA|DSA|EC)\\s?PRIVATE KEY-----'
+severity = "CRITICAL"
+
+[[rules]]
+id = "aws-access-key"
+description = "AWS Access Key ID"
+regex = "AKIA[0-9A-Z]{16}"
+severity = "CRITICAL"
+
+[[rules]]
+id = "github-token"
+description = "GitHub Personal Access Token"
+regex = "gh[pousr]{1}_[A-Za-z0-9_]{36,255}"
+severity = "CRITICAL"
+
+[[rules]]
+id = "slack-token"
+description = "Slack Bot Token"
+regex = "xox[b|p|o|a]-[0-9]{12}-[0-9]{12}-[a-zA-Z0-9]{32}"
+severity = "CRITICAL"
+
+# Entropy rules for high-entropy strings that might be keys
+[[rules]]
+id = "high-entropy-string"
+description = "High entropy string (potential API key)"
+regex = "[A-Za-z0-9_-]{40,100}"
+entropy = 5.5
+keywords = ["key", "secret", "token", "password"]
