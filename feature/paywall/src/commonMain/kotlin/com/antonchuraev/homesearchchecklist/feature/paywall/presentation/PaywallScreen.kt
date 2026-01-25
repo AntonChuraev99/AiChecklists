@@ -3,7 +3,6 @@ package com.antonchuraev.homesearchchecklist.feature.paywall.presentation
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -46,6 +45,15 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.unit.max
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.illustrations.CreateViaAiIllustration
 import com.antonchuraev.homesearchchecklist.desingsystem.illustrations.FillViaAiIllustration
@@ -113,70 +121,60 @@ fun PaywallScreen(
             modifier = Modifier.fillMaxSize()
         ) {
             // Top section with close button and pager
-            Box(
+            // Skip button row (same style as OnboardingScreen)
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f)
+                    .statusBarsPadding()
+                    .padding(top = AppDimens.SpacingSm, end = AppDimens.ScreenPaddingHorizontal),
+                horizontalArrangement = Arrangement.End
             ) {
-                Column(
-                    modifier = Modifier.fillMaxSize()
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(AppDimens.SpacingSm))
+                        .clickable { viewModel.sendIntent(PaywallIntent.Close) }
+                        .padding(AppDimens.SpacingSm),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Skip button row (same style as OnboardingScreen)
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .statusBarsPadding()
-                            .padding(top = AppDimens.SpacingSm, end = AppDimens.ScreenPaddingHorizontal),
-                        horizontalArrangement = Arrangement.End
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(AppDimens.SpacingSm))
-                                .clickable { viewModel.sendIntent(PaywallIntent.Close) }
-                                .padding(AppDimens.SpacingSm),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = stringResource(Res.string.onboarding_skip),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
+                    Text(
+                        text = stringResource(Res.string.onboarding_skip),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
 
-                    // Pager with illustrations
-                    HorizontalPager(
-                        state = pagerState,
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
-                    ) { pageIndex ->
-                        PaywallPageContent(
-                            page = pages[pageIndex],
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
+            // Pager with illustrations
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier
+                    .weight(1F)
+                    .fillMaxWidth()
+            ) { pageIndex ->
+                PaywallPageContent(
+                    page = pages[pageIndex],
+                    modifier = Modifier
+                )
+            }
 
-                    // Page indicators
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = AppDimens.SpacingLg),
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        repeat(pages.size) { index ->
-                            PageIndicator(
-                                isSelected = index == pagerState.currentPage,
-                                modifier = Modifier.padding(horizontal = 4.dp)
-                            )
-                        }
-                    }
+            // Page indicators
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = AppDimens.SpacingLg),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                repeat(pages.size) { index ->
+                    PageIndicator(
+                        isSelected = index == pagerState.currentPage,
+                        modifier = Modifier.padding(horizontal = 4.dp)
+                    )
                 }
             }
 
@@ -281,7 +279,7 @@ private fun PageIndicator(
 }
 
 @Composable
-private fun SubscriptionCard(
+private fun ColumnScope.SubscriptionCard(
     product: PaywallProduct?,
     isLoading: Boolean,
     isPurchasing: Boolean,
@@ -300,8 +298,10 @@ private fun SubscriptionCard(
             .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
             .background(primaryContainerColor.copy(alpha = 0.3f))
             .padding(horizontal = 24.dp)
-            .padding(top = 28.dp, bottom = 8.dp)
-            .navigationBarsPadding(),
+            .padding(top = 8.dp, bottom = 8.dp)
+            .navigationBarsPadding()
+            .wrapContentHeight()
+        ,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // Fixed height container for content to prevent layout jumps
@@ -325,15 +325,22 @@ private fun SubscriptionCard(
             }
         }
 
+        Spacer(Modifier.height(16.dp))
+
         // Footer links - more compact
-        Row(
-            modifier = Modifier.fillMaxWidth(),
+        FlowRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .wrapContentHeight()
+            ,
             horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
+            verticalArrangement = Arrangement.Center,
+            itemVerticalAlignment = Alignment.CenterVertically
         ) {
             TextButton(
                 onClick = onTermsClick,
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                contentPadding = PaddingValues(horizontal = 6.dp),
+                modifier = Modifier.height(25.dp)
             ) {
                 Text(
                     text = stringResource(Res.string.paywall_terms),
@@ -341,29 +348,11 @@ private fun SubscriptionCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Text(
-                text = "•",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            TextButton(
-                onClick = onRestore,
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
-            ) {
-                Text(
-                    text = stringResource(Res.string.paywall_restore),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Text(
-                text = "•",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+
             TextButton(
                 onClick = onPrivacyClick,
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                contentPadding = PaddingValues(horizontal = 6.dp),
+                modifier = Modifier.height(25.dp)
             ) {
                 Text(
                     text = stringResource(Res.string.paywall_privacy),
@@ -371,14 +360,24 @@ private fun SubscriptionCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Text(
-                text = "•",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+
+            TextButton(
+                onClick = onRestore,
+                contentPadding = PaddingValues(horizontal = 6.dp),
+                modifier = Modifier.height(25.dp)
+            ) {
+                Text(
+                    text = stringResource(Res.string.paywall_restore),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+
             TextButton(
                 onClick = onSupportClick,
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                contentPadding = PaddingValues(horizontal = 6.dp),
+                modifier = Modifier.height(25.dp)
             ) {
                 Text(
                     text = stringResource(Res.string.paywall_support),
@@ -424,7 +423,7 @@ private fun SubscriptionContent(
             textAlign = TextAlign.Center
         )
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(6.dp))
 
         // CTA Button
         Button(
@@ -459,7 +458,7 @@ private fun SubscriptionContent(
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(6.dp))
 
         // "No payment due now" with checkmark
         if (product.hasFreeTrial) {
