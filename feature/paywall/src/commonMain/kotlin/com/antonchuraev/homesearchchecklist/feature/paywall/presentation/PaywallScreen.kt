@@ -2,6 +2,7 @@ package com.antonchuraev.homesearchchecklist.feature.paywall.presentation
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,12 +23,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Text
@@ -121,31 +121,32 @@ fun PaywallScreen(
                 Column(
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    // Close button row
+                    // Skip button row (same style as OnboardingScreen)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .statusBarsPadding()
-                            .padding(8.dp),
+                            .padding(top = AppDimens.SpacingSm, end = AppDimens.ScreenPaddingHorizontal),
                         horizontalArrangement = Arrangement.End
                     ) {
-                        IconButton(
-                            onClick = { viewModel.sendIntent(PaywallIntent.Close) }
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(AppDimens.SpacingSm))
+                                .clickable { viewModel.sendIntent(PaywallIntent.Close) }
+                                .padding(AppDimens.SpacingSm),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .clip(CircleShape)
-                                    .background(Color.Gray.copy(alpha = 0.2f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = stringResource(Res.string.cancel),
-                                    tint = Color.Gray,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
+                            Text(
+                                text = stringResource(Res.string.onboarding_skip),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
 
@@ -303,95 +304,26 @@ private fun SubscriptionCard(
             .navigationBarsPadding(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        if (isLoading) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(40.dp),
-                color = primaryColor
-            )
-            Spacer(modifier = Modifier.height(20.dp))
-        } else if (product != null) {
-            // Main headline
-            Text(
-                text = if (product.hasFreeTrial) {
-                    stringResource(Res.string.paywall_days_free, product.freeTrialDays)
-                } else {
-                    stringResource(Res.string.paywall_go_premium)
-                },
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = primaryColor,
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            // Price line
-            Text(
-                text = stringResource(Res.string.paywall_then_price, product.priceString),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // CTA Button
-            Button(
-                onClick = onSubscribe,
-                enabled = !isPurchasing,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                shape = RoundedCornerShape(26.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = primaryColor,
-                    contentColor = Color.White,
-                    disabledContainerColor = primaryColor.copy(alpha = 0.5f)
+        // Fixed height container for content to prevent layout jumps
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(180.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(40.dp),
+                    color = primaryColor
                 )
-            ) {
-                if (isPurchasing) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(22.dp),
-                        color = Color.White,
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Text(
-                        text = if (product.hasFreeTrial) {
-                            stringResource(Res.string.paywall_start_free_trial)
-                        } else {
-                            stringResource(Res.string.paywall_subscribe_now)
-                        },
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+            } else if (product != null) {
+                SubscriptionContent(
+                    product = product,
+                    isPurchasing = isPurchasing,
+                    onSubscribe = onSubscribe,
+                    primaryColor = primaryColor
+                )
             }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // "No payment due now" with checkmark
-            if (product.hasFreeTrial) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Check,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = stringResource(Res.string.paywall_no_payment_now),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
         }
 
         // Footer links - more compact
@@ -453,6 +385,100 @@ private fun SubscriptionCard(
                     text = stringResource(Res.string.paywall_support),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SubscriptionContent(
+    product: PaywallProduct,
+    isPurchasing: Boolean,
+    onSubscribe: () -> Unit,
+    primaryColor: Color
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Main headline
+        Text(
+            text = if (product.hasFreeTrial) {
+                stringResource(Res.string.paywall_days_free, product.freeTrialDays)
+            } else {
+                stringResource(Res.string.paywall_go_premium)
+            },
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            color = primaryColor,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        // Price line
+        Text(
+            text = stringResource(Res.string.paywall_then_price, product.priceString),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // CTA Button
+        Button(
+            onClick = onSubscribe,
+            enabled = !isPurchasing,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp),
+            shape = RoundedCornerShape(26.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = primaryColor,
+                contentColor = Color.White,
+                disabledContainerColor = primaryColor.copy(alpha = 0.5f)
+            )
+        ) {
+            if (isPurchasing) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(22.dp),
+                    color = Color.White,
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Text(
+                    text = if (product.hasFreeTrial) {
+                        stringResource(Res.string.paywall_start_free_trial)
+                    } else {
+                        stringResource(Res.string.paywall_subscribe_now)
+                    },
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // "No payment due now" with checkmark
+        if (product.hasFreeTrial) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = stringResource(Res.string.paywall_no_payment_now),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
             }
         }
