@@ -46,6 +46,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
+import androidx.compose.foundation.layout.fillMaxHeight
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.illustrations.CreateViaAiIllustration
 import com.antonchuraev.homesearchchecklist.desingsystem.illustrations.FillViaAiIllustration
@@ -55,6 +56,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.feature.paywall.data.PaywallConfig
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallProduct
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.PaywallIntent
+import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.PaywallState
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.PaywallViewModel
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
@@ -78,7 +80,7 @@ fun OnboardingScreen(
 ) {
     val state by viewModel.screenState.collectAsState()
     val paywallState by paywallViewModel.screenState.collectAsState()
-    val uriHandler = LocalUriHandler.current
+
 
     val pages = listOf(
         OnboardingPage(
@@ -130,7 +132,6 @@ fun OnboardingScreen(
             .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
             .navigationBarsPadding()
-            .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
     ) {
         // Skip button (shown on all pages including paywall)
         Row(
@@ -163,6 +164,8 @@ fun OnboardingScreen(
         // Pager
         HorizontalPager(
             state = pagerState,
+            contentPadding = PaddingValues(horizontal = AppDimens.ScreenPaddingHorizontal),
+            pageSpacing = AppDimens.ScreenPaddingHorizontal,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
@@ -170,12 +173,20 @@ fun OnboardingScreen(
             if (pageIndex < pages.size) {
                 OnboardingPageContent(
                     page = pages[pageIndex],
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .weight(1F)
                 )
             } else {
+                val product = paywallState.products.firstOrNull()
+
                 // Paywall page
                 PaywallPageContent(
-                    modifier = Modifier.fillMaxSize()
+                    product = product,
+                    paywallState = paywallState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .weight(1F)
                 )
             }
         }
@@ -184,28 +195,22 @@ fun OnboardingScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(180.dp),
+                .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
+            ,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Spacer(modifier = Modifier.height(AppDimens.SpacingXl))
+
             if (isPaywallPage) {
                 val product = paywallState.products.firstOrNull()
-
-                // Price info section
-                PaywallPriceInfo(
-                    product = product,
-                    isLoading = paywallState.isLoading
-                )
-
-                Spacer(modifier = Modifier.weight(1f))
-
                 // Subscribe button
                 Button(
                     onClick = { paywallViewModel.sendIntent(PaywallIntent.Purchase) },
                     enabled = !paywallState.isPurchasing && product != null,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(52.dp),
-                    shape = RoundedCornerShape(26.dp),
+                        .height(AppDimens.ButtonHeight),
+                    shape = MaterialTheme.shapes.small,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
                         contentColor = Color.White
@@ -229,26 +234,15 @@ fun OnboardingScreen(
                         )
                     }
                 }
-
-                Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
-
-                // Legal links
-                PaywallLegalLinks(
-                    onTermsClick = { uriHandler.openUri(PaywallConfig.TERMS_OF_USE_URL) },
-                    onPrivacyClick = { uriHandler.openUri(PaywallConfig.PRIVACY_POLICY_URL) }
-                )
             } else {
-                // Regular onboarding pages - button at bottom
-                Spacer(modifier = Modifier.weight(1f))
-
                 AppButton(
                     text = stringResource(Res.string.onboarding_continue),
                     onClick = { viewModel.sendIntent(OnboardingIntent.OnNextPage) },
                     modifier = Modifier.fillMaxWidth()
                 )
-
-                Spacer(modifier = Modifier.height(AppDimens.SpacingXl))
             }
+
+            Spacer(modifier = Modifier.height(AppDimens.SpacingXl))
         }
 
         // Page indicators
@@ -274,13 +268,14 @@ private fun OnboardingPageContent(
     modifier: Modifier = Modifier
 ) {
     Column(
-        modifier = modifier.padding(vertical = AppDimens.SpacingLg),
+        modifier = modifier
+            .padding(vertical = AppDimens.SpacingLg),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // Illustration container
         Box(
             modifier = Modifier
-                .weight(1f)
+                .fillMaxHeight(fraction = 0.7F)
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(24.dp))
                 .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)),
@@ -337,8 +332,12 @@ private fun PageIndicator(
 
 @Composable
 private fun PaywallPageContent(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    product: PaywallProduct?,
+    paywallState: PaywallState
 ) {
+    val uriHandler = LocalUriHandler.current
+
     Column(
         modifier = modifier.padding(vertical = AppDimens.SpacingLg),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -357,28 +356,20 @@ private fun PaywallPageContent(
 
         Spacer(modifier = Modifier.height(AppDimens.SpacingXl))
 
-        // Title
-        Text(
-            text = stringResource(Res.string.paywall_go_premium),
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth()
+        // Legal links
+        PaywallLegalLinks(
+            onTermsClick = { uriHandler.openUri(PaywallConfig.TERMS_OF_USE_URL) },
+            onPrivacyClick = { uriHandler.openUri(PaywallConfig.PRIVACY_POLICY_URL) }
         )
+
 
         Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
 
-        // Tagline
-        Text(
-            text = stringResource(Res.string.paywall_preview_tagline),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth()
+        // Price info section
+        PaywallPriceInfo(
+            product = product,
+            isLoading = paywallState.isLoading
         )
-
-        Spacer(modifier = Modifier.height(AppDimens.SpacingXl))
     }
 }
 
