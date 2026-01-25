@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 class ChecklistDetailViewModel(
@@ -26,14 +27,14 @@ class ChecklistDetailViewModel(
     private val _screenState = MutableStateFlow<ChecklistDetailState>(ChecklistDetailState.Loading)
     override val screenState: StateFlow<ChecklistDetailState> = _screenState.asStateFlow()
 
+    private var loadDataJob: Job? = null
+
     init {
         loadData()
     }
 
-    private var isCreatingDefaultFill = false
-
     private fun loadData() {
-        viewModelScope.launch {
+        loadDataJob = viewModelScope.launch {
             val checklist = repository.getChecklistById(checklistId)
             if (checklist == null) {
                 _screenState.value = ChecklistDetailState.NotFound
@@ -46,9 +47,8 @@ class ChecklistDetailViewModel(
             ) { defaultFill, additionalFills ->
                 defaultFill to additionalFills
             }.collect { (defaultFill, additionalFills) ->
-                if (defaultFill == null && !isCreatingDefaultFill) {
-                    isCreatingDefaultFill = true
-                    createMissingDefaultFill(checklist)
+                if (defaultFill == null) {
+                    _screenState.value = ChecklistDetailState.NotFound
                     return@collect
                 }
 
@@ -82,20 +82,6 @@ class ChecklistDetailViewModel(
                 userLimits = null
             )
         }
-    }
-
-    private suspend fun createMissingDefaultFill(checklist: Checklist) {
-        val fillItems = checklist.items.map { item ->
-            ChecklistFillItem(text = item.text, checked = false, note = null)
-        }
-        val defaultFill = ChecklistFill(
-            checklistId = checklistId,
-            name = "",
-            items = fillItems,
-            createdAt = currentTimeMillis(),
-            isDefault = true
-        )
-        repository.addFill(defaultFill)
     }
 
     override fun onIntent(intent: ChecklistDetailIntent) {
@@ -236,6 +222,8 @@ class ChecklistDetailViewModel(
         if (state !is ChecklistDetailState.Content) return
 
         updateContentState { it.copy(showDeleteConfirmation = false) }
+        loadDataJob?.cancel()
+
         viewModelScope.launch {
             repository.deleteChecklist(state.checklist)
             navigator.onBack()
