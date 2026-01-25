@@ -46,6 +46,21 @@ class ChecklistRepositoryImpl(
 
     override suspend fun updateChecklist(checklist: Checklist) {
         checklistDao.update(checklist.toEntity())
+
+        // Sync default fill items with updated checklist items
+        val defaultFillEntity = fillDao.getDefaultFillByChecklistId(checklist.id)
+        if (defaultFillEntity != null) {
+            val existingItemsMap = defaultFillEntity.items.associateBy { it.text }
+            val updatedItems = checklist.items.map { checklistItem ->
+                val existingItem = existingItemsMap[checklistItem.text]
+                ChecklistFillItem(
+                    text = checklistItem.text,
+                    checked = existingItem?.checked ?: false,
+                    note = existingItem?.note
+                )
+            }
+            fillDao.insert(defaultFillEntity.copy(items = updatedItems))
+        }
     }
 
     override suspend fun deleteChecklist(checklist: Checklist) {
