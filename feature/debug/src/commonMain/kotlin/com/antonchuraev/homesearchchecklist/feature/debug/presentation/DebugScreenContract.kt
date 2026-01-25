@@ -14,5 +14,6 @@ sealed interface DebugScreenIntent : Intent {
     data object ResetOnboarding : DebugScreenIntent
     data object ClearData : DebugScreenIntent
     data object CreateTestChecklists : DebugScreenIntent
+    data object OpenStoreScreenshot : DebugScreenIntent
 }
 

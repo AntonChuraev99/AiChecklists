@@ -34,6 +34,10 @@ class AppNavigatorImpl() : AppNavigator {
         navController.navigate(AppNavRoute.Debug)
     }
 
+    override fun navigateToStoreScreenshot() {
+        navController.navigate(AppNavRoute.StoreScreenshot)
+    }
+
     override fun navigateToCreateChecklistScreen(templateId: Int?) {
         navController.navigate(AppNavRoute.CreateChecklistRoute.CreateChecklist(templateId))
     }
