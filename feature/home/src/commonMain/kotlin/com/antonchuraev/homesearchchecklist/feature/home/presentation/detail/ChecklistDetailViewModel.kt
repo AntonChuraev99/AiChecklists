@@ -4,6 +4,7 @@ import androidx.lifecycle.viewModelScope
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
@@ -29,6 +30,8 @@ class ChecklistDetailViewModel(
         loadData()
     }
 
+    private var isCreatingDefaultFill = false
+
     private fun loadData() {
         viewModelScope.launch {
             val checklist = repository.getChecklistById(checklistId)
@@ -39,102 +42,94 @@ class ChecklistDetailViewModel(
 
             combine(
                 repository.getDefaultFillByChecklistId(checklistId),
-                repository.getAdditionalFillsByChecklistId(checklistId),
-                getUserLimitsUseCase()
-            ) { defaultFill, additionalFills, userLimits ->
-                Triple(defaultFill, additionalFills, userLimits)
-            }.collect { (defaultFill, additionalFills, userLimits) ->
-                val currentState = _screenState.value
-                if (currentState is ChecklistDetailState.Content) {
-                    _screenState.value = currentState.copy(
-                        defaultFill = defaultFill,
-                        additionalFillsCount = additionalFills.size,
-                        userLimits = userLimits
-                    )
-                } else {
-                    _screenState.value = ChecklistDetailState.Content(
-                        checklist = checklist,
-                        defaultFill = defaultFill,
-                        additionalFillsCount = additionalFills.size,
-                        userLimits = userLimits
-                    )
+                repository.getAdditionalFillsByChecklistId(checklistId)
+            ) { defaultFill, additionalFills ->
+                defaultFill to additionalFills
+            }.collect { (defaultFill, additionalFills) ->
+                if (defaultFill == null && !isCreatingDefaultFill) {
+                    isCreatingDefaultFill = true
+                    createMissingDefaultFill(checklist)
+                    return@collect
                 }
+
+                updateOrCreateContentState(checklist, defaultFill, additionalFills.size)
             }
         }
+
+        viewModelScope.launch {
+            getUserLimitsUseCase().collect { userLimits ->
+                updateContentState { it.copy(userLimits = userLimits) }
+            }
+        }
+    }
+
+    private fun updateOrCreateContentState(
+        checklist: Checklist,
+        defaultFill: ChecklistFill?,
+        additionalFillsCount: Int
+    ) {
+        val currentState = _screenState.value
+        _screenState.value = if (currentState is ChecklistDetailState.Content) {
+            currentState.copy(
+                defaultFill = defaultFill,
+                additionalFillsCount = additionalFillsCount
+            )
+        } else {
+            ChecklistDetailState.Content(
+                checklist = checklist,
+                defaultFill = defaultFill,
+                additionalFillsCount = additionalFillsCount,
+                userLimits = null
+            )
+        }
+    }
+
+    private suspend fun createMissingDefaultFill(checklist: Checklist) {
+        val fillItems = checklist.items.map { item ->
+            ChecklistFillItem(text = item.text, checked = false, note = null)
+        }
+        val defaultFill = ChecklistFill(
+            checklistId = checklistId,
+            name = "",
+            items = fillItems,
+            createdAt = currentTimeMillis(),
+            isDefault = true
+        )
+        repository.addFill(defaultFill)
     }
 
     override fun onIntent(intent: ChecklistDetailIntent) {
         when (intent) {
             ChecklistDetailIntent.OnBackClick -> navigator.onBack()
-
-            ChecklistDetailIntent.OnEditChecklistClick -> {
-                navigator.navigateToEditChecklist(checklistId)
-            }
-
-            ChecklistDetailIntent.OnShareClick -> {
-                navigator.navigateToShareChecklist(checklistId)
-            }
-
-            ChecklistDetailIntent.OnDeleteChecklistClick -> {
-                updateContentState { it.copy(showDeleteConfirmation = true) }
-            }
-
+            ChecklistDetailIntent.OnEditChecklistClick -> navigator.navigateToEditChecklist(checklistId)
+            ChecklistDetailIntent.OnShareClick -> navigator.navigateToShareChecklist(checklistId)
+            ChecklistDetailIntent.OnDeleteChecklistClick -> updateContentState { it.copy(showDeleteConfirmation = true) }
             ChecklistDetailIntent.OnConfirmDeleteChecklist -> deleteChecklist()
-
-            ChecklistDetailIntent.OnDismissDeleteConfirmation -> {
-                updateContentState { it.copy(showDeleteConfirmation = false) }
-            }
-
-            is ChecklistDetailIntent.OnItemCheckedChange -> {
-                updateItemChecked(intent.index, intent.checked)
-            }
-
-            is ChecklistDetailIntent.OnAddNoteClick -> {
-                val state = _screenState.value
-                if (state is ChecklistDetailState.Content && state.defaultFill != null) {
-                    val currentNote = state.defaultFill.items.getOrNull(intent.index)?.note ?: ""
-                    updateContentState {
-                        it.copy(noteDialogItemIndex = intent.index, editingNote = currentNote)
-                    }
-                }
-            }
-
-            is ChecklistDetailIntent.OnNoteChanged -> {
-                updateContentState { it.copy(editingNote = intent.note) }
-            }
-
+            ChecklistDetailIntent.OnDismissDeleteConfirmation -> updateContentState { it.copy(showDeleteConfirmation = false) }
+            is ChecklistDetailIntent.OnItemCheckedChange -> updateItemChecked(intent.index, intent.checked)
+            is ChecklistDetailIntent.OnAddNoteClick -> openNoteDialog(intent.index)
+            is ChecklistDetailIntent.OnNoteChanged -> updateContentState { it.copy(editingNote = intent.note) }
             ChecklistDetailIntent.OnSaveNote -> saveNote()
-
-            ChecklistDetailIntent.OnDismissNoteDialog -> {
-                updateContentState { it.copy(noteDialogItemIndex = null, editingNote = "") }
-            }
-
-            ChecklistDetailIntent.OnViewAllFillsClick -> {
-                navigator.navigateToFillsList(checklistId)
-            }
-
+            ChecklistDetailIntent.OnDismissNoteDialog -> updateContentState { it.copy(noteDialogItemIndex = null, editingNote = "") }
+            ChecklistDetailIntent.OnViewAllFillsClick -> navigator.navigateToFillsList(checklistId)
             ChecklistDetailIntent.OnAddFillClick -> handleAddFillClick()
-
             ChecklistDetailIntent.OnAddFillViaAiClick -> handleAddFillViaAiClick()
-
-            ChecklistDetailIntent.OnDismissAddFillDialog -> {
-                updateContentState { it.copy(showAddFillDialog = false) }
-            }
-
-            is ChecklistDetailIntent.OnNewFillNameChanged -> {
-                updateContentState { it.copy(newFillName = intent.name, fillNameError = null) }
-            }
-
+            ChecklistDetailIntent.OnDismissAddFillDialog -> updateContentState { it.copy(showAddFillDialog = false) }
+            is ChecklistDetailIntent.OnNewFillNameChanged -> updateContentState { it.copy(newFillName = intent.name, fillNameError = null) }
             ChecklistDetailIntent.OnConfirmAddFill -> createNewFill()
-
-            ChecklistDetailIntent.OnDismissFillLimitDialog -> {
-                updateContentState { it.copy(showFillLimitDialog = false) }
-            }
-
+            ChecklistDetailIntent.OnDismissFillLimitDialog -> updateContentState { it.copy(showFillLimitDialog = false) }
             ChecklistDetailIntent.OnUpgradeToPremiumClick -> {
                 updateContentState { it.copy(showFillLimitDialog = false) }
                 navigator.navigateToPaywall()
             }
+        }
+    }
+
+    private fun openNoteDialog(itemIndex: Int) {
+        val state = _screenState.value
+        if (state is ChecklistDetailState.Content && state.defaultFill != null) {
+            val currentNote = state.defaultFill.items.getOrNull(itemIndex)?.note.orEmpty()
+            updateContentState { it.copy(noteDialogItemIndex = itemIndex, editingNote = currentNote) }
         }
     }
 
@@ -175,20 +170,18 @@ class ChecklistDetailViewModel(
     }
 
     private fun handleAddFillClick() {
-        val state = _screenState.value
-        if (state !is ChecklistDetailState.Content) return
-
-        val limits = state.userLimits
-        // +1 for the default fill
-        val totalFills = state.additionalFillsCount + 1
-        if (limits != null && !limits.canCreateFill(totalFills)) {
-            updateContentState { it.copy(showFillLimitDialog = true) }
-        } else {
+        withFillLimitCheck {
             updateContentState { it.copy(showAddFillDialog = true, newFillName = "") }
         }
     }
 
     private fun handleAddFillViaAiClick() {
+        withFillLimitCheck {
+            navigator.navigateToAnalyzeScreen(checklistId)
+        }
+    }
+
+    private inline fun withFillLimitCheck(onAllowed: () -> Unit) {
         val state = _screenState.value
         if (state !is ChecklistDetailState.Content) return
 
@@ -197,7 +190,7 @@ class ChecklistDetailViewModel(
         if (limits != null && !limits.canCreateFill(totalFills)) {
             updateContentState { it.copy(showFillLimitDialog = true) }
         } else {
-            navigator.navigateToAnalyzeScreen(checklistId)
+            onAllowed()
         }
     }
 
@@ -240,13 +233,12 @@ class ChecklistDetailViewModel(
 
     private fun deleteChecklist() {
         val state = _screenState.value
-        if (state is ChecklistDetailState.Content) {
-            // Dismiss dialog immediately to prevent double-click
-            updateContentState { it.copy(showDeleteConfirmation = false) }
-            viewModelScope.launch {
-                repository.deleteChecklist(state.checklist)
-                navigator.onBack()
-            }
+        if (state !is ChecklistDetailState.Content) return
+
+        updateContentState { it.copy(showDeleteConfirmation = false) }
+        viewModelScope.launch {
+            repository.deleteChecklist(state.checklist)
+            navigator.onBack()
         }
     }
 
