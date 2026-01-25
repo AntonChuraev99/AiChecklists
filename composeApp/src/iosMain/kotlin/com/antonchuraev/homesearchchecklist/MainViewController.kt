@@ -7,6 +7,10 @@ import org.koin.mp.KoinPlatform
 fun MainViewController() = ComposeUIViewController { App() }
 
 fun navigateToDebugMenu() {
+    if (!AppBuildConfig.isDebug) {
+        println("Debug menu is only available in debug builds")
+        return
+    }
     try {
         val navigator = KoinPlatform.getKoin().get<AppNavigator>()
         navigator.navigateToDebugMenu()

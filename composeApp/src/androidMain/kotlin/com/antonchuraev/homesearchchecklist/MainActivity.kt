@@ -17,8 +17,10 @@ import org.koin.android.ext.android.inject
 class MainActivity : ComponentActivity() {
 
     private val appNavigator: AppNavigator by inject()
-    private val debugMenuDetector = DebugMenuDetector {
-        appNavigator.navigateToDebugMenu()
+    private val debugMenuDetector = if (AppBuildConfig.isDebug) {
+        DebugMenuDetector { appNavigator.navigateToDebugMenu() }
+    } else {
+        null
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -34,7 +36,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        if (debugMenuDetector.onKeyDown(keyCode)) {
+        if (debugMenuDetector?.onKeyDown(keyCode) == true) {
             return true
         }
         return super.onKeyDown(keyCode, event)
