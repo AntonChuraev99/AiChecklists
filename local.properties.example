@@ -1,0 +1,28 @@
+# Firebase Configuration
+# Get google-services.json from Firebase Console:
+# https://console.firebase.google.com/project/aichecklists-40230/settings/general
+#
+# Steps:
+# 1. Go to Firebase Console
+# 2. Select project 'aichecklists-40230'
+# 3. Go to Settings > Project Settings
+# 4. Click "Your apps" > Android app > Download google-services.json
+# 5. Place the file at: composeApp/google-services.json
+
+# DO NOT COMMIT: This file contains platform-specific and secret values
+# Add to .gitignore if not already present
+
+# Android SDK path (optional, usually auto-detected)
+# sdk.dir=/path/to/Android/Sdk
+
+# Gemini API Key (for Cloud Functions deployment only)
+# Generate from: https://aistudio.google.com/app/apikey
+# DO NOT share or commit this value
+GEMINI_API_KEY=your_key_here
+
+# Google Cloud Project ID
+GCP_PROJECT_ID=aichecklists-40230
+
+# Build variants
+android.useAndroidX=true
+android.enableJetifier=true
