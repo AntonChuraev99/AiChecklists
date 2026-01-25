@@ -2,6 +2,7 @@ package com.antonchuraev.homesearchchecklist.feature.home.presentation.detail
 
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -20,7 +21,7 @@ class ChecklistDetailViewModelTest {
 
         val initialState = ChecklistDetailState.Content(
             checklist = checklist,
-            fills = emptyList()
+            defaultFill = null
         )
 
         // Dialog should be closed initially
@@ -40,7 +41,7 @@ class ChecklistDetailViewModelTest {
 
         val openState = ChecklistDetailState.Content(
             checklist = checklist,
-            fills = emptyList(),
+            defaultFill = null,
             showAddFillDialog = true,
             newFillName = ""
         )
@@ -58,7 +59,7 @@ class ChecklistDetailViewModelTest {
 
         val stateWithError = ChecklistDetailState.Content(
             checklist = checklist,
-            fills = emptyList(),
+            defaultFill = null,
             showAddFillDialog = true,
             fillNameError = "Name cannot be empty"
         )
@@ -79,24 +80,38 @@ class ChecklistDetailViewModelTest {
     }
 
     @Test
-    fun `Content state should calculate progress correctly`() {
+    fun `Content state should calculate progress correctly from default fill`() {
         val checklist = Checklist(
             id = 1L,
             name = "Test Checklist",
             items = listOf(
-                ChecklistItem("Item 1", checked = true),
-                ChecklistItem("Item 2", checked = false),
-                ChecklistItem("Item 3", checked = true)
+                ChecklistItem("Item 1"),
+                ChecklistItem("Item 2"),
+                ChecklistItem("Item 3")
             )
+        )
+
+        val defaultFill = ChecklistFill(
+            id = 1L,
+            checklistId = 1L,
+            name = "",
+            items = listOf(
+                ChecklistFillItem("Item 1", checked = true),
+                ChecklistFillItem("Item 2", checked = false),
+                ChecklistFillItem("Item 3", checked = true)
+            ),
+            createdAt = 0L,
+            isDefault = true
         )
 
         val state = ChecklistDetailState.Content(
             checklist = checklist,
-            fills = emptyList()
+            defaultFill = defaultFill
         )
 
-        val checkedCount = state.checklist.items.count { it.checked }
-        val totalCount = state.checklist.items.size
+        // Progress should be calculated from defaultFill, not from checklist
+        val checkedCount = state.defaultFill?.items?.count { it.checked } ?: 0
+        val totalCount = state.defaultFill?.items?.size ?: 0
 
         assertEquals(2, checkedCount)
         assertEquals(3, totalCount)
