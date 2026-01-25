@@ -32,6 +32,10 @@ release.keystore
 # Firebase service account (NEVER commit!)
 *firebase-adminsdk*.json
 
+# Firebase config files (contain API keys!)
+google-services.json
+GoogleService-Info.plist
+
 # Google Service Account keys (NEVER commit!)
 *-service-account*.json
 *serviceaccount*.json
