@@ -98,7 +98,7 @@ fun TemplatesScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
-                    .padding(top = AppDimens.SpacingMd)
+                    .padding(vertical = AppDimens.SpacingMd)
             )
 
             // Main content area (scrollable)
