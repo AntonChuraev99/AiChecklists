@@ -307,8 +307,7 @@ private fun SubscriptionCard(
         // Fixed height container for content to prevent layout jumps
         Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(180.dp),
+                .fillMaxWidth(),
             contentAlignment = Alignment.Center
         ) {
             if (isLoading) {

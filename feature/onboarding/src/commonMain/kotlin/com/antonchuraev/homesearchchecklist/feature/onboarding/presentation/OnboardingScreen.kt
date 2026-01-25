@@ -81,7 +81,6 @@ fun OnboardingScreen(
     val state by viewModel.screenState.collectAsState()
     val paywallState by paywallViewModel.screenState.collectAsState()
 
-
     val pages = listOf(
         OnboardingPage(
             titleRes = Res.string.onboarding_page1_title,
@@ -173,37 +172,28 @@ fun OnboardingScreen(
             if (pageIndex < pages.size) {
                 OnboardingPageContent(
                     page = pages[pageIndex],
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .weight(1F)
+                    modifier = Modifier.fillMaxSize()
                 )
             } else {
-                val product = paywallState.products.firstOrNull()
-
-                // Paywall page
                 PaywallPageContent(
-                    product = product,
+                    product = paywallState.products.firstOrNull(),
                     paywallState = paywallState,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .weight(1F)
+                    modifier = Modifier.fillMaxSize()
                 )
             }
         }
 
-        // Bottom section with fixed height to prevent layout jumps
+        // Bottom section
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
-            ,
+                .padding(horizontal = AppDimens.ScreenPaddingHorizontal),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(modifier = Modifier.height(AppDimens.SpacingXl))
 
             if (isPaywallPage) {
                 val product = paywallState.products.firstOrNull()
-                // Subscribe button
                 Button(
                     onClick = { paywallViewModel.sendIntent(PaywallIntent.Purchase) },
                     enabled = !paywallState.isPurchasing && product != null,
@@ -356,12 +346,10 @@ private fun PaywallPageContent(
 
         Spacer(modifier = Modifier.height(AppDimens.SpacingXl))
 
-        // Legal links
         PaywallLegalLinks(
             onTermsClick = { uriHandler.openUri(PaywallConfig.TERMS_OF_USE_URL) },
             onPrivacyClick = { uriHandler.openUri(PaywallConfig.PRIVACY_POLICY_URL) }
         )
-
 
         Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
 
