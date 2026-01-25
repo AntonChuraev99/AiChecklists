@@ -132,36 +132,31 @@ fun OnboardingScreen(
             .navigationBarsPadding()
             .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
     ) {
-        // Skip button (hidden on paywall page)
+        // Skip button (shown on all pages including paywall)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = AppDimens.SpacingSm),
             horizontalArrangement = Arrangement.End
         ) {
-            if (!isPaywallPage) {
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(AppDimens.SpacingSm))
-                        .clickable { viewModel.sendIntent(OnboardingIntent.OnSkip) }
-                        .padding(AppDimens.SpacingSm),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = stringResource(Res.string.onboarding_skip),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            } else {
-                // Spacer to maintain layout
-                Spacer(modifier = Modifier.height(36.dp))
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(AppDimens.SpacingSm))
+                    .clickable { viewModel.sendIntent(OnboardingIntent.OnSkip) }
+                    .padding(AppDimens.SpacingSm),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(Res.string.onboarding_skip),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
 
@@ -185,33 +180,82 @@ fun OnboardingScreen(
             }
         }
 
-        // Bottom section: different for paywall page
-        if (isPaywallPage) {
-            PaywallBottomSection(
-                product = paywallState.products.firstOrNull(),
-                isLoading = paywallState.isLoading,
-                isPurchasing = paywallState.isPurchasing,
-                onSubscribe = { paywallViewModel.sendIntent(PaywallIntent.Purchase) },
-                onSkip = { viewModel.sendIntent(OnboardingIntent.OnSkip) },
-                onTermsClick = { uriHandler.openUri(PaywallConfig.TERMS_OF_USE_URL) },
-                onPrivacyClick = { uriHandler.openUri(PaywallConfig.PRIVACY_POLICY_URL) }
-            )
-        } else {
-            // Continue button
-            AppButton(
-                text = stringResource(Res.string.onboarding_continue),
-                onClick = { viewModel.sendIntent(OnboardingIntent.OnNextPage) },
-                modifier = Modifier.fillMaxWidth()
-            )
+        // Bottom section with fixed height to prevent layout jumps
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(180.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            if (isPaywallPage) {
+                val product = paywallState.products.firstOrNull()
 
-            Spacer(modifier = Modifier.height(AppDimens.SpacingLg))
+                // Price info section
+                PaywallPriceInfo(
+                    product = product,
+                    isLoading = paywallState.isLoading
+                )
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                // Subscribe button
+                Button(
+                    onClick = { paywallViewModel.sendIntent(PaywallIntent.Purchase) },
+                    enabled = !paywallState.isPurchasing && product != null,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    shape = RoundedCornerShape(26.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = Color.White
+                    )
+                ) {
+                    if (paywallState.isPurchasing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(22.dp),
+                            color = Color.White,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text(
+                            text = if (product?.hasFreeTrial == true) {
+                                stringResource(Res.string.paywall_start_free_trial)
+                            } else {
+                                stringResource(Res.string.paywall_subscribe_now)
+                            },
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
+
+                // Legal links
+                PaywallLegalLinks(
+                    onTermsClick = { uriHandler.openUri(PaywallConfig.TERMS_OF_USE_URL) },
+                    onPrivacyClick = { uriHandler.openUri(PaywallConfig.PRIVACY_POLICY_URL) }
+                )
+            } else {
+                // Regular onboarding pages - button at bottom
+                Spacer(modifier = Modifier.weight(1f))
+
+                AppButton(
+                    text = stringResource(Res.string.onboarding_continue),
+                    onClick = { viewModel.sendIntent(OnboardingIntent.OnNextPage) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(AppDimens.SpacingXl))
+            }
         }
 
         // Page indicators
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = if (isPaywallPage) AppDimens.SpacingSm else AppDimens.SpacingXl),
+                .padding(bottom = AppDimens.SpacingLg),
             horizontalArrangement = Arrangement.Center
         ) {
             repeat(TOTAL_PAGES) { index ->
@@ -339,17 +383,11 @@ private fun PaywallPageContent(
 }
 
 @Composable
-private fun PaywallBottomSection(
+private fun PaywallPriceInfo(
     product: PaywallProduct?,
-    isLoading: Boolean,
-    isPurchasing: Boolean,
-    onSubscribe: () -> Unit,
-    onSkip: () -> Unit,
-    onTermsClick: () -> Unit,
-    onPrivacyClick: () -> Unit
+    isLoading: Boolean
 ) {
     Column(
-        modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         if (isLoading) {
@@ -357,9 +395,8 @@ private fun PaywallBottomSection(
                 modifier = Modifier.size(32.dp),
                 color = MaterialTheme.colorScheme.primary
             )
-            Spacer(modifier = Modifier.height(AppDimens.SpacingLg))
         } else if (product != null) {
-            // Price info
+            // Price headline
             if (product.hasFreeTrial) {
                 Text(
                     text = stringResource(Res.string.paywall_days_free, product.freeTrialDays),
@@ -370,50 +407,16 @@ private fun PaywallBottomSection(
                 Spacer(modifier = Modifier.height(4.dp))
             }
 
+            // Price details
             Text(
                 text = stringResource(Res.string.paywall_then_price, product.priceString),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
-
-            // Subscribe button
-            Button(
-                onClick = onSubscribe,
-                enabled = !isPurchasing,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                shape = RoundedCornerShape(26.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = Color.White
-                )
-            ) {
-                if (isPurchasing) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(22.dp),
-                        color = Color.White,
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Text(
-                        text = if (product.hasFreeTrial) {
-                            stringResource(Res.string.paywall_start_free_trial)
-                        } else {
-                            stringResource(Res.string.paywall_subscribe_now)
-                        },
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
-
             // No payment now hint
             if (product.hasFreeTrial) {
+                Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Center
@@ -421,7 +424,7 @@ private fun PaywallBottomSection(
                     Icon(
                         imageVector = Icons.Default.Check,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
@@ -432,58 +435,43 @@ private fun PaywallBottomSection(
                     )
                 }
             }
-
-            Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
         }
+    }
+}
 
-        // Skip link
+@Composable
+private fun PaywallLegalLinks(
+    onTermsClick: () -> Unit,
+    onPrivacyClick: () -> Unit
+) {
+    Row(
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
         TextButton(
-            onClick = onSkip,
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+            onClick = onTermsClick,
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
         ) {
             Text(
-                text = stringResource(Res.string.onboarding_skip),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-
-        // Legal links
-        Row(
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            TextButton(
-                onClick = onTermsClick,
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
-            ) {
-                Text(
-                    text = stringResource(Res.string.paywall_terms),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Text(
-                text = "•",
+                text = stringResource(Res.string.paywall_terms),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            TextButton(
-                onClick = onPrivacyClick,
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
-            ) {
-                Text(
-                    text = stringResource(Res.string.paywall_privacy),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+        }
+        Text(
+            text = "•",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        TextButton(
+            onClick = onPrivacyClick,
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+        ) {
+            Text(
+                text = stringResource(Res.string.paywall_privacy),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
