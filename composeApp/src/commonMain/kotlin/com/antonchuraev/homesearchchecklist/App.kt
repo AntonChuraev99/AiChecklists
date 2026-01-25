@@ -11,6 +11,7 @@ import com.antonchuraev.homesearchchecklist.feature.create.presentation.create.C
 import com.antonchuraev.homesearchchecklist.feature.create.presentation.preview.TemplatePreviewScreen
 import com.antonchuraev.homesearchchecklist.feature.create.presentation.templates.TemplatesScreen
 import com.antonchuraev.homesearchchecklist.feature.debug.presentation.DebugScreen
+import com.antonchuraev.homesearchchecklist.feature.debug.presentation.StoreScreenshotScreen
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.MainScreen
 import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.OnboardingScreen
 import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.AnalyzeScreen
@@ -71,11 +72,15 @@ fun App() {
                     TemplatePreviewScreen(templateId = route.templateId)
                 }
 
-                /**
-                 * todo add only in debug
-                 */
-                composable<AppNavRoute.Debug> {
-                    DebugScreen()
+                // Debug screens - only available in debug builds
+                if (AppBuildConfig.isDebug) {
+                    composable<AppNavRoute.Debug> {
+                        DebugScreen()
+                    }
+
+                    composable<AppNavRoute.StoreScreenshot> {
+                        StoreScreenshotScreen()
+                    }
                 }
 
                 composable<AppNavRoute.Analyze> { backStackEntry ->

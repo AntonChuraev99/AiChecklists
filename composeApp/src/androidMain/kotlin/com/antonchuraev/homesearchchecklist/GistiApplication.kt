@@ -12,7 +12,7 @@ class GistiApplication : Application() {
         // Initialize RevenueCat early (before any UI)
         RevenueCatInitializer.initialize(
             apiKey = PaywallConfig.ANDROID_API_KEY,
-            isDebug = true // Enable debug logging
+            isDebug = AppBuildConfig.isDebug
         )
     }
 }
