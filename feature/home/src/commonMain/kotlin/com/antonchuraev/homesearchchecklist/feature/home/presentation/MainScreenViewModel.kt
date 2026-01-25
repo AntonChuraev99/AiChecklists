@@ -7,9 +7,12 @@ import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetSu
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetUserLimitsUseCase
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.formatExpirationDate
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 
@@ -23,8 +26,26 @@ class MainScreenViewModel(
 
     private val _showLimitDialog = MutableStateFlow(false)
 
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val checklistsWithProgress = repository.checklists.flatMapLatest { checklists ->
+        if (checklists.isEmpty()) {
+            flowOf(emptyList())
+        } else {
+            val fillFlows = checklists.map { checklist ->
+                repository.getDefaultFillByChecklistId(checklist.id).map { fill ->
+                    ChecklistWithProgress(
+                        checklist = checklist,
+                        totalItems = fill?.items?.size ?: checklist.items.size,
+                        checkedItems = fill?.items?.count { it.checked } ?: 0
+                    )
+                }
+            }
+            combine(fillFlows) { it.toList() }
+        }
+    }
+
     override val screenState: StateFlow<MainScreenState> = combine(
-        repository.checklists,
+        checklistsWithProgress,
         getSubscriptionStatusUseCase(),
         userDataRepository.getUserDataFlow().map { it.aiCredits },
         getUserLimitsUseCase(),
@@ -47,7 +68,7 @@ class MainScreenViewModel(
             MainScreenIntent.OnAddChecklistClick -> handleAddChecklistClick()
             MainScreenIntent.OnAddChecklistFromTemplatesClick -> handleAddChecklistFromTemplatesClick()
             MainScreenIntent.OnAiAnalyzeClick -> appNavigator.navigateToAnalyzeScreen()
-            is MainScreenIntent.OnChecklistClick -> appNavigator.navigateToChecklistDetail(intent.checklist.id)
+            is MainScreenIntent.OnChecklistClick -> appNavigator.navigateToChecklistDetail(intent.checklistWithProgress.checklist.id)
             MainScreenIntent.OnPremiumBannerClick -> handlePremiumOrCreditsClick()
             MainScreenIntent.OnCreditsClick -> handlePremiumOrCreditsClick()
             MainScreenIntent.OnDismissLimitDialog -> _showLimitDialog.update { false }
