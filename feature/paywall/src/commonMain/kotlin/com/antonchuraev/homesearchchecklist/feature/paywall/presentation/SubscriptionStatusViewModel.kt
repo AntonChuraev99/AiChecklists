@@ -68,3 +68,5 @@ class SubscriptionStatusViewModel(
 }
 
 expect fun formatExpirationDate(timestamp: Long): String
+
+expect fun getTrialEndDateFormatted(daysFromNow: Int): String
