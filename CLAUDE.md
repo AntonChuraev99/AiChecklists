@@ -335,6 +335,18 @@ data class UserLimits(
 )
 ```
 
+### Trial Timeline (Blinkist Style)
+The paywall includes a visual trial timeline showing:
+- **Today**: Free $0.00 (in user's currency)
+- **Due date**: Price after trial ends
+
+Key components:
+- `TrialTimeline` composable with Canvas-drawn timeline
+- `formatZeroPrice()` — currency-aware zero price formatting
+- `getTrialEndDateFormatted()` — expect/actual for date calculation
+
+See: [docs/solutions/ui-improvements/paywall-trial-timeline.md](docs/solutions/ui-improvements/paywall-trial-timeline.md)
+
 ## Feature: Sharing
 
 Located in `feature/sharing/`. Export checklists to share with others.

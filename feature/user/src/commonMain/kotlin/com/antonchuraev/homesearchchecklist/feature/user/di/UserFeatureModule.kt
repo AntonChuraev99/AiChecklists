@@ -1,5 +1,6 @@
 package com.antonchuraev.homesearchchecklist.feature.user.di
 
+import com.antonchuraev.homesearchchecklist.core.datastore.api.UserAppDatastoreProvider
 import com.antonchuraev.homesearchchecklist.feature.user.data.remote.UserApiService
 import com.antonchuraev.homesearchchecklist.feature.user.data.remote.UserApiServiceImpl
 import com.antonchuraev.homesearchchecklist.feature.user.data.repository.UserDataRepositoryImpl
@@ -18,7 +19,8 @@ val userFeatureModule = module {
             appScope = get(),
             deviceIdProvider = get(),
             userApiService = get(),
-            logger = get()
+            logger = get(),
+            appDatastore = UserAppDatastoreProvider.instance
         )
     } bind UserDataRepository::class
 
