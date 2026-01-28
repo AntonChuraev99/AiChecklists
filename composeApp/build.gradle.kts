@@ -35,6 +35,13 @@ kotlin {
             implementation(compose.preview)
             implementation(libs.androidx.activity.compose)
             implementation(libs.room.ktx)
+
+            // Glance for App Widgets
+            implementation(libs.glance)
+            implementation(libs.glance.appwidget)
+
+            // WorkManager for widget sync
+            implementation(libs.workmanager)
         }
         commonMain.dependencies {
             implementation(projects.core.common.api)

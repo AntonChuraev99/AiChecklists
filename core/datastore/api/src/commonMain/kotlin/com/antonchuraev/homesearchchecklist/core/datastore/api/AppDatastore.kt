@@ -27,12 +27,14 @@ fun createDataStore(producePath: () -> String): DataStore<Preferences> =
         }
     )
 
+/**
+ * Wrapper around DataStore for convenient access to preferences.
+ * DataStore instance should be provided via DI as a singleton.
+ */
 class AppDatastore(
-    name: String,
+    private val dataStore: DataStore<Preferences>,
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
-
-    private val dataStore = createDataStore(name)
 
     suspend fun saveBoolean(key: String, value: Boolean) {
         withContext(dispatcher) {
@@ -75,4 +77,16 @@ class AppDatastore(
         }
     }
 
+}
+
+/**
+ * Singleton provider for user preferences DataStore.
+ * Ensures only one DataStore instance exists for user/datastore file.
+ */
+object UserAppDatastoreProvider {
+    private const val USER_DATASTORE_NAME = "user/datastore"
+
+    val instance: AppDatastore by lazy {
+        AppDatastore(createDataStore(USER_DATASTORE_NAME))
+    }
 }
