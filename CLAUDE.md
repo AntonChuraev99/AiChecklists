@@ -562,3 +562,58 @@ Splash → Onboarding → Main
 1. Справедливость — пользователи платят пропорционально расходу
 2. Высокую маржу — минимум 63% даже при агрессивном использовании
 3. Гибкость — можно увеличить лимиты без убытков
+
+### Remote Config: ai_credits_cost_json
+
+JSON для удалённой настройки стоимости кредитов по типам ввода и моделям AI.
+
+**Ключ в Remote Config:** `ai_credits_cost_json`
+
+```json
+{
+  "default_model": "gemini-1.5-flash",
+  "models": {
+    "gemini-1.5-flash": {
+      "raw_text": 30,
+      "web_link": 30,
+      "text_file": 30,
+      "pdf": 30,
+      "photo": 45,
+      "voice": 60
+    },
+    "gemini-2.0-flash": {
+      "raw_text": 25,
+      "web_link": 25,
+      "text_file": 25,
+      "pdf": 25,
+      "photo": 40,
+      "voice": 50
+    },
+    "gemini-1.5-pro": {
+      "raw_text": 60,
+      "web_link": 60,
+      "text_file": 60,
+      "pdf": 60,
+      "photo": 90,
+      "voice": 120
+    }
+  },
+  "fallback_cost": 30
+}
+```
+
+**Поля:**
+| Поле | Описание |
+|------|----------|
+| `default_model` | Модель по умолчанию |
+| `models` | Словарь моделей с ценами по типам |
+| `models.<model>.<input_type>` | Стоимость в кредитах для типа ввода |
+| `fallback_cost` | Цена по умолчанию, если тип не найден |
+
+**Типы ввода (соответствуют `InputDataType` enum):**
+- `raw_text` — ручной ввод текста
+- `web_link` — URL ссылка
+- `text_file` — текстовый файл
+- `pdf` — PDF документ
+- `photo` — фотография
+- `voice` — голосовая запись
