@@ -4,7 +4,9 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppDatastore
 import com.antonchuraev.homesearchchecklist.feature.user.data.device.DeviceIdProvider
 import com.antonchuraev.homesearchchecklist.feature.user.data.device.getPlatformName
+import com.antonchuraev.homesearchchecklist.feature.user.data.remote.RegisterUserResult
 import com.antonchuraev.homesearchchecklist.feature.user.data.remote.UserApiService
+import com.antonchuraev.homesearchchecklist.feature.user.domain.model.RegistrationData
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.UserData
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import kotlinx.coroutines.CoroutineScope
@@ -29,6 +31,7 @@ class UserDataRepositoryImpl(
         private const val IS_ONBOARDING_PASSED_KEY = "is_onboarding_passed"
         private const val IS_PREMIUM_KEY = "is_premium"
         private const val AI_CREDITS_KEY = "ai_credits"
+        internal const val IS_PAYWALL_LINKED_KEY = "is_paywall_linked"
 
         private val DEFAULT_USER_DATA = UserData(
             userId = "",
@@ -83,7 +86,7 @@ class UserDataRepositoryImpl(
         }
     }
 
-    override suspend fun ensureUserRegistered(): Result<UserData> {
+    override suspend fun ensureUserRegistered(): Result<RegistrationData> {
         logger.debug(TAG, "ensureUserRegistered: starting...")
 
         // Check if user is already registered locally
@@ -103,7 +106,7 @@ class UserDataRepositoryImpl(
         return registerAndSave(deviceId)
     }
 
-    override suspend fun syncWithServer(): Result<UserData> {
+    override suspend fun syncWithServer(): Result<RegistrationData> {
         logger.debug(TAG, "syncWithServer: starting...")
 
         val deviceId = deviceIdProvider.getDeviceId()
@@ -112,7 +115,15 @@ class UserDataRepositoryImpl(
         return registerAndSave(deviceId)
     }
 
-    private suspend fun registerAndSave(deviceId: String): Result<UserData> {
+    override suspend fun isPaywallLinked(): Boolean {
+        return appDatastore.observeBoolean(IS_PAYWALL_LINKED_KEY, false).first()
+    }
+
+    override suspend fun setPaywallLinked(linked: Boolean) {
+        appDatastore.saveBoolean(IS_PAYWALL_LINKED_KEY, linked)
+    }
+
+    private suspend fun registerAndSave(deviceId: String): Result<RegistrationData> {
         return userApiService.registerUser(
             deviceId = deviceId,
             appVersion = null,
@@ -127,13 +138,15 @@ class UserDataRepositoryImpl(
         }.onFailure { error ->
             logger.error(TAG, "registerAndSave: FAILED - ${error.message}", error)
         }.map { result ->
-            UserData(
-                userId = result.userId,
-                isOnboardingPassed = appDatastore.observeBoolean(IS_ONBOARDING_PASSED_KEY, false).first(),
-                isPremium = result.isPremium,
-                aiCredits = result.aiCredits
+            RegistrationData(
+                userData = UserData(
+                    userId = result.userId,
+                    isOnboardingPassed = appDatastore.observeBoolean(IS_ONBOARDING_PASSED_KEY, false).first(),
+                    isPremium = result.isPremium,
+                    aiCredits = result.aiCredits
+                ),
+                isNewUser = result.isNewUser
             )
         }
     }
 }
-
