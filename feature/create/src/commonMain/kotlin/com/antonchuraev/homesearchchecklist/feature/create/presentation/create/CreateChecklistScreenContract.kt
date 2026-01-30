@@ -9,13 +9,15 @@ data class CreateChecklistState(
     val items: List<ChecklistItem> = emptyList(),
     val nameError: String? = null,
     val isEditMode: Boolean = false,
-    val editChecklistId: Long? = null
+    val editChecklistId: Long? = null,
+    val newItemText: String = ""
 ) : State
 
 sealed interface CreateChecklistIntent : Intent {
     data object OnBackClick : CreateChecklistIntent
     data object OnSaveClick : CreateChecklistIntent
     data class OnNameChange(val name: String) : CreateChecklistIntent
-    data class OnAddItem(val itemText: String) : CreateChecklistIntent
+    data class OnNewItemTextChange(val text: String) : CreateChecklistIntent
+    data object OnAddItemFromInput : CreateChecklistIntent
     data class OnDeleteItem(val item: ChecklistItem) : CreateChecklistIntent
 }
