@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.Icon
@@ -117,10 +117,10 @@ fun CreateChecklistScreen(
             }
 
             // Items list (new items appear at top)
-            items(
+            itemsIndexed(
                 items = screenState.items,
-                key = { item -> item.text.hashCode() }
-            ) { item ->
+                key = { index, _ -> "item_$index" }
+            ) { _, item ->
                 AppCard(modifier = Modifier.animateItem()) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
