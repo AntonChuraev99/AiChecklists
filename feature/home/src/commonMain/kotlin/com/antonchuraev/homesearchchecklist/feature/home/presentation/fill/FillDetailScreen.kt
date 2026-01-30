@@ -33,6 +33,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -174,7 +175,10 @@ private fun FillDetailContent(
                 ProgressHeader(fill = state.fill)
             }
 
-            itemsIndexed(state.fill.items) { index, item ->
+            itemsIndexed(
+                items = state.fill.items,
+                key = { _, item -> item.id }
+            ) { index, item ->
                 FillItemCard(
                     item = item,
                     onCheckedChange = { checked ->
@@ -244,7 +248,7 @@ private fun ProgressHeader(fill: ChecklistFill) {
             )
         }
         Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
-        androidx.compose.material3.LinearProgressIndicator(
+        LinearProgressIndicator(
             progress = { progress },
             modifier = Modifier
                 .fillMaxWidth()

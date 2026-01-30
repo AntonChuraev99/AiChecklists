@@ -3,6 +3,7 @@ package com.antonchuraev.homesearchchecklist.feature.home.presentation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,8 +11,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Checklist
@@ -40,44 +41,48 @@ fun MainScreenContent(
     onAiAnalyzeClick: () -> Unit,
     onPremiumBannerClick: () -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
-            .padding(top = AppDimens.SpacingLg, bottom = AppDimens.SpacingXxl)
-            .verticalScroll(rememberScrollState())
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(
+            start = AppDimens.ScreenPaddingHorizontal,
+            end = AppDimens.ScreenPaddingHorizontal,
+            top = AppDimens.SpacingLg,
+            bottom = AppDimens.SpacingXxl
+        ),
+        verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
     ) {
-        PremiumBanner(
-            isActive = screenState.subscriptionStatus.isActive,
-            formattedExpirationDate = screenState.formattedExpirationDate,
-            onUpgradeClick = onPremiumBannerClick,
-            onSubscriptionClick = onPremiumBannerClick
-        )
-
-        Spacer(modifier = Modifier.height(AppDimens.SpacingLg))
+        item(key = "premium_banner") {
+            PremiumBanner(
+                isActive = screenState.subscriptionStatus.isActive,
+                formattedExpirationDate = screenState.formattedExpirationDate,
+                onUpgradeClick = onPremiumBannerClick,
+                onSubscriptionClick = onPremiumBannerClick
+            )
+        }
 
         if (screenState.checklists.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                EmptyState(
-                    icon = Icons.Outlined.Checklist,
-                    title = stringResource(Res.string.main_empty_title),
-                    description = stringResource(Res.string.main_empty_description)
-                )
-            }
-        } else {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
-            ) {
-                screenState.checklists.forEach { checklistWithProgress ->
-                    ChecklistCard(
-                        checklistWithProgress = checklistWithProgress,
-                        onClick = { onChecklistClick(checklistWithProgress) }
+            item(key = "empty_state") {
+                Box(
+                    modifier = Modifier.fillParentMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    EmptyState(
+                        icon = Icons.Outlined.Checklist,
+                        title = stringResource(Res.string.main_empty_title),
+                        description = stringResource(Res.string.main_empty_description)
                     )
                 }
+            }
+        } else {
+            items(
+                items = screenState.checklists,
+                key = { it.checklist.id }
+            ) { checklistWithProgress ->
+                ChecklistCard(
+                    checklistWithProgress = checklistWithProgress,
+                    onClick = { onChecklistClick(checklistWithProgress) },
+                    modifier = Modifier.animateItem()
+                )
             }
         }
     }
@@ -86,9 +91,10 @@ fun MainScreenContent(
 @Composable
 private fun ChecklistCard(
     checklistWithProgress: ChecklistWithProgress,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    AppCard(onClick = onClick) {
+    AppCard(onClick = onClick, modifier = modifier) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,

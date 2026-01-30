@@ -124,7 +124,7 @@ class ChecklistDetailViewModel(
         if (state !is ChecklistDetailState.Content || state.defaultFill == null) return
 
         val updatedItems = state.defaultFill.items.mapIndexed { i, item ->
-            if (i == index) item.copy(checked = checked) else item
+            if (i == index) item.withChecked(checked) else item
         }
 
         val updatedFill = state.defaultFill.copy(items = updatedItems)
@@ -141,7 +141,7 @@ class ChecklistDetailViewModel(
 
         val updatedItems = state.defaultFill.items.mapIndexed { i, item ->
             if (i == itemIndex) {
-                item.copy(note = state.editingNote.takeIf { it.isNotBlank() })
+                item.withNote(state.editingNote.takeIf { it.isNotBlank() })
             } else {
                 item
             }
