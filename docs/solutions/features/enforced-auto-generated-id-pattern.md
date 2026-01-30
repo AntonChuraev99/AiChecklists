@@ -9,6 +9,9 @@ tags:
   - auto-generated-id
   - defensive-design
   - kmp
+  - kotlinx-serialization
+  - backward-compatibility
+  - room
 module: feature/checklist
 date: 2026-01-30
 symptoms:
@@ -17,6 +20,8 @@ symptoms:
   - "Duplicate keys IllegalArgumentException in LazyColumn"
   - "Need to guarantee unique stable keys for Compose list items"
   - "Accidental ID collision when creating multiple items rapidly"
+  - "MissingFieldException: Fields [id] are required but were missing"
+  - "Crash after adding new field to @Serializable data class"
 ---
 
 # Enforced Auto-Generated ID Pattern
@@ -76,19 +81,53 @@ import kotlin.random.Random
 data class ChecklistItem private constructor(
     val text: String,
     val checked: Boolean = false,
-    val id: String
+    val id: String = generateId()  // ⚠️ CRITICAL: Default required for backward compatibility!
 ) {
-    /**
-     * Creates a new ChecklistItem with auto-generated unique ID.
-     * This is the only public way to create new items.
-     */
     constructor(text: String, checked: Boolean = false) : this(
         text = text,
         checked = checked,
-        id = "${currentTimeMillis()}_${Random.nextInt(0, 10000)}"
+        id = generateId()
     )
+
+    companion object {
+        private fun generateId() = "${currentTimeMillis()}_${Random.nextInt(0, 10000)}"
+    }
 }
 ```
+
+### ⚠️ Critical: Default Values in Primary Constructor
+
+**Why defaults are required in private constructor:**
+
+kotlinx.serialization uses the **primary constructor directly** for deserialization. If old JSON data in the database doesn't have the `id` field:
+
+```kotlin
+// Old data in Room DB (before id was added):
+{"text": "Buy groceries", "checked": false}
+
+// Without default in primary constructor:
+data class ChecklistItem private constructor(
+    val text: String,
+    val checked: Boolean,
+    val id: String  // ❌ No default → MissingFieldException!
+)
+
+// With default in primary constructor:
+data class ChecklistItem private constructor(
+    val text: String,
+    val checked: Boolean = false,
+    val id: String = generateId()  // ✅ Default → new id generated
+)
+```
+
+**Error without defaults:**
+```
+kotlinx.serialization.MissingFieldException:
+Fields [checked, id] are required for type with serial name
+'...ChecklistItem', but they were missing at path: $[0]
+```
+
+**Rule:** When adding new fields to `@Serializable` data classes, **always provide default values** in the primary constructor for backward compatibility with existing data.
 
 ### Usage in LazyColumn
 
@@ -122,6 +161,44 @@ val hacked = item.copy(id = "duplicate")  // ✅ Compiles - BAD!
 
 // With @ConsistentCopyVisibility:
 val hacked = item.copy(id = "duplicate")  // ❌ ERROR: copy is private
+```
+
+### Helper Methods for Updates
+
+Since `copy()` is private, provide explicit update methods that preserve the id:
+
+```kotlin
+@ConsistentCopyVisibility
+@Serializable
+data class ChecklistFillItem private constructor(
+    val text: String,
+    val checked: Boolean,
+    val note: String? = null,
+    val id: String = generateId()
+) {
+    constructor(text: String, checked: Boolean, note: String? = null) : this(
+        text = text, checked = checked, note = note, id = generateId()
+    )
+
+    /** Update checked state while preserving id */
+    fun withChecked(checked: Boolean) = ChecklistFillItem(text, checked, note, id)
+
+    /** Update note while preserving id */
+    fun withNote(note: String?) = ChecklistFillItem(text, checked, note, id)
+
+    companion object {
+        private fun generateId() = "${currentTimeMillis()}_${Random.nextInt(0, 10000)}"
+    }
+}
+```
+
+Usage in ViewModel:
+```kotlin
+// Instead of: item.copy(checked = true)
+val updated = item.withChecked(true)
+
+// Instead of: item.copy(note = "Some note")
+val updated = item.withNote("Some note")
 ```
 
 ### Serialization works

@@ -22,8 +22,8 @@ data class Checklist(
 @Serializable
 data class ChecklistItem private constructor(
     val text: String,
-    val checked: Boolean,
-    val id: String
+    val checked: Boolean = false,
+    val id: String = generateId()
 ) {
     constructor(text: String, checked: Boolean = false) : this(
         text = text,
@@ -61,8 +61,8 @@ data class ChecklistFill(
 data class ChecklistFillItem private constructor(
     val text: String,
     val checked: Boolean,
-    val note: String?,
-    val id: String
+    val note: String? = null,
+    val id: String = generateId()
 ) {
     constructor(
         text: String,
