@@ -44,7 +44,7 @@ fun AppScaffold(
                             IconButton(onClick = onBackButtonClick) {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Filled.ArrowBackIos,
-                                    contentDescription = "Назад",
+                                    contentDescription = "Back",
                                     tint = MaterialTheme.colorScheme.primary
                                 )
                             }

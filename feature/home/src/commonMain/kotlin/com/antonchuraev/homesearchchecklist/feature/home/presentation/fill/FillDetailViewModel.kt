@@ -109,7 +109,7 @@ class FillDetailViewModel(
         if (state is FillDetailState.Content) {
             val updatedItems = state.fill.items.toMutableList()
             if (itemIndex in updatedItems.indices) {
-                updatedItems[itemIndex] = updatedItems[itemIndex].copy(checked = checked)
+                updatedItems[itemIndex] = updatedItems[itemIndex].withChecked(checked)
                 val updatedFill = state.fill.copy(items = updatedItems)
                 _screenState.value = state.copy(fill = updatedFill)
 
@@ -149,7 +149,7 @@ class FillDetailViewModel(
             val updatedItems = state.fill.items.toMutableList()
             if (itemIndex in updatedItems.indices) {
                 val noteText = state.editingNote.trim().takeIf { it.isNotEmpty() }
-                updatedItems[itemIndex] = updatedItems[itemIndex].copy(note = noteText)
+                updatedItems[itemIndex] = updatedItems[itemIndex].withNote(noteText)
                 val updatedFill = state.fill.copy(items = updatedItems)
                 _screenState.value = state.copy(
                     fill = updatedFill,

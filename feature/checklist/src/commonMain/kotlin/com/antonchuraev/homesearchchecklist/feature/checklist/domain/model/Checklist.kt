@@ -22,17 +22,17 @@ data class Checklist(
 @Serializable
 data class ChecklistItem private constructor(
     val text: String,
-    val checked: Boolean = false,
-    val id: String = generateId()
-){
-
-
-    constructor(text: String , checked: Boolean):this(text = text, checked = checked, id = generateId())
+    val checked: Boolean,
+    val id: String
+) {
+    constructor(text: String, checked: Boolean = false) : this(
+        text = text,
+        checked = checked,
+        id = generateId()
+    )
 
     companion object {
-
         private fun generateId() = "${currentTimeMillis()}_${Random.nextInt(0, 10000)}"
-
     }
 }
 
@@ -56,10 +56,32 @@ data class ChecklistFill(
  * Item state in a filled checklist
  * id is auto-generated for stable LazyColumn keys
  */
+@ConsistentCopyVisibility
 @Serializable
-data class ChecklistFillItem(
+data class ChecklistFillItem private constructor(
     val text: String,
     val checked: Boolean,
-    val note: String? = null,
-    val id: String = "${currentTimeMillis()}_${Random.nextInt(0, 10000)}"
-)
+    val note: String?,
+    val id: String
+) {
+    constructor(
+        text: String,
+        checked: Boolean,
+        note: String? = null
+    ) : this(
+        text = text,
+        checked = checked,
+        note = note,
+        id = generateId()
+    )
+
+    /** Update checked state while preserving id */
+    fun withChecked(checked: Boolean) = ChecklistFillItem(text, checked, note, id)
+
+    /** Update note while preserving id */
+    fun withNote(note: String?) = ChecklistFillItem(text, checked, note, id)
+
+    companion object {
+        private fun generateId() = "${currentTimeMillis()}_${Random.nextInt(0, 10000)}"
+    }
+}
