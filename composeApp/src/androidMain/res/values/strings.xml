@@ -1,3 +1,8 @@
 <resources>
     <string name="app_name">Gisti - AI Checklists</string>
+
+    <!-- Widget -->
+    <string name="widget_name">Checklist</string>
+    <string name="widget_description">Display and check off items from your checklist</string>
+    <string name="widget_loading">Loading…</string>
 </resources>

@@ -15,6 +15,9 @@ interface ChecklistDao {
     @Query("SELECT * FROM checklists WHERE id = :id")
     suspend fun getById(id: Long): ChecklistEntity?
 
+    @Query("SELECT * FROM checklists WHERE id = :id")
+    fun observeChecklistById(id: Long): Flow<ChecklistEntity?>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(checklist: ChecklistEntity): Long
 

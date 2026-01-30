@@ -6,10 +6,22 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Check
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.SubscriptionStatus
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.UserLimits
 
+/**
+ * Checklist with progress calculated from default fill
+ */
+data class ChecklistWithProgress(
+    val checklist: Checklist,
+    val totalItems: Int,
+    val checkedItems: Int
+) {
+    val progress: Float
+        get() = if (totalItems > 0) checkedItems.toFloat() / totalItems else 0f
+}
+
 sealed interface MainScreenState : State {
     data object Loading : MainScreenState
     data class Success(
-        val checklists: List<Checklist>,
+        val checklists: List<ChecklistWithProgress>,
         val subscriptionStatus: SubscriptionStatus = SubscriptionStatus.FREE,
         val formattedExpirationDate: String? = null,
         val aiCredits: Int = 0,
@@ -26,7 +38,7 @@ sealed interface MainScreenIntent : Intent {
 
     data object OnAiAnalyzeClick : MainScreenIntent
 
-    data class OnChecklistClick(val checklist: Checklist) : MainScreenIntent
+    data class OnChecklistClick(val checklistWithProgress: ChecklistWithProgress) : MainScreenIntent
 
     data object OnPremiumBannerClick : MainScreenIntent
 

@@ -35,6 +35,13 @@ kotlin {
             implementation(compose.preview)
             implementation(libs.androidx.activity.compose)
             implementation(libs.room.ktx)
+
+            // Glance for App Widgets
+            implementation(libs.glance)
+            implementation(libs.glance.appwidget)
+
+            // WorkManager for widget sync
+            implementation(libs.workmanager)
         }
         commonMain.dependencies {
             implementation(projects.core.common.api)
@@ -91,8 +98,8 @@ android {
         applicationId = "com.antonchuraev.aichecklists"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 4
-        versionName = "1.3"
+        versionCode = 7
+        versionName = "1.6"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
