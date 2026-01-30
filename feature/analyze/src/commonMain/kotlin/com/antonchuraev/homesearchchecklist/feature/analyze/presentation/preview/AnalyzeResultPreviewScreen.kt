@@ -214,10 +214,14 @@ private fun AnalyzeResultPreviewContent(
         }
 
         // Editable items list (new items appear at top)
-        itemsIndexed(state.editableItems) { index, item ->
+        itemsIndexed(
+            items = state.editableItems,
+            key = { index, item -> "$index-${item.hashCode()}" }
+        ) { index, item ->
             ChecklistItemCard(
                 text = item,
-                onRemove = { onRemoveItem(index) }
+                onRemove = { onRemoveItem(index) },
+                modifier = Modifier.animateItem()
             )
         }
 
@@ -231,10 +235,11 @@ private fun AnalyzeResultPreviewContent(
 @Composable
 private fun ChecklistItemCard(
     text: String,
-    onRemove: () -> Unit
+    onRemove: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface

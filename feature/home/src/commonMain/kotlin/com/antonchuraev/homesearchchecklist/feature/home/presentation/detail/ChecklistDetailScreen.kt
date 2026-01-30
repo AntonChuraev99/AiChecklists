@@ -206,7 +206,10 @@ private fun ChecklistDetailContent(
                 }
 
                 // Checklist items
-                itemsIndexed(defaultFill.items) { index, item ->
+                itemsIndexed(
+                    items = defaultFill.items,
+                    key = { _, item -> item.id }
+                ) { index, item ->
                     ChecklistItemCard(
                         item = item,
                         onCheckedChange = { checked ->

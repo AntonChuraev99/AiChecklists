@@ -100,7 +100,7 @@ class WidgetRepository(
 
         val updatedItems = fill.items.toMutableList()
         val currentItem = updatedItems[itemIndex]
-        updatedItems[itemIndex] = currentItem.copy(checked = !currentItem.checked)
+        updatedItems[itemIndex] = currentItem.withChecked(!currentItem.checked)
 
         val updatedFill = fill.copy(items = updatedItems)
         fillDao.insert(updatedFill)

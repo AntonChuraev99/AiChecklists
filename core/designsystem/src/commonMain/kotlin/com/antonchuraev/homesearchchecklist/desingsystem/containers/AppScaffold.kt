@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.desingsystem.containers
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBackIos
@@ -43,7 +44,7 @@ fun AppScaffold(
                             IconButton(onClick = onBackButtonClick) {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Filled.ArrowBackIos,
-                                    contentDescription = "Назад",
+                                    contentDescription = "Back",
                                     tint = MaterialTheme.colorScheme.primary
                                 )
                             }
@@ -60,11 +61,12 @@ fun AppScaffold(
         bottomBar = bottomBar
     ) {
         Box(
-            Modifier.padding(it),
-            content = {
-                content.invoke()
-            }
-        )
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(it)
+        ) {
+            content.invoke()
+        }
     }
 }
 
