@@ -29,9 +29,9 @@ val appModule = module {
         debugFeatureModule,
         homeFeatureModule,
         splashFeatureModule,
-        userFeatureModule,
         analyzeFeatureModule,
-        paywallFeatureModule,
+        paywallFeatureModule,  // Must be before splashFeatureModule (SplashViewModel depends on PaywallRepository)
+        userFeatureModule,
         sharingFeatureModule,
         platformModule()
     )

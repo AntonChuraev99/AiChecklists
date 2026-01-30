@@ -26,6 +26,7 @@ kotlin {
             implementation(projects.core.navigation.api)
             implementation(projects.core.designsystem)
             implementation(projects.feature.user)
+            implementation(projects.feature.paywall)
 
             implementation(compose.runtime)
             implementation(compose.foundation)
