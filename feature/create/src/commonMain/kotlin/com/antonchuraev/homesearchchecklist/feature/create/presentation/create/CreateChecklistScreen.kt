@@ -3,13 +3,14 @@ package com.antonchuraev.homesearchchecklist.feature.create.presentation.create
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.Icon
@@ -66,66 +67,81 @@ fun CreateChecklistScreen(
             }
         }
     ) {
-        Column(
-            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingLg),
-            modifier = Modifier
-                .verticalScroll(rememberScrollState())
-                .padding(AppDimens.ScreenPaddingHorizontal)
+        LazyColumn(
+            contentPadding = PaddingValues(
+                start = AppDimens.ScreenPaddingHorizontal,
+                end = AppDimens.ScreenPaddingHorizontal,
+                top = AppDimens.SpacingLg,
+                bottom = AppDimens.SpacingLg
+            ),
+            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)) {
-                Text(
-                    text = stringResource(Res.string.create_name_section),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                AppTextField(
-                    value = screenState.name,
-                    onValueChange = { viewModel.sendIntent(CreateChecklistIntent.OnNameChange(it)) },
-                    placeholder = stringResource(Res.string.create_name_placeholder),
-                    isError = screenState.nameError != null,
-                    errorMessage = screenState.nameError,
-                    showClearButton = true
-                )
+            // Name section
+            item(key = "name_section") {
+                Column(verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)) {
+                    Text(
+                        text = stringResource(Res.string.create_name_section),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    AppTextField(
+                        value = screenState.name,
+                        onValueChange = { viewModel.sendIntent(CreateChecklistIntent.OnNameChange(it)) },
+                        placeholder = stringResource(Res.string.create_name_placeholder),
+                        isError = screenState.nameError != null,
+                        errorMessage = screenState.nameError,
+                        showClearButton = true
+                    )
+                }
             }
 
-            Column(verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)) {
-                Text(
-                    text = stringResource(Res.string.create_items_section),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
+            // Items section header and input
+            item(key = "items_header") {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
+                    modifier = Modifier.padding(top = AppDimens.SpacingMd)
+                ) {
+                    Text(
+                        text = stringResource(Res.string.create_items_section),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
 
-                // Inline input field for adding items
-                AddItemInputField(
-                    text = screenState.newItemText,
-                    onTextChange = { viewModel.sendIntent(CreateChecklistIntent.OnNewItemTextChange(it)) },
-                    onAdd = { viewModel.sendIntent(CreateChecklistIntent.OnAddItemFromInput) }
-                )
+                    // Inline input field for adding items
+                    AddItemInputField(
+                        text = screenState.newItemText,
+                        onTextChange = { viewModel.sendIntent(CreateChecklistIntent.OnNewItemTextChange(it)) },
+                        onAdd = { viewModel.sendIntent(CreateChecklistIntent.OnAddItemFromInput) }
+                    )
+                }
+            }
 
-                // Items list (new items appear at top)
-                screenState.items.forEach { item ->
-                    AppCard {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+            // Items list (new items appear at top)
+            items(
+                items = screenState.items,
+                key = { item -> item.text.hashCode() }
+            ) { item ->
+                AppCard(modifier = Modifier.animateItem()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = item.text,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(
+                            onClick = { viewModel.sendIntent(CreateChecklistIntent.OnDeleteItem(item)) },
+                            modifier = Modifier.size(40.dp)
                         ) {
-                            Text(
-                                text = item.text,
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.weight(1f)
+                            Icon(
+                                imageVector = Icons.Outlined.Close,
+                                contentDescription = stringResource(Res.string.delete),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            IconButton(
-                                onClick = { viewModel.sendIntent(CreateChecklistIntent.OnDeleteItem(item)) },
-                                modifier = Modifier.size(40.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Close,
-                                    contentDescription = stringResource(Res.string.delete),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
                         }
                     }
                 }
