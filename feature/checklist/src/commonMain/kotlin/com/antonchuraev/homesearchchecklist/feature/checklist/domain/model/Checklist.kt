@@ -1,5 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.checklist.domain.model
 
+import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
+import kotlin.random.Random
 import kotlinx.serialization.Serializable
 
 /**
@@ -14,12 +16,25 @@ data class Checklist(
 
 /**
  * Single item in a checklist template
+ * id is auto-generated for stable LazyColumn keys
  */
+@ConsistentCopyVisibility
 @Serializable
-data class ChecklistItem(
+data class ChecklistItem private constructor(
     val text: String,
-    val checked: Boolean = false
-)
+    val checked: Boolean = false,
+    val id: String = generateId()
+){
+
+
+    constructor(text: String , checked: Boolean):this(text = text, checked = checked, id = generateId())
+
+    companion object {
+
+        private fun generateId() = "${currentTimeMillis()}_${Random.nextInt(0, 10000)}"
+
+    }
+}
 
 /**
  * A filled instance of a checklist
@@ -39,10 +54,12 @@ data class ChecklistFill(
 
 /**
  * Item state in a filled checklist
+ * id is auto-generated for stable LazyColumn keys
  */
 @Serializable
 data class ChecklistFillItem(
     val text: String,
     val checked: Boolean,
-    val note: String? = null
+    val note: String? = null,
+    val id: String = "${currentTimeMillis()}_${Random.nextInt(0, 10000)}"
 )

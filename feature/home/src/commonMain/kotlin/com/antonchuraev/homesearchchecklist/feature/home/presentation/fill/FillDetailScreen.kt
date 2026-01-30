@@ -174,7 +174,10 @@ private fun FillDetailContent(
                 ProgressHeader(fill = state.fill)
             }
 
-            itemsIndexed(state.fill.items) { index, item ->
+            itemsIndexed(
+                items = state.fill.items,
+                key = { _, item -> item.id }
+            ) { index, item ->
                 FillItemCard(
                     item = item,
                     onCheckedChange = { checked ->

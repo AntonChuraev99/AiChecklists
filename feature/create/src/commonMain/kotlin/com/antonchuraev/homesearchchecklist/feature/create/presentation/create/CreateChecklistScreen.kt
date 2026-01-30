@@ -119,7 +119,7 @@ fun CreateChecklistScreen(
             // Items list (new items appear at top)
             itemsIndexed(
                 items = screenState.items,
-                key = { index, _ -> "item_$index" }
+                key = { _, item -> item.id }
             ) { _, item ->
                 AppCard(modifier = Modifier.animateItem()) {
                     Row(
