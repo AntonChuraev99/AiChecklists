@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.paywall.data.repository
 
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.Entitlements
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.LoginResult
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallOffering
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallProduct
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PurchaseResult
@@ -218,5 +219,51 @@ class PaywallRepositoryImpl : PaywallRepository {
             activeEntitlements = activeEntitlements,
             expirationDate = null // Will be implemented when product expiration is needed
         )
+    }
+
+    override suspend fun logIn(appUserId: String): Result<LoginResult> {
+        if (!isConfigured()) {
+            return Result.failure(IllegalStateException("RevenueCat not configured"))
+        }
+
+        return suspendCancellableCoroutine { continuation ->
+            Purchases.sharedInstance.logIn(
+                newAppUserID = appUserId,
+                onError = { error ->
+                    continuation.resume(Result.failure(Exception(error.message)))
+                },
+                onSuccess = { customerInfo, created ->
+                    val status = customerInfo.toSubscriptionStatus()
+                    _subscriptionStatus.value = status
+                    continuation.resume(
+                        Result.success(
+                            LoginResult(
+                                subscriptionStatus = status,
+                                isNewCustomer = created
+                            )
+                        )
+                    )
+                }
+            )
+        }
+    }
+
+    override suspend fun logOut(): Result<SubscriptionStatus> {
+        if (!isConfigured()) {
+            return Result.failure(IllegalStateException("RevenueCat not configured"))
+        }
+
+        return suspendCancellableCoroutine { continuation ->
+            Purchases.sharedInstance.logOut(
+                onError = { error ->
+                    continuation.resume(Result.failure(Exception(error.message)))
+                },
+                onSuccess = { customerInfo ->
+                    val status = customerInfo.toSubscriptionStatus()
+                    _subscriptionStatus.value = status
+                    continuation.resume(Result.success(status))
+                }
+            )
+        }
     }
 }
