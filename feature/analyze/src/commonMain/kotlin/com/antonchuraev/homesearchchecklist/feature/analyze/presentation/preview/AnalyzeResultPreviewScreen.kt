@@ -17,8 +17,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
@@ -28,7 +26,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -40,8 +37,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AddItemInputField
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppTextField
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
@@ -205,21 +202,22 @@ private fun AnalyzeResultPreviewContent(
             )
         }
 
-        // Editable items list
+        // Add new item field (at top, new items appear below)
+        item {
+            AddItemInputField(
+                text = state.newItemText,
+                onTextChange = onNewItemTextChange,
+                onAdd = onAddItem,
+                placeholder = stringResource(Res.string.analyze_preview_add_item_hint)
+            )
+            Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
+        }
+
+        // Editable items list (new items appear at top)
         itemsIndexed(state.editableItems) { index, item ->
             ChecklistItemCard(
                 text = item,
                 onRemove = { onRemoveItem(index) }
-            )
-        }
-
-        // Add new item field
-        item {
-            Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
-            AddItemField(
-                text = state.newItemText,
-                onTextChange = onNewItemTextChange,
-                onAdd = onAddItem
             )
         }
 
@@ -283,45 +281,3 @@ private fun ChecklistItemCard(
     }
 }
 
-@Composable
-private fun AddItemField(
-    text: String,
-    onTextChange: (String) -> Unit,
-    onAdd: () -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
-    ) {
-        OutlinedTextField(
-            value = text,
-            onValueChange = onTextChange,
-            placeholder = { Text(stringResource(Res.string.analyze_preview_add_item_hint)) },
-            modifier = Modifier.weight(1f),
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-            keyboardActions = KeyboardActions(onDone = { if (text.isNotBlank()) onAdd() }),
-            shape = RoundedCornerShape(12.dp)
-        )
-
-        IconButton(
-            onClick = onAdd,
-            enabled = text.isNotBlank(),
-            modifier = Modifier
-                .size(48.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(
-                    if (text.isNotBlank()) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.surfaceVariant
-                )
-        ) {
-            Icon(
-                imageVector = Icons.Default.Add,
-                contentDescription = stringResource(Res.string.analyze_preview_add_item),
-                tint = if (text.isNotBlank()) MaterialTheme.colorScheme.onPrimary
-                else MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}

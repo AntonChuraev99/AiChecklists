@@ -91,8 +91,8 @@ fun MainScreen(
             Box(modifier = Modifier.fillMaxSize()) {
                 MainScreenContent(
                     screenState = state,
-                    onChecklistClick = { checklist ->
-                        viewModel.sendIntent(MainScreenIntent.OnChecklistClick(checklist))
+                    onChecklistClick = { checklistWithProgress ->
+                        viewModel.sendIntent(MainScreenIntent.OnChecklistClick(checklistWithProgress))
                     },
                     onAddChecklistClick = {
                         viewModel.sendIntent(MainScreenIntent.OnAddChecklistClick)

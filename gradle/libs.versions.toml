@@ -27,6 +27,8 @@ sqlite = "2.6.2"
 kotlinxCoroutines = "1.10.2"
 datastore = "1.2.0"
 ksp = "2.3.4"
+glance = "1.1.1"
+workmanager = "2.10.0"
 revenuecat = "2.2.17+17.26.1"
 googleServices = "4.4.2"
 firebaseBom = "33.7.0"
@@ -84,6 +86,13 @@ ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negoti
 ktor-serialization-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
 ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
 ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "ktor" }
+
+# Glance for App Widgets
+glance = { module = "androidx.glance:glance", version.ref = "glance" }
+glance-appwidget = { module = "androidx.glance:glance-appwidget", version.ref = "glance" }
+
+# WorkManager for background sync
+workmanager = { module = "androidx.work:work-runtime-ktx", version.ref = "workmanager" }
 
 [bundles]
 koin-feature = [

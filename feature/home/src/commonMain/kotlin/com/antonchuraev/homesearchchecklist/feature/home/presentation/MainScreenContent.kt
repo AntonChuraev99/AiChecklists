@@ -27,7 +27,6 @@ import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
 import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
-import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.components.PremiumBanner
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
@@ -36,7 +35,7 @@ import org.jetbrains.compose.resources.stringResource
 @Composable
 fun MainScreenContent(
     screenState: MainScreenState.Success,
-    onChecklistClick: (Checklist) -> Unit,
+    onChecklistClick: (ChecklistWithProgress) -> Unit,
     onAddChecklistClick: () -> Unit,
     onAiAnalyzeClick: () -> Unit,
     onPremiumBannerClick: () -> Unit
@@ -73,10 +72,10 @@ fun MainScreenContent(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
             ) {
-                screenState.checklists.forEach { checklist ->
+                screenState.checklists.forEach { checklistWithProgress ->
                     ChecklistCard(
-                        checklist = checklist,
-                        onClick = { onChecklistClick(checklist) }
+                        checklistWithProgress = checklistWithProgress,
+                        onClick = { onChecklistClick(checklistWithProgress) }
                     )
                 }
             }
@@ -86,13 +85,9 @@ fun MainScreenContent(
 
 @Composable
 private fun ChecklistCard(
-    checklist: Checklist,
+    checklistWithProgress: ChecklistWithProgress,
     onClick: () -> Unit
 ) {
-    val totalItems = checklist.items.size
-    val checkedItems = checklist.items.count { it.checked }
-    val progress = if (totalItems > 0) checkedItems.toFloat() / totalItems else 0f
-
     AppCard(onClick = onClick) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -104,18 +99,18 @@ private fun ChecklistCard(
                 verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs)
             ) {
                 Text(
-                    text = checklist.name,
+                    text = checklistWithProgress.checklist.name,
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
 
-                if (totalItems > 0) {
+                if (checklistWithProgress.totalItems > 0) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
                     ) {
                         LinearProgressIndicator(
-                            progress = { progress },
+                            progress = { checklistWithProgress.progress },
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(MaterialTheme.shapes.small),
@@ -123,7 +118,7 @@ private fun ChecklistCard(
                             trackColor = MaterialTheme.colorScheme.outlineVariant,
                         )
                         Text(
-                            text = "$checkedItems/$totalItems",
+                            text = "${checklistWithProgress.checkedItems}/${checklistWithProgress.totalItems}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

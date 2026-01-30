@@ -18,7 +18,8 @@ class UserDataRepositoryImpl(
     private val appScope: CoroutineScope,
     private val deviceIdProvider: DeviceIdProvider,
     private val userApiService: UserApiService,
-    private val logger: AppLogger
+    private val logger: AppLogger,
+    private val appDatastore: AppDatastore
 ) : UserDataRepository {
 
     companion object {
@@ -36,8 +37,6 @@ class UserDataRepositoryImpl(
             aiCredits = 0
         )
     }
-
-    private val appDatastore: AppDatastore = AppDatastore("user/datastore")
 
     private val userDataFlow = combine(
         appDatastore.observeString(USER_ID_KEY, ""),

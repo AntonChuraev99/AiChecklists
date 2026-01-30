@@ -11,6 +11,8 @@
     <string name="selected">Selected:</string>
     <string name="select">Select</string>
     <string name="delete">Delete</string>
+    <string name="add_item">Add item</string>
+    <string name="add_item_placeholder">Add new item...</string>
 
     <!-- Onboarding -->
     <string name="onboarding_skip">Skip</string>
@@ -234,6 +236,10 @@
     <string name="paywall_start_free_trial">Start your FREE trial</string>
     <string name="paywall_subscribe_now">Subscribe Now</string>
     <string name="paywall_no_payment_now">No payment due now</string>
+    <string name="paywall_cancel_anytime">Cancel anytime</string>
+    <string name="paywall_timeline_today">Today</string>
+    <string name="paywall_timeline_due">Due %1$s</string>
+    <string name="paywall_timeline_free">Free</string>
     <string name="paywall_terms">Terms of Use</string>
     <string name="paywall_privacy">Privacy Policy</string>
     <string name="paywall_support">Support</string>

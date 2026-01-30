@@ -89,8 +89,9 @@ class AnalyzeResultPreviewViewModel(
         val text = _screenState.value.newItemText.trim()
         if (text.isNotEmpty()) {
             _screenState.update { state ->
+                // New items appear at the TOP of the list
                 state.copy(
-                    editableItems = state.editableItems + text,
+                    editableItems = listOf(text) + state.editableItems,
                     newItemText = ""
                 )
             }

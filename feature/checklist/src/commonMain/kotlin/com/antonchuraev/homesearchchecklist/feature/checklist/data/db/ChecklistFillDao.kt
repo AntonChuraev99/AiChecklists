@@ -14,6 +14,9 @@ interface ChecklistFillDao {
     @Query("SELECT * FROM checklist_fills WHERE checklistId = :checklistId AND isDefault = 1 LIMIT 1")
     fun observeDefaultFillByChecklistId(checklistId: Long): Flow<ChecklistFillEntity?>
 
+    @Query("SELECT * FROM checklist_fills WHERE checklistId = :checklistId AND isDefault = 1 LIMIT 1")
+    suspend fun getDefaultFillByChecklistId(checklistId: Long): ChecklistFillEntity?
+
     @Query("SELECT * FROM checklist_fills WHERE checklistId = :checklistId AND isDefault = 0 ORDER BY createdAt DESC")
     fun observeAdditionalFillsByChecklistId(checklistId: Long): Flow<List<ChecklistFillEntity>>
 
