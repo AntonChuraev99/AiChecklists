@@ -26,4 +26,3 @@ val userFeatureModule = module {
 
     factory { CompleteOnboardingUseCase(get()) }
 }
-
