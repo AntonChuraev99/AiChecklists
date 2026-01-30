@@ -51,17 +51,36 @@ class CreateChecklistViewModel(
             is CreateChecklistIntent.OnNameChange -> _screenState.update {
                 it.copy(name = intent.name, nameError = null)
             }
-            is CreateChecklistIntent.OnAddItem -> _screenState.update {
-                it.copy(items = it.items + ChecklistItem(intent.itemText, false))
+            is CreateChecklistIntent.OnNewItemTextChange -> _screenState.update {
+                it.copy(newItemText = intent.text)
             }
-
+            CreateChecklistIntent.OnAddItemFromInput -> addItemFromInput()
             is CreateChecklistIntent.OnDeleteItem -> _screenState.update {
                 it.copy(items = it.items - intent.item)
             }
         }
     }
 
+    private fun addItemFromInput() {
+        val text = _screenState.value.newItemText.trim()
+        if (text.isNotBlank()) {
+            _screenState.update {
+                // New items appear at the TOP of the list
+                it.copy(
+                    items = listOf(ChecklistItem(text, false)) + it.items,
+                    newItemText = ""
+                )
+            }
+        }
+    }
+
     private fun onSaveClick() {
+        // Auto-add unsaved text from input field before saving
+        val unsavedText = _screenState.value.newItemText.trim()
+        if (unsavedText.isNotBlank()) {
+            addItemFromInput()
+        }
+
         val currentState = _screenState.value
 
         if (currentState.name.isBlank()) {

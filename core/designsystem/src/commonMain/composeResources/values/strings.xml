@@ -11,6 +11,8 @@
     <string name="selected">Selected:</string>
     <string name="select">Select</string>
     <string name="delete">Delete</string>
+    <string name="add_item">Add item</string>
+    <string name="add_item_placeholder">Add new item...</string>
 
     <!-- Onboarding -->
     <string name="onboarding_skip">Skip</string>
