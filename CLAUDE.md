@@ -37,6 +37,17 @@ Gisti transforms any content into actionable checklists using AI. The app has **
 - **Premium** ($1.99/mo): Unlimited checklists/fills, 300 AI credits daily, priority support
 - 3-day free trial for new users
 
+## Project Language
+
+**All code comments, documentation, and commit messages must be in English.**
+
+This includes:
+- Code comments and KDoc/Javadoc
+- Documentation in `docs/` folder
+- Commit messages
+- PR descriptions
+- Variable and function names (always English)
+
 ## Build Commands
 
 ```bash

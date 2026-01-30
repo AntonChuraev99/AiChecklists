@@ -23,11 +23,11 @@ symptoms:
 
 ## Overview
 
-Паттерн для Kotlin data class, который **гарантирует** автоматическую генерацию уникального ID при создании объекта. Используется для стабильных ключей в LazyColumn.
+A Kotlin data class pattern that **guarantees** automatic unique ID generation when creating objects. Used for stable LazyColumn keys.
 
 ## Problem
 
-### Почему index-based keys не работают
+### Why index-based keys don't work
 
 ```kotlin
 // ❌ BAD: Index-based keys break animations
@@ -36,36 +36,36 @@ LazyColumn {
 }
 ```
 
-Когда элемент удаляется:
-- Item с index 3 становится index 2
-- Compose думает что это тот же элемент (ключ "item_2")
-- Анимации ломаются, состояние путается
+When an item is deleted:
+- Item at index 3 becomes index 2
+- Compose thinks it's the same item (key "item_2")
+- Animations break, state gets confused
 
-### Почему обычный default parameter не достаточен
+### Why regular default parameter is not enough
 
 ```kotlin
-// ⚠️ RISKY: Можно передать кастомный id
+// ⚠️ RISKY: Custom id can be passed
 data class ChecklistItem(
     val text: String,
     val id: String = generateId()
 )
 
-// Разработчик может сломать:
-ChecklistItem("Task", id = "duplicate-id")  // Коллизия!
-item.copy(id = "hacked")                    // Обход генерации!
+// Developer can break it:
+ChecklistItem("Task", id = "duplicate-id")  // Collision!
+item.copy(id = "hacked")                    // Bypass generation!
 ```
 
 ## Solution
 
-### Ключевые компоненты
+### Key components
 
-| Компонент | Назначение |
-|-----------|------------|
-| `private constructor` | Запрещает создание с кастомным id |
-| `@ConsistentCopyVisibility` | Делает `copy()` тоже private (Kotlin 1.9+) |
-| Public secondary constructor | Единственный способ создать объект |
+| Component | Purpose |
+|-----------|---------|
+| `private constructor` | Prevents creation with custom id |
+| `@ConsistentCopyVisibility` | Makes `copy()` also private (Kotlin 1.9+) |
+| Public secondary constructor | Only way to create object |
 
-### Реализация
+### Implementation
 
 ```kotlin
 import kotlinx.serialization.Serializable
@@ -90,7 +90,7 @@ data class ChecklistItem private constructor(
 }
 ```
 
-### Использование в LazyColumn
+### Usage in LazyColumn
 
 ```kotlin
 @Composable
@@ -102,7 +102,7 @@ fun ChecklistScreen(items: List<ChecklistItem>) {
         ) { index, item ->
             ChecklistItemRow(
                 item = item,
-                modifier = Modifier.animateItem()  // Анимации работают!
+                modifier = Modifier.animateItem()  // Animations work!
             )
         }
     }
@@ -113,32 +113,32 @@ fun ChecklistScreen(items: List<ChecklistItem>) {
 
 ### @ConsistentCopyVisibility
 
-Без этой аннотации `copy()` всегда public:
+Without this annotation `copy()` is always public:
 
 ```kotlin
-// Без @ConsistentCopyVisibility:
+// Without @ConsistentCopyVisibility:
 val item = ChecklistItem("Task")
-val hacked = item.copy(id = "duplicate")  // ✅ Компилируется - ПЛОХО!
+val hacked = item.copy(id = "duplicate")  // ✅ Compiles - BAD!
 
-// С @ConsistentCopyVisibility:
+// With @ConsistentCopyVisibility:
 val hacked = item.copy(id = "duplicate")  // ❌ ERROR: copy is private
 ```
 
-### Serialization работает
+### Serialization works
 
-`@Serializable` использует primary constructor напрямую через compiler plugin:
+`@Serializable` uses primary constructor directly via compiler plugin:
 
 ```kotlin
 val json = """{"text":"Task","checked":false,"id":"123_456"}"""
 val item = Json.decodeFromString<ChecklistItem>(json)
-// item.id = "123_456" (сохранён из JSON!)
+// item.id = "123_456" (preserved from JSON!)
 ```
 
-Сериализация обходит Kotlin visibility — это **ожидаемое поведение**.
+Serialization bypasses Kotlin visibility — this is **expected behavior**.
 
-### Room Database тоже работает
+### Room Database also works
 
-Room использует reflection для доступа к primary constructor.
+Room uses reflection to access the primary constructor.
 
 ## ID Generation Strategy
 
@@ -146,12 +146,12 @@ Room использует reflection для доступа к primary constructo
 id = "${currentTimeMillis()}_${Random.nextInt(0, 10000)}"
 ```
 
-- **`currentTimeMillis()`** — миллисекундная точность
-- **`Random.nextInt(0, 10000)`** — защита от коллизий при быстром создании в цикле
+- **`currentTimeMillis()`** — millisecond precision
+- **`Random.nextInt(0, 10000)`** — collision protection for rapid creation in loops
 
 ### KMP Compatibility
 
-Используем expect/actual для `currentTimeMillis()`:
+Use expect/actual for `currentTimeMillis()`:
 
 ```kotlin
 // commonMain
@@ -167,24 +167,24 @@ actual fun currentTimeMillis(): Long =
 
 ## Trade-offs
 
-| Аспект | Плюс | Минус |
-|--------|------|-------|
-| Уникальность ID | Гарантирована | Требует Kotlin 1.9+ |
-| Иммутабельность | Нельзя случайно изменить id | Нужны helper методы вместо copy() |
-| Сериализация | Работает прозрачно | — |
-| Тестирование | Предсказуемое поведение | Нельзя создать с конкретным id |
+| Aspect | Benefit | Cost |
+|--------|---------|------|
+| ID uniqueness | Guaranteed | Requires Kotlin 1.9+ |
+| Immutability | Cannot accidentally modify id | Need helper methods instead of copy() |
+| Serialization | Works transparently | — |
+| Testing | Predictable behavior | Cannot create with specific id |
 
 ## When to Use
 
-✅ **Используйте когда:**
-- Объекты отображаются в LazyColumn/LazyRow
-- Нужны стабильные ключи для анимаций
-- ID должен быть уникальным и неизменяемым
+✅ **Use when:**
+- Objects are displayed in LazyColumn/LazyRow
+- Need stable keys for animations
+- ID must be unique and immutable
 
-❌ **Не используйте когда:**
-- ID приходит с сервера (нужен контроль над значением)
-- Простые value objects без коллекций
-- Нужна возможность тестирования с конкретными ID
+❌ **Don't use when:**
+- ID comes from server (need control over value)
+- Simple value objects without collections
+- Need ability to test with specific IDs
 
 ## Files
 
