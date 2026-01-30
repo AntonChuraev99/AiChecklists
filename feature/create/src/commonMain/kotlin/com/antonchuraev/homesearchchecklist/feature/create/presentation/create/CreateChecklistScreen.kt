@@ -30,10 +30,6 @@ import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
-import androidx.compose.animation.animateBounds
-import androidx.compose.animation.animateContentSize
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
