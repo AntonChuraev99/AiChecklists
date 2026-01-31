@@ -2,6 +2,7 @@ package com.antonchuraev.homesearchchecklist.feature.paywall.presentation
 
 import androidx.lifecycle.viewModelScope
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
+import com.antonchuraev.homesearchchecklist.core.common.api.formatExpirationDate
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetSubscriptionStatusUseCase
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
@@ -67,6 +68,4 @@ class SubscriptionStatusViewModel(
     }
 }
 
-expect fun formatExpirationDate(timestamp: Long): String
 
-expect fun getTrialEndDateFormatted(daysFromNow: Int): String

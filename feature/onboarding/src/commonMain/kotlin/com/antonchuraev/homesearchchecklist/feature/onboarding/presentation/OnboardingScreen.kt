@@ -52,6 +52,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.illustrations.CreateVia
 import com.antonchuraev.homesearchchecklist.desingsystem.illustrations.FillViaAiIllustration
 import com.antonchuraev.homesearchchecklist.desingsystem.illustrations.ExportShareIllustration
 import com.antonchuraev.homesearchchecklist.desingsystem.illustrations.PremiumBenefitsIllustration
+import com.antonchuraev.homesearchchecklist.desingsystem.sharedUI.TrialTimeline
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.feature.paywall.data.PaywallConfig
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallProduct
@@ -413,6 +414,14 @@ private fun PaywallPriceInfo(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+
+                Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
+
+                TrialTimeline(
+                    trialDays = product.freeTrialDays,
+                    priceString = product.priceString,
+                    primaryColor = MaterialTheme.colorScheme.primary
+                )
             }
         }
     }
