@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Email
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -69,6 +70,9 @@ fun MainScreen(
         },
         bottomBar = {
             if (screenState is MainScreenState.Success) {
+                val state = screenState as MainScreenState.Success
+                val canCreateChecklist = state.userLimits?.canCreateChecklist ?: true
+
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -77,9 +81,12 @@ fun MainScreen(
                         .navigationBarsPadding()
                 ) {
                     AppButton(
-                        text = stringResource(Res.string.main_create_checklist),
+                        text = stringResource(
+                            if (canCreateChecklist) Res.string.main_create_checklist
+                            else Res.string.main_create_checklist_locked
+                        ),
                         onClick = { viewModel.sendIntent(MainScreenIntent.OnAddChecklistClick) },
-                        icon = Icons.Filled.Add,
+                        icon = if (canCreateChecklist) Icons.Filled.Add else Icons.Outlined.Lock,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }

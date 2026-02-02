@@ -36,6 +36,7 @@
     <string name="main_empty_title">Ready to get organized?</string>
     <string name="main_empty_description">Create your first checklist or let AI build one from any text, photo, or document.</string>
     <string name="main_create_checklist">Create Checklist</string>
+    <string name="main_create_checklist_locked">Unlock More Checklists</string>
     <string name="main_ai_analysis">AI Analysis</string>
     <string name="main_no_items">Empty</string>
 
