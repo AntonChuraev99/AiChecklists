@@ -317,6 +317,10 @@ def register_user(request: Request):
 
 FILL_CHECKLIST_PROMPT = """You are an AI assistant that helps fill checklists based on provided data.
 
+LANGUAGE: Detect the language of USER DATA. The "note" and "summary" fields MUST be in that detected language.
+- Match checklist items SEMANTICALLY across languages (e.g., Russian item "Проверить окна" matches English input "windows look good")
+- If USER DATA has no text, use the language of checklist items
+
 The user has a checklist with the following items that need to be filled:
 {checklist_items}
 
@@ -475,6 +479,11 @@ def analyze_and_fill_checklist(request: Request):
 # ============================================================================
 
 GENERATE_CHECKLIST_PROMPT = """You are an AI assistant that creates checklists based on user requirements.
+
+LANGUAGE: Detect the language of USER DATA. ALL output (checklist_name, items, summary) MUST be in that detected language.
+- If USER DATA has mixed languages, use the DOMINANT language (>50% of content)
+- If USER DATA is empty or non-textual, use the language of USER PROMPT
+- If both are non-textual, use English as fallback
 
 USER PROMPT:
 {user_prompt}
