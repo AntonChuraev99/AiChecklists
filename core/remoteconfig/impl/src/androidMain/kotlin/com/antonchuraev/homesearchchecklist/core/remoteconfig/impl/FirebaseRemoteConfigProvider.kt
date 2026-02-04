@@ -63,7 +63,10 @@ class FirebaseRemoteConfigProvider : RemoteConfigProvider {
 
     override fun getLong(key: String, defaultValue: Long): Long {
         return try {
-            remoteConfig.getLong(key)
+            val value = remoteConfig.getLong(key)
+            // Firebase returns 0 if key not found or defaults not yet applied
+            // Use provided defaultValue in this case
+            if (value == 0L) defaultValue else value
         } catch (e: Exception) {
             defaultValue
         }
