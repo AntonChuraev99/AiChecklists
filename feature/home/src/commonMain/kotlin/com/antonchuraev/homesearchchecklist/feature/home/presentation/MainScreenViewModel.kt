@@ -80,8 +80,7 @@ class MainScreenViewModel(
     }
 
     private fun handleAddChecklistClick() {
-        val state = screenState.value as? MainScreenState.Success ?: return
-        if (state.userLimits?.canCreateChecklist == false) {
+        if (screenState.value.userLimits?.canCreateChecklist == false) {
             appNavigator.navigateToPaywall()
         } else {
             appNavigator.navigateToTemplatesScreen()
@@ -89,8 +88,7 @@ class MainScreenViewModel(
     }
 
     private fun handleAddChecklistFromTemplatesClick() {
-        val state = screenState.value as? MainScreenState.Success ?: return
-        if (state.userLimits?.canCreateChecklist == false) {
+        if (screenState.value.userLimits?.canCreateChecklist == false) {
             _showLimitDialog.update { true }
         } else {
             appNavigator.navigateToTemplatesScreen()

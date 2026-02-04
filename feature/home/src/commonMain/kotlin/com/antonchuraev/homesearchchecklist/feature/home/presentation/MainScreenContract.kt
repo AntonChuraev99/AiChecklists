@@ -19,14 +19,19 @@ data class ChecklistWithProgress(
 }
 
 sealed interface MainScreenState : State {
-    data object Loading : MainScreenState
+
+    val userLimits: UserLimits?
+
+    data object Loading : MainScreenState {
+        override val userLimits: UserLimits? = null
+    }
     data class Success(
         val checklists: List<ChecklistWithProgress>,
-        val subscriptionStatus: SubscriptionStatus = SubscriptionStatus.FREE,
+        val subscriptionStatus: SubscriptionStatus,
         val formattedExpirationDate: String? = null,
         val aiCredits: Int = 0,
-        val userLimits: UserLimits? = null,
-        val showLimitReachedDialog: Boolean = false
+        val showLimitReachedDialog: Boolean = false,
+        override val userLimits: UserLimits?
     ) : MainScreenState
 }
 
