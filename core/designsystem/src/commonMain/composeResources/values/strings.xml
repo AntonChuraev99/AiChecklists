@@ -280,4 +280,8 @@
     <string name="debug_label_name">Name</string>
     <string name="debug_label_version">Version</string>
     <string name="debug_label_build">Build</string>
+    <string name="debug_test_restore_credits">Test Restore Credits</string>
+    <string name="debug_test_restore_credits_description">Simulate credit restore after purchase</string>
+    <string name="debug_restore_credits_success">Credits restored: %1$d</string>
+    <string name="debug_restore_credits_error">Failed to restore credits</string>
 </resources>
