@@ -7,7 +7,8 @@ Functions:
 3. generate_checklist - Create new checklist from prompt + user data
 4. get_usage_stats - Get user's AI usage statistics
 5. refill_premium_credits - Daily credits refill for premium users (called by Cloud Scheduler at 12:00 CET)
-6. get_credits_info - Get credits configuration and user's current credits
+6. restore_credits_after_purchase - Instantly restore credits after premium purchase
+7. get_credits_info - Get credits configuration and user's current credits
 
 All AI calls go through these functions for usage control and monitoring.
 Credits are deducted for all users (including premium). Premium users get daily refill to cap.
@@ -752,7 +753,84 @@ def refill_premium_credits(request: Request):
 
 
 # ============================================================================
-# FUNCTION 6: Get credits config (for client to display correct info)
+# FUNCTION 6: Restore credits after premium purchase
+# ============================================================================
+
+@functions_framework.http
+def restore_credits_after_purchase(request: Request):
+    """
+    Instantly restore credits for a user after premium purchase.
+
+    This function should be called by the client immediately after:
+    - Successful premium subscription purchase
+    - Successful purchase restore
+
+    Logic:
+    - Verify user exists
+    - Mark user as premium (if not already)
+    - Set credits to premium_daily_credits_cap
+
+    Request body:
+    {
+        "user_id": "string",
+        "revenuecat_customer_id": "string (optional, for verification)"
+    }
+
+    Response:
+    {
+        "success": true,
+        "ai_credits": number,
+        "is_premium": true,
+        "message": "Credits restored"
+    }
+    """
+    data, error = validate_request(request)
+    if error:
+        return create_error_response(error)
+
+    user_id = data["user_id"]
+
+    try:
+        # Get user from Firestore
+        user_ref = db.collection("users").document(user_id)
+        user_doc = user_ref.get()
+
+        if not user_doc.exists:
+            return create_error_response("User not found", 404)
+
+        # Get credits config
+        config = get_credits_config()
+        credits_cap = config["premium_daily_credits_cap"]
+
+        # Update user: set premium status and restore credits
+        user_ref.update({
+            "is_premium": True,
+            "ai_credits": credits_cap,
+            "premium_activated_at": datetime.utcnow().isoformat(),
+            "credits_restored_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.utcnow().isoformat()
+        })
+
+        # Log the restore operation
+        db.collection("credits_restore_log").add({
+            "user_id": user_id,
+            "timestamp": datetime.utcnow().isoformat(),
+            "credits_restored": credits_cap,
+            "trigger": "purchase"
+        })
+
+        return create_success_response({
+            "ai_credits": credits_cap,
+            "is_premium": True,
+            "message": "Credits restored successfully"
+        })
+
+    except Exception as e:
+        return create_error_response(f"Failed to restore credits: {str(e)}", 500)
+
+
+# ============================================================================
+# FUNCTION 7: Get credits config (for client to display correct info)
 # ============================================================================
 
 @functions_framework.http

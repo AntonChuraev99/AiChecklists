@@ -123,6 +123,31 @@ class UserDataRepositoryImpl(
         appDatastore.saveBoolean(IS_PAYWALL_LINKED_KEY, linked)
     }
 
+    override suspend fun restoreCreditsAfterPurchase(): Result<Int> {
+        logger.debug(TAG, "restoreCreditsAfterPurchase: starting...")
+
+        val userId = appDatastore.observeString(USER_ID_KEY, "").first()
+        if (userId.isBlank()) {
+            logger.error(TAG, "restoreCreditsAfterPurchase: no user_id found")
+            return Result.failure(IllegalStateException("User not registered"))
+        }
+
+        logger.debug(TAG, "restoreCreditsAfterPurchase: calling API for userId=$userId")
+
+        return userApiService.restoreCreditsAfterPurchase(userId)
+            .onSuccess { result ->
+                logger.info(TAG, "restoreCreditsAfterPurchase: SUCCESS - aiCredits=${result.aiCredits}, isPremium=${result.isPremium}")
+                // Update local cache
+                appDatastore.saveInt(AI_CREDITS_KEY, result.aiCredits)
+                appDatastore.saveBoolean(IS_PREMIUM_KEY, result.isPremium)
+                logger.debug(TAG, "restoreCreditsAfterPurchase: saved to datastore")
+            }
+            .onFailure { error ->
+                logger.error(TAG, "restoreCreditsAfterPurchase: FAILED - ${error.message}", error)
+            }
+            .map { it.aiCredits }
+    }
+
     private suspend fun registerAndSave(deviceId: String): Result<RegistrationData> {
         return userApiService.registerUser(
             deviceId = deviceId,

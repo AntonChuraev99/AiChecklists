@@ -25,6 +25,15 @@ data class RegisterUserResult(
 )
 
 /**
+ * Result of credits restoration after purchase.
+ */
+data class RestoreCreditsResult(
+    val aiCredits: Int,
+    val isPremium: Boolean,
+    val message: String
+)
+
+/**
  * Service for user-related API calls.
  */
 interface UserApiService {
@@ -41,6 +50,17 @@ interface UserApiService {
         appVersion: String? = null,
         platform: String? = null
     ): Result<RegisterUserResult>
+
+    /**
+     * Restore credits after premium purchase.
+     *
+     * This should be called immediately after successful subscription purchase
+     * or restore to give user their premium credits instantly.
+     *
+     * @param userId User's unique identifier
+     * @return Result with restored credits info or error
+     */
+    suspend fun restoreCreditsAfterPurchase(userId: String): Result<RestoreCreditsResult>
 }
 
 /**
@@ -111,6 +131,35 @@ class UserApiServiceImpl(
             throw Exception(responseBody.error ?: "Failed to register user")
         }
     }
+
+    override suspend fun restoreCreditsAfterPurchase(userId: String): Result<RestoreCreditsResult> = runCatching {
+        logger.debug(TAG, "restoreCreditsAfterPurchase: userId=$userId")
+
+        val request = RestoreCreditsRequest(userId = userId)
+
+        logger.debug(TAG, "restoreCreditsAfterPurchase: calling $baseUrl/restore_credits_after_purchase")
+        val response: HttpResponse = httpClient.post("$baseUrl/restore_credits_after_purchase") {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }
+        logger.debug(TAG, "restoreCreditsAfterPurchase: response status=${response.status}")
+
+        val responseBody = response.body<RestoreCreditsResponseDto>()
+        logger.debug(TAG, "restoreCreditsAfterPurchase: response body - success=${responseBody.success}, aiCredits=${responseBody.aiCredits}, error=${responseBody.error}")
+
+        if (responseBody.success) {
+            val result = RestoreCreditsResult(
+                aiCredits = responseBody.aiCredits ?: 0,
+                isPremium = responseBody.isPremium ?: true,
+                message = responseBody.message ?: "Credits restored"
+            )
+            logger.info(TAG, "restoreCreditsAfterPurchase: SUCCESS - aiCredits=${result.aiCredits}")
+            result
+        } else {
+            logger.error(TAG, "restoreCreditsAfterPurchase: FAILED - ${responseBody.error}")
+            throw Exception(responseBody.error ?: "Failed to restore credits")
+        }
+    }
 }
 
 @Serializable
@@ -129,4 +178,18 @@ private data class RegisterUserResponseDto(
     @SerialName("is_premium") val isPremium: Boolean? = null,
     @SerialName("ai_credits") val aiCredits: Int? = null,
     @SerialName("created_at") val createdAt: String? = null
+)
+
+@Serializable
+private data class RestoreCreditsRequest(
+    @SerialName("user_id") val userId: String
+)
+
+@Serializable
+private data class RestoreCreditsResponseDto(
+    val success: Boolean,
+    val error: String? = null,
+    @SerialName("ai_credits") val aiCredits: Int? = null,
+    @SerialName("is_premium") val isPremium: Boolean? = null,
+    val message: String? = null
 )
