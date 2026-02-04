@@ -260,31 +260,50 @@ def wait_for_operation(operation_name: str, token: str):
 
 
 def set_iam_policy(function_name: str, token: str):
-    """Allow unauthenticated access to the function."""
+    """Allow unauthenticated access to the function (Gen2 uses Cloud Run)."""
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json",
     }
 
+    # For Gen2 functions, we need to set IAM policy on the underlying Cloud Run service
+    # First, get the function to find the Cloud Run service name
     full_name = f"projects/{PROJECT_ID}/locations/{REGION}/functions/{function_name}"
-    iam_url = f"https://cloudfunctions.googleapis.com/v2/{full_name}:setIamPolicy"
+    func_url = f"https://cloudfunctions.googleapis.com/v2/{full_name}"
+
+    func_response = requests.get(func_url, headers=headers)
+    if func_response.status_code != 200:
+        print(f"  [WARN] Could not get function info: {func_response.status_code}")
+        return
+
+    func_data = func_response.json()
+    service_uri = func_data.get("serviceConfig", {}).get("uri", "")
+
+    # Extract service name from URI (format: https://func-name-xxxxx-uc.a.run.app)
+    # The Cloud Run service name matches the function name for Gen2
+    # Cloud Run service name uses hyphens instead of underscores
+    service_name = function_name.replace("_", "-")
+
+    # Set IAM policy on Cloud Run service
+    run_iam_url = f"https://run.googleapis.com/v1/projects/{PROJECT_ID}/locations/{REGION}/services/{service_name}:setIamPolicy"
 
     policy = {
         "policy": {
             "bindings": [
                 {
-                    "role": "roles/cloudfunctions.invoker",
+                    "role": "roles/run.invoker",
                     "members": ["allUsers"]
                 }
             ]
         }
     }
 
-    response = requests.post(iam_url, headers=headers, json=policy)
+    response = requests.post(run_iam_url, headers=headers, json=policy)
     if response.status_code == 200:
-        print(f"  [OK] IAM policy set for {function_name}")
+        print(f"  [OK] IAM policy set for {function_name} (Cloud Run: {service_name})")
     else:
         print(f"  [WARN] Could not set IAM policy: {response.status_code}")
+        print(f"    Response: {response.text[:200]}")
 
 
 def main():
