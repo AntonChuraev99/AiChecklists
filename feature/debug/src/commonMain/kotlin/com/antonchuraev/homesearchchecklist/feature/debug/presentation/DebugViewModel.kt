@@ -36,6 +36,9 @@ class DebugViewModel(
             DebugScreenIntent.ClearData -> clearData()
             DebugScreenIntent.CreateTestChecklists -> createTestChecklists()
             DebugScreenIntent.OpenStoreScreenshot -> appNavigator.navigateToStoreScreenshot()
+            DebugScreenIntent.TestRestoreCredits -> testRestoreCredits()
+            DebugScreenIntent.DismissRestoreCreditsResult -> _screenState.value =
+                _screenState.value.copy(restoreCreditsResult = null)
         }
     }
 
@@ -93,6 +96,28 @@ class DebugViewModel(
             testChecklists.forEach { checklist ->
                 checklistRepository.addChecklist(checklist)
             }
+        }
+    }
+
+    private fun testRestoreCredits() {
+        viewModelScope.launch {
+            _screenState.value = _screenState.value.copy(isRestoreCreditsLoading = true)
+
+            userDataRepository.restoreCreditsAfterPurchase()
+                .onSuccess { credits ->
+                    _screenState.value = _screenState.value.copy(
+                        isRestoreCreditsLoading = false,
+                        restoreCreditsResult = RestoreCreditsResult.Success(credits)
+                    )
+                }
+                .onFailure { error ->
+                    _screenState.value = _screenState.value.copy(
+                        isRestoreCreditsLoading = false,
+                        restoreCreditsResult = RestoreCreditsResult.Error(
+                            error.message ?: "Unknown error"
+                        )
+                    )
+                }
         }
     }
 }

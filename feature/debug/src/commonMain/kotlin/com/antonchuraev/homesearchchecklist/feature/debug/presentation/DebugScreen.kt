@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Screenshot
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -56,6 +57,13 @@ fun DebugScreen(
         },
         DebugItem(Icons.Outlined.Screenshot, "Store Screenshots", "Preview screens for App Store/Play Store") {
             viewModel.sendIntent(DebugScreenIntent.OpenStoreScreenshot)
+        },
+        DebugItem(
+            Icons.Default.Star,
+            stringResource(Res.string.debug_test_restore_credits),
+            stringResource(Res.string.debug_test_restore_credits_description)
+        ) {
+            viewModel.sendIntent(DebugScreenIntent.TestRestoreCredits)
         }
     )
 
@@ -107,6 +115,44 @@ fun DebugScreen(
                     AppButtonText(
                         text = stringResource(Res.string.ok),
                         onClick = { viewModel.sendIntent(DebugScreenIntent.HideInfoDialog) }
+                    )
+                },
+                containerColor = MaterialTheme.colorScheme.surface,
+                shape = MaterialTheme.shapes.large
+            )
+        }
+
+        screenState.restoreCreditsResult?.let { result ->
+            AlertDialog(
+                onDismissRequest = { viewModel.sendIntent(DebugScreenIntent.DismissRestoreCreditsResult) },
+                title = {
+                    Text(
+                        text = stringResource(Res.string.debug_test_restore_credits),
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                },
+                text = {
+                    Text(
+                        text = when (result) {
+                            is RestoreCreditsResult.Success -> stringResource(
+                                Res.string.debug_restore_credits_success,
+                                result.credits
+                            )
+                            is RestoreCreditsResult.Error -> stringResource(
+                                Res.string.debug_restore_credits_error
+                            ) + ": ${result.message}"
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = when (result) {
+                            is RestoreCreditsResult.Success -> MaterialTheme.colorScheme.onSurface
+                            is RestoreCreditsResult.Error -> MaterialTheme.colorScheme.error
+                        }
+                    )
+                },
+                confirmButton = {
+                    AppButtonText(
+                        text = stringResource(Res.string.ok),
+                        onClick = { viewModel.sendIntent(DebugScreenIntent.DismissRestoreCreditsResult) }
                     )
                 },
                 containerColor = MaterialTheme.colorScheme.surface,
