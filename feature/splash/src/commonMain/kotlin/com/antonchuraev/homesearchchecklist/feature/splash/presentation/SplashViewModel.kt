@@ -45,15 +45,17 @@ class SplashViewModel(
     /**
      * Links the user with RevenueCat after successful registration.
      * For returning users (isNewUser=false), also triggers auto-restore.
+     * For already linked users, refreshes subscription status from RevenueCat.
      */
     private suspend fun linkWithPaywall(userId: String, isNewUser: Boolean) {
-        // Check if already linked
-        if (userDataRepository.isPaywallLinked()) {
+        // Check if RevenueCat is configured
+        if (!paywallRepository.isConfigured()) {
             return
         }
 
-        // Check if RevenueCat is configured
-        if (!paywallRepository.isConfigured()) {
+        // If already linked, just refresh subscription status
+        if (userDataRepository.isPaywallLinked()) {
+            paywallRepository.refreshSubscriptionStatus()
             return
         }
 
