@@ -80,40 +80,29 @@ class MainScreenViewModel(
     }
 
     private fun handleAddChecklistClick() {
-        val currentState = screenState.value
-        if (currentState is MainScreenState.Success) {
-            val limits = currentState.userLimits
-            if (limits != null && !limits.canCreateChecklist) {
-                // Navigate directly to paywall when limit reached
-                appNavigator.navigateToPaywall()
-            } else {
-                // Navigate to Templates screen where user can choose template,
-                // create manually, or create with AI
-                appNavigator.navigateToTemplatesScreen()
-            }
+        val state = screenState.value as? MainScreenState.Success ?: return
+        if (state.userLimits?.canCreateChecklist == false) {
+            appNavigator.navigateToPaywall()
+        } else {
+            appNavigator.navigateToTemplatesScreen()
         }
     }
 
     private fun handleAddChecklistFromTemplatesClick() {
-        val currentState = screenState.value
-        if (currentState is MainScreenState.Success) {
-            val limits = currentState.userLimits
-            if (limits != null && !limits.canCreateChecklist) {
-                _showLimitDialog.update { true }
-            } else {
-                appNavigator.navigateToTemplatesScreen()
-            }
+        val state = screenState.value as? MainScreenState.Success ?: return
+        if (state.userLimits?.canCreateChecklist == false) {
+            _showLimitDialog.update { true }
+        } else {
+            appNavigator.navigateToTemplatesScreen()
         }
     }
 
     private fun handlePremiumOrCreditsClick() {
-        val currentState = screenState.value
-        if (currentState is MainScreenState.Success) {
-            if (currentState.subscriptionStatus.isActive) {
-                appNavigator.navigateToSubscriptionStatus()
-            } else {
-                appNavigator.navigateToPaywall()
-            }
+        val state = screenState.value as? MainScreenState.Success ?: return
+        if (state.subscriptionStatus.isActive) {
+            appNavigator.navigateToSubscriptionStatus()
+        } else {
+            appNavigator.navigateToPaywall()
         }
     }
 }
