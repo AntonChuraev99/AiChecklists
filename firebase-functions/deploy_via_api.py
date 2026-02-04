@@ -58,6 +58,12 @@ FUNCTIONS = [
         "memory": "256M",
         "timeout": "30s",
     },
+    {
+        "name": "restore_credits_after_purchase",
+        "entry_point": "restore_credits_after_purchase",
+        "memory": "256M",
+        "timeout": "30s",
+    },
 ]
 
 

@@ -39,4 +39,15 @@ interface UserDataRepository {
      * Marks the user as linked with RevenueCat.
      */
     suspend fun setPaywallLinked(linked: Boolean)
+
+    /**
+     * Restore credits after premium purchase.
+     *
+     * Calls the server to instantly restore credits for the user
+     * after successful subscription purchase or restore.
+     * Updates local cache with new credits and premium status.
+     *
+     * @return Result with restored credits info or error
+     */
+    suspend fun restoreCreditsAfterPurchase(): Result<Int>
 }
