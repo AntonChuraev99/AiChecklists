@@ -130,6 +130,43 @@ gcloud functions deploy analyze_and_fill_checklist \
     --memory=512MB
 ```
 
+### Gen2 IAM Policy (IMPORTANT)
+
+Gen2 Cloud Functions use **Cloud Run** under the hood. The IAM policy must be set using the Cloud Run API, not the Cloud Functions API.
+
+**Critical differences:**
+| Aspect | Gen1 | Gen2 |
+|--------|------|------|
+| IAM API | `cloudfunctions.googleapis.com` | `run.googleapis.com` |
+| Service name | `my_function_name` | `my-function-name` (hyphens!) |
+
+**Setting public access for Gen2:**
+
+```bash
+# Transform function name: underscores → hyphens
+FUNCTION_NAME="restore_credits_after_purchase"
+CLOUD_RUN_SERVICE="${FUNCTION_NAME//_/-}"  # restore-credits-after-purchase
+
+# Set IAM using Cloud Run API (NOT cloudfunctions API!)
+gcloud run services add-iam-policy-binding $CLOUD_RUN_SERVICE \
+    --region=us-central1 \
+    --member="allUsers" \
+    --role="roles/run.invoker"
+```
+
+**Verification:**
+```bash
+# Check IAM policy in Cloud Run
+gcloud run services get-iam-policy restore-credits-after-purchase --region=us-central1
+
+# Test endpoint (should NOT return 403)
+curl -X POST https://us-central1-aichecklists-40230.cloudfunctions.net/restore_credits_after_purchase \
+    -H "Content-Type: application/json" \
+    -d '{"user_id": "test"}'
+```
+
+See [Gen2 IAM Policy Documentation](../docs/solutions/deployment-issues/gen2-cloud-functions-iam-policy.md) for detailed troubleshooting.
+
 ## Usage Tracking
 
 Usage is tracked in Firestore:
