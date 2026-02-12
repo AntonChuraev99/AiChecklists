@@ -25,6 +25,7 @@ kotlin {
         commonMain.dependencies {
             implementation(projects.core.navigation.api)
             implementation(projects.core.designsystem)
+            implementation(projects.core.common.api)
             implementation(projects.feature.user)
             implementation(projects.feature.paywall)
 
