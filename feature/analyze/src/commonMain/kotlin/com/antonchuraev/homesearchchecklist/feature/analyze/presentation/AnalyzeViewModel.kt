@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.analyze.presentation
 
 import androidx.lifecycle.viewModelScope
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeInputData
@@ -22,7 +23,8 @@ class AnalyzeViewModel(
     private val checklistRepository: ChecklistRepository,
     private val appNavigator: AppNavigator,
     private val userDataRepository: UserDataRepository,
-    private val getSubscriptionStatusUseCase: GetSubscriptionStatusUseCase
+    private val getSubscriptionStatusUseCase: GetSubscriptionStatusUseCase,
+    private val analyticsTracker: AnalyticsTracker
 ) : AppViewModel<AnalyzeScreenState, AnalyzeScreenIntent, Nothing>() {
 
     private val _screenState = MutableStateFlow(AnalyzeScreenState(
@@ -199,6 +201,9 @@ class AnalyzeViewModel(
             return
         }
 
+        val inputType = state.selectedInputType?.name?.lowercase() ?: "unknown"
+        analyticsTracker.event("ai_analyze_started", mapOf("input_type" to inputType))
+
         viewModelScope.launch {
             _screenState.update { it.copy(isAnalyzing = true, error = null) }
 
@@ -213,6 +218,10 @@ class AnalyzeViewModel(
 
             analyzeRepository.analyzeData(inputData, targetChecklist)
                 .onSuccess { result ->
+                    analyticsTracker.event("ai_analyze_completed", mapOf(
+                        "input_type" to inputType,
+                        "item_count" to result.suggestedItems.size
+                    ))
                     _screenState.update {
                         it.copy(
                             isAnalyzing = false,
@@ -232,6 +241,10 @@ class AnalyzeViewModel(
                     appNavigator.navigateToAnalyzeResultPreview()
                 }
                 .onFailure { error ->
+                    analyticsTracker.event("ai_analyze_failed", mapOf(
+                        "input_type" to inputType,
+                        "error" to (error.message ?: "unknown")
+                    ))
                     _screenState.update {
                         it.copy(
                             isAnalyzing = false,

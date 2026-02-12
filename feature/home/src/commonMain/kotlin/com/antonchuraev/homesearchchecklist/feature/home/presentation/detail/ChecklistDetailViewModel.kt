@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation.detail
 
 import androidx.lifecycle.viewModelScope
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
@@ -21,7 +22,8 @@ class ChecklistDetailViewModel(
     private val checklistId: Long,
     private val repository: ChecklistRepository,
     private val navigator: AppNavigator,
-    private val getUserLimitsUseCase: GetUserLimitsUseCase
+    private val getUserLimitsUseCase: GetUserLimitsUseCase,
+    private val analyticsTracker: AnalyticsTracker
 ) : AppViewModel<ChecklistDetailState, ChecklistDetailIntent, Nothing>() {
 
     private val _screenState = MutableStateFlow<ChecklistDetailState>(ChecklistDetailState.Loading)
@@ -226,6 +228,7 @@ class ChecklistDetailViewModel(
 
         viewModelScope.launch {
             repository.deleteChecklist(state.checklist)
+            analyticsTracker.event("checklist_deleted")
             navigator.onBack()
         }
     }

@@ -31,6 +31,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -46,12 +47,17 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun AnalyzeResultPreviewScreen(
     viewModel: AnalyzeResultPreviewViewModel = koinViewModel()
 ) {
+    val analyticsTracker: AnalyticsTracker = koinInject()
+    LaunchedEffect(Unit) { analyticsTracker.screenView("analyze_result") }
+
     val state by viewModel.screenState.collectAsState()
 
     AppScaffold(

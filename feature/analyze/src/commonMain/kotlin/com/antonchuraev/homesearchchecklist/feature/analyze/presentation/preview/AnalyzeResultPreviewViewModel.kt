@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.analyze.presentation.preview
 
 import androidx.lifecycle.viewModelScope
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
@@ -18,7 +19,8 @@ import kotlinx.coroutines.launch
 
 class AnalyzeResultPreviewViewModel(
     private val appNavigator: AppNavigator,
-    private val checklistRepository: ChecklistRepository
+    private val checklistRepository: ChecklistRepository,
+    private val analyticsTracker: AnalyticsTracker
 ) : AppViewModel<AnalyzeResultPreviewScreenState, AnalyzeResultPreviewScreenIntent, Nothing>() {
 
     private val _screenState = MutableStateFlow(AnalyzeResultPreviewScreenState())
@@ -133,6 +135,10 @@ class AnalyzeResultPreviewViewModel(
                     )
 
                     val fillId = checklistRepository.addFill(newFill)
+                    analyticsTracker.event("fill_created", mapOf(
+                        "source" to "ai",
+                        "item_count" to state.editableItems.size
+                    ))
                     _screenState.update { it.copy(isCreating = false) }
                     AnalyzeResultHolder.clear()
                     appNavigator.navigateToFillDetail(fillId, clearBackStack = true)
@@ -144,6 +150,10 @@ class AnalyzeResultPreviewViewModel(
                     )
 
                     val checklistId = checklistRepository.addChecklist(checklist)
+                    analyticsTracker.event("checklist_created", mapOf(
+                        "source" to "ai",
+                        "item_count" to state.editableItems.size
+                    ))
                     _screenState.update { it.copy(isCreating = false) }
                     AnalyzeResultHolder.clear()
                     appNavigator.navigateToChecklistDetail(checklistId, clearBackStack = true)

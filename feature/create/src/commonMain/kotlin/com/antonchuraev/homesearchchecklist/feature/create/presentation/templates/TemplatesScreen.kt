@@ -76,12 +76,17 @@ import com.antonchuraev.homesearchchecklist.feature.create.domain.model.Template
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun TemplatesScreen(
     viewModel: TemplatesViewModel = koinViewModel()
 ) {
+    val analyticsTracker: AnalyticsTracker = koinInject()
+    LaunchedEffect(Unit) { analyticsTracker.screenView("templates") }
+
     val state by viewModel.screenState.collectAsState()
 
     val searchFocusRequester = remember { FocusRequester() }

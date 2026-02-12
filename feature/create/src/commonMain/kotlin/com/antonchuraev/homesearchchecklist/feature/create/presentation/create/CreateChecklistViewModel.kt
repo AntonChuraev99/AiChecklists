@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.create.presentation.create
 
 import androidx.lifecycle.viewModelScope
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
@@ -15,7 +16,8 @@ import kotlinx.coroutines.launch
 class CreateChecklistViewModel(
     private val editChecklistId: Long?,
     private val checklistRepository: ChecklistRepository,
-    private val appNavigator: AppNavigator
+    private val appNavigator: AppNavigator,
+    private val analyticsTracker: AnalyticsTracker
 ) : AppViewModel<CreateChecklistState, CreateChecklistIntent, Nothing>() {
 
     private val _screenState = MutableStateFlow(CreateChecklistState(
@@ -102,6 +104,10 @@ class CreateChecklistViewModel(
                 checklistRepository.addChecklist(
                     Checklist(name = currentState.name.trim(), items = currentState.items)
                 )
+                analyticsTracker.event("checklist_created", mapOf(
+                    "source" to "manual",
+                    "item_count" to currentState.items.size
+                ))
                 appNavigator.navigateToMainScreen(clearBackStack = true)
             }
         }

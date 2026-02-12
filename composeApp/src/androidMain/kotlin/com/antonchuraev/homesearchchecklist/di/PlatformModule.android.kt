@@ -1,6 +1,8 @@
 package com.antonchuraev.homesearchchecklist.di
 
 import com.antonchuraev.aichecklists.BuildConfig
+import com.antonchuraev.homesearchchecklist.Analytics
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppContextHolder
 import com.antonchuraev.homesearchchecklist.feature.analyze.data.config.GeminiConfig
 import com.antonchuraev.homesearchchecklist.feature.user.data.device.DeviceIdProvider
@@ -14,4 +16,5 @@ actual fun platformModule(): Module = module {
     single { AppContextHolder.context }
     single { GeminiConfig(apiKey = BuildConfig.GEMINI_API_KEY) }
     single { DeviceIdProvider(get()) }
+    single<AnalyticsTracker> { Analytics }
 }

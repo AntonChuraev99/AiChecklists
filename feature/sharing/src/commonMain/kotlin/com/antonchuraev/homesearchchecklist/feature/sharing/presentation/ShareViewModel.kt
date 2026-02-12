@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.sharing.presentation
 
 import androidx.lifecycle.viewModelScope
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
@@ -18,7 +19,8 @@ class ShareViewModel(
     private val repository: ChecklistRepository,
     private val navigator: AppNavigator,
     private val formatter: ChecklistFormatter,
-    private val pdfGenerator: PdfGenerator
+    private val pdfGenerator: PdfGenerator,
+    private val analyticsTracker: AnalyticsTracker
 ) : AppViewModel<ShareScreenState, ShareScreenIntent, Nothing>() {
 
     private val _screenState = MutableStateFlow(ShareScreenState())
@@ -76,6 +78,12 @@ class ShareViewModel(
         val checklist = state.checklist ?: return
         val fill = state.checklistFill ?: return
         val format = state.selectedFormat ?: return
+
+        val formatName = when (format) {
+            ShareFormat.Text -> "text"
+            ShareFormat.Pdf -> "pdf"
+        }
+        analyticsTracker.event("share_checklist", mapOf("format" to formatName))
 
         when (format) {
             ShareFormat.Text -> {

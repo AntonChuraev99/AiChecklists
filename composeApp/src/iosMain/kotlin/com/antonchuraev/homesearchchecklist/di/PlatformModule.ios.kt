@@ -1,10 +1,17 @@
 package com.antonchuraev.homesearchchecklist.di
 
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.feature.analyze.data.config.GeminiConfig
 import com.antonchuraev.homesearchchecklist.feature.user.data.device.DeviceIdProvider
 import org.koin.core.module.Module
 import org.koin.dsl.module
 import platform.Foundation.NSBundle
+
+private object StubAnalyticsTracker : AnalyticsTracker {
+    override fun setUserId(userId: String) = Unit
+    override fun screenView(name: String) = Unit
+    override fun event(name: String, params: Map<String, Any>) = Unit
+}
 
 actual fun platformModule(): Module = module {
     single {
@@ -12,4 +19,5 @@ actual fun platformModule(): Module = module {
         GeminiConfig(apiKey = apiKey)
     }
     single { DeviceIdProvider() }
+    single<AnalyticsTracker> { StubAnalyticsTracker }
 }

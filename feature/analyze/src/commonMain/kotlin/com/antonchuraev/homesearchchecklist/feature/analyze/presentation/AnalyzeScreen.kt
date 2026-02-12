@@ -35,6 +35,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,6 +62,8 @@ import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.recorde
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 
@@ -69,6 +72,9 @@ fun AnalyzeScreen(
     checklistId: Long? = null,
     viewModel: AnalyzeViewModel = koinViewModel { parametersOf(checklistId) }
 ) {
+    val analyticsTracker: AnalyticsTracker = koinInject()
+    LaunchedEffect(Unit) { analyticsTracker.screenView("analyze") }
+
     val screenState by viewModel.screenState.collectAsStateWithLifecycle()
 
     val title = if (screenState.isFillMode) {

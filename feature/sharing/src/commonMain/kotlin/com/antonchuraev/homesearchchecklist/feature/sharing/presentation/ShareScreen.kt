@@ -25,6 +25,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,6 +42,8 @@ import com.antonchuraev.homesearchchecklist.feature.sharing.presentation.share.S
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 
@@ -49,6 +52,9 @@ fun ShareScreen(
     checklistId: Long,
     viewModel: ShareViewModel = koinViewModel { parametersOf(checklistId) }
 ) {
+    val analyticsTracker: AnalyticsTracker = koinInject()
+    LaunchedEffect(Unit) { analyticsTracker.screenView("share") }
+
     val state by viewModel.screenState.collectAsStateWithLifecycle()
 
     ShareScreenContent(

@@ -20,7 +20,8 @@ val sharingFeatureModule = module {
             repository = get(),
             navigator = get(),
             formatter = get(),
-            pdfGenerator = get()
+            pdfGenerator = get(),
+            analyticsTracker = get()
         )
     }
 }
