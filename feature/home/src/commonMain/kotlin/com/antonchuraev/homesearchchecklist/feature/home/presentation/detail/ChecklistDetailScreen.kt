@@ -42,6 +42,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -64,6 +65,8 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Check
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 
@@ -72,6 +75,9 @@ fun ChecklistDetailScreen(
     checklistId: Long,
     viewModel: ChecklistDetailViewModel = koinViewModel { parametersOf(checklistId) }
 ) {
+    val analyticsTracker: AnalyticsTracker = koinInject()
+    LaunchedEffect(Unit) { analyticsTracker.screenView("checklist_detail") }
+
     val state by viewModel.screenState.collectAsStateWithLifecycle()
 
     when (val currentState = state) {

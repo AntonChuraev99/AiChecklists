@@ -61,6 +61,8 @@ import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.Paywall
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.PaywallViewModel
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 data class OnboardingPage(
@@ -79,6 +81,9 @@ fun OnboardingScreen(
     viewModel: OnboardingViewModel = koinViewModel(),
     paywallViewModel: PaywallViewModel = koinViewModel()
 ) {
+    val analyticsTracker: AnalyticsTracker = koinInject()
+    LaunchedEffect(Unit) { analyticsTracker.screenView("onboarding") }
+
     val state by viewModel.screenState.collectAsState()
     val paywallState by paywallViewModel.screenState.collectAsState()
 

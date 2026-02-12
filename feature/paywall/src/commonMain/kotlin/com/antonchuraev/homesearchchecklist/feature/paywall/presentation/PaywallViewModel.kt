@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.paywall.presentation
 
 import androidx.lifecycle.viewModelScope
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.paywall.data.PaywallConfig
@@ -20,7 +21,8 @@ class PaywallViewModel(
     private val navigator: AppNavigator,
     private val getOfferingsUseCase: GetOfferingsUseCase,
     private val purchaseProductUseCase: PurchaseProductUseCase,
-    private val restorePurchasesUseCase: RestorePurchasesUseCase
+    private val restorePurchasesUseCase: RestorePurchasesUseCase,
+    private val analyticsTracker: AnalyticsTracker
 ) : AppViewModel<PaywallState, PaywallIntent, Nothing>() {
 
     companion object {
@@ -122,6 +124,9 @@ class PaywallViewModel(
 
             when (val result = purchaseProductUseCase(selectedProduct.packageId)) {
                 is PurchaseResult.Success -> {
+                    analyticsTracker.event("purchase_completed", mapOf(
+                        "product_id" to selectedProduct.id
+                    ))
                     _screenState.update {
                         it.copy(isPurchasing = false, purchaseSuccess = true)
                     }
@@ -132,6 +137,9 @@ class PaywallViewModel(
                     _screenState.update { it.copy(isPurchasing = false) }
                 }
                 is PurchaseResult.Error -> {
+                    analyticsTracker.event("purchase_failed", mapOf(
+                        "error" to (result.message ?: "unknown")
+                    ))
                     _screenState.update {
                         it.copy(isPurchasing = false, error = result.message)
                     }

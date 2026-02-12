@@ -30,7 +30,8 @@ val analyzeFeatureModule = module {
             checklistRepository = get(),
             appNavigator = get(),
             userDataRepository = get(),
-            getSubscriptionStatusUseCase = get()
+            getSubscriptionStatusUseCase = get(),
+            analyticsTracker = get()
         )
     }
 
@@ -38,7 +39,8 @@ val analyzeFeatureModule = module {
     viewModel {
         AnalyzeResultPreviewViewModel(
             appNavigator = get(),
-            checklistRepository = get()
+            checklistRepository = get(),
+            analyticsTracker = get()
         )
     }
 }

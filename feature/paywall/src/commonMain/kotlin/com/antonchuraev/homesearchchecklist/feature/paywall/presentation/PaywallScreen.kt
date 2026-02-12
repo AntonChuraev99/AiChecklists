@@ -58,6 +58,8 @@ import com.antonchuraev.homesearchchecklist.feature.paywall.data.PaywallConfig
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallProduct
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 // Background color for paywall
@@ -77,6 +79,9 @@ fun PaywallScreen(
     viewModel: PaywallViewModel = koinViewModel(),
     onPurchaseSuccess: () -> Unit = {}
 ) {
+    val analyticsTracker: AnalyticsTracker = koinInject()
+    LaunchedEffect(Unit) { analyticsTracker.screenView("paywall") }
+
     val state by viewModel.screenState.collectAsState()
     val uriHandler = LocalUriHandler.current
 

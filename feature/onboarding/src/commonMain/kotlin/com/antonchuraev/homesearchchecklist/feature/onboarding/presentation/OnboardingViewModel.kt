@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.onboarding.presentation
 
 import androidx.lifecycle.viewModelScope
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.CompleteOnboardingUseCase
@@ -12,7 +13,8 @@ import kotlinx.coroutines.launch
 
 class OnboardingViewModel(
     private val navigator: AppNavigator,
-    private val completeOnboardingUseCase: CompleteOnboardingUseCase
+    private val completeOnboardingUseCase: CompleteOnboardingUseCase,
+    private val analyticsTracker: AnalyticsTracker
 ) : AppViewModel<OnboardingState, OnboardingIntent, Nothing>() {
 
     private val _screenState = MutableStateFlow(OnboardingState())
@@ -41,6 +43,7 @@ class OnboardingViewModel(
 
     private fun completeOnboarding() {
         viewModelScope.launch {
+            analyticsTracker.event("onboarding_completed")
             completeOnboardingUseCase()
             navigator.navigateToMainScreen(clearBackStack = true)
         }

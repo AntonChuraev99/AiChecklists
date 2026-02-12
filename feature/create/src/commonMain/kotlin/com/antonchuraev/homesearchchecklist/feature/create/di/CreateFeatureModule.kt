@@ -20,7 +20,8 @@ val createFeatureModule = module {
         CreateChecklistViewModel(
             editChecklistId = params.getOrNull(),
             checklistRepository = get(),
-            appNavigator = get()
+            appNavigator = get(),
+            analyticsTracker = get()
         )
     }
     viewModelOf(::TemplatesViewModel)

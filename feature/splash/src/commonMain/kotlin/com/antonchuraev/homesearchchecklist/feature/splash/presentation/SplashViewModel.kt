@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.repository.PaywallRepository
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
@@ -16,7 +17,8 @@ class SplashViewModel(
     private val paywallRepository: PaywallRepository,
     private val appNavigator: AppNavigator,
     private val appScope: CoroutineScope,
-    private val logger: AppLogger
+    private val logger: AppLogger,
+    private val analyticsTracker: AnalyticsTracker
 ) : ViewModel() {
 
     init {
@@ -34,6 +36,8 @@ class SplashViewModel(
             log("getUserData() took ${duration.inWholeMilliseconds}ms, userId=${cached.userId.take(8)}, isBlank:${cached.userId.isBlank()}")
 
             if (cached.userId.isNotBlank()) {
+                // Set analytics userId BEFORE navigation to avoid unattributed screen_view events
+                analyticsTracker.setUserId(cached.userId)
                 navigateTo(cached.isOnboardingPassed)
             } else {
                 // New user (first launch only): must wait for registration
@@ -41,6 +45,7 @@ class SplashViewModel(
                 val userData = result.getOrNull()?.userData ?: cached
 
                 result.onSuccess { data ->
+                    analyticsTracker.setUserId(data.userData.userId)
                     appScope.launch { linkWithPaywall(data.userData.userId, isNewUser = data.isNewUser) }
                 }
 
@@ -56,6 +61,7 @@ class SplashViewModel(
             val cached = userDataRepository.getUserData()
             if (cached.userId.isBlank()) return@launch
 
+            analyticsTracker.setUserId(cached.userId)
             launch { runCatching { userDataRepository.syncWithServer() } }
             launch { runCatching { linkWithPaywall(cached.userId, isNewUser = false) } }
         }
