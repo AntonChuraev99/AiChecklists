@@ -5,40 +5,66 @@ import androidx.lifecycle.viewModelScope
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.repository.PaywallRepository
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
+import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlin.time.measureTimedValue
 
 class SplashViewModel(
     private val userDataRepository: UserDataRepository,
     private val paywallRepository: PaywallRepository,
-    private val appNavigator: AppNavigator
+    private val appNavigator: AppNavigator,
+    private val appScope: CoroutineScope,
+    private val logger: AppLogger
 ) : ViewModel() {
 
     init {
+        // Background sync — completely independent, on appScope
+        log("start init")
+        startBackgroundSync()
+        log("started startBackgroundSync")
+        // Navigation — fast path, only reads cache
         viewModelScope.launch {
-            // Ensure user is registered with the server (or retrieve existing user)
-            // This uses device ID to prevent abuse from reinstalling the app
-            val registrationResult = userDataRepository.ensureUserRegistered()
 
-            // Link with RevenueCat (fire-and-forget, don't block navigation)
-            registrationResult.onSuccess { registrationData ->
-                launch {
-                    linkWithPaywall(
-                        userId = registrationData.userData.userId,
-                        isNewUser = registrationData.isNewUser
-                    )
-                }
+            log("start getUserData()")
+            val (cached, duration) = measureTimedValue {
+                userDataRepository.getUserData()
             }
+            log("getUserData() took ${duration.inWholeMilliseconds}ms, userId=${cached.userId.take(8)}, isBlank:${cached.userId.isBlank()}")
 
-            // Get user data (either from registration or cached)
-            val userData = registrationResult.getOrNull()?.userData
-                ?: userDataRepository.getUserData()
+            if (cached.userId.isNotBlank()) {
+                navigateTo(cached.isOnboardingPassed)
+            } else {
+                // New user (first launch only): must wait for registration
+                val result = userDataRepository.ensureUserRegistered()
+                val userData = result.getOrNull()?.userData ?: cached
 
-            with(appNavigator) {
-                when (userData.isOnboardingPassed) {
-                    true -> navigateToMainScreen(clearBackStack = true)
-                    false -> navigateToOnboarding()
+                result.onSuccess { data ->
+                    appScope.launch { linkWithPaywall(data.userData.userId, isNewUser = data.isNewUser) }
                 }
+
+                navigateTo(userData.isOnboardingPassed)
             }
+        }
+    }
+
+
+
+    private fun startBackgroundSync() {
+        appScope.launch {
+            val cached = userDataRepository.getUserData()
+            if (cached.userId.isBlank()) return@launch
+
+            launch { runCatching { userDataRepository.syncWithServer() } }
+            launch { runCatching { linkWithPaywall(cached.userId, isNewUser = false) } }
+        }
+    }
+
+    private fun navigateTo(isOnboardingPassed: Boolean) {
+        with(appNavigator) {
+            if (isOnboardingPassed) navigateToMainScreen(clearBackStack = true)
+            else navigateToOnboarding()
         }
     }
 
@@ -69,5 +95,13 @@ class SplashViewModel(
                     paywallRepository.restorePurchases()
                 }
             }
+    }
+
+    private fun log(text: String){
+        logger.debug(TAG , text)
+    }
+
+    companion object {
+        private const val TAG = "SplashViewModel"
     }
 }

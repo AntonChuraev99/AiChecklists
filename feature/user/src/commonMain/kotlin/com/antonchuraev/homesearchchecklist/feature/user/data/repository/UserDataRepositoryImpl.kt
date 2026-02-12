@@ -12,6 +12,7 @@ import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserD
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
@@ -59,7 +60,7 @@ class UserDataRepositoryImpl(
         DEFAULT_USER_DATA
     )
 
-    override fun getUserDataFlow(): Flow<UserData> {
+    override fun getUserDataFlow(): StateFlow<UserData> {
         return userDataFlow
     }
 

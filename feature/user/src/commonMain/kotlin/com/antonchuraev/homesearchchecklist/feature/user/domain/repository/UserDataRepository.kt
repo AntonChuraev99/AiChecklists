@@ -3,10 +3,11 @@ package com.antonchuraev.homesearchchecklist.feature.user.domain.repository
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.RegistrationData
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.UserData
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 
 interface UserDataRepository {
 
-    fun getUserDataFlow(): Flow<UserData>
+    fun getUserDataFlow(): StateFlow<UserData>
 
     suspend fun getUserData(): UserData
 
