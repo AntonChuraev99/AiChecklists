@@ -1,5 +1,8 @@
 package com.antonchuraev.homesearchchecklist.feature.create.presentation.templates
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,7 +21,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Apartment
@@ -26,6 +28,7 @@ import androidx.compose.material.icons.filled.Celebration
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.CleaningServices
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FlightTakeoff
 import androidx.compose.material.icons.filled.Groups
@@ -39,19 +42,23 @@ import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -77,29 +84,55 @@ fun TemplatesScreen(
 ) {
     val state by viewModel.screenState.collectAsState()
 
+    val searchFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(state.isSearchActive) {
+        if (state.isSearchActive) {
+            searchFocusRequester.requestFocus()
+        }
+    }
+
     AppScaffold(
         title = stringResource(Res.string.create_title),
-        onBackButtonClick = { viewModel.sendIntent(TemplatesScreenIntent.OnBackClick) }
+        onBackButtonClick = { viewModel.sendIntent(TemplatesScreenIntent.OnBackClick) },
+        actions = {
+            IconButton(
+                onClick = { viewModel.sendIntent(TemplatesScreenIntent.OnToggleSearch) }
+            ) {
+                Icon(
+                    imageVector = if (state.isSearchActive) Icons.Default.Close else Icons.Default.Search,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onBackground
+                )
+            }
+        }
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Search field
-            AppTextField(
-                value = state.searchQuery,
-                onValueChange = { viewModel.sendIntent(TemplatesScreenIntent.OnSearchQueryChange(it)) },
-                placeholder = stringResource(Res.string.templates_search_placeholder),
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                },
-                showClearButton = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
-                    .padding(vertical = AppDimens.SpacingMd)
-            )
+            // Expandable search field
+            AnimatedVisibility(
+                visible = state.isSearchActive,
+                enter = expandVertically(),
+                exit = shrinkVertically()
+            ) {
+                AppTextField(
+                    value = state.searchQuery,
+                    onValueChange = { viewModel.sendIntent(TemplatesScreenIntent.OnSearchQueryChange(it)) },
+                    placeholder = stringResource(Res.string.templates_search_placeholder),
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    showClearButton = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
+                        .padding(vertical = AppDimens.SpacingMd)
+                        .focusRequester(searchFocusRequester)
+                )
+            }
 
             // Main content area (scrollable)
             Box(

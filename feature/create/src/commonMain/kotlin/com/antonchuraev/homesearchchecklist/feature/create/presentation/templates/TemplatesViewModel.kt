@@ -35,6 +35,7 @@ class TemplatesViewModel(
             TemplatesScreenIntent.OnCreateFromTemplate -> createFromTemplate()
             TemplatesScreenIntent.OnDismissError -> dismissError()
             is TemplatesScreenIntent.OnSearchQueryChange -> onSearchQueryChange(intent.query)
+            TemplatesScreenIntent.OnToggleSearch -> toggleSearch()
             TemplatesScreenIntent.OnCreateManuallyClick -> appNavigator.navigateToCreateChecklistScreen(null)
             TemplatesScreenIntent.OnCreateWithAiClick -> appNavigator.navigateToAnalyzeScreen()
         }
@@ -54,6 +55,22 @@ class TemplatesViewModel(
                     it.copy(isLoading = false, error = e.message ?: "Failed to load templates")
                 }
             }
+        }
+    }
+
+    private fun toggleSearch() {
+        val currentState = _screenState.value
+        if (currentState.isSearchActive) {
+            // Closing search — clear query and reset filter
+            _screenState.update {
+                it.copy(
+                    isSearchActive = false,
+                    searchQuery = "",
+                    filteredCategories = it.categories
+                )
+            }
+        } else {
+            _screenState.update { it.copy(isSearchActive = true) }
         }
     }
 
