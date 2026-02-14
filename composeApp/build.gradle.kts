@@ -47,6 +47,7 @@ kotlin {
             implementation(projects.core.common.api)
             implementation(projects.core.common.impl)
             implementation(projects.core.designsystem)
+            implementation(projects.core.datastore.api)
             implementation(projects.core.navigation.api)
             implementation(projects.core.navigation.impl)
             implementation(projects.core.remoteconfig.api)
