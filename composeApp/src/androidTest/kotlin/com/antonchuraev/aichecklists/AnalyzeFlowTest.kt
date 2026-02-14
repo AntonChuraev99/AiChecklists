@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
@@ -22,17 +23,28 @@ import org.junit.Test
 class AnalyzeFlowTest : BaseUiTest() {
 
     private fun skipOnboardingAndGoToMain() {
-        waitForIdle()
+        waitForSplashToComplete()
         try {
             composeTestRule.onNodeWithText("Skip").performClick()
+            // Wait for Main screen to appear (up to 10 seconds)
+            waitUntil(10000) {
+                composeTestRule.onAllNodesWithText("Ready to get organized?")
+                    .fetchSemanticsNodes().isNotEmpty()
+            }
             waitForIdle()
         } catch (e: AssertionError) {
-            // Onboarding might already be completed
+            // Onboarding might already be completed - verify Main screen
+            waitUntil(5000) {
+                composeTestRule.onAllNodesWithText("Ready to get organized?")
+                    .fetchSemanticsNodes().isNotEmpty()
+            }
         }
     }
 
     private fun navigateToAnalyze() {
         skipOnboardingAndGoToMain()
+        // Wait for AI Analysis button to be ready
+        waitForButton("AI Analysis")
         composeTestRule
             .onNodeWithText("AI Analysis")
             .performClick()
@@ -40,6 +52,7 @@ class AnalyzeFlowTest : BaseUiTest() {
     }
 
     @Test
+    @Smoke
     fun analyzeScreen_displaysInputTypeOptions() {
         navigateToAnalyze()
 
@@ -166,9 +179,9 @@ class AnalyzeFlowTest : BaseUiTest() {
 
         waitForIdle()
 
-        // Should be back on main screen
+        // Should be back on main screen (empty state after Test Orchestrator clears data)
         composeTestRule
-            .onNodeWithText("My Checklists")
+            .onNodeWithText("Ready to get organized?")
             .assertIsDisplayed()
     }
 
