@@ -1,10 +1,8 @@
 package com.antonchuraev.homesearchchecklist.feature.user.data.device
 
-import platform.UIKit.UIDevice
+import platform.Foundation.NSUUID
 
-actual class DeviceIdProvider {
-    actual fun getDeviceId(): String {
-        return UIDevice.currentDevice.identifierForVendor?.UUIDString
-            ?: "unknown_ios_device"
-    }
-}
+/**
+ * iOS implementation of UUID generation using NSUUID().
+ */
+internal actual fun uuidString(): String = NSUUID().UUIDString

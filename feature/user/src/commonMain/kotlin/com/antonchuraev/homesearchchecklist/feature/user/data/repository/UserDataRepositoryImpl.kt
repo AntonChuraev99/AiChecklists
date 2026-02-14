@@ -101,7 +101,7 @@ class UserDataRepositoryImpl(
         }
 
         // User not registered, call the server
-        val deviceId = deviceIdProvider.getDeviceId()
+        val deviceId = deviceIdProvider.getOrCreateDeviceId()
         logger.debug(TAG, "ensureUserRegistered: registering new user with deviceId=$deviceId")
 
         return registerAndSave(deviceId)
@@ -110,7 +110,7 @@ class UserDataRepositoryImpl(
     override suspend fun syncWithServer(): Result<RegistrationData> {
         logger.debug(TAG, "syncWithServer: starting...")
 
-        val deviceId = deviceIdProvider.getDeviceId()
+        val deviceId = deviceIdProvider.getOrCreateDeviceId()
         logger.debug(TAG, "syncWithServer: deviceId=$deviceId")
 
         return registerAndSave(deviceId)

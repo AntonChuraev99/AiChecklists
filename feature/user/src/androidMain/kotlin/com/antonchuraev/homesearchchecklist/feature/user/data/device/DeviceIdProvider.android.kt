@@ -1,17 +1,8 @@
 package com.antonchuraev.homesearchchecklist.feature.user.data.device
 
-import android.annotation.SuppressLint
-import android.content.Context
-import android.provider.Settings
+import java.util.UUID
 
-actual class DeviceIdProvider(
-    private val context: Context
-) {
-    @SuppressLint("HardwareIds")
-    actual fun getDeviceId(): String {
-        return Settings.Secure.getString(
-            context.contentResolver,
-            Settings.Secure.ANDROID_ID
-        ) ?: "unknown_android_device"
-    }
-}
+/**
+ * Android implementation of UUID generation using java.util.UUID.
+ */
+internal actual fun uuidString(): String = UUID.randomUUID().toString()
