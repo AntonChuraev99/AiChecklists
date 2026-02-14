@@ -36,6 +36,12 @@ kotlin {
             implementation(libs.ktor.serialization.json)
         }
 
+        commonTest.dependencies {
+            implementation(libs.kotlin.test)
+            implementation(libs.kotlinx.coroutines.test)
+            implementation(libs.datastore.preferences.core)
+        }
+
         androidMain.dependencies {
             implementation(libs.ktor.client.okhttp)
         }
