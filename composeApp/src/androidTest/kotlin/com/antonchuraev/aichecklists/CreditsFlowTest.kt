@@ -1,6 +1,7 @@
 package com.antonchuraev.aichecklists
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import org.junit.Test
@@ -17,12 +18,21 @@ import org.junit.Test
 class CreditsFlowTest : BaseUiTest() {
 
     private fun skipOnboardingAndGoToMain() {
-        waitForIdle()
+        waitForSplashToComplete()
         try {
             composeTestRule.onNodeWithText("Skip").performClick()
+            // Wait for Main screen to appear (up to 10 seconds)
+            waitUntil(10000) {
+                composeTestRule.onAllNodesWithText("Ready to get organized?")
+                    .fetchSemanticsNodes().isNotEmpty()
+            }
             waitForIdle()
         } catch (e: AssertionError) {
-            // Onboarding might already be completed
+            // Onboarding might already be completed - verify Main screen
+            waitUntil(5000) {
+                composeTestRule.onAllNodesWithText("Ready to get organized?")
+                    .fetchSemanticsNodes().isNotEmpty()
+            }
         }
     }
 
@@ -37,10 +47,12 @@ class CreditsFlowTest : BaseUiTest() {
     }
 
     @Test
+    @Smoke
     fun creditsChip_clickNavigatesToPaywall() {
         skipOnboardingAndGoToMain()
 
         // When: Click on credits chip (for non-premium user, goes to paywall)
+        waitForButton("credits", substring = true)
         composeTestRule
             .onNodeWithText("credits", substring = true)
             .performClick()
@@ -58,6 +70,7 @@ class CreditsFlowTest : BaseUiTest() {
         skipOnboardingAndGoToMain()
 
         // Navigate to paywall
+        waitForButton("credits", substring = true)
         composeTestRule
             .onNodeWithText("credits", substring = true)
             .performClick()
@@ -92,6 +105,7 @@ class CreditsFlowTest : BaseUiTest() {
         skipOnboardingAndGoToMain()
 
         // Navigate to paywall
+        waitForButton("credits", substring = true)
         composeTestRule
             .onNodeWithText("credits", substring = true)
             .performClick()

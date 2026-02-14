@@ -17,13 +17,14 @@ import org.junit.Test
 class OnboardingFlowTest : BaseUiTest() {
 
     @Test
+    @Smoke
     fun onboarding_displaysFirstPage() {
         // Given: App is launched for the first time
-        waitForIdle()
+        waitForSplashToComplete()
 
         // Then: First onboarding page is displayed
         composeTestRule
-            .onNodeWithText("Capture Everything")
+            .onNodeWithText("Create via AI")
             .assertIsDisplayed()
 
         // And: Continue button is displayed
@@ -43,7 +44,7 @@ class OnboardingFlowTest : BaseUiTest() {
 
         // Given: First page is displayed
         composeTestRule
-            .onNodeWithText("Capture Everything")
+            .onNodeWithText("Create via AI")
             .assertIsDisplayed()
 
         // When: Click Continue
@@ -55,7 +56,7 @@ class OnboardingFlowTest : BaseUiTest() {
 
         // Then: Second page is displayed
         composeTestRule
-            .onNodeWithText("AI Does the Work")
+            .onNodeWithText("Fill via AI")
             .assertIsDisplayed()
 
         // When: Click Continue again
@@ -67,7 +68,7 @@ class OnboardingFlowTest : BaseUiTest() {
 
         // Then: Third page is displayed with Get Started button
         composeTestRule
-            .onNodeWithText("Never Miss a Thing")
+            .onNodeWithText("Export & Share")
             .assertIsDisplayed()
 
         composeTestRule
@@ -76,8 +77,9 @@ class OnboardingFlowTest : BaseUiTest() {
     }
 
     @Test
+    @Smoke
     fun onboarding_skipNavigatesToMainScreen() {
-        waitForIdle()
+        waitForSplashToComplete()
 
         // Given: Onboarding is displayed
         composeTestRule
@@ -91,9 +93,9 @@ class OnboardingFlowTest : BaseUiTest() {
 
         waitForIdle()
 
-        // Then: Main screen is displayed
+        // Then: Main screen is displayed (empty state)
         composeTestRule
-            .onNodeWithText("My Checklists")
+            .onNodeWithText("Ready to get organized?")
             .assertIsDisplayed()
     }
 
@@ -124,9 +126,9 @@ class OnboardingFlowTest : BaseUiTest() {
 
         waitForIdle()
 
-        // Then: Main screen is displayed
+        // Then: Main screen is displayed (empty state)
         composeTestRule
-            .onNodeWithText("My Checklists")
+            .onNodeWithText("Ready to get organized?")
             .assertIsDisplayed()
     }
 }

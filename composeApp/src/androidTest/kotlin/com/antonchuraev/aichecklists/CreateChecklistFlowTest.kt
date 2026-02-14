@@ -2,6 +2,7 @@ package com.antonchuraev.aichecklists
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
@@ -21,13 +22,22 @@ import org.junit.Test
 class CreateChecklistFlowTest : BaseUiTest() {
 
     private fun skipOnboardingAndGoToMain() {
-        waitForIdle()
+        waitForSplashToComplete()
         // Skip onboarding if shown
         try {
             composeTestRule.onNodeWithText("Skip").performClick()
+            // Wait for Main screen to appear (up to 10 seconds)
+            waitUntil(10000) {
+                composeTestRule.onAllNodesWithText("Ready to get organized?")
+                    .fetchSemanticsNodes().isNotEmpty()
+            }
             waitForIdle()
         } catch (e: AssertionError) {
-            // Onboarding might already be completed
+            // Onboarding might already be completed - verify Main screen
+            waitUntil(5000) {
+                composeTestRule.onAllNodesWithText("Ready to get organized?")
+                    .fetchSemanticsNodes().isNotEmpty()
+            }
         }
     }
 
@@ -35,12 +45,13 @@ class CreateChecklistFlowTest : BaseUiTest() {
     fun createChecklist_navigatesToCreateScreen() {
         skipOnboardingAndGoToMain()
 
-        // Given: Main screen is displayed
+        // Given: Main screen is displayed (empty state after Test Orchestrator clears data)
         composeTestRule
-            .onNodeWithText("My Checklists")
+            .onNodeWithText("Ready to get organized?")
             .assertIsDisplayed()
 
         // When: Click Create Checklist button
+        waitForButton("Create Checklist")
         composeTestRule
             .onNodeWithText("Create Checklist")
             .performClick()
@@ -62,6 +73,7 @@ class CreateChecklistFlowTest : BaseUiTest() {
         skipOnboardingAndGoToMain()
 
         // Navigate to create screen
+        waitForButton("Create Checklist")
         composeTestRule
             .onNodeWithText("Create Checklist")
             .performClick()
@@ -105,10 +117,12 @@ class CreateChecklistFlowTest : BaseUiTest() {
     }
 
     @Test
+    @Smoke
     fun createChecklist_saveWithEmptyNameShowsError() {
         skipOnboardingAndGoToMain()
 
         // Navigate to create screen
+        waitForButton("Create Checklist")
         composeTestRule
             .onNodeWithText("Create Checklist")
             .performClick()
@@ -132,6 +146,7 @@ class CreateChecklistFlowTest : BaseUiTest() {
         skipOnboardingAndGoToMain()
 
         // Navigate to create screen
+        waitForButton("Create Checklist")
         composeTestRule
             .onNodeWithText("Create Checklist")
             .performClick()
@@ -165,6 +180,7 @@ class CreateChecklistFlowTest : BaseUiTest() {
         waitForIdle()
 
         // Should navigate back to main screen
+        // After creating first checklist, main_title is shown (not empty state)
         composeTestRule
             .onNodeWithText("My Checklists")
             .assertIsDisplayed()
@@ -180,6 +196,7 @@ class CreateChecklistFlowTest : BaseUiTest() {
         skipOnboardingAndGoToMain()
 
         // Navigate to create screen
+        waitForButton("Create Checklist")
         composeTestRule
             .onNodeWithText("Create Checklist")
             .performClick()
@@ -195,9 +212,9 @@ class CreateChecklistFlowTest : BaseUiTest() {
 
         waitForIdle()
 
-        // Should be back on main screen
+        // Should be back on main screen (empty state)
         composeTestRule
-            .onNodeWithText("My Checklists")
+            .onNodeWithText("Ready to get organized?")
             .assertIsDisplayed()
     }
 }

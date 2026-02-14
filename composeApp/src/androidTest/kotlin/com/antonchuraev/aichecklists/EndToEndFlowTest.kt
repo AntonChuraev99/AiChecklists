@@ -18,12 +18,13 @@ import org.junit.Test
 class EndToEndFlowTest : BaseUiTest() {
 
     @Test
+    @Smoke
     fun completeUserJourney_onboardingToChecklistCreation() {
-        waitForIdle()
+        waitForSplashToComplete()
 
         // Step 1: Complete onboarding
         composeTestRule
-            .onNodeWithText("Capture Everything")
+            .onNodeWithText("Create via AI")
             .assertIsDisplayed()
 
         composeTestRule
@@ -32,7 +33,7 @@ class EndToEndFlowTest : BaseUiTest() {
         waitForIdle()
 
         composeTestRule
-            .onNodeWithText("AI Does the Work")
+            .onNodeWithText("Fill via AI")
             .assertIsDisplayed()
 
         composeTestRule
@@ -41,7 +42,7 @@ class EndToEndFlowTest : BaseUiTest() {
         waitForIdle()
 
         composeTestRule
-            .onNodeWithText("Never Miss a Thing")
+            .onNodeWithText("Export & Share")
             .assertIsDisplayed()
 
         composeTestRule
@@ -59,6 +60,7 @@ class EndToEndFlowTest : BaseUiTest() {
             .assertIsDisplayed()
 
         // Step 3: Create a checklist
+        waitForButton("Create Checklist")
         composeTestRule
             .onNodeWithText("Create Checklist")
             .performClick()
@@ -134,8 +136,9 @@ class EndToEndFlowTest : BaseUiTest() {
     }
 
     @Test
+    @Smoke
     fun navigationFlow_mainToAnalyzeAndBack() {
-        waitForIdle()
+        waitForSplashToComplete()
 
         // Skip onboarding
         try {
@@ -145,12 +148,13 @@ class EndToEndFlowTest : BaseUiTest() {
             // Onboarding already completed
         }
 
-        // Verify main screen
+        // Verify main screen (empty state after clearPackageData)
         composeTestRule
-            .onNodeWithText("My Checklists")
+            .onNodeWithText("Ready to get organized?")
             .assertIsDisplayed()
 
         // Navigate to AI Analysis
+        waitForButton("AI Analysis")
         composeTestRule
             .onNodeWithText("AI Analysis")
             .performClick()
@@ -176,15 +180,16 @@ class EndToEndFlowTest : BaseUiTest() {
         pressBack()
         waitForIdle()
 
-        // Verify back on main screen
+        // Verify back on main screen (empty state)
         composeTestRule
-            .onNodeWithText("My Checklists")
+            .onNodeWithText("Ready to get organized?")
             .assertIsDisplayed()
     }
 
     @Test
+    @Smoke
     fun creditsFlow_viewCreditsAndPaywall() {
-        waitForIdle()
+        waitForSplashToComplete()
 
         // Skip onboarding
         try {
@@ -194,12 +199,13 @@ class EndToEndFlowTest : BaseUiTest() {
             // Onboarding already completed
         }
 
-        // Verify main screen
+        // Verify main screen (empty state after clearPackageData)
         composeTestRule
-            .onNodeWithText("My Checklists")
+            .onNodeWithText("Ready to get organized?")
             .assertIsDisplayed()
 
         // Click on credits chip
+        waitForButton("credits", substring = true)
         composeTestRule
             .onNodeWithText("credits", substring = true)
             .performClick()
@@ -219,15 +225,16 @@ class EndToEndFlowTest : BaseUiTest() {
         pressBack()
         waitForIdle()
 
-        // Verify back on main screen
+        // Verify back on main screen (empty state)
         composeTestRule
-            .onNodeWithText("My Checklists")
+            .onNodeWithText("Ready to get organized?")
             .assertIsDisplayed()
     }
 
     @Test
+    @Smoke
     fun checklistDetailFlow_viewAndInteract() {
-        waitForIdle()
+        waitForSplashToComplete()
 
         // Skip onboarding
         try {
@@ -238,6 +245,7 @@ class EndToEndFlowTest : BaseUiTest() {
         }
 
         // Create a checklist first
+        waitForButton("Create Checklist")
         composeTestRule
             .onNodeWithText("Create Checklist")
             .performClick()
@@ -281,9 +289,9 @@ class EndToEndFlowTest : BaseUiTest() {
         pressBack()
         waitForIdle()
 
-        // Verify back on main screen
+        // Verify back on main screen (empty state)
         composeTestRule
-            .onNodeWithText("My Checklists")
+            .onNodeWithText("Ready to get organized?")
             .assertIsDisplayed()
     }
 }

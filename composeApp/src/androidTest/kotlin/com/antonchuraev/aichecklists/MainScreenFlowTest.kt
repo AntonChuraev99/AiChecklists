@@ -2,6 +2,7 @@ package com.antonchuraev.aichecklists
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
@@ -19,22 +20,32 @@ import org.junit.Test
 class MainScreenFlowTest : BaseUiTest() {
 
     private fun skipOnboardingAndGoToMain() {
-        waitForIdle()
+        waitForSplashToComplete()
         try {
             composeTestRule.onNodeWithText("Skip").performClick()
+            // Wait for Main screen to appear (up to 10 seconds)
+            waitUntil(10000) {
+                composeTestRule.onAllNodesWithText("Ready to get organized?")
+                    .fetchSemanticsNodes().isNotEmpty()
+            }
             waitForIdle()
         } catch (e: AssertionError) {
-            // Onboarding might already be completed
+            // Onboarding might already be completed - verify Main screen
+            waitUntil(5000) {
+                composeTestRule.onAllNodesWithText("Ready to get organized?")
+                    .fetchSemanticsNodes().isNotEmpty()
+            }
         }
     }
 
     @Test
+    @Smoke
     fun mainScreen_displaysEmptyState() {
         skipOnboardingAndGoToMain()
 
-        // Then: Main screen is displayed
+        // Then: Main screen is displayed (empty state)
         composeTestRule
-            .onNodeWithText("My Checklists")
+            .onNodeWithText("Ready to get organized?")
             .assertIsDisplayed()
 
         // And: Empty state message is displayed
@@ -69,6 +80,7 @@ class MainScreenFlowTest : BaseUiTest() {
         skipOnboardingAndGoToMain()
 
         // When: Click AI Analysis button
+        waitForButton("AI Analysis")
         composeTestRule
             .onNodeWithText("AI Analysis")
             .performClick()
@@ -90,6 +102,7 @@ class MainScreenFlowTest : BaseUiTest() {
         skipOnboardingAndGoToMain()
 
         // Create a checklist first
+        waitForButton("Create Checklist")
         composeTestRule
             .onNodeWithText("Create Checklist")
             .performClick()
@@ -136,6 +149,7 @@ class MainScreenFlowTest : BaseUiTest() {
         skipOnboardingAndGoToMain()
 
         // Create a checklist first
+        waitForButton("Create Checklist")
         composeTestRule
             .onNodeWithText("Create Checklist")
             .performClick()
