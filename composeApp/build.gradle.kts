@@ -102,7 +102,7 @@ android {
         versionCode = 12
         versionName = "1.8.2"
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = "com.antonchuraev.aichecklists.TestRunner"
 
         // Test Orchestrator - isolate tests with clearPackageData
         testInstrumentationRunnerArguments["clearPackageData"] = "true"

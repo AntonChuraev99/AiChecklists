@@ -9,133 +9,116 @@ import org.junit.Test
 /**
  * UI tests for the Credits and Premium flow.
  *
+ * Note: Paywall is a pager-style screen with trial timeline,
+ * not a static benefits list. Key elements:
+ * - "3 Days for Free" header
+ * - "Start your FREE trial" button
+ * - "Restore Purchase" link
+ * - "Skip" to dismiss
+ *
  * Tests cover:
- * 1. Credits display in toolbar
- * 2. Click on credits chip navigation
- * 3. Subscription status screen
- * 4. Paywall screen for non-premium users
+ * 1. Credits / Get More display in toolbar
+ * 2. Click on Get More navigates to paywall
+ * 3. Paywall screen elements display
+ * 4. Paywall back navigation
+ * 5. Credits info on analyze screen
+ * 6. Get More button state
  */
 class CreditsFlowTest : BaseUiTest() {
 
-    private fun skipOnboardingAndGoToMain() {
-        waitForSplashToComplete()
-        try {
-            composeTestRule.onNodeWithText("Skip").performClick()
-            // Wait for Main screen to appear (up to 10 seconds)
-            waitUntil(10000) {
-                composeTestRule.onAllNodesWithText("Ready to get organized?")
-                    .fetchSemanticsNodes().isNotEmpty()
-            }
-            waitForIdle()
-        } catch (e: AssertionError) {
-            // Onboarding might already be completed - verify Main screen
-            waitUntil(5000) {
-                composeTestRule.onAllNodesWithText("Ready to get organized?")
-                    .fetchSemanticsNodes().isNotEmpty()
-            }
-        }
-    }
-
     @Test
-    fun creditsChip_displaysCreditsCount() {
+    fun creditsChip_displaysCreditsArea() {
         skipOnboardingAndGoToMain()
 
-        // Then: Credits chip should show credits count
+        // "Go Premium" banner with "Daily AI credits refill" is on main screen
+        waitUntil(5000) {
+            composeTestRule.onAllNodesWithText("Go Premium")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
         composeTestRule
-            .onNodeWithText("credits", substring = true)
+            .onNodeWithText("Go Premium")
             .assertIsDisplayed()
     }
 
     @Test
     @Smoke
-    fun creditsChip_clickNavigatesToPaywall() {
+    fun creditsChip_clickGetMoreNavigatesToPaywall() {
         skipOnboardingAndGoToMain()
 
-        // When: Click on credits chip (for non-premium user, goes to paywall)
-        waitForButton("credits", substring = true)
-        composeTestRule
-            .onNodeWithText("credits", substring = true)
-            .performClick()
+        // Click on "Get More" chip (free user with 0 credits)
+        navigateToPaywall()
 
-        waitForIdle()
-
-        // Then: Paywall screen should be displayed
+        // Paywall screen should be displayed with trial offer
+        waitUntil(5000) {
+            composeTestRule.onAllNodesWithText("3 Days for Free")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
         composeTestRule
-            .onNodeWithText("Unlock Your Full Potential")
+            .onNodeWithText("3 Days for Free")
             .assertIsDisplayed()
     }
 
     @Test
-    fun paywallScreen_displaysFeatures() {
+    fun paywallScreen_displaysTrialInfo() {
         skipOnboardingAndGoToMain()
 
         // Navigate to paywall
-        waitForButton("credits", substring = true)
-        composeTestRule
-            .onNodeWithText("credits", substring = true)
-            .performClick()
-        waitForIdle()
+        navigateToPaywall()
 
-        // Then: Paywall features should be displayed
+        // Trial offer should be displayed
+        waitUntil(5000) {
+            composeTestRule.onAllNodesWithText("3 Days for Free")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
         composeTestRule
-            .onNodeWithText("Create unlimited checklists")
+            .onNodeWithText("3 Days for Free")
             .assertIsDisplayed()
 
+        // Start trial button
         composeTestRule
-            .onNodeWithText("Daily AI credits refill", substring = true)
+            .onNodeWithText("Start your FREE trial")
             .assertIsDisplayed()
 
+        // Cancel anytime reassurance
         composeTestRule
-            .onNodeWithText("Sync across all your devices")
+            .onNodeWithText("Cancel anytime")
             .assertIsDisplayed()
 
-        // And: Continue button should be displayed
+        // Restore purchase link
         composeTestRule
-            .onNodeWithText("Continue")
-            .assertIsDisplayed()
-
-        // And: Restore purchases button should be displayed
-        composeTestRule
-            .onNodeWithText("Restore Purchases")
+            .onNodeWithText("Restore Purchase")
             .assertIsDisplayed()
     }
 
     @Test
-    fun paywallScreen_backNavigatesToMain() {
+    fun paywallScreen_skipReturnsToMain() {
         skipOnboardingAndGoToMain()
 
         // Navigate to paywall
-        waitForButton("credits", substring = true)
-        composeTestRule
-            .onNodeWithText("credits", substring = true)
-            .performClick()
-        waitForIdle()
+        navigateToPaywall()
 
         // Verify we're on paywall
+        waitUntil(5000) {
+            composeTestRule.onAllNodesWithText("3 Days for Free")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Press Skip to dismiss
         composeTestRule
-            .onNodeWithText("Unlock Your Full Potential")
-            .assertIsDisplayed()
-
-        // Press back
-        pressBack()
-
+            .onNodeWithText("Skip")
+            .performClick()
         waitForIdle()
 
         // Should be back on main screen
-        composeTestRule
-            .onNodeWithText("My Checklists")
-            .assertIsDisplayed()
+        assertOnMainScreen()
     }
 
     @Test
-    fun analyzeScreen_showsCreditsInfo() {
+    fun analyzeScreen_showsCostInfo() {
         skipOnboardingAndGoToMain()
 
-        // Navigate to analyze screen
-        composeTestRule
-            .onNodeWithText("AI Analysis")
-            .performClick()
-        waitForIdle()
+        // Navigate to analyze screen via Create Checklist → Create with AI
+        navigateToAnalyze()
 
         // Select an input type
         composeTestRule
@@ -143,30 +126,23 @@ class CreditsFlowTest : BaseUiTest() {
             .performClick()
         waitForIdle()
 
-        // Then: Credits info should be shown
+        // Cost info should be shown (specific text to avoid multi-node match)
         composeTestRule
             .onNodeWithText("This action costs", substring = true)
-            .assertIsDisplayed()
-
-        // And: Current credits should be shown
-        composeTestRule
-            .onNodeWithText("credits", substring = true)
             .assertIsDisplayed()
     }
 
     @Test
-    fun mainScreen_getMoreButtonAppearsWhenNoCredits() {
-        // Note: This test assumes user has 0 credits
-        // In real scenario, you'd need to set up test fixtures
+    fun mainScreen_getMoreButtonVisible() {
         skipOnboardingAndGoToMain()
 
-        // If credits are 0, "Get More" should appear instead of credits count
-        // This test verifies the UI can display the "Get More" state
-        // The actual state depends on user data
+        // Verify main screen is displayed
+        assertOnMainScreen()
 
-        // Verify credits area is present in toolbar
-        composeTestRule
-            .onNodeWithText("My Checklists")
-            .assertIsDisplayed()
+        // "Get More" button should be present
+        waitUntil(5000) {
+            composeTestRule.onAllNodesWithText("Get More")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
     }
 }

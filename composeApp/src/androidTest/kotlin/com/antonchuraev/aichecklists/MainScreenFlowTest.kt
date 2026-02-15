@@ -1,11 +1,9 @@
 package com.antonchuraev.aichecklists
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTextInput
 import org.junit.Test
 
 /**
@@ -14,29 +12,10 @@ import org.junit.Test
  * Tests cover:
  * 1. Empty state display
  * 2. Checklist list display
- * 3. Credits chip display
+ * 3. Credits chip / Get More display
  * 4. Navigation to different screens
  */
 class MainScreenFlowTest : BaseUiTest() {
-
-    private fun skipOnboardingAndGoToMain() {
-        waitForSplashToComplete()
-        try {
-            composeTestRule.onNodeWithText("Skip").performClick()
-            // Wait for Main screen to appear (up to 10 seconds)
-            waitUntil(10000) {
-                composeTestRule.onAllNodesWithText("Ready to get organized?")
-                    .fetchSemanticsNodes().isNotEmpty()
-            }
-            waitForIdle()
-        } catch (e: AssertionError) {
-            // Onboarding might already be completed - verify Main screen
-            waitUntil(5000) {
-                composeTestRule.onAllNodesWithText("Ready to get organized?")
-                    .fetchSemanticsNodes().isNotEmpty()
-            }
-        }
-    }
 
     @Test
     @Smoke
@@ -48,19 +27,9 @@ class MainScreenFlowTest : BaseUiTest() {
             .onNodeWithText("Ready to get organized?")
             .assertIsDisplayed()
 
-        // And: Empty state message is displayed
-        composeTestRule
-            .onNodeWithText("Ready to get organized?")
-            .assertIsDisplayed()
-
         // And: Create Checklist button is displayed
         composeTestRule
             .onNodeWithText("Create Checklist")
-            .assertIsDisplayed()
-
-        // And: AI Analysis button is displayed
-        composeTestRule
-            .onNodeWithText("AI Analysis")
             .assertIsDisplayed()
     }
 
@@ -68,30 +37,22 @@ class MainScreenFlowTest : BaseUiTest() {
     fun mainScreen_displaysCreditsChip() {
         skipOnboardingAndGoToMain()
 
-        // Then: Credits chip should be displayed in toolbar
-        // It shows "X credits" format
+        // Then: Credits area should be displayed in toolbar
+        // Shows "Get More" when 0 credits, or "N credits" when > 0
+        // "Go Premium" banner also contains "credits" substring
         composeTestRule
             .onNodeWithText("credits", substring = true)
             .assertIsDisplayed()
     }
 
     @Test
-    fun mainScreen_navigatesToAiAnalysis() {
+    fun mainScreen_navigatesToAnalyzeViaCreateWithAi() {
         skipOnboardingAndGoToMain()
 
-        // When: Click AI Analysis button
-        waitForButton("AI Analysis")
-        composeTestRule
-            .onNodeWithText("AI Analysis")
-            .performClick()
-
-        waitForIdle()
+        // Navigate to analyze via: Create Checklist → Create with AI
+        navigateToAnalyze()
 
         // Then: Analyze screen is displayed
-        composeTestRule
-            .onNodeWithText("AI Analysis")
-            .assertIsDisplayed()
-
         composeTestRule
             .onNodeWithText("What would you like to analyze?")
             .assertIsDisplayed()
@@ -101,46 +62,16 @@ class MainScreenFlowTest : BaseUiTest() {
     fun mainScreen_createdChecklistAppears() {
         skipOnboardingAndGoToMain()
 
-        // Create a checklist first
-        waitForButton("Create Checklist")
-        composeTestRule
-            .onNodeWithText("Create Checklist")
-            .performClick()
-        waitForIdle()
-
-        composeTestRule
-            .onNode(hasText("e.g., Project Tasks"))
-            .performTextInput("Shopping List")
-
-        composeTestRule
-            .onNodeWithText("Add Item")
-            .performClick()
-        waitForIdle()
-
-        composeTestRule
-            .onNode(hasText("Item text"))
-            .performTextInput("Buy groceries")
-
-        // Save item
-        composeTestRule
-            .onNodeWithText("Save")
-            .performClick()
-        waitForIdle()
-
-        // Save checklist
-        composeTestRule
-            .onNodeWithText("Save")
-            .performClick()
-        waitForIdle()
+        // Create a checklist using helper (navigates through Templates)
+        createChecklistWithItems("Shopping List", "Buy groceries")
 
         // Then: Checklist should appear in the list
+        waitUntil(5000) {
+            composeTestRule.onAllNodesWithText("Shopping List")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
         composeTestRule
             .onNodeWithText("Shopping List")
-            .assertIsDisplayed()
-
-        // And: Progress indicator should be shown (0/1)
-        composeTestRule
-            .onNodeWithText("0/1")
             .assertIsDisplayed()
     }
 
@@ -149,22 +80,13 @@ class MainScreenFlowTest : BaseUiTest() {
         skipOnboardingAndGoToMain()
 
         // Create a checklist first
-        waitForButton("Create Checklist")
-        composeTestRule
-            .onNodeWithText("Create Checklist")
-            .performClick()
-        waitForIdle()
-
-        composeTestRule
-            .onNode(hasText("e.g., Project Tasks"))
-            .performTextInput("Detail Test")
-
-        composeTestRule
-            .onNodeWithText("Save")
-            .performClick()
-        waitForIdle()
+        createChecklistWithItems("Detail Test", "Test item")
 
         // Click on the checklist
+        waitUntil(5000) {
+            composeTestRule.onAllNodesWithText("Detail Test")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
         composeTestRule
             .onNodeWithText("Detail Test")
             .performClick()

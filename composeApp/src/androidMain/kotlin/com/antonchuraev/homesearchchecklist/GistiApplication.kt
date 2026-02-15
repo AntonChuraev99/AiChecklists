@@ -10,7 +10,7 @@ import org.koin.android.ext.koin.androidLogger
 import org.koin.core.context.GlobalContext
 import org.koin.core.context.startKoin
 
-class GistiApplication : Application() {
+open class GistiApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
@@ -27,7 +27,15 @@ class GistiApplication : Application() {
             }
         }
 
-        // Initialize RevenueCat early (before any UI)
+        initRevenueCat()
+    }
+
+    /**
+     * Initialize RevenueCat for subscription management.
+     * Open so that test Application subclass can skip it to avoid
+     * creating fake anonymous users in RevenueCat dashboard.
+     */
+    protected open fun initRevenueCat() {
         RevenueCatInitializer.initialize(
             apiKey = PaywallConfig.ANDROID_API_KEY,
             isDebug = AppBuildConfig.isDebug

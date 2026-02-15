@@ -1,61 +1,38 @@
 package com.antonchuraev.aichecklists
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTextInput
 import org.junit.Test
 
 /**
  * UI tests for sharing and exporting checklists.
  *
+ * Share screen shows:
+ * - Title: "Share Checklist"
+ * - Formats: "Plain Text", "PDF Document"
+ * - "Share" button (disabled until format selected)
+ *
  * Tests cover:
- * 1. Navigate to share screen
+ * 1. Navigate to share screen from checklist detail
  * 2. Export as plain text
- * 3. Export as PDF
+ * 3. Export as PDF document
  */
 class SharingExportFlowTest : BaseUiTest() {
 
-    private fun skipOnboardingAndGoToMain() {
-        waitForIdle()
-        try {
-            composeTestRule.onNodeWithText("Skip").performClick()
-            waitForIdle()
-        } catch (e: AssertionError) {
-            // Onboarding might already be completed
-        }
-    }
-
-    private fun createChecklistWithItems(): String {
+    private fun createAndOpenChecklist(): String {
         val checklistName = "Share Test Checklist"
+        createChecklistWithItems(checklistName, "Item to share")
 
+        // Open checklist detail
+        waitUntil(5000) {
+            composeTestRule.onAllNodesWithText(checklistName)
+                .fetchSemanticsNodes().isNotEmpty()
+        }
         composeTestRule
-            .onNodeWithText("Create Checklist")
-            .performClick()
-        waitForIdle()
-
-        composeTestRule
-            .onNode(hasText("e.g., Project Tasks"))
-            .performTextInput(checklistName)
-
-        // Add items
-        composeTestRule
-            .onNodeWithText("Add Item")
-            .performClick()
-        waitForIdle()
-
-        composeTestRule
-            .onNode(hasText("Item text"))
-            .performTextInput("Item to share")
-
-        composeTestRule
-            .onNodeWithText("Save")
-            .performClick()
-        waitForIdle()
-
-        composeTestRule
-            .onNodeWithText("Save")
+            .onNodeWithText(checklistName)
             .performClick()
         waitForIdle()
 
@@ -66,23 +43,26 @@ class SharingExportFlowTest : BaseUiTest() {
     fun sharing_navigateToShareScreen() {
         skipOnboardingAndGoToMain()
 
-        val checklistName = createChecklistWithItems()
+        createAndOpenChecklist()
 
-        // Open checklist detail
+        // Click share button (icon in toolbar with content description "Share")
         composeTestRule
-            .onNodeWithText(checklistName)
+            .onNode(hasContentDescription("Share"))
             .performClick()
         waitForIdle()
 
-        // Click share button (share icon in toolbar or menu)
+        // Share screen should be displayed (use unique title to avoid multi-node match)
         composeTestRule
-            .onNodeWithText("Share", substring = true)
-            .performClick()
-        waitForIdle()
+            .onNodeWithText("Share Checklist")
+            .assertIsDisplayed()
 
-        // Share screen should be displayed
+        // Format options should be visible
         composeTestRule
-            .onNodeWithText("Share", substring = true)
+            .onNodeWithText("Plain Text")
+            .assertIsDisplayed()
+
+        composeTestRule
+            .onNodeWithText("PDF Document")
             .assertIsDisplayed()
     }
 
@@ -90,28 +70,21 @@ class SharingExportFlowTest : BaseUiTest() {
     fun sharing_exportAsPlainText() {
         skipOnboardingAndGoToMain()
 
-        val checklistName = createChecklistWithItems()
+        createAndOpenChecklist()
 
-        // Open checklist and navigate to share
+        // Click share icon
         composeTestRule
-            .onNodeWithText(checklistName)
-            .performClick()
-        waitForIdle()
-
-        composeTestRule
-            .onNodeWithText("Share", substring = true)
+            .onNode(hasContentDescription("Share"))
             .performClick()
         waitForIdle()
 
         // Select "Plain Text" format
         composeTestRule
-            .onNodeWithText("Text", substring = true)
+            .onNodeWithText("Plain Text")
             .performClick()
         waitForIdle()
 
-        // Share intent should be triggered
-        // Note: We can't test the actual share dialog in UI tests
-        // but we can verify the UI responds
+        // Share intent triggered (can't test actual share dialog)
         waitForIdle()
     }
 
@@ -119,27 +92,21 @@ class SharingExportFlowTest : BaseUiTest() {
     fun sharing_exportAsPdf() {
         skipOnboardingAndGoToMain()
 
-        val checklistName = createChecklistWithItems()
+        createAndOpenChecklist()
 
-        // Open checklist and navigate to share
+        // Click share icon
         composeTestRule
-            .onNodeWithText(checklistName)
+            .onNode(hasContentDescription("Share"))
             .performClick()
         waitForIdle()
 
+        // Select "PDF Document" format
         composeTestRule
-            .onNodeWithText("Share", substring = true)
+            .onNodeWithText("PDF Document")
             .performClick()
         waitForIdle()
 
-        // Select "PDF" format
-        composeTestRule
-            .onNodeWithText("PDF")
-            .performClick()
-        waitForIdle()
-
-        // PDF generation should start
-        // Loading indicator or success message
+        // PDF generation started
         waitForIdle()
     }
 }
