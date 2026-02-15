@@ -6,6 +6,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
+import org.junit.Ignore
 import org.junit.Test
 import java.io.File
 
@@ -15,6 +16,7 @@ import java.io.File
  * This test captures screenshots and UI dumps at each step to diagnose
  * why navigation from Onboarding to Main screen is failing.
  */
+@Ignore("Diagnostic utility, not a real test")
 class DiagnosticTest : BaseUiTest() {
 
     private val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())

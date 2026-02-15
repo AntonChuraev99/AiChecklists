@@ -1,62 +1,44 @@
 package com.antonchuraev.aichecklists
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsNotEnabled
-import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTextInput
 import org.junit.Test
 
 /**
  * UI tests for Premium features and limits enforcement.
  *
+ * Note: Paywall is a pager-style screen with trial timeline:
+ * - "3 Days for Free" header
+ * - "Start your FREE trial" button
+ * - "Restore Purchase" link (no 's')
+ * - "Skip" to dismiss
+ *
  * Tests cover:
  * 1. Checklist creation limit for free users (max 3)
  * 2. Fill creation limit for free users (max 5 per checklist)
  * 3. Paywall shown when limit reached
- * 4. Premium benefits displayed on paywall
- * 5. Restore purchases button functionality
- * 6. Credits refill explanation for premium users
+ * 4. Premium trial info displayed on paywall
+ * 5. Restore purchase link on paywall
  */
 class PremiumFeaturesFlowTest : BaseUiTest() {
-
-    private fun skipOnboardingAndGoToMain() {
-        waitForIdle()
-        try {
-            composeTestRule.onNodeWithText("Skip").performClick()
-            waitForIdle()
-        } catch (e: AssertionError) {
-            // Onboarding might already be completed
-        }
-    }
-
-    private fun createChecklist(name: String) {
-        composeTestRule
-            .onNodeWithText("Create Checklist")
-            .performClick()
-        waitForIdle()
-
-        composeTestRule
-            .onNode(hasText("e.g., Project Tasks"))
-            .performTextInput(name)
-
-        composeTestRule
-            .onNodeWithText("Save")
-            .performClick()
-        waitForIdle()
-    }
 
     @Test
     fun premiumFeatures_checklistLimitForFreeUsers() {
         skipOnboardingAndGoToMain()
 
         // Create 3 checklists (free limit)
-        createChecklist("Checklist 1")
-        createChecklist("Checklist 2")
-        createChecklist("Checklist 3")
+        createChecklistWithItems("Checklist 1", "Item 1")
+        createChecklistWithItems("Checklist 2", "Item 2")
+        createChecklistWithItems("Checklist 3", "Item 3")
 
         // Verify all 3 checklists are displayed
+        waitUntil(5000) {
+            composeTestRule.onAllNodesWithText("Checklist 3")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+
         composeTestRule
             .onNodeWithText("Checklist 1")
             .assertIsDisplayed()
@@ -69,15 +51,28 @@ class PremiumFeaturesFlowTest : BaseUiTest() {
             .onNodeWithText("Checklist 3")
             .assertIsDisplayed()
 
-        // Attempt to create 4th checklist
+        // At limit: button changes to "Unlock More Checklists"
+        waitUntil(5000) {
+            composeTestRule.onAllNodesWithText("Unlock More Checklists")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
         composeTestRule
-            .onNodeWithText("Create Checklist")
+            .onNodeWithText("Unlock More Checklists")
+            .assertIsDisplayed()
+
+        // Click it - should show paywall
+        composeTestRule
+            .onNodeWithText("Unlock More Checklists")
             .performClick()
         waitForIdle()
 
-        // Should show paywall or limit message
+        // Paywall should appear with trial offer
+        waitUntil(5000) {
+            composeTestRule.onAllNodesWithText("3 Days for Free")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
         composeTestRule
-            .onNodeWithText("Unlock Your Full Potential", substring = true)
+            .onNodeWithText("3 Days for Free")
             .assertIsDisplayed()
     }
 
@@ -85,45 +80,24 @@ class PremiumFeaturesFlowTest : BaseUiTest() {
     fun premiumFeatures_fillLimitEnforcement() {
         skipOnboardingAndGoToMain()
 
-        // Create a checklist with items
-        composeTestRule
-            .onNodeWithText("Create Checklist")
-            .performClick()
-        waitForIdle()
-
-        composeTestRule
-            .onNode(hasText("e.g., Project Tasks"))
-            .performTextInput("Fill Limit Test")
-
-        composeTestRule
-            .onNodeWithText("Add Item")
-            .performClick()
-        waitForIdle()
-
-        composeTestRule
-            .onNode(hasText("Item text"))
-            .performTextInput("Test item")
-
-        composeTestRule
-            .onNodeWithText("Save")
-            .performClick()
-        waitForIdle()
-
-        composeTestRule
-            .onNodeWithText("Save")
-            .performClick()
-        waitForIdle()
+        // Create a checklist with an item
+        createChecklistWithItems("Fill Limit Test", "Test item")
 
         // Open checklist detail
+        waitUntil(5000) {
+            composeTestRule.onAllNodesWithText("Fill Limit Test")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
         composeTestRule
             .onNodeWithText("Fill Limit Test")
             .performClick()
         waitForIdle()
 
         // Create 5 fills (free limit)
-        repeat(5) { index ->
+        repeat(5) {
+            waitForButton("Create New Fill")
             composeTestRule
-                .onNodeWithText("New Fill", substring = true)
+                .onNodeWithText("Create New Fill")
                 .performClick()
             waitForIdle()
 
@@ -131,13 +105,14 @@ class PremiumFeaturesFlowTest : BaseUiTest() {
             waitForIdle()
         }
 
-        // Attempt to create 6th fill
+        // Attempt to create 6th fill - should show limit or paywall
+        waitForButton("Create New Fill")
         composeTestRule
-            .onNodeWithText("New Fill", substring = true)
+            .onNodeWithText("Create New Fill")
             .performClick()
         waitForIdle()
 
-        // Should show limit message or paywall
+        // Should show paywall or limit message
         waitForIdle()
     }
 
@@ -146,103 +121,84 @@ class PremiumFeaturesFlowTest : BaseUiTest() {
         skipOnboardingAndGoToMain()
 
         // Create max checklists
-        createChecklist("Checklist 1")
-        createChecklist("Checklist 2")
-        createChecklist("Checklist 3")
+        createChecklistWithItems("Checklist 1", "Item 1")
+        createChecklistWithItems("Checklist 2", "Item 2")
+        createChecklistWithItems("Checklist 3", "Item 3")
 
-        // Try to create one more
+        // At limit: button becomes "Unlock More Checklists"
+        waitUntil(5000) {
+            composeTestRule.onAllNodesWithText("Unlock More Checklists")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
         composeTestRule
-            .onNodeWithText("Create Checklist")
+            .onNodeWithText("Unlock More Checklists")
             .performClick()
         waitForIdle()
 
-        // Paywall should be displayed
+        // Paywall should be displayed with trial info
+        waitUntil(5000) {
+            composeTestRule.onAllNodesWithText("3 Days for Free")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
         composeTestRule
-            .onNodeWithText("Unlock Your Full Potential")
+            .onNodeWithText("3 Days for Free")
             .assertIsDisplayed()
 
-        // Verify premium benefits are listed
         composeTestRule
-            .onNodeWithText("Create unlimited checklists")
-            .assertIsDisplayed()
-
-        composeTestRule
-            .onNodeWithText("Daily AI credits refill", substring = true)
+            .onNodeWithText("Start your FREE trial")
             .assertIsDisplayed()
     }
 
     @Test
-    fun premiumFeatures_paywallDisplaysBenefits() {
+    fun premiumFeatures_paywallDisplaysTrialInfo() {
         skipOnboardingAndGoToMain()
 
-        // Navigate to paywall via credits chip
-        composeTestRule
-            .onNodeWithText("credits", substring = true)
-            .performClick()
-        waitForIdle()
+        // Navigate to paywall via Get More button
+        navigateToPaywall()
 
-        // Verify all premium benefits are shown
+        // Verify paywall is shown with trial offer
+        waitUntil(5000) {
+            composeTestRule.onAllNodesWithText("3 Days for Free")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
         composeTestRule
-            .onNodeWithText("Create unlimited checklists")
+            .onNodeWithText("3 Days for Free")
             .assertIsDisplayed()
 
         composeTestRule
-            .onNodeWithText("Daily AI credits refill", substring = true)
+            .onNodeWithText("Start your FREE trial")
             .assertIsDisplayed()
 
         composeTestRule
-            .onNodeWithText("Sync across all your devices")
-            .assertIsDisplayed()
-
-        // Verify pricing is displayed
-        composeTestRule
-            .onNodeWithText("$1.99", substring = true)
+            .onNodeWithText("Cancel anytime")
             .assertIsDisplayed()
     }
 
     @Test
-    fun premiumFeatures_restorePurchasesButton() {
+    fun premiumFeatures_restorePurchaseLink() {
         skipOnboardingAndGoToMain()
 
         // Navigate to paywall
-        composeTestRule
-            .onNodeWithText("credits", substring = true)
-            .performClick()
-        waitForIdle()
+        navigateToPaywall()
 
-        // Verify Restore Purchases button is present
+        // Verify paywall is shown
+        waitUntil(5000) {
+            composeTestRule.onAllNodesWithText("3 Days for Free")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Verify Restore Purchase link is present (no 's')
         composeTestRule
-            .onNodeWithText("Restore Purchases")
+            .onNodeWithText("Restore Purchase")
             .assertIsDisplayed()
 
         // Click it (will show message if no purchases)
         composeTestRule
-            .onNodeWithText("Restore Purchases")
+            .onNodeWithText("Restore Purchase")
             .performClick()
         waitForIdle()
 
-        // Should show some feedback (success or "no purchases found")
+        // Should show some feedback
         waitForIdle()
-    }
-
-    @Test
-    fun premiumFeatures_creditsRefillExplanation() {
-        skipOnboardingAndGoToMain()
-
-        // Navigate to paywall
-        composeTestRule
-            .onNodeWithText("credits", substring = true)
-            .performClick()
-        waitForIdle()
-
-        // Verify daily credits refill is explained
-        composeTestRule
-            .onNodeWithText("Daily AI credits refill", substring = true)
-            .assertIsDisplayed()
-
-        // Should mention "300 credits" for premium
-        composeTestRule
-            .onNodeWithText("300", substring = true)
-            .assertIsDisplayed()
     }
 }

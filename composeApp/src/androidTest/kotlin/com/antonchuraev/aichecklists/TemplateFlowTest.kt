@@ -1,6 +1,7 @@
 package com.antonchuraev.aichecklists
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import org.junit.Test
@@ -20,34 +21,28 @@ import org.junit.Test
  */
 class TemplateFlowTest : BaseUiTest() {
 
-    private fun skipOnboardingAndGoToMain() {
-        waitForIdle()
-        try {
-            composeTestRule.onNodeWithText("Skip").performClick()
-            waitForIdle()
-        } catch (e: AssertionError) {
-            // Onboarding might already be completed
-        }
-    }
-
     private fun navigateToTemplates() {
         skipOnboardingAndGoToMain()
-        // Templates is part of CreateChecklistRoute
-        // We'll navigate via deep link or through the app flow
-        // For now, we focus on testing Templates screen components
+        waitForButton("Create Checklist")
+        composeTestRule.onNodeWithText("Create Checklist").performClick()
+        waitForIdle()
+        // Now on Templates screen with title "New Checklist"
+        waitForButton("Create Manually")
     }
 
     @Test
     fun templatesScreen_displaysBottomActionButtons() {
         navigateToTemplates()
 
-        // Note: Templates screen shows bottom action buttons
-        // "Create Manually" - opens CreateChecklist screen
-        // "Create with AI" - opens Analyze screen
+        // Verify "Create Manually" button
+        composeTestRule
+            .onNodeWithText("Create Manually")
+            .assertIsDisplayed()
 
-        // This test verifies the buttons are present
-        // Actual navigation is tested in separate tests
-        waitForIdle()
+        // Verify "Create with AI" button
+        composeTestRule
+            .onNodeWithText("Create with AI")
+            .assertIsDisplayed()
     }
 
     @Test
@@ -56,14 +51,15 @@ class TemplateFlowTest : BaseUiTest() {
 
         // When: Click "Create Manually" button
         composeTestRule
-            .onNodeWithText("Create Manually", substring = true)
+            .onNodeWithText("Create Manually")
             .performClick()
         waitForIdle()
 
-        // Then: Should navigate to CreateChecklist screen
+        // Then: Should navigate to CreateChecklist form
+        // Verify by checking for the name input placeholder
         composeTestRule
-            .onNodeWithText("New Checklist")
-            .assertIsDisplayed()
+            .onNode(hasText("e.g., Project Tasks"))
+            .assertExists()
     }
 
     @Test
@@ -72,7 +68,7 @@ class TemplateFlowTest : BaseUiTest() {
 
         // When: Click "Create with AI" button
         composeTestRule
-            .onNodeWithText("Create with AI", substring = true)
+            .onNodeWithText("Create with AI")
             .performClick()
         waitForIdle()
 
@@ -83,16 +79,21 @@ class TemplateFlowTest : BaseUiTest() {
     }
 
     @Test
-    fun templatesScreen_searchIconTogglesSearchField() {
+    fun templatesScreen_displaysTitle() {
         navigateToTemplates()
 
-        // When: Click search icon in toolbar
-        // The icon toggles between Search and Close
-        waitForIdle()
+        // Verify Templates screen title
+        composeTestRule
+            .onNodeWithText("New Checklist")
+            .assertIsDisplayed()
 
-        // Note: Search functionality requires finding the search icon
-        // which is part of the toolbar actions
-        // This test structure is ready but needs icon click implementation
+        // Verify "Choose a template" heading
+        composeTestRule
+            .onNodeWithText("Choose a template")
+            .assertIsDisplayed()
+
+        // TODO: APP BUG - Search icon has no content description (accessibility issue)
+        // Fix: Add contentDescription = "Search" to search icon in Templates toolbar
     }
 
     @Test
@@ -103,9 +104,7 @@ class TemplateFlowTest : BaseUiTest() {
         pressBack()
         waitForIdle()
 
-        // Then: Should return to main screen
-        composeTestRule
-            .onNodeWithText("My Checklists")
-            .assertIsDisplayed()
+        // Then: Should return to main screen (empty state)
+        assertOnMainScreen()
     }
 }

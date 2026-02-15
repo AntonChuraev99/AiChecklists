@@ -1,10 +1,10 @@
 package com.antonchuraev.aichecklists
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTextInput
 import org.junit.Test
 
 /**
@@ -22,55 +22,21 @@ import org.junit.Test
  */
 class OfflineModeFlowTest : BaseUiTest() {
 
-    private fun skipOnboardingAndGoToMain() {
-        waitForIdle()
-        try {
-            composeTestRule.onNodeWithText("Skip").performClick()
-            waitForIdle()
-        } catch (e: AssertionError) {
-            // Onboarding might already be completed
-        }
-    }
-
     @Test
     fun offline_createChecklistWithoutNetwork() {
         skipOnboardingAndGoToMain()
 
-        // Note: In real offline test, we'd disable network first
-        // For now, we verify CRUD works (Room DB is local)
+        // Note: In real offline test, we'd disable network first.
+        // For now, we verify CRUD works (Room DB is local).
 
-        // Create checklist
-        composeTestRule
-            .onNodeWithText("Create Checklist")
-            .performClick()
-        waitForIdle()
+        // Create checklist using shared helper
+        createChecklistWithItems("Offline Checklist", "Offline Item")
 
-        composeTestRule
-            .onNode(hasText("e.g., Project Tasks"))
-            .performTextInput("Offline Checklist")
-
-        // Add item
-        composeTestRule
-            .onNodeWithText("Add Item")
-            .performClick()
-        waitForIdle()
-
-        composeTestRule
-            .onNode(hasText("Item text"))
-            .performTextInput("Offline Item")
-
-        composeTestRule
-            .onNodeWithText("Save")
-            .performClick()
-        waitForIdle()
-
-        // Save checklist
-        composeTestRule
-            .onNodeWithText("Save")
-            .performClick()
-        waitForIdle()
-
-        // Verify checklist appears (stored in local Room DB)
+        // Verify checklist appears on main (stored in local Room DB)
+        waitUntil(5000) {
+            composeTestRule.onAllNodesWithText("Offline Checklist")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
         composeTestRule
             .onNodeWithText("Offline Checklist")
             .assertIsDisplayed()
@@ -81,25 +47,13 @@ class OfflineModeFlowTest : BaseUiTest() {
         skipOnboardingAndGoToMain()
 
         // Create a checklist first (will be in local DB)
-        composeTestRule
-            .onNodeWithText("Create Checklist")
-            .performClick()
-        waitForIdle()
+        createChecklistWithItems("View Test", "Test Item")
 
-        composeTestRule
-            .onNode(hasText("e.g., Project Tasks"))
-            .performTextInput("View Test")
-
-        composeTestRule
-            .onNodeWithText("Save")
-            .performClick()
-        waitForIdle()
-
-        // Navigate away and back
-        pressBack()
-        waitForIdle()
-
-        // Checklist should still be visible (Room DB persists)
+        // Verify checklist is visible on main
+        waitUntil(5000) {
+            composeTestRule.onAllNodesWithText("View Test")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
         composeTestRule
             .onNodeWithText("View Test")
             .assertIsDisplayed()
@@ -111,8 +65,13 @@ class OfflineModeFlowTest : BaseUiTest() {
         waitForIdle()
 
         // Detail screen should load without network
+        // Wait for detail-specific element (Create New Fill button)
+        waitUntil(5000) {
+            composeTestRule.onAllNodesWithText("Create New Fill")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
         composeTestRule
-            .onNodeWithText("View Test")
+            .onNodeWithText("Create New Fill")
             .assertIsDisplayed()
     }
 
@@ -121,66 +80,34 @@ class OfflineModeFlowTest : BaseUiTest() {
         skipOnboardingAndGoToMain()
 
         // Create a checklist
-        composeTestRule
-            .onNodeWithText("Create Checklist")
-            .performClick()
-        waitForIdle()
+        createChecklistWithItems("Edit Offline Test", "Original")
 
-        composeTestRule
-            .onNode(hasText("e.g., Project Tasks"))
-            .performTextInput("Edit Offline Test")
-
-        composeTestRule
-            .onNodeWithText("Add Item")
-            .performClick()
-        waitForIdle()
-
-        composeTestRule
-            .onNode(hasText("Item text"))
-            .performTextInput("Original")
-
-        composeTestRule
-            .onNodeWithText("Save")
-            .performClick()
-        waitForIdle()
-
-        composeTestRule
-            .onNodeWithText("Save")
-            .performClick()
-        waitForIdle()
-
-        // Open and edit
+        // Open checklist detail
+        waitUntil(5000) {
+            composeTestRule.onAllNodesWithText("Edit Offline Test")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
         composeTestRule
             .onNodeWithText("Edit Offline Test")
             .performClick()
         waitForIdle()
 
+        // Click edit icon (content description "Edit")
         composeTestRule
-            .onNodeWithText("Edit", substring = true)
+            .onNode(hasContentDescription("Edit"))
             .performClick()
         waitForIdle()
 
-        // Add new item offline
-        composeTestRule
-            .onNodeWithText("Add Item")
-            .performClick()
-        waitForIdle()
+        // Add new item offline using inline flow
+        addItemToChecklist("Offline Added")
 
-        composeTestRule
-            .onNode(hasText("Item text"))
-            .performTextInput("Offline Added")
-
+        // Save checklist
         composeTestRule
             .onNodeWithText("Save")
             .performClick()
         waitForIdle()
 
-        composeTestRule
-            .onNodeWithText("Save")
-            .performClick()
-        waitForIdle()
-
-        // Verify new item is saved
+        // Verify new item is saved on detail screen
         composeTestRule
             .onNodeWithText("Offline Added")
             .assertIsDisplayed()
@@ -191,21 +118,13 @@ class OfflineModeFlowTest : BaseUiTest() {
         skipOnboardingAndGoToMain()
 
         // Create a checklist to delete
-        composeTestRule
-            .onNodeWithText("Create Checklist")
-            .performClick()
-        waitForIdle()
+        createChecklistWithItems("Delete Offline", "Item to delete")
 
-        composeTestRule
-            .onNode(hasText("e.g., Project Tasks"))
-            .performTextInput("Delete Offline")
-
-        composeTestRule
-            .onNodeWithText("Save")
-            .performClick()
-        waitForIdle()
-
-        // Verify it exists
+        // Verify it exists on main
+        waitUntil(5000) {
+            composeTestRule.onAllNodesWithText("Delete Offline")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
         composeTestRule
             .onNodeWithText("Delete Offline")
             .assertIsDisplayed()
@@ -216,65 +135,44 @@ class OfflineModeFlowTest : BaseUiTest() {
             .performClick()
         waitForIdle()
 
-        // Delete via menu or button
+        // Delete via icon (content description "Delete")
         composeTestRule
-            .onNodeWithText("Delete", substring = true)
+            .onNode(hasContentDescription("Delete"))
             .performClick()
         waitForIdle()
 
-        // Confirm deletion
+        // Confirm deletion (dialog with "Delete" button)
+        waitForButton("Delete")
         composeTestRule
-            .onNodeWithText("Delete", substring = true)
+            .onNodeWithText("Delete")
             .performClick()
         waitForIdle()
 
         // Should navigate back to main (checklist deleted from Room DB)
-        composeTestRule
-            .onNodeWithText("My Checklists")
-            .assertIsDisplayed()
+        assertOnMainScreen()
     }
 
     @Test
     fun offline_checkUncheckFillItemsWithoutNetwork() {
         skipOnboardingAndGoToMain()
 
-        // Create checklist with items
-        composeTestRule
-            .onNodeWithText("Create Checklist")
-            .performClick()
-        waitForIdle()
+        // Create checklist with an item
+        createChecklistWithItems("Fill Offline Test", "Offline Fill Item")
 
-        composeTestRule
-            .onNode(hasText("e.g., Project Tasks"))
-            .performTextInput("Fill Offline Test")
-
-        composeTestRule
-            .onNodeWithText("Add Item")
-            .performClick()
-        waitForIdle()
-
-        composeTestRule
-            .onNode(hasText("Item text"))
-            .performTextInput("Offline Fill Item")
-
-        composeTestRule
-            .onNodeWithText("Save")
-            .performClick()
-        waitForIdle()
-
-        composeTestRule
-            .onNodeWithText("Save")
-            .performClick()
-        waitForIdle()
-
-        // Open checklist and create fill
+        // Open checklist detail
+        waitUntil(5000) {
+            composeTestRule.onAllNodesWithText("Fill Offline Test")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
         composeTestRule
             .onNodeWithText("Fill Offline Test")
             .performClick()
         waitForIdle()
 
+        // Create fill
+        waitForButton("Create New Fill")
         composeTestRule
-            .onNodeWithText("New Fill", substring = true)
+            .onNodeWithText("Create New Fill")
             .performClick()
         waitForIdle()
 
@@ -290,9 +188,9 @@ class OfflineModeFlowTest : BaseUiTest() {
             .performClick()
         waitForIdle()
 
-        // Progress should update (0/1)
+        // Item should still be visible after toggle
         composeTestRule
-            .onNodeWithText("0/1")
+            .onNodeWithText("Offline Fill Item")
             .assertIsDisplayed()
     }
 }

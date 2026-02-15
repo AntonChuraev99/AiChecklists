@@ -1,62 +1,38 @@
 package com.antonchuraev.aichecklists
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsEnabled
-import androidx.compose.ui.test.assertIsNotEnabled
-import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTextInput
 import org.junit.Test
 
 /**
  * UI tests for the AI Analysis flow.
  *
+ * Note: Test Orchestrator clears app data, so credits = 0.
+ * With 0 credits, input fields (text area, URL field) do NOT appear.
+ * Instead, "Not enough credits" message and disabled Analyze button show.
+ *
  * Tests cover:
- * 1. Navigate to analyze screen
- * 2. Select different input types
- * 3. Enter text for analysis
- * 4. Credits display and validation
- * 5. Analyze button state based on credits
+ * 1. Navigate to analyze screen and verify input types
+ * 2. Select input types and verify cost info
+ * 3. Verify credits warning with 0 credits
+ * 4. Back navigation
+ * 5. Input type selection changes
  */
 class AnalyzeFlowTest : BaseUiTest() {
 
-    private fun skipOnboardingAndGoToMain() {
-        waitForSplashToComplete()
-        try {
-            composeTestRule.onNodeWithText("Skip").performClick()
-            // Wait for Main screen to appear (up to 10 seconds)
-            waitUntil(10000) {
-                composeTestRule.onAllNodesWithText("Ready to get organized?")
-                    .fetchSemanticsNodes().isNotEmpty()
-            }
-            waitForIdle()
-        } catch (e: AssertionError) {
-            // Onboarding might already be completed - verify Main screen
-            waitUntil(5000) {
-                composeTestRule.onAllNodesWithText("Ready to get organized?")
-                    .fetchSemanticsNodes().isNotEmpty()
-            }
-        }
-    }
-
-    private fun navigateToAnalyze() {
+    private fun goToAnalyze() {
         skipOnboardingAndGoToMain()
-        // Wait for AI Analysis button to be ready
-        waitForButton("AI Analysis")
-        composeTestRule
-            .onNodeWithText("AI Analysis")
-            .performClick()
-        waitForIdle()
+        navigateToAnalyze()
     }
 
     @Test
     @Smoke
     fun analyzeScreen_displaysInputTypeOptions() {
-        navigateToAnalyze()
+        goToAnalyze()
 
-        // Then: All input type options are displayed
+        // All input type options are displayed
         composeTestRule
             .onNodeWithText("Photo")
             .assertIsDisplayed()
@@ -79,115 +55,102 @@ class AnalyzeFlowTest : BaseUiTest() {
     }
 
     @Test
-    fun analyzeScreen_selectTextInputShowsTextField() {
-        navigateToAnalyze()
+    fun analyzeScreen_selectInputTypeShowsCostAndAnalyzeButton() {
+        goToAnalyze()
 
-        // When: Select "Paste Text" option
+        // Select "Paste Text" option
         composeTestRule
             .onNodeWithText("Paste Text")
             .performClick()
-
         waitForIdle()
 
-        // Then: Text input area should appear
+        // Cost info should appear
         composeTestRule
-            .onNodeWithText("Add your content")
+            .onNodeWithText("This action costs", substring = true)
             .assertIsDisplayed()
 
-        // And: Analyze button should appear
+        // Analyze button should appear (disabled with 0 credits)
         composeTestRule
             .onNodeWithText("Analyze")
             .assertIsDisplayed()
     }
 
     @Test
-    fun analyzeScreen_selectWebLinkShowsUrlField() {
-        navigateToAnalyze()
+    fun analyzeScreen_selectWebLinkShowsCostInfo() {
+        goToAnalyze()
 
-        // When: Select "Web Link" option
+        // Select "Web Link" option
         composeTestRule
             .onNodeWithText("Web Link")
             .performClick()
-
         waitForIdle()
 
-        // Then: URL input should appear
+        // Cost info should appear
         composeTestRule
-            .onNodeWithText("URL")
+            .onNodeWithText("This action costs", substring = true)
             .assertIsDisplayed()
 
+        // Analyze button should appear
         composeTestRule
-            .onNodeWithText("https://example.com/article")
+            .onNodeWithText("Analyze")
             .assertIsDisplayed()
     }
 
     @Test
-    fun analyzeScreen_showsCostInfo() {
-        navigateToAnalyze()
+    fun analyzeScreen_showsNotEnoughCreditsWarning() {
+        goToAnalyze()
 
         // Select an input type to show the bottom bar
         composeTestRule
             .onNodeWithText("Paste Text")
             .performClick()
-
         waitForIdle()
 
-        // Then: Cost info should be displayed
+        // With 0 credits, "Not enough credits" warning should appear
         composeTestRule
-            .onNodeWithText("This action costs", substring = true)
-            .assertIsDisplayed()
-
-        composeTestRule
-            .onNodeWithText("credits", substring = true)
+            .onNodeWithText("Not enough credits", substring = true)
             .assertIsDisplayed()
     }
 
     @Test
-    fun analyzeScreen_enterTextForAnalysis() {
-        navigateToAnalyze()
+    fun analyzeScreen_showsCostInfoWithCreditsAmount() {
+        goToAnalyze()
 
-        // Select "Paste Text"
+        // Select an input type
         composeTestRule
             .onNodeWithText("Paste Text")
             .performClick()
         waitForIdle()
 
-        // Enter some text
+        // Cost info should be displayed (e.g., "This action costs 30 credits")
         composeTestRule
-            .onNode(hasText("Paste meeting notes", substring = true))
-            .performTextInput("1. Buy milk\n2. Clean the house\n3. Call mom")
-
-        waitForIdle()
-
-        // Analyze button should be displayed
-        composeTestRule
-            .onNodeWithText("Analyze")
+            .onNodeWithText("This action costs", substring = true)
             .assertIsDisplayed()
     }
 
     @Test
-    fun analyzeScreen_backButtonNavigatesToMain() {
-        navigateToAnalyze()
+    fun analyzeScreen_backNavigatesToTemplates() {
+        goToAnalyze()
 
         // Verify we're on analyze screen
         composeTestRule
             .onNodeWithText("What would you like to analyze?")
             .assertIsDisplayed()
 
-        // Press back
+        // Press back - goes from Analyze to Templates
         pressBack()
-
         waitForIdle()
 
-        // Should be back on main screen (empty state after Test Orchestrator clears data)
-        composeTestRule
-            .onNodeWithText("Ready to get organized?")
-            .assertIsDisplayed()
+        // Should be on Templates screen
+        waitUntil(3000) {
+            composeTestRule.onAllNodesWithText("Create Manually")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
     }
 
     @Test
-    fun analyzeScreen_inputTypeSelectionChangesHighlight() {
-        navigateToAnalyze()
+    fun analyzeScreen_inputTypeSelectionChanges() {
+        goToAnalyze()
 
         // Select "Photo"
         composeTestRule
@@ -207,9 +170,9 @@ class AnalyzeFlowTest : BaseUiTest() {
             .performClick()
         waitForIdle()
 
-        // Input area should be visible
+        // Analyze button should be visible after selection
         composeTestRule
-            .onNodeWithText("Your text")
+            .onNodeWithText("Analyze")
             .assertIsDisplayed()
     }
 }

@@ -1,9 +1,13 @@
 package com.antonchuraev.aichecklists
 
-import androidx.activity.ComponentActivity
-import androidx.compose.ui.test.SemanticsNodeInteractionCollection
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
@@ -132,33 +136,119 @@ abstract class BaseUiTest {
         device.pressBack()
     }
 
-    // ===== MockK Helpers (Optional - add when needed) =====
-    //
-    // Uncomment and implement if you need to mock services:
-    //
-    // private val mockAiAnalyzer = mockk<AiAnalyzer>(relaxed = true)
-    // private val mockPaywallRepository = mockk<PaywallRepository>(relaxed = true)
-    //
-    // @Before
-    // fun setupMocks() {
-    //     stopKoin()
-    //     startKoin {
-    //         androidContext(composeTestRule.activity.applicationContext)
-    //         modules(
-    //             module {
-    //                 single<AiAnalyzer> { mockAiAnalyzer }
-    //                 single<PaywallRepository> { mockPaywallRepository }
-    //             }
-    //         )
-    //     }
-    // }
-    //
-    // @After
-    // fun teardownKoin() {
-    //     stopKoin()
-    // }
-    //
-    // protected fun givenAiAnalysisReturns(result: AnalyzeResult) {
-    //     coEvery { mockAiAnalyzer.analyze(any(), any()) } returns Result.success(result)
-    // }
+    // ===== Common Navigation Helpers =====
+
+    /**
+     * Skip onboarding and wait for main screen to appear.
+     *
+     * CRITICAL: This method waits for Splash to complete first (10-15 seconds),
+     * then skips onboarding. All tests MUST use this instead of manual splash handling.
+     *
+     * After this call, "Create Checklist" button is visible on main screen.
+     */
+    protected fun skipOnboardingAndGoToMain() {
+        waitForSplashToComplete()
+        try {
+            composeTestRule.onNodeWithText("Skip").performClick()
+            waitUntil(10000) {
+                composeTestRule.onAllNodesWithText("Create Checklist")
+                    .fetchSemanticsNodes().isNotEmpty()
+            }
+            waitForIdle()
+        } catch (e: AssertionError) {
+            // Onboarding might already be completed
+            waitUntil(10000) {
+                composeTestRule.onAllNodesWithText("Create Checklist")
+                    .fetchSemanticsNodes().isNotEmpty()
+            }
+        }
+    }
+
+    /**
+     * Navigate from main screen to the manual create checklist form.
+     *
+     * Flow: Main → Templates screen → "Create Manually" → Create form
+     * After this call, "e.g., Project Tasks" placeholder is visible.
+     */
+    protected fun navigateToCreateForm() {
+        waitForButton("Create Checklist")
+        composeTestRule.onNodeWithText("Create Checklist").performClick()
+        waitForIdle()
+        waitForButton("Create Manually")
+        composeTestRule.onNodeWithText("Create Manually").performClick()
+        waitForIdle()
+    }
+
+    /**
+     * Navigate from main screen to the AI Analyze screen.
+     *
+     * Flow: Main → Templates screen → "Create with AI" → Analyze screen
+     */
+    protected fun navigateToAnalyze() {
+        waitForButton("Create Checklist")
+        composeTestRule.onNodeWithText("Create Checklist").performClick()
+        waitForIdle()
+        waitForButton("Create with AI")
+        composeTestRule.onNodeWithText("Create with AI").performClick()
+        waitForIdle()
+    }
+
+    /**
+     * Add an item to checklist on the create/edit form.
+     *
+     * Uses the inline "Add new item..." field + "+" button (content desc: "Add item").
+     * NOT a dialog — items are added directly in the list.
+     */
+    protected fun addItemToChecklist(text: String) {
+        composeTestRule
+            .onNode(hasText("Add new item..."))
+            .performTextInput(text)
+        composeTestRule
+            .onNode(hasContentDescription("Add item"))
+            .performClick()
+        waitForIdle()
+    }
+
+    /**
+     * Create a checklist with given name and items, then return to main screen.
+     *
+     * Full flow: Main → Templates → Create Manually → fill form → Save → Main
+     */
+    protected fun createChecklistWithItems(name: String, vararg items: String) {
+        navigateToCreateForm()
+
+        composeTestRule
+            .onNode(hasText("e.g., Project Tasks"))
+            .performTextInput(name)
+
+        for (item in items) {
+            addItemToChecklist(item)
+        }
+
+        composeTestRule.onNodeWithText("Save").performClick()
+        waitForIdle()
+    }
+
+    /**
+     * Navigate to paywall via "Get More" button.
+     *
+     * Note: When credits = 0, the chip shows "Get More".
+     * When credits > 0, it shows "{N} credits".
+     */
+    protected fun navigateToPaywall() {
+        waitForButton("Get More")
+        composeTestRule.onNodeWithText("Get More").performClick()
+        waitForIdle()
+    }
+
+    /**
+     * Assert we're on main screen by checking "Create Checklist" button is visible.
+     */
+    protected fun assertOnMainScreen() {
+        waitUntil(5000) {
+            composeTestRule.onAllNodesWithText("Create Checklist")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNodeWithText("Create Checklist").assertIsDisplayed()
+    }
 }
