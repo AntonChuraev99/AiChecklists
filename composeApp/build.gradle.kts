@@ -46,6 +46,7 @@ kotlin {
         commonMain.dependencies {
             implementation(projects.core.common.api)
             implementation(projects.core.common.impl)
+            implementation(projects.core.datastore.api)
             implementation(projects.core.designsystem)
             implementation(projects.core.datastore.api)
             implementation(projects.core.navigation.api)
@@ -102,7 +103,10 @@ android {
         versionCode = 13
         versionName = "1.8.3"
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = "com.antonchuraev.aichecklists.TestRunner"
+
+        // Test Orchestrator - isolate tests with clearPackageData
+        testInstrumentationRunnerArguments["clearPackageData"] = "true"
 
         // Read Gemini API key from local.properties
         val localProperties = project.rootProject.file("local.properties")
@@ -113,12 +117,27 @@ android {
         buildConfigField("String", "GEMINI_API_KEY", "\"${properties.getProperty("GEMINI_API_KEY", "")}\"")
     }
 
+    testOptions {
+        // Enable Test Orchestrator for test isolation
+        execution = "ANDROIDX_TEST_ORCHESTRATOR"
+
+        // Disable animations to prevent flaky tests
+        animationsDisabled = true
+
+        unitTests {
+            isIncludeAndroidResources = true
+            isReturnDefaultValues = true
+        }
+    }
+
     buildFeatures {
         buildConfig = true
     }
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "/META-INF/LICENSE.md"
+            excludes += "/META-INF/LICENSE-notice.md"
         }
     }
     signingConfigs {
@@ -174,5 +193,12 @@ dependencies {
     androidTestImplementation("androidx.compose.ui:ui-test-junit4:1.7.8")
     androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
     debugImplementation("androidx.compose.ui:ui-test-manifest:1.7.8")
+
+    // Test Orchestrator - runs each test in isolated process
+    androidTestUtil("androidx.test:orchestrator:1.5.0")
+
+    // MockK - mocking library for Kotlin
+    androidTestImplementation("io.mockk:mockk-android:1.13.8")
+    androidTestImplementation("io.mockk:mockk-agent:1.13.8")
 }
 

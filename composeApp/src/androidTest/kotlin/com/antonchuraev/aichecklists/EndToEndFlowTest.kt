@@ -1,10 +1,9 @@
 package com.antonchuraev.aichecklists
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTextInput
 import org.junit.Test
 
 /**
@@ -12,18 +11,20 @@ import org.junit.Test
  *
  * Tests cover:
  * 1. Complete onboarding to checklist creation flow
- * 2. Create, view, and interact with checklist
- * 3. Full app navigation flow
+ * 2. Navigation: main → analyze → back
+ * 3. Credits flow: main → paywall → back
+ * 4. Checklist detail flow: create → detail → back
  */
 class EndToEndFlowTest : BaseUiTest() {
 
     @Test
+    @Smoke
     fun completeUserJourney_onboardingToChecklistCreation() {
-        waitForIdle()
+        waitForSplashToComplete()
 
-        // Step 1: Complete onboarding
+        // Step 1: Complete onboarding (4 pages)
         composeTestRule
-            .onNodeWithText("Capture Everything")
+            .onNodeWithText("Create via AI")
             .assertIsDisplayed()
 
         composeTestRule
@@ -32,7 +33,7 @@ class EndToEndFlowTest : BaseUiTest() {
         waitForIdle()
 
         composeTestRule
-            .onNodeWithText("AI Does the Work")
+            .onNodeWithText("Fill via AI")
             .assertIsDisplayed()
 
         composeTestRule
@@ -41,232 +42,106 @@ class EndToEndFlowTest : BaseUiTest() {
         waitForIdle()
 
         composeTestRule
-            .onNodeWithText("Never Miss a Thing")
+            .onNodeWithText("Export & Share")
             .assertIsDisplayed()
 
+        // Continue to 4th page (trial)
         composeTestRule
-            .onNodeWithText("Get Started")
+            .onNodeWithText("Continue")
             .performClick()
         waitForIdle()
 
-        // Step 2: Verify main screen
+        // Skip trial to go to main screen
         composeTestRule
-            .onNodeWithText("My Checklists")
-            .assertIsDisplayed()
+            .onNodeWithText("Skip")
+            .performClick()
+        waitForIdle()
+
+        // Step 2: Verify main screen (empty state)
+        assertOnMainScreen()
 
         composeTestRule
             .onNodeWithText("Ready to get organized?")
             .assertIsDisplayed()
 
-        // Step 3: Create a checklist
-        composeTestRule
-            .onNodeWithText("Create Checklist")
-            .performClick()
-        waitForIdle()
-
-        composeTestRule
-            .onNodeWithText("New Checklist")
-            .assertIsDisplayed()
-
-        // Enter checklist name
-        composeTestRule
-            .onNode(hasText("e.g., Project Tasks"))
-            .performTextInput("My First Checklist")
-
-        // Add first item
-        composeTestRule
-            .onNodeWithText("Add Item")
-            .performClick()
-        waitForIdle()
-
-        composeTestRule
-            .onNode(hasText("Item text"))
-            .performTextInput("Task 1")
-
-        composeTestRule
-            .onNodeWithText("Save")
-            .performClick()
-        waitForIdle()
-
-        // Add second item
-        composeTestRule
-            .onNodeWithText("Add Item")
-            .performClick()
-        waitForIdle()
-
-        composeTestRule
-            .onNode(hasText("Item text"))
-            .performTextInput("Task 2")
-
-        composeTestRule
-            .onNodeWithText("Save")
-            .performClick()
-        waitForIdle()
-
-        // Verify items are displayed
-        composeTestRule
-            .onNodeWithText("Task 1")
-            .assertIsDisplayed()
-
-        composeTestRule
-            .onNodeWithText("Task 2")
-            .assertIsDisplayed()
-
-        // Save checklist
-        composeTestRule
-            .onNodeWithText("Save")
-            .performClick()
-        waitForIdle()
+        // Step 3: Create a checklist using helpers
+        createChecklistWithItems("My First Checklist", "Task 1", "Task 2")
 
         // Step 4: Verify checklist appears on main screen
-        composeTestRule
-            .onNodeWithText("My Checklists")
-            .assertIsDisplayed()
+        assertOnMainScreen()
 
         composeTestRule
             .onNodeWithText("My First Checklist")
             .assertIsDisplayed()
-
-        // Verify progress indicator
-        composeTestRule
-            .onNodeWithText("0/2")
-            .assertIsDisplayed()
     }
 
     @Test
+    @Smoke
     fun navigationFlow_mainToAnalyzeAndBack() {
-        waitForIdle()
+        skipOnboardingAndGoToMain()
 
-        // Skip onboarding
-        try {
-            composeTestRule.onNodeWithText("Skip").performClick()
-            waitForIdle()
-        } catch (e: AssertionError) {
-            // Onboarding already completed
-        }
-
-        // Verify main screen
-        composeTestRule
-            .onNodeWithText("My Checklists")
-            .assertIsDisplayed()
-
-        // Navigate to AI Analysis
-        composeTestRule
-            .onNodeWithText("AI Analysis")
-            .performClick()
-        waitForIdle()
+        // Navigate to analyze via Create Checklist → Create with AI
+        navigateToAnalyze()
 
         // Verify analyze screen
         composeTestRule
             .onNodeWithText("What would you like to analyze?")
             .assertIsDisplayed()
 
-        // Select input type
-        composeTestRule
-            .onNodeWithText("Paste Text")
-            .performClick()
+        // Go back twice (analyze → templates → main)
+        pressBack()
         waitForIdle()
-
-        // Verify input area
-        composeTestRule
-            .onNodeWithText("Your text")
-            .assertIsDisplayed()
-
-        // Go back
         pressBack()
         waitForIdle()
 
-        // Verify back on main screen
-        composeTestRule
-            .onNodeWithText("My Checklists")
-            .assertIsDisplayed()
+        // Verify back on main screen (empty state)
+        assertOnMainScreen()
     }
 
     @Test
+    @Smoke
     fun creditsFlow_viewCreditsAndPaywall() {
-        waitForIdle()
+        skipOnboardingAndGoToMain()
 
-        // Skip onboarding
-        try {
-            composeTestRule.onNodeWithText("Skip").performClick()
-            waitForIdle()
-        } catch (e: AssertionError) {
-            // Onboarding already completed
+        // Navigate to paywall via Get More
+        navigateToPaywall()
+
+        // Verify paywall screen (trial offer for non-premium user)
+        waitUntil(5000) {
+            composeTestRule.onAllNodesWithText("3 Days for Free")
+                .fetchSemanticsNodes().isNotEmpty()
         }
-
-        // Verify main screen
         composeTestRule
-            .onNodeWithText("My Checklists")
+            .onNodeWithText("3 Days for Free")
             .assertIsDisplayed()
 
-        // Click on credits chip
         composeTestRule
-            .onNodeWithText("credits", substring = true)
+            .onNodeWithText("Start your FREE trial")
+            .assertIsDisplayed()
+
+        // Dismiss paywall via Skip
+        composeTestRule
+            .onNodeWithText("Skip")
             .performClick()
-        waitForIdle()
-
-        // Verify paywall screen (for non-premium user)
-        composeTestRule
-            .onNodeWithText("Unlock Your Full Potential")
-            .assertIsDisplayed()
-
-        // Verify premium features are listed
-        composeTestRule
-            .onNodeWithText("Daily AI credits refill", substring = true)
-            .assertIsDisplayed()
-
-        // Go back
-        pressBack()
         waitForIdle()
 
         // Verify back on main screen
-        composeTestRule
-            .onNodeWithText("My Checklists")
-            .assertIsDisplayed()
+        assertOnMainScreen()
     }
 
     @Test
+    @Smoke
     fun checklistDetailFlow_viewAndInteract() {
-        waitForIdle()
+        skipOnboardingAndGoToMain()
 
-        // Skip onboarding
-        try {
-            composeTestRule.onNodeWithText("Skip").performClick()
-            waitForIdle()
-        } catch (e: AssertionError) {
-            // Onboarding already completed
-        }
-
-        // Create a checklist first
-        composeTestRule
-            .onNodeWithText("Create Checklist")
-            .performClick()
-        waitForIdle()
-
-        composeTestRule
-            .onNode(hasText("e.g., Project Tasks"))
-            .performTextInput("Detail Test Checklist")
-
-        composeTestRule
-            .onNodeWithText("Add Item")
-            .performClick()
-        waitForIdle()
-
-        composeTestRule
-            .onNode(hasText("Item text"))
-            .performTextInput("Check this item")
-
-        composeTestRule
-            .onNodeWithText("Save")
-            .performClick()
-        waitForIdle()
-
-        composeTestRule
-            .onNodeWithText("Save")
-            .performClick()
-        waitForIdle()
+        // Create a checklist
+        createChecklistWithItems("Detail Test Checklist", "Check this item")
 
         // Click on the checklist to view details
+        waitUntil(5000) {
+            composeTestRule.onAllNodesWithText("Detail Test Checklist")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
         composeTestRule
             .onNodeWithText("Detail Test Checklist")
             .performClick()
@@ -282,8 +157,6 @@ class EndToEndFlowTest : BaseUiTest() {
         waitForIdle()
 
         // Verify back on main screen
-        composeTestRule
-            .onNodeWithText("My Checklists")
-            .assertIsDisplayed()
+        assertOnMainScreen()
     }
 }

@@ -2,6 +2,7 @@ package com.antonchuraev.aichecklists
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
@@ -11,49 +12,44 @@ import org.junit.Test
  * UI tests for the Create Checklist flow.
  *
  * Tests cover:
- * 1. Navigate to create screen
- * 2. Enter checklist name
- * 3. Add items to checklist
- * 4. Delete items from checklist
- * 5. Save checklist
- * 6. Validation errors
+ * 1. Navigate to templates screen
+ * 2. Navigate to create form via "Create Manually"
+ * 3. Enter checklist name and add items (inline flow)
+ * 4. Save checklist
+ * 5. Validation errors
+ * 6. Back navigation
  */
 class CreateChecklistFlowTest : BaseUiTest() {
 
-    private fun skipOnboardingAndGoToMain() {
-        waitForIdle()
-        // Skip onboarding if shown
-        try {
-            composeTestRule.onNodeWithText("Skip").performClick()
-            waitForIdle()
-        } catch (e: AssertionError) {
-            // Onboarding might already be completed
-        }
-    }
-
     @Test
-    fun createChecklist_navigatesToCreateScreen() {
+    fun createChecklist_navigatesToTemplatesScreen() {
         skipOnboardingAndGoToMain()
 
-        // Given: Main screen is displayed
+        // Given: Main screen is displayed (empty state)
         composeTestRule
-            .onNodeWithText("My Checklists")
+            .onNodeWithText("Ready to get organized?")
             .assertIsDisplayed()
 
         // When: Click Create Checklist button
+        waitForButton("Create Checklist")
         composeTestRule
             .onNodeWithText("Create Checklist")
             .performClick()
 
         waitForIdle()
 
-        // Then: Create screen is displayed
+        // Then: Templates screen is displayed
         composeTestRule
             .onNodeWithText("New Checklist")
             .assertIsDisplayed()
 
+        // And: Bottom action buttons are present
         composeTestRule
-            .onNodeWithText("Checklist Name")
+            .onNodeWithText("Create Manually")
+            .assertIsDisplayed()
+
+        composeTestRule
+            .onNodeWithText("Create with AI")
             .assertIsDisplayed()
     }
 
@@ -61,11 +57,8 @@ class CreateChecklistFlowTest : BaseUiTest() {
     fun createChecklist_enterNameAndAddItems() {
         skipOnboardingAndGoToMain()
 
-        // Navigate to create screen
-        composeTestRule
-            .onNodeWithText("Create Checklist")
-            .performClick()
-        waitForIdle()
+        // Navigate to create form via Templates → Create Manually
+        navigateToCreateForm()
 
         // Enter checklist name
         composeTestRule
@@ -74,29 +67,8 @@ class CreateChecklistFlowTest : BaseUiTest() {
 
         waitForIdle()
 
-        // Click Add Item button
-        composeTestRule
-            .onNodeWithText("Add Item")
-            .performClick()
-
-        waitForIdle()
-
-        // Dialog should appear
-        composeTestRule
-            .onNodeWithText("Add Item")
-            .assertIsDisplayed()
-
-        // Enter item text
-        composeTestRule
-            .onNode(hasText("Item text"))
-            .performTextInput("First item")
-
-        // Save item
-        composeTestRule
-            .onNodeWithText("Save")
-            .performClick()
-
-        waitForIdle()
+        // Add item using inline flow (type in "Add new item..." field + click "+" button)
+        addItemToChecklist("First item")
 
         // Item should be displayed
         composeTestRule
@@ -105,14 +77,12 @@ class CreateChecklistFlowTest : BaseUiTest() {
     }
 
     @Test
+    @Smoke
     fun createChecklist_saveWithEmptyNameShowsError() {
         skipOnboardingAndGoToMain()
 
-        // Navigate to create screen
-        composeTestRule
-            .onNodeWithText("Create Checklist")
-            .performClick()
-        waitForIdle()
+        // Navigate to create form
+        navigateToCreateForm()
 
         // Try to save without entering name
         composeTestRule
@@ -122,52 +92,21 @@ class CreateChecklistFlowTest : BaseUiTest() {
         waitForIdle()
 
         // Should still be on create screen (not saved)
+        // The "e.g., Project Tasks" placeholder should still be visible
         composeTestRule
-            .onNodeWithText("New Checklist")
-            .assertIsDisplayed()
+            .onNode(hasText("e.g., Project Tasks"))
+            .assertExists()
     }
 
     @Test
     fun createChecklist_saveSuccessfully() {
         skipOnboardingAndGoToMain()
 
-        // Navigate to create screen
-        composeTestRule
-            .onNodeWithText("Create Checklist")
-            .performClick()
-        waitForIdle()
-
-        // Enter checklist name
-        composeTestRule
-            .onNode(hasText("e.g., Project Tasks"))
-            .performTextInput("Test Checklist")
-
-        // Add an item
-        composeTestRule
-            .onNodeWithText("Add Item")
-            .performClick()
-        waitForIdle()
-
-        composeTestRule
-            .onNode(hasText("Item text"))
-            .performTextInput("Test item")
-
-        composeTestRule
-            .onNodeWithText("Save")
-            .performClick()
-        waitForIdle()
-
-        // Save the checklist
-        composeTestRule
-            .onNodeWithText("Save")
-            .performClick()
-
-        waitForIdle()
+        // Create a checklist using helper
+        createChecklistWithItems("Test Checklist", "Test item")
 
         // Should navigate back to main screen
-        composeTestRule
-            .onNodeWithText("My Checklists")
-            .assertIsDisplayed()
+        assertOnMainScreen()
 
         // Created checklist should be visible
         composeTestRule
@@ -179,25 +118,26 @@ class CreateChecklistFlowTest : BaseUiTest() {
     fun createChecklist_backButtonNavigatesToMain() {
         skipOnboardingAndGoToMain()
 
-        // Navigate to create screen
+        // Navigate to templates screen
+        waitForButton("Create Checklist")
         composeTestRule
             .onNodeWithText("Create Checklist")
             .performClick()
         waitForIdle()
 
-        // Click back button (content description "Назад")
+        // Verify templates screen
         composeTestRule
             .onNodeWithText("New Checklist")
             .assertIsDisplayed()
 
-        // Use the back action - simulate back press
+        // Press back
         pressBack()
 
         waitForIdle()
 
-        // Should be back on main screen
+        // Should be back on main screen (empty state)
         composeTestRule
-            .onNodeWithText("My Checklists")
+            .onNodeWithText("Ready to get organized?")
             .assertIsDisplayed()
     }
 }

@@ -17,13 +17,14 @@ import org.junit.Test
 class OnboardingFlowTest : BaseUiTest() {
 
     @Test
+    @Smoke
     fun onboarding_displaysFirstPage() {
         // Given: App is launched for the first time
-        waitForIdle()
+        waitForSplashToComplete()
 
         // Then: First onboarding page is displayed
         composeTestRule
-            .onNodeWithText("Capture Everything")
+            .onNodeWithText("Create via AI")
             .assertIsDisplayed()
 
         // And: Continue button is displayed
@@ -39,11 +40,11 @@ class OnboardingFlowTest : BaseUiTest() {
 
     @Test
     fun onboarding_navigatesThroughPages() {
-        waitForIdle()
+        waitForSplashToComplete()
 
         // Given: First page is displayed
         composeTestRule
-            .onNodeWithText("Capture Everything")
+            .onNodeWithText("Create via AI")
             .assertIsDisplayed()
 
         // When: Click Continue
@@ -55,7 +56,7 @@ class OnboardingFlowTest : BaseUiTest() {
 
         // Then: Second page is displayed
         composeTestRule
-            .onNodeWithText("AI Does the Work")
+            .onNodeWithText("Fill via AI")
             .assertIsDisplayed()
 
         // When: Click Continue again
@@ -65,19 +66,28 @@ class OnboardingFlowTest : BaseUiTest() {
 
         waitForIdle()
 
-        // Then: Third page is displayed with Get Started button
+        // Then: Third page is displayed
         composeTestRule
-            .onNodeWithText("Never Miss a Thing")
+            .onNodeWithText("Export & Share")
             .assertIsDisplayed()
 
+        // When: Click Continue to go to 4th (trial) page
         composeTestRule
-            .onNodeWithText("Get Started")
+            .onNodeWithText("Continue")
+            .performClick()
+
+        waitForIdle()
+
+        // Then: Fourth page shows trial offer
+        composeTestRule
+            .onNodeWithText("Start your FREE trial")
             .assertIsDisplayed()
     }
 
     @Test
+    @Smoke
     fun onboarding_skipNavigatesToMainScreen() {
-        waitForIdle()
+        waitForSplashToComplete()
 
         // Given: Onboarding is displayed
         composeTestRule
@@ -91,17 +101,17 @@ class OnboardingFlowTest : BaseUiTest() {
 
         waitForIdle()
 
-        // Then: Main screen is displayed
+        // Then: Main screen is displayed (empty state)
         composeTestRule
-            .onNodeWithText("My Checklists")
+            .onNodeWithText("Ready to get organized?")
             .assertIsDisplayed()
     }
 
     @Test
-    fun onboarding_getStartedNavigatesToMainScreen() {
-        waitForIdle()
+    fun onboarding_skipFromLastPageNavigatesToMainScreen() {
+        waitForSplashToComplete()
 
-        // Navigate to the last page
+        // Navigate to the last (4th) page
         composeTestRule
             .onNodeWithText("Continue")
             .performClick()
@@ -112,21 +122,24 @@ class OnboardingFlowTest : BaseUiTest() {
             .performClick()
         waitForIdle()
 
-        // Given: Last page is displayed
         composeTestRule
-            .onNodeWithText("Get Started")
+            .onNodeWithText("Continue")
+            .performClick()
+        waitForIdle()
+
+        // Given: Last page (trial) is displayed
+        composeTestRule
+            .onNodeWithText("Start your FREE trial")
             .assertIsDisplayed()
 
-        // When: Click Get Started
+        // When: Click Skip (don't start trial in tests)
         composeTestRule
-            .onNodeWithText("Get Started")
+            .onNodeWithText("Skip")
             .performClick()
 
         waitForIdle()
 
-        // Then: Main screen is displayed
-        composeTestRule
-            .onNodeWithText("My Checklists")
-            .assertIsDisplayed()
+        // Then: Main screen is displayed (empty state)
+        assertOnMainScreen()
     }
 }
