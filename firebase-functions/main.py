@@ -18,7 +18,7 @@ import base64
 import json
 import os
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import firebase_admin
@@ -26,6 +26,7 @@ from firebase_admin import credentials, firestore
 from flask import Request, jsonify
 import google.generativeai as genai
 import functions_framework
+import requests as http_requests  # avoid conflict with flask Request
 
 # Initialize Firebase Admin
 if not firebase_admin._apps:
@@ -37,6 +38,14 @@ db = firestore.client()
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
+
+# RevenueCat verification (V1 Secret key, NOT public key)
+REVENUECAT_API_KEY = os.environ.get("REVENUECAT_API_KEY")
+
+# Tri-state result for RevenueCat verification
+VERIFIED = "verified"
+NOT_VERIFIED = "not_verified"
+UNAVAILABLE = "unavailable"
 
 # Usage limits (can be overridden via Remote Config)
 DEFAULT_DAILY_LIMIT_FREE = 10
@@ -132,6 +141,46 @@ def create_success_response(data: dict):
 
 
 # ============================================================================
+# RevenueCat purchase verification
+# ============================================================================
+
+def verify_premium_with_revenuecat(user_id: str) -> str:
+    """
+    Verify user has active subscription via RevenueCat API.
+    Returns: VERIFIED, NOT_VERIFIED, or UNAVAILABLE.
+    """
+    if not REVENUECAT_API_KEY:
+        return UNAVAILABLE
+
+    try:
+        resp = http_requests.get(
+            f"https://api.revenuecat.com/v1/subscribers/{user_id}",
+            headers={"Authorization": f"Bearer {REVENUECAT_API_KEY}"},
+            timeout=5
+        )
+        if resp.status_code != 200:
+            return NOT_VERIFIED
+
+        data = resp.json()
+        entitlements = data.get("subscriber", {}).get("entitlements", {})
+        premium = entitlements.get("premium", {})
+        if not premium:
+            return NOT_VERIFIED
+
+        expires = premium.get("expires_date")
+        if expires is None:
+            return VERIFIED  # lifetime
+
+        if datetime.fromisoformat(expires.replace("Z", "+00:00")) > datetime.now(timezone.utc):
+            return VERIFIED
+        return NOT_VERIFIED
+    except (http_requests.Timeout, http_requests.ConnectionError):
+        return UNAVAILABLE
+    except Exception:
+        return NOT_VERIFIED
+
+
+# ============================================================================
 # AI Credits management (lifetime credits for AI usage)
 # ============================================================================
 
@@ -172,51 +221,66 @@ def get_user_credits(user_id: str) -> int:
     return user_data.get("ai_credits", 0)
 
 
-def check_credits_available(user_id: str, is_premium: bool = False) -> tuple[bool, int, str]:
+def get_user_premium_status(user_id: str) -> bool:
+    """Get premium status from Firestore (server truth), not from client."""
+    user_data = get_user_data(user_id)
+    if user_data is None:
+        return False
+    return user_data.get("is_premium", False)
+
+
+def reserve_credits(user_id: str) -> int | None:
     """
-    Check if user has enough credits for an AI action.
-
-    Premium users also use credits now (they get daily refills instead of unlimited).
-
-    Returns: (is_allowed, remaining_credits, error_message)
+    Atomically check and deduct credits in a single Firestore transaction.
+    Returns new remaining count, or None if insufficient credits.
     """
     config = get_credits_config()
-    credits = get_user_credits(user_id)
-    action_cost = config["action_cost"]
+    cost = config["action_cost"]
+    user_ref = db.collection("users").document(user_id)
 
-    if credits < action_cost:
-        if is_premium:
-            return False, credits, f"Not enough credits. You have {credits}, but need {action_cost}. Your credits will be refilled at 12:00 CET."
-        else:
-            return False, credits, f"Not enough credits. You have {credits}, but need {action_cost}. Purchase premium for daily credits refill."
-
-    return True, credits, ""
-
-
-def deduct_user_credits(user_id: str) -> int:
-    """
-    Deduct credits for an AI action.
-    Returns the new remaining credits count.
-    """
-    try:
-        user_ref = db.collection("users").document(user_id)
-        user_data = get_user_data(user_id)
-
-        if user_data is None:
-            return 0
-
-        config = get_credits_config()
-        current = user_data.get("ai_credits", 0)
-        new_count = max(0, current - config["action_cost"])
-
-        user_ref.update({
+    @firestore.transactional
+    def txn(transaction):
+        snapshot = user_ref.get(transaction=transaction)
+        if not snapshot.exists:
+            return None
+        current = snapshot.get("ai_credits") or 0
+        if current < cost:
+            return None
+        new_count = current - cost
+        transaction.update(user_ref, {
             "ai_credits": new_count,
-            "updated_at": datetime.utcnow().isoformat()
+            "updated_at": datetime.now(timezone.utc).isoformat()
         })
-
         return new_count
-    except Exception:
-        return 0
+
+    return txn(db.transaction())
+
+
+# ============================================================================
+# Shared AI helpers
+# ============================================================================
+
+def call_gemini(prompt: str, input_type: str, input_data: str):
+    """Call Gemini API with appropriate content type."""
+    model = genai.GenerativeModel("gemini-2.0-flash-lite")
+    if input_type == "image_base64" and input_data:
+        return model.generate_content([
+            prompt, {"mime_type": "image/jpeg", "data": base64.b64decode(input_data)}
+        ])
+    if input_type == "audio_base64" and input_data:
+        return model.generate_content([
+            prompt, {"mime_type": "audio/mp4", "data": base64.b64decode(input_data)}
+        ])
+    return model.generate_content(prompt)
+
+
+def parse_gemini_json(response_text: str) -> dict:
+    """Extract and parse JSON from Gemini response."""
+    if "```json" in response_text:
+        response_text = response_text.split("```json")[1].split("```")[0]
+    elif "```" in response_text:
+        response_text = response_text.split("```")[1].split("```")[0]
+    return json.loads(response_text.strip())
 
 
 # ============================================================================
@@ -382,7 +446,7 @@ def analyze_and_fill_checklist(request: Request):
         return create_error_response(error)
 
     user_id = data["user_id"]
-    is_premium = data.get("is_premium", False)
+    is_premium = get_user_premium_status(user_id)
     checklist = data.get("checklist")
     input_type = data.get("input_type")
     input_data = data.get("input_data")
@@ -397,10 +461,17 @@ def analyze_and_fill_checklist(request: Request):
     if not get_remote_config_value("feature_ai_analysis_enabled", True):
         return create_error_response("AI analysis is currently disabled", 503)
 
-    # Check if user has enough credits
-    allowed, remaining, credits_error = check_credits_available(user_id, is_premium)
-    if not allowed:
-        return create_error_response(credits_error, 402)  # 402 Payment Required
+    # Check daily usage limit (before spending credits)
+    usage_allowed, usage_error = check_usage_limit(user_id, is_premium)
+    if not usage_allowed:
+        return create_error_response(usage_error, 429)
+
+    # Reserve credits atomically (deduct before Gemini call)
+    remaining = reserve_credits(user_id)
+    if remaining is None:
+        cost = get_credits_config()["action_cost"]
+        suffix = "Refill at 12:00 CET." if is_premium else "Get premium for daily refill."
+        return create_error_response(f"Not enough credits. Need {cost}. {suffix}", 402)
 
     # Check input length (skip for binary data types)
     if input_type not in ("image_base64", "audio_base64"):
@@ -428,51 +499,22 @@ def analyze_and_fill_checklist(request: Request):
     )
 
     try:
-        # Call Gemini API
-        model = genai.GenerativeModel("gemini-2.0-flash-lite")
+        response = call_gemini(prompt, input_type, input_data)
+        result = parse_gemini_json(response.text)
+    except json.JSONDecodeError:
+        return create_error_response("Failed to parse AI response", 500)
+    except Exception:
+        return create_error_response("AI processing failed. Please try again.", 500)
 
-        if input_type == "image_base64":
-            image_bytes = base64.b64decode(input_data)
-            response = model.generate_content([
-                prompt,
-                {"mime_type": "image/jpeg", "data": image_bytes}
-            ])
-        elif input_type == "audio_base64":
-            audio_bytes = base64.b64decode(input_data)
-            response = model.generate_content([
-                prompt,
-                {"mime_type": "audio/mp4", "data": audio_bytes}
-            ])
-        else:
-            response = model.generate_content(prompt)
+    # Increment usage stats
+    increment_usage(user_id, "analyze_and_fill_checklist", input_type)
 
-        # Parse response
-        response_text = response.text
-        # Extract JSON from response
-        if "```json" in response_text:
-            response_text = response_text.split("```json")[1].split("```")[0]
-        elif "```" in response_text:
-            response_text = response_text.split("```")[1].split("```")[0]
-
-        result = json.loads(response_text.strip())
-
-        # Deduct credits for all users (premium users also use credits now)
-        new_remaining = deduct_user_credits(user_id)
-
-        # Increment usage stats
-        usage = increment_usage(user_id, "analyze_and_fill_checklist", input_type)
-
-        return create_success_response({
-            "filled_items": result.get("filled_items", []),
-            "summary": result.get("summary", ""),
-            "confidence": result.get("confidence", 0.8),
-            "ai_credits": new_remaining
-        })
-
-    except json.JSONDecodeError as e:
-        return create_error_response(f"Failed to parse AI response: {str(e)}", 500)
-    except Exception as e:
-        return create_error_response(f"AI analysis failed: {str(e)}", 500)
+    return create_success_response({
+        "filled_items": result.get("filled_items", []),
+        "summary": result.get("summary", ""),
+        "confidence": result.get("confidence", 0.8),
+        "ai_credits": remaining
+    })
 
 
 # ============================================================================
@@ -538,7 +580,7 @@ def generate_checklist(request: Request):
         return create_error_response(error)
 
     user_id = data["user_id"]
-    is_premium = data.get("is_premium", False)
+    is_premium = get_user_premium_status(user_id)
     user_prompt = data.get("prompt")
     input_type = data.get("input_type", "none")
     input_data = data.get("input_data", "")
@@ -551,10 +593,17 @@ def generate_checklist(request: Request):
     if not get_remote_config_value("feature_ai_analysis_enabled", True):
         return create_error_response("AI analysis is currently disabled", 503)
 
-    # Check if user has enough credits
-    allowed, remaining, credits_error = check_credits_available(user_id, is_premium)
-    if not allowed:
-        return create_error_response(credits_error, 402)  # 402 Payment Required
+    # Check daily usage limit (before spending credits)
+    usage_allowed, usage_error = check_usage_limit(user_id, is_premium)
+    if not usage_allowed:
+        return create_error_response(usage_error, 429)
+
+    # Reserve credits atomically (deduct before Gemini call)
+    remaining = reserve_credits(user_id)
+    if remaining is None:
+        cost = get_credits_config()["action_cost"]
+        suffix = "Refill at 12:00 CET." if is_premium else "Get premium for daily refill."
+        return create_error_response(f"Not enough credits. Need {cost}. {suffix}", 402)
 
     # Check input length (skip binary data in length calculation)
     max_length = get_remote_config_value("ai_analysis_max_input_length", DEFAULT_MAX_INPUT_LENGTH)
@@ -581,52 +630,23 @@ def generate_checklist(request: Request):
     )
 
     try:
-        # Call Gemini API
-        model = genai.GenerativeModel("gemini-2.0-flash-lite")
+        response = call_gemini(prompt, input_type, input_data)
+        result = parse_gemini_json(response.text)
+    except json.JSONDecodeError:
+        return create_error_response("Failed to parse AI response", 500)
+    except Exception:
+        return create_error_response("AI processing failed. Please try again.", 500)
 
-        if input_type == "image_base64" and input_data:
-            image_bytes = base64.b64decode(input_data)
-            response = model.generate_content([
-                prompt,
-                {"mime_type": "image/jpeg", "data": image_bytes}
-            ])
-        elif input_type == "audio_base64" and input_data:
-            audio_bytes = base64.b64decode(input_data)
-            response = model.generate_content([
-                prompt,
-                {"mime_type": "audio/mp4", "data": audio_bytes}
-            ])
-        else:
-            response = model.generate_content(prompt)
+    # Increment usage stats
+    increment_usage(user_id, "generate_checklist", input_type)
 
-        # Parse response
-        response_text = response.text
-        # Extract JSON from response
-        if "```json" in response_text:
-            response_text = response_text.split("```json")[1].split("```")[0]
-        elif "```" in response_text:
-            response_text = response_text.split("```")[1].split("```")[0]
-
-        result = json.loads(response_text.strip())
-
-        # Deduct credits for all users (premium users also use credits now)
-        new_remaining = deduct_user_credits(user_id)
-
-        # Increment usage stats
-        usage = increment_usage(user_id, "generate_checklist", input_type)
-
-        return create_success_response({
-            "checklist_name": result.get("checklist_name", "New Checklist"),
-            "items": result.get("items", []),
-            "summary": result.get("summary", ""),
-            "confidence": result.get("confidence", 0.8),
-            "ai_credits": new_remaining
-        })
-
-    except json.JSONDecodeError as e:
-        return create_error_response(f"Failed to parse AI response: {str(e)}", 500)
-    except Exception as e:
-        return create_error_response(f"AI generation failed: {str(e)}", 500)
+    return create_success_response({
+        "checklist_name": result.get("checklist_name", "New Checklist"),
+        "items": result.get("items", []),
+        "summary": result.get("summary", ""),
+        "confidence": result.get("confidence", 0.8),
+        "ai_credits": remaining
+    })
 
 
 # ============================================================================
@@ -798,23 +818,34 @@ def restore_credits_after_purchase(request: Request):
         if not user_doc.exists:
             return create_error_response("User not found", 404)
 
+        # Verify purchase with RevenueCat
+        status = verify_premium_with_revenuecat(user_id)
+        if status == UNAVAILABLE:
+            return create_error_response(
+                "Verification service temporarily unavailable. Please try again.", 503
+            )
+        if status == NOT_VERIFIED:
+            return create_error_response("No active subscription found", 403)
+
         # Get credits config
         config = get_credits_config()
         credits_cap = config["premium_daily_credits_cap"]
+
+        now = datetime.now(timezone.utc).isoformat()
 
         # Update user: set premium status and restore credits
         user_ref.update({
             "is_premium": True,
             "ai_credits": credits_cap,
-            "premium_activated_at": datetime.utcnow().isoformat(),
-            "credits_restored_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat()
+            "premium_activated_at": now,
+            "credits_restored_at": now,
+            "updated_at": now
         })
 
         # Log the restore operation
         db.collection("credits_restore_log").add({
             "user_id": user_id,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": now,
             "credits_restored": credits_cap,
             "trigger": "purchase"
         })
@@ -826,7 +857,7 @@ def restore_credits_after_purchase(request: Request):
         })
 
     except Exception as e:
-        return create_error_response(f"Failed to restore credits: {str(e)}", 500)
+        return create_error_response("Failed to restore credits. Please try again.", 500)
 
 
 # ============================================================================
