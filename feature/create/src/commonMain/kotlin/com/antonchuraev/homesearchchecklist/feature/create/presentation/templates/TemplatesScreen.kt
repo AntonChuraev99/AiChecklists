@@ -106,7 +106,11 @@ fun TemplatesScreen(
             ) {
                 Icon(
                     imageVector = if (state.isSearchActive) Icons.Default.Close else Icons.Default.Search,
-                    contentDescription = null,
+                    contentDescription = if (state.isSearchActive) {
+                        stringResource(Res.string.cancel)
+                    } else {
+                        stringResource(Res.string.templates_search_placeholder)
+                    },
                     tint = MaterialTheme.colorScheme.onBackground
                 )
             }

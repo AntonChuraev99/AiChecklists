@@ -10,7 +10,7 @@ import kotlin.reflect.KClass
  * This interface defines the contract for analyzing various input types
  * and extracting relevant information to fill checklist items.
  *
- * TODO: Implement with actual AI service (OpenAI, Gemini, local ML model, etc.)
+ * Production implementation: [GeminiAiAnalyzer]
  */
 interface AiAnalyzer {
 
