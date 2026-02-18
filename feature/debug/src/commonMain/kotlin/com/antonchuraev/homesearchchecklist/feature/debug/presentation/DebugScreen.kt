@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.outlined.Screenshot
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -38,7 +39,8 @@ import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun DebugScreen(
-    viewModel: DebugViewModel = koinViewModel()
+    viewModel: DebugViewModel = koinViewModel(),
+    onShowCsat: () -> Unit = {},
 ) {
     val screenState by viewModel.screenState.collectAsStateWithLifecycle()
 
@@ -64,6 +66,13 @@ fun DebugScreen(
             stringResource(Res.string.debug_test_restore_credits_description)
         ) {
             viewModel.sendIntent(DebugScreenIntent.TestRestoreCredits)
+        },
+        DebugItem(
+            Icons.Default.ThumbUp,
+            "Show CSAT Survey",
+            "Force show CSAT bottom sheet for testing"
+        ) {
+            onShowCsat()
         }
     )
 
