@@ -42,6 +42,9 @@ kotlin {
 
             // WorkManager for widget sync
             implementation(libs.workmanager)
+
+            // Google Play In-App Review
+            implementation(libs.play.review.ktx)
         }
         commonMain.dependencies {
             implementation(projects.core.common.api)
@@ -82,6 +85,7 @@ kotlin {
 
             implementation(libs.room.runtime)
             implementation(libs.sqlite.bundled)
+            implementation(libs.kotlinx.datetime)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
