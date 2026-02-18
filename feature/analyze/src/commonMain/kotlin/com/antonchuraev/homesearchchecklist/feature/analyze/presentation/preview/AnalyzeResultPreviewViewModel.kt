@@ -28,7 +28,6 @@ class AnalyzeResultPreviewViewModel(
     override val screenState: StateFlow<AnalyzeResultPreviewScreenState> = _screenState.asStateFlow()
 
     private var targetChecklistId: Long? = null
-    private var originalItemsCheckedState: Map<Int, Boolean> = emptyMap()
 
     init {
         loadData()
@@ -57,13 +56,12 @@ class AnalyzeResultPreviewViewModel(
         }
 
         targetChecklistId = data.targetChecklistId
-        originalItemsCheckedState = data.items.mapIndexed { index, item -> index to item.checked }.toMap()
 
         _screenState.update {
             it.copy(
                 isLoading = false,
                 checklistName = data.suggestedName,
-                editableItems = if (data.fillDefault && data.fillDefaultItems != null) {
+                editableItems = if (data.isFillMode && data.fillDefaultItems != null) {
                     data.fillDefaultItems.map { item -> item.text }
                 } else {
                     data.items.map { item -> item.text }
@@ -86,7 +84,10 @@ class AnalyzeResultPreviewViewModel(
             val newItems = state.editableItems.toMutableList().apply {
                 if (index in indices) removeAt(index)
             }
-            state.copy(editableItems = newItems)
+            val newFillItems = state.fillDefaultItems.toMutableList().apply {
+                if (index in indices) removeAt(index)
+            }
+            state.copy(editableItems = newItems, fillDefaultItems = newFillItems)
         }
     }
 
@@ -98,9 +99,15 @@ class AnalyzeResultPreviewViewModel(
         val text = _screenState.value.newItemText.trim()
         if (text.isNotEmpty()) {
             _screenState.update { state ->
+                val newFillItem = ChecklistFillItem(text = text, checked = false, note = null)
                 // New items appear at the TOP of the list
                 state.copy(
                     editableItems = listOf(text) + state.editableItems,
+                    fillDefaultItems = if (state.isFillMode) {
+                        listOf(newFillItem) + state.fillDefaultItems
+                    } else {
+                        state.fillDefaultItems
+                    },
                     newItemText = ""
                 )
             }
@@ -130,13 +137,12 @@ class AnalyzeResultPreviewViewModel(
 
             try {
                 if (state.isFillMode && targetChecklistId != null) {
-                    // Create a fill for existing checklist
-                    val fillItems = state.editableItems.mapIndexed { index, text ->
-                        ChecklistFillItem(
-                            text = text,
-                            checked = originalItemsCheckedState[index] ?: false,
-                            note = null
-                        )
+                    // Create a fill for existing checklist using fillDefaultItems
+                    // which keep checked states and notes in sync with editableItems
+                    val fillItems = state.fillDefaultItems.ifEmpty {
+                        state.editableItems.map { text ->
+                            ChecklistFillItem(text = text, checked = false, note = null)
+                        }
                     }
 
                     val newFill = ChecklistFill(
