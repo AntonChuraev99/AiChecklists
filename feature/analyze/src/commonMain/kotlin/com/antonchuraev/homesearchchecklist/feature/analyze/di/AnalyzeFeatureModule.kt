@@ -22,10 +22,11 @@ val analyzeFeatureModule = module {
         )
     }
 
-    // ViewModel with optional checklistId parameter
-    viewModel { (checklistId: Long?) ->
+    // ViewModel with optional checklistId and fillDefault parameters
+    viewModel { (checklistId: Long?, fillDefault: Boolean) ->
         AnalyzeViewModel(
             checklistId = checklistId,
+            fillDefault = fillDefault,
             analyzeRepository = get(),
             checklistRepository = get(),
             appNavigator = get(),

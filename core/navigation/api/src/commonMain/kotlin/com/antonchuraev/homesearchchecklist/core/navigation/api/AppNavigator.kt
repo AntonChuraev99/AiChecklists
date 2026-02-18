@@ -30,7 +30,7 @@ interface AppNavigator {
 
     fun navigateToTemplatePreview(templateId: String)
 
-    fun navigateToAnalyzeScreen(checklistId: Long? = null)
+    fun navigateToAnalyzeScreen(checklistId: Long? = null, fillDefault: Boolean = false)
 
     fun navigateToAnalyzeResultPreview()
 

@@ -19,6 +19,7 @@ import kotlinx.coroutines.launch
 
 class AnalyzeViewModel(
     private val checklistId: Long?,
+    private val fillDefault: Boolean = false,
     private val analyzeRepository: AnalyzeRepository,
     private val checklistRepository: ChecklistRepository,
     private val appNavigator: AppNavigator,
@@ -29,6 +30,7 @@ class AnalyzeViewModel(
 
     private val _screenState = MutableStateFlow(AnalyzeScreenState(
         isFillMode = checklistId != null,
+        fillDefault = fillDefault,
         selectedChecklistId = checklistId
     ))
     override val screenState: StateFlow<AnalyzeScreenState> = _screenState.asStateFlow()
@@ -235,8 +237,10 @@ class AnalyzeViewModel(
                         suggestedName = if (state.isFillMode) "AI Fill" else "New Checklist",
                         summary = result.summary,
                         isFillMode = state.isFillMode,
+                        fillDefault = state.fillDefault,
                         targetChecklistId = state.selectedChecklistId,
-                        targetChecklistName = targetChecklist?.name
+                        targetChecklistName = targetChecklist?.name,
+                        fillDefaultItems = if (state.fillDefault) result.fillItems else null
                     )
                     appNavigator.navigateToAnalyzeResultPreview()
                 }

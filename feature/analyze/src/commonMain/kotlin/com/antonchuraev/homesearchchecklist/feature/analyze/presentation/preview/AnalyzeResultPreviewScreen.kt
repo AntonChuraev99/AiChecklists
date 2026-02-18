@@ -83,13 +83,15 @@ fun AnalyzeResultPreviewScreen(
                         AppButton(
                             text = if (state.isCreating)
                                 stringResource(Res.string.analyze_preview_creating)
+                            else if (state.fillDefault)
+                                stringResource(Res.string.fill_apply)
                             else if (state.isFillMode)
                                 stringResource(Res.string.analyze_preview_create_fill_button, state.editableItems.size)
                             else
                                 stringResource(Res.string.analyze_preview_create_button, state.editableItems.size),
                             onClick = { viewModel.sendIntent(AnalyzeResultPreviewScreenIntent.OnCreateChecklist) },
                             icon = Icons.Filled.Add,
-                            enabled = !state.isCreating && state.editableItems.isNotEmpty() && state.checklistName.isNotBlank(),
+                            enabled = !state.isCreating && state.editableItems.isNotEmpty() && (state.fillDefault || state.checklistName.isNotBlank()),
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
@@ -182,19 +184,21 @@ private fun AnalyzeResultPreviewContent(
             }
         }
 
-        // Checklist name input
-        item {
-            AppTextField(
-                value = state.checklistName,
-                onValueChange = onChecklistNameChanged,
-                label = if (state.isFillMode)
-                    stringResource(Res.string.analyze_preview_fill_name_label)
-                else
-                    stringResource(Res.string.analyze_preview_name_label),
-                modifier = Modifier.fillMaxWidth(),
-                showClearButton = true
-            )
-            Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
+        // Checklist name input (hidden in fill-default mode)
+        if (!state.fillDefault) {
+            item {
+                AppTextField(
+                    value = state.checklistName,
+                    onValueChange = onChecklistNameChanged,
+                    label = if (state.isFillMode)
+                        stringResource(Res.string.analyze_preview_fill_name_label)
+                    else
+                        stringResource(Res.string.analyze_preview_name_label),
+                    modifier = Modifier.fillMaxWidth(),
+                    showClearButton = true
+                )
+                Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
+            }
         }
 
         // Items count

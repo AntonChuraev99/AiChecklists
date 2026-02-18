@@ -34,6 +34,8 @@ import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.NoteAdd
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -270,6 +272,15 @@ private fun ChecklistDetailContent(
             maxFills = state.userLimits.maxFillsPerChecklist,
             onDismiss = { onIntent(ChecklistDetailIntent.OnDismissFillLimitDialog) },
             onUpgrade = { onIntent(ChecklistDetailIntent.OnUpgradeToPremiumClick) }
+        )
+    }
+
+    // Fill target bottom sheet
+    if (state.showFillTargetSheet) {
+        FillTargetBottomSheet(
+            onFillMainChecklist = { onIntent(ChecklistDetailIntent.OnFillMainChecklistSelected) },
+            onCreateNewFill = { onIntent(ChecklistDetailIntent.OnCreateNewFillSelected) },
+            onDismiss = { onIntent(ChecklistDetailIntent.OnFillTargetSheetDismiss) }
         )
     }
 }
@@ -572,6 +583,85 @@ private fun DeleteConfirmationDialog(
         containerColor = MaterialTheme.colorScheme.surface,
         shape = MaterialTheme.shapes.large
     )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FillTargetBottomSheet(
+    onFillMainChecklist: () -> Unit,
+    onCreateNewFill: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
+                .padding(bottom = AppDimens.SpacingXxl),
+            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
+        ) {
+            Text(
+                text = stringResource(Res.string.fill_target_title),
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(bottom = AppDimens.SpacingSm)
+            )
+
+            AppCard(onClick = onFillMainChecklist) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Edit,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(Res.string.fill_target_main),
+                            style = MaterialTheme.typography.titleSmall
+                        )
+                        Text(
+                            text = stringResource(Res.string.fill_target_main_description),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            AppCard(onClick = onCreateNewFill) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.ContentCopy,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(Res.string.fill_target_new),
+                            style = MaterialTheme.typography.titleSmall
+                        )
+                        Text(
+                            text = stringResource(Res.string.fill_target_new_description),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable

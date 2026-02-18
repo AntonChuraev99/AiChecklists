@@ -136,6 +136,16 @@
     <string name="analyze_voice_open_settings">Open Settings</string>
     <string name="analyze_error_no_recording">Record a voice message to analyze</string>
 
+    <!-- Fill target selector -->
+    <string name="fill_target_title">Where to fill?</string>
+    <string name="fill_target_main">Fill Main Checklist</string>
+    <string name="fill_target_main_description">Update existing items with AI results</string>
+    <string name="fill_target_new">Create New Fill</string>
+    <string name="fill_target_new_description">Create a separate fill for this analysis</string>
+
+    <!-- Fill apply (fill-default mode) -->
+    <string name="fill_apply">Apply to Checklist</string>
+
     <!-- Fill mode (Fill via AI) -->
     <string name="analyze_fill_title">Fill via AI</string>
     <string name="analyze_fill_result_title">AI Fill Ready!</string>

@@ -2,6 +2,7 @@ package com.antonchuraev.homesearchchecklist.feature.analyze.presentation.previe
 
 import com.antonchuraev.homesearchchecklist.core.common.api.Intent
 import com.antonchuraev.homesearchchecklist.core.common.api.State
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
 
 data class AnalyzeResultPreviewScreenState(
     val isLoading: Boolean = true,
@@ -10,6 +11,8 @@ data class AnalyzeResultPreviewScreenState(
     val newItemText: String = "",
     val summary: String? = null,
     val isFillMode: Boolean = false,
+    val fillDefault: Boolean = false,
+    val fillDefaultItems: List<ChecklistFillItem> = emptyList(),
     val targetChecklistName: String? = null,
     val isCreating: Boolean = false,
     val error: String? = null
