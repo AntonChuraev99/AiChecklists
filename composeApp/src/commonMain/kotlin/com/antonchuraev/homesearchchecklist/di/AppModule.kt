@@ -1,7 +1,10 @@
 package com.antonchuraev.homesearchchecklist.di
 
 import com.antonchuraev.homesearchchecklist.AppViewModel
+import com.antonchuraev.homesearchchecklist.csat.CsatManager
+import com.antonchuraev.homesearchchecklist.csat.CsatViewModel
 import com.antonchuraev.homesearchchecklist.core.common.impl.di.commonCoreModule
+import com.antonchuraev.homesearchchecklist.core.datastore.api.UserAppDatastoreProvider
 import com.antonchuraev.homesearchchecklist.core.navigation.impl.di.navigationCoreModule
 import com.antonchuraev.homesearchchecklist.feature.checklist.di.checklistFeatureModule
 import com.antonchuraev.homesearchchecklist.feature.create.di.createFeatureModule
@@ -35,7 +38,9 @@ val appModule = module {
         sharingFeatureModule,
         platformModule()
     )
+    single { CsatManager(UserAppDatastoreProvider.instance) }
     viewModelOf(::AppViewModel)
+    viewModelOf(::CsatViewModel)
 }
 
 expect fun platformModule(): Module

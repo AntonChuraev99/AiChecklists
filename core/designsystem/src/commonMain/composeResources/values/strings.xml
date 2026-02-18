@@ -275,6 +275,18 @@
     <string name="share_generating_pdf">Generating PDF...</string>
     <string name="share_error">Failed to share</string>
 
+    <!-- CSAT Survey -->
+    <string name="csat_title">How do you like Gisti?</string>
+    <string name="csat_not_good">Not Good</string>
+    <string name="csat_okay">It\'s Okay</string>
+    <string name="csat_love_it">Love It!</string>
+    <string name="csat_feedback_placeholder">Tell us more (optional)...</string>
+    <string name="csat_submit">Submit</string>
+    <string name="csat_thank_you_title">Thank you for your feedback!</string>
+    <string name="csat_thank_you_description">Would you mind leaving a review?\nIt helps us a lot!</string>
+    <string name="csat_rate_button">Rate on Google Play</string>
+    <string name="csat_maybe_later">Maybe later</string>
+
     <!-- Debug Screen -->
     <string name="debug_title">Debug Menu</string>
     <string name="debug_developer_tools">Developer Tools</string>
