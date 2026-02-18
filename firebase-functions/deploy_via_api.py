@@ -63,6 +63,25 @@ FUNCTIONS = [
         "entry_point": "restore_credits_after_purchase",
         "memory": "256M",
         "timeout": "30s",
+        "secrets": [
+            {
+                "key": "REVENUECAT_API_KEY",
+                "secret": "revenuecat-api-key",
+                "version": "latest",
+            }
+        ],
+    },
+    {
+        "name": "refill_premium_credits",
+        "entry_point": "refill_premium_credits",
+        "memory": "256M",
+        "timeout": "30s",
+    },
+    {
+        "name": "get_credits_info",
+        "entry_point": "get_credits_info",
+        "memory": "256M",
+        "timeout": "30s",
     },
 ]
 
@@ -201,6 +220,19 @@ def deploy_function(function_config: dict, source_url: str, token: str, gemini_k
             "allTrafficOnLatestRevision": True,
         },
     }
+
+    # Add Secret Manager references if function requires secrets
+    if "secrets" in function_config:
+        secret_env_vars = []
+        for secret_cfg in function_config["secrets"]:
+            secret_env_vars.append({
+                "key": secret_cfg["key"],
+                "projectId": PROJECT_ID,
+                "secret": secret_cfg["secret"],
+                "version": secret_cfg.get("version", "latest"),
+            })
+        function_body["serviceConfig"]["secretEnvironmentVariables"] = secret_env_vars
+        print(f"  With secrets: {[s['key'] for s in secret_env_vars]}")
 
     # Check if function exists
     check_url = f"{FUNCTIONS_API}/{function_name}"
