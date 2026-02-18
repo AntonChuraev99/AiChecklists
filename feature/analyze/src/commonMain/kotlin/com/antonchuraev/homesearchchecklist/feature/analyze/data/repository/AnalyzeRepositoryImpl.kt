@@ -51,6 +51,13 @@ class AnalyzeRepositoryImpl(
                             userDataRepository.update(userData.copy(aiCredits = newGenerations))
                         }
 
+                        val fillItems = response.data.filledItems.map { filled ->
+                            ChecklistFillItem(
+                                text = filled.text,
+                                checked = filled.checked,
+                                note = filled.note?.takeIf { it.isNotBlank() }
+                            )
+                        }
                         val filledItems = response.data.filledItems.map { filled ->
                             ChecklistItem(
                                 text = filled.note?.let { "${filled.text} - $it" } ?: filled.text,
@@ -61,7 +68,8 @@ class AnalyzeRepositoryImpl(
                             AnalyzeResult(
                                 suggestedItems = filledItems,
                                 confidence = response.data.confidence,
-                                summary = response.data.summary
+                                summary = response.data.summary,
+                                fillItems = fillItems
                             )
                         )
                     } else {

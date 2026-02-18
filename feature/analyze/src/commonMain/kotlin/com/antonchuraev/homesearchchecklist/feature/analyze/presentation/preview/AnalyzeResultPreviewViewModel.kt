@@ -14,6 +14,7 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -62,9 +63,15 @@ class AnalyzeResultPreviewViewModel(
             it.copy(
                 isLoading = false,
                 checklistName = data.suggestedName,
-                editableItems = data.items.map { item -> item.text },
+                editableItems = if (data.fillDefault && data.fillDefaultItems != null) {
+                    data.fillDefaultItems.map { item -> item.text }
+                } else {
+                    data.items.map { item -> item.text }
+                },
                 summary = data.summary,
                 isFillMode = data.isFillMode,
+                fillDefault = data.fillDefault,
+                fillDefaultItems = data.fillDefaultItems ?: emptyList(),
                 targetChecklistName = data.targetChecklistName
             )
         }
@@ -102,6 +109,11 @@ class AnalyzeResultPreviewViewModel(
 
     private fun createChecklist() {
         val state = _screenState.value
+
+        if (state.fillDefault) {
+            applyToDefaultFill()
+            return
+        }
 
         if (state.editableItems.isEmpty()) {
             _screenState.update { it.copy(error = "Add at least one item") }
@@ -162,6 +174,51 @@ class AnalyzeResultPreviewViewModel(
                 _screenState.update {
                     it.copy(isCreating = false, error = e.message ?: "Failed to create checklist")
                 }
+            }
+        }
+    }
+
+    private fun applyToDefaultFill() {
+        viewModelScope.launch {
+            _screenState.update { it.copy(isCreating = true) }
+            try {
+                val checklistId = targetChecklistId ?: run {
+                    _screenState.update { it.copy(isCreating = false, error = "Checklist not found") }
+                    return@launch
+                }
+
+                val defaultFill = checklistRepository
+                    .getDefaultFillByChecklistId(checklistId)
+                    .first()
+
+                if (defaultFill == null) {
+                    _screenState.update { it.copy(isCreating = false, error = "Default fill not found") }
+                    return@launch
+                }
+
+                val fillDefaultItems = _screenState.value.fillDefaultItems
+                val updatedItems = defaultFill.items.mapIndexed { index, existingItem ->
+                    val aiResult = fillDefaultItems.getOrNull(index)
+                    if (aiResult != null) {
+                        existingItem
+                            .withChecked(aiResult.checked)
+                            .let { item ->
+                                aiResult.note?.let { note -> item.withNote(note) } ?: item
+                            }
+                    } else {
+                        existingItem
+                    }
+                }
+
+                val updatedFill = defaultFill.copy(items = updatedItems)
+                checklistRepository.updateFill(updatedFill)
+
+                analyticsTracker.event("default_fill_updated")
+
+                AnalyzeResultHolder.clear()
+                appNavigator.navigateToChecklistDetail(checklistId)
+            } catch (e: Exception) {
+                _screenState.update { it.copy(isCreating = false, error = e.message) }
             }
         }
     }

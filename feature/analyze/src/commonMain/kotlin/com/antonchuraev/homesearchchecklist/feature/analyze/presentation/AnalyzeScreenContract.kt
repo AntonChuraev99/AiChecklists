@@ -24,6 +24,7 @@ data class AnalyzeScreenState(
     val isPremium: Boolean = false,
     // Fill mode - when filling an existing checklist
     val isFillMode: Boolean = false,
+    val fillDefault: Boolean = false,
     val targetChecklist: Checklist? = null,
     val fillName: String = "",
     val isSavingFill: Boolean = false,

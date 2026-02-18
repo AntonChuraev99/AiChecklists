@@ -70,7 +70,8 @@ import org.koin.core.parameter.parametersOf
 @Composable
 fun AnalyzeScreen(
     checklistId: Long? = null,
-    viewModel: AnalyzeViewModel = koinViewModel { parametersOf(checklistId) }
+    fillDefault: Boolean = false,
+    viewModel: AnalyzeViewModel = koinViewModel { parametersOf(checklistId, fillDefault) }
 ) {
     val analyticsTracker: AnalyticsTracker = koinInject()
     LaunchedEffect(Unit) { analyticsTracker.screenView("analyze") }

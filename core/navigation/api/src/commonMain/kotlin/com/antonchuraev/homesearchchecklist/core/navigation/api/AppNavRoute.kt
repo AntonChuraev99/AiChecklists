@@ -32,7 +32,7 @@ sealed interface AppNavRoute {
     data object StoreScreenshot : AppNavRoute
 
     @Serializable
-    data class Analyze(val checklistId: Long? = null) : AppNavRoute
+    data class Analyze(val checklistId: Long? = null, val fillDefault: Boolean = false) : AppNavRoute
 
     @Serializable
     data object AnalyzeResultPreview : AppNavRoute

@@ -102,6 +102,9 @@ class ChecklistDetailViewModel(
             ChecklistDetailIntent.OnViewAllFillsClick -> navigator.navigateToFillsList(checklistId)
             ChecklistDetailIntent.OnAddFillClick -> handleAddFillClick()
             ChecklistDetailIntent.OnAddFillViaAiClick -> handleAddFillViaAiClick()
+            ChecklistDetailIntent.OnFillTargetSheetDismiss -> updateContentState { it.copy(showFillTargetSheet = false) }
+            ChecklistDetailIntent.OnFillMainChecklistSelected -> handleFillMainChecklistSelected()
+            ChecklistDetailIntent.OnCreateNewFillSelected -> handleCreateNewFillSelected()
             ChecklistDetailIntent.OnDismissAddFillDialog -> updateContentState { it.copy(showAddFillDialog = false) }
             is ChecklistDetailIntent.OnNewFillNameChanged -> updateContentState { it.copy(newFillName = intent.name, fillNameError = null) }
             ChecklistDetailIntent.OnConfirmAddFill -> createNewFill()
@@ -164,8 +167,18 @@ class ChecklistDetailViewModel(
     }
 
     private fun handleAddFillViaAiClick() {
+        updateContentState { it.copy(showFillTargetSheet = true) }
+    }
+
+    private fun handleFillMainChecklistSelected() {
+        updateContentState { it.copy(showFillTargetSheet = false) }
+        navigator.navigateToAnalyzeScreen(checklistId, fillDefault = true)
+    }
+
+    private fun handleCreateNewFillSelected() {
+        updateContentState { it.copy(showFillTargetSheet = false) }
         withFillLimitCheck {
-            navigator.navigateToAnalyzeScreen(checklistId)
+            navigator.navigateToAnalyzeScreen(checklistId, fillDefault = false)
         }
     }
 

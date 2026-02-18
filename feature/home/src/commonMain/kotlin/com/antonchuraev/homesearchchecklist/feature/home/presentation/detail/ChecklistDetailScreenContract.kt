@@ -21,7 +21,8 @@ sealed interface ChecklistDetailState : State {
         val userLimits: UserLimits? = null,
         val showFillLimitDialog: Boolean = false,
         val noteDialogItemIndex: Int? = null,
-        val editingNote: String = ""
+        val editingNote: String = "",
+        val showFillTargetSheet: Boolean = false
     ) : ChecklistDetailState
 }
 
@@ -48,6 +49,9 @@ sealed interface ChecklistDetailIntent : Intent {
     // Add new fill
     data object OnAddFillClick : ChecklistDetailIntent
     data object OnAddFillViaAiClick : ChecklistDetailIntent
+    data object OnFillTargetSheetDismiss : ChecklistDetailIntent
+    data object OnFillMainChecklistSelected : ChecklistDetailIntent
+    data object OnCreateNewFillSelected : ChecklistDetailIntent
     data object OnDismissAddFillDialog : ChecklistDetailIntent
     data class OnNewFillNameChanged(val name: String) : ChecklistDetailIntent
     data object OnConfirmAddFill : ChecklistDetailIntent

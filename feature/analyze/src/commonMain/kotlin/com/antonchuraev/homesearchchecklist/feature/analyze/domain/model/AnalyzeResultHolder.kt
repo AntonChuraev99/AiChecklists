@@ -1,5 +1,6 @@
 package com.antonchuraev.homesearchchecklist.feature.analyze.domain.model
 
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
 
 /**
@@ -14,16 +15,20 @@ object AnalyzeResultHolder {
         suggestedName: String,
         summary: String?,
         isFillMode: Boolean = false,
+        fillDefault: Boolean = false,
         targetChecklistId: Long? = null,
-        targetChecklistName: String? = null
+        targetChecklistName: String? = null,
+        fillDefaultItems: List<ChecklistFillItem>? = null
     ) {
         data = AnalyzeResultData(
             items = items.toMutableList(),
             suggestedName = suggestedName,
             summary = summary,
             isFillMode = isFillMode,
+            fillDefault = fillDefault,
             targetChecklistId = targetChecklistId,
-            targetChecklistName = targetChecklistName
+            targetChecklistName = targetChecklistName,
+            fillDefaultItems = fillDefaultItems
         )
     }
 
@@ -39,6 +44,8 @@ data class AnalyzeResultData(
     val suggestedName: String,
     val summary: String?,
     val isFillMode: Boolean,
+    val fillDefault: Boolean = false,
     val targetChecklistId: Long?,
-    val targetChecklistName: String?
+    val targetChecklistName: String?,
+    val fillDefaultItems: List<ChecklistFillItem>? = null
 )

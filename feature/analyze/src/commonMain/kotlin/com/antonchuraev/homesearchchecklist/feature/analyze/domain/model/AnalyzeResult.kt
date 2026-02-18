@@ -1,7 +1,9 @@
 package com.antonchuraev.homesearchchecklist.feature.analyze.domain.model
 
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 
 /**
  * Result of AI analysis containing suggested checklist items
@@ -27,7 +29,14 @@ data class AnalyzeResult(
     /**
      * Any warnings or notes from the analysis
      */
-    val warnings: List<String> = emptyList()
+    val warnings: List<String> = emptyList(),
+
+    /**
+     * Raw fill items with separate text/checked/note fields (for fill-default mode).
+     * Only populated in fill mode. Not serialized.
+     */
+    @Transient
+    val fillItems: List<ChecklistFillItem> = emptyList()
 )
 
 /**
