@@ -30,6 +30,15 @@ endpoints:
     region: us-central1
     platform: gcfv2
 
+  restore_credits_after_purchase:
+    entryPoint: restore_credits_after_purchase
+    httpsTrigger: {}
+    region: us-central1
+    platform: gcfv2
+    secretEnvironmentVariables:
+      - key: REVENUECAT_API_KEY
+        secret: revenuecat-api-key
+
   get_credits_info:
     entryPoint: get_credits_info
     httpsTrigger: {}
