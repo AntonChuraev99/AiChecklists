@@ -1,7 +1,13 @@
 package com.antonchuraev.homesearchchecklist
 
+import com.antonchuraev.homesearchchecklist.csat.CsatBottomSheet
+import com.antonchuraev.homesearchchecklist.csat.CsatIntent
+import com.antonchuraev.homesearchchecklist.csat.CsatViewModel
+import com.antonchuraev.homesearchchecklist.csat.InAppReviewLauncher
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -26,6 +32,7 @@ import com.antonchuraev.homesearchchecklist.feature.sharing.presentation.ShareSc
 import androidx.navigation.toRoute
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.koin.compose.KoinApplication
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -40,6 +47,9 @@ fun App() {
         val navController = rememberNavController().also {
             viewModel.installNavController(it)
         }
+
+        val csatViewModel: CsatViewModel = koinInject()
+        val csatState by csatViewModel.screenState.collectAsState()
 
         AppTheme {
             NavHost(
@@ -75,7 +85,9 @@ fun App() {
                 // Debug screens - only available in debug builds
                 if (AppBuildConfig.isDebug) {
                     composable<AppNavRoute.Debug> {
-                        DebugScreen()
+                        DebugScreen(
+                            onShowCsat = { csatViewModel.sendIntent(CsatIntent.ForceShow) }
+                        )
                     }
 
                     composable<AppNavRoute.StoreScreenshot> {
@@ -121,6 +133,20 @@ fun App() {
                     ShareScreen(checklistId = route.checklistId)
                 }
             }
+
+            // CSAT survey — global overlay
+            if (csatState.showBottomSheet) {
+                CsatBottomSheet(
+                    state = csatState,
+                    onIntent = csatViewModel::sendIntent,
+                )
+            }
+
+            // In-App Review launcher — side-effect composable, no UI
+            InAppReviewLauncher(
+                shouldLaunch = csatState.shouldLaunchReview,
+                onComplete = { csatViewModel.sendIntent(CsatIntent.ReviewComplete) },
+            )
         }
     }
 }
