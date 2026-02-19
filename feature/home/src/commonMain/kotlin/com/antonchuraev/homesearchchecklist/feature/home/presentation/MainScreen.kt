@@ -14,8 +14,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -26,7 +26,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalUriHandler
+
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
@@ -39,28 +39,24 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
-private const val SUPPORT_EMAIL = "churaevanton@gmail.com"
-
 @Composable
 fun MainScreen(
+    onFeedbackClick: () -> Unit = {},
     viewModel: MainScreenViewModel = koinViewModel(),
 ) {
     val analyticsTracker: AnalyticsTracker = koinInject()
     LaunchedEffect(Unit) { analyticsTracker.screenView("main") }
 
     val screenState: MainScreenState by viewModel.screenState.collectAsStateWithLifecycle()
-    val uriHandler = LocalUriHandler.current
 
     AppScaffold(
         title = "",
         actions = {
-            // Support button
-            IconButton(
-                onClick = { uriHandler.openUri("mailto:$SUPPORT_EMAIL") }
-            ) {
+            // Feedback button — opens CSAT survey
+            IconButton(onClick = onFeedbackClick) {
                 Icon(
-                    imageVector = Icons.Outlined.Email,
-                    contentDescription = stringResource(Res.string.paywall_support),
+                    imageVector = Icons.Outlined.Star,
+                    contentDescription = "Feedback",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }

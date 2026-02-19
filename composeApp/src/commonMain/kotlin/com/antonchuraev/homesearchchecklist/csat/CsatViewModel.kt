@@ -52,7 +52,7 @@ sealed interface CsatIntent : Intent {
     data object SkipReview : CsatIntent
     data object Dismiss : CsatIntent
     data object ReviewComplete : CsatIntent
-    data object ForceShow : CsatIntent // Debug only
+    data object ForceShow : CsatIntent
 }
 
 sealed interface CsatSideEffect : SideEffect
