@@ -48,6 +48,7 @@ kotlin {
 
             // Amplitude Analytics
             implementation(libs.amplitude.analytics)
+            implementation(libs.play.services.appset)
         }
         commonMain.dependencies {
             implementation(projects.core.common.api)
