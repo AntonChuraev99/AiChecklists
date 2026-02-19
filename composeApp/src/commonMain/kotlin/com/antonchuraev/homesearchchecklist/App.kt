@@ -65,7 +65,9 @@ fun App() {
                 }
 
                 composable<AppNavRoute.Main> {
-                    MainScreen()
+                    MainScreen(
+                        onFeedbackClick = { csatViewModel.sendIntent(CsatIntent.ForceShow) }
+                    )
                 }
 
                 composable<AppNavRoute.CreateChecklistRoute.CreateChecklist> { backStackEntry ->
