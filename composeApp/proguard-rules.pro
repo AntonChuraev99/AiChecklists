@@ -30,6 +30,9 @@
 -keep class com.google.firebase.** { *; }
 -keep class com.google.android.gms.** { *; }
 
+# Google Play Core (In-App Review)
+-dontwarn com.google.android.gms.common.annotation.NoNullnessRewrite
+
 # RevenueCat
 -keep class com.revenuecat.** { *; }
 
