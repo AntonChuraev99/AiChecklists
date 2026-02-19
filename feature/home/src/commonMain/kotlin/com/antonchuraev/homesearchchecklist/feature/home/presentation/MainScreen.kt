@@ -15,7 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -55,7 +55,7 @@ fun MainScreen(
             // Feedback button — opens CSAT survey
             IconButton(onClick = onFeedbackClick) {
                 Icon(
-                    imageVector = Icons.Outlined.Star,
+                    imageVector = Icons.Outlined.Email,
                     contentDescription = "Feedback",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
