@@ -151,7 +151,9 @@ fun CsatBottomSheet(
                         PositiveFeedbackContent(
                             chips = FeedbackChip.positiveChips,
                             selectedChips = state.selectedChips,
+                            feedbackText = state.feedbackText,
                             onToggleChip = { onIntent(CsatIntent.ToggleChip(it)) },
+                            onTextChange = { onIntent(CsatIntent.UpdateText(it)) },
                             onSubmit = { onIntent(CsatIntent.Submit) },
                         )
                     }
@@ -349,11 +351,15 @@ private fun NegativeFeedbackContent(
 private fun PositiveFeedbackContent(
     chips: List<FeedbackChip>,
     selectedChips: Set<FeedbackChip>,
+    feedbackText: String,
     onToggleChip: (FeedbackChip) -> Unit,
+    onTextChange: (String) -> Unit,
     onSubmit: () -> Unit,
 ) {
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .imePadding(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         FeedbackChipsRow(
@@ -361,6 +367,17 @@ private fun PositiveFeedbackContent(
             chips = chips,
             selectedChips = selectedChips,
             onToggleChip = onToggleChip,
+        )
+
+        Spacer(Modifier.height(AppDimens.SpacingMd))
+
+        AppTextField(
+            value = feedbackText,
+            onValueChange = onTextChange,
+            placeholder = stringResource(Res.string.csat_feedback_placeholder),
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = false,
+            maxLines = 4,
         )
 
         Spacer(Modifier.height(AppDimens.SpacingLg))
