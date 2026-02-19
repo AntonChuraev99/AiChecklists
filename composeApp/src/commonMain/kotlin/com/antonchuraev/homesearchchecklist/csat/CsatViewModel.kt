@@ -97,7 +97,10 @@ class CsatViewModel(
             is CsatIntent.UpdateText -> handleUpdateText(intent.text)
             CsatIntent.Submit -> handleSubmit()
             CsatIntent.LaunchReview -> handleLaunchReview()
-            CsatIntent.SkipReview -> handleClose()
+            CsatIntent.SkipReview -> {
+                analyticsTracker.event("csat_review_skipped")
+                handleClose()
+            }
             CsatIntent.Dismiss -> handleDismiss()
             CsatIntent.ReviewComplete -> handleReviewComplete()
             CsatIntent.ForceShow -> handleForceShow()
@@ -105,10 +108,12 @@ class CsatViewModel(
     }
 
     private fun handleForceShow() {
+        analyticsTracker.event("csat_opened", mapOf("source" to "manual"))
         _screenState.update { it.copy(showBottomSheet = true) }
     }
 
     private fun handleSelectRating(rating: CsatRating) {
+        analyticsTracker.event("csat_rating_selected", mapOf("rating" to rating.name))
         _screenState.update {
             it.copy(
                 selectedRating = rating,
@@ -120,8 +125,13 @@ class CsatViewModel(
     }
 
     private fun handleToggleChip(chip: FeedbackChip) {
+        val wasSelected = chip in _screenState.value.selectedChips
+        analyticsTracker.event(
+            "csat_chip_toggled",
+            mapOf("chip" to chip.name, "selected" to !wasSelected),
+        )
         _screenState.update {
-            val newChips = if (chip in it.selectedChips) {
+            val newChips = if (wasSelected) {
                 it.selectedChips - chip
             } else {
                 it.selectedChips + chip
@@ -174,6 +184,8 @@ class CsatViewModel(
     }
 
     private fun handleDismiss() {
+        val hadRating = _screenState.value.selectedRating != null
+        analyticsTracker.event("csat_dismissed", mapOf("had_rating" to hadRating))
         viewModelScope.launch {
             csatManager.recordOutcome(CsatManager.OUTCOME_DISMISSED)
         }
