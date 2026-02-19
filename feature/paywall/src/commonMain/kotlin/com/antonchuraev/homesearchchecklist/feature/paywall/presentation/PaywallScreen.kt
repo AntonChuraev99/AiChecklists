@@ -35,6 +35,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -115,6 +118,19 @@ fun PaywallScreen(
         pageCount = { pages.size }
     )
 
+    // Track page swipes
+    var previousPage by remember { mutableStateOf(pagerState.settledPage) }
+    LaunchedEffect(pagerState.settledPage) {
+        if (pagerState.settledPage != previousPage) {
+            analyticsTracker.event("paywall_page_swiped", mapOf(
+                "source" to state.source,
+                "from_page" to previousPage,
+                "to_page" to pagerState.settledPage
+            ))
+            previousPage = pagerState.settledPage
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -189,9 +205,18 @@ fun PaywallScreen(
                 isPurchasing = state.isPurchasing,
                 onSubscribe = { viewModel.sendIntent(PaywallIntent.Purchase) },
                 onRestore = { viewModel.sendIntent(PaywallIntent.RestorePurchases) },
-                onTermsClick = { uriHandler.openUri(PaywallConfig.TERMS_OF_USE_URL) },
-                onPrivacyClick = { uriHandler.openUri(PaywallConfig.PRIVACY_POLICY_URL) },
-                onSupportClick = { uriHandler.openUri("mailto:${PaywallConfig.SUPPORT_EMAIL}") }
+                onTermsClick = {
+                    analyticsTracker.event("paywall_terms_clicked", mapOf("source" to state.source))
+                    uriHandler.openUri(PaywallConfig.TERMS_OF_USE_URL)
+                },
+                onPrivacyClick = {
+                    analyticsTracker.event("paywall_privacy_clicked", mapOf("source" to state.source))
+                    uriHandler.openUri(PaywallConfig.PRIVACY_POLICY_URL)
+                },
+                onSupportClick = {
+                    analyticsTracker.event("paywall_support_clicked", mapOf("source" to state.source))
+                    uriHandler.openUri("mailto:${PaywallConfig.SUPPORT_EMAIL}")
+                }
             )
         }
 

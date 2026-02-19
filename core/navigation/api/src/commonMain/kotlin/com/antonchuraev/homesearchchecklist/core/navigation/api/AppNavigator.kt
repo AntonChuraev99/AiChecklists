@@ -46,7 +46,7 @@ interface AppNavigator {
 
     fun navigateToFillsList(checklistId: Long)
 
-    fun navigateToPaywall()
+    fun navigateToPaywall(source: String = "unknown")
 
     fun navigateToSubscriptionStatus(showSuccessMessage: Boolean = false)
 

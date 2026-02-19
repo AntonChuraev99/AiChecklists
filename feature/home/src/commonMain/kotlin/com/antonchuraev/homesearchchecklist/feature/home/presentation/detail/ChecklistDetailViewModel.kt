@@ -111,7 +111,7 @@ class ChecklistDetailViewModel(
             ChecklistDetailIntent.OnDismissFillLimitDialog -> updateContentState { it.copy(showFillLimitDialog = false) }
             ChecklistDetailIntent.OnUpgradeToPremiumClick -> {
                 updateContentState { it.copy(showFillLimitDialog = false) }
-                navigator.navigateToPaywall()
+                navigator.navigateToPaywall(source = "detail_fill_limit")
             }
         }
     }

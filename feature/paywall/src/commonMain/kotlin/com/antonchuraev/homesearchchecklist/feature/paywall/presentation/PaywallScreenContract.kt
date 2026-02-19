@@ -10,7 +10,8 @@ data class PaywallState(
     val products: List<PaywallProduct> = emptyList(),
     val selectedProductId: String? = null,
     val error: String? = null,
-    val purchaseSuccess: Boolean = false
+    val purchaseSuccess: Boolean = false,
+    val source: String = "unknown"
 ) : State
 
 sealed interface PaywallIntent : Intent {
