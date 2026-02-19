@@ -2,6 +2,7 @@ package com.antonchuraev.homesearchchecklist
 
 import com.amplitude.android.Amplitude
 import com.amplitude.android.Configuration
+import com.amplitude.common.Logger
 import com.antonchuraev.aichecklists.BuildConfig
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppContextHolder
@@ -30,7 +31,7 @@ object Analytics : AnalyticsTracker {
             )
         ).apply {
             if (AppBuildConfig.isDebug) {
-                configuration.optOut = true
+                logger.logMode = Logger.LogMode.DEBUG
             }
         }
     }
