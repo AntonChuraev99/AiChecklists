@@ -27,7 +27,7 @@ class CsatFlowTest : BaseUiTest() {
 
     /**
      * Helper to trigger CSAT by creating 2 checklists.
-     * CSAT appears after 2nd action with a 3-second delay.
+     * CSAT appears after 2nd action with a 5-second delay.
      */
     private fun triggerCsatBySaving2Checklists() {
         // First checklist — increments counter to 1
@@ -42,9 +42,9 @@ class CsatFlowTest : BaseUiTest() {
 
     /**
      * Wait for CSAT bottom sheet to appear.
-     * CSAT has a 3-second delay after triggering, so we wait up to 5 seconds.
+     * CSAT has a 5-second delay after triggering, so we wait up to 8 seconds.
      */
-    private fun waitForCsatToAppear(timeoutMillis: Long = 6000) {
+    private fun waitForCsatToAppear(timeoutMillis: Long = 8000) {
         waitUntil(timeoutMillis) {
             composeTestRule.onAllNodesWithText("How do you like Gisti?")
                 .fetchSemanticsNodes().isNotEmpty()
@@ -391,8 +391,8 @@ class CsatFlowTest : BaseUiTest() {
         assertOnMainScreen()
 
         // Then: CSAT does NOT appear (wait a bit to make sure)
-        // Wait for potential delay (3s CSAT delay + buffer)
-        Thread.sleep(4000)
+        // Wait for potential delay (5s CSAT delay + buffer)
+        Thread.sleep(6000)
         waitForIdle()
 
         // CSAT should not be visible

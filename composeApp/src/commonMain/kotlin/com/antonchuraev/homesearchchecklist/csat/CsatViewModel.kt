@@ -63,7 +63,7 @@ class CsatViewModel(
 ) : AppViewModel<CsatState, CsatIntent, CsatSideEffect>() {
 
     companion object {
-        private const val SHOW_DELAY_MS = 3000L
+        private const val SHOW_DELAY_MS = 5000L
         private const val MAX_FEEDBACK_LENGTH = 500
     }
 
@@ -149,6 +149,10 @@ class CsatViewModel(
             ),
         )
 
+        viewModelScope.launch {
+            csatManager.recordOutcome(CsatManager.OUTCOME_SUBMITTED)
+        }
+
         when (rating) {
             CsatRating.LoveIt -> {
                 _screenState.update { it.copy(isSubmitted = true) }
@@ -170,8 +174,9 @@ class CsatViewModel(
     }
 
     private fun handleDismiss() {
-        // If user dismissed after selecting a rating, apply cooldown (already recorded in showWithDelay)
-        // If dismissed without selecting — no extra cooldown, just close
+        viewModelScope.launch {
+            csatManager.recordOutcome(CsatManager.OUTCOME_DISMISSED)
+        }
         handleClose()
     }
 
