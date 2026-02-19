@@ -13,25 +13,34 @@ import kotlinx.datetime.todayIn
  * Manages CSAT trigger evaluation and persistence.
  *
  * Tracks how many "meaningful actions" the user has taken (creating a checklist,
- * creating a fill, completing an AI fill) and decides when to show the CSAT survey.
+ * creating a fill, completing an AI fill, sharing) and decides when to show the
+ * CSAT survey.
  *
- * Uses 2 DataStore keys:
+ * Uses 3 DataStore keys:
  * - [KEY_ACTION_COUNT] (Int) — lifetime counter of meaningful user actions
- * - [KEY_LAST_SHOWN_DATE] (Int) — epoch day of last CSAT show for 30-day cooldown
+ * - [KEY_LAST_SHOWN_DATE] (Int) — epoch day of last CSAT show for cooldown
+ * - [KEY_LAST_OUTCOME] (String) — "submitted" or "dismissed" to pick cooldown duration
  */
 class CsatManager(private val datastore: AppDatastore) {
 
     companion object {
         private const val KEY_ACTION_COUNT = "csat_action_count"
         private const val KEY_LAST_SHOWN_DATE = "csat_last_shown_date"
-        private const val COOLDOWN_DAYS = 30
+        private const val KEY_LAST_OUTCOME = "csat_last_outcome"
+
+        private const val COOLDOWN_SUBMITTED_DAYS = 45
+        private const val COOLDOWN_DISMISSED_DAYS = 3
         private const val MIN_ACTIONS = 2
+
+        const val OUTCOME_SUBMITTED = "submitted"
+        const val OUTCOME_DISMISSED = "dismissed"
     }
 
     private val csatTriggerEvents = setOf(
         "checklist_created",
         "fill_created",
         "default_fill_updated",
+        "share_checklist",
     )
 
     private fun todayEpochDays(): Int =
@@ -47,19 +56,31 @@ class CsatManager(private val datastore: AppDatastore) {
         if (count < MIN_ACTIONS) return false
 
         val lastShownDay = datastore.observeInt(KEY_LAST_SHOWN_DATE, 0).first()
-        val today = todayEpochDays()
+        if (lastShownDay == 0) return true
 
-        return lastShownDay == 0 || (today - lastShownDay) >= COOLDOWN_DAYS
+        val today = todayEpochDays()
+        val outcome = datastore.observeString(KEY_LAST_OUTCOME, OUTCOME_DISMISSED).first()
+        val cooldownDays = if (outcome == OUTCOME_SUBMITTED) {
+            COOLDOWN_SUBMITTED_DAYS
+        } else {
+            COOLDOWN_DISMISSED_DAYS
+        }
+
+        return (today - lastShownDay) >= cooldownDays
     }
 
     suspend fun recordShown() {
         datastore.saveInt(KEY_LAST_SHOWN_DATE, todayEpochDays())
     }
 
+    suspend fun recordOutcome(outcome: String) {
+        datastore.saveString(KEY_LAST_OUTCOME, outcome)
+    }
+
     /**
      * Starts observing analytics events and increments the action counter
-     * when a CSAT-relevant event is detected. Returns a callback to check
-     * whether CSAT should be shown after the latest action.
+     * when a CSAT-relevant event is detected. Invokes [onShouldShow] when
+     * conditions are met.
      */
     fun startObserving(
         scope: CoroutineScope,
