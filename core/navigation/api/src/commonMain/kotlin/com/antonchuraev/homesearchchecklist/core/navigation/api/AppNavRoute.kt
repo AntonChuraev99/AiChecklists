@@ -47,7 +47,7 @@ sealed interface AppNavRoute {
     data class FillsList(val checklistId: Long) : AppNavRoute
 
     @Serializable
-    data object Paywall : AppNavRoute
+    data class Paywall(val source: String = "unknown") : AppNavRoute
 
     @Serializable
     data class SubscriptionStatus(val showSuccessMessage: Boolean = false) : AppNavRoute

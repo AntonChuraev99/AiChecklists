@@ -45,6 +45,9 @@ kotlin {
 
             // Google Play In-App Review
             implementation(libs.play.review.ktx)
+
+            // Amplitude Analytics
+            implementation(libs.amplitude.analytics)
         }
         commonMain.dependencies {
             implementation(projects.core.common.api)
@@ -119,6 +122,7 @@ android {
             properties.load(localProperties.inputStream())
         }
         buildConfigField("String", "GEMINI_API_KEY", "\"${properties.getProperty("GEMINI_API_KEY", "")}\"")
+        buildConfigField("String", "AMPLITUDE_KEY", "\"${properties.getProperty("AMPLITUDE_KEY", "")}\"")
     }
 
     testOptions {

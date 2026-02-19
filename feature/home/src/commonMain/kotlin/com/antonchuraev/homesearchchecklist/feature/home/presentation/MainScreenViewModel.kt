@@ -74,14 +74,14 @@ class MainScreenViewModel(
             MainScreenIntent.OnDismissLimitDialog -> _showLimitDialog.update { false }
             MainScreenIntent.OnUpgradeToPremiumClick -> {
                 _showLimitDialog.update { false }
-                appNavigator.navigateToPaywall()
+                appNavigator.navigateToPaywall(source = "main_limit_dialog")
             }
         }
     }
 
     private fun handleAddChecklistClick() {
         if (screenState.value.userLimits?.canCreateChecklist == false) {
-            appNavigator.navigateToPaywall()
+            appNavigator.navigateToPaywall(source = "main_add_checklist_limit")
         } else {
             appNavigator.navigateToTemplatesScreen()
         }
@@ -100,7 +100,7 @@ class MainScreenViewModel(
         if (state.subscriptionStatus.isActive) {
             appNavigator.navigateToSubscriptionStatus()
         } else {
-            appNavigator.navigateToPaywall()
+            appNavigator.navigateToPaywall(source = "main_credits_chip")
         }
     }
 }
