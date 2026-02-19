@@ -278,7 +278,7 @@
     <!-- CSAT Survey -->
     <string name="csat_title">How do you like Gisti?</string>
     <string name="csat_not_good">Not Good</string>
-    <string name="csat_okay">It\'s Okay</string>
+    <string name="csat_okay">It's Okay</string>
     <string name="csat_love_it">Love It!</string>
     <string name="csat_feedback_placeholder">Tell us more (optional)...</string>
     <string name="csat_submit">Submit</string>
