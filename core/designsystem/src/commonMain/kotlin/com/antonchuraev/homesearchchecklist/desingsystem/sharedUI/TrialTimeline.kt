@@ -57,7 +57,8 @@ fun TrialTimeline(
     primaryColor: Color,
     modifier: Modifier = Modifier.Companion
 ) {
-    val trialEndDate = remember(trialDays) { getTrialEndDateFormatted(trialDays) }
+    // Google Play counts today as day 1 of the trial, so billing starts on today + (trialDays - 1)
+    val trialEndDate = remember(trialDays) { getTrialEndDateFormatted(trialDays - 1) }
     val zeroPriceFormatted = remember(priceString) { formatZeroPrice(priceString) }
     val lineColor = primaryColor.copy(alpha = 0.3f)
     val textSecondary = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
