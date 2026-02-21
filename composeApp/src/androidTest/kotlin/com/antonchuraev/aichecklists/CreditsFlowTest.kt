@@ -11,8 +11,8 @@ import org.junit.Test
  *
  * Note: Paywall is a pager-style screen with trial timeline,
  * not a static benefits list. Key elements:
- * - "3 Days for Free" header
- * - "Start your FREE trial" button
+ * - "3-Day Free Trial" header
+ * - "Start Free Trial" button
  * - "Restore Purchase" link
  * - "Skip" to dismiss
  *
@@ -50,11 +50,11 @@ class CreditsFlowTest : BaseUiTest() {
 
         // Paywall screen should be displayed with trial offer
         waitUntil(5000) {
-            composeTestRule.onAllNodesWithText("3 Days for Free")
+            composeTestRule.onAllNodesWithText("3-Day Free Trial")
                 .fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule
-            .onNodeWithText("3 Days for Free")
+            .onNodeWithText("3-Day Free Trial")
             .assertIsDisplayed()
     }
 
@@ -67,21 +67,21 @@ class CreditsFlowTest : BaseUiTest() {
 
         // Trial offer should be displayed
         waitUntil(5000) {
-            composeTestRule.onAllNodesWithText("3 Days for Free")
+            composeTestRule.onAllNodesWithText("3-Day Free Trial")
                 .fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule
-            .onNodeWithText("3 Days for Free")
+            .onNodeWithText("3-Day Free Trial")
             .assertIsDisplayed()
 
         // Start trial button
         composeTestRule
-            .onNodeWithText("Start your FREE trial")
+            .onNodeWithText("Start Free Trial")
             .assertIsDisplayed()
 
-        // Cancel anytime reassurance
+        // Subscription disclosure (auto-renewal + cancel info)
         composeTestRule
-            .onNodeWithText("Cancel anytime")
+            .onNodeWithText("Auto-renews", substring = true)
             .assertIsDisplayed()
 
         // Restore purchase link
@@ -99,7 +99,7 @@ class CreditsFlowTest : BaseUiTest() {
 
         // Verify we're on paywall
         waitUntil(5000) {
-            composeTestRule.onAllNodesWithText("3 Days for Free")
+            composeTestRule.onAllNodesWithText("3-Day Free Trial")
                 .fetchSemanticsNodes().isNotEmpty()
         }
 

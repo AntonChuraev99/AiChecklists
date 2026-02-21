@@ -80,7 +80,7 @@ class OnboardingFlowTest : BaseUiTest() {
 
         // Then: Fourth page shows trial offer
         composeTestRule
-            .onNodeWithText("Start your FREE trial")
+            .onNodeWithText("Start Free Trial")
             .assertIsDisplayed()
     }
 
@@ -129,7 +129,7 @@ class OnboardingFlowTest : BaseUiTest() {
 
         // Given: Last page (trial) is displayed
         composeTestRule
-            .onNodeWithText("Start your FREE trial")
+            .onNodeWithText("Start Free Trial")
             .assertIsDisplayed()
 
         // When: Click Skip (don't start trial in tests)
