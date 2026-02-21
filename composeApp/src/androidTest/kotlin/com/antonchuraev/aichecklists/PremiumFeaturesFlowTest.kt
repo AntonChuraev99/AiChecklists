@@ -10,8 +10,8 @@ import org.junit.Test
  * UI tests for Premium features and limits enforcement.
  *
  * Note: Paywall is a pager-style screen with trial timeline:
- * - "3 Days for Free" header
- * - "Start your FREE trial" button
+ * - "3-Day Free Trial" header
+ * - "Start Free Trial" button
  * - "Restore Purchase" link (no 's')
  * - "Skip" to dismiss
  *
@@ -68,11 +68,11 @@ class PremiumFeaturesFlowTest : BaseUiTest() {
 
         // Paywall should appear with trial offer
         waitUntil(5000) {
-            composeTestRule.onAllNodesWithText("3 Days for Free")
+            composeTestRule.onAllNodesWithText("3-Day Free Trial")
                 .fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule
-            .onNodeWithText("3 Days for Free")
+            .onNodeWithText("3-Day Free Trial")
             .assertIsDisplayed()
     }
 
@@ -137,15 +137,15 @@ class PremiumFeaturesFlowTest : BaseUiTest() {
 
         // Paywall should be displayed with trial info
         waitUntil(5000) {
-            composeTestRule.onAllNodesWithText("3 Days for Free")
+            composeTestRule.onAllNodesWithText("3-Day Free Trial")
                 .fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule
-            .onNodeWithText("3 Days for Free")
+            .onNodeWithText("3-Day Free Trial")
             .assertIsDisplayed()
 
         composeTestRule
-            .onNodeWithText("Start your FREE trial")
+            .onNodeWithText("Start Free Trial")
             .assertIsDisplayed()
     }
 
@@ -158,19 +158,19 @@ class PremiumFeaturesFlowTest : BaseUiTest() {
 
         // Verify paywall is shown with trial offer
         waitUntil(5000) {
-            composeTestRule.onAllNodesWithText("3 Days for Free")
+            composeTestRule.onAllNodesWithText("3-Day Free Trial")
                 .fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule
-            .onNodeWithText("3 Days for Free")
+            .onNodeWithText("3-Day Free Trial")
             .assertIsDisplayed()
 
         composeTestRule
-            .onNodeWithText("Start your FREE trial")
+            .onNodeWithText("Start Free Trial")
             .assertIsDisplayed()
 
         composeTestRule
-            .onNodeWithText("Cancel anytime")
+            .onNodeWithText("Auto-renews", substring = true)
             .assertIsDisplayed()
     }
 
@@ -183,7 +183,7 @@ class PremiumFeaturesFlowTest : BaseUiTest() {
 
         // Verify paywall is shown
         waitUntil(5000) {
-            composeTestRule.onAllNodesWithText("3 Days for Free")
+            composeTestRule.onAllNodesWithText("3-Day Free Trial")
                 .fetchSemanticsNodes().isNotEmpty()
         }
 

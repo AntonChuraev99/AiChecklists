@@ -108,15 +108,15 @@ class EndToEndFlowTest : BaseUiTest() {
 
         // Verify paywall screen (trial offer for non-premium user)
         waitUntil(5000) {
-            composeTestRule.onAllNodesWithText("3 Days for Free")
+            composeTestRule.onAllNodesWithText("3-Day Free Trial")
                 .fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule
-            .onNodeWithText("3 Days for Free")
+            .onNodeWithText("3-Day Free Trial")
             .assertIsDisplayed()
 
         composeTestRule
-            .onNodeWithText("Start your FREE trial")
+            .onNodeWithText("Start Free Trial")
             .assertIsDisplayed()
 
         // Dismiss paywall via Skip
