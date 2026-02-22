@@ -14,7 +14,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
-import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
@@ -56,13 +55,11 @@ class DeviceIdProviderTest {
 
     /**
      * Test: When DataStore already has UUID, should return existing value
-     * FIXME: Stub DataStore implementation has issues with pre-populated data
      */
-    @Ignore
     @Test
     fun testReturnsExistingUuidFromDataStore() = runTest {
         // Arrange
-        val existingUuid = "123e4567-e89b-12d3-a456-426614174000"
+        val existingUuid = "123e4567-e89b-42d3-a456-426614174000"
         val datastore = createStubDatastore(mapOf("device_id" to existingUuid))
         val deviceIdProvider = DeviceIdProvider(datastore)
 
