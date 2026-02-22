@@ -325,6 +325,16 @@
         <item quantity="one">%d item remaining</item>
         <item quantity="other">%d items remaining</item>
     </plurals>
+    <string name="reminder_exact_alarm_title">Enable Precise Reminders</string>
+    <string name="reminder_exact_alarm_step1">Tap \"Open Settings\" below</string>
+    <string name="reminder_exact_alarm_step2">Find \"Alarms &amp; reminders\"</string>
+    <string name="reminder_exact_alarm_step3">Toggle ON for Gisti</string>
+    <string name="reminder_exact_alarm_description">Without this, reminders may be delayed by a few minutes.</string>
+    <string name="reminder_exact_alarm_dont_show">Don\'t show again</string>
+    <string name="reminder_exact_alarm_open_settings">Open Settings</string>
+    <string name="reminder_exact_alarm_skip">Skip</string>
+    <string name="reminder_exact_alarm_granted">Precise reminders enabled!</string>
+    <string name="reminder_exact_alarm_denied">Reminders may be delayed by a few minutes</string>
 
     <!-- Debug Screen -->
     <string name="debug_title">Debug Menu</string>

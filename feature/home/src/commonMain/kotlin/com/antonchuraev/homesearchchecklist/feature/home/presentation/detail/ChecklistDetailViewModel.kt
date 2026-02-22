@@ -4,6 +4,7 @@ import androidx.lifecycle.viewModelScope
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
+import com.antonchuraev.homesearchchecklist.core.datastore.api.AppDatastore
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
@@ -16,6 +17,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -26,13 +28,17 @@ class ChecklistDetailViewModel(
     private val navigator: AppNavigator,
     private val getUserLimitsUseCase: GetUserLimitsUseCase,
     private val analyticsTracker: AnalyticsTracker,
-    private val reminderScheduler: ChecklistReminderScheduler
+    private val reminderScheduler: ChecklistReminderScheduler,
+    private val datastore: AppDatastore
 ) : AppViewModel<ChecklistDetailState, ChecklistDetailIntent, Nothing>() {
 
     private val _screenState = MutableStateFlow<ChecklistDetailState>(ChecklistDetailState.Loading)
     override val screenState: StateFlow<ChecklistDetailState> = _screenState.asStateFlow()
 
     private var loadDataJob: Job? = null
+
+    /** True when user navigated to exact alarm settings; used to detect return. */
+    private var wentToExactAlarmSettings = false
 
     init {
         loadData()
@@ -149,6 +155,18 @@ class ChecklistDetailViewModel(
                 updateContentState {
                     it.copy(showReminderSheet = false, showCustomPicker = false, customPickerDateMillis = null)
                 }
+            }
+
+            // Exact alarm permission
+            ChecklistDetailIntent.OnExactAlarmOpenSettings -> handleExactAlarmOpenSettings()
+            ChecklistDetailIntent.OnExactAlarmSkip -> handleExactAlarmSkip()
+            is ChecklistDetailIntent.OnExactAlarmDontShowChanged -> {
+                updateContentState { it.copy(exactAlarmDontShowAgain = intent.checked) }
+            }
+            ChecklistDetailIntent.OnDismissExactAlarmSheet -> handleExactAlarmSkip()
+            ChecklistDetailIntent.OnReturnedFromSettings -> handleReturnedFromSettings()
+            ChecklistDetailIntent.OnSnackbarDismissed -> {
+                updateContentState { it.copy(snackbarMessage = null) }
             }
         }
     }
@@ -310,6 +328,53 @@ class ChecklistDetailViewModel(
                 it.copy(checklist = it.checklist.copy(reminderAt = triggerAtMillis))
             }
             analyticsTracker.event("reminder_set", mapOf("checklist_id" to state.checklist.id.toString()))
+
+            maybeShowExactAlarmInstruction()
+        }
+    }
+
+    private suspend fun maybeShowExactAlarmInstruction() {
+        if (reminderScheduler.canScheduleExactAlarms()) return
+
+        val suppressed = datastore.observeBoolean(PREF_EXACT_ALARM_DONT_SHOW, false).first()
+        if (suppressed) return
+
+        updateContentState { it.copy(showExactAlarmSheet = true, exactAlarmDontShowAgain = false) }
+    }
+
+    private fun handleExactAlarmOpenSettings() {
+        viewModelScope.launch {
+            val state = _screenState.value as? ChecklistDetailState.Content ?: return@launch
+            if (state.exactAlarmDontShowAgain) {
+                datastore.saveBoolean(PREF_EXACT_ALARM_DONT_SHOW, true)
+            }
+            wentToExactAlarmSettings = true
+            updateContentState { it.copy(showExactAlarmSheet = false) }
+            reminderScheduler.openExactAlarmSettings()
+        }
+    }
+
+    private fun handleExactAlarmSkip() {
+        viewModelScope.launch {
+            val state = _screenState.value as? ChecklistDetailState.Content ?: return@launch
+            if (state.exactAlarmDontShowAgain) {
+                datastore.saveBoolean(PREF_EXACT_ALARM_DONT_SHOW, true)
+            }
+            updateContentState { it.copy(showExactAlarmSheet = false) }
+        }
+    }
+
+    fun handleReturnedFromSettings() {
+        if (!wentToExactAlarmSettings) return
+        wentToExactAlarmSettings = false
+
+        viewModelScope.launch {
+            if (reminderScheduler.canScheduleExactAlarms()) {
+                reminderScheduler.rescheduleAllActive()
+                updateContentState { it.copy(snackbarMessage = SNACKBAR_EXACT_GRANTED) }
+            } else {
+                updateContentState { it.copy(snackbarMessage = SNACKBAR_EXACT_DENIED) }
+            }
         }
     }
 
@@ -329,5 +394,11 @@ class ChecklistDetailViewModel(
         _screenState.update { state ->
             if (state is ChecklistDetailState.Content) update(state) else state
         }
+    }
+
+    companion object {
+        const val PREF_EXACT_ALARM_DONT_SHOW = "exact_alarm_dont_show"
+        const val SNACKBAR_EXACT_GRANTED = "exact_alarm_granted"
+        const val SNACKBAR_EXACT_DENIED = "exact_alarm_denied"
     }
 }

@@ -4,6 +4,7 @@ import com.antonchuraev.homesearchchecklist.AppViewModel
 import com.antonchuraev.homesearchchecklist.csat.CsatManager
 import com.antonchuraev.homesearchchecklist.csat.CsatViewModel
 import com.antonchuraev.homesearchchecklist.core.common.impl.di.commonCoreModule
+import com.antonchuraev.homesearchchecklist.core.datastore.api.AppDatastore
 import com.antonchuraev.homesearchchecklist.core.datastore.api.UserAppDatastoreProvider
 import com.antonchuraev.homesearchchecklist.core.navigation.impl.di.navigationCoreModule
 import com.antonchuraev.homesearchchecklist.feature.checklist.di.checklistFeatureModule
@@ -38,7 +39,8 @@ val appModule = module {
         sharingFeatureModule,
         platformModule()
     )
-    single { CsatManager(UserAppDatastoreProvider.instance) }
+    single<AppDatastore> { UserAppDatastoreProvider.instance }
+    single { CsatManager(get()) }
     viewModelOf(::AppViewModel)
     // CsatViewModel as singleton — accessed from App.kt and DebugScreen
     single { CsatViewModel(get(), get()) }

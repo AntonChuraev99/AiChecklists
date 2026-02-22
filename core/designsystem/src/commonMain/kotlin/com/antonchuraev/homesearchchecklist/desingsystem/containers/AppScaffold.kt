@@ -23,10 +23,12 @@ fun AppScaffold(
     onBackButtonClick: (() -> Unit)? = null,
     actions: @Composable () -> Unit = {},
     bottomBar: @Composable () -> Unit = {},
+    snackbarHost: @Composable () -> Unit = {},
     content: @Composable () -> Unit
 ) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = snackbarHost,
         topBar = {
             if (title != null || onBackButtonClick != null) {
                 CenterAlignedTopAppBar(

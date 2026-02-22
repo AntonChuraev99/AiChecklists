@@ -48,6 +48,9 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
@@ -61,6 +64,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -69,6 +73,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonSecondary
@@ -95,6 +101,11 @@ fun ChecklistDetailScreen(
 ) {
     val analyticsTracker: AnalyticsTracker = koinInject()
     LaunchedEffect(Unit) { analyticsTracker.screenView("checklist_detail") }
+
+    // Detect return from exact alarm settings
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        viewModel.handleReturnedFromSettings()
+    }
 
     val state by viewModel.screenState.collectAsStateWithLifecycle()
 
@@ -144,8 +155,25 @@ private fun ChecklistDetailContent(
     state: ChecklistDetailState.Content,
     onIntent: (ChecklistDetailIntent) -> Unit
 ) {
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Snackbar message from ViewModel (exact alarm permission result)
+    val exactGrantedMessage = stringResource(Res.string.reminder_exact_alarm_granted)
+    val exactDeniedMessage = stringResource(Res.string.reminder_exact_alarm_denied)
+    LaunchedEffect(state.snackbarMessage) {
+        val message = state.snackbarMessage ?: return@LaunchedEffect
+        val text = when (message) {
+            ChecklistDetailViewModel.SNACKBAR_EXACT_GRANTED -> exactGrantedMessage
+            ChecklistDetailViewModel.SNACKBAR_EXACT_DENIED -> exactDeniedMessage
+            else -> message
+        }
+        snackbarHostState.showSnackbar(text)
+        onIntent(ChecklistDetailIntent.OnSnackbarDismissed)
+    }
+
     AppScaffold(
         onBackButtonClick = { onIntent(ChecklistDetailIntent.OnBackClick) },
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         actions = {
             IconButton(onClick = { onIntent(ChecklistDetailIntent.OnReminderClick) }) {
                 Icon(
@@ -335,6 +363,17 @@ private fun ChecklistDetailContent(
             onDateSelected = { onIntent(ChecklistDetailIntent.OnDateSelected(it)) },
             onTimeSelected = { hour, minute -> onIntent(ChecklistDetailIntent.OnTimeSelected(hour, minute)) },
             onDismiss = { onIntent(ChecklistDetailIntent.OnDismissReminderUI) }
+        )
+    }
+
+    // Exact alarm permission instruction sheet
+    if (state.showExactAlarmSheet) {
+        ExactAlarmInstructionSheet(
+            dontShowAgain = state.exactAlarmDontShowAgain,
+            onDontShowAgainChanged = { onIntent(ChecklistDetailIntent.OnExactAlarmDontShowChanged(it)) },
+            onOpenSettings = { onIntent(ChecklistDetailIntent.OnExactAlarmOpenSettings) },
+            onSkip = { onIntent(ChecklistDetailIntent.OnExactAlarmSkip) },
+            onDismiss = { onIntent(ChecklistDetailIntent.OnDismissExactAlarmSheet) }
         )
     }
 }
@@ -875,6 +914,121 @@ private fun CurrentReminderCard(reminderAtMillis: Long) {
                 modifier = Modifier.weight(1f)
             )
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ExactAlarmInstructionSheet(
+    dontShowAgain: Boolean,
+    onDontShowAgainChanged: (Boolean) -> Unit,
+    onOpenSettings: () -> Unit,
+    onSkip: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .navigationBarsPadding()
+                .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
+                .padding(bottom = AppDimens.SpacingXxl),
+            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
+        ) {
+            // Title
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Notifications,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(28.dp)
+                )
+                Text(
+                    text = stringResource(Res.string.reminder_exact_alarm_title),
+                    style = MaterialTheme.typography.titleLarge
+                )
+            }
+
+            Spacer(modifier = Modifier.height(AppDimens.SpacingXs))
+
+            // Steps
+            StepRow(number = 1, text = stringResource(Res.string.reminder_exact_alarm_step1))
+            StepRow(number = 2, text = stringResource(Res.string.reminder_exact_alarm_step2))
+            StepRow(number = 3, text = stringResource(Res.string.reminder_exact_alarm_step3))
+
+            // Description
+            Text(
+                text = stringResource(Res.string.reminder_exact_alarm_description),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = AppDimens.SpacingXs)
+            )
+
+            // Don't show again checkbox
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Checkbox(
+                    checked = dontShowAgain,
+                    onCheckedChange = onDontShowAgainChanged
+                )
+                Text(
+                    text = stringResource(Res.string.reminder_exact_alarm_dont_show),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+
+            // Buttons
+            AppButton(
+                text = stringResource(Res.string.reminder_exact_alarm_open_settings),
+                onClick = onOpenSettings,
+                modifier = Modifier.fillMaxWidth()
+            )
+            AppButtonText(
+                text = stringResource(Res.string.reminder_exact_alarm_skip),
+                onClick = onSkip,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+@Composable
+private fun StepRow(number: Int, text: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(28.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = number.toString(),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f)
+        )
     }
 }
 
