@@ -2,7 +2,7 @@ package com.antonchuraev.homesearchchecklist
 
 import com.amplitude.android.Amplitude
 import com.amplitude.android.Configuration
-import com.amplitude.common.Logger
+
 import com.antonchuraev.aichecklists.BuildConfig
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppContextHolder
@@ -20,20 +20,16 @@ object Analytics : AnalyticsTracker {
     // Nullable Amplitude - handles empty API key gracefully
     private val amplitude: Amplitude? by lazy {
         val key = BuildConfig.AMPLITUDE_KEY
-        if (key.isBlank()) {
-            return@lazy null
-        }
+        if (key.isBlank()) return@lazy null
+
         Amplitude(
             Configuration(
                 apiKey = key,
                 context = AppContextHolder.context,
-                trackingSessionEvents = true
+                trackingSessionEvents = true,
+                optOut = AppBuildConfig.isDebug
             )
-        ).apply {
-            if (AppBuildConfig.isDebug) {
-                logger.logMode = Logger.LogMode.DEBUG
-            }
-        }
+        )
     }
 
     override fun setUserId(userId: String) {

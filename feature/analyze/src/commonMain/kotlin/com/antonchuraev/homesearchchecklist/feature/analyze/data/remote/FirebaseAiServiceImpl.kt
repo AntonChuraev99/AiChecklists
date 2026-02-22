@@ -54,7 +54,7 @@ class FirebaseAiServiceImpl(
         inputType: AiInputType,
         inputData: String
     ): Result<AiServiceResponse<FillChecklistResult>> = runCatching {
-        logger.debug(TAG, "analyzeAndFillChecklist: userId=$userId, checklistId=${checklist.id}, inputType=$inputType")
+        logger.debug(TAG, "analyzeAndFillChecklist: userId=${userId.take(8)}..., checklistId=${checklist.id}, inputType=$inputType")
 
         val request = FillChecklistRequest(
             userId = userId,
@@ -107,7 +107,7 @@ class FirebaseAiServiceImpl(
         inputType: AiInputType,
         inputData: String?
     ): Result<AiServiceResponse<GenerateChecklistResult>> = runCatching {
-        logger.debug(TAG, "generateChecklist: userId=$userId, inputType=$inputType, promptLength=${prompt.length}")
+        logger.debug(TAG, "generateChecklist: userId=${userId.take(8)}..., inputType=$inputType, promptLength=${prompt.length}")
 
         val request = GenerateChecklistRequest(
             userId = userId,
@@ -154,7 +154,7 @@ class FirebaseAiServiceImpl(
         userId: String,
         isPremium: Boolean
     ): Result<AiServiceResponse<UsageInfo>> = runCatching {
-        logger.debug(TAG, "getUsageStats: userId=$userId, isPremium=$isPremium")
+        logger.debug(TAG, "getUsageStats: userId=${userId.take(8)}..., isPremium=$isPremium")
 
         val request = UsageStatsRequest(
             userId = userId,
@@ -190,7 +190,7 @@ class FirebaseAiServiceImpl(
         appVersion: String?,
         platform: String?
     ): Result<AiServiceResponse<RegisterUserResult>> = runCatching {
-        logger.debug(TAG, "registerUser: deviceId=$deviceId, platform=$platform")
+        logger.debug(TAG, "registerUser: deviceId=${deviceId.take(8)}..., platform=$platform")
 
         val request = RegisterUserRequest(
             deviceId = deviceId,
@@ -206,7 +206,7 @@ class FirebaseAiServiceImpl(
         logger.debug(TAG, "registerUser: response status=${response.status}")
 
         val responseBody = response.body<RegisterUserResponseDto>()
-        logger.debug(TAG, "registerUser: success=${responseBody.success}, userId=${responseBody.userId}, aiCredits=${responseBody.aiCredits}, error=${responseBody.error}")
+        logger.debug(TAG, "registerUser: success=${responseBody.success}, userId=${responseBody.userId?.take(8)}..., aiCredits=${responseBody.aiCredits}, error=${responseBody.error}")
 
         if (responseBody.success && responseBody.userId != null) {
             AiServiceResponse(
