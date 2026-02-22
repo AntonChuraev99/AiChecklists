@@ -47,6 +47,7 @@ import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
@@ -755,8 +756,10 @@ private fun ReminderBottomSheet(
     onRemoveReminder: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surface
     ) {
         Column(
@@ -773,6 +776,11 @@ private fun ReminderBottomSheet(
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.padding(bottom = AppDimens.SpacingSm)
             )
+
+            if (currentReminder != null) {
+                CurrentReminderCard(reminderAtMillis = currentReminder)
+                Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
+            }
 
             ReminderPresetRow(
                 icon = Icons.Outlined.Schedule,
@@ -833,6 +841,50 @@ private fun ReminderPresetRow(
             )
         }
     }
+}
+
+@Composable
+private fun CurrentReminderCard(reminderAtMillis: Long) {
+    val tz = TimeZone.currentSystemDefault()
+    val reminderDateTime = Instant.fromEpochMilliseconds(reminderAtMillis)
+        .toLocalDateTime(tz)
+    val formattedDate = formatReminderDateTime(reminderDateTime)
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(AppDimens.SpacingLg),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Notifications,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp)
+            )
+            Text(
+                text = formattedDate,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+private fun formatReminderDateTime(dateTime: LocalDateTime): String {
+    val month = dateTime.month.name.take(3).lowercase()
+        .replaceFirstChar { it.uppercase() }
+    val day = dateTime.dayOfMonth
+    val hour = dateTime.hour.toString().padStart(2, '0')
+    val minute = dateTime.minute.toString().padStart(2, '0')
+    return "$month $day, $hour:$minute"
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
