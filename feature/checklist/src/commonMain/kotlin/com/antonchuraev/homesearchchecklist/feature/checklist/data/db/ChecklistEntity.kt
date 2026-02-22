@@ -9,9 +9,10 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Check
 data class ChecklistEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0L,
     val name: String,
-    val items: List<ChecklistItem>
+    val items: List<ChecklistItem>,
+    val reminderAt: Long? = null
 )
 
-fun ChecklistEntity.toDomain() = Checklist(id, name, items)
-fun Checklist.toEntity() = ChecklistEntity(id, name, items)
+fun ChecklistEntity.toDomain() = Checklist(id, name, items, reminderAt)
+fun Checklist.toEntity() = ChecklistEntity(id, name, items, reminderAt)
 

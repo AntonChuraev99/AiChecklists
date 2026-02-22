@@ -9,7 +9,9 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Check
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetUserLimitsUseCase
+import kotlinx.datetime.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,7 +25,8 @@ class ChecklistDetailViewModel(
     private val repository: ChecklistRepository,
     private val navigator: AppNavigator,
     private val getUserLimitsUseCase: GetUserLimitsUseCase,
-    private val analyticsTracker: AnalyticsTracker
+    private val analyticsTracker: AnalyticsTracker,
+    private val reminderScheduler: ChecklistReminderScheduler
 ) : AppViewModel<ChecklistDetailState, ChecklistDetailIntent, Nothing>() {
 
     private val _screenState = MutableStateFlow<ChecklistDetailState>(ChecklistDetailState.Loading)
@@ -112,6 +115,40 @@ class ChecklistDetailViewModel(
             ChecklistDetailIntent.OnUpgradeToPremiumClick -> {
                 updateContentState { it.copy(showFillLimitDialog = false) }
                 navigator.navigateToPaywall(source = "detail_fill_limit")
+            }
+
+            // Reminders
+            ChecklistDetailIntent.OnReminderClick -> handleReminderClick()
+            is ChecklistDetailIntent.OnReminderPresetSelected -> {
+                val now = Clock.System.now().toEpochMilliseconds()
+                if (intent.triggerAtMillis <= now) return
+                saveReminder(intent.triggerAtMillis)
+                updateContentState { it.copy(showReminderSheet = false) }
+            }
+            ChecklistDetailIntent.OnCustomDateRequested -> {
+                updateContentState {
+                    it.copy(showReminderSheet = false, showCustomPicker = true, customPickerDateMillis = null)
+                }
+            }
+            is ChecklistDetailIntent.OnDateSelected -> {
+                updateContentState { it.copy(customPickerDateMillis = intent.dateMillis) }
+            }
+            is ChecklistDetailIntent.OnTimeSelected -> {
+                val dateMillis = (_screenState.value as? ChecklistDetailState.Content)?.customPickerDateMillis ?: return
+                val triggerAt = combinePickerResults(dateMillis, intent.hour, intent.minute)
+                val now = Clock.System.now().toEpochMilliseconds()
+                if (triggerAt <= now) return
+                saveReminder(triggerAt)
+                updateContentState { it.copy(showCustomPicker = false, customPickerDateMillis = null) }
+            }
+            ChecklistDetailIntent.OnRemoveReminder -> {
+                removeReminder()
+                updateContentState { it.copy(showReminderSheet = false) }
+            }
+            ChecklistDetailIntent.OnDismissReminderUI -> {
+                updateContentState {
+                    it.copy(showReminderSheet = false, showCustomPicker = false, customPickerDateMillis = null)
+                }
             }
         }
     }
@@ -240,9 +277,51 @@ class ChecklistDetailViewModel(
         loadDataJob?.cancel()
 
         viewModelScope.launch {
+            reminderScheduler.cancel(state.checklist.id)
             repository.deleteChecklist(state.checklist)
             analyticsTracker.event("checklist_deleted")
             navigator.onBack()
+        }
+    }
+
+    private fun handleReminderClick() {
+        viewModelScope.launch {
+            val state = _screenState.value as? ChecklistDetailState.Content ?: return@launch
+            val isPremium = state.userLimits?.isPremium ?: false
+            val currentChecklistHasReminder = state.checklist.reminderAt != null
+
+            if (!isPremium && !currentChecklistHasReminder) {
+                val activeCount = repository.countActiveReminders()
+                if (activeCount >= 1) {
+                    navigator.navigateToPaywall(source = "detail_reminder_limit")
+                    return@launch
+                }
+            }
+            updateContentState { it.copy(showReminderSheet = true) }
+        }
+    }
+
+    private fun saveReminder(triggerAtMillis: Long) {
+        viewModelScope.launch {
+            val state = _screenState.value as? ChecklistDetailState.Content ?: return@launch
+            repository.setReminder(state.checklist.id, triggerAtMillis)
+            reminderScheduler.schedule(state.checklist.id, triggerAtMillis)
+            updateContentState {
+                it.copy(checklist = it.checklist.copy(reminderAt = triggerAtMillis))
+            }
+            analyticsTracker.event("reminder_set", mapOf("checklist_id" to state.checklist.id.toString()))
+        }
+    }
+
+    private fun removeReminder() {
+        viewModelScope.launch {
+            val state = _screenState.value as? ChecklistDetailState.Content ?: return@launch
+            repository.setReminder(state.checklist.id, null)
+            reminderScheduler.cancel(state.checklist.id)
+            updateContentState {
+                it.copy(checklist = it.checklist.copy(reminderAt = null))
+            }
+            analyticsTracker.event("reminder_cancelled", mapOf("checklist_id" to state.checklist.id.toString()))
         }
     }
 

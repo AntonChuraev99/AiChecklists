@@ -11,7 +11,8 @@ import kotlinx.serialization.Serializable
 data class Checklist(
     val id: Long = 0L,
     val name: String,
-    val items: List<ChecklistItem>
+    val items: List<ChecklistItem>,
+    val reminderAt: Long? = null
 )
 
 /**

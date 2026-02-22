@@ -7,6 +7,8 @@ import androidx.room.Query
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
+data class ChecklistReminderInfo(val id: Long, val name: String, val reminderAt: Long)
+
 @Dao
 interface ChecklistDao {
     @Query("SELECT * FROM checklists ORDER BY id DESC")
@@ -26,5 +28,14 @@ interface ChecklistDao {
 
     @Query("DELETE FROM checklists WHERE id = :id")
     suspend fun deleteById(id: Long)
+
+    @Query("UPDATE checklists SET reminderAt = :reminderAt WHERE id = :id")
+    suspend fun updateReminder(id: Long, reminderAt: Long?)
+
+    @Query("SELECT COUNT(*) FROM checklists WHERE reminderAt IS NOT NULL AND reminderAt > :nowMillis")
+    suspend fun countActiveReminders(nowMillis: Long): Int
+
+    @Query("SELECT id, name, reminderAt FROM checklists WHERE reminderAt IS NOT NULL AND reminderAt > :nowMillis")
+    suspend fun getActiveReminders(nowMillis: Long): List<ChecklistReminderInfo>
 }
 

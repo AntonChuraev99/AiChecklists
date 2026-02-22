@@ -5,4 +5,14 @@
     <string name="widget_name">Checklist</string>
     <string name="widget_description">Display and check off items from your checklist</string>
     <string name="widget_loading">Loading…</string>
+
+    <!-- Reminder Notifications -->
+    <string name="reminder_all_completed">All items completed!</string>
+    <string name="reminder_notification_channel">Checklist Reminders</string>
+    <string name="reminder_notification_channel_desc">Notifications for checklist reminders and deadlines</string>
+    <string name="reminder_notification_tap">Tap to open</string>
+    <plurals name="reminder_items_remaining">
+        <item quantity="one">%d item remaining</item>
+        <item quantity="other">%d items remaining</item>
+    </plurals>
 </resources>
