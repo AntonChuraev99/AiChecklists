@@ -9,7 +9,6 @@ import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.paywall.data.PaywallConfig
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PurchaseResult
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.RestoreResult
-import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallProduct
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetOfferingsUseCase
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.PurchaseProductUseCase
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.RestorePurchasesUseCase
@@ -29,21 +28,6 @@ class PaywallViewModel(
 ) : AppViewModel<PaywallState, PaywallIntent, Nothing>() {
 
     private val source: String = savedStateHandle[AppNavRoute.Paywall::source.name] ?: "unknown"
-
-    companion object {
-        // Mock product for testing when RevenueCat returns empty
-        private val MOCK_PRODUCT = PaywallProduct(
-            id = "mock_premium_monthly",
-            title = "Premium Monthly",
-            description = "Full access to all features",
-            priceString = "$1.99",
-            periodString = "month",
-            packageId = "mock_package",
-            isPopular = true,
-            hasFreeTrial = true,
-            freeTrialDays = 3
-        )
-    }
 
     private val _screenState = MutableStateFlow(PaywallState(source = source))
     override val screenState: StateFlow<PaywallState> = _screenState.asStateFlow()
@@ -75,22 +59,20 @@ class PaywallViewModel(
                 .onSuccess { offering ->
                     var products = offering?.products ?: emptyList()
 
-                    // Use mock product if no products returned (for testing)
                     if (products.isEmpty()) {
-                        products = listOf(MOCK_PRODUCT)
-                    } else {
-                        // Apply default free trial if RevenueCat didn't return trial info
-                        // This allows testing different trial configurations in Google Play Console
-                        products = products.map { product ->
-                            if (!product.hasFreeTrial && product.freeTrialDays == 0) {
-                                // Use default trial days from config
-                                product.copy(
-                                    hasFreeTrial = true,
-                                    freeTrialDays = PaywallConfig.DEFAULT_FREE_TRIAL_DAYS
-                                )
-                            } else {
-                                product
-                            }
+                        handleEmptyProducts()
+                        return@launch
+                    }
+
+                    // Apply default free trial if RevenueCat didn't return trial info
+                    products = products.map { product ->
+                        if (!product.hasFreeTrial && product.freeTrialDays == 0) {
+                            product.copy(
+                                hasFreeTrial = true,
+                                freeTrialDays = PaywallConfig.DEFAULT_FREE_TRIAL_DAYS
+                            )
+                        } else {
+                            product
                         }
                     }
 
@@ -106,16 +88,22 @@ class PaywallViewModel(
                     }
                 }
                 .onFailure { error ->
-                    // On failure, still show mock product for testing
-                    _screenState.update {
-                        it.copy(
-                            isLoading = false,
-                            products = listOf(MOCK_PRODUCT),
-                            selectedProductId = MOCK_PRODUCT.id,
-                            error = null // Don't show error, show mock product instead
-                        )
-                    }
+                    analyticsTracker.event("products_load_failed", mapOf(
+                        "source" to source,
+                        "error" to (error.message ?: "unknown")
+                    ))
+                    handleEmptyProducts()
                 }
+        }
+    }
+
+    private fun handleEmptyProducts() {
+        _screenState.update {
+            it.copy(
+                isLoading = false,
+                products = emptyList(),
+                error = "Unable to load subscription options. Please check your internet connection and try again."
+            )
         }
     }
 

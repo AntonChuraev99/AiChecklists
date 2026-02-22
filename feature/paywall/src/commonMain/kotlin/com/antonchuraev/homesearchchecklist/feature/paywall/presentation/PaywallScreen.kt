@@ -204,6 +204,7 @@ fun PaywallScreen(
                 isLoading = state.isLoading,
                 isPurchasing = state.isPurchasing,
                 onSubscribe = { viewModel.sendIntent(PaywallIntent.Purchase) },
+                onRetry = { viewModel.sendIntent(PaywallIntent.LoadProducts) },
                 onRestore = { viewModel.sendIntent(PaywallIntent.RestorePurchases) },
                 onTermsClick = {
                     analyticsTracker.event("paywall_terms_clicked", mapOf("source" to state.source))
@@ -228,6 +229,14 @@ fun PaywallScreen(
                     .padding(AppDimens.SpacingLg)
                     .navigationBarsPadding(),
                 action = {
+                    TextButton(onClick = {
+                        viewModel.sendIntent(PaywallIntent.DismissError)
+                        viewModel.sendIntent(PaywallIntent.LoadProducts)
+                    }) {
+                        Text(stringResource(Res.string.paywall_retry))
+                    }
+                },
+                dismissAction = {
                     TextButton(onClick = { viewModel.sendIntent(PaywallIntent.DismissError) }) {
                         Text(stringResource(Res.string.ok))
                     }
@@ -312,6 +321,7 @@ private fun ColumnScope.SubscriptionCard(
     isLoading: Boolean,
     isPurchasing: Boolean,
     onSubscribe: () -> Unit,
+    onRetry: () -> Unit,
     onRestore: () -> Unit,
     onTermsClick: () -> Unit,
     onPrivacyClick: () -> Unit,
@@ -338,18 +348,28 @@ private fun ColumnScope.SubscriptionCard(
                 .fillMaxWidth(),
             contentAlignment = Alignment.Center
         ) {
-            if (isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(40.dp),
-                    color = primaryColor
-                )
-            } else if (product != null) {
-                SubscriptionContent(
-                    product = product,
-                    isPurchasing = isPurchasing,
-                    onSubscribe = onSubscribe,
-                    primaryColor = primaryColor
-                )
+            when {
+                isLoading -> {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(40.dp),
+                        color = primaryColor
+                    )
+                }
+                product != null -> {
+                    SubscriptionContent(
+                        product = product,
+                        isPurchasing = isPurchasing,
+                        onSubscribe = onSubscribe,
+                        primaryColor = primaryColor
+                    )
+                }
+                else -> {
+                    // Products failed to load
+                    LoadingErrorContent(
+                        onRetry = onRetry,
+                        primaryColor = primaryColor
+                    )
+                }
             }
         }
 
@@ -413,6 +433,45 @@ private fun ColumnScope.SubscriptionCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun LoadingErrorContent(
+    onRetry: () -> Unit,
+    primaryColor: Color
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = stringResource(Res.string.paywall_load_error),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(AppDimens.SpacingLg))
+
+        Button(
+            onClick = onRetry,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp),
+            shape = RoundedCornerShape(26.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = primaryColor,
+                contentColor = Color.White
+            )
+        ) {
+            Text(
+                text = stringResource(Res.string.paywall_retry),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 }
