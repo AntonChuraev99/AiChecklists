@@ -10,4 +10,7 @@ interface ChecklistReminderScheduler {
 
     /** Opens system settings for granting exact alarm permission. No-op below API 31. */
     fun openExactAlarmSettings() {}
+
+    /** Returns true if the app can post notifications (always true below API 33). */
+    fun hasNotificationPermission(): Boolean = true
 }

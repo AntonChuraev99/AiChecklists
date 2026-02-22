@@ -28,6 +28,7 @@ sealed interface ChecklistDetailState : State {
         val customPickerDateMillis: Long? = null,
         val showExactAlarmSheet: Boolean = false,
         val exactAlarmDontShowAgain: Boolean = false,
+        val showNotificationPermissionSheet: Boolean = false,
         val snackbarMessage: String? = null
     ) : ChecklistDetailState
 }
@@ -74,6 +75,11 @@ sealed interface ChecklistDetailIntent : Intent {
     data class OnTimeSelected(val hour: Int, val minute: Int) : ChecklistDetailIntent
     data object OnRemoveReminder : ChecklistDetailIntent
     data object OnDismissReminderUI : ChecklistDetailIntent
+
+    // Notification permission
+    data class OnNotificationPermissionResult(val granted: Boolean) : ChecklistDetailIntent
+    data object OnNotificationPermissionSkip : ChecklistDetailIntent
+    data object OnDismissNotificationPermissionSheet : ChecklistDetailIntent
 
     // Exact alarm permission
     data object OnExactAlarmOpenSettings : ChecklistDetailIntent

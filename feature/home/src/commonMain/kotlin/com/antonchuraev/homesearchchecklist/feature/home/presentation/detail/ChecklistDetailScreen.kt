@@ -36,6 +36,7 @@ import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.NoteAdd
+import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Share
@@ -342,6 +343,18 @@ private fun ChecklistDetailContent(
             onFillMainChecklist = { onIntent(ChecklistDetailIntent.OnFillMainChecklistSelected) },
             onCreateNewFill = { onIntent(ChecklistDetailIntent.OnCreateNewFillSelected) },
             onDismiss = { onIntent(ChecklistDetailIntent.OnFillTargetSheetDismiss) }
+        )
+    }
+
+    // Notification permission bottom sheet
+    if (state.showNotificationPermissionSheet) {
+        val requestPermission = rememberNotificationPermissionRequester { granted ->
+            onIntent(ChecklistDetailIntent.OnNotificationPermissionResult(granted))
+        }
+        NotificationPermissionSheet(
+            onEnableClick = requestPermission,
+            onSkip = { onIntent(ChecklistDetailIntent.OnNotificationPermissionSkip) },
+            onDismiss = { onIntent(ChecklistDetailIntent.OnDismissNotificationPermissionSheet) }
         )
     }
 
@@ -784,6 +797,135 @@ private fun FillLimitDialog(
         containerColor = MaterialTheme.colorScheme.surface,
         shape = MaterialTheme.shapes.large
     )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun NotificationPermissionSheet(
+    onEnableClick: () -> Unit,
+    onSkip: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
+                .padding(bottom = AppDimens.SpacingXxl),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Bell icon
+            Box(
+                modifier = Modifier
+                    .size(72.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.NotificationsActive,
+                    contentDescription = null,
+                    modifier = Modifier.size(40.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            Spacer(modifier = Modifier.height(AppDimens.SpacingLg))
+
+            // Title
+            Text(
+                text = stringResource(Res.string.reminder_notification_permission_title),
+                style = MaterialTheme.typography.titleLarge,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
+
+            // Description
+            Text(
+                text = stringResource(Res.string.reminder_notification_permission_description),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(AppDimens.SpacingXl))
+
+            // Feature list
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
+            ) {
+                NotificationFeatureRow(
+                    icon = Icons.Outlined.Schedule,
+                    text = stringResource(Res.string.reminder_notification_permission_feature1)
+                )
+                NotificationFeatureRow(
+                    icon = Icons.Outlined.Notifications,
+                    text = stringResource(Res.string.reminder_notification_permission_feature2)
+                )
+                NotificationFeatureRow(
+                    icon = Icons.Outlined.AutoAwesome,
+                    text = stringResource(Res.string.reminder_notification_permission_feature3)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(AppDimens.SpacingXl))
+
+            // Buttons
+            AppButton(
+                text = stringResource(Res.string.reminder_notification_permission_enable),
+                onClick = onEnableClick,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
+            AppButtonText(
+                text = stringResource(Res.string.reminder_notification_permission_skip),
+                onClick = onSkip,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+@Composable
+private fun NotificationFeatureRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    text: String
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+        }
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f)
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

@@ -336,6 +336,15 @@
     <string name="reminder_exact_alarm_granted">Precise reminders enabled!</string>
     <string name="reminder_exact_alarm_denied">Reminders may be delayed by a few minutes</string>
 
+    <!-- Notification Permission -->
+    <string name="reminder_notification_permission_title">Enable Notifications</string>
+    <string name="reminder_notification_permission_description">Allow Gisti to notify you when your reminder is due so you never miss an important checklist.</string>
+    <string name="reminder_notification_permission_feature1">Get notified at the exact time you set</string>
+    <string name="reminder_notification_permission_feature2">See your checklist name and remaining items</string>
+    <string name="reminder_notification_permission_feature3">Tap the notification to jump right in</string>
+    <string name="reminder_notification_permission_enable">Enable Notifications</string>
+    <string name="reminder_notification_permission_skip">Not Now</string>
+
     <!-- Debug Screen -->
     <string name="debug_title">Debug Menu</string>
     <string name="debug_developer_tools">Developer Tools</string>
