@@ -98,7 +98,7 @@ class UserApiServiceImpl(
         appVersion: String?,
         platform: String?
     ): Result<RegisterUserResult> = runCatching {
-        logger.debug(TAG, "registerUser: deviceId=$deviceId, platform=$platform")
+        logger.debug(TAG, "registerUser: deviceId=${deviceId.take(8)}..., platform=$platform")
 
         val request = RegisterUserRequest(
             deviceId = deviceId,
@@ -114,7 +114,7 @@ class UserApiServiceImpl(
         logger.debug(TAG, "registerUser: response status=${response.status}")
 
         val responseBody = response.body<RegisterUserResponseDto>()
-        logger.debug(TAG, "registerUser: response body - success=${responseBody.success}, userId=${responseBody.userId}, aiCredits=${responseBody.aiCredits}, isPremium=${responseBody.isPremium}, error=${responseBody.error}")
+        logger.debug(TAG, "registerUser: response body - success=${responseBody.success}, userId=${responseBody.userId?.take(8)}..., aiCredits=${responseBody.aiCredits}, isPremium=${responseBody.isPremium}, error=${responseBody.error}")
 
         if (responseBody.success && responseBody.userId != null) {
             val result = RegisterUserResult(
@@ -133,7 +133,7 @@ class UserApiServiceImpl(
     }
 
     override suspend fun restoreCreditsAfterPurchase(userId: String): Result<RestoreCreditsResult> = runCatching {
-        logger.debug(TAG, "restoreCreditsAfterPurchase: userId=$userId")
+        logger.debug(TAG, "restoreCreditsAfterPurchase: userId=${userId.take(8)}...")
 
         val request = RestoreCreditsRequest(userId = userId)
 

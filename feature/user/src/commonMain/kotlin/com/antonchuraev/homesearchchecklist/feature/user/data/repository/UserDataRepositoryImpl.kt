@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.withTimeoutOrNull
 
 class UserDataRepositoryImpl(
     private val appScope: CoroutineScope,
@@ -65,17 +66,14 @@ class UserDataRepositoryImpl(
     }
 
     override suspend fun getUserData(): UserData {
-        val userId = appDatastore.observeString(USER_ID_KEY, "").first()
-        val isOnboardingPassed = appDatastore.observeBoolean(IS_ONBOARDING_PASSED_KEY, false).first()
-        val isPremium = appDatastore.observeBoolean(IS_PREMIUM_KEY, false).first()
-        val aiCredits = appDatastore.observeInt(AI_CREDITS_KEY, 0).first()
+        // Fast path: StateFlow already has data from DataStore (common case for returning users)
+        val snapshot = userDataFlow.value
+        if (snapshot.userId.isNotBlank()) return snapshot
 
-        return UserData(
-            userId = userId,
-            isOnboardingPassed = isOnboardingPassed,
-            isPremium = isPremium,
-            aiCredits = aiCredits
-        )
+        // Cold start: DataStore may not have emitted yet, wait briefly for real data
+        return withTimeoutOrNull(100) {
+            userDataFlow.first { it.userId.isNotBlank() }
+        } ?: snapshot
     }
 
     override suspend fun update(userData: UserData) {
@@ -92,7 +90,7 @@ class UserDataRepositoryImpl(
 
         // Check if user is already registered locally
         val currentUserId = appDatastore.observeString(USER_ID_KEY, "").first()
-        logger.debug(TAG, "ensureUserRegistered: currentUserId='$currentUserId'")
+        logger.debug(TAG, "ensureUserRegistered: currentUserId='${currentUserId.take(8)}...'")
 
         if (currentUserId.isNotBlank()) {
             // User already registered, sync with server to get fresh data
@@ -102,7 +100,7 @@ class UserDataRepositoryImpl(
 
         // User not registered, call the server
         val deviceId = deviceIdProvider.getOrCreateDeviceId()
-        logger.debug(TAG, "ensureUserRegistered: registering new user with deviceId=$deviceId")
+        logger.debug(TAG, "ensureUserRegistered: registering new user with deviceId=${deviceId.take(8)}...")
 
         return registerAndSave(deviceId)
     }
@@ -111,7 +109,7 @@ class UserDataRepositoryImpl(
         logger.debug(TAG, "syncWithServer: starting...")
 
         val deviceId = deviceIdProvider.getOrCreateDeviceId()
-        logger.debug(TAG, "syncWithServer: deviceId=$deviceId")
+        logger.debug(TAG, "syncWithServer: deviceId=${deviceId.take(8)}...")
 
         return registerAndSave(deviceId)
     }
@@ -133,7 +131,7 @@ class UserDataRepositoryImpl(
             return Result.failure(IllegalStateException("User not registered"))
         }
 
-        logger.debug(TAG, "restoreCreditsAfterPurchase: calling API for userId=$userId")
+        logger.debug(TAG, "restoreCreditsAfterPurchase: calling API for userId=${userId.take(8)}...")
 
         return userApiService.restoreCreditsAfterPurchase(userId)
             .onSuccess { result ->
@@ -155,7 +153,7 @@ class UserDataRepositoryImpl(
             appVersion = null,
             platform = getPlatformName()
         ).onSuccess { result ->
-            logger.info(TAG, "registerAndSave: SUCCESS - userId=${result.userId}, aiCredits=${result.aiCredits}, isPremium=${result.isPremium}")
+            logger.info(TAG, "registerAndSave: SUCCESS - userId=${result.userId.take(8)}..., aiCredits=${result.aiCredits}, isPremium=${result.isPremium}")
             // Save user data locally
             appDatastore.saveString(USER_ID_KEY, result.userId)
             appDatastore.saveBoolean(IS_PREMIUM_KEY, result.isPremium)
