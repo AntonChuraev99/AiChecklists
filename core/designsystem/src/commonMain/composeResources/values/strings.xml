@@ -246,6 +246,8 @@
     <string name="paywall_then_price">then %1$s / month</string>
     <string name="paywall_start_free_trial">Start Free Trial</string>
     <string name="paywall_subscribe_now">Subscribe Now</string>
+    <string name="paywall_retry">Try Again</string>
+    <string name="paywall_load_error">Unable to load subscription options.\nPlease check your connection and try again.</string>
     <string name="paywall_no_payment_now">No payment due now</string>
     <string name="paywall_cancel_anytime">Cancel anytime</string>
     <string name="paywall_timeline_today">Today</string>
