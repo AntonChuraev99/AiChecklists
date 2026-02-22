@@ -144,7 +144,6 @@ private fun ChecklistDetailContent(
     onIntent: (ChecklistDetailIntent) -> Unit
 ) {
     AppScaffold(
-        title = state.checklist.name,
         onBackButtonClick = { onIntent(ChecklistDetailIntent.OnBackClick) },
         actions = {
             IconButton(onClick = { onIntent(ChecklistDetailIntent.OnReminderClick) }) {
@@ -222,7 +221,12 @@ private fun ChecklistDetailContent(
                 verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
             ) {
                 item {
-                    Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
+                    Text(
+                        text = state.checklist.name,
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.padding(top = AppDimens.SpacingMd)
+                    )
                 }
 
                 // Progress header with completion celebration
