@@ -123,7 +123,7 @@ android {
             properties.load(localProperties.inputStream())
         }
         buildConfigField("String", "GEMINI_API_KEY", "\"${properties.getProperty("GEMINI_API_KEY", "")}\"")
-        buildConfigField("String", "AMPLITUDE_KEY", "\"${properties.getProperty("AMPLITUDE_KEY", "")}\"")
+        // Amplitude keys set per build type below
     }
 
     testOptions {
@@ -167,6 +167,14 @@ android {
         }
     }
     buildTypes {
+        getByName("debug") {
+            val localProperties = project.rootProject.file("local.properties")
+            val properties = Properties()
+            if (localProperties.exists()) {
+                properties.load(localProperties.inputStream())
+            }
+            buildConfigField("String", "AMPLITUDE_KEY", "\"${properties.getProperty("AMPLITUDE_DEBUG_KEY", "")}\"")
+        }
         getByName("release") {
             isMinifyEnabled = true
             isShrinkResources = true
@@ -175,6 +183,13 @@ android {
                 "proguard-rules.pro"
             )
             signingConfig = signingConfigs.getByName("release")
+
+            val localProperties = project.rootProject.file("local.properties")
+            val properties = Properties()
+            if (localProperties.exists()) {
+                properties.load(localProperties.inputStream())
+            }
+            buildConfigField("String", "AMPLITUDE_KEY", "\"${properties.getProperty("AMPLITUDE_KEY", "")}\"")
         }
     }
     compileOptions {
