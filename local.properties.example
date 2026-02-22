@@ -23,6 +23,8 @@ GEMINI_API_KEY=your_key_here
 # Google Cloud Project ID
 GCP_PROJECT_ID=aichecklists-40230
 
+AMPLITUDE_DEBUG_KEY=....
+
 # Build variants
 android.useAndroidX=true
 android.enableJetifier=true
