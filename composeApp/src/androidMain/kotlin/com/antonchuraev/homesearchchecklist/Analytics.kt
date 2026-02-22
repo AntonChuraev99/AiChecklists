@@ -18,6 +18,8 @@ object Analytics : AnalyticsTracker {
     }
 
     // Nullable Amplitude - handles empty API key gracefully
+    // Debug builds use a separate Amplitude project (AMPLITUDE_KEY_DEBUG)
+    // so debug events go to sandbox, not production
     private val amplitude: Amplitude? by lazy {
         val key = BuildConfig.AMPLITUDE_KEY
         if (key.isBlank()) return@lazy null
@@ -26,8 +28,7 @@ object Analytics : AnalyticsTracker {
             Configuration(
                 apiKey = key,
                 context = AppContextHolder.context,
-                trackingSessionEvents = true,
-                optOut = AppBuildConfig.isDebug
+                trackingSessionEvents = true
             )
         )
     }
