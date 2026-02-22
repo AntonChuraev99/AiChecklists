@@ -3,6 +3,7 @@ package com.antonchuraev.homesearchchecklist.feature.checklist.data.repository
 import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistDao
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistFillDao
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.toDomain
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.toEntity
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
@@ -69,6 +70,23 @@ class ChecklistRepositoryImpl(
 
     override suspend fun getChecklistById(id: Long): Checklist? {
         return checklistDao.getById(id)?.toDomain()
+    }
+
+    // Reminders
+    override suspend fun setReminder(checklistId: Long, reminderAt: Long?) {
+        checklistDao.updateReminder(checklistId, reminderAt)
+    }
+
+    override suspend fun countActiveReminders(): Int {
+        return checklistDao.countActiveReminders(currentTimeMillis())
+    }
+
+    override suspend fun getActiveReminders(): List<ChecklistReminderInfo> {
+        return checklistDao.getActiveReminders(currentTimeMillis())
+    }
+
+    override suspend fun getDefaultFillOneShot(checklistId: Long): ChecklistFill? {
+        return fillDao.getDefaultFillByChecklistId(checklistId)?.toDomain()
     }
 
     // Fills (instances)

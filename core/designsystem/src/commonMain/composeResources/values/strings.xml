@@ -308,6 +308,24 @@
     <string name="csat_rate_button">Rate on Google Play</string>
     <string name="csat_maybe_later">Maybe later</string>
 
+    <!-- Reminders -->
+    <string name="reminder_set_reminder">Set Reminder</string>
+    <string name="reminder_in_one_hour">In 1 hour</string>
+    <string name="reminder_tomorrow_morning">Tomorrow morning</string>
+    <string name="reminder_tomorrow_evening">Tomorrow evening</string>
+    <string name="reminder_pick_date_time">Pick date &amp; time</string>
+    <string name="reminder_remove">Remove Reminder</string>
+    <string name="reminder_select_time">Select Time</string>
+    <string name="reminder_next">Next</string>
+    <string name="reminder_all_completed">All items completed!</string>
+    <string name="reminder_notification_channel">Checklist Reminders</string>
+    <string name="reminder_notification_channel_desc">Notifications for checklist reminders and deadlines</string>
+    <string name="reminder_notification_tap">Tap to open</string>
+    <plurals name="reminder_items_remaining">
+        <item quantity="one">%d item remaining</item>
+        <item quantity="other">%d items remaining</item>
+    </plurals>
+
     <!-- Debug Screen -->
     <string name="debug_title">Debug Menu</string>
     <string name="debug_developer_tools">Developer Tools</string>

@@ -1,5 +1,6 @@
 package com.antonchuraev.homesearchchecklist
 
+import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import android.view.KeyEvent
@@ -8,19 +9,32 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppContextHolder
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
+import com.antonchuraev.homesearchchecklist.notification.ReminderReceiver
 import org.koin.android.ext.android.inject
 
 class MainActivity : ComponentActivity() {
 
     private val appNavigator: AppNavigator by inject()
+    private val analyticsTracker: AnalyticsTracker by inject()
     private val debugMenuDetector = if (AppBuildConfig.isDebug) {
         DebugMenuDetector { appNavigator.navigateToDebugMenu() }
     } else {
         null
+    }
+
+    var pendingChecklistId: Long? = null
+        private set
+
+    fun consumePendingChecklistId(): Long? {
+        val id = pendingChecklistId
+        pendingChecklistId = null
+        return id
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -30,9 +44,41 @@ class MainActivity : ComponentActivity() {
         )
         super.onCreate(savedInstanceState)
 
+        // Check for deep link in launch intent (cold start from notification)
+        extractDeepLinkChecklistId(intent)?.let { id ->
+            pendingChecklistId = id
+        }
+
         setContent {
             App()
+
+            // Consume pending deep link after NavController is ready (cold start from notification)
+            LaunchedEffect(Unit) {
+                consumePendingChecklistId()?.let { id ->
+                    appNavigator.navigateToChecklistDetail(id)
+                    analyticsTracker.event("reminder_notification_tapped", mapOf(
+                        "checklist_id" to id.toString()
+                    ))
+                }
+            }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        // Warm start — NavController is already ready
+        extractDeepLinkChecklistId(intent)?.let { id ->
+            appNavigator.navigateToChecklistDetail(id)
+            analyticsTracker.event("reminder_notification_tapped", mapOf(
+                "checklist_id" to id.toString()
+            ))
+        }
+    }
+
+    private fun extractDeepLinkChecklistId(intent: Intent?): Long? {
+        if (intent?.action != ReminderReceiver.ACTION_OPEN_CHECKLIST) return null
+        val id = intent.getLongExtra(ReminderReceiver.EXTRA_NAVIGATE_CHECKLIST_ID, -1L)
+        return if (id != -1L) id else null
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {

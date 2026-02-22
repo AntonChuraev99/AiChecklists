@@ -3,6 +3,7 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:name="com.antonchuraev.homesearchchecklist.GistiApplication"
@@ -31,6 +32,15 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- Reminder Notification Receiver -->
+        <receiver
+            android:name="com.antonchuraev.homesearchchecklist.notification.ReminderReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.antonchuraev.aichecklists.ACTION_REMINDER_FIRE" />
+            </intent-filter>
+        </receiver>
 
         <!-- Checklist Widget -->
         <receiver

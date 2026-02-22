@@ -22,7 +22,10 @@ sealed interface ChecklistDetailState : State {
         val showFillLimitDialog: Boolean = false,
         val noteDialogItemIndex: Int? = null,
         val editingNote: String = "",
-        val showFillTargetSheet: Boolean = false
+        val showFillTargetSheet: Boolean = false,
+        val showReminderSheet: Boolean = false,
+        val showCustomPicker: Boolean = false,
+        val customPickerDateMillis: Long? = null
     ) : ChecklistDetailState
 }
 
@@ -59,4 +62,13 @@ sealed interface ChecklistDetailIntent : Intent {
     // Limits
     data object OnDismissFillLimitDialog : ChecklistDetailIntent
     data object OnUpgradeToPremiumClick : ChecklistDetailIntent
+
+    // Reminders
+    data object OnReminderClick : ChecklistDetailIntent
+    data class OnReminderPresetSelected(val triggerAtMillis: Long) : ChecklistDetailIntent
+    data object OnCustomDateRequested : ChecklistDetailIntent
+    data class OnDateSelected(val dateMillis: Long) : ChecklistDetailIntent
+    data class OnTimeSelected(val hour: Int, val minute: Int) : ChecklistDetailIntent
+    data object OnRemoveReminder : ChecklistDetailIntent
+    data object OnDismissReminderUI : ChecklistDetailIntent
 }

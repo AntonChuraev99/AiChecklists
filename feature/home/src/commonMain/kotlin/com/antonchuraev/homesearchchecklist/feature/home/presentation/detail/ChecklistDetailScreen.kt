@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -29,13 +31,25 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.NoteAdd
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.WbSunny
+import androidx.compose.material.icons.outlined.WbTwilight
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -68,6 +82,7 @@ import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import kotlinx.datetime.*
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
@@ -132,6 +147,19 @@ private fun ChecklistDetailContent(
         title = state.checklist.name,
         onBackButtonClick = { onIntent(ChecklistDetailIntent.OnBackClick) },
         actions = {
+            IconButton(onClick = { onIntent(ChecklistDetailIntent.OnReminderClick) }) {
+                Icon(
+                    imageVector = if (state.checklist.reminderAt != null)
+                        Icons.Filled.Notifications
+                    else
+                        Icons.Outlined.Notifications,
+                    contentDescription = stringResource(Res.string.reminder_set_reminder),
+                    tint = if (state.checklist.reminderAt != null)
+                        MaterialTheme.colorScheme.primary
+                    else
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             IconButton(onClick = { onIntent(ChecklistDetailIntent.OnShareClick) }) {
                 Icon(Icons.Outlined.Share, contentDescription = stringResource(Res.string.share))
             }
@@ -281,6 +309,27 @@ private fun ChecklistDetailContent(
             onFillMainChecklist = { onIntent(ChecklistDetailIntent.OnFillMainChecklistSelected) },
             onCreateNewFill = { onIntent(ChecklistDetailIntent.OnCreateNewFillSelected) },
             onDismiss = { onIntent(ChecklistDetailIntent.OnFillTargetSheetDismiss) }
+        )
+    }
+
+    // Reminder bottom sheet
+    if (state.showReminderSheet) {
+        ReminderBottomSheet(
+            currentReminder = state.checklist.reminderAt,
+            onPresetSelected = { onIntent(ChecklistDetailIntent.OnReminderPresetSelected(it)) },
+            onCustomDateRequested = { onIntent(ChecklistDetailIntent.OnCustomDateRequested) },
+            onRemoveReminder = { onIntent(ChecklistDetailIntent.OnRemoveReminder) },
+            onDismiss = { onIntent(ChecklistDetailIntent.OnDismissReminderUI) }
+        )
+    }
+
+    // Custom date/time picker
+    if (state.showCustomPicker) {
+        ReminderDateTimePicker(
+            selectedDateMillis = state.customPickerDateMillis,
+            onDateSelected = { onIntent(ChecklistDetailIntent.OnDateSelected(it)) },
+            onTimeSelected = { hour, minute -> onIntent(ChecklistDetailIntent.OnTimeSelected(hour, minute)) },
+            onDismiss = { onIntent(ChecklistDetailIntent.OnDismissReminderUI) }
         )
     }
 }
@@ -691,4 +740,153 @@ private fun FillLimitDialog(
         containerColor = MaterialTheme.colorScheme.surface,
         shape = MaterialTheme.shapes.large
     )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReminderBottomSheet(
+    currentReminder: Long?,
+    onPresetSelected: (Long) -> Unit,
+    onCustomDateRequested: () -> Unit,
+    onRemoveReminder: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .navigationBarsPadding()
+                .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
+                .padding(bottom = AppDimens.SpacingXxl),
+            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs)
+        ) {
+            Text(
+                text = stringResource(Res.string.reminder_set_reminder),
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(bottom = AppDimens.SpacingSm)
+            )
+
+            ReminderPresetRow(
+                icon = Icons.Outlined.Schedule,
+                text = stringResource(Res.string.reminder_in_one_hour),
+                onClick = {
+                    onPresetSelected(Clock.System.now().plus(1, DateTimeUnit.HOUR).toEpochMilliseconds())
+                }
+            )
+            ReminderPresetRow(
+                icon = Icons.Outlined.WbSunny,
+                text = stringResource(Res.string.reminder_tomorrow_morning),
+                onClick = { onPresetSelected(tomorrowAt(hour = 9, minute = 0)) }
+            )
+            ReminderPresetRow(
+                icon = Icons.Outlined.WbTwilight,
+                text = stringResource(Res.string.reminder_tomorrow_evening),
+                onClick = { onPresetSelected(tomorrowAt(hour = 18, minute = 0)) }
+            )
+            ReminderPresetRow(
+                icon = Icons.Outlined.CalendarMonth,
+                text = stringResource(Res.string.reminder_pick_date_time),
+                onClick = onCustomDateRequested
+            )
+
+            if (currentReminder != null) {
+                HorizontalDivider(modifier = Modifier.padding(vertical = AppDimens.SpacingSm))
+                AppButtonText(
+                    text = stringResource(Res.string.reminder_remove),
+                    onClick = onRemoveReminder
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReminderPresetRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    text: String,
+    onClick: () -> Unit
+) {
+    AppCard(onClick = onClick) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp)
+            )
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReminderDateTimePicker(
+    selectedDateMillis: Long?,
+    onDateSelected: (Long) -> Unit,
+    onTimeSelected: (Int, Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    if (selectedDateMillis == null) {
+        val dateState = rememberDatePickerState()
+        DatePickerDialog(
+            onDismissRequest = onDismiss,
+            confirmButton = {
+                AppButtonText(
+                    text = stringResource(Res.string.reminder_next),
+                    onClick = { dateState.selectedDateMillis?.let(onDateSelected) }
+                )
+            },
+            dismissButton = {
+                AppButtonText(text = stringResource(Res.string.cancel), onClick = onDismiss)
+            }
+        ) {
+            DatePicker(state = dateState)
+        }
+    } else {
+        val timeState = rememberTimePickerState(initialHour = 9, initialMinute = 0)
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text(stringResource(Res.string.reminder_select_time)) },
+            text = { TimePicker(state = timeState) },
+            confirmButton = {
+                AppButtonText(
+                    text = stringResource(Res.string.ok),
+                    onClick = { onTimeSelected(timeState.hour, timeState.minute) }
+                )
+            },
+            dismissButton = {
+                AppButtonText(text = stringResource(Res.string.cancel), onClick = onDismiss)
+            },
+            containerColor = MaterialTheme.colorScheme.surface,
+            shape = MaterialTheme.shapes.large
+        )
+    }
+}
+
+private fun tomorrowAt(hour: Int, minute: Int): Long {
+    val tz = TimeZone.currentSystemDefault()
+    val now = Clock.System.now()
+    val tomorrowDate = now.plus(1, DateTimeUnit.DAY, tz).toLocalDateTime(tz).date
+    val targetDateTime = LocalDateTime(tomorrowDate, LocalTime(hour, minute))
+    return targetDateTime.toInstant(tz).toEpochMilliseconds()
+}
+
+fun combinePickerResults(datePickerMillis: Long, hour: Int, minute: Int): Long {
+    val utcMidnight = Instant.fromEpochMilliseconds(datePickerMillis)
+    val localDate = utcMidnight.toLocalDateTime(TimeZone.UTC).date
+    val localDateTime = LocalDateTime(localDate, LocalTime(hour, minute))
+    return localDateTime.toInstant(TimeZone.currentSystemDefault()).toEpochMilliseconds()
 }
