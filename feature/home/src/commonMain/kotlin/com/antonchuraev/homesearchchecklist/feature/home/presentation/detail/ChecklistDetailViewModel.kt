@@ -123,6 +123,11 @@ class ChecklistDetailViewModel(
                 navigator.navigateToPaywall(source = "detail_fill_limit")
             }
 
+            // Notification permission
+            is ChecklistDetailIntent.OnNotificationPermissionResult -> handleNotificationPermissionResult()
+            ChecklistDetailIntent.OnNotificationPermissionSkip -> handleNotificationPermissionSkip()
+            ChecklistDetailIntent.OnDismissNotificationPermissionSheet -> handleNotificationPermissionSkip()
+
             // Reminders
             ChecklistDetailIntent.OnReminderClick -> handleReminderClick()
             is ChecklistDetailIntent.OnReminderPresetSelected -> {
@@ -315,7 +320,24 @@ class ChecklistDetailViewModel(
                     return@launch
                 }
             }
-            updateContentState { it.copy(showReminderSheet = true) }
+
+            if (!reminderScheduler.hasNotificationPermission()) {
+                updateContentState { it.copy(showNotificationPermissionSheet = true) }
+            } else {
+                updateContentState { it.copy(showReminderSheet = true) }
+            }
+        }
+    }
+
+    private fun handleNotificationPermissionResult() {
+        updateContentState {
+            it.copy(showNotificationPermissionSheet = false, showReminderSheet = true)
+        }
+    }
+
+    private fun handleNotificationPermissionSkip() {
+        updateContentState {
+            it.copy(showNotificationPermissionSheet = false, showReminderSheet = true)
         }
     }
 
