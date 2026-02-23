@@ -154,7 +154,7 @@ class CsatViewModel(
             "csat_submitted",
             mapOf(
                 "rating" to rating.name,
-                "has_text" to state.feedbackText.isNotBlank(),
+                "text" to state.feedbackText,
                 "chips" to state.selectedChips.joinToString(",") { it.name },
             ),
         )
