@@ -108,7 +108,7 @@
     <string name="analyze_select_photo">Choose Photo</string>
     <string name="analyze_select_pdf">Choose PDF</string>
     <string name="analyze_select_file">Choose File</string>
-    <string name="analyze_result_title">Here\'s your checklist!</string>
+    <string name="analyze_result_title">Here's your checklist!</string>
     <string name="analyze_items_found">Items extracted:</string>
     <string name="analyze_and_more">... and %1$d more</string>
     <string name="analyze_checklist_name_label">Checklist name</string>
@@ -202,10 +202,10 @@
 
     <!-- Limits -->
     <string name="limit_reached_title">Checklist Limit Reached</string>
-    <string name="limit_reached_message">You\'ve reached the maximum of %1$d checklists on the free plan. Upgrade to Premium for unlimited checklists.</string>
+    <string name="limit_reached_message">You've reached the maximum of %1$d checklists on the free plan. Upgrade to Premium for unlimited checklists.</string>
     <string name="limit_upgrade">Upgrade to Premium</string>
     <string name="limit_fill_reached_title">Fill Limit Reached</string>
-    <string name="limit_fill_reached_message">You\'ve reached the maximum of %1$d fills for this checklist. Upgrade to Premium for unlimited fills.</string>
+    <string name="limit_fill_reached_message">You've reached the maximum of %1$d fills for this checklist. Upgrade to Premium for unlimited fills.</string>
     <string name="limit_checklist_count">%1$d/%2$d checklists</string>
     <string name="limit_fill_count">%1$d/%2$d fills</string>
 
@@ -328,11 +328,11 @@
         <item quantity="other">%d items remaining</item>
     </plurals>
     <string name="reminder_exact_alarm_title">Enable Precise Reminders</string>
-    <string name="reminder_exact_alarm_step1">Tap \"Open Settings\" below</string>
-    <string name="reminder_exact_alarm_step2">Find \"Alarms &amp; reminders\"</string>
+    <string name="reminder_exact_alarm_step1">Tap "Open Settings" below</string>
+    <string name="reminder_exact_alarm_step2">Find "Alarms &amp; reminders"</string>
     <string name="reminder_exact_alarm_step3">Toggle ON for Gisti</string>
     <string name="reminder_exact_alarm_description">Without this, reminders may be delayed by a few minutes.</string>
-    <string name="reminder_exact_alarm_dont_show">Don\'t show again</string>
+    <string name="reminder_exact_alarm_dont_show">Don't show again</string>
     <string name="reminder_exact_alarm_open_settings">Open Settings</string>
     <string name="reminder_exact_alarm_skip">Skip</string>
     <string name="reminder_exact_alarm_granted">Precise reminders enabled!</string>
