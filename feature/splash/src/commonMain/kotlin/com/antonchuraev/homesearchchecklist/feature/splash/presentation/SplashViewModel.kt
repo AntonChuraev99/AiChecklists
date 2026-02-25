@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.repository.PaywallRepository
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.RestorePurchasesUseCase
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
@@ -15,6 +16,7 @@ import kotlin.time.measureTimedValue
 class SplashViewModel(
     private val userDataRepository: UserDataRepository,
     private val paywallRepository: PaywallRepository,
+    private val restorePurchasesUseCase: RestorePurchasesUseCase,
     private val appNavigator: AppNavigator,
     private val appScope: CoroutineScope,
     private val logger: AppLogger,
@@ -96,9 +98,9 @@ class SplashViewModel(
             .onSuccess { loginResult ->
                 userDataRepository.setPaywallLinked(true)
 
-                // For returning users, auto-restore purchases
+                // For returning users, auto-restore purchases + credits via UseCase
                 if (!isNewUser && !loginResult.isNewCustomer) {
-                    paywallRepository.restorePurchases()
+                    restorePurchasesUseCase()
                 }
             }
     }
