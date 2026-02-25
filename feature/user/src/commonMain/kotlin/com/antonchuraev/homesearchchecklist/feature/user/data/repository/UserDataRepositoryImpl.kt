@@ -1,5 +1,6 @@
 package com.antonchuraev.homesearchchecklist.feature.user.data.repository
 
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppDatastore
 import com.antonchuraev.homesearchchecklist.feature.user.data.device.DeviceIdProvider
@@ -15,6 +16,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -23,7 +25,8 @@ class UserDataRepositoryImpl(
     private val deviceIdProvider: DeviceIdProvider,
     private val userApiService: UserApiService,
     private val logger: AppLogger,
-    private val appDatastore: AppDatastore
+    private val appDatastore: AppDatastore,
+    private val analyticsTracker: AnalyticsTracker
 ) : UserDataRepository {
 
     companion object {
@@ -34,6 +37,9 @@ class UserDataRepositoryImpl(
         private const val IS_PREMIUM_KEY = "is_premium"
         private const val AI_CREDITS_KEY = "ai_credits"
         internal const val IS_PAYWALL_LINKED_KEY = "is_paywall_linked"
+
+        private const val MAX_RESTORE_RETRIES = 3
+        private const val RESTORE_RETRY_BASE_DELAY_MS = 2000L
 
         private val DEFAULT_USER_DATA = UserData(
             userId = "",
@@ -123,28 +129,53 @@ class UserDataRepositoryImpl(
     }
 
     override suspend fun restoreCreditsAfterPurchase(): Result<Int> {
+        analyticsTracker.event("credits_restore_started")
         logger.debug(TAG, "restoreCreditsAfterPurchase: starting...")
 
         val userId = appDatastore.observeString(USER_ID_KEY, "").first()
         if (userId.isBlank()) {
             logger.error(TAG, "restoreCreditsAfterPurchase: no user_id found")
+            analyticsTracker.event("credits_restore_failed", mapOf("error" to "no_user_id"))
             return Result.failure(IllegalStateException("User not registered"))
         }
 
         logger.debug(TAG, "restoreCreditsAfterPurchase: calling API for userId=${userId.take(8)}...")
 
-        return userApiService.restoreCreditsAfterPurchase(userId)
-            .onSuccess { result ->
-                logger.info(TAG, "restoreCreditsAfterPurchase: SUCCESS - aiCredits=${result.aiCredits}, isPremium=${result.isPremium}")
-                // Update local cache
+        var lastError: Throwable? = null
+        for (attempt in 1..MAX_RESTORE_RETRIES) {
+            val apiResult = userApiService.restoreCreditsAfterPurchase(userId)
+
+            if (apiResult.isSuccess) {
+                val result = apiResult.getOrThrow()
+                logger.info(TAG, "restoreCreditsAfterPurchase: SUCCESS (attempt $attempt) - aiCredits=${result.aiCredits}, isPremium=${result.isPremium}")
                 appDatastore.saveInt(AI_CREDITS_KEY, result.aiCredits)
                 appDatastore.saveBoolean(IS_PREMIUM_KEY, result.isPremium)
-                logger.debug(TAG, "restoreCreditsAfterPurchase: saved to datastore")
+                analyticsTracker.event("credits_restore_success", mapOf(
+                    "credits" to result.aiCredits,
+                    "attempt" to attempt
+                ))
+                return Result.success(result.aiCredits)
             }
-            .onFailure { error ->
-                logger.error(TAG, "restoreCreditsAfterPurchase: FAILED - ${error.message}", error)
+
+            lastError = apiResult.exceptionOrNull()
+            logger.error(TAG, "restoreCreditsAfterPurchase: attempt $attempt/$MAX_RESTORE_RETRIES FAILED - ${lastError?.message}", lastError)
+
+            if (attempt < MAX_RESTORE_RETRIES) {
+                analyticsTracker.event("credits_restore_retry", mapOf(
+                    "attempt" to attempt,
+                    "error" to (lastError?.message ?: "unknown")
+                ))
+                delay(RESTORE_RETRY_BASE_DELAY_MS * attempt)
             }
-            .map { it.aiCredits }
+        }
+
+        val errorMessage = lastError?.message ?: "unknown"
+        logger.error(TAG, "restoreCreditsAfterPurchase: ALL $MAX_RESTORE_RETRIES attempts FAILED")
+        analyticsTracker.event("credits_restore_failed", mapOf(
+            "error" to errorMessage,
+            "attempts" to MAX_RESTORE_RETRIES
+        ))
+        return Result.failure(lastError ?: IllegalStateException("All retries failed"))
     }
 
     private suspend fun registerAndSave(deviceId: String): Result<RegistrationData> {

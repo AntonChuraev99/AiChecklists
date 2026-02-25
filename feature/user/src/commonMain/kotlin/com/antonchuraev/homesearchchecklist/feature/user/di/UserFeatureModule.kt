@@ -20,7 +20,8 @@ val userFeatureModule = module {
             deviceIdProvider = get(),
             userApiService = get(),
             logger = get(),
-            appDatastore = UserAppDatastoreProvider.instance
+            appDatastore = UserAppDatastoreProvider.instance,
+            analyticsTracker = get()
         )
     } bind UserDataRepository::class
 

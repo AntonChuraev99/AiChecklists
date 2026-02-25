@@ -400,6 +400,49 @@ stringResource(Res.string.your_key)
 - Common: `save`, `cancel`, `ok`, `error`
 - Use snake_case
 
+## Credit Restore Architecture
+
+### Flow: Purchase → Credits (300)
+
+After a successful purchase or restore, credits must be explicitly restored via Cloud Function `restore_credits_after_purchase`. This is NOT automatic — the client must call it.
+
+### Call Chain
+
+```
+PurchaseProductUseCase / RestorePurchasesUseCase
+  → UserDataRepository.restoreCreditsAfterPurchase()
+    → UserDataRepositoryImpl (retry up to 3 times, backoff 2s/4s)
+      → UserApiService → POST /restore_credits_after_purchase
+        → Cloud Function verifies premium via RevenueCat REST API
+        → Writes to Firestore: is_premium=true, ai_credits=300
+      → On success: saves to DataStore (local cache)
+```
+
+### Analytics Events (credits restore)
+
+| Event | When | Key Params |
+|-------|------|------------|
+| `credits_restore_started` | restoreCreditsAfterPurchase begins | — |
+| `credits_restore_success` | Credits successfully restored | `credits`, `attempt` |
+| `credits_restore_retry` | Retry attempt after failure | `attempt`, `error` |
+| `credits_restore_failed` | All retries exhausted OR no user_id | `error`, `attempts` |
+
+### Critical Rules
+
+- **Always use UseCase** for restoring purchases — `RestorePurchasesUseCase` (not `paywallRepository.restorePurchases()` directly). The UseCase adds `restoreCreditsAfterPurchase()` after RevenueCat restore.
+- **SplashViewModel.linkWithPaywall()** must use `RestorePurchasesUseCase` for returning users.
+- **Retry is in the repository** (`UserDataRepositoryImpl`) — all callers get retry automatically.
+- **Slow networks** (>10s Google Play transactions) may cause Cloud Function timeout — retry with backoff handles this.
+- **`PurchaseProductUseCase`** ignores the `Result<Int>` from `restoreCreditsAfterPurchase()` — the purchase is already successful. Analytics captures failures.
+
+### Firestore Collections (credits)
+
+| Collection | Purpose |
+|-----------|---------|
+| `users/{userId}` | `is_premium`, `ai_credits`, `credits_restored_at` |
+| `credits_restore_log` | Log of successful restore operations |
+| `credits_refill_log` | Log of daily premium credit refills |
+
 ## Dependencies
 
 Versions in `gradle/libs.versions.toml`:

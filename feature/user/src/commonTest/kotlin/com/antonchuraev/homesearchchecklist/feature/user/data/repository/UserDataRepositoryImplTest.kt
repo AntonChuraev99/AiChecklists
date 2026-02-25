@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppDatastore
 import com.antonchuraev.homesearchchecklist.feature.user.data.device.DeviceIdProvider
@@ -200,7 +201,8 @@ class UserDataRepositoryImplTest {
             deviceIdProvider = stubDeviceIdProvider,
             userApiService = stubApiService,
             logger = logger,
-            appDatastore = datastore
+            appDatastore = datastore,
+            analyticsTracker = NoOpAnalyticsTracker()
         )
         testDispatcher.scheduler.advanceUntilIdle()
 
@@ -229,6 +231,165 @@ class UserDataRepositoryImplTest {
     }
 
     // ============================================
+    // restoreCreditsAfterPurchase() tests
+    // ============================================
+
+    @Test
+    fun restoreCreditsAfterPurchase_successOnFirstAttempt_returnsCreditsAndTracksAnalytics() = runTest {
+        val analytics = RecordingAnalyticsTracker()
+        val apiService = FakeUserApiService(
+            restoreResults = listOf(
+                Result.success(RestoreCreditsResult(aiCredits = 300, isPremium = true, message = "ok"))
+            )
+        )
+        val datastore = createStubDatastore(
+            strings = mapOf("user_id" to "user-premium-123"),
+            booleans = mapOf("is_premium" to false),
+            ints = mapOf("ai_credits" to 0)
+        )
+        val repo = createRepositoryWith(datastore, apiService, analytics)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val result = repo.restoreCreditsAfterPurchase()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Assert: returns 300 credits
+        assertTrue(result.isSuccess)
+        assertEquals(300, result.getOrNull())
+
+        // Assert: DataStore updated
+        val userData = repo.getUserData()
+        assertEquals(300, userData.aiCredits)
+        assertTrue(userData.isPremium)
+
+        // Assert: analytics tracked
+        assertTrue(analytics.hasEvent("credits_restore_started"))
+        assertTrue(analytics.hasEvent("credits_restore_success"))
+        assertEquals(300, analytics.getEventParam("credits_restore_success", "credits"))
+        assertEquals(1, analytics.getEventParam("credits_restore_success", "attempt"))
+
+        // Assert: no retry or failure events
+        assertTrue(!analytics.hasEvent("credits_restore_retry"))
+        assertTrue(!analytics.hasEvent("credits_restore_failed"))
+    }
+
+    @Test
+    fun restoreCreditsAfterPurchase_failsThenSucceeds_retriesAndReturnsCredits() = runTest {
+        val analytics = RecordingAnalyticsTracker()
+        val apiService = FakeUserApiService(
+            restoreResults = listOf(
+                Result.failure(Exception("timeout")),
+                Result.success(RestoreCreditsResult(aiCredits = 300, isPremium = true, message = "ok"))
+            )
+        )
+        val datastore = createStubDatastore(
+            strings = mapOf("user_id" to "user-retry-456"),
+            booleans = mapOf("is_premium" to false),
+            ints = mapOf("ai_credits" to 0)
+        )
+        val repo = createRepositoryWith(datastore, apiService, analytics)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val result = repo.restoreCreditsAfterPurchase()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Assert: eventually succeeds
+        assertTrue(result.isSuccess)
+        assertEquals(300, result.getOrNull())
+
+        // Assert: retry event tracked
+        assertTrue(analytics.hasEvent("credits_restore_retry"))
+        assertEquals(1, analytics.getEventParam("credits_restore_retry", "attempt"))
+        assertEquals("timeout", analytics.getEventParam("credits_restore_retry", "error"))
+
+        // Assert: success on attempt 2
+        assertEquals(2, analytics.getEventParam("credits_restore_success", "attempt"))
+    }
+
+    @Test
+    fun restoreCreditsAfterPurchase_allRetriesFail_returnsFailureAndTracksAnalytics() = runTest {
+        val analytics = RecordingAnalyticsTracker()
+        val apiService = FakeUserApiService(
+            restoreResults = listOf(
+                Result.failure(Exception("timeout 1")),
+                Result.failure(Exception("timeout 2")),
+                Result.failure(Exception("timeout 3"))
+            )
+        )
+        val datastore = createStubDatastore(
+            strings = mapOf("user_id" to "user-fail-789"),
+            booleans = mapOf("is_premium" to false),
+            ints = mapOf("ai_credits" to 0)
+        )
+        val repo = createRepositoryWith(datastore, apiService, analytics)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val result = repo.restoreCreditsAfterPurchase()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Assert: returns failure
+        assertTrue(result.isFailure)
+
+        // Assert: DataStore NOT updated (still 0 credits)
+        val userData = repo.getUserData()
+        assertEquals(0, userData.aiCredits)
+        assertEquals(false, userData.isPremium)
+
+        // Assert: analytics tracked
+        assertTrue(analytics.hasEvent("credits_restore_started"))
+        assertTrue(analytics.hasEvent("credits_restore_failed"))
+        assertEquals(3, analytics.getEventParam("credits_restore_failed", "attempts"))
+
+        // Assert: 2 retry events (after attempt 1 and 2, not after final attempt 3)
+        assertEquals(2, analytics.countEvents("credits_restore_retry"))
+
+        // Assert: no success event
+        assertTrue(!analytics.hasEvent("credits_restore_success"))
+    }
+
+    @Test
+    fun restoreCreditsAfterPurchase_noUserId_returnsFailureImmediately() = runTest {
+        val analytics = RecordingAnalyticsTracker()
+        val apiService = FakeUserApiService(restoreResults = emptyList())
+        val datastore = createStubDatastore() // no user_id
+        val repo = createRepositoryWith(datastore, apiService, analytics)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val result = repo.restoreCreditsAfterPurchase()
+
+        // Assert: fails with "User not registered"
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull()?.message?.contains("User not registered") == true)
+
+        // Assert: analytics tracked with no_user_id error
+        assertTrue(analytics.hasEvent("credits_restore_failed"))
+        assertEquals("no_user_id", analytics.getEventParam("credits_restore_failed", "error"))
+
+        // Assert: API was never called
+        assertEquals(0, apiService.restoreCallCount)
+    }
+
+    @Test
+    fun restoreCreditsAfterPurchase_apiCalledWithCorrectUserId() = runTest {
+        val apiService = FakeUserApiService(
+            restoreResults = listOf(
+                Result.success(RestoreCreditsResult(aiCredits = 300, isPremium = true, message = "ok"))
+            )
+        )
+        val datastore = createStubDatastore(
+            strings = mapOf("user_id" to "expected-user-id-here")
+        )
+        val repo = createRepositoryWith(datastore, apiService, RecordingAnalyticsTracker())
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        repo.restoreCreditsAfterPurchase()
+
+        // Assert: API called with correct userId
+        assertEquals(1, apiService.restoreCallCount)
+        assertEquals("expected-user-id-here", apiService.lastRestoreUserId)
+    }
+
+    // ============================================
     // Helper Functions
     // ============================================
 
@@ -238,7 +399,23 @@ class UserDataRepositoryImplTest {
             deviceIdProvider = DeviceIdProvider(createStubDatastore()),
             userApiService = NoOpUserApiService(),
             logger = NoOpLogger(),
-            appDatastore = datastore
+            appDatastore = datastore,
+            analyticsTracker = NoOpAnalyticsTracker()
+        )
+    }
+
+    private fun TestScope.createRepositoryWith(
+        datastore: AppDatastore,
+        apiService: UserApiService,
+        analyticsTracker: AnalyticsTracker
+    ): UserDataRepositoryImpl {
+        return UserDataRepositoryImpl(
+            appScope = backgroundScope,
+            deviceIdProvider = DeviceIdProvider(createStubDatastore()),
+            userApiService = apiService,
+            logger = NoOpLogger(),
+            appDatastore = datastore,
+            analyticsTracker = analyticsTracker
         )
     }
 
@@ -293,6 +470,57 @@ class UserDataRepositoryImplTest {
         override fun info(tag: String, message: String) {}
         override fun warning(tag: String, message: String) {}
         override fun error(tag: String, message: String, throwable: Throwable?) {}
+    }
+
+    private class NoOpAnalyticsTracker : AnalyticsTracker {
+        override fun setUserId(userId: String) {}
+        override fun screenView(name: String) {}
+        override fun event(name: String, params: Map<String, Any>) {}
+    }
+
+    /**
+     * Records all analytics events for assertion in tests.
+     */
+    private class RecordingAnalyticsTracker : AnalyticsTracker {
+        private val events = mutableListOf<Pair<String, Map<String, Any>>>()
+
+        override fun setUserId(userId: String) {}
+        override fun screenView(name: String) {}
+        override fun event(name: String, params: Map<String, Any>) {
+            events.add(name to params)
+        }
+
+        fun hasEvent(name: String): Boolean = events.any { it.first == name }
+        fun countEvents(name: String): Int = events.count { it.first == name }
+        fun getEventParam(name: String, param: String): Any? =
+            events.firstOrNull { it.first == name }?.second?.get(param)
+    }
+
+    /**
+     * Configurable fake API service that returns sequential results for restoreCreditsAfterPurchase.
+     */
+    private class FakeUserApiService(
+        private val restoreResults: List<Result<RestoreCreditsResult>>
+    ) : UserApiService {
+        var restoreCallCount = 0
+            private set
+        var lastRestoreUserId: String? = null
+            private set
+
+        override suspend fun registerUser(
+            deviceId: String, appVersion: String?, platform: String?
+        ): Result<RegisterUserResult> =
+            Result.failure(Exception("Not implemented in test"))
+
+        override suspend fun restoreCreditsAfterPurchase(userId: String): Result<RestoreCreditsResult> {
+            lastRestoreUserId = userId
+            val index = restoreCallCount++
+            return if (index < restoreResults.size) {
+                restoreResults[index]
+            } else {
+                Result.failure(Exception("No more stub results (call #$index)"))
+            }
+        }
     }
 
     private class NoOpUserApiService : UserApiService {
