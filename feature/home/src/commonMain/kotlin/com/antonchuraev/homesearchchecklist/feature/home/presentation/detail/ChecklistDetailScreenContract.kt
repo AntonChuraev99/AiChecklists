@@ -20,7 +20,7 @@ sealed interface ChecklistDetailState : State {
         val isCreatingFill: Boolean = false,
         val userLimits: UserLimits? = null,
         val showFillLimitDialog: Boolean = false,
-        val noteDialogItemIndex: Int? = null,
+        val noteDialogItemId: String? = null,
         val editingNote: String = "",
         val showFillTargetSheet: Boolean = false,
         val showReminderSheet: Boolean = false,
@@ -29,7 +29,9 @@ sealed interface ChecklistDetailState : State {
         val showExactAlarmSheet: Boolean = false,
         val exactAlarmDontShowAgain: Boolean = false,
         val showNotificationPermissionSheet: Boolean = false,
-        val snackbarMessage: String? = null
+        val snackbarMessage: String? = null,
+        val showOverflowSheet: Boolean = false,
+        val separateCompleted: Boolean = false
     ) : ChecklistDetailState
 }
 
@@ -43,9 +45,10 @@ sealed interface ChecklistDetailIntent : Intent {
     data object OnConfirmDeleteChecklist : ChecklistDetailIntent
     data object OnDismissDeleteConfirmation : ChecklistDetailIntent
 
-    // Item actions (for default fill)
-    data class OnItemCheckedChange(val index: Int, val checked: Boolean) : ChecklistDetailIntent
-    data class OnAddNoteClick(val index: Int) : ChecklistDetailIntent
+    // Item actions (for default fill) — id-based for safe partition support
+    data class OnItemCheckedChange(val itemId: String, val checked: Boolean) : ChecklistDetailIntent
+    data class OnAddNoteClick(val itemId: String) : ChecklistDetailIntent
+    data class OnAddItem(val text: String) : ChecklistDetailIntent
     data class OnNoteChanged(val note: String) : ChecklistDetailIntent
     data object OnSaveNote : ChecklistDetailIntent
     data object OnDismissNoteDialog : ChecklistDetailIntent
@@ -80,6 +83,11 @@ sealed interface ChecklistDetailIntent : Intent {
     data class OnNotificationPermissionResult(val granted: Boolean) : ChecklistDetailIntent
     data object OnNotificationPermissionSkip : ChecklistDetailIntent
     data object OnDismissNotificationPermissionSheet : ChecklistDetailIntent
+
+    // Overflow menu
+    data object OnOverflowMenuClick : ChecklistDetailIntent
+    data object OnDismissOverflowSheet : ChecklistDetailIntent
+    data object OnToggleSeparateCompleted : ChecklistDetailIntent
 
     // Exact alarm permission
     data object OnExactAlarmOpenSettings : ChecklistDetailIntent

@@ -179,6 +179,13 @@
     <string name="checklist_add_fill_dialog_title">New Fill</string>
     <string name="checklist_fill_name_label">Fill name</string>
     <string name="checklist_fill_name_placeholder">e.g., Apartment on Main St</string>
+    <string name="more_options">More options</string>
+    <string name="separate_completed">Separate completed</string>
+    <string name="completed_count">Completed (%1$d)</string>
+    <string name="delete_checklist">Delete checklist</string>
+    <string name="collapse">Collapse</string>
+    <string name="expand">Expand</string>
+
     <string name="checklist_fill_delete_title">Delete Fill?</string>
     <string name="checklist_fill_delete_message">Are you sure you want to delete "%1$s"? This action cannot be undone.</string>
 

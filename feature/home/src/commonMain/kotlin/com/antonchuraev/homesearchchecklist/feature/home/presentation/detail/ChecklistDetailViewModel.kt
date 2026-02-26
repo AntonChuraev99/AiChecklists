@@ -90,7 +90,8 @@ class ChecklistDetailViewModel(
                 checklist = checklist,
                 defaultFill = defaultFill,
                 additionalFillsCount = additionalFillsCount,
-                userLimits = null
+                userLimits = null,
+                separateCompleted = checklist.separateCompleted
             )
         }
     }
@@ -103,11 +104,12 @@ class ChecklistDetailViewModel(
             ChecklistDetailIntent.OnDeleteChecklistClick -> updateContentState { it.copy(showDeleteConfirmation = true) }
             ChecklistDetailIntent.OnConfirmDeleteChecklist -> deleteChecklist()
             ChecklistDetailIntent.OnDismissDeleteConfirmation -> updateContentState { it.copy(showDeleteConfirmation = false) }
-            is ChecklistDetailIntent.OnItemCheckedChange -> updateItemChecked(intent.index, intent.checked)
-            is ChecklistDetailIntent.OnAddNoteClick -> openNoteDialog(intent.index)
+            is ChecklistDetailIntent.OnItemCheckedChange -> updateItemChecked(intent.itemId, intent.checked)
+            is ChecklistDetailIntent.OnAddNoteClick -> openNoteDialog(intent.itemId)
+            is ChecklistDetailIntent.OnAddItem -> addItem(intent.text)
             is ChecklistDetailIntent.OnNoteChanged -> updateContentState { it.copy(editingNote = intent.note) }
             ChecklistDetailIntent.OnSaveNote -> saveNote()
-            ChecklistDetailIntent.OnDismissNoteDialog -> updateContentState { it.copy(noteDialogItemIndex = null, editingNote = "") }
+            ChecklistDetailIntent.OnDismissNoteDialog -> updateContentState { it.copy(noteDialogItemId = null, editingNote = "") }
             ChecklistDetailIntent.OnViewAllFillsClick -> navigator.navigateToFillsList(checklistId)
             ChecklistDetailIntent.OnAddFillClick -> handleAddFillClick()
             ChecklistDetailIntent.OnAddFillViaAiClick -> handleAddFillViaAiClick()
@@ -122,6 +124,11 @@ class ChecklistDetailViewModel(
                 updateContentState { it.copy(showFillLimitDialog = false) }
                 navigator.navigateToPaywall(source = "detail_fill_limit")
             }
+
+            // Overflow menu
+            ChecklistDetailIntent.OnOverflowMenuClick -> updateContentState { it.copy(showOverflowSheet = true) }
+            ChecklistDetailIntent.OnDismissOverflowSheet -> updateContentState { it.copy(showOverflowSheet = false) }
+            ChecklistDetailIntent.OnToggleSeparateCompleted -> toggleSeparateCompleted()
 
             // Notification permission
             is ChecklistDetailIntent.OnNotificationPermissionResult -> handleNotificationPermissionResult()
@@ -176,20 +183,20 @@ class ChecklistDetailViewModel(
         }
     }
 
-    private fun openNoteDialog(itemIndex: Int) {
+    private fun openNoteDialog(itemId: String) {
         val state = _screenState.value
         if (state is ChecklistDetailState.Content && state.defaultFill != null) {
-            val currentNote = state.defaultFill.items.getOrNull(itemIndex)?.note.orEmpty()
-            updateContentState { it.copy(noteDialogItemIndex = itemIndex, editingNote = currentNote) }
+            val currentNote = state.defaultFill.items.firstOrNull { it.id == itemId }?.note.orEmpty()
+            updateContentState { it.copy(noteDialogItemId = itemId, editingNote = currentNote) }
         }
     }
 
-    private fun updateItemChecked(index: Int, checked: Boolean) {
+    private fun updateItemChecked(itemId: String, checked: Boolean) {
         val state = _screenState.value
         if (state !is ChecklistDetailState.Content || state.defaultFill == null) return
 
-        val updatedItems = state.defaultFill.items.mapIndexed { i, item ->
-            if (i == index) item.withChecked(checked) else item
+        val updatedItems = state.defaultFill.items.map { item ->
+            if (item.id == itemId) item.withChecked(checked) else item
         }
 
         val updatedFill = state.defaultFill.copy(items = updatedItems)
@@ -202,10 +209,10 @@ class ChecklistDetailViewModel(
     private fun saveNote() {
         val state = _screenState.value
         if (state !is ChecklistDetailState.Content || state.defaultFill == null) return
-        val itemIndex = state.noteDialogItemIndex ?: return
+        val itemId = state.noteDialogItemId ?: return
 
-        val updatedItems = state.defaultFill.items.mapIndexed { i, item ->
-            if (i == itemIndex) {
+        val updatedItems = state.defaultFill.items.map { item ->
+            if (item.id == itemId) {
                 item.withNote(state.editingNote.takeIf { it.isNotBlank() })
             } else {
                 item
@@ -216,7 +223,35 @@ class ChecklistDetailViewModel(
 
         viewModelScope.launch {
             repository.updateFill(updatedFill)
-            updateContentState { it.copy(noteDialogItemIndex = null, editingNote = "") }
+            updateContentState { it.copy(noteDialogItemId = null, editingNote = "") }
+        }
+    }
+
+    private fun toggleSeparateCompleted() {
+        val current = (_screenState.value as? ChecklistDetailState.Content)?.separateCompleted ?: false
+        val newValue = !current
+        updateContentState { it.copy(separateCompleted = newValue) }
+        viewModelScope.launch {
+            repository.setSeparateCompleted(checklistId, newValue)
+        }
+        analyticsTracker.event(
+            "separate_completed_toggled",
+            mapOf("enabled" to newValue.toString())
+        )
+    }
+
+    private fun addItem(text: String) {
+        val state = _screenState.value as? ChecklistDetailState.Content ?: return
+        val fill = state.defaultFill ?: return
+        val trimmed = text.trim()
+        if (trimmed.isEmpty()) return
+
+        val newItem = ChecklistFillItem(text = trimmed, checked = false, note = null)
+        val updatedFill = fill.copy(items = fill.items + newItem)
+
+        viewModelScope.launch {
+            repository.updateFill(updatedFill)
+            analyticsTracker.event("item_added_quick")
         }
     }
 

@@ -72,6 +72,11 @@ class ChecklistRepositoryImpl(
         return checklistDao.getById(id)?.toDomain()
     }
 
+    // Display preferences
+    override suspend fun setSeparateCompleted(checklistId: Long, value: Boolean) {
+        checklistDao.setSeparateCompleted(checklistId, value)
+    }
+
     // Reminders
     override suspend fun setReminder(checklistId: Long, reminderAt: Long?) {
         checklistDao.updateReminder(checklistId, reminderAt)

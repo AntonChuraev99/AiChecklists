@@ -10,9 +10,10 @@ data class ChecklistEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0L,
     val name: String,
     val items: List<ChecklistItem>,
-    val reminderAt: Long? = null
+    val reminderAt: Long? = null,
+    val separateCompleted: Boolean = false
 )
 
-fun ChecklistEntity.toDomain() = Checklist(id, name, items, reminderAt)
-fun Checklist.toEntity() = ChecklistEntity(id, name, items, reminderAt)
+fun ChecklistEntity.toDomain() = Checklist(id, name, items, reminderAt, separateCompleted)
+fun Checklist.toEntity() = ChecklistEntity(id, name, items, reminderAt, separateCompleted)
 
