@@ -205,10 +205,13 @@ private fun ChecklistDetailContent(
         actions = {
             IconButton(
                 onClick = {
-                    addItemActive = true
-                    coroutineScope.launch {
-                        // Scroll to inline_add_item which is after header + progress + items
-                        listState.animateScrollToItem(listState.layoutInfo.totalItemsCount - 1)
+                    if (addItemActive) {
+                        addItemActive = false
+                    } else {
+                        addItemActive = true
+                        coroutineScope.launch {
+                            listState.animateScrollToItem(listState.layoutInfo.totalItemsCount - 1)
+                        }
                     }
                 }
             ) {
@@ -1478,12 +1481,12 @@ private fun InlineAddItemInput(
         focusRequester.requestFocus()
     }
 
-    // Track keyboard visibility: when keyboard hides via system back, clear focus
+    // Track keyboard visibility: when keyboard hides via system back, close input
     LaunchedEffect(imeBottom) {
         val isKeyboardVisible = imeBottom > 0
         if (wasKeyboardVisible && !isKeyboardVisible) {
             focusManager.clearFocus()
-            if (text.isBlank()) onClose()
+            onClose()
         }
         wasKeyboardVisible = isKeyboardVisible
     }
