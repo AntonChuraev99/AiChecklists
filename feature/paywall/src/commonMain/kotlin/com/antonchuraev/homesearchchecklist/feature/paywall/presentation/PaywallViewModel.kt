@@ -7,6 +7,7 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavRoute
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.paywall.data.PaywallConfig
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallException
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PurchaseResult
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.RestoreResult
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetOfferingsUseCase
@@ -24,10 +25,13 @@ class PaywallViewModel(
     private val getOfferingsUseCase: GetOfferingsUseCase,
     private val purchaseProductUseCase: PurchaseProductUseCase,
     private val restorePurchasesUseCase: RestorePurchasesUseCase,
-    private val analyticsTracker: AnalyticsTracker
+    private val analyticsTracker: AnalyticsTracker,
+    sourceOverride: String? = null
 ) : AppViewModel<PaywallState, PaywallIntent, Nothing>() {
 
-    private val source: String = savedStateHandle[AppNavRoute.Paywall::source.name] ?: "unknown"
+    private val source: String = sourceOverride
+        ?: savedStateHandle[AppNavRoute.Paywall::source.name]
+        ?: "unknown"
 
     private val _screenState = MutableStateFlow(PaywallState(source = source))
     override val screenState: StateFlow<PaywallState> = _screenState.asStateFlow()
@@ -60,6 +64,10 @@ class PaywallViewModel(
                     var products = offering?.products ?: emptyList()
 
                     if (products.isEmpty()) {
+                        analyticsTracker.event("products_load_empty", mapOf(
+                            "source" to source,
+                            "reason" to if (offering == null) "no_current_offering" else "empty_packages"
+                        ))
                         handleEmptyProducts()
                         return@launch
                     }
@@ -88,10 +96,15 @@ class PaywallViewModel(
                     }
                 }
                 .onFailure { error ->
-                    analyticsTracker.event("products_load_failed", mapOf(
+                    val params = mutableMapOf(
                         "source" to source,
-                        "error" to (error.message ?: "unknown")
-                    ))
+                        "error" to (error.message ?: "unknown").take(100)
+                    )
+                    if (error is PaywallException) {
+                        params["error_code"] = error.errorCode.name
+                        params["underlying_error"] = (error.underlyingError ?: "none").take(100)
+                    }
+                    analyticsTracker.event("products_load_failed", params)
                     handleEmptyProducts()
                 }
         }
@@ -147,7 +160,9 @@ class PaywallViewModel(
                     analyticsTracker.event("purchase_failed", mapOf(
                         "source" to source,
                         "product_id" to selectedProduct.id,
-                        "error" to (result.message ?: "unknown")
+                        "error" to (result.message).take(100),
+                        "error_code" to (result.errorCode ?: "unknown"),
+                        "underlying_error" to (result.underlyingError ?: "none").take(100)
                     ))
                     _screenState.update {
                         it.copy(isPurchasing = false, error = result.message)
@@ -181,7 +196,9 @@ class PaywallViewModel(
                 is RestoreResult.Error -> {
                     analyticsTracker.event("restore_failed", mapOf(
                         "source" to source,
-                        "error" to (result.message ?: "unknown")
+                        "error" to (result.message).take(100),
+                        "error_code" to (result.errorCode ?: "unknown"),
+                        "underlying_error" to (result.underlyingError ?: "none").take(100)
                     ))
                     _screenState.update {
                         it.copy(isPurchasing = false, error = result.message)

@@ -2,6 +2,8 @@ package com.antonchuraev.homesearchchecklist.feature.paywall.data.repository
 
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.Entitlements
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.LoginResult
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallErrorCode
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallException
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallOffering
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallProduct
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PurchaseResult
@@ -10,15 +12,18 @@ import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.Subscri
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.repository.PaywallRepository
 import com.revenuecat.purchases.kmp.Purchases
 import com.revenuecat.purchases.kmp.PurchasesDelegate
-import com.revenuecat.purchases.kmp.models.PurchasesError
 import com.revenuecat.purchases.kmp.models.CustomerInfo
 import com.revenuecat.purchases.kmp.models.Package
+import com.revenuecat.purchases.kmp.models.PurchasesError
+import com.revenuecat.purchases.kmp.models.PurchasesErrorCode
 import com.revenuecat.purchases.kmp.models.StoreProduct
 import com.revenuecat.purchases.kmp.models.StoreTransaction
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.coroutines.resume
 
 class PaywallRepositoryImpl : PaywallRepository {
@@ -26,7 +31,9 @@ class PaywallRepositoryImpl : PaywallRepository {
     private val _subscriptionStatus = MutableStateFlow(SubscriptionStatus.FREE)
     override val subscriptionStatus: Flow<SubscriptionStatus> = _subscriptionStatus.asStateFlow()
 
+    @Volatile
     private var cachedPackages: Map<String, Package> = emptyMap()
+    private val packagesMutex = Mutex()
     private var listenerRegistered = false
 
     /**
@@ -54,7 +61,12 @@ class PaywallRepositoryImpl : PaywallRepository {
 
     override suspend fun getOfferings(): Result<PaywallOffering?> {
         if (!isConfigured()) {
-            return Result.failure(IllegalStateException("RevenueCat not configured"))
+            return Result.failure(
+                PaywallException(
+                    errorCode = PaywallErrorCode.NOT_CONFIGURED,
+                    message = "RevenueCat not configured"
+                )
+            )
         }
 
         // Ensure listener is set up for pending purchase updates
@@ -63,7 +75,7 @@ class PaywallRepositoryImpl : PaywallRepository {
         return suspendCancellableCoroutine { continuation ->
             Purchases.sharedInstance.getOfferings(
                 onError = { error ->
-                    continuation.resume(Result.failure(Exception(error.message)))
+                    continuation.resume(Result.failure(error.toPaywallException()))
                 },
                 onSuccess = { offerings ->
                     val currentOffering = offerings.current
@@ -136,7 +148,7 @@ class PaywallRepositoryImpl : PaywallRepository {
             return PurchaseResult.Error("RevenueCat not configured")
         }
 
-        val packageToPurchase = cachedPackages[packageId]
+        val packageToPurchase = packagesMutex.withLock { cachedPackages[packageId] }
             ?: return PurchaseResult.Error("Package not found: $packageId")
 
         return suspendCancellableCoroutine { continuation ->
@@ -146,7 +158,13 @@ class PaywallRepositoryImpl : PaywallRepository {
                     if (userCancelled) {
                         continuation.resume(PurchaseResult.Cancelled)
                     } else {
-                        continuation.resume(PurchaseResult.Error(error.message))
+                        continuation.resume(
+                            PurchaseResult.Error(
+                                message = error.message,
+                                errorCode = error.code.name,
+                                underlyingError = error.underlyingErrorMessage
+                            )
+                        )
                     }
                 },
                 onSuccess = { _: StoreTransaction, customerInfo: CustomerInfo ->
@@ -166,7 +184,13 @@ class PaywallRepositoryImpl : PaywallRepository {
         return suspendCancellableCoroutine { continuation ->
             Purchases.sharedInstance.restorePurchases(
                 onError = { error ->
-                    continuation.resume(RestoreResult.Error(error.message))
+                    continuation.resume(
+                        RestoreResult.Error(
+                            message = error.message,
+                            errorCode = error.code.name,
+                            underlyingError = error.underlyingErrorMessage
+                        )
+                    )
                 },
                 onSuccess = { customerInfo ->
                     val status = customerInfo.toSubscriptionStatus()
@@ -223,14 +247,19 @@ class PaywallRepositoryImpl : PaywallRepository {
 
     override suspend fun logIn(appUserId: String): Result<LoginResult> {
         if (!isConfigured()) {
-            return Result.failure(IllegalStateException("RevenueCat not configured"))
+            return Result.failure(
+                PaywallException(
+                    errorCode = PaywallErrorCode.NOT_CONFIGURED,
+                    message = "RevenueCat not configured"
+                )
+            )
         }
 
         return suspendCancellableCoroutine { continuation ->
             Purchases.sharedInstance.logIn(
                 newAppUserID = appUserId,
                 onError = { error ->
-                    continuation.resume(Result.failure(Exception(error.message)))
+                    continuation.resume(Result.failure(error.toPaywallException()))
                 },
                 onSuccess = { customerInfo, created ->
                     val status = customerInfo.toSubscriptionStatus()
@@ -250,13 +279,18 @@ class PaywallRepositoryImpl : PaywallRepository {
 
     override suspend fun logOut(): Result<SubscriptionStatus> {
         if (!isConfigured()) {
-            return Result.failure(IllegalStateException("RevenueCat not configured"))
+            return Result.failure(
+                PaywallException(
+                    errorCode = PaywallErrorCode.NOT_CONFIGURED,
+                    message = "RevenueCat not configured"
+                )
+            )
         }
 
         return suspendCancellableCoroutine { continuation ->
             Purchases.sharedInstance.logOut(
                 onError = { error ->
-                    continuation.resume(Result.failure(Exception(error.message)))
+                    continuation.resume(Result.failure(error.toPaywallException()))
                 },
                 onSuccess = { customerInfo ->
                     val status = customerInfo.toSubscriptionStatus()
@@ -265,5 +299,23 @@ class PaywallRepositoryImpl : PaywallRepository {
                 }
             )
         }
+    }
+
+    private fun PurchasesError.toPaywallException(): PaywallException {
+        val errorCode = when (code) {
+            PurchasesErrorCode.NetworkError -> PaywallErrorCode.NETWORK_ERROR
+            PurchasesErrorCode.OfflineConnectionError -> PaywallErrorCode.OFFLINE
+            PurchasesErrorCode.StoreProblemError -> PaywallErrorCode.STORE_PROBLEM
+            PurchasesErrorCode.UnknownBackendError -> PaywallErrorCode.UNKNOWN_BACKEND
+            PurchasesErrorCode.ConfigurationError -> PaywallErrorCode.CONFIGURATION_ERROR
+            PurchasesErrorCode.InvalidCredentialsError -> PaywallErrorCode.INVALID_CREDENTIALS
+            PurchasesErrorCode.ProductNotAvailableForPurchaseError -> PaywallErrorCode.PRODUCT_NOT_AVAILABLE
+            else -> PaywallErrorCode.UNKNOWN
+        }
+        return PaywallException(
+            errorCode = errorCode,
+            underlyingError = underlyingErrorMessage,
+            message = message
+        )
     }
 }

@@ -46,6 +46,10 @@ kotlin {
             implementation(libs.revenuecat.purchases.core)
             implementation(libs.revenuecat.purchases.result)
         }
+        commonTest.dependencies {
+            implementation(libs.kotlin.test)
+            implementation(libs.kotlinx.coroutines.test)
+        }
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)
         }

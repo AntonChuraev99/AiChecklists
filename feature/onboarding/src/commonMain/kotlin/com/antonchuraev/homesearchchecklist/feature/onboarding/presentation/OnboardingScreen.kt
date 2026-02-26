@@ -64,6 +64,7 @@ import org.jetbrains.compose.resources.stringResource
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
+import org.koin.core.parameter.parametersOf
 
 data class OnboardingPage(
     val titleRes: StringResource,
@@ -79,7 +80,10 @@ private const val PAYWALL_PAGE_INDEX = 3
 @Composable
 fun OnboardingScreen(
     viewModel: OnboardingViewModel = koinViewModel(),
-    paywallViewModel: PaywallViewModel = koinViewModel()
+    paywallViewModel: PaywallViewModel = koinViewModel(
+        key = "onboarding_paywall",
+        parameters = { parametersOf("onboarding_trial") }
+    )
 ) {
     val analyticsTracker: AnalyticsTracker = koinInject()
     LaunchedEffect(Unit) { analyticsTracker.screenView("onboarding") }

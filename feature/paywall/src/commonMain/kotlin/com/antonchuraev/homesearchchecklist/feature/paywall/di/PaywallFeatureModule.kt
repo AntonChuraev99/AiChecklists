@@ -9,6 +9,7 @@ import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.Purch
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.RestorePurchasesUseCase
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.PaywallViewModel
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.SubscriptionStatusViewModel
+import org.koin.core.module.dsl.viewModel
 import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
 
@@ -23,6 +24,16 @@ val paywallFeatureModule = module {
     factory { GetUserLimitsUseCase(get(), get(), get()) }
 
     // ViewModels
-    viewModelOf(::PaywallViewModel)
+    viewModel { params ->
+        PaywallViewModel(
+            savedStateHandle = get(),
+            navigator = get(),
+            getOfferingsUseCase = get(),
+            purchaseProductUseCase = get(),
+            restorePurchasesUseCase = get(),
+            analyticsTracker = get(),
+            sourceOverride = params.getOrNull<String>()
+        )
+    }
     viewModelOf(::SubscriptionStatusViewModel)
 }
