@@ -13,6 +13,9 @@ interface ChecklistRepository {
     suspend fun deleteChecklist(checklist: Checklist)
     suspend fun getChecklistById(id: Long): Checklist?
 
+    // Display preferences
+    suspend fun setSeparateCompleted(checklistId: Long, value: Boolean)
+
     // Reminders
     suspend fun setReminder(checklistId: Long, reminderAt: Long?)
     suspend fun countActiveReminders(): Int

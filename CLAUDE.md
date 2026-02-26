@@ -161,11 +161,27 @@ Located in `core/designsystem/`. Style: **Minimal & Clean** with white backgroun
 ### Spacing (theme/Dimens.kt)
 `AppDimens` constants: `SpacingXs` (4dp), `SpacingSm` (8dp), `SpacingMd` (12dp), `SpacingLg` (16dp), `SpacingXl` (24dp), `SpacingXxl` (32dp).
 
+### Component Naming Convention
+
+| Category | Prefix | Location | Examples |
+|----------|--------|----------|----------|
+| Material3 wrappers | `App` | `components/` | `AppButton`, `AppCard`, `AppSwitch` |
+| Layout containers | `App` | `containers/` | `AppScaffold` |
+| Compound/semantic | Descriptive name | `components/` | `EmptyState`, `AddItemInputField` |
+| Feature illustrations | Descriptive name | `illustrations/` | `CreateViaAiIllustration` |
+
+**Rules:**
+- Wrapping a single Material3 widget → `App` + widget name (`AppSwitch`, `AppTextField`)
+- Composing multiple widgets into a reusable pattern → descriptive name (`EmptyState`, `AddItemInputField`)
+- Always use design system components instead of raw Material3 when available (e.g. `AppSwitch` not `Switch`)
+
 ### Components
-- `AppButton` / `AppButtonSecondary` / `AppButtonText`
+- `AppButton` / `AppButtonSecondary` / `AppButtonText` / `AppButtonDestructive`
 - `AppCard` - 12dp corners, 2dp elevation
-- `AppTextField` - outlined text field
+- `AppSwitch` - switch with visible unchecked track (outlineVariant)
+- `AppTextField` - outlined text field with keyboard options support
 - `EmptyState` - centered icon + title + description
+- `AddItemInputField` - inline text input + add button
 - `AppScaffold` - screen wrapper with top bar (auto-handles system insets)
 
 ### System Insets (Edge-to-Edge)

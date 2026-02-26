@@ -17,9 +17,15 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
     }
 }
 
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(connection: SQLiteConnection) {
+        connection.execSQL("ALTER TABLE checklists ADD COLUMN separateCompleted INTEGER NOT NULL DEFAULT 0")
+    }
+}
+
 @Database(
     entities = [ChecklistEntity::class, ChecklistFillEntity::class],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(ChecklistItemConverters::class)
@@ -33,7 +39,7 @@ abstract class ChecklistDatabase : RoomDatabase() {
             builder: Builder<ChecklistDatabase>
         ): ChecklistDatabase {
             return builder
-                .addMigrations(MIGRATION_3_4)
+                .addMigrations(MIGRATION_3_4, MIGRATION_4_5)
                 .fallbackToDestructiveMigration(dropAllTables = false)
                 .setQueryCoroutineContext(Dispatchers.IO)
                 .build()

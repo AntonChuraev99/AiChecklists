@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,14 +22,22 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Surface
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.filled.Notifications
@@ -59,16 +68,29 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppSwitch
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
@@ -90,6 +112,7 @@ import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import kotlinx.coroutines.launch
 import kotlinx.datetime.*
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
@@ -172,10 +195,28 @@ private fun ChecklistDetailContent(
         onIntent(ChecklistDetailIntent.OnSnackbarDismissed)
     }
 
+    var addItemActive by remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+
     AppScaffold(
         onBackButtonClick = { onIntent(ChecklistDetailIntent.OnBackClick) },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         actions = {
+            IconButton(
+                onClick = {
+                    addItemActive = true
+                    coroutineScope.launch {
+                        // Scroll to inline_add_item which is after header + progress + items
+                        listState.animateScrollToItem(listState.layoutInfo.totalItemsCount - 1)
+                    }
+                }
+            ) {
+                Icon(
+                    Icons.Outlined.Add,
+                    contentDescription = stringResource(Res.string.add_item)
+                )
+            }
             IconButton(onClick = { onIntent(ChecklistDetailIntent.OnReminderClick) }) {
                 Icon(
                     imageVector = if (state.checklist.reminderAt != null)
@@ -195,11 +236,10 @@ private fun ChecklistDetailContent(
             IconButton(onClick = { onIntent(ChecklistDetailIntent.OnEditChecklistClick) }) {
                 Icon(Icons.Outlined.Edit, contentDescription = stringResource(Res.string.checklist_edit))
             }
-            IconButton(onClick = { onIntent(ChecklistDetailIntent.OnDeleteChecklistClick) }) {
+            IconButton(onClick = { onIntent(ChecklistDetailIntent.OnOverflowMenuClick) }) {
                 Icon(
-                    Icons.Outlined.Delete,
-                    contentDescription = stringResource(Res.string.delete),
-                    tint = MaterialTheme.colorScheme.error
+                    Icons.Filled.MoreVert,
+                    contentDescription = stringResource(Res.string.more_options)
                 )
             }
         },
@@ -244,7 +284,22 @@ private fun ChecklistDetailContent(
                 CircularProgressIndicator()
             }
         } else {
+            val uncheckedItems by remember(defaultFill.items, state.separateCompleted) {
+                derivedStateOf {
+                    if (state.separateCompleted) defaultFill.items.filter { !it.checked }
+                    else defaultFill.items
+                }
+            }
+            val completedItems by remember(defaultFill.items, state.separateCompleted) {
+                derivedStateOf {
+                    if (state.separateCompleted) defaultFill.items.filter { it.checked }
+                    else emptyList()
+                }
+            }
+            var completedExpanded by remember { mutableStateOf(true) }
+
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = AppDimens.ScreenPaddingHorizontal),
@@ -275,18 +330,58 @@ private fun ChecklistDetailContent(
                     }
                 }
 
-                // Checklist items
-                itemsIndexed(
-                    items = defaultFill.items,
-                    key = { _, item -> item.id }
-                ) { index, item ->
+                // Unchecked items (or all items when separateCompleted is off)
+                items(
+                    count = uncheckedItems.size,
+                    key = { uncheckedItems[it].id }
+                ) { index ->
+                    val item = uncheckedItems[index]
                     ChecklistItemCard(
                         item = item,
                         onCheckedChange = { checked ->
-                            onIntent(ChecklistDetailIntent.OnItemCheckedChange(index, checked))
+                            onIntent(ChecklistDetailIntent.OnItemCheckedChange(item.id, checked))
                         },
-                        onNoteClick = { onIntent(ChecklistDetailIntent.OnAddNoteClick(index)) }
+                        onNoteClick = { onIntent(ChecklistDetailIntent.OnAddNoteClick(item.id)) },
+                        modifier = Modifier.animateItem()
                     )
+                }
+
+                // Inline add item input (shown when toolbar "+" is tapped)
+                if (addItemActive) {
+                    item(key = "inline_add_item") {
+                        InlineAddItemInput(
+                            onAddItem = { onIntent(ChecklistDetailIntent.OnAddItem(it)) },
+                            onClose = { addItemActive = false }
+                        )
+                    }
+                }
+
+                // Completed section (only when separateCompleted is on and there are completed items)
+                if (state.separateCompleted && completedItems.isNotEmpty()) {
+                    item(key = "completed_header") {
+                        CompletedSectionHeader(
+                            completedCount = completedItems.size,
+                            expanded = completedExpanded,
+                            onToggle = { completedExpanded = !completedExpanded }
+                        )
+                    }
+
+                    if (completedExpanded) {
+                        items(
+                            count = completedItems.size,
+                            key = { completedItems[it].id }
+                        ) { index ->
+                            val item = completedItems[index]
+                            ChecklistItemCard(
+                                item = item,
+                                onCheckedChange = { checked ->
+                                    onIntent(ChecklistDetailIntent.OnItemCheckedChange(item.id, checked))
+                                },
+                                onNoteClick = { onIntent(ChecklistDetailIntent.OnAddNoteClick(item.id)) },
+                                modifier = Modifier.animateItem()
+                            )
+                        }
+                    }
                 }
 
                 // Bottom spacing for the fixed buttons
@@ -298,7 +393,7 @@ private fun ChecklistDetailContent(
     }
 
     // Note dialog
-    if (state.noteDialogItemIndex != null) {
+    if (state.noteDialogItemId != null) {
         NoteDialog(
             note = state.editingNote,
             onNoteChanged = { onIntent(ChecklistDetailIntent.OnNoteChanged(it)) },
@@ -387,6 +482,19 @@ private fun ChecklistDetailContent(
             onOpenSettings = { onIntent(ChecklistDetailIntent.OnExactAlarmOpenSettings) },
             onSkip = { onIntent(ChecklistDetailIntent.OnExactAlarmSkip) },
             onDismiss = { onIntent(ChecklistDetailIntent.OnDismissExactAlarmSheet) }
+        )
+    }
+
+    // Overflow menu bottom sheet
+    if (state.showOverflowSheet) {
+        OverflowMenuSheet(
+            separateCompleted = state.separateCompleted,
+            onToggleSeparateCompleted = { onIntent(ChecklistDetailIntent.OnToggleSeparateCompleted) },
+            onDeleteClick = {
+                onIntent(ChecklistDetailIntent.OnDismissOverflowSheet)
+                onIntent(ChecklistDetailIntent.OnDeleteChecklistClick)
+            },
+            onDismiss = { onIntent(ChecklistDetailIntent.OnDismissOverflowSheet) }
         )
     }
 }
@@ -515,10 +623,12 @@ private fun ViewAllFillsCard(
 private fun ChecklistItemCard(
     item: ChecklistFillItem,
     onCheckedChange: (Boolean) -> Unit,
-    onNoteClick: () -> Unit
+    onNoteClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     AppCard(
-        onClick = { onCheckedChange(!item.checked) }
+        onClick = { onCheckedChange(!item.checked) },
+        modifier = modifier
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Row(
@@ -1241,4 +1351,181 @@ fun combinePickerResults(datePickerMillis: Long, hour: Int, minute: Int): Long {
     val localDate = utcMidnight.toLocalDateTime(TimeZone.UTC).date
     val localDateTime = LocalDateTime(localDate, LocalTime(hour, minute))
     return localDateTime.toInstant(TimeZone.currentSystemDefault()).toEpochMilliseconds()
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun OverflowMenuSheet(
+    separateCompleted: Boolean,
+    onToggleSeparateCompleted: () -> Unit,
+    onDeleteClick: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
+                .padding(bottom = AppDimens.SpacingXxl)
+        ) {
+            // Separate completed toggle
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onToggleSeparateCompleted() }
+                    .padding(vertical = AppDimens.SpacingMd),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.CheckCircle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(AppDimens.SpacingMd))
+                Text(
+                    text = stringResource(Res.string.separate_completed),
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.weight(1f)
+                )
+                AppSwitch(
+                    checked = separateCompleted,
+                    onCheckedChange = null
+                )
+            }
+
+            HorizontalDivider()
+
+            // Delete checklist
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onDeleteClick() }
+                    .padding(vertical = AppDimens.SpacingMd),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Delete,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(AppDimens.SpacingMd))
+                Text(
+                    text = stringResource(Res.string.delete_checklist),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CompletedSectionHeader(
+    completedCount: Int,
+    expanded: Boolean,
+    onToggle: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onToggle() }
+            .padding(vertical = AppDimens.SpacingSm),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Filled.CheckCircle,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(modifier = Modifier.width(AppDimens.SpacingSm))
+        Text(
+            text = stringResource(Res.string.completed_count, completedCount),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f)
+        )
+        Icon(
+            imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+            contentDescription = if (expanded) {
+                stringResource(Res.string.collapse)
+            } else {
+                stringResource(Res.string.expand)
+            },
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun InlineAddItemInput(
+    onAddItem: (String) -> Unit,
+    onClose: () -> Unit
+) {
+    var text by remember { mutableStateOf("") }
+    val focusRequester = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
+    val density = LocalDensity.current
+    val imeBottom = WindowInsets.ime.getBottom(density)
+    var wasKeyboardVisible by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+    }
+
+    // Track keyboard visibility: when keyboard hides via system back, clear focus
+    LaunchedEffect(imeBottom) {
+        val isKeyboardVisible = imeBottom > 0
+        if (wasKeyboardVisible && !isKeyboardVisible) {
+            focusManager.clearFocus()
+            if (text.isBlank()) onClose()
+        }
+        wasKeyboardVisible = isKeyboardVisible
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        AppTextField(
+            value = text,
+            onValueChange = { text = it },
+            placeholder = stringResource(Res.string.add_item_placeholder),
+            modifier = Modifier
+                .weight(1f)
+                .focusRequester(focusRequester),
+            keyboardOptions = KeyboardOptions(
+                imeAction = ImeAction.Done,
+                capitalization = KeyboardCapitalization.Sentences
+            ),
+            keyboardActions = KeyboardActions(
+                onDone = {
+                    if (text.isNotBlank()) {
+                        onAddItem(text)
+                        text = ""
+                    }
+                }
+            )
+        )
+        IconButton(
+            onClick = {
+                if (text.isNotBlank()) {
+                    onAddItem(text)
+                    text = ""
+                } else {
+                    onClose()
+                }
+            }
+        ) {
+            Icon(
+                imageVector = if (text.isNotBlank()) Icons.Outlined.Check else Icons.Outlined.Add,
+                contentDescription = stringResource(Res.string.add_item)
+            )
+        }
+    }
 }
