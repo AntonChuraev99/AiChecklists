@@ -372,3 +372,130 @@ class TestParseGeminiJson:
         main = _import_main
         with pytest.raises(json.JSONDecodeError):
             main.parse_gemini_json("not json at all")
+
+
+# ===========================================================================
+# P0: Refill verifies subscription via RevenueCat
+# ===========================================================================
+
+class TestRefillPremiumCredits:
+    """Tests for refill_premium_credits with RevenueCat verification."""
+
+    def _make_user_doc(self, user_id, ai_credits=100, is_premium=True):
+        """Create a mock Firestore user document."""
+        doc = MagicMock()
+        doc.id = user_id
+        doc.to_dict.return_value = {
+            "is_premium": is_premium,
+            "ai_credits": ai_credits
+        }
+        doc.reference = MagicMock()
+        return doc
+
+    def test_refills_verified_user(self, _import_main):
+        """User with active RevenueCat subscription gets credits refilled."""
+        main = _import_main
+
+        user_doc = self._make_user_doc("user-1", ai_credits=50)
+        main.db.collection.return_value.where.return_value.get.return_value = [user_doc]
+        main.db.collection.return_value.add = MagicMock()
+
+        with patch.object(main, "verify_premium_with_revenuecat", return_value=main.VERIFIED):
+            with patch.object(main, "get_credits_config", return_value={
+                "initial_credits": 100, "action_cost": 30, "premium_daily_credits_cap": 300
+            }):
+                with app.test_request_context():
+                    req = make_request({})
+                    response = main.refill_premium_credits(req)
+                    if isinstance(response, tuple):
+                        data = response[0].get_json()
+                    else:
+                        data = response.get_json()
+
+                    assert data["users_updated"] == 1
+                    assert data["users_expired"] == 0
+                    user_doc.reference.update.assert_called_once()
+                    update_args = user_doc.reference.update.call_args[0][0]
+                    assert update_args["ai_credits"] == 300
+
+    def test_expires_unverified_user(self, _import_main):
+        """User with expired subscription gets is_premium set to False."""
+        main = _import_main
+
+        user_doc = self._make_user_doc("user-expired", ai_credits=200)
+        main.db.collection.return_value.where.return_value.get.return_value = [user_doc]
+        main.db.collection.return_value.add = MagicMock()
+
+        with patch.object(main, "verify_premium_with_revenuecat", return_value=main.NOT_VERIFIED):
+            with patch.object(main, "get_credits_config", return_value={
+                "initial_credits": 100, "action_cost": 30, "premium_daily_credits_cap": 300
+            }):
+                with app.test_request_context():
+                    req = make_request({})
+                    response = main.refill_premium_credits(req)
+                    if isinstance(response, tuple):
+                        data = response[0].get_json()
+                    else:
+                        data = response.get_json()
+
+                    assert data["users_expired"] == 1
+                    assert data["users_updated"] == 0
+                    update_args = user_doc.reference.update.call_args[0][0]
+                    assert update_args["is_premium"] is False
+
+    def test_refills_when_revenuecat_unavailable(self, _import_main):
+        """When RevenueCat is down, refill anyway (benefit of the doubt)."""
+        main = _import_main
+
+        user_doc = self._make_user_doc("user-offline", ai_credits=10)
+        main.db.collection.return_value.where.return_value.get.return_value = [user_doc]
+        main.db.collection.return_value.add = MagicMock()
+
+        with patch.object(main, "verify_premium_with_revenuecat", return_value=main.UNAVAILABLE):
+            with patch.object(main, "get_credits_config", return_value={
+                "initial_credits": 100, "action_cost": 30, "premium_daily_credits_cap": 300
+            }):
+                with app.test_request_context():
+                    req = make_request({})
+                    response = main.refill_premium_credits(req)
+                    if isinstance(response, tuple):
+                        data = response[0].get_json()
+                    else:
+                        data = response.get_json()
+
+                    assert data["users_updated"] == 1
+                    assert data["users_expired"] == 0
+
+    def test_mixed_users(self, _import_main):
+        """Multiple users: one verified, one expired, one at cap."""
+        main = _import_main
+
+        active_user = self._make_user_doc("user-active", ai_credits=50)
+        expired_user = self._make_user_doc("user-expired", ai_credits=200)
+        full_user = self._make_user_doc("user-full", ai_credits=300)
+
+        main.db.collection.return_value.where.return_value.get.return_value = [
+            active_user, expired_user, full_user
+        ]
+        main.db.collection.return_value.add = MagicMock()
+
+        def verify_side_effect(user_id):
+            if user_id == "user-expired":
+                return main.NOT_VERIFIED
+            return main.VERIFIED
+
+        with patch.object(main, "verify_premium_with_revenuecat", side_effect=verify_side_effect):
+            with patch.object(main, "get_credits_config", return_value={
+                "initial_credits": 100, "action_cost": 30, "premium_daily_credits_cap": 300
+            }):
+                with app.test_request_context():
+                    req = make_request({})
+                    response = main.refill_premium_credits(req)
+                    if isinstance(response, tuple):
+                        data = response[0].get_json()
+                    else:
+                        data = response.get_json()
+
+                    assert data["users_updated"] == 1   # active_user
+                    assert data["users_expired"] == 1   # expired_user
+                    assert data["users_skipped"] == 1   # full_user
