@@ -223,6 +223,31 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 - **Typesafe project accessors**: Reference modules as `projects.core.common.api`
 - **AppBuildConfig**: Debug/release build detection via expect/actual pattern
 
+### Checklist Template vs Fill
+
+`Checklist` (template) defines items; `ChecklistFill` stores checked/note state per session. The default fill mirrors the template.
+
+**When adding items from the detail screen**, update BOTH:
+```kotlin
+repository.updateFill(updatedFill)                   // fill — for detail screen
+repository.updateChecklistTemplate(updatedChecklist)  // template — for edit screen
+```
+
+- `updateChecklist()` — updates template AND re-syncs fill (regenerates all fill item IDs). Use for Edit screen saves.
+- `updateChecklistTemplate()` — updates template ONLY, no fill sync. Use when fill is already updated separately.
+
+### KMP Platform Constraints
+
+APIs that do NOT work in `commonMain` — verify availability before using:
+
+| API | Status in KMP | Alternative |
+|-----|---------------|-------------|
+| `BackHandler` | Android-only (`activity-compose`) | `WindowInsets.ime` for keyboard back |
+| `onFocusChanged` for keyboard hide | Focus stays `true` when keyboard hides | Track `WindowInsets.ime.getBottom()` |
+| `Switch` + `Row(clickable)` | Double-toggle bug | `AppSwitch(onCheckedChange = null)`, Row handles click |
+
+Per-entity preferences (e.g., `separateCompleted`) belong in Room, not DataStore. DataStore is for global app preferences only.
+
 ## UI Best Practices
 
 ### Text in HorizontalPager

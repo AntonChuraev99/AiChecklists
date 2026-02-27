@@ -64,6 +64,10 @@ class ChecklistRepositoryImpl(
         }
     }
 
+    override suspend fun updateChecklistTemplate(checklist: Checklist) {
+        checklistDao.update(checklist.toEntity())
+    }
+
     override suspend fun deleteChecklist(checklist: Checklist) {
         checklistDao.deleteById(checklist.id)
     }
