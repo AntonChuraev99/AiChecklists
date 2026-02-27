@@ -14,7 +14,8 @@ data class Checklist(
     val items: List<ChecklistItem>,
     val reminderAt: Long? = null,
     val separateCompleted: Boolean = false,
-    val position: Int = 0
+    val position: Int = 0,
+    val autoDeleteCompleted: Boolean = false
 )
 
 /**

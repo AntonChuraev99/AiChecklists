@@ -53,6 +53,8 @@ import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.PlaylistRemove
+import androidx.compose.material.icons.outlined.RemoveDone
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.NoteAdd
 import androidx.compose.material.icons.outlined.NotificationsActive
@@ -623,6 +625,10 @@ private fun ChecklistDetailContent(
     if (state.showOverflowSheet) {
         OverflowMenuSheet(
             separateCompleted = state.separateCompleted,
+            autoDeleteCompleted = state.autoDeleteCompleted,
+            hasCompletedItems = state.defaultFill?.items?.any { it.checked } == true,
+            onDeleteCompletedItems = { onIntent(ChecklistDetailIntent.OnDeleteCompletedItems) },
+            onToggleAutoDeleteCompleted = { onIntent(ChecklistDetailIntent.OnToggleAutoDeleteCompleted) },
             onToggleSeparateCompleted = { onIntent(ChecklistDetailIntent.OnToggleSeparateCompleted) },
             onDeleteClick = {
                 onIntent(ChecklistDetailIntent.OnDismissOverflowSheet)
@@ -1600,6 +1606,10 @@ fun combinePickerResults(datePickerMillis: Long, hour: Int, minute: Int): Long {
 @Composable
 private fun OverflowMenuSheet(
     separateCompleted: Boolean,
+    autoDeleteCompleted: Boolean,
+    hasCompletedItems: Boolean,
+    onDeleteCompletedItems: () -> Unit,
+    onToggleAutoDeleteCompleted: () -> Unit,
     onToggleSeparateCompleted: () -> Unit,
     onDeleteClick: () -> Unit,
     onDismiss: () -> Unit
@@ -1614,6 +1624,63 @@ private fun OverflowMenuSheet(
                 .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
                 .padding(bottom = AppDimens.SpacingXxl)
         ) {
+            // Delete completed items button
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(
+                        if (hasCompletedItems) Modifier.clickable { onDeleteCompletedItems() }
+                        else Modifier
+                    )
+                    .padding(vertical = AppDimens.SpacingMd),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.PlaylistRemove,
+                    contentDescription = null,
+                    tint = if (hasCompletedItems) MaterialTheme.colorScheme.onSurfaceVariant
+                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(AppDimens.SpacingMd))
+                Text(
+                    text = stringResource(Res.string.delete_completed_items),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (hasCompletedItems) MaterialTheme.colorScheme.onSurface
+                    else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                )
+            }
+
+            HorizontalDivider()
+
+            // Auto-delete completed toggle
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onToggleAutoDeleteCompleted() }
+                    .padding(vertical = AppDimens.SpacingMd),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.RemoveDone,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(AppDimens.SpacingMd))
+                Text(
+                    text = stringResource(Res.string.auto_delete_completed),
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.weight(1f)
+                )
+                AppSwitch(
+                    checked = autoDeleteCompleted,
+                    onCheckedChange = null
+                )
+            }
+
+            HorizontalDivider()
+
             // Separate completed toggle
             Row(
                 modifier = Modifier

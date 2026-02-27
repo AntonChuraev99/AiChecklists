@@ -35,6 +35,9 @@ interface ChecklistDao {
     @Query("UPDATE checklists SET separateCompleted = :value WHERE id = :id")
     suspend fun setSeparateCompleted(id: Long, value: Boolean)
 
+    @Query("UPDATE checklists SET autoDeleteCompleted = :value WHERE id = :id")
+    suspend fun setAutoDeleteCompleted(id: Long, value: Boolean)
+
     @Query("UPDATE checklists SET position = :position WHERE id = :id")
     suspend fun updatePosition(id: Long, position: Int)
 
