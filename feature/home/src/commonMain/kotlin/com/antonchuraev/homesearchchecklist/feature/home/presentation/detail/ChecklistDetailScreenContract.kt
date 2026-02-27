@@ -26,6 +26,9 @@ sealed interface ChecklistDetailState : State {
         val showReminderSheet: Boolean = false,
         val showCustomPicker: Boolean = false,
         val customPickerDateMillis: Long? = null,
+        val customPickerMinDateMillis: Long = 0L,
+        val customPickerInitialHour: Int = 9,
+        val isCustomTimeInPast: Boolean = false,
         val showExactAlarmSheet: Boolean = false,
         val exactAlarmDontShowAgain: Boolean = false,
         val showNotificationPermissionSheet: Boolean = false,
@@ -76,6 +79,7 @@ sealed interface ChecklistDetailIntent : Intent {
     data object OnCustomDateRequested : ChecklistDetailIntent
     data class OnDateSelected(val dateMillis: Long) : ChecklistDetailIntent
     data class OnTimeSelected(val hour: Int, val minute: Int) : ChecklistDetailIntent
+    data class OnCustomTimeChanged(val hour: Int, val minute: Int) : ChecklistDetailIntent
     data object OnRemoveReminder : ChecklistDetailIntent
     data object OnDismissReminderUI : ChecklistDetailIntent
 
@@ -88,6 +92,11 @@ sealed interface ChecklistDetailIntent : Intent {
     data object OnOverflowMenuClick : ChecklistDetailIntent
     data object OnDismissOverflowSheet : ChecklistDetailIntent
     data object OnToggleSeparateCompleted : ChecklistDetailIntent
+
+    // Analytics-only intents (UI events tracked via ViewModel for testability)
+    data class OnCompletedSectionToggle(val expanded: Boolean, val completedCount: Int) : ChecklistDetailIntent
+    data object OnQuickAddOpened : ChecklistDetailIntent
+    data class OnQuickAddCancelled(val hadText: Boolean) : ChecklistDetailIntent
 
     // Exact alarm permission
     data object OnExactAlarmOpenSettings : ChecklistDetailIntent

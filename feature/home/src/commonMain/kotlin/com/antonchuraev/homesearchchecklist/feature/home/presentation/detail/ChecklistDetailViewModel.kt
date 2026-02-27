@@ -9,6 +9,7 @@ import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetUserLimitsUseCase
@@ -126,7 +127,10 @@ class ChecklistDetailViewModel(
             }
 
             // Overflow menu
-            ChecklistDetailIntent.OnOverflowMenuClick -> updateContentState { it.copy(showOverflowSheet = true) }
+            ChecklistDetailIntent.OnOverflowMenuClick -> {
+                updateContentState { it.copy(showOverflowSheet = true) }
+                analyticsTracker.event("overflow_menu_opened")
+            }
             ChecklistDetailIntent.OnDismissOverflowSheet -> updateContentState { it.copy(showOverflowSheet = false) }
             ChecklistDetailIntent.OnToggleSeparateCompleted -> toggleSeparateCompleted()
 
@@ -144,12 +148,47 @@ class ChecklistDetailViewModel(
                 updateContentState { it.copy(showReminderSheet = false) }
             }
             ChecklistDetailIntent.OnCustomDateRequested -> {
+                val tz = TimeZone.currentSystemDefault()
+                val todayDate = Clock.System.now().toLocalDateTime(tz).date
+                val todayUtcMidnight = LocalDateTime(todayDate, LocalTime(0, 0))
+                    .toInstant(TimeZone.UTC).toEpochMilliseconds()
                 updateContentState {
-                    it.copy(showReminderSheet = false, showCustomPicker = true, customPickerDateMillis = null)
+                    it.copy(
+                        showReminderSheet = false,
+                        showCustomPicker = true,
+                        customPickerDateMillis = null,
+                        customPickerMinDateMillis = todayUtcMidnight,
+                        customPickerInitialHour = 9,
+                        isCustomTimeInPast = false
+                    )
                 }
             }
             is ChecklistDetailIntent.OnDateSelected -> {
-                updateContentState { it.copy(customPickerDateMillis = intent.dateMillis) }
+                val tz = TimeZone.currentSystemDefault()
+                val nowLocal = Clock.System.now().toLocalDateTime(tz)
+                val selectedDate = Instant.fromEpochMilliseconds(intent.dateMillis)
+                    .toLocalDateTime(TimeZone.UTC).date
+                val isToday = selectedDate == nowLocal.date
+                val initialHour = if (isToday) (nowLocal.hour + 1).coerceAtMost(23) else 9
+                updateContentState {
+                    it.copy(
+                        customPickerDateMillis = intent.dateMillis,
+                        customPickerInitialHour = initialHour,
+                        isCustomTimeInPast = false
+                    )
+                }
+            }
+            is ChecklistDetailIntent.OnCustomTimeChanged -> {
+                val state = (_screenState.value as? ChecklistDetailState.Content) ?: return
+                val dateMillis = state.customPickerDateMillis ?: return
+                val tz = TimeZone.currentSystemDefault()
+                val nowLocal = Clock.System.now().toLocalDateTime(tz)
+                val selectedDate = Instant.fromEpochMilliseconds(dateMillis)
+                    .toLocalDateTime(TimeZone.UTC).date
+                val isToday = selectedDate == nowLocal.date
+                val isInPast = isToday &&
+                    LocalTime(intent.hour, intent.minute) <= nowLocal.time
+                updateContentState { it.copy(isCustomTimeInPast = isInPast) }
             }
             is ChecklistDetailIntent.OnTimeSelected -> {
                 val dateMillis = (_screenState.value as? ChecklistDetailState.Content)?.customPickerDateMillis ?: return
@@ -176,6 +215,18 @@ class ChecklistDetailViewModel(
                 updateContentState { it.copy(exactAlarmDontShowAgain = intent.checked) }
             }
             ChecklistDetailIntent.OnDismissExactAlarmSheet -> handleExactAlarmSkip()
+            // Analytics-only intents
+            is ChecklistDetailIntent.OnCompletedSectionToggle -> {
+                val eventName = if (intent.expanded) "completed_section_expanded" else "completed_section_collapsed"
+                analyticsTracker.event(eventName, mapOf("completed_count" to intent.completedCount.toString()))
+            }
+            ChecklistDetailIntent.OnQuickAddOpened -> {
+                analyticsTracker.event("quick_add_opened")
+            }
+            is ChecklistDetailIntent.OnQuickAddCancelled -> {
+                analyticsTracker.event("quick_add_cancelled", mapOf("had_text" to intent.hadText.toString()))
+            }
+
             ChecklistDetailIntent.OnReturnedFromSettings -> handleReturnedFromSettings()
             ChecklistDetailIntent.OnSnackbarDismissed -> {
                 updateContentState { it.copy(snackbarMessage = null) }
@@ -246,12 +297,20 @@ class ChecklistDetailViewModel(
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return
 
-        val newItem = ChecklistFillItem(text = trimmed, checked = false, note = null)
-        val updatedFill = fill.copy(items = fill.items + newItem)
+        val newFillItem = ChecklistFillItem(text = trimmed, checked = false, note = null)
+        val updatedFill = fill.copy(items = fill.items + newFillItem)
+
+        val newChecklistItem = ChecklistItem(text = trimmed)
+        val updatedChecklist = state.checklist.copy(items = state.checklist.items + newChecklistItem)
+        updateContentState { it.copy(checklist = updatedChecklist) }
 
         viewModelScope.launch {
             repository.updateFill(updatedFill)
-            analyticsTracker.event("item_added_quick")
+            repository.updateChecklistTemplate(updatedChecklist)
+            analyticsTracker.event("item_added_quick", mapOf(
+                "checklist_id" to checklistId.toString(),
+                "item_count" to updatedFill.items.size.toString()
+            ))
         }
     }
 
@@ -337,7 +396,11 @@ class ChecklistDetailViewModel(
         viewModelScope.launch {
             reminderScheduler.cancel(state.checklist.id)
             repository.deleteChecklist(state.checklist)
-            analyticsTracker.event("checklist_deleted")
+            analyticsTracker.event("checklist_deleted", mapOf(
+                "checklist_id" to state.checklist.id.toString(),
+                "item_count" to (state.defaultFill?.items?.size ?: 0).toString(),
+                "source" to "overflow_menu"
+            ))
             navigator.onBack()
         }
     }
