@@ -42,8 +42,8 @@ GoogleService-Info.plist
 service-account*.json
 aichecklists-*.json
 
-# Claude Code local settings
-.claude/settings.local.json
+# Claude Code local config
+.claude/
 
 # Python virtual environment
 venv/
@@ -53,8 +53,16 @@ __pycache__/
 # Release builds (signed APKs/AABs)
 composeApp/release/
 
-# Firebase hosting build
-hosting/public/
+# Firebase hosting cache
+hosting/.firebase/
+
+# Docs (local working notes, some contain API keys)
+docs/
+SECURITY.md
+SECURITY_DELIVERY_SUMMARY.txt
+
+# Generated/vendored stubs (not project source)
+commonMain/
 
 # Temp images in root (move to proper location)
 *.png
