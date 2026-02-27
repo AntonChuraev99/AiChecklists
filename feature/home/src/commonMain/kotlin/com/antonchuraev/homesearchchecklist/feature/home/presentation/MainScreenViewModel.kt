@@ -15,6 +15,8 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import androidx.lifecycle.viewModelScope
 
 class MainScreenViewModel(
     private val repository: ChecklistRepository,
@@ -75,6 +77,9 @@ class MainScreenViewModel(
             MainScreenIntent.OnUpgradeToPremiumClick -> {
                 _showLimitDialog.update { false }
                 appNavigator.navigateToPaywall(source = "main_limit_dialog")
+            }
+            is MainScreenIntent.OnReorderChecklists -> {
+                viewModelScope.launch { repository.reorderChecklists(intent.orderedIds) }
             }
         }
     }

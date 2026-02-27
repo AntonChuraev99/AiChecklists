@@ -13,7 +13,8 @@ data class Checklist(
     val name: String,
     val items: List<ChecklistItem>,
     val reminderAt: Long? = null,
-    val separateCompleted: Boolean = false
+    val separateCompleted: Boolean = false,
+    val position: Int = 0
 )
 
 /**

@@ -11,7 +11,7 @@ data class ChecklistReminderInfo(val id: Long, val name: String, val reminderAt:
 
 @Dao
 interface ChecklistDao {
-    @Query("SELECT * FROM checklists ORDER BY id DESC")
+    @Query("SELECT * FROM checklists ORDER BY position ASC")
     fun observeChecklists(): Flow<List<ChecklistEntity>>
 
     @Query("SELECT * FROM checklists WHERE id = :id")
@@ -34,6 +34,15 @@ interface ChecklistDao {
 
     @Query("UPDATE checklists SET separateCompleted = :value WHERE id = :id")
     suspend fun setSeparateCompleted(id: Long, value: Boolean)
+
+    @Query("UPDATE checklists SET position = :position WHERE id = :id")
+    suspend fun updatePosition(id: Long, position: Int)
+
+    @Query("UPDATE checklists SET position = position + 1")
+    suspend fun incrementAllPositions()
+
+    @Query("SELECT * FROM checklists ORDER BY position ASC")
+    suspend fun getAllOrderedByPosition(): List<ChecklistEntity>
 
     @Query("SELECT COUNT(*) FROM checklists WHERE reminderAt IS NOT NULL AND reminderAt > :nowMillis")
     suspend fun countActiveReminders(nowMillis: Long): Int

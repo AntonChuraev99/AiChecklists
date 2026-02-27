@@ -34,7 +34,9 @@ sealed interface ChecklistDetailState : State {
         val showNotificationPermissionSheet: Boolean = false,
         val snackbarMessage: String? = null,
         val showOverflowSheet: Boolean = false,
-        val separateCompleted: Boolean = false
+        val separateCompleted: Boolean = false,
+        val showDeleteItemConfirmation: Boolean = false,
+        val itemPendingDeleteId: String? = null
     ) : ChecklistDetailState
 }
 
@@ -92,6 +94,12 @@ sealed interface ChecklistDetailIntent : Intent {
     data object OnOverflowMenuClick : ChecklistDetailIntent
     data object OnDismissOverflowSheet : ChecklistDetailIntent
     data object OnToggleSeparateCompleted : ChecklistDetailIntent
+
+    // Item reorder and delete
+    data class OnFinalizeReorder(val orderedItemIds: List<String>) : ChecklistDetailIntent
+    data class OnDeleteItemClick(val itemId: String) : ChecklistDetailIntent
+    data object OnConfirmDeleteItem : ChecklistDetailIntent
+    data object OnDismissDeleteItemDialog : ChecklistDetailIntent
 
     // Analytics-only intents (UI events tracked via ViewModel for testability)
     data class OnCompletedSectionToggle(val expanded: Boolean, val completedCount: Int) : ChecklistDetailIntent

@@ -36,6 +36,7 @@ firebaseCrashlytics = "3.0.2"
 playReview = "2.0.2"
 kotlinxDatetime = "0.6.2"
 amplitude = "1.16.8"
+reorderable = "2.4.3"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -106,6 +107,9 @@ workmanager = { module = "androidx.work:work-runtime-ktx", version.ref = "workma
 # Amplitude Analytics
 amplitude-analytics = { group = "com.amplitude", name = "analytics-android", version.ref = "amplitude" }
 play-services-appset = { module = "com.google.android.gms:play-services-appset", version = "16.1.0" }
+
+# Reorderable (drag & drop for LazyColumn/LazyRow)
+reorderable = { module = "sh.calvin.reorderable:reorderable", version.ref = "reorderable" }
 
 [bundles]
 koin-feature = [

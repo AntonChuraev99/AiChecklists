@@ -52,4 +52,6 @@ sealed interface MainScreenIntent : Intent {
     data object OnDismissLimitDialog : MainScreenIntent
 
     data object OnUpgradeToPremiumClick : MainScreenIntent
+
+    data class OnReorderChecklists(val orderedIds: List<Long>) : MainScreenIntent
 }

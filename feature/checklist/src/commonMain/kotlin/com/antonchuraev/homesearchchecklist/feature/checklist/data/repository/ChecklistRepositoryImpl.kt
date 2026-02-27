@@ -24,7 +24,9 @@ class ChecklistRepositoryImpl(
     }
 
     override suspend fun addChecklist(checklist: Checklist): Long {
-        val checklistId = checklistDao.insert(checklist.toEntity())
+        // Shift all existing checklists down so the new one appears at the top
+        checklistDao.incrementAllPositions()
+        val checklistId = checklistDao.insert(checklist.toEntity().copy(position = 0))
 
         // Create default fill automatically
         val defaultFill = ChecklistFill(
@@ -70,6 +72,7 @@ class ChecklistRepositoryImpl(
 
     override suspend fun deleteChecklist(checklist: Checklist) {
         checklistDao.deleteById(checklist.id)
+        reindexPositions()
     }
 
     override suspend fun getChecklistById(id: Long): Checklist? {
@@ -133,6 +136,21 @@ class ChecklistRepositoryImpl(
 
     override suspend fun deleteFill(fill: ChecklistFill) {
         fillDao.deleteById(fill.id)
+    }
+
+    override suspend fun reorderChecklists(orderedIds: List<Long>) {
+        orderedIds.forEachIndexed { index, id ->
+            checklistDao.updatePosition(id, index)
+        }
+    }
+
+    private suspend fun reindexPositions() {
+        val all = checklistDao.getAllOrderedByPosition()
+        all.forEachIndexed { index, entity ->
+            if (entity.position != index) {
+                checklistDao.updatePosition(entity.id, index)
+            }
+        }
     }
 }
 
