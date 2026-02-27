@@ -1,0 +1,20 @@
+{
+  "functions": [
+    {
+      "source": "firebase-functions",
+      "codebase": "default",
+      "runtime": "python312",
+      "ignore": [
+        "venv",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local",
+        "test_main.py",
+        "requirements-dev.txt",
+        "__pycache__",
+        ".pytest_cache"
+      ]
+    }
+  ]
+}
