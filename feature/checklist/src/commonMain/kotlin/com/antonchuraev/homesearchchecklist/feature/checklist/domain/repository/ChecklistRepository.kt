@@ -10,6 +10,7 @@ interface ChecklistRepository {
     val checklists: Flow<List<Checklist>>
     suspend fun addChecklist(checklist: Checklist): Long
     suspend fun updateChecklist(checklist: Checklist)
+    suspend fun updateChecklistTemplate(checklist: Checklist)
     suspend fun deleteChecklist(checklist: Checklist)
     suspend fun getChecklistById(id: Long): Checklist?
 
