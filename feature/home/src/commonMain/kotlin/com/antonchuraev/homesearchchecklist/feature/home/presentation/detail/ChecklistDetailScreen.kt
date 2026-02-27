@@ -62,6 +62,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.TimePicker
+import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.material3.Checkbox
@@ -206,9 +207,11 @@ private fun ChecklistDetailContent(
             IconButton(
                 onClick = {
                     if (addItemActive) {
+                        onIntent(ChecklistDetailIntent.OnQuickAddCancelled(hadText = false))
                         addItemActive = false
                     } else {
                         addItemActive = true
+                        onIntent(ChecklistDetailIntent.OnQuickAddOpened)
                         coroutineScope.launch {
                             listState.animateScrollToItem(listState.layoutInfo.totalItemsCount - 1)
                         }
@@ -354,7 +357,10 @@ private fun ChecklistDetailContent(
                     item(key = "inline_add_item") {
                         InlineAddItemInput(
                             onAddItem = { onIntent(ChecklistDetailIntent.OnAddItem(it)) },
-                            onClose = { addItemActive = false }
+                            onClose = { hadText ->
+                                onIntent(ChecklistDetailIntent.OnQuickAddCancelled(hadText = hadText))
+                                addItemActive = false
+                            }
                         )
                     }
                 }
@@ -365,7 +371,14 @@ private fun ChecklistDetailContent(
                         CompletedSectionHeader(
                             completedCount = completedItems.size,
                             expanded = completedExpanded,
-                            onToggle = { completedExpanded = !completedExpanded }
+                            onToggle = {
+                                val newExpanded = !completedExpanded
+                                completedExpanded = newExpanded
+                                onIntent(ChecklistDetailIntent.OnCompletedSectionToggle(
+                                    expanded = newExpanded,
+                                    completedCount = completedItems.size
+                                ))
+                            }
                         )
                     }
 
@@ -471,7 +484,11 @@ private fun ChecklistDetailContent(
     if (state.showCustomPicker) {
         ReminderDateTimePicker(
             selectedDateMillis = state.customPickerDateMillis,
+            minDateMillis = state.customPickerMinDateMillis,
+            initialHour = state.customPickerInitialHour,
+            isTimeInPast = state.isCustomTimeInPast,
             onDateSelected = { onIntent(ChecklistDetailIntent.OnDateSelected(it)) },
+            onTimeChanged = { hour, minute -> onIntent(ChecklistDetailIntent.OnCustomTimeChanged(hour, minute)) },
             onTimeSelected = { hour, minute -> onIntent(ChecklistDetailIntent.OnTimeSelected(hour, minute)) },
             onDismiss = { onIntent(ChecklistDetailIntent.OnDismissReminderUI) }
         )
@@ -1300,12 +1317,29 @@ private fun formatReminderDateTime(dateTime: LocalDateTime): String {
 @Composable
 private fun ReminderDateTimePicker(
     selectedDateMillis: Long?,
+    minDateMillis: Long,
+    initialHour: Int,
+    isTimeInPast: Boolean,
     onDateSelected: (Long) -> Unit,
+    onTimeChanged: (Int, Int) -> Unit,
     onTimeSelected: (Int, Int) -> Unit,
     onDismiss: () -> Unit
 ) {
     if (selectedDateMillis == null) {
-        val dateState = rememberDatePickerState()
+        val currentYear = Clock.System.now()
+            .toLocalDateTime(TimeZone.currentSystemDefault()).year
+        val dateState = rememberDatePickerState(
+            initialSelectedDateMillis = minDateMillis,
+            selectableDates = object : SelectableDates {
+                override fun isSelectableDate(utcTimeMillis: Long): Boolean {
+                    return utcTimeMillis >= minDateMillis
+                }
+
+                override fun isSelectableYear(year: Int): Boolean {
+                    return year >= currentYear
+                }
+            }
+        )
         DatePickerDialog(
             onDismissRequest = onDismiss,
             confirmButton = {
@@ -1321,7 +1355,12 @@ private fun ReminderDateTimePicker(
             DatePicker(state = dateState)
         }
     } else {
-        val timeState = rememberTimePickerState(initialHour = 9, initialMinute = 0)
+        val timeState = rememberTimePickerState(initialHour = initialHour, initialMinute = 0)
+
+        LaunchedEffect(timeState.hour, timeState.minute) {
+            onTimeChanged(timeState.hour, timeState.minute)
+        }
+
         AlertDialog(
             onDismissRequest = onDismiss,
             title = { Text(stringResource(Res.string.reminder_select_time)) },
@@ -1329,7 +1368,8 @@ private fun ReminderDateTimePicker(
             confirmButton = {
                 AppButtonText(
                     text = stringResource(Res.string.ok),
-                    onClick = { onTimeSelected(timeState.hour, timeState.minute) }
+                    onClick = { onTimeSelected(timeState.hour, timeState.minute) },
+                    enabled = !isTimeInPast
                 )
             },
             dismissButton = {
@@ -1468,7 +1508,7 @@ private fun CompletedSectionHeader(
 @Composable
 private fun InlineAddItemInput(
     onAddItem: (String) -> Unit,
-    onClose: () -> Unit
+    onClose: (hadText: Boolean) -> Unit
 ) {
     var text by remember { mutableStateOf("") }
     val focusRequester = remember { FocusRequester() }
@@ -1486,7 +1526,7 @@ private fun InlineAddItemInput(
         val isKeyboardVisible = imeBottom > 0
         if (wasKeyboardVisible && !isKeyboardVisible) {
             focusManager.clearFocus()
-            onClose()
+            onClose(text.isNotBlank())
         }
         wasKeyboardVisible = isKeyboardVisible
     }
@@ -1521,7 +1561,7 @@ private fun InlineAddItemInput(
                     onAddItem(text)
                     text = ""
                 } else {
-                    onClose()
+                    onClose(false)
                 }
             }
         ) {
