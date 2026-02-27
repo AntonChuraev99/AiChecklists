@@ -708,8 +708,11 @@ def refill_premium_credits(request: Request):
 
     Logic:
     - Find all users with is_premium = True
-    - For each user, if their credits < premium_daily_credits_cap, set to cap
-    - If credits >= cap, don't change (don't accumulate beyond cap)
+    - Verify each user's subscription via RevenueCat API
+    - If subscription expired: set is_premium = False, skip refill
+    - If RevenueCat unavailable: refill anyway (benefit of the doubt)
+    - If subscription active and credits < cap: refill to cap
+    - If credits >= cap: don't change (don't accumulate beyond cap)
 
     Request body (optional, for manual trigger):
     {
@@ -721,6 +724,7 @@ def refill_premium_credits(request: Request):
         "success": true,
         "users_updated": number,
         "users_skipped": number,
+        "users_expired": number,
         "credits_cap": number
     }
     """
@@ -737,8 +741,25 @@ def refill_premium_credits(request: Request):
 
         users_updated = 0
         users_skipped = 0
+        users_expired = 0
 
         for user_doc in premium_users:
+            # Verify subscription is still active via RevenueCat
+            status = verify_premium_with_revenuecat(user_doc.id)
+
+            if status == NOT_VERIFIED:
+                # Subscription expired or cancelled — revoke premium
+                user_doc.reference.update({
+                    "is_premium": False,
+                    "premium_expired_at": datetime.now(timezone.utc).isoformat(),
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                })
+                users_expired += 1
+                continue
+
+            # UNAVAILABLE — give benefit of the doubt, refill anyway
+            # VERIFIED — subscription confirmed, refill
+
             user_data = user_doc.to_dict()
             current_credits = user_data.get("ai_credits", 0)
 
@@ -746,8 +767,8 @@ def refill_premium_credits(request: Request):
                 # Refill to cap
                 user_doc.reference.update({
                     "ai_credits": credits_cap,
-                    "credits_refilled_at": datetime.utcnow().isoformat(),
-                    "updated_at": datetime.utcnow().isoformat()
+                    "credits_refilled_at": datetime.now(timezone.utc).isoformat(),
+                    "updated_at": datetime.now(timezone.utc).isoformat()
                 })
                 users_updated += 1
             else:
@@ -756,15 +777,17 @@ def refill_premium_credits(request: Request):
 
         # Log the refill operation
         db.collection("credits_refill_log").add({
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "users_updated": users_updated,
             "users_skipped": users_skipped,
+            "users_expired": users_expired,
             "credits_cap": credits_cap
         })
 
         return create_success_response({
             "users_updated": users_updated,
             "users_skipped": users_skipped,
+            "users_expired": users_expired,
             "credits_cap": credits_cap
         })
 

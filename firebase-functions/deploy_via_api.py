@@ -75,7 +75,14 @@ FUNCTIONS = [
         "name": "refill_premium_credits",
         "entry_point": "refill_premium_credits",
         "memory": "256M",
-        "timeout": "30s",
+        "timeout": "300s",
+        "secrets": [
+            {
+                "key": "REVENUECAT_API_KEY",
+                "secret": "revenuecat-api-key",
+                "version": "latest",
+            }
+        ],
     },
     {
         "name": "get_credits_info",

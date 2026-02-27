@@ -78,6 +78,20 @@ gcloud functions deploy get_usage_stats \
     --memory=256MB \
     --timeout=30s
 
+# Deploy refill_premium_credits function (with RevenueCat verification)
+echo "Deploying refill_premium_credits..."
+gcloud functions deploy refill_premium_credits \
+    --gen2 \
+    --runtime=python312 \
+    --region=$REGION \
+    --source=. \
+    --entry-point=refill_premium_credits \
+    --trigger-http \
+    --allow-unauthenticated \
+    --set-secrets="REVENUECAT_API_KEY=revenuecat-api-key:latest" \
+    --memory=256MB \
+    --timeout=300s
+
 echo ""
 echo "Deployment complete!"
 echo ""
@@ -86,3 +100,4 @@ echo "  analyze_and_fill_checklist: https://$REGION-$PROJECT_ID.cloudfunctions.n
 echo "  generate_checklist: https://$REGION-$PROJECT_ID.cloudfunctions.net/generate_checklist"
 echo "  restore_credits_after_purchase: https://$REGION-$PROJECT_ID.cloudfunctions.net/restore_credits_after_purchase"
 echo "  get_usage_stats: https://$REGION-$PROJECT_ID.cloudfunctions.net/get_usage_stats"
+echo "  refill_premium_credits: https://$REGION-$PROJECT_ID.cloudfunctions.net/refill_premium_credits"
