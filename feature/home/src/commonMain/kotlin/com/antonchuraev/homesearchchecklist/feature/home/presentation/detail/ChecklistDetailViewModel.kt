@@ -92,7 +92,8 @@ class ChecklistDetailViewModel(
                 defaultFill = defaultFill,
                 additionalFillsCount = additionalFillsCount,
                 userLimits = null,
-                separateCompleted = checklist.separateCompleted
+                separateCompleted = checklist.separateCompleted,
+                autoDeleteCompleted = checklist.autoDeleteCompleted
             )
         }
     }
@@ -143,6 +144,8 @@ class ChecklistDetailViewModel(
             }
             ChecklistDetailIntent.OnDismissOverflowSheet -> updateContentState { it.copy(showOverflowSheet = false) }
             ChecklistDetailIntent.OnToggleSeparateCompleted -> toggleSeparateCompleted()
+            ChecklistDetailIntent.OnToggleAutoDeleteCompleted -> toggleAutoDeleteCompleted()
+            ChecklistDetailIntent.OnDeleteCompletedItems -> deleteCompletedItems()
 
             // Notification permission
             is ChecklistDetailIntent.OnNotificationPermissionResult -> handleNotificationPermissionResult()
@@ -256,6 +259,26 @@ class ChecklistDetailViewModel(
         val state = _screenState.value
         if (state !is ChecklistDetailState.Content || state.defaultFill == null) return
 
+        // Auto-delete: when checking an item and autoDeleteCompleted is on, remove it
+        if (checked && state.autoDeleteCompleted) {
+            val itemToDelete = state.defaultFill.items.firstOrNull { it.id == itemId } ?: return
+            val updatedFillItems = state.defaultFill.items.filter { it.id != itemId }
+            val updatedFill = state.defaultFill.copy(items = updatedFillItems)
+
+            val updatedChecklistItems = state.checklist.items.filter { it.text != itemToDelete.text }
+            val updatedChecklist = state.checklist.copy(items = updatedChecklistItems)
+            updateContentState { it.copy(checklist = updatedChecklist) }
+
+            viewModelScope.launch {
+                repository.updateFill(updatedFill)
+                repository.updateChecklistTemplate(updatedChecklist)
+                analyticsTracker.event("item_auto_deleted", mapOf(
+                    "checklist_id" to checklistId.toString()
+                ))
+            }
+            return
+        }
+
         val updatedItems = state.defaultFill.items.map { item ->
             if (item.id == itemId) item.withChecked(checked) else item
         }
@@ -299,6 +322,47 @@ class ChecklistDetailViewModel(
             "separate_completed_toggled",
             mapOf("enabled" to newValue.toString())
         )
+    }
+
+    private fun toggleAutoDeleteCompleted() {
+        val current = (_screenState.value as? ChecklistDetailState.Content)?.autoDeleteCompleted ?: false
+        val newValue = !current
+        updateContentState { it.copy(autoDeleteCompleted = newValue) }
+        viewModelScope.launch {
+            repository.setAutoDeleteCompleted(checklistId, newValue)
+        }
+        analyticsTracker.event(
+            "auto_delete_completed_toggled",
+            mapOf("enabled" to newValue.toString())
+        )
+    }
+
+    private fun deleteCompletedItems() {
+        val state = _screenState.value as? ChecklistDetailState.Content ?: return
+        val fill = state.defaultFill ?: return
+
+        val completedTexts = fill.items.filter { it.checked }.map { it.text }.toSet()
+        if (completedTexts.isEmpty()) return
+
+        val updatedFillItems = fill.items.filter { !it.checked }
+        val updatedFill = fill.copy(items = updatedFillItems)
+
+        val updatedChecklistItems = state.checklist.items.filter { it.text !in completedTexts }
+        val updatedChecklist = state.checklist.copy(items = updatedChecklistItems)
+
+        updateContentState {
+            it.copy(checklist = updatedChecklist, showOverflowSheet = false)
+        }
+
+        viewModelScope.launch {
+            repository.updateFill(updatedFill)
+            repository.updateChecklistTemplate(updatedChecklist)
+            analyticsTracker.event("completed_items_deleted", mapOf(
+                "checklist_id" to checklistId.toString(),
+                "deleted_count" to completedTexts.size.toString(),
+                "remaining_count" to updatedFillItems.size.toString()
+            ))
+        }
     }
 
     private fun addItem(text: String) {

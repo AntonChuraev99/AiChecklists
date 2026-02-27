@@ -84,6 +84,10 @@ class ChecklistRepositoryImpl(
         checklistDao.setSeparateCompleted(checklistId, value)
     }
 
+    override suspend fun setAutoDeleteCompleted(checklistId: Long, value: Boolean) {
+        checklistDao.setAutoDeleteCompleted(checklistId, value)
+    }
+
     // Reminders
     override suspend fun setReminder(checklistId: Long, reminderAt: Long?) {
         checklistDao.updateReminder(checklistId, reminderAt)

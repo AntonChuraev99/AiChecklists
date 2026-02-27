@@ -218,6 +218,7 @@ class ChecklistDetailAnalyticsTest {
         override suspend fun deleteChecklist(checklist: Checklist) {}
         override suspend fun getChecklistById(id: Long): Checklist? = storedChecklist
         override suspend fun setSeparateCompleted(checklistId: Long, value: Boolean) {}
+        override suspend fun setAutoDeleteCompleted(checklistId: Long, value: Boolean) {}
         override suspend fun setReminder(checklistId: Long, reminderAt: Long?) {}
         override suspend fun countActiveReminders(): Int = 0
         override suspend fun getActiveReminders(): List<ChecklistReminderInfo> = emptyList()

@@ -17,6 +17,7 @@ interface ChecklistRepository {
 
     // Display preferences
     suspend fun setSeparateCompleted(checklistId: Long, value: Boolean)
+    suspend fun setAutoDeleteCompleted(checklistId: Long, value: Boolean)
 
     // Reminders
     suspend fun setReminder(checklistId: Long, reminderAt: Long?)
