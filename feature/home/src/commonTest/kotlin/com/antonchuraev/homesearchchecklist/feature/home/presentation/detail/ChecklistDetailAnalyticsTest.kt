@@ -231,6 +231,7 @@ class ChecklistDetailAnalyticsTest {
         override suspend fun addFill(fill: ChecklistFill): Long = 1L
         override suspend fun updateFill(fill: ChecklistFill) {}
         override suspend fun deleteFill(fill: ChecklistFill) {}
+        override suspend fun reorderChecklists(orderedIds: List<Long>) {}
     }
 
     private class FakeAppNavigator : AppNavigator {

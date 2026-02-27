@@ -126,6 +126,16 @@ class ChecklistDetailViewModel(
                 navigator.navigateToPaywall(source = "detail_fill_limit")
             }
 
+            // Item reorder and delete
+            is ChecklistDetailIntent.OnFinalizeReorder -> finalizeReorder(intent.orderedItemIds)
+            is ChecklistDetailIntent.OnDeleteItemClick -> {
+                updateContentState { it.copy(itemPendingDeleteId = intent.itemId, showDeleteItemConfirmation = true) }
+            }
+            ChecklistDetailIntent.OnConfirmDeleteItem -> confirmDeleteItem()
+            ChecklistDetailIntent.OnDismissDeleteItemDialog -> {
+                updateContentState { it.copy(itemPendingDeleteId = null, showDeleteItemConfirmation = false) }
+            }
+
             // Overflow menu
             ChecklistDetailIntent.OnOverflowMenuClick -> {
                 updateContentState { it.copy(showOverflowSheet = true) }
@@ -507,6 +517,69 @@ class ChecklistDetailViewModel(
                 it.copy(checklist = it.checklist.copy(reminderAt = null))
             }
             analyticsTracker.event("reminder_cancelled", mapOf("checklist_id" to state.checklist.id.toString()))
+        }
+    }
+
+    private fun finalizeReorder(orderedItemIds: List<String>) {
+        val state = _screenState.value as? ChecklistDetailState.Content ?: return
+        val fill = state.defaultFill ?: return
+
+        // Build a lookup for fill items by id
+        val fillItemsById = fill.items.associateBy { it.id }
+        val completedItems = if (state.separateCompleted) fill.items.filter { it.checked } else emptyList()
+
+        // Reorder unchecked items according to the provided order
+        val reorderedUnchecked = orderedItemIds.mapNotNull { fillItemsById[it] }
+        val newFillItems = reorderedUnchecked + completedItems
+        val updatedFill = fill.copy(items = newFillItems)
+
+        // Mirror reorder in checklist template items by matching text to fill order
+        val orderedTexts = reorderedUnchecked.map { it.text }
+        val templateByText = state.checklist.items.associateBy { it.text }
+        val reorderedTemplateUnchecked = orderedTexts.mapNotNull { templateByText[it] }
+        val completedTemplateItems = if (state.separateCompleted) {
+            val uncheckedTexts = orderedTexts.toSet()
+            state.checklist.items.filter { it.text !in uncheckedTexts }
+        } else {
+            emptyList()
+        }
+
+        val updatedChecklist = state.checklist.copy(items = reorderedTemplateUnchecked + completedTemplateItems)
+        updateContentState { it.copy(checklist = updatedChecklist) }
+
+        viewModelScope.launch {
+            repository.updateFill(updatedFill)
+            repository.updateChecklistTemplate(updatedChecklist)
+        }
+    }
+
+    private fun confirmDeleteItem() {
+        val state = _screenState.value as? ChecklistDetailState.Content ?: return
+        val fill = state.defaultFill ?: return
+        val itemId = state.itemPendingDeleteId ?: return
+
+        val itemToDelete = fill.items.firstOrNull { it.id == itemId } ?: return
+        val updatedFillItems = fill.items.filter { it.id != itemId }
+        val updatedFill = fill.copy(items = updatedFillItems)
+
+        val updatedChecklistItems = state.checklist.items.filter { it.text != itemToDelete.text }
+        val updatedChecklist = state.checklist.copy(items = updatedChecklistItems)
+
+        updateContentState {
+            it.copy(
+                checklist = updatedChecklist,
+                showDeleteItemConfirmation = false,
+                itemPendingDeleteId = null
+            )
+        }
+
+        viewModelScope.launch {
+            repository.updateFill(updatedFill)
+            repository.updateChecklistTemplate(updatedChecklist)
+            analyticsTracker.event("item_deleted", mapOf(
+                "checklist_id" to checklistId.toString(),
+                "item_count" to updatedFillItems.size.toString()
+            ))
         }
     }
 

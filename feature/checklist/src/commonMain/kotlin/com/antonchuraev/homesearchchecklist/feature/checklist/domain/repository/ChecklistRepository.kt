@@ -13,6 +13,7 @@ interface ChecklistRepository {
     suspend fun updateChecklistTemplate(checklist: Checklist)
     suspend fun deleteChecklist(checklist: Checklist)
     suspend fun getChecklistById(id: Long): Checklist?
+    suspend fun reorderChecklists(orderedIds: List<Long>)
 
     // Display preferences
     suspend fun setSeparateCompleted(checklistId: Long, value: Boolean)

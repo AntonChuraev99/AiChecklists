@@ -20,9 +20,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,30 +52,43 @@ fun MainScreen(
     LaunchedEffect(Unit) { analyticsTracker.screenView("main") }
 
     val screenState: MainScreenState by viewModel.screenState.collectAsStateWithLifecycle()
+    var isEditMode by rememberSaveable { mutableStateOf(false) }
 
     AppScaffold(
         title = "",
         actions = {
-            // Feedback button — opens CSAT survey
-            IconButton(onClick = onFeedbackClick) {
-                Icon(
-                    imageVector = Icons.Outlined.Email,
-                    contentDescription = "Feedback",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            if (isEditMode) {
+                // Edit mode: show "Done" button
+                TextButton(onClick = { isEditMode = false }) {
+                    Text(
+                        text = stringResource(Res.string.done),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            } else {
+                // Normal mode: feedback + credits
+                IconButton(onClick = onFeedbackClick) {
+                    Icon(
+                        imageVector = Icons.Outlined.Email,
+                        contentDescription = "Feedback",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
 
-            if (screenState is MainScreenState.Success) {
-                val state = screenState as MainScreenState.Success
-                CreditsChip(
-                    credits = state.aiCredits,
-                    isPremium = state.subscriptionStatus.isActive,
-                    onClick = { viewModel.sendIntent(MainScreenIntent.OnCreditsClick) }
-                )
+                if (screenState is MainScreenState.Success) {
+                    val state = screenState as MainScreenState.Success
+                    CreditsChip(
+                        credits = state.aiCredits,
+                        isPremium = state.subscriptionStatus.isActive,
+                        onClick = { viewModel.sendIntent(MainScreenIntent.OnCreditsClick) }
+                    )
+                }
             }
         },
         bottomBar = {
-            if (screenState is MainScreenState.Success) {
+            // Hide bottom bar in edit mode
+            if (!isEditMode && screenState is MainScreenState.Success) {
                 val state = screenState as MainScreenState.Success
                 val canCreateChecklist = state.userLimits?.canCreateChecklist ?: true
 
@@ -100,6 +117,7 @@ fun MainScreen(
             Box(modifier = Modifier.fillMaxSize()) {
                 MainScreenContent(
                     screenState = state,
+                    isEditMode = isEditMode,
                     onChecklistClick = { checklistWithProgress ->
                         viewModel.sendIntent(MainScreenIntent.OnChecklistClick(checklistWithProgress))
                     },
@@ -111,6 +129,11 @@ fun MainScreen(
                     },
                     onPremiumBannerClick = {
                         viewModel.sendIntent(MainScreenIntent.OnPremiumBannerClick)
+                    },
+                    onEnterEditMode = { isEditMode = true },
+                    onExitEditMode = { isEditMode = false },
+                    onReorderChecklists = { orderedIds ->
+                        viewModel.sendIntent(MainScreenIntent.OnReorderChecklists(orderedIds))
                     }
                 )
             }

@@ -23,9 +23,23 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
     }
 }
 
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(connection: SQLiteConnection) {
+        connection.execSQL("ALTER TABLE checklists ADD COLUMN position INTEGER NOT NULL DEFAULT 0")
+        // Preserve existing order (was ORDER BY id DESC) by assigning positions
+        connection.execSQL(
+            """
+            UPDATE checklists SET position = (
+                SELECT COUNT(*) FROM checklists AS c2 WHERE c2.id > checklists.id
+            )
+            """.trimIndent()
+        )
+    }
+}
+
 @Database(
     entities = [ChecklistEntity::class, ChecklistFillEntity::class],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 @TypeConverters(ChecklistItemConverters::class)
@@ -39,7 +53,7 @@ abstract class ChecklistDatabase : RoomDatabase() {
             builder: Builder<ChecklistDatabase>
         ): ChecklistDatabase {
             return builder
-                .addMigrations(MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                 .fallbackToDestructiveMigration(dropAllTables = false)
                 .setQueryCoroutineContext(Dispatchers.IO)
                 .build()

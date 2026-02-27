@@ -5,8 +5,17 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,6 +44,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.RemoveCircle
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.CheckCircle
@@ -65,6 +75,8 @@ import androidx.compose.material3.TimePicker
 import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -73,6 +85,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.AppSwitch
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -80,12 +93,16 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.ui.focus.FocusRequester
@@ -115,6 +132,8 @@ import org.jetbrains.compose.resources.stringResource
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import kotlinx.coroutines.launch
 import kotlinx.datetime.*
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
@@ -197,84 +216,119 @@ private fun ChecklistDetailContent(
     }
 
     var addItemActive by remember { mutableStateOf(false) }
+    var isEditMode by rememberSaveable { mutableStateOf(false) }
     val listState = rememberLazyListState()
+    val hapticFeedback = LocalHapticFeedback.current
     val coroutineScope = rememberCoroutineScope()
 
+    // Wiggle animation for edit mode
+    val wiggleTransition = rememberInfiniteTransition(label = "wiggle")
+    val wiggleAngle by wiggleTransition.animateFloat(
+        initialValue = -0.8f,
+        targetValue = 0.8f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 150),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "wiggleAngle"
+    )
+
     AppScaffold(
-        onBackButtonClick = { onIntent(ChecklistDetailIntent.OnBackClick) },
+        onBackButtonClick = {
+            if (isEditMode) {
+                isEditMode = false
+            } else {
+                onIntent(ChecklistDetailIntent.OnBackClick)
+            }
+        },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         actions = {
-            IconButton(
-                onClick = {
-                    if (addItemActive) {
-                        onIntent(ChecklistDetailIntent.OnQuickAddCancelled(hadText = false))
-                        addItemActive = false
-                    } else {
-                        addItemActive = true
-                        onIntent(ChecklistDetailIntent.OnQuickAddOpened)
-                        coroutineScope.launch {
-                            listState.animateScrollToItem(listState.layoutInfo.totalItemsCount - 1)
+            if (isEditMode) {
+                // Edit mode: only "Done" button
+                TextButton(onClick = { isEditMode = false }) {
+                    Text(
+                        text = stringResource(Res.string.done),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            } else {
+                // Normal mode: regular toolbar actions
+                IconButton(
+                    onClick = {
+                        if (addItemActive) {
+                            onIntent(ChecklistDetailIntent.OnQuickAddCancelled(hadText = false))
+                            addItemActive = false
+                        } else {
+                            addItemActive = true
+                            onIntent(ChecklistDetailIntent.OnQuickAddOpened)
+                            coroutineScope.launch {
+                                listState.animateScrollToItem(listState.layoutInfo.totalItemsCount - 1)
+                            }
                         }
                     }
+                ) {
+                    Icon(
+                        Icons.Outlined.Add,
+                        contentDescription = stringResource(Res.string.add_item)
+                    )
                 }
-            ) {
-                Icon(
-                    Icons.Outlined.Add,
-                    contentDescription = stringResource(Res.string.add_item)
-                )
-            }
-            IconButton(onClick = { onIntent(ChecklistDetailIntent.OnReminderClick) }) {
-                Icon(
-                    imageVector = if (state.checklist.reminderAt != null)
-                        Icons.Filled.Notifications
-                    else
-                        Icons.Outlined.Notifications,
-                    contentDescription = stringResource(Res.string.reminder_set_reminder),
-                    tint = if (state.checklist.reminderAt != null)
-                        MaterialTheme.colorScheme.primary
-                    else
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            IconButton(onClick = { onIntent(ChecklistDetailIntent.OnShareClick) }) {
-                Icon(Icons.Outlined.Share, contentDescription = stringResource(Res.string.share))
-            }
-            IconButton(onClick = { onIntent(ChecklistDetailIntent.OnEditChecklistClick) }) {
-                Icon(Icons.Outlined.Edit, contentDescription = stringResource(Res.string.checklist_edit))
-            }
-            IconButton(onClick = { onIntent(ChecklistDetailIntent.OnOverflowMenuClick) }) {
-                Icon(
-                    Icons.Filled.MoreVert,
-                    contentDescription = stringResource(Res.string.more_options)
-                )
+                IconButton(onClick = { onIntent(ChecklistDetailIntent.OnReminderClick) }) {
+                    Icon(
+                        imageVector = if (state.checklist.reminderAt != null)
+                            Icons.Filled.Notifications
+                        else
+                            Icons.Outlined.Notifications,
+                        contentDescription = stringResource(Res.string.reminder_set_reminder),
+                        tint = if (state.checklist.reminderAt != null)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                IconButton(onClick = { onIntent(ChecklistDetailIntent.OnShareClick) }) {
+                    Icon(Icons.Outlined.Share, contentDescription = stringResource(Res.string.share))
+                }
+                IconButton(onClick = { onIntent(ChecklistDetailIntent.OnEditChecklistClick) }) {
+                    Icon(Icons.Outlined.Edit, contentDescription = stringResource(Res.string.checklist_edit))
+                }
+                IconButton(onClick = { onIntent(ChecklistDetailIntent.OnOverflowMenuClick) }) {
+                    Icon(
+                        Icons.Filled.MoreVert,
+                        contentDescription = stringResource(Res.string.more_options)
+                    )
+                }
             }
         },
         bottomBar = {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shadowElevation = 8.dp,
-                color = MaterialTheme.colorScheme.surface
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
-                        .padding(top = AppDimens.SpacingMd, bottom = AppDimens.SpacingLg)
-                        .navigationBarsPadding(),
-                    verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
+            // Hide bottom bar in edit mode
+            if (!isEditMode) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shadowElevation = 8.dp,
+                    color = MaterialTheme.colorScheme.surface
                 ) {
-                    AppButtonSecondary(
-                        text = stringResource(Res.string.checklist_new_fill),
-                        onClick = { onIntent(ChecklistDetailIntent.OnAddFillClick) },
-                        icon = Icons.Outlined.ContentCopy,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    AppButton(
-                        text = stringResource(Res.string.checklist_add_fill_ai),
-                        onClick = { onIntent(ChecklistDetailIntent.OnAddFillViaAiClick) },
-                        icon = Icons.Outlined.AutoAwesome,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
+                            .padding(top = AppDimens.SpacingMd, bottom = AppDimens.SpacingLg)
+                            .navigationBarsPadding(),
+                        verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
+                    ) {
+                        AppButtonSecondary(
+                            text = stringResource(Res.string.checklist_new_fill),
+                            onClick = { onIntent(ChecklistDetailIntent.OnAddFillClick) },
+                            icon = Icons.Outlined.ContentCopy,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        AppButton(
+                            text = stringResource(Res.string.checklist_add_fill_ai),
+                            onClick = { onIntent(ChecklistDetailIntent.OnAddFillViaAiClick) },
+                            icon = Icons.Outlined.AutoAwesome,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
             }
         }
@@ -290,11 +344,9 @@ private fun ChecklistDetailContent(
                 CircularProgressIndicator()
             }
         } else {
-            val uncheckedItems by remember(defaultFill.items, state.separateCompleted) {
-                derivedStateOf {
-                    if (state.separateCompleted) defaultFill.items.filter { !it.checked }
-                    else defaultFill.items
-                }
+            val sourceUnchecked = remember(defaultFill.items, state.separateCompleted) {
+                if (state.separateCompleted) defaultFill.items.filter { !it.checked }
+                else defaultFill.items
             }
             val completedItems by remember(defaultFill.items, state.separateCompleted) {
                 derivedStateOf {
@@ -303,6 +355,24 @@ private fun ChecklistDetailContent(
                 }
             }
             var completedExpanded by remember { mutableStateOf(true) }
+
+            // Local mutable list for optimistic reorder (no DB writes during drag)
+            var localUnchecked by remember(sourceUnchecked) {
+                mutableStateOf(sourceUnchecked)
+            }
+
+            val reorderableState = rememberReorderableLazyListState(listState) { from, to ->
+                // Offset: title(0) + progress(1) + optional fills card(2) = 2 or 3 header items
+                val headerCount = 2 + (if (state.additionalFillsCount > 0) 1 else 0)
+                val fromIndex = from.index - headerCount
+                val toIndex = to.index - headerCount
+                if (fromIndex >= 0 && toIndex >= 0 && fromIndex < localUnchecked.size && toIndex < localUnchecked.size) {
+                    localUnchecked = localUnchecked.toMutableList().apply {
+                        add(toIndex, removeAt(fromIndex))
+                    }
+                    hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                }
+            }
 
             LazyColumn(
                 state = listState,
@@ -338,22 +408,46 @@ private fun ChecklistDetailContent(
 
                 // Unchecked items (or all items when separateCompleted is off)
                 items(
-                    count = uncheckedItems.size,
-                    key = { uncheckedItems[it].id }
+                    count = localUnchecked.size,
+                    key = { localUnchecked[it].id }
                 ) { index ->
-                    val item = uncheckedItems[index]
-                    ChecklistItemCard(
-                        item = item,
-                        onCheckedChange = { checked ->
-                            onIntent(ChecklistDetailIntent.OnItemCheckedChange(item.id, checked))
-                        },
-                        onNoteClick = { onIntent(ChecklistDetailIntent.OnAddNoteClick(item.id)) },
-                        modifier = Modifier.animateItem()
-                    )
+                    val item = localUnchecked[index]
+                    ReorderableItem(
+                        state = reorderableState,
+                        key = item.id,
+                        enabled = isEditMode
+                    ) { isDragging ->
+                        ChecklistItemCard(
+                            item = item,
+                            isDragging = isDragging,
+                            isEditMode = isEditMode,
+                            wiggleAngle = wiggleAngle,
+                            onCheckedChange = { checked ->
+                                onIntent(ChecklistDetailIntent.OnItemCheckedChange(item.id, checked))
+                            },
+                            onNoteClick = { onIntent(ChecklistDetailIntent.OnAddNoteClick(item.id)) },
+                            onLongClick = {
+                                if (!isEditMode) {
+                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    isEditMode = true
+                                }
+                            },
+                            onDeleteClick = { onIntent(ChecklistDetailIntent.OnDeleteItemClick(item.id)) },
+                            cardDragModifier = Modifier.draggableHandle(
+                                onDragStarted = {
+                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                },
+                                onDragStopped = {
+                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onIntent(ChecklistDetailIntent.OnFinalizeReorder(localUnchecked.map { it.id }))
+                                }
+                            )
+                        )
+                    }
                 }
 
                 // Inline add item input (shown when toolbar "+" is tapped)
-                if (addItemActive) {
+                if (addItemActive && !isEditMode) {
                     item(key = "inline_add_item") {
                         InlineAddItemInput(
                             onAddItem = { onIntent(ChecklistDetailIntent.OnAddItem(it)) },
@@ -390,11 +484,20 @@ private fun ChecklistDetailContent(
                             val item = completedItems[index]
                             ChecklistItemCard(
                                 item = item,
+                                isDragging = false,
+                                isEditMode = isEditMode,
+                                wiggleAngle = wiggleAngle,
                                 onCheckedChange = { checked ->
                                     onIntent(ChecklistDetailIntent.OnItemCheckedChange(item.id, checked))
                                 },
                                 onNoteClick = { onIntent(ChecklistDetailIntent.OnAddNoteClick(item.id)) },
-                                modifier = Modifier.animateItem()
+                                onLongClick = {
+                                    if (!isEditMode) {
+                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        isEditMode = true
+                                    }
+                                },
+                                onDeleteClick = { onIntent(ChecklistDetailIntent.OnDeleteItemClick(item.id)) }
                             )
                         }
                     }
@@ -436,6 +539,17 @@ private fun ChecklistDetailContent(
             checklistName = state.checklist.name,
             onConfirm = { onIntent(ChecklistDetailIntent.OnConfirmDeleteChecklist) },
             onDismiss = { onIntent(ChecklistDetailIntent.OnDismissDeleteConfirmation) }
+        )
+    }
+
+    // Delete item confirmation dialog
+    if (state.showDeleteItemConfirmation && state.itemPendingDeleteId != null) {
+        val itemText = state.defaultFill?.items
+            ?.firstOrNull { it.id == state.itemPendingDeleteId }?.text.orEmpty()
+        DeleteItemConfirmationDialog(
+            itemText = itemText,
+            onConfirm = { onIntent(ChecklistDetailIntent.OnConfirmDeleteItem) },
+            onDismiss = { onIntent(ChecklistDetailIntent.OnDismissDeleteItemDialog) }
         )
     }
 
@@ -639,26 +753,76 @@ private fun ViewAllFillsCard(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ChecklistItemCard(
     item: ChecklistFillItem,
+    isDragging: Boolean,
+    isEditMode: Boolean,
+    wiggleAngle: Float,
     onCheckedChange: (Boolean) -> Unit,
     onNoteClick: () -> Unit,
+    onLongClick: () -> Unit,
+    onDeleteClick: () -> Unit,
+    cardDragModifier: Modifier = Modifier,
     modifier: Modifier = Modifier
 ) {
-    AppCard(
-        onClick = { onCheckedChange(!item.checked) },
+    val elevation by animateDpAsState(
+        if (isDragging) 8.dp else AppDimens.CardElevation
+    )
+
+    Card(
         modifier = modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                if (isEditMode && !isDragging) {
+                    rotationZ = wiggleAngle
+                }
+            }
+            .then(
+                if (isEditMode) {
+                    cardDragModifier
+                } else {
+                    Modifier.combinedClickable(
+                        onClick = { onCheckedChange(!item.checked) },
+                        onLongClick = onLongClick
+                    )
+                }
+            ),
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = elevation)
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.fillMaxWidth().padding(AppDimens.CardPadding)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Checkbox(
-                    checked = item.checked,
-                    onCheckedChange = onCheckedChange
-                )
+                if (isEditMode) {
+                    // Edit mode: red delete button
+                    IconButton(
+                        onClick = onDeleteClick,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            Icons.Filled.RemoveCircle,
+                            contentDescription = stringResource(Res.string.delete_item),
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
+
+                if (!isEditMode) {
+                    Checkbox(
+                        checked = item.checked,
+                        onCheckedChange = onCheckedChange
+                    )
+                }
+
                 Text(
                     text = item.text,
                     style = MaterialTheme.typography.bodyLarge,
@@ -668,31 +832,38 @@ private fun ChecklistItemCard(
                         MaterialTheme.colorScheme.onSurface
                     },
                     textDecoration = if (item.checked) TextDecoration.LineThrough else null,
-                    modifier = Modifier.weight(1f)
-                )
-                IconButton(onClick = onNoteClick) {
-                    Icon(
-                        Icons.Outlined.NoteAdd,
-                        contentDescription = stringResource(Res.string.fill_add_note),
-                        tint = if (item.note != null) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                        modifier = Modifier.size(20.dp)
+                    modifier = Modifier.weight(1f).padding(
+                        start = if (isEditMode) AppDimens.SpacingSm else 0.dp
                     )
+                )
+
+                if (!isEditMode) {
+                    IconButton(onClick = onNoteClick) {
+                        Icon(
+                            Icons.Outlined.NoteAdd,
+                            contentDescription = stringResource(Res.string.fill_add_note),
+                            tint = if (item.note != null) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
 
-            item.note?.let { note ->
-                Text(
-                    text = note,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(start = 48.dp, end = 48.dp, bottom = AppDimens.SpacingSm)
-                )
+            if (!isEditMode) {
+                item.note?.let { note ->
+                    Text(
+                        text = note,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(start = 48.dp, end = 48.dp, bottom = AppDimens.SpacingSm)
+                    )
+                }
             }
         }
     }
@@ -786,6 +957,35 @@ private fun AddFillDialog(
                     onClick = onDismiss
                 )
             }
+        },
+        containerColor = MaterialTheme.colorScheme.surface,
+        shape = MaterialTheme.shapes.large
+    )
+}
+
+@Composable
+private fun DeleteItemConfirmationDialog(
+    itemText: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(Res.string.detail_delete_item_title)) },
+        text = {
+            Text(stringResource(Res.string.detail_delete_item_message, itemText))
+        },
+        confirmButton = {
+            AppButton(
+                text = stringResource(Res.string.delete),
+                onClick = onConfirm
+            )
+        },
+        dismissButton = {
+            AppButtonText(
+                text = stringResource(Res.string.cancel),
+                onClick = onDismiss
+            )
         },
         containerColor = MaterialTheme.colorScheme.surface,
         shape = MaterialTheme.shapes.large
