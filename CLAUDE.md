@@ -8,6 +8,31 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 > **iOS release strategy**: iOS version will be published after Android revenue covers the Apple Developer Program fee ($99/year). Until then, iOS target exists in code but is not actively released.
 
+### Public Repository
+
+This is an **open-source public repository**. All code, commits, and PR history are visible to everyone.
+
+**NEVER commit:**
+- API keys, tokens, passwords, or secrets of any kind
+- `google-services.json` / `GoogleService-Info.plist` (Firebase config with API keys)
+- Service account JSON files
+- `.env` files with real values
+- Security audit documents that reference real credentials
+
+**Already in `.gitignore`:**
+- `.claude/` — local Claude Code config
+- `docs/` — local working notes (some contain real API keys)
+- `commonMain/` — generated/vendored stubs
+- `SECURITY.md`, `SECURITY_DELIVERY_SUMMARY.txt` — security docs with real keys
+- `hosting/.firebase/` — Firebase cache
+
+**Safe to commit** (not secrets):
+- Firebase project ID (`aichecklists-40230`) — public by design, visible in every Firebase URL and in the APK
+- `.firebaserc` — project alias mapping
+- `firebase.json` — hosting/functions config (no keys)
+
+Before committing any new file, verify it does not contain patterns like `AIzaSy*`, hardcoded tokens, or credentials.
+
 ### Product Concept
 
 Gisti transforms any content into actionable checklists using AI. The app has **three core AI-powered features**:
