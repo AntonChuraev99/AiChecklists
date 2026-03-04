@@ -4,7 +4,31 @@ import com.antonchuraev.homesearchchecklist.core.common.api.Intent
 import com.antonchuraev.homesearchchecklist.core.common.api.State
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatEndCondition
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatType
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.UserLimits
+
+/**
+ * Groups all mutable repeat configuration fields into a single object.
+ * Null when repeat rule sheet is closed; non-null with defaults when open.
+ */
+data class PendingRepeatConfig(
+    val type: RepeatType = RepeatType.DAILY,
+    val interval: Int = 1,
+    val weekDays: Set<Int> = emptySet(),
+    val endCondition: RepeatEndCondition = RepeatEndCondition.Never,
+    val resetChecks: Boolean = false,
+    val isCustom: Boolean = false
+) {
+    fun toRule(): ReminderRepeatRule = ReminderRepeatRule(
+        type = type,
+        interval = interval,
+        weekDays = weekDays.takeIf { it.isNotEmpty() && type == RepeatType.WEEKLY },
+        endCondition = endCondition,
+        resetChecks = resetChecks
+    )
+}
 
 sealed interface ChecklistDetailState : State {
     data object Loading : ChecklistDetailState
@@ -37,7 +61,12 @@ sealed interface ChecklistDetailState : State {
         val separateCompleted: Boolean = false,
         val autoDeleteCompleted: Boolean = false,
         val showDeleteItemConfirmation: Boolean = false,
-        val itemPendingDeleteId: String? = null
+        val itemPendingDeleteId: String? = null,
+        // Repeat rule configuration
+        val showRepeatRuleSheet: Boolean = false,
+        val pendingRepeatConfig: PendingRepeatConfig? = null,
+        val showEndConditionPicker: Boolean = false,
+        val repeatRuleSummary: String? = null
     ) : ChecklistDetailState
 }
 
@@ -108,6 +137,20 @@ sealed interface ChecklistDetailIntent : Intent {
     data class OnCompletedSectionToggle(val expanded: Boolean, val completedCount: Int) : ChecklistDetailIntent
     data object OnQuickAddOpened : ChecklistDetailIntent
     data class OnQuickAddCancelled(val hadText: Boolean) : ChecklistDetailIntent
+
+    // Repeat rule
+    data object OnRepeatRuleClick : ChecklistDetailIntent
+    data class OnRepeatTypeSelected(val type: RepeatType?) : ChecklistDetailIntent
+    data class OnRepeatIntervalChanged(val interval: Int) : ChecklistDetailIntent
+    data class OnWeekDayToggled(val dayNumber: Int) : ChecklistDetailIntent
+    data class OnResetChecksToggled(val enabled: Boolean) : ChecklistDetailIntent
+    data object OnDismissRepeatRuleSheet : ChecklistDetailIntent
+    data object OnSaveRepeatRule : ChecklistDetailIntent
+
+    // End condition
+    data object OnEndConditionClick : ChecklistDetailIntent
+    data class OnEndConditionSelected(val condition: RepeatEndCondition) : ChecklistDetailIntent
+    data object OnDismissEndConditionPicker : ChecklistDetailIntent
 
     // Exact alarm permission
     data object OnExactAlarmOpenSettings : ChecklistDetailIntent

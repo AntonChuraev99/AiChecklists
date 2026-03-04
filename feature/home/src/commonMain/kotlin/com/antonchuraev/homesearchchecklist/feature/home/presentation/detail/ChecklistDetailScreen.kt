@@ -128,6 +128,9 @@ import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatEndCondition
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatType
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
@@ -589,10 +592,37 @@ private fun ChecklistDetailContent(
     if (state.showReminderSheet) {
         ReminderBottomSheet(
             currentReminder = state.checklist.reminderAt,
+            repeatRuleSummary = state.repeatRuleSummary ?: state.checklist.repeatRule?.let { rule ->
+                buildRepeatRuleSummaryText(rule)
+            },
             onPresetSelected = { onIntent(ChecklistDetailIntent.OnReminderPresetSelected(it)) },
             onCustomDateRequested = { onIntent(ChecklistDetailIntent.OnCustomDateRequested) },
+            onRepeatClick = { onIntent(ChecklistDetailIntent.OnRepeatRuleClick) },
             onRemoveReminder = { onIntent(ChecklistDetailIntent.OnRemoveReminder) },
             onDismiss = { onIntent(ChecklistDetailIntent.OnDismissReminderUI) }
+        )
+    }
+
+    // Repeat rule bottom sheet
+    if (state.showRepeatRuleSheet && state.pendingRepeatConfig != null) {
+        RepeatRuleSheet(
+            config = state.pendingRepeatConfig,
+            showEndConditionPicker = state.showEndConditionPicker,
+            onTypeSelected = { onIntent(ChecklistDetailIntent.OnRepeatTypeSelected(it)) },
+            onCustomToggle = {
+                onIntent(ChecklistDetailIntent.OnRepeatTypeSelected(state.pendingRepeatConfig.type))
+                // Toggle custom mode by updating isCustom
+                val current = state.pendingRepeatConfig
+                onIntent(ChecklistDetailIntent.OnRepeatIntervalChanged(current.interval))
+            },
+            onIntervalChanged = { onIntent(ChecklistDetailIntent.OnRepeatIntervalChanged(it)) },
+            onWeekDayToggled = { onIntent(ChecklistDetailIntent.OnWeekDayToggled(it)) },
+            onResetChecksToggled = { onIntent(ChecklistDetailIntent.OnResetChecksToggled(it)) },
+            onEndConditionClick = { onIntent(ChecklistDetailIntent.OnEndConditionClick) },
+            onEndConditionSelected = { onIntent(ChecklistDetailIntent.OnEndConditionSelected(it)) },
+            onDismissEndCondition = { onIntent(ChecklistDetailIntent.OnDismissEndConditionPicker) },
+            onSave = { onIntent(ChecklistDetailIntent.OnSaveRepeatRule) },
+            onDismiss = { onIntent(ChecklistDetailIntent.OnDismissRepeatRuleSheet) }
         )
     }
 
@@ -1268,8 +1298,10 @@ private fun NotificationFeatureRow(
 @Composable
 private fun ReminderBottomSheet(
     currentReminder: Long?,
+    repeatRuleSummary: String?,
     onPresetSelected: (Long) -> Unit,
     onCustomDateRequested: () -> Unit,
+    onRepeatClick: () -> Unit,
     onRemoveReminder: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -1322,6 +1354,13 @@ private fun ReminderBottomSheet(
                 onClick = onCustomDateRequested
             )
 
+            // Repeat rule row
+            HorizontalDivider(modifier = Modifier.padding(vertical = AppDimens.SpacingSm))
+            RepeatRuleRow(
+                summary = repeatRuleSummary,
+                onClick = onRepeatClick
+            )
+
             if (currentReminder != null) {
                 HorizontalDivider(modifier = Modifier.padding(vertical = AppDimens.SpacingSm))
                 AppButtonText(
@@ -1330,6 +1369,46 @@ private fun ReminderBottomSheet(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun RepeatRuleRow(
+    summary: String?,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = AppDimens.SpacingMd, horizontal = AppDimens.SpacingSm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.Schedule,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(24.dp)
+        )
+        Text(
+            text = stringResource(Res.string.reminder_repeat_label),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(modifier = Modifier.weight(1f))
+        Text(
+            text = summary ?: stringResource(Res.string.reminder_repeat_none),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp)
+        )
     }
 }
 
@@ -1393,6 +1472,411 @@ private fun CurrentReminderCard(reminderAtMillis: Long) {
             )
         }
     }
+}
+
+private fun buildRepeatRuleSummaryText(rule: ReminderRepeatRule): String {
+    return when (rule.type) {
+        RepeatType.DAILY -> if (rule.interval == 1) "Every day" else "Every ${rule.interval} days"
+        RepeatType.WEEKLY -> {
+            val days = rule.weekDays.orEmpty()
+            if (days.isNotEmpty()) {
+                val dayNames = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+                val selected = days.sorted().map { dayNames[it - 1] }
+                if (selected == listOf("Mon", "Tue", "Wed", "Thu", "Fri")) "Mon–Fri"
+                else selected.joinToString(", ")
+            } else if (rule.interval == 1) "Every week"
+            else "Every ${rule.interval} weeks"
+        }
+        RepeatType.MONTHLY -> if (rule.interval == 1) "Every month" else "Every ${rule.interval} months"
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RepeatRuleSheet(
+    config: PendingRepeatConfig,
+    showEndConditionPicker: Boolean,
+    onTypeSelected: (RepeatType?) -> Unit,
+    onCustomToggle: () -> Unit,
+    onIntervalChanged: (Int) -> Unit,
+    onWeekDayToggled: (Int) -> Unit,
+    onResetChecksToggled: (Boolean) -> Unit,
+    onEndConditionClick: () -> Unit,
+    onEndConditionSelected: (RepeatEndCondition) -> Unit,
+    onDismissEndCondition: () -> Unit,
+    onSave: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .navigationBarsPadding()
+                .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
+                .padding(bottom = AppDimens.SpacingXxl),
+            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
+        ) {
+            Text(
+                text = stringResource(Res.string.reminder_repeat_title),
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(bottom = AppDimens.SpacingSm)
+            )
+
+            // Type options
+            RepeatTypeOption(
+                text = stringResource(Res.string.reminder_repeat_none),
+                selected = !config.isCustom && config.interval == 1 && config.type == RepeatType.DAILY && config.weekDays.isEmpty()
+                    && config == PendingRepeatConfig(),
+                onClick = { onTypeSelected(null) }
+            )
+            RepeatTypeOption(
+                text = stringResource(Res.string.reminder_repeat_daily),
+                selected = !config.isCustom && config.type == RepeatType.DAILY && config.interval == 1,
+                onClick = { onTypeSelected(RepeatType.DAILY) }
+            )
+            RepeatTypeOption(
+                text = stringResource(Res.string.reminder_repeat_weekly),
+                selected = !config.isCustom && config.type == RepeatType.WEEKLY && config.interval == 1 && config.weekDays.isEmpty(),
+                onClick = { onTypeSelected(RepeatType.WEEKLY) }
+            )
+            RepeatTypeOption(
+                text = stringResource(Res.string.reminder_repeat_monthly),
+                selected = !config.isCustom && config.type == RepeatType.MONTHLY && config.interval == 1,
+                onClick = { onTypeSelected(RepeatType.MONTHLY) }
+            )
+
+            // Custom option
+            var customExpanded by rememberSaveable { mutableStateOf(config.isCustom) }
+            RepeatTypeOption(
+                text = stringResource(Res.string.reminder_repeat_custom),
+                selected = config.isCustom || customExpanded,
+                onClick = { customExpanded = !customExpanded }
+            )
+
+            // Custom interval section
+            AnimatedVisibility(visible = customExpanded || config.isCustom) {
+                CustomRepeatSection(
+                    config = config,
+                    onTypeChanged = { onTypeSelected(it) },
+                    onIntervalChanged = onIntervalChanged,
+                    onWeekDayToggled = onWeekDayToggled
+                )
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = AppDimens.SpacingSm))
+
+            // Reset checkboxes toggle
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable { onResetChecksToggled(!config.resetChecks) }
+                    .padding(vertical = AppDimens.SpacingSm),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(Res.string.reminder_reset_checks),
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = stringResource(Res.string.reminder_reset_checks_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                AppSwitch(
+                    checked = config.resetChecks,
+                    onCheckedChange = null
+                )
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = AppDimens.SpacingSm))
+
+            // End condition row
+            val endConditionText = when (config.endCondition) {
+                is RepeatEndCondition.Never -> stringResource(Res.string.reminder_ends_never)
+                is RepeatEndCondition.UntilDate -> {
+                    val dt = Instant.fromEpochMilliseconds(config.endCondition.dateMillis)
+                        .toLocalDateTime(TimeZone.currentSystemDefault())
+                    stringResource(Res.string.reminder_ends_on_date) + " ${formatReminderDateTime(dt)}"
+                }
+                is RepeatEndCondition.AfterCount -> "${config.endCondition.maxCount} ${stringResource(Res.string.reminder_ends_occurrences)}"
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable(onClick = onEndConditionClick)
+                    .padding(vertical = AppDimens.SpacingMd),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(Res.string.reminder_ends),
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                Text(
+                    text = endConditionText,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
+
+            // Save button
+            AppButton(
+                text = stringResource(Res.string.reminder_repeat_save),
+                onClick = onSave,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+
+    // End condition picker dialog
+    if (showEndConditionPicker) {
+        EndConditionDialog(
+            currentCondition = config.endCondition,
+            onConditionSelected = onEndConditionSelected,
+            onDismiss = onDismissEndCondition
+        )
+    }
+}
+
+@Composable
+private fun RepeatTypeOption(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = AppDimens.SpacingSm, horizontal = AppDimens.SpacingXs),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
+    ) {
+        Icon(
+            imageVector = if (selected) Icons.Filled.CheckCircle else Icons.Outlined.CheckCircle,
+            contentDescription = null,
+            tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+            modifier = Modifier.size(24.dp)
+        )
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal
+        )
+    }
+}
+
+@Composable
+private fun CustomRepeatSection(
+    config: PendingRepeatConfig,
+    onTypeChanged: (RepeatType) -> Unit,
+    onIntervalChanged: (Int) -> Unit,
+    onWeekDayToggled: (Int) -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+    ) {
+        Column(
+            modifier = Modifier.padding(AppDimens.SpacingLg),
+            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
+        ) {
+            // "Every [N] [type]" row
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
+            ) {
+                Text(
+                    text = stringResource(Res.string.reminder_repeat_every),
+                    style = MaterialTheme.typography.bodyLarge
+                )
+
+                // Interval input
+                var intervalText by rememberSaveable(config.interval) {
+                    mutableStateOf(config.interval.toString())
+                }
+                AppTextField(
+                    value = intervalText,
+                    onValueChange = { text ->
+                        intervalText = text.filter { it.isDigit() }.take(2)
+                        intervalText.toIntOrNull()?.let { onIntervalChanged(it) }
+                    },
+                    modifier = Modifier.width(56.dp),
+                    keyboardOptions = KeyboardOptions(
+                        imeAction = ImeAction.Done
+                    )
+                )
+
+                // Type selector chips
+                val types = listOf(
+                    RepeatType.DAILY to stringResource(Res.string.reminder_repeat_days),
+                    RepeatType.WEEKLY to stringResource(Res.string.reminder_repeat_weeks),
+                    RepeatType.MONTHLY to stringResource(Res.string.reminder_repeat_months)
+                )
+                types.forEach { (type, label) ->
+                    val selected = config.type == type
+                    Surface(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(16.dp))
+                            .clickable { onTypeChanged(type) },
+                        color = if (selected) MaterialTheme.colorScheme.primaryContainer
+                        else MaterialTheme.colorScheme.surface,
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (selected) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(
+                                horizontal = AppDimens.SpacingMd,
+                                vertical = AppDimens.SpacingXs
+                            )
+                        )
+                    }
+                }
+            }
+
+            // Weekday chips (only for WEEKLY type)
+            if (config.type == RepeatType.WEEKLY) {
+                val dayLabels = listOf(
+                    1 to stringResource(Res.string.reminder_weekday_mon),
+                    2 to stringResource(Res.string.reminder_weekday_tue),
+                    3 to stringResource(Res.string.reminder_weekday_wed),
+                    4 to stringResource(Res.string.reminder_weekday_thu),
+                    5 to stringResource(Res.string.reminder_weekday_fri),
+                    6 to stringResource(Res.string.reminder_weekday_sat),
+                    7 to stringResource(Res.string.reminder_weekday_sun)
+                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    dayLabels.forEach { (dayNumber, label) ->
+                        val isSelected = dayNumber in config.weekDays
+                        Surface(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .clickable { onWeekDayToggled(dayNumber) },
+                            shape = CircleShape,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.surfaceVariant
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = label,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary
+                                    else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EndConditionDialog(
+    currentCondition: RepeatEndCondition,
+    onConditionSelected: (RepeatEndCondition) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var selectedType by rememberSaveable {
+        mutableStateOf(
+            when (currentCondition) {
+                is RepeatEndCondition.Never -> "never"
+                is RepeatEndCondition.UntilDate -> "date"
+                is RepeatEndCondition.AfterCount -> "count"
+            }
+        )
+    }
+    var countText by rememberSaveable {
+        mutableStateOf(
+            (currentCondition as? RepeatEndCondition.AfterCount)?.maxCount?.toString() ?: "10"
+        )
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(Res.string.reminder_ends)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)) {
+                // Never
+                RepeatTypeOption(
+                    text = stringResource(Res.string.reminder_ends_never),
+                    selected = selectedType == "never",
+                    onClick = { selectedType = "never" }
+                )
+                // After N occurrences
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RepeatTypeOption(
+                        text = stringResource(Res.string.reminder_ends_after_count),
+                        selected = selectedType == "count",
+                        onClick = { selectedType = "count" }
+                    )
+                }
+                if (selectedType == "count") {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
+                        modifier = Modifier.padding(start = AppDimens.SpacingXxl)
+                    ) {
+                        AppTextField(
+                            value = countText,
+                            onValueChange = { text ->
+                                countText = text.filter { it.isDigit() }.take(3)
+                            },
+                            modifier = Modifier.width(64.dp),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done)
+                        )
+                        Text(
+                            text = stringResource(Res.string.reminder_ends_occurrences),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            AppButtonText(
+                text = stringResource(Res.string.reminder_ends_done),
+                onClick = {
+                    val condition = when (selectedType) {
+                        "count" -> RepeatEndCondition.AfterCount(countText.toIntOrNull()?.coerceIn(1, 999) ?: 10)
+                        else -> RepeatEndCondition.Never
+                    }
+                    onConditionSelected(condition)
+                }
+            )
+        },
+        dismissButton = {
+            AppButtonText(text = stringResource(Res.string.cancel), onClick = onDismiss)
+        }
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
