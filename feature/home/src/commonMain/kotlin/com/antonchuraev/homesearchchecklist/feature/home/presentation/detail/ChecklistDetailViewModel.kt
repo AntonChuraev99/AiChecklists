@@ -706,14 +706,7 @@ class ChecklistDetailViewModel(
         }
     }
 
-    private fun handleRepeatTypeSelected(type: RepeatType?) {
-        if (type == null) {
-            // "Don't repeat" selected — clear config
-            updateContentState {
-                it.copy(pendingRepeatConfig = PendingRepeatConfig().copy(isCustom = false))
-            }
-            return
-        }
+    private fun handleRepeatTypeSelected(type: RepeatType) {
         updatePendingRepeatConfig {
             it.copy(
                 type = type,

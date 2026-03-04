@@ -1496,7 +1496,7 @@ private fun buildRepeatRuleSummaryText(rule: ReminderRepeatRule): String {
 private fun RepeatRuleSheet(
     config: PendingRepeatConfig,
     showEndConditionPicker: Boolean,
-    onTypeSelected: (RepeatType?) -> Unit,
+    onTypeSelected: (RepeatType) -> Unit,
     onCustomToggle: () -> Unit,
     onIntervalChanged: (Int) -> Unit,
     onWeekDayToggled: (Int) -> Unit,
@@ -1529,12 +1529,6 @@ private fun RepeatRuleSheet(
             )
 
             // Type options
-            RepeatTypeOption(
-                text = stringResource(Res.string.reminder_repeat_none),
-                selected = !config.isCustom && config.interval == 1 && config.type == RepeatType.DAILY && config.weekDays.isEmpty()
-                    && config == PendingRepeatConfig(),
-                onClick = { onTypeSelected(null) }
-            )
             RepeatTypeOption(
                 text = stringResource(Res.string.reminder_repeat_daily),
                 selected = !config.isCustom && config.type == RepeatType.DAILY && config.interval == 1,
