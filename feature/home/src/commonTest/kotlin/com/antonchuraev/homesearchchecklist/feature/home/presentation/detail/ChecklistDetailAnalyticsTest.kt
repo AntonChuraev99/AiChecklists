@@ -233,6 +233,15 @@ class ChecklistDetailAnalyticsTest {
         override suspend fun updateFill(fill: ChecklistFill) {}
         override suspend fun deleteFill(fill: ChecklistFill) {}
         override suspend fun reorderChecklists(orderedIds: List<Long>) {}
+
+        // Recurring reminders
+        override suspend fun setReminderWithRule(checklistId: Long, reminderAt: Long?, repeatRule: com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule?) {}
+        override suspend fun advanceRecurringReminder(checklistId: Long, nextReminderAt: Long?, newCount: Int) {}
+        override suspend fun clearRecurringReminder(checklistId: Long) {}
+        override suspend fun setRepeatRule(checklistId: Long, rule: com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule?) {}
+        override suspend fun resetDefaultFillChecks(checklistId: Long) {}
+        override suspend fun countRecurringReminders(): Int = 0
+        override suspend fun getPastDueRecurringReminders(nowMillis: Long): List<com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistRecurringInfo> = emptyList()
     }
 
     private class FakeAppNavigator : AppNavigator {

@@ -6,11 +6,15 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.TaskStackBuilder
 import com.antonchuraev.aichecklists.R
 import com.antonchuraev.homesearchchecklist.MainActivity
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.computeNextOccurrence
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -26,18 +30,51 @@ class ReminderReceiver : BroadcastReceiver() {
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val repository: ChecklistRepository =
-                    GlobalContext.getOrNull()?.get() ?: return@launch
+                val koin = GlobalContext.getOrNull() ?: return@launch
+                val repository: ChecklistRepository = koin.get()
 
                 val checklist = repository.getChecklistById(checklistId) ?: return@launch
                 val defaultFill = repository.getDefaultFillOneShot(checklistId)
                 val uncheckedCount = defaultFill?.items?.count { !it.checked } ?: 0
 
-                repository.setReminder(checklistId, null)
+                val repeatRule = checklist.repeatRule
+                if (repeatRule == null) {
+                    // One-shot reminder: clear and show notification
+                    repository.setReminder(checklistId, null)
+                } else {
+                    // Recurring reminder: compute next occurrence
+                    val now = System.currentTimeMillis()
+                    val nextOccurrence = repeatRule.computeNextOccurrence(
+                        currentTriggerMillis = checklist.reminderAt ?: now,
+                        currentCount = checklist.repeatOccurrenceCount,
+                        nowMillis = now
+                    )
+
+                    if (nextOccurrence != null) {
+                        // Atomic: update reminderAt + increment count in one SQL statement
+                        repository.advanceRecurringReminder(
+                            checklistId = checklistId,
+                            nextReminderAt = nextOccurrence,
+                            newCount = checklist.repeatOccurrenceCount + 1
+                        )
+                        val scheduler: ChecklistReminderScheduler = koin.get()
+                        scheduler.schedule(checklistId, nextOccurrence)
+
+                        // Auto-reset checkboxes if enabled
+                        if (repeatRule.resetChecks) {
+                            repository.resetDefaultFillChecks(checklistId)
+                        }
+                    } else {
+                        // End condition reached — stop repeating
+                        repository.clearRecurringReminder(checklistId)
+                    }
+                }
 
                 showNotification(context, checklistId, checklist.name, uncheckedCount)
-            } catch (_: Exception) {
-                // Do not crash the receiver
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e(TAG, "Error processing reminder for checklist", e)
             } finally {
                 pendingResult.finish()
             }
@@ -99,6 +136,7 @@ class ReminderReceiver : BroadcastReceiver() {
     }
 
     companion object {
+        private const val TAG = "ReminderReceiver"
         const val ACTION_FIRE = "com.antonchuraev.aichecklists.ACTION_REMINDER_FIRE"
         const val EXTRA_CHECKLIST_ID = "checklist_id"
         const val ACTION_OPEN_CHECKLIST = "com.antonchuraev.aichecklists.action.OPEN_CHECKLIST"

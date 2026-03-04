@@ -4,7 +4,9 @@ import android.app.AlarmManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -26,8 +28,10 @@ class ExactAlarmPermissionReceiver : BroadcastReceiver() {
                 val scheduler: ChecklistReminderScheduler =
                     GlobalContext.getOrNull()?.get() ?: return@launch
                 scheduler.rescheduleAllActive()
-            } catch (_: Exception) {
-                // Non-critical
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e("ExactAlarmReceiver", "Error rescheduling alarms", e)
             } finally {
                 pendingResult.finish()
             }
