@@ -575,12 +575,22 @@ class ChecklistDetailViewModel(
     private fun removeReminder() {
         viewModelScope.launch {
             val state = _screenState.value as? ChecklistDetailState.Content ?: return@launch
-            repository.setReminder(state.checklist.id, null)
-            reminderScheduler.cancel(state.checklist.id)
-            updateContentState {
-                it.copy(checklist = it.checklist.copy(reminderAt = null))
+            val checklist = state.checklist
+            if (checklist.repeatRule != null) {
+                // Clear recurring reminder: reminderAt, repeatRule, and occurrenceCount
+                repository.clearRecurringReminder(checklist.id)
+            } else {
+                repository.setReminder(checklist.id, null)
             }
-            analyticsTracker.event("reminder_cancelled", mapOf("checklist_id" to state.checklist.id.toString()))
+            reminderScheduler.cancel(checklist.id)
+            updateContentState {
+                it.copy(checklist = it.checklist.copy(
+                    reminderAt = null,
+                    repeatRule = null,
+                    repeatOccurrenceCount = 0
+                ))
+            }
+            analyticsTracker.event("reminder_cancelled", mapOf("checklist_id" to checklist.id.toString()))
         }
     }
 
