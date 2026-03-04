@@ -43,12 +43,19 @@ val MIGRATION_6_7 = object : Migration(6, 7) {
     }
 }
 
+val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(connection: SQLiteConnection) {
+        connection.execSQL("ALTER TABLE checklists ADD COLUMN repeatRule TEXT DEFAULT NULL")
+        connection.execSQL("ALTER TABLE checklists ADD COLUMN repeatOccurrenceCount INTEGER NOT NULL DEFAULT 0")
+    }
+}
+
 @Database(
     entities = [ChecklistEntity::class, ChecklistFillEntity::class],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
-@TypeConverters(ChecklistItemConverters::class)
+@TypeConverters(ChecklistItemConverters::class, ReminderConverters::class)
 @ConstructedBy(ChecklistDatabaseConstructor::class)
 abstract class ChecklistDatabase : RoomDatabase() {
     abstract fun checklistDao(): ChecklistDao
@@ -59,7 +66,7 @@ abstract class ChecklistDatabase : RoomDatabase() {
             builder: Builder<ChecklistDatabase>
         ): ChecklistDatabase {
             return builder
-                .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                 .fallbackToDestructiveMigration(dropAllTables = false)
                 .setQueryCoroutineContext(Dispatchers.IO)
                 .build()

@@ -13,6 +13,8 @@ data class Checklist(
     val name: String,
     val items: List<ChecklistItem>,
     val reminderAt: Long? = null,
+    val repeatRule: ReminderRepeatRule? = null,
+    val repeatOccurrenceCount: Int = 0,
     val separateCompleted: Boolean = false,
     val position: Int = 0,
     val autoDeleteCompleted: Boolean = false
