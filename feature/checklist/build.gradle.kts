@@ -28,9 +28,13 @@ kotlin {
             implementation(libs.bundles.koin.library)
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)
+            implementation(libs.kotlinx.datetime)
 
             implementation(libs.room.runtime)
             implementation(libs.sqlite.bundled)
+        }
+        commonTest.dependencies {
+            implementation(libs.kotlin.test)
         }
         androidMain.dependencies {
             implementation(libs.room.ktx)

@@ -5,9 +5,18 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
 import kotlinx.coroutines.flow.Flow
 
 data class ChecklistReminderInfo(val id: Long, val name: String, val reminderAt: Long)
+
+data class ChecklistRecurringInfo(
+    val id: Long,
+    val name: String,
+    val reminderAt: Long,
+    val repeatRule: ReminderRepeatRule?,
+    val repeatOccurrenceCount: Int
+)
 
 @Dao
 interface ChecklistDao {
@@ -52,5 +61,43 @@ interface ChecklistDao {
 
     @Query("SELECT id, name, reminderAt FROM checklists WHERE reminderAt IS NOT NULL AND reminderAt > :nowMillis")
     suspend fun getActiveReminders(nowMillis: Long): List<ChecklistReminderInfo>
+
+    // ─── Recurring reminder atomic operations ───
+
+    @Query("""
+        UPDATE checklists
+        SET reminderAt = :nextReminderAt, repeatOccurrenceCount = :newCount
+        WHERE id = :id
+    """)
+    suspend fun advanceRecurringReminder(id: Long, nextReminderAt: Long?, newCount: Int)
+
+    @Query("""
+        UPDATE checklists
+        SET reminderAt = NULL, repeatRule = NULL, repeatOccurrenceCount = 0
+        WHERE id = :id
+    """)
+    suspend fun clearRecurringReminder(id: Long)
+
+    @Query("""
+        UPDATE checklists
+        SET reminderAt = :reminderAt, repeatRule = :repeatRuleJson, repeatOccurrenceCount = 0
+        WHERE id = :id
+    """)
+    suspend fun setReminderWithRule(id: Long, reminderAt: Long?, repeatRuleJson: String?)
+
+    @Query("UPDATE checklists SET repeatRule = :ruleJson WHERE id = :id")
+    suspend fun setRepeatRule(id: Long, ruleJson: String?)
+
+    @Query("SELECT COUNT(*) FROM checklists WHERE repeatRule IS NOT NULL AND reminderAt IS NOT NULL")
+    suspend fun countRecurringReminders(): Int
+
+    @Query("""
+        SELECT id, name, reminderAt, repeatRule, repeatOccurrenceCount
+        FROM checklists
+        WHERE reminderAt IS NOT NULL
+          AND repeatRule IS NOT NULL
+          AND reminderAt <= :nowMillis
+    """)
+    suspend fun getPastDueRecurringReminders(nowMillis: Long): List<ChecklistRecurringInfo>
 }
 

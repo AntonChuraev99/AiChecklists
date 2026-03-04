@@ -3,12 +3,15 @@ package com.antonchuraev.homesearchchecklist.feature.checklist.data.repository
 import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistDao
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistFillDao
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistRecurringInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistReminderInfo
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ReminderConverters
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.toDomain
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.toEntity
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -140,6 +143,54 @@ class ChecklistRepositoryImpl(
 
     override suspend fun deleteFill(fill: ChecklistFill) {
         fillDao.deleteById(fill.id)
+    }
+
+    // Recurring reminders — atomic operations
+
+    private val reminderConverters = ReminderConverters()
+
+    override suspend fun setReminderWithRule(
+        checklistId: Long,
+        reminderAt: Long?,
+        repeatRule: ReminderRepeatRule?
+    ) {
+        val ruleJson = reminderConverters.repeatRuleToString(repeatRule)
+        checklistDao.setReminderWithRule(checklistId, reminderAt, ruleJson)
+    }
+
+    override suspend fun advanceRecurringReminder(
+        checklistId: Long,
+        nextReminderAt: Long?,
+        newCount: Int
+    ) {
+        checklistDao.advanceRecurringReminder(checklistId, nextReminderAt, newCount)
+    }
+
+    override suspend fun clearRecurringReminder(checklistId: Long) {
+        checklistDao.clearRecurringReminder(checklistId)
+    }
+
+    override suspend fun setRepeatRule(checklistId: Long, rule: ReminderRepeatRule?) {
+        val ruleJson = reminderConverters.repeatRuleToString(rule)
+        checklistDao.setRepeatRule(checklistId, ruleJson)
+    }
+
+    override suspend fun resetDefaultFillChecks(checklistId: Long) {
+        val defaultFillEntity = fillDao.getDefaultFillByChecklistId(checklistId)
+        if (defaultFillEntity != null) {
+            val resetItems = defaultFillEntity.items.map {
+                ChecklistFillItem(text = it.text, checked = false, note = it.note)
+            }
+            fillDao.insert(defaultFillEntity.copy(items = resetItems))
+        }
+    }
+
+    override suspend fun countRecurringReminders(): Int {
+        return checklistDao.countRecurringReminders()
+    }
+
+    override suspend fun getPastDueRecurringReminders(nowMillis: Long): List<ChecklistRecurringInfo> {
+        return checklistDao.getPastDueRecurringReminders(nowMillis)
     }
 
     override suspend fun reorderChecklists(orderedIds: List<Long>) {
