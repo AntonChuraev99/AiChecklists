@@ -191,18 +191,6 @@ class ChecklistDetailRepeatRuleTest {
         assertEquals(RepeatType.WEEKLY, contentState(vm).pendingRepeatConfig!!.type)
     }
 
-    @Test
-    fun onRepeatTypeSelected_null_resetsToDefault() = runTest {
-        val vm = createViewModel()
-        vm.onIntent(ChecklistDetailIntent.OnRepeatRuleClick)
-        vm.onIntent(ChecklistDetailIntent.OnRepeatTypeSelected(RepeatType.MONTHLY))
-        vm.onIntent(ChecklistDetailIntent.OnRepeatTypeSelected(null))
-
-        val config = contentState(vm).pendingRepeatConfig!!
-        assertEquals(RepeatType.DAILY, config.type)
-        assertEquals(1, config.interval)
-    }
-
     // --- Interval ---
 
     @Test

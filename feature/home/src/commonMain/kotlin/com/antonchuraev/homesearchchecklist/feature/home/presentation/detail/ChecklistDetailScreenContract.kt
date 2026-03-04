@@ -140,7 +140,7 @@ sealed interface ChecklistDetailIntent : Intent {
 
     // Repeat rule
     data object OnRepeatRuleClick : ChecklistDetailIntent
-    data class OnRepeatTypeSelected(val type: RepeatType?) : ChecklistDetailIntent
+    data class OnRepeatTypeSelected(val type: RepeatType) : ChecklistDetailIntent
     data class OnRepeatIntervalChanged(val interval: Int) : ChecklistDetailIntent
     data class OnWeekDayToggled(val dayNumber: Int) : ChecklistDetailIntent
     data class OnResetChecksToggled(val enabled: Boolean) : ChecklistDetailIntent
