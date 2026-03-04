@@ -566,6 +566,15 @@ class ChecklistDetailViewModel(
                 "checklist_id" to state.checklist.id.toString(),
                 "has_repeat" to (pendingRule != null).toString()
             ))
+            if (pendingRule != null) {
+                analyticsTracker.event("recurring_reminder_set", mapOf(
+                    "type" to pendingRule.type.name,
+                    "interval" to pendingRule.interval.toString(),
+                    "weekdays" to (pendingRule.weekDays?.joinToString(",") ?: ""),
+                    "end_condition" to pendingRule.endCondition::class.simpleName.orEmpty(),
+                    "reset_checks" to pendingRule.resetChecks.toString()
+                ))
+            }
 
             maybeShowExactAlarmInstruction()
         }
@@ -634,7 +643,16 @@ class ChecklistDetailViewModel(
                     repeatOccurrenceCount = 0
                 ))
             }
-            analyticsTracker.event("reminder_cancelled", mapOf("checklist_id" to checklist.id.toString()))
+            if (checklist.repeatRule != null) {
+                analyticsTracker.event("recurring_reminder_cancelled", mapOf(
+                    "checklist_id" to checklist.id.toString(),
+                    "total_occurrences" to checklist.repeatOccurrenceCount.toString()
+                ))
+            } else {
+                analyticsTracker.event("reminder_cancelled", mapOf(
+                    "checklist_id" to checklist.id.toString()
+                ))
+            }
         }
     }
 
@@ -643,6 +661,34 @@ class ChecklistDetailViewModel(
     private fun openRepeatRuleSheet() {
         val state = _screenState.value as? ChecklistDetailState.Content ?: return
         val existingRule = state.checklist.repeatRule
+
+        // If editing an existing rule, skip the limit check
+        if (existingRule != null) {
+            showRepeatRuleSheetWithConfig(state, existingRule)
+            return
+        }
+
+        // Free users: check recurring reminder limit
+        val isPremium = state.userLimits?.isPremium ?: false
+        if (!isPremium) {
+            viewModelScope.launch {
+                val recurringCount = repository.countRecurringReminders()
+                if (recurringCount >= MAX_FREE_RECURRING_REMINDERS) {
+                    analyticsTracker.event("recurring_limit_hit")
+                    navigator.navigateToPaywall(source = "detail_recurring_limit")
+                } else {
+                    showRepeatRuleSheetWithConfig(state, existingRule = null)
+                }
+            }
+        } else {
+            showRepeatRuleSheetWithConfig(state, existingRule = null)
+        }
+    }
+
+    private fun showRepeatRuleSheetWithConfig(
+        state: ChecklistDetailState.Content,
+        existingRule: ReminderRepeatRule?
+    ) {
         val config = if (existingRule != null) {
             PendingRepeatConfig(
                 type = existingRule.type,
@@ -718,11 +764,15 @@ class ChecklistDetailViewModel(
             }
             // Reschedule alarm (rule change may affect behavior but trigger time stays the same)
             reminderScheduler.schedule(state.checklist.id, existingReminder)
-            analyticsTracker.event("repeat_rule_saved", mapOf(
-                "checklist_id" to state.checklist.id.toString(),
-                "type" to (rule?.type?.name ?: "none"),
-                "has_end_condition" to (rule?.endCondition !is RepeatEndCondition.Never).toString()
-            ))
+            if (rule != null) {
+                analyticsTracker.event("recurring_reminder_set", mapOf(
+                    "type" to rule.type.name,
+                    "interval" to rule.interval.toString(),
+                    "weekdays" to (rule.weekDays?.joinToString(",") ?: ""),
+                    "end_condition" to rule.endCondition::class.simpleName.orEmpty(),
+                    "reset_checks" to rule.resetChecks.toString()
+                ))
+            }
         }
     }
 
@@ -831,5 +881,7 @@ class ChecklistDetailViewModel(
         const val PREF_EXACT_ALARM_DONT_SHOW = "exact_alarm_dont_show"
         const val SNACKBAR_EXACT_GRANTED = "exact_alarm_granted"
         const val SNACKBAR_EXACT_DENIED = "exact_alarm_denied"
+        /** Max recurring reminders for free users. Matches Remote Config default. */
+        const val MAX_FREE_RECURRING_REMINDERS = 1
     }
 }
