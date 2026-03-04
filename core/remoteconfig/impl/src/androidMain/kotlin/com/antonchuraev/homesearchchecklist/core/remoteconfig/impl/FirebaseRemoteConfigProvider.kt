@@ -34,6 +34,7 @@ class FirebaseRemoteConfigProvider : RemoteConfigProvider {
         RemoteConfigKeys.AI_DAILY_LIMIT_PREMIUM to RemoteConfigDefaults.AI_DAILY_LIMIT_PREMIUM,
         RemoteConfigKeys.MAX_CHECKLISTS_FREE to RemoteConfigDefaults.MAX_CHECKLISTS_FREE,
         RemoteConfigKeys.MAX_FILLS_FREE to RemoteConfigDefaults.MAX_FILLS_FREE,
+        RemoteConfigKeys.MAX_RECURRING_REMINDERS_FREE to RemoteConfigDefaults.MAX_RECURRING_REMINDERS_FREE,
     )
 
     override suspend fun fetchAndActivate(): Boolean {

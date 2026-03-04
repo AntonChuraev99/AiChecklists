@@ -20,6 +20,7 @@ import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.LoginRe
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallOffering
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PurchaseResult
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.RestoreResult
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.Entitlements
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.SubscriptionStatus
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.repository.PaywallRepository
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetUserLimitsUseCase
@@ -89,7 +90,11 @@ class ChecklistDetailRepeatRuleTest {
         Dispatchers.resetMain()
     }
 
-    private fun createViewModel(): ChecklistDetailViewModel {
+    private fun createViewModel(
+        navigator: FakeAppNavigator = FakeAppNavigator(),
+        analyticsTracker: FakeAnalyticsTracker = FakeAnalyticsTracker(),
+        paywallRepository: FakePaywallRepository = FakePaywallRepository()
+    ): ChecklistDetailViewModel {
         val datastore = AppDatastore(
             PreferenceDataStoreFactory.createWithPath {
                 "build/test_prefs_repeat_${Random.nextLong()}.preferences_pb".toPath()
@@ -100,13 +105,13 @@ class ChecklistDetailRepeatRuleTest {
         return ChecklistDetailViewModel(
             checklistId = 1L,
             repository = repository,
-            navigator = FakeAppNavigator(),
+            navigator = navigator,
             getUserLimitsUseCase = GetUserLimitsUseCase(
                 FakeRemoteConfigProvider(),
                 repository,
-                FakePaywallRepository()
+                paywallRepository
             ),
-            analyticsTracker = FakeAnalyticsTracker(),
+            analyticsTracker = analyticsTracker,
             reminderScheduler = scheduler,
             datastore = datastore
         )
@@ -125,8 +130,7 @@ class ChecklistDetailRepeatRuleTest {
 
         val state = contentState(vm)
         assertTrue(state.showRepeatRuleSheet)
-        assertNotNull(state.pendingRepeatConfig)
-        val config = state.pendingRepeatConfig!!
+        val config = checkNotNull(state.pendingRepeatConfig)
         assertEquals(RepeatType.DAILY, config.type)
         assertEquals(1, config.interval)
     }
@@ -359,12 +363,136 @@ class ChecklistDetailRepeatRuleTest {
         assertNull(rule.weekDays) // Cleaned up
     }
 
+    // --- Recurring reminder limits ---
+
+    @Test
+    fun onRepeatRuleClick_freeUser_withExistingRecurring_navigatesToPaywall() = runTest {
+        repository.recurringReminderCount = 1 // Already at limit
+        val navigator = FakeAppNavigator()
+        val vm = createViewModel(navigator = navigator)
+        vm.onIntent(ChecklistDetailIntent.OnRepeatRuleClick)
+
+        // Wait for coroutine to complete
+
+
+        assertEquals("detail_recurring_limit", navigator.lastPaywallSource)
+        // Sheet should NOT be open
+        val state = contentState(vm)
+        assertFalse(state.showRepeatRuleSheet)
+    }
+
+    @Test
+    fun onRepeatRuleClick_freeUser_noExistingRecurring_opensSheet() = runTest {
+        repository.recurringReminderCount = 0
+        val vm = createViewModel()
+        vm.onIntent(ChecklistDetailIntent.OnRepeatRuleClick)
+
+
+
+        val state = contentState(vm)
+        assertTrue(state.showRepeatRuleSheet)
+    }
+
+    @Test
+    fun onRepeatRuleClick_premiumUser_alwaysOpensSheet() = runTest {
+        repository.recurringReminderCount = 10 // Many recurring, but premium
+        val premiumStatus = SubscriptionStatus(
+            isActive = true,
+            activeEntitlements = setOf(Entitlements.PREMIUM)
+        )
+        val vm = createViewModel(
+            paywallRepository = FakePaywallRepository(premiumStatus)
+        )
+        vm.onIntent(ChecklistDetailIntent.OnRepeatRuleClick)
+
+
+
+        val state = contentState(vm)
+        assertTrue(state.showRepeatRuleSheet)
+    }
+
+    @Test
+    fun onRepeatRuleClick_freeUser_editingExistingRule_skipsLimitCheck() = runTest {
+        // Even at limit, editing existing recurring should be allowed
+        repository.recurringReminderCount = 1
+        repository.storedChecklist = testChecklist.copy(
+            repeatRule = ReminderRepeatRule(
+                type = RepeatType.DAILY,
+                interval = 1,
+                endCondition = RepeatEndCondition.Never
+            ),
+            reminderAt = 1000L
+        )
+        val navigator = FakeAppNavigator()
+        val vm = createViewModel(navigator = navigator)
+        vm.onIntent(ChecklistDetailIntent.OnRepeatRuleClick)
+
+
+
+        // Sheet should open (editing, not creating new)
+        val state = contentState(vm)
+        assertTrue(state.showRepeatRuleSheet)
+        assertNull(navigator.lastPaywallSource)
+    }
+
+    // --- Analytics ---
+
+    @Test
+    fun onRepeatRuleClick_limitHit_tracksAnalytics() = runTest {
+        repository.recurringReminderCount = 1
+        val tracker = FakeAnalyticsTracker()
+        val vm = createViewModel(analyticsTracker = tracker)
+        vm.onIntent(ChecklistDetailIntent.OnRepeatRuleClick)
+
+
+
+        assertTrue(tracker.events.any { it.first == "recurring_limit_hit" })
+    }
+
+    @Test
+    fun removeReminder_withRecurringRule_tracksRecurringCancelled() = runTest {
+        repository.storedChecklist = testChecklist.copy(
+            reminderAt = 1000L,
+            repeatRule = ReminderRepeatRule(
+                type = RepeatType.DAILY,
+                interval = 1,
+                endCondition = RepeatEndCondition.Never
+            ),
+            repeatOccurrenceCount = 5
+        )
+        val tracker = FakeAnalyticsTracker()
+        val vm = createViewModel(analyticsTracker = tracker)
+        vm.onIntent(ChecklistDetailIntent.OnRemoveReminder)
+
+
+
+        val event = tracker.events.find { it.first == "recurring_reminder_cancelled" }
+        assertNotNull(event)
+        assertEquals("5", event.second["total_occurrences"])
+    }
+
+    @Test
+    fun removeReminder_withoutRecurringRule_tracksRegularCancelled() = runTest {
+        repository.storedChecklist = testChecklist.copy(reminderAt = 1000L)
+        val tracker = FakeAnalyticsTracker()
+        val vm = createViewModel(analyticsTracker = tracker)
+        vm.onIntent(ChecklistDetailIntent.OnRemoveReminder)
+
+
+
+        assertTrue(tracker.events.any { it.first == "reminder_cancelled" })
+        assertFalse(tracker.events.any { it.first == "recurring_reminder_cancelled" })
+    }
+
     // --- Test doubles ---
 
     private class FakeAnalyticsTracker : AnalyticsTracker {
+        val events = mutableListOf<Pair<String, Map<String, Any>>>()
         override fun setUserId(userId: String) {}
         override fun screenView(name: String) {}
-        override fun event(name: String, params: Map<String, Any>) {}
+        override fun event(name: String, params: Map<String, Any>) {
+            events.add(name to params)
+        }
     }
 
     private class FakeChecklistRepository : ChecklistRepository {
@@ -400,7 +528,8 @@ class ChecklistDetailRepeatRuleTest {
         override suspend fun clearRecurringReminder(checklistId: Long) {}
         override suspend fun setRepeatRule(checklistId: Long, rule: ReminderRepeatRule?) {}
         override suspend fun resetDefaultFillChecks(checklistId: Long) {}
-        override suspend fun countRecurringReminders(): Int = 0
+        var recurringReminderCount: Int = 0
+        override suspend fun countRecurringReminders(): Int = recurringReminderCount
         override suspend fun getPastDueRecurringReminders(nowMillis: Long): List<com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistRecurringInfo> = emptyList()
     }
 
@@ -420,7 +549,8 @@ class ChecklistDetailRepeatRuleTest {
         override fun navigateToChecklistDetail(checklistId: Long, clearBackStack: Boolean) {}
         override fun navigateToFillDetail(fillId: Long, clearBackStack: Boolean) {}
         override fun navigateToFillsList(checklistId: Long) {}
-        override fun navigateToPaywall(source: String) {}
+        var lastPaywallSource: String? = null
+        override fun navigateToPaywall(source: String) { lastPaywallSource = source }
         override fun navigateToSubscriptionStatus(showSuccessMessage: Boolean) {}
         override fun navigateToShareChecklist(checklistId: Long) {}
     }
@@ -432,8 +562,10 @@ class ChecklistDetailRepeatRuleTest {
         override fun getLong(key: String, defaultValue: Long): Long = defaultValue
     }
 
-    private class FakePaywallRepository : PaywallRepository {
-        override val subscriptionStatus: Flow<SubscriptionStatus> = flowOf(SubscriptionStatus.FREE)
+    private class FakePaywallRepository(
+        status: SubscriptionStatus = SubscriptionStatus.FREE
+    ) : PaywallRepository {
+        override val subscriptionStatus: Flow<SubscriptionStatus> = flowOf(status)
         override suspend fun getOfferings(): Result<PaywallOffering?> = Result.success(null)
         override suspend fun purchase(packageId: String): PurchaseResult = PurchaseResult.Error("not implemented")
         override suspend fun restorePurchases(): RestoreResult = RestoreResult.Error("not implemented")
