@@ -362,7 +362,7 @@
     <string name="reminder_notification_permission_skip">Not Now</string>
 
     <!-- Repeat types -->
-    <string name="reminder_repeat_none">Don\'t repeat</string>
+    <string name="reminder_repeat_none">Don't repeat</string>
     <string name="reminder_repeat_daily">Every day</string>
     <string name="reminder_repeat_weekly">Every week</string>
     <string name="reminder_repeat_monthly">Every month</string>
