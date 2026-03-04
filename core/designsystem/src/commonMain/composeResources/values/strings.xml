@@ -361,6 +361,51 @@
     <string name="reminder_notification_permission_enable">Enable Notifications</string>
     <string name="reminder_notification_permission_skip">Not Now</string>
 
+    <!-- Repeat types -->
+    <string name="reminder_repeat_none">Don\'t repeat</string>
+    <string name="reminder_repeat_daily">Every day</string>
+    <string name="reminder_repeat_weekly">Every week</string>
+    <string name="reminder_repeat_monthly">Every month</string>
+    <string name="reminder_repeat_custom">Custom…</string>
+
+    <!-- Repeat interval -->
+    <string name="reminder_repeat_every">Every</string>
+    <string name="reminder_repeat_days">days</string>
+    <string name="reminder_repeat_weeks">weeks</string>
+    <string name="reminder_repeat_months">months</string>
+
+    <!-- Weekdays (short) -->
+    <string name="reminder_weekday_mon">M</string>
+    <string name="reminder_weekday_tue">T</string>
+    <string name="reminder_weekday_wed">W</string>
+    <string name="reminder_weekday_thu">T</string>
+    <string name="reminder_weekday_fri">F</string>
+    <string name="reminder_weekday_sat">S</string>
+    <string name="reminder_weekday_sun">S</string>
+
+    <!-- End condition -->
+    <string name="reminder_ends">Ends</string>
+    <string name="reminder_ends_never">Never</string>
+    <string name="reminder_ends_on_date">On date</string>
+    <string name="reminder_ends_after_count">After</string>
+    <string name="reminder_ends_occurrences">occurrences</string>
+
+    <!-- Reset checks -->
+    <string name="reminder_reset_checks">Reset checkboxes each time</string>
+    <string name="reminder_reset_checks_desc">Uncheck all items when reminder repeats</string>
+
+    <!-- Summary labels -->
+    <string name="reminder_repeat_label">Repeat</string>
+    <string name="reminder_repeat_summary_daily">Every day</string>
+    <string name="reminder_repeat_summary_weekly">Every week</string>
+    <string name="reminder_repeat_summary_monthly">Every month</string>
+    <string name="reminder_repeat_summary_weekdays">Mon–Fri</string>
+
+    <!-- Repeat rule sheet -->
+    <string name="reminder_repeat_title">Repeat</string>
+    <string name="reminder_repeat_save">Save</string>
+    <string name="reminder_ends_done">Done</string>
+
     <!-- Debug Screen -->
     <string name="debug_title">Debug Menu</string>
     <string name="debug_developer_tools">Developer Tools</string>
