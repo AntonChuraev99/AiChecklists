@@ -9,9 +9,11 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Repea
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatType
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.UserLimits
 
+enum class ReminderTab { ONCE, REPEAT }
+
 /**
  * Groups all mutable repeat configuration fields into a single object.
- * Null when repeat rule sheet is closed; non-null with defaults when open.
+ * Null when repeat tab is not active; non-null with defaults when open.
  */
 data class PendingRepeatConfig(
     val type: RepeatType = RepeatType.DAILY,
@@ -19,7 +21,9 @@ data class PendingRepeatConfig(
     val weekDays: Set<Int> = emptySet(),
     val endCondition: RepeatEndCondition = RepeatEndCondition.Never,
     val resetChecks: Boolean = false,
-    val isCustom: Boolean = false
+    val isCustom: Boolean = false,
+    val timeHour: Int = 9,
+    val timeMinute: Int = 0
 ) {
     fun toRule(): ReminderRepeatRule = ReminderRepeatRule(
         type = type,
@@ -62,12 +66,12 @@ sealed interface ChecklistDetailState : State {
         val autoDeleteCompleted: Boolean = false,
         val showDeleteItemConfirmation: Boolean = false,
         val itemPendingDeleteId: String? = null,
-        // Repeat rule configuration
-        val showRepeatRuleSheet: Boolean = false,
+        // Reminder sheet tab state
+        val activeReminderTab: ReminderTab = ReminderTab.ONCE,
+        // Repeat configuration (active while editing on the REPEAT tab)
         val pendingRepeatConfig: PendingRepeatConfig? = null,
         val showEndConditionPicker: Boolean = false,
         val repeatRuleSummary: String? = null,
-        val savedRepeatConfig: PendingRepeatConfig? = null
     ) : ChecklistDetailState
 }
 
@@ -116,6 +120,9 @@ sealed interface ChecklistDetailIntent : Intent {
     data object OnRemoveReminder : ChecklistDetailIntent
     data object OnDismissReminderUI : ChecklistDetailIntent
 
+    // Reminder sheet tab
+    data class OnReminderTabSelected(val tab: ReminderTab) : ChecklistDetailIntent
+
     // Notification permission
     data class OnNotificationPermissionResult(val granted: Boolean) : ChecklistDetailIntent
     data object OnNotificationPermissionSkip : ChecklistDetailIntent
@@ -139,15 +146,15 @@ sealed interface ChecklistDetailIntent : Intent {
     data object OnQuickAddOpened : ChecklistDetailIntent
     data class OnQuickAddCancelled(val hadText: Boolean) : ChecklistDetailIntent
 
-    // Repeat rule
-    data object OnRepeatRuleClick : ChecklistDetailIntent
+    // Repeat schedule (independent of reminder)
     data class OnRepeatTypeSelected(val type: RepeatType) : ChecklistDetailIntent
     data class OnSmartPresetSelected(val config: PendingRepeatConfig) : ChecklistDetailIntent
     data class OnRepeatIntervalChanged(val interval: Int) : ChecklistDetailIntent
     data class OnWeekDayToggled(val dayNumber: Int) : ChecklistDetailIntent
     data class OnResetChecksToggled(val enabled: Boolean) : ChecklistDetailIntent
-    data object OnDismissRepeatRuleSheet : ChecklistDetailIntent
-    data object OnSaveRepeatRule : ChecklistDetailIntent
+    data class OnRepeatTimeChanged(val hour: Int, val minute: Int) : ChecklistDetailIntent
+    data object OnSaveRepeatSchedule : ChecklistDetailIntent
+    data object OnRemoveRepeatSchedule : ChecklistDetailIntent
 
     // End condition
     data object OnEndConditionClick : ChecklistDetailIntent

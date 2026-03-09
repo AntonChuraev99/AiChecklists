@@ -7,10 +7,12 @@ import com.antonchuraev.homesearchchecklist.core.datastore.api.AppDatastore
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistReminderInfo
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistRepeatInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.LoginResult
@@ -234,14 +236,14 @@ class ChecklistDetailAnalyticsTest {
         override suspend fun deleteFill(fill: ChecklistFill) {}
         override suspend fun reorderChecklists(orderedIds: List<Long>) {}
 
-        // Recurring reminders
-        override suspend fun setReminderWithRule(checklistId: Long, reminderAt: Long?, repeatRule: com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule?) {}
-        override suspend fun advanceRecurringReminder(checklistId: Long, nextReminderAt: Long?, newCount: Int) {}
-        override suspend fun clearRecurringReminder(checklistId: Long) {}
-        override suspend fun setRepeatRule(checklistId: Long, rule: com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule?) {}
+        // Independent repeat schedule
+        override suspend fun setRepeatSchedule(checklistId: Long, rule: ReminderRepeatRule, timeOfDayMinutes: Int, firstTriggerAt: Long) {}
+        override suspend fun advanceRepeatSchedule(checklistId: Long, nextAt: Long?, newCount: Int) {}
+        override suspend fun clearRepeatSchedule(checklistId: Long) {}
         override suspend fun resetDefaultFillChecks(checklistId: Long) {}
-        override suspend fun countRecurringReminders(): Int = 0
-        override suspend fun getPastDueRecurringReminders(nowMillis: Long): List<com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistRecurringInfo> = emptyList()
+        override suspend fun countActiveRepeatSchedules(): Int = 0
+        override suspend fun getActiveRepeatSchedules(): List<ChecklistRepeatInfo> = emptyList()
+        override suspend fun getPastDueRepeatSchedules(nowMillis: Long): List<ChecklistRepeatInfo> = emptyList()
     }
 
     private class FakeAppNavigator : AppNavigator {
@@ -288,8 +290,11 @@ class ChecklistDetailAnalyticsTest {
     }
 
     private class FakeReminderScheduler : ChecklistReminderScheduler {
-        override fun schedule(checklistId: Long, triggerAtMillis: Long) {}
-        override fun cancel(checklistId: Long) {}
-        override suspend fun rescheduleAllActive() {}
+        override fun scheduleReminder(checklistId: Long, triggerAtMillis: Long) {}
+        override fun cancelReminder(checklistId: Long) {}
+        override suspend fun rescheduleAllActiveReminders() {}
+        override fun scheduleRepeat(checklistId: Long, triggerAtMillis: Long) {}
+        override fun cancelRepeat(checklistId: Long) {}
+        override suspend fun rescheduleAllActiveRepeats() {}
     }
 }

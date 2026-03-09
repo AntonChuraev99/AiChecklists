@@ -49,7 +49,8 @@ open class GistiApplication : Application() {
             try {
                 val scheduler: ChecklistReminderScheduler =
                     GlobalContext.getOrNull()?.get() ?: return@launch
-                scheduler.rescheduleAllActive()
+                scheduler.rescheduleAllActiveReminders()
+                scheduler.rescheduleAllActiveRepeats()
             } catch (_: Exception) {
                 // Non-critical — reminders will be rescheduled next launch
             }

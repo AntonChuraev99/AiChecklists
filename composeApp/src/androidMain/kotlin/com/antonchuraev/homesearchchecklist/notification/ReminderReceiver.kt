@@ -24,10 +24,16 @@ import org.koin.core.context.GlobalContext
 class ReminderReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action != ACTION_FIRE) return
         val checklistId = intent.getLongExtra(EXTRA_CHECKLIST_ID, -1L)
         if (checklistId == -1L) return
 
+        when (intent.action) {
+            ACTION_REMINDER_FIRE -> handleOneShot(context, checklistId)
+            ACTION_REPEAT_FIRE -> handleRepeat(context, checklistId)
+        }
+    }
+
+    private fun handleOneShot(context: Context, checklistId: Long) {
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
@@ -38,61 +44,79 @@ class ReminderReceiver : BroadcastReceiver() {
                 val defaultFill = repository.getDefaultFillOneShot(checklistId)
                 val uncheckedCount = defaultFill?.items?.count { !it.checked } ?: 0
 
+                // One-shot: clear reminderAt after firing
+                repository.setReminder(checklistId, null)
+
+                showNotification(context, checklistId, checklist.name, uncheckedCount)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e(TAG, "Error processing one-shot reminder", e)
+            } finally {
+                pendingResult.finish()
+            }
+        }
+    }
+
+    private fun handleRepeat(context: Context, checklistId: Long) {
+        val pendingResult = goAsync()
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val koin = GlobalContext.getOrNull() ?: return@launch
+                val repository: ChecklistRepository = koin.get()
                 val analytics: AnalyticsTracker? = koin.getOrNull()
-                val repeatRule = checklist.repeatRule
-                if (repeatRule == null) {
-                    // One-shot reminder: clear and show notification
-                    repository.setReminder(checklistId, null)
-                } else {
-                    // Recurring reminder: compute next occurrence
-                    val now = System.currentTimeMillis()
-                    val nextOccurrence = repeatRule.computeNextOccurrence(
-                        currentTriggerMillis = checklist.reminderAt ?: now,
-                        currentCount = checklist.repeatOccurrenceCount,
-                        nowMillis = now
+
+                val checklist = repository.getChecklistById(checklistId) ?: return@launch
+                val defaultFill = repository.getDefaultFillOneShot(checklistId)
+                val uncheckedCount = defaultFill?.items?.count { !it.checked } ?: 0
+                val repeatRule = checklist.repeatRule ?: return@launch
+
+                val now = System.currentTimeMillis()
+                val nextOccurrence = repeatRule.computeNextOccurrence(
+                    currentTriggerMillis = checklist.repeatNextAt ?: now,
+                    currentCount = checklist.repeatOccurrenceCount,
+                    nowMillis = now
+                )
+
+                if (nextOccurrence != null) {
+                    val newCount = checklist.repeatOccurrenceCount + 1
+                    repository.advanceRepeatSchedule(
+                        checklistId = checklistId,
+                        nextAt = nextOccurrence,
+                        newCount = newCount
                     )
+                    val scheduler: ChecklistReminderScheduler = koin.get()
+                    scheduler.scheduleRepeat(checklistId, nextOccurrence)
 
-                    if (nextOccurrence != null) {
-                        val newCount = checklist.repeatOccurrenceCount + 1
-                        // Atomic: update reminderAt + increment count in one SQL statement
-                        repository.advanceRecurringReminder(
-                            checklistId = checklistId,
-                            nextReminderAt = nextOccurrence,
-                            newCount = newCount
-                        )
-                        val scheduler: ChecklistReminderScheduler = koin.get()
-                        scheduler.schedule(checklistId, nextOccurrence)
+                    analytics?.event("recurring_reminder_fired", mapOf(
+                        "checklist_id" to checklistId.toString(),
+                        "occurrence_count" to newCount.toString(),
+                        "next_at" to nextOccurrence.toString()
+                    ))
 
-                        analytics?.event("recurring_reminder_fired", mapOf(
+                    // Auto-reset checkboxes if enabled
+                    if (repeatRule.resetChecks) {
+                        repository.resetDefaultFillChecks(checklistId)
+                        analytics?.event("recurring_checks_reset", mapOf(
                             "checklist_id" to checklistId.toString(),
-                            "occurrence_count" to newCount.toString(),
-                            "next_at" to nextOccurrence.toString()
-                        ))
-
-                        // Auto-reset checkboxes if enabled
-                        if (repeatRule.resetChecks) {
-                            repository.resetDefaultFillChecks(checklistId)
-                            analytics?.event("recurring_checks_reset", mapOf(
-                                "checklist_id" to checklistId.toString(),
-                                "items_count" to (defaultFill?.items?.size ?: 0).toString()
-                            ))
-                        }
-                    } else {
-                        // End condition reached — stop repeating
-                        repository.clearRecurringReminder(checklistId)
-                        analytics?.event("recurring_reminder_ended", mapOf(
-                            "checklist_id" to checklistId.toString(),
-                            "end_reason" to repeatRule.endCondition::class.simpleName.orEmpty(),
-                            "total_occurrences" to checklist.repeatOccurrenceCount.toString()
+                            "items_count" to (defaultFill?.items?.size ?: 0).toString()
                         ))
                     }
+                } else {
+                    // End condition reached — stop repeating
+                    repository.clearRepeatSchedule(checklistId)
+                    analytics?.event("recurring_reminder_ended", mapOf(
+                        "checklist_id" to checklistId.toString(),
+                        "end_reason" to repeatRule.endCondition::class.simpleName.orEmpty(),
+                        "total_occurrences" to checklist.repeatOccurrenceCount.toString()
+                    ))
                 }
 
                 showNotification(context, checklistId, checklist.name, uncheckedCount)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                Log.e(TAG, "Error processing reminder for checklist", e)
+                Log.e(TAG, "Error processing repeat reminder", e)
             } finally {
                 pendingResult.finish()
             }
@@ -123,7 +147,7 @@ class ReminderReceiver : BroadcastReceiver() {
         val pendingIntent = TaskStackBuilder.create(context).run {
             addNextIntentWithParentStack(deepLinkIntent)
             getPendingIntent(
-                ReminderScheduler.checklistIdToRequestCode(checklistId),
+                ReminderScheduler.reminderRequestCode(checklistId),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )!!
         }
@@ -148,14 +172,15 @@ class ReminderReceiver : BroadcastReceiver() {
 
         val notificationManager = context.getSystemService(NotificationManager::class.java)
         notificationManager.notify(
-            ReminderScheduler.checklistIdToRequestCode(checklistId),
+            ReminderScheduler.reminderRequestCode(checklistId),
             notification
         )
     }
 
     companion object {
         private const val TAG = "ReminderReceiver"
-        const val ACTION_FIRE = "com.antonchuraev.aichecklists.ACTION_REMINDER_FIRE"
+        const val ACTION_REMINDER_FIRE = "com.antonchuraev.aichecklists.ACTION_REMINDER_FIRE"
+        const val ACTION_REPEAT_FIRE = "com.antonchuraev.aichecklists.ACTION_REPEAT_FIRE"
         const val EXTRA_CHECKLIST_ID = "checklist_id"
         const val ACTION_OPEN_CHECKLIST = "com.antonchuraev.aichecklists.action.OPEN_CHECKLIST"
         const val EXTRA_NAVIGATE_CHECKLIST_ID = "navigate_to_checklist"

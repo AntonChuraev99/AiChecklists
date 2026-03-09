@@ -59,6 +59,7 @@ import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.NoteAdd
 import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Repeat
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.WbSunny
@@ -69,6 +70,8 @@ import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.Tab
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -279,13 +282,15 @@ private fun ChecklistDetailContent(
                     )
                 }
                 IconButton(onClick = { onIntent(ChecklistDetailIntent.OnReminderClick) }) {
+                    val hasActiveSchedule = state.checklist.reminderAt != null
+                            || state.checklist.repeatRule != null
                     Icon(
-                        imageVector = if (state.checklist.reminderAt != null)
+                        imageVector = if (hasActiveSchedule)
                             Icons.Filled.Notifications
                         else
                             Icons.Outlined.Notifications,
                         contentDescription = stringResource(Res.string.reminder_set_reminder),
-                        tint = if (state.checklist.reminderAt != null)
+                        tint = if (hasActiveSchedule)
                             MaterialTheme.colorScheme.primary
                         else
                             MaterialTheme.colorScheme.onSurfaceVariant
@@ -588,42 +593,31 @@ private fun ChecklistDetailContent(
         )
     }
 
-    // Reminder bottom sheet
+    // Unified reminder / repeat bottom sheet with tabs
     if (state.showReminderSheet) {
-        ReminderBottomSheet(
+        ReminderSheet(
+            activeTab = state.activeReminderTab,
             currentReminder = state.checklist.reminderAt,
-            repeatRuleSummary = state.repeatRuleSummary ?: state.checklist.repeatRule?.let { rule ->
-                buildRepeatRuleSummaryText(rule)
-            },
+            currentRepeatRule = state.checklist.repeatRule,
+            repeatRuleSummary = state.repeatRuleSummary,
+            pendingRepeatConfig = state.pendingRepeatConfig,
+            showEndConditionPicker = state.showEndConditionPicker,
+            onTabSelected = { onIntent(ChecklistDetailIntent.OnReminderTabSelected(it)) },
             onPresetSelected = { onIntent(ChecklistDetailIntent.OnReminderPresetSelected(it)) },
             onCustomDateRequested = { onIntent(ChecklistDetailIntent.OnCustomDateRequested) },
-            onRepeatClick = { onIntent(ChecklistDetailIntent.OnRepeatRuleClick) },
             onRemoveReminder = { onIntent(ChecklistDetailIntent.OnRemoveReminder) },
-            onDismiss = { onIntent(ChecklistDetailIntent.OnDismissReminderUI) }
-        )
-    }
-
-    // Repeat rule bottom sheet
-    if (state.showRepeatRuleSheet && state.pendingRepeatConfig != null) {
-        RepeatRuleSheet(
-            config = state.pendingRepeatConfig,
-            showEndConditionPicker = state.showEndConditionPicker,
-            onTypeSelected = { onIntent(ChecklistDetailIntent.OnRepeatTypeSelected(it)) },
+            onRepeatTypeSelected = { onIntent(ChecklistDetailIntent.OnRepeatTypeSelected(it)) },
             onSmartPresetSelected = { onIntent(ChecklistDetailIntent.OnSmartPresetSelected(it)) },
-            onCustomToggle = {
-                onIntent(ChecklistDetailIntent.OnRepeatTypeSelected(state.pendingRepeatConfig.type))
-                // Toggle custom mode by updating isCustom
-                val current = state.pendingRepeatConfig
-                onIntent(ChecklistDetailIntent.OnRepeatIntervalChanged(current.interval))
-            },
-            onIntervalChanged = { onIntent(ChecklistDetailIntent.OnRepeatIntervalChanged(it)) },
+            onRepeatIntervalChanged = { onIntent(ChecklistDetailIntent.OnRepeatIntervalChanged(it)) },
             onWeekDayToggled = { onIntent(ChecklistDetailIntent.OnWeekDayToggled(it)) },
             onResetChecksToggled = { onIntent(ChecklistDetailIntent.OnResetChecksToggled(it)) },
+            onRepeatTimeChanged = { h, m -> onIntent(ChecklistDetailIntent.OnRepeatTimeChanged(h, m)) },
             onEndConditionClick = { onIntent(ChecklistDetailIntent.OnEndConditionClick) },
             onEndConditionSelected = { onIntent(ChecklistDetailIntent.OnEndConditionSelected(it)) },
             onDismissEndCondition = { onIntent(ChecklistDetailIntent.OnDismissEndConditionPicker) },
-            onSave = { onIntent(ChecklistDetailIntent.OnSaveRepeatRule) },
-            onDismiss = { onIntent(ChecklistDetailIntent.OnDismissRepeatRuleSheet) }
+            onSaveRepeat = { onIntent(ChecklistDetailIntent.OnSaveRepeatSchedule) },
+            onRemoveRepeat = { onIntent(ChecklistDetailIntent.OnRemoveRepeatSchedule) },
+            onDismiss = { onIntent(ChecklistDetailIntent.OnDismissReminderUI) }
         )
     }
 
@@ -1297,13 +1291,28 @@ private fun NotificationFeatureRow(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ReminderBottomSheet(
+private fun ReminderSheet(
+    activeTab: ReminderTab,
     currentReminder: Long?,
+    currentRepeatRule: ReminderRepeatRule?,
     repeatRuleSummary: String?,
+    pendingRepeatConfig: PendingRepeatConfig?,
+    showEndConditionPicker: Boolean,
+    onTabSelected: (ReminderTab) -> Unit,
     onPresetSelected: (Long) -> Unit,
     onCustomDateRequested: () -> Unit,
-    onRepeatClick: () -> Unit,
     onRemoveReminder: () -> Unit,
+    onRepeatTypeSelected: (RepeatType) -> Unit,
+    onSmartPresetSelected: (PendingRepeatConfig) -> Unit,
+    onRepeatIntervalChanged: (Int) -> Unit,
+    onWeekDayToggled: (Int) -> Unit,
+    onResetChecksToggled: (Boolean) -> Unit,
+    onRepeatTimeChanged: (Int, Int) -> Unit,
+    onEndConditionClick: () -> Unit,
+    onEndConditionSelected: (RepeatEndCondition) -> Unit,
+    onDismissEndCondition: () -> Unit,
+    onSaveRepeat: () -> Unit,
+    onRemoveRepeat: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -1315,58 +1324,50 @@ private fun ReminderBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
                 .navigationBarsPadding()
-                .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
-                .padding(bottom = AppDimens.SpacingXxl),
-            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs)
         ) {
-            Text(
-                text = stringResource(Res.string.reminder_set_reminder),
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(bottom = AppDimens.SpacingSm)
-            )
-
-            if (currentReminder != null) {
-                CurrentReminderCard(reminderAtMillis = currentReminder)
-                Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
+            // Tab row
+            PrimaryTabRow(
+                selectedTabIndex = if (activeTab == ReminderTab.ONCE) 0 else 1,
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.primary
+            ) {
+                Tab(
+                    selected = activeTab == ReminderTab.ONCE,
+                    onClick = { onTabSelected(ReminderTab.ONCE) },
+                    text = { Text(stringResource(Res.string.reminder_tab_once)) }
+                )
+                Tab(
+                    selected = activeTab == ReminderTab.REPEAT,
+                    onClick = { onTabSelected(ReminderTab.REPEAT) },
+                    text = { Text(stringResource(Res.string.reminder_tab_repeat)) }
+                )
             }
 
-            ReminderPresetRow(
-                icon = Icons.Outlined.Schedule,
-                text = stringResource(Res.string.reminder_in_one_hour),
-                onClick = {
-                    onPresetSelected(Clock.System.now().plus(1, DateTimeUnit.HOUR).toEpochMilliseconds())
-                }
-            )
-            ReminderPresetRow(
-                icon = Icons.Outlined.WbSunny,
-                text = stringResource(Res.string.reminder_tomorrow_morning),
-                onClick = { onPresetSelected(tomorrowAt(hour = 9, minute = 0)) }
-            )
-            ReminderPresetRow(
-                icon = Icons.Outlined.WbTwilight,
-                text = stringResource(Res.string.reminder_tomorrow_evening),
-                onClick = { onPresetSelected(tomorrowAt(hour = 18, minute = 0)) }
-            )
-            ReminderPresetRow(
-                icon = Icons.Outlined.CalendarMonth,
-                text = stringResource(Res.string.reminder_pick_date_time),
-                onClick = onCustomDateRequested
-            )
-
-            // Repeat rule row
-            HorizontalDivider(modifier = Modifier.padding(vertical = AppDimens.SpacingSm))
-            RepeatRuleRow(
-                summary = repeatRuleSummary,
-                onClick = onRepeatClick
-            )
-
-            if (currentReminder != null) {
-                HorizontalDivider(modifier = Modifier.padding(vertical = AppDimens.SpacingSm))
-                AppButtonText(
-                    text = stringResource(Res.string.reminder_remove),
-                    onClick = onRemoveReminder
+            // Tab content
+            when (activeTab) {
+                ReminderTab.ONCE -> OnceTabContent(
+                    currentReminder = currentReminder,
+                    onPresetSelected = onPresetSelected,
+                    onCustomDateRequested = onCustomDateRequested,
+                    onRemoveReminder = onRemoveReminder
+                )
+                ReminderTab.REPEAT -> RepeatTabContent(
+                    config = pendingRepeatConfig ?: PendingRepeatConfig(),
+                    currentRepeatRule = currentRepeatRule,
+                    repeatRuleSummary = repeatRuleSummary,
+                    showEndConditionPicker = showEndConditionPicker,
+                    onTypeSelected = onRepeatTypeSelected,
+                    onSmartPresetSelected = onSmartPresetSelected,
+                    onIntervalChanged = onRepeatIntervalChanged,
+                    onWeekDayToggled = onWeekDayToggled,
+                    onResetChecksToggled = onResetChecksToggled,
+                    onTimeChanged = onRepeatTimeChanged,
+                    onEndConditionClick = onEndConditionClick,
+                    onEndConditionSelected = onEndConditionSelected,
+                    onDismissEndCondition = onDismissEndCondition,
+                    onSave = onSaveRepeat,
+                    onRemove = onRemoveRepeat
                 )
             }
         }
@@ -1374,16 +1375,291 @@ private fun ReminderBottomSheet(
 }
 
 @Composable
-private fun RepeatRuleRow(
-    summary: String?,
-    onClick: () -> Unit
+private fun OnceTabContent(
+    currentReminder: Long?,
+    onPresetSelected: (Long) -> Unit,
+    onCustomDateRequested: () -> Unit,
+    onRemoveReminder: () -> Unit
 ) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
+            .padding(top = AppDimens.SpacingLg, bottom = AppDimens.SpacingXxl),
+        verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs)
+    ) {
+        if (currentReminder != null) {
+            CurrentReminderCard(reminderAtMillis = currentReminder)
+            Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
+        }
+
+        ReminderPresetRow(
+            icon = Icons.Outlined.Schedule,
+            text = stringResource(Res.string.reminder_in_one_hour),
+            onClick = {
+                onPresetSelected(Clock.System.now().plus(1, DateTimeUnit.HOUR).toEpochMilliseconds())
+            }
+        )
+        ReminderPresetRow(
+            icon = Icons.Outlined.WbSunny,
+            text = stringResource(Res.string.reminder_tomorrow_morning),
+            onClick = { onPresetSelected(tomorrowAt(hour = 9, minute = 0)) }
+        )
+        ReminderPresetRow(
+            icon = Icons.Outlined.WbTwilight,
+            text = stringResource(Res.string.reminder_tomorrow_evening),
+            onClick = { onPresetSelected(tomorrowAt(hour = 18, minute = 0)) }
+        )
+        ReminderPresetRow(
+            icon = Icons.Outlined.CalendarMonth,
+            text = stringResource(Res.string.reminder_pick_date_time),
+            onClick = onCustomDateRequested
+        )
+
+        if (currentReminder != null) {
+            HorizontalDivider(modifier = Modifier.padding(vertical = AppDimens.SpacingSm))
+            AppButtonText(
+                text = stringResource(Res.string.reminder_remove),
+                onClick = onRemoveReminder
+            )
+        }
+    }
+}
+
+@Composable
+private fun RepeatTabContent(
+    config: PendingRepeatConfig,
+    currentRepeatRule: ReminderRepeatRule?,
+    repeatRuleSummary: String?,
+    showEndConditionPicker: Boolean,
+    onTypeSelected: (RepeatType) -> Unit,
+    onSmartPresetSelected: (PendingRepeatConfig) -> Unit,
+    onIntervalChanged: (Int) -> Unit,
+    onWeekDayToggled: (Int) -> Unit,
+    onResetChecksToggled: (Boolean) -> Unit,
+    onTimeChanged: (Int, Int) -> Unit,
+    onEndConditionClick: () -> Unit,
+    onEndConditionSelected: (RepeatEndCondition) -> Unit,
+    onDismissEndCondition: () -> Unit,
+    onSave: () -> Unit,
+    onRemove: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
+            .padding(top = AppDimens.SpacingLg, bottom = AppDimens.SpacingXxl),
+        verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
+    ) {
+        // Current repeat schedule card
+        if (currentRepeatRule != null && repeatRuleSummary != null) {
+            CurrentRepeatCard(
+                summary = repeatRuleSummary,
+                timeHour = config.timeHour,
+                timeMinute = config.timeMinute
+            )
+            Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
+        }
+
+        // Custom state for toggling custom repeat section
+        var customExpanded by rememberSaveable { mutableStateOf(config.isCustom) }
+        val isCustomActive = config.isCustom || customExpanded
+
+        // Preset type options
+        RepeatTypeOption(
+            text = stringResource(Res.string.reminder_repeat_daily),
+            selected = !isCustomActive && config.type == RepeatType.DAILY && config.interval == 1,
+            onClick = { customExpanded = false; onTypeSelected(RepeatType.DAILY) }
+        )
+        RepeatTypeOption(
+            text = stringResource(Res.string.reminder_repeat_weekdays),
+            selected = !isCustomActive && config.type == RepeatType.WEEKLY && config.interval == 1
+                    && config.weekDays == setOf(1, 2, 3, 4, 5),
+            onClick = {
+                customExpanded = false
+                onSmartPresetSelected(PendingRepeatConfig(
+                    type = RepeatType.WEEKLY, interval = 1,
+                    weekDays = setOf(1, 2, 3, 4, 5),
+                    timeHour = config.timeHour, timeMinute = config.timeMinute
+                ))
+            }
+        )
+        RepeatTypeOption(
+            text = stringResource(Res.string.reminder_repeat_weekly),
+            selected = !isCustomActive && config.type == RepeatType.WEEKLY && config.interval == 1 && config.weekDays.isEmpty(),
+            onClick = { customExpanded = false; onTypeSelected(RepeatType.WEEKLY) }
+        )
+        RepeatTypeOption(
+            text = stringResource(Res.string.reminder_repeat_biweekly),
+            selected = !isCustomActive && config.type == RepeatType.WEEKLY && config.interval == 2 && config.weekDays.isEmpty(),
+            onClick = {
+                customExpanded = false
+                onSmartPresetSelected(PendingRepeatConfig(
+                    type = RepeatType.WEEKLY, interval = 2,
+                    timeHour = config.timeHour, timeMinute = config.timeMinute
+                ))
+            }
+        )
+        RepeatTypeOption(
+            text = stringResource(Res.string.reminder_repeat_monthly),
+            selected = !isCustomActive && config.type == RepeatType.MONTHLY && config.interval == 1,
+            onClick = { customExpanded = false; onTypeSelected(RepeatType.MONTHLY) }
+        )
+        RepeatTypeOption(
+            text = stringResource(Res.string.reminder_repeat_quarterly),
+            selected = !isCustomActive && config.type == RepeatType.MONTHLY && config.interval == 3,
+            onClick = {
+                customExpanded = false
+                onSmartPresetSelected(PendingRepeatConfig(
+                    type = RepeatType.MONTHLY, interval = 3,
+                    timeHour = config.timeHour, timeMinute = config.timeMinute
+                ))
+            }
+        )
+        RepeatTypeOption(
+            text = stringResource(Res.string.reminder_repeat_yearly),
+            selected = !isCustomActive && config.type == RepeatType.YEARLY && config.interval == 1,
+            onClick = { customExpanded = false; onTypeSelected(RepeatType.YEARLY) }
+        )
+
+        // Custom option
+        RepeatTypeOption(
+            text = stringResource(Res.string.reminder_repeat_custom),
+            selected = isCustomActive,
+            onClick = { customExpanded = !customExpanded }
+        )
+
+        // Custom interval section
+        AnimatedVisibility(visible = isCustomActive) {
+            CustomRepeatSection(
+                config = config,
+                onTypeChanged = onTypeSelected,
+                onIntervalChanged = onIntervalChanged,
+                onWeekDayToggled = onWeekDayToggled
+            )
+        }
+
+        HorizontalDivider(modifier = Modifier.padding(vertical = AppDimens.SpacingSm))
+
+        // Time of day picker
+        RepeatTimePicker(
+            hour = config.timeHour,
+            minute = config.timeMinute,
+            onTimeChanged = onTimeChanged
+        )
+
+        HorizontalDivider(modifier = Modifier.padding(vertical = AppDimens.SpacingSm))
+
+        // Reset checkboxes toggle
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .clickable { onResetChecksToggled(!config.resetChecks) }
+                .padding(vertical = AppDimens.SpacingSm),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(Res.string.reminder_reset_checks),
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Text(
+                    text = stringResource(Res.string.reminder_reset_checks_desc),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            AppSwitch(
+                checked = config.resetChecks,
+                onCheckedChange = null
+            )
+        }
+
+        HorizontalDivider(modifier = Modifier.padding(vertical = AppDimens.SpacingSm))
+
+        // End condition row
+        val endConditionText = when (config.endCondition) {
+            is RepeatEndCondition.Never -> stringResource(Res.string.reminder_ends_never)
+            is RepeatEndCondition.UntilDate -> {
+                val dt = Instant.fromEpochMilliseconds(config.endCondition.dateMillis)
+                    .toLocalDateTime(TimeZone.currentSystemDefault())
+                stringResource(Res.string.reminder_ends_on_date) + " ${formatReminderDateTime(dt)}"
+            }
+            is RepeatEndCondition.AfterCount -> "${config.endCondition.maxCount} ${stringResource(Res.string.reminder_ends_occurrences)}"
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .clickable(onClick = onEndConditionClick)
+                .padding(vertical = AppDimens.SpacingMd),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = stringResource(Res.string.reminder_ends),
+                style = MaterialTheme.typography.bodyLarge
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            Text(
+                text = endConditionText,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
+
+        // Save button
+        AppButton(
+            text = stringResource(Res.string.reminder_repeat_save),
+            onClick = onSave,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        // Remove repeat button (only if an active repeat schedule exists)
+        if (currentRepeatRule != null) {
+            AppButtonText(
+                text = stringResource(Res.string.reminder_remove_repeat),
+                onClick = onRemove,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+
+    // End condition picker dialog
+    if (showEndConditionPicker) {
+        EndConditionDialog(
+            currentCondition = config.endCondition,
+            onConditionSelected = onEndConditionSelected,
+            onDismiss = onDismissEndCondition
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RepeatTimePicker(
+    hour: Int,
+    minute: Int,
+    onTimeChanged: (Int, Int) -> Unit
+) {
+    var showTimePicker by rememberSaveable { mutableStateOf(false) }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick)
-            .padding(vertical = AppDimens.SpacingMd, horizontal = AppDimens.SpacingSm),
+            .clickable { showTimePicker = true }
+            .padding(vertical = AppDimens.SpacingSm),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
     ) {
@@ -1394,21 +1670,41 @@ private fun RepeatRuleRow(
             modifier = Modifier.size(24.dp)
         )
         Text(
-            text = stringResource(Res.string.reminder_repeat_label),
+            text = stringResource(Res.string.reminder_repeat_time_label),
             style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface
+            modifier = Modifier.weight(1f)
         )
-        Spacer(modifier = Modifier.weight(1f))
         Text(
-            text = summary ?: stringResource(Res.string.reminder_repeat_none),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            text = "${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.primary
         )
-        Icon(
-            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(20.dp)
+    }
+
+    if (showTimePicker) {
+        val timeState = rememberTimePickerState(initialHour = hour, initialMinute = minute)
+
+        AlertDialog(
+            onDismissRequest = { showTimePicker = false },
+            title = { Text(stringResource(Res.string.reminder_select_time)) },
+            text = { TimePicker(state = timeState) },
+            confirmButton = {
+                AppButtonText(
+                    text = stringResource(Res.string.ok),
+                    onClick = {
+                        onTimeChanged(timeState.hour, timeState.minute)
+                        showTimePicker = false
+                    }
+                )
+            },
+            dismissButton = {
+                AppButtonText(
+                    text = stringResource(Res.string.cancel),
+                    onClick = { showTimePicker = false }
+                )
+            },
+            containerColor = MaterialTheme.colorScheme.surface,
+            shape = MaterialTheme.shapes.large
         )
     }
 }
@@ -1475,221 +1771,35 @@ private fun CurrentReminderCard(reminderAtMillis: Long) {
     }
 }
 
-private fun buildRepeatRuleSummaryText(rule: ReminderRepeatRule): String {
-    return when (rule.type) {
-        RepeatType.DAILY -> if (rule.interval == 1) "Every day" else "Every ${rule.interval} days"
-        RepeatType.WEEKLY -> {
-            val days = rule.weekDays.orEmpty()
-            if (days.isNotEmpty()) {
-                val dayNames = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
-                val selected = days.sorted().map { dayNames[it - 1] }
-                if (selected == listOf("Mon", "Tue", "Wed", "Thu", "Fri")) "Mon–Fri"
-                else selected.joinToString(", ")
-            } else if (rule.interval == 1) "Every week"
-            else "Every ${rule.interval} weeks"
-        }
-        RepeatType.MONTHLY -> if (rule.interval == 1) "Every month" else "Every ${rule.interval} months"
-        RepeatType.YEARLY -> if (rule.interval == 1) "Every year" else "Every ${rule.interval} years"
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun RepeatRuleSheet(
-    config: PendingRepeatConfig,
-    showEndConditionPicker: Boolean,
-    onTypeSelected: (RepeatType) -> Unit,
-    onSmartPresetSelected: (PendingRepeatConfig) -> Unit,
-    onCustomToggle: () -> Unit,
-    onIntervalChanged: (Int) -> Unit,
-    onWeekDayToggled: (Int) -> Unit,
-    onResetChecksToggled: (Boolean) -> Unit,
-    onEndConditionClick: () -> Unit,
-    onEndConditionSelected: (RepeatEndCondition) -> Unit,
-    onDismissEndCondition: () -> Unit,
-    onSave: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface
+private fun CurrentRepeatCard(summary: String, timeHour: Int, timeMinute: Int) {
+    val timeFormatted = "${timeHour.toString().padStart(2, '0')}:${timeMinute.toString().padStart(2, '0')}"
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .navigationBarsPadding()
-                .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
-                .padding(bottom = AppDimens.SpacingXxl),
-            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
+                .padding(AppDimens.SpacingLg),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
         ) {
+            Icon(
+                imageVector = Icons.Outlined.Repeat,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp)
+            )
             Text(
-                text = stringResource(Res.string.reminder_repeat_title),
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(bottom = AppDimens.SpacingSm)
-            )
-
-            // Custom state must be declared before presets so they can check it
-            var customExpanded by rememberSaveable { mutableStateOf(config.isCustom) }
-            val isCustomActive = config.isCustom || customExpanded
-
-            // Type options
-            RepeatTypeOption(
-                text = stringResource(Res.string.reminder_repeat_daily),
-                selected = !isCustomActive && config.type == RepeatType.DAILY && config.interval == 1,
-                onClick = { customExpanded = false; onTypeSelected(RepeatType.DAILY) }
-            )
-            RepeatTypeOption(
-                text = stringResource(Res.string.reminder_repeat_weekdays),
-                selected = !isCustomActive && config.type == RepeatType.WEEKLY && config.interval == 1
-                        && config.weekDays == setOf(1, 2, 3, 4, 5),
-                onClick = {
-                    customExpanded = false
-                    onSmartPresetSelected(PendingRepeatConfig(
-                        type = RepeatType.WEEKLY, interval = 1,
-                        weekDays = setOf(1, 2, 3, 4, 5)
-                    ))
-                }
-            )
-            RepeatTypeOption(
-                text = stringResource(Res.string.reminder_repeat_weekly),
-                selected = !isCustomActive && config.type == RepeatType.WEEKLY && config.interval == 1 && config.weekDays.isEmpty(),
-                onClick = { customExpanded = false; onTypeSelected(RepeatType.WEEKLY) }
-            )
-            RepeatTypeOption(
-                text = stringResource(Res.string.reminder_repeat_biweekly),
-                selected = !isCustomActive && config.type == RepeatType.WEEKLY && config.interval == 2 && config.weekDays.isEmpty(),
-                onClick = {
-                    customExpanded = false
-                    onSmartPresetSelected(PendingRepeatConfig(
-                        type = RepeatType.WEEKLY, interval = 2
-                    ))
-                }
-            )
-            RepeatTypeOption(
-                text = stringResource(Res.string.reminder_repeat_monthly),
-                selected = !isCustomActive && config.type == RepeatType.MONTHLY && config.interval == 1,
-                onClick = { customExpanded = false; onTypeSelected(RepeatType.MONTHLY) }
-            )
-            RepeatTypeOption(
-                text = stringResource(Res.string.reminder_repeat_quarterly),
-                selected = !isCustomActive && config.type == RepeatType.MONTHLY && config.interval == 3,
-                onClick = {
-                    customExpanded = false
-                    onSmartPresetSelected(PendingRepeatConfig(
-                        type = RepeatType.MONTHLY, interval = 3
-                    ))
-                }
-            )
-            RepeatTypeOption(
-                text = stringResource(Res.string.reminder_repeat_yearly),
-                selected = !isCustomActive && config.type == RepeatType.YEARLY && config.interval == 1,
-                onClick = { customExpanded = false; onTypeSelected(RepeatType.YEARLY) }
-            )
-
-            // Custom option
-            RepeatTypeOption(
-                text = stringResource(Res.string.reminder_repeat_custom),
-                selected = isCustomActive,
-                onClick = { customExpanded = !customExpanded }
-            )
-
-            // Custom interval section
-            AnimatedVisibility(visible = isCustomActive) {
-                CustomRepeatSection(
-                    config = config,
-                    onTypeChanged = { onTypeSelected(it) },
-                    onIntervalChanged = onIntervalChanged,
-                    onWeekDayToggled = onWeekDayToggled
-                )
-            }
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = AppDimens.SpacingSm))
-
-            // Reset checkboxes toggle
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .clickable { onResetChecksToggled(!config.resetChecks) }
-                    .padding(vertical = AppDimens.SpacingSm),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(Res.string.reminder_reset_checks),
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                    Text(
-                        text = stringResource(Res.string.reminder_reset_checks_desc),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                AppSwitch(
-                    checked = config.resetChecks,
-                    onCheckedChange = null
-                )
-            }
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = AppDimens.SpacingSm))
-
-            // End condition row
-            val endConditionText = when (config.endCondition) {
-                is RepeatEndCondition.Never -> stringResource(Res.string.reminder_ends_never)
-                is RepeatEndCondition.UntilDate -> {
-                    val dt = Instant.fromEpochMilliseconds(config.endCondition.dateMillis)
-                        .toLocalDateTime(TimeZone.currentSystemDefault())
-                    stringResource(Res.string.reminder_ends_on_date) + " ${formatReminderDateTime(dt)}"
-                }
-                is RepeatEndCondition.AfterCount -> "${config.endCondition.maxCount} ${stringResource(Res.string.reminder_ends_occurrences)}"
-            }
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .clickable(onClick = onEndConditionClick)
-                    .padding(vertical = AppDimens.SpacingMd),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = stringResource(Res.string.reminder_ends),
-                    style = MaterialTheme.typography.bodyLarge
-                )
-                Spacer(modifier = Modifier.weight(1f))
-                Text(
-                    text = endConditionText,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
-
-            // Save button
-            AppButton(
-                text = stringResource(Res.string.reminder_repeat_save),
-                onClick = onSave,
-                modifier = Modifier.fillMaxWidth()
+                text = stringResource(Res.string.reminder_repeat_active, summary, timeFormatted),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f)
             )
         }
-    }
-
-    // End condition picker dialog
-    if (showEndConditionPicker) {
-        EndConditionDialog(
-            currentCondition = config.endCondition,
-            onConditionSelected = onEndConditionSelected,
-            onDismiss = onDismissEndCondition
-        )
     }
 }
 

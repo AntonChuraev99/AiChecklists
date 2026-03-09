@@ -1,7 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository
 
-import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistRecurringInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistReminderInfo
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistRepeatInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
@@ -21,20 +21,20 @@ interface ChecklistRepository {
     suspend fun setSeparateCompleted(checklistId: Long, value: Boolean)
     suspend fun setAutoDeleteCompleted(checklistId: Long, value: Boolean)
 
-    // Reminders (one-shot)
+    // One-shot reminders (independent of repeat)
     suspend fun setReminder(checklistId: Long, reminderAt: Long?)
     suspend fun countActiveReminders(): Int
     suspend fun getActiveReminders(): List<ChecklistReminderInfo>
     suspend fun getDefaultFillOneShot(checklistId: Long): ChecklistFill?
 
-    // Recurring reminders — atomic operations
-    suspend fun setReminderWithRule(checklistId: Long, reminderAt: Long?, repeatRule: ReminderRepeatRule?)
-    suspend fun advanceRecurringReminder(checklistId: Long, nextReminderAt: Long?, newCount: Int)
-    suspend fun clearRecurringReminder(checklistId: Long)
-    suspend fun setRepeatRule(checklistId: Long, rule: ReminderRepeatRule?)
+    // Independent repeat schedule
+    suspend fun setRepeatSchedule(checklistId: Long, rule: ReminderRepeatRule, timeOfDayMinutes: Int, firstTriggerAt: Long)
+    suspend fun advanceRepeatSchedule(checklistId: Long, nextAt: Long?, newCount: Int)
+    suspend fun clearRepeatSchedule(checklistId: Long)
     suspend fun resetDefaultFillChecks(checklistId: Long)
-    suspend fun countRecurringReminders(): Int
-    suspend fun getPastDueRecurringReminders(nowMillis: Long): List<ChecklistRecurringInfo>
+    suspend fun countActiveRepeatSchedules(): Int
+    suspend fun getActiveRepeatSchedules(): List<ChecklistRepeatInfo>
+    suspend fun getPastDueRepeatSchedules(nowMillis: Long): List<ChecklistRepeatInfo>
 
     // Fills (instances)
     fun getFillsByChecklistId(checklistId: Long): Flow<List<ChecklistFill>>
@@ -46,4 +46,3 @@ interface ChecklistRepository {
     suspend fun updateFill(fill: ChecklistFill)
     suspend fun deleteFill(fill: ChecklistFill)
 }
-

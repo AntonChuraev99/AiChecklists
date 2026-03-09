@@ -220,21 +220,28 @@ class ChecklistDetailViewModel(
             }
             ChecklistDetailIntent.OnDismissReminderUI -> {
                 updateContentState {
-                    it.copy(showReminderSheet = false, showCustomPicker = false, customPickerDateMillis = null)
+                    it.copy(
+                        showReminderSheet = false,
+                        showCustomPicker = false,
+                        customPickerDateMillis = null,
+                        pendingRepeatConfig = null,
+                        showEndConditionPicker = false
+                    )
                 }
             }
 
-            // Repeat rule
-            ChecklistDetailIntent.OnRepeatRuleClick -> openRepeatRuleSheet()
+            // Reminder sheet tab switching
+            is ChecklistDetailIntent.OnReminderTabSelected -> handleReminderTabSelected(intent.tab)
+
+            // Repeat schedule
             is ChecklistDetailIntent.OnRepeatTypeSelected -> handleRepeatTypeSelected(intent.type)
             is ChecklistDetailIntent.OnSmartPresetSelected -> updatePendingRepeatConfig { intent.config }
             is ChecklistDetailIntent.OnRepeatIntervalChanged -> updatePendingRepeatConfig { it.copy(interval = intent.interval.coerceIn(1, 99)) }
             is ChecklistDetailIntent.OnWeekDayToggled -> toggleWeekDay(intent.dayNumber)
             is ChecklistDetailIntent.OnResetChecksToggled -> updatePendingRepeatConfig { it.copy(resetChecks = intent.enabled) }
-            ChecklistDetailIntent.OnDismissRepeatRuleSheet -> updateContentState {
-                it.copy(showRepeatRuleSheet = false, pendingRepeatConfig = null, showEndConditionPicker = false)
-            }
-            ChecklistDetailIntent.OnSaveRepeatRule -> saveRepeatRule()
+            is ChecklistDetailIntent.OnRepeatTimeChanged -> updatePendingRepeatConfig { it.copy(timeHour = intent.hour, timeMinute = intent.minute) }
+            ChecklistDetailIntent.OnSaveRepeatSchedule -> saveRepeatSchedule()
+            ChecklistDetailIntent.OnRemoveRepeatSchedule -> removeRepeatSchedule()
 
             // End condition
             ChecklistDetailIntent.OnEndConditionClick -> updateContentState { it.copy(showEndConditionPicker = true) }
@@ -251,6 +258,7 @@ class ChecklistDetailViewModel(
                 updateContentState { it.copy(exactAlarmDontShowAgain = intent.checked) }
             }
             ChecklistDetailIntent.OnDismissExactAlarmSheet -> handleExactAlarmSkip()
+
             // Analytics-only intents
             is ChecklistDetailIntent.OnCompletedSectionToggle -> {
                 val eventName = if (intent.expanded) "completed_section_expanded" else "completed_section_collapsed"
@@ -491,7 +499,8 @@ class ChecklistDetailViewModel(
         loadDataJob?.cancel()
 
         viewModelScope.launch {
-            reminderScheduler.cancel(state.checklist.id)
+            reminderScheduler.cancelReminder(state.checklist.id)
+            reminderScheduler.cancelRepeat(state.checklist.id)
             repository.deleteChecklist(state.checklist)
             analyticsTracker.event("checklist_deleted", mapOf(
                 "checklist_id" to state.checklist.id.toString(),
@@ -516,10 +525,76 @@ class ChecklistDetailViewModel(
                 }
             }
 
-            if (!reminderScheduler.hasNotificationPermission()) {
-                updateContentState { it.copy(showNotificationPermissionSheet = true) }
+            // Determine default tab: if repeat is active and no one-shot reminder, open on REPEAT tab
+            val defaultTab = if (state.checklist.repeatNextAt != null && state.checklist.reminderAt == null) {
+                ReminderTab.REPEAT
             } else {
-                updateContentState { it.copy(showReminderSheet = true) }
+                ReminderTab.ONCE
+            }
+
+            if (!reminderScheduler.hasNotificationPermission()) {
+                updateContentState { it.copy(showNotificationPermissionSheet = true, activeReminderTab = defaultTab) }
+            } else {
+                updateContentState { it.copy(showReminderSheet = true, activeReminderTab = defaultTab) }
+            }
+        }
+    }
+
+    private fun handleReminderTabSelected(tab: ReminderTab) {
+        if (tab == ReminderTab.REPEAT) {
+            initRepeatTabIfNeeded()
+        } else {
+            updateContentState { it.copy(activeReminderTab = ReminderTab.ONCE) }
+        }
+    }
+
+    private fun initRepeatTabIfNeeded() {
+        val state = _screenState.value as? ChecklistDetailState.Content ?: return
+
+        // Already has pending config — just switch tab
+        if (state.pendingRepeatConfig != null) {
+            updateContentState { it.copy(activeReminderTab = ReminderTab.REPEAT) }
+            return
+        }
+
+        val existingRule = state.checklist.repeatRule
+        val isPremium = state.userLimits?.isPremium ?: false
+
+        if (existingRule != null) {
+            // Editing an existing repeat rule — no limit check needed
+            val existingTimeMinutes = state.checklist.repeatTimeOfDayMinutes ?: (9 * 60)
+            val config = PendingRepeatConfig(
+                type = existingRule.type,
+                interval = existingRule.interval,
+                weekDays = existingRule.weekDays ?: emptySet(),
+                endCondition = existingRule.endCondition,
+                resetChecks = existingRule.resetChecks,
+                isCustom = existingRule.interval > 1 || !existingRule.weekDays.isNullOrEmpty(),
+                timeHour = existingTimeMinutes / 60,
+                timeMinute = existingTimeMinutes % 60
+            )
+            updateContentState {
+                it.copy(activeReminderTab = ReminderTab.REPEAT, pendingRepeatConfig = config)
+            }
+            return
+        }
+
+        // New repeat schedule — check free user limit
+        if (!isPremium) {
+            viewModelScope.launch {
+                val activeCount = repository.countActiveRepeatSchedules()
+                if (activeCount >= MAX_FREE_REPEAT_SCHEDULES) {
+                    analyticsTracker.event("recurring_limit_hit")
+                    navigator.navigateToPaywall(source = "detail_recurring_limit")
+                } else {
+                    updateContentState {
+                        it.copy(activeReminderTab = ReminderTab.REPEAT, pendingRepeatConfig = PendingRepeatConfig())
+                    }
+                }
+            }
+        } else {
+            updateContentState {
+                it.copy(activeReminderTab = ReminderTab.REPEAT, pendingRepeatConfig = PendingRepeatConfig())
             }
         }
     }
@@ -539,47 +614,112 @@ class ChecklistDetailViewModel(
     private fun saveReminder(triggerAtMillis: Long) {
         viewModelScope.launch {
             val state = _screenState.value as? ChecklistDetailState.Content ?: return@launch
-            val configForRule = state.pendingRepeatConfig ?: state.savedRepeatConfig
-            val pendingRule = configForRule?.toRule()
 
-            if (pendingRule != null) {
-                // Atomic save: reminder + repeat rule + reset occurrence count
-                repository.setReminderWithRule(state.checklist.id, triggerAtMillis, pendingRule)
-                updateContentState {
-                    it.copy(
-                        checklist = it.checklist.copy(
-                            reminderAt = triggerAtMillis,
-                            repeatRule = pendingRule,
-                            repeatOccurrenceCount = 0
-                        ),
-                        pendingRepeatConfig = null,
-                        savedRepeatConfig = null,
-                        repeatRuleSummary = buildRepeatSummary(configForRule)
-                    )
-                }
-            } else {
-                repository.setReminder(state.checklist.id, triggerAtMillis)
-                updateContentState {
-                    it.copy(checklist = it.checklist.copy(reminderAt = triggerAtMillis))
-                }
+            repository.setReminder(state.checklist.id, triggerAtMillis)
+            reminderScheduler.scheduleReminder(state.checklist.id, triggerAtMillis)
+
+            updateContentState {
+                it.copy(checklist = it.checklist.copy(reminderAt = triggerAtMillis))
             }
 
-            reminderScheduler.schedule(state.checklist.id, triggerAtMillis)
             analyticsTracker.event("reminder_set", mapOf(
-                "checklist_id" to state.checklist.id.toString(),
-                "has_repeat" to (pendingRule != null).toString()
+                "checklist_id" to state.checklist.id.toString()
             ))
-            if (pendingRule != null) {
-                analyticsTracker.event("recurring_reminder_set", mapOf(
-                    "type" to pendingRule.type.name,
-                    "interval" to pendingRule.interval.toString(),
-                    "weekdays" to (pendingRule.weekDays?.joinToString(",") ?: ""),
-                    "end_condition" to pendingRule.endCondition::class.simpleName.orEmpty(),
-                    "reset_checks" to pendingRule.resetChecks.toString()
-                ))
-            }
 
             maybeShowExactAlarmInstruction()
+        }
+    }
+
+    private fun removeReminder() {
+        viewModelScope.launch {
+            val state = _screenState.value as? ChecklistDetailState.Content ?: return@launch
+            repository.setReminder(state.checklist.id, null)
+            reminderScheduler.cancelReminder(state.checklist.id)
+            updateContentState {
+                it.copy(checklist = it.checklist.copy(reminderAt = null))
+            }
+            val repeatRule = state.checklist.repeatRule
+            if (repeatRule != null) {
+                analyticsTracker.event("recurring_reminder_cancelled", mapOf(
+                    "checklist_id" to state.checklist.id.toString(),
+                    "total_occurrences" to state.checklist.repeatOccurrenceCount.toString()
+                ))
+            } else {
+                analyticsTracker.event("reminder_cancelled", mapOf(
+                    "checklist_id" to state.checklist.id.toString()
+                ))
+            }
+        }
+    }
+
+    private fun saveRepeatSchedule() {
+        val state = _screenState.value as? ChecklistDetailState.Content ?: return
+        val config = state.pendingRepeatConfig ?: return
+        val rule = config.toRule()
+        val timeMinutes = config.timeHour * 60 + config.timeMinute
+
+        viewModelScope.launch {
+            val tz = TimeZone.currentSystemDefault()
+            val now = Clock.System.now()
+            val today = now.toLocalDateTime(tz).date
+            val triggerTime = LocalTime(config.timeHour, config.timeMinute)
+            val todayTrigger = LocalDateTime(today, triggerTime).toInstant(tz).toEpochMilliseconds()
+
+            val firstTriggerAt = if (todayTrigger > now.toEpochMilliseconds()) {
+                todayTrigger
+            } else {
+                val tomorrow = today.plus(1, DateTimeUnit.DAY)
+                LocalDateTime(tomorrow, triggerTime).toInstant(tz).toEpochMilliseconds()
+            }
+
+            repository.setRepeatSchedule(state.checklist.id, rule, timeMinutes, firstTriggerAt)
+            reminderScheduler.scheduleRepeat(state.checklist.id, firstTriggerAt)
+
+            updateContentState {
+                it.copy(
+                    checklist = it.checklist.copy(
+                        repeatRule = rule,
+                        repeatTimeOfDayMinutes = timeMinutes,
+                        repeatNextAt = firstTriggerAt,
+                        repeatOccurrenceCount = 0
+                    ),
+                    showReminderSheet = false,
+                    pendingRepeatConfig = null,
+                    repeatRuleSummary = buildRepeatSummary(config)
+                )
+            }
+
+            analyticsTracker.event("repeat_schedule_set", mapOf(
+                "type" to rule.type.name,
+                "interval" to rule.interval.toString(),
+                "time_of_day" to "$timeMinutes",
+                "reset_checks" to rule.resetChecks.toString()
+            ))
+            maybeShowExactAlarmInstruction()
+        }
+    }
+
+    private fun removeRepeatSchedule() {
+        viewModelScope.launch {
+            val state = _screenState.value as? ChecklistDetailState.Content ?: return@launch
+            repository.clearRepeatSchedule(state.checklist.id)
+            reminderScheduler.cancelRepeat(state.checklist.id)
+            updateContentState {
+                it.copy(
+                    checklist = it.checklist.copy(
+                        repeatRule = null,
+                        repeatTimeOfDayMinutes = null,
+                        repeatNextAt = null,
+                        repeatOccurrenceCount = 0
+                    ),
+                    showReminderSheet = false,
+                    pendingRepeatConfig = null,
+                    repeatRuleSummary = null
+                )
+            }
+            analyticsTracker.event("repeat_schedule_cancelled", mapOf(
+                "checklist_id" to state.checklist.id.toString()
+            ))
         }
     }
 
@@ -620,7 +760,8 @@ class ChecklistDetailViewModel(
 
         viewModelScope.launch {
             if (reminderScheduler.canScheduleExactAlarms()) {
-                reminderScheduler.rescheduleAllActive()
+                reminderScheduler.rescheduleAllActiveReminders()
+                reminderScheduler.rescheduleAllActiveRepeats()
                 updateContentState { it.copy(snackbarMessage = SNACKBAR_EXACT_GRANTED) }
             } else {
                 updateContentState { it.copy(snackbarMessage = SNACKBAR_EXACT_DENIED) }
@@ -628,86 +769,7 @@ class ChecklistDetailViewModel(
         }
     }
 
-    private fun removeReminder() {
-        viewModelScope.launch {
-            val state = _screenState.value as? ChecklistDetailState.Content ?: return@launch
-            val checklist = state.checklist
-            if (checklist.repeatRule != null) {
-                // Clear recurring reminder: reminderAt, repeatRule, and occurrenceCount
-                repository.clearRecurringReminder(checklist.id)
-            } else {
-                repository.setReminder(checklist.id, null)
-            }
-            reminderScheduler.cancel(checklist.id)
-            updateContentState {
-                it.copy(checklist = it.checklist.copy(
-                    reminderAt = null,
-                    repeatRule = null,
-                    repeatOccurrenceCount = 0
-                ))
-            }
-            if (checklist.repeatRule != null) {
-                analyticsTracker.event("recurring_reminder_cancelled", mapOf(
-                    "checklist_id" to checklist.id.toString(),
-                    "total_occurrences" to checklist.repeatOccurrenceCount.toString()
-                ))
-            } else {
-                analyticsTracker.event("reminder_cancelled", mapOf(
-                    "checklist_id" to checklist.id.toString()
-                ))
-            }
-        }
-    }
-
     // ─── Repeat rule helpers ───────────────────────────────────────────
-
-    private fun openRepeatRuleSheet() {
-        val state = _screenState.value as? ChecklistDetailState.Content ?: return
-        val existingRule = state.checklist.repeatRule
-
-        // If editing an existing rule or restoring a pending config, skip the limit check
-        if (existingRule != null || state.savedRepeatConfig != null) {
-            showRepeatRuleSheetWithConfig(state, existingRule)
-            return
-        }
-
-        // Free users: check recurring reminder limit
-        val isPremium = state.userLimits?.isPremium ?: false
-        if (!isPremium) {
-            viewModelScope.launch {
-                val recurringCount = repository.countRecurringReminders()
-                if (recurringCount >= MAX_FREE_RECURRING_REMINDERS) {
-                    analyticsTracker.event("recurring_limit_hit")
-                    navigator.navigateToPaywall(source = "detail_recurring_limit")
-                } else {
-                    showRepeatRuleSheetWithConfig(state, existingRule = null)
-                }
-            }
-        } else {
-            showRepeatRuleSheetWithConfig(state, existingRule = null)
-        }
-    }
-
-    private fun showRepeatRuleSheetWithConfig(
-        state: ChecklistDetailState.Content,
-        existingRule: ReminderRepeatRule?
-    ) {
-        val config = if (existingRule != null) {
-            PendingRepeatConfig(
-                type = existingRule.type,
-                interval = existingRule.interval,
-                weekDays = existingRule.weekDays ?: emptySet(),
-                endCondition = existingRule.endCondition,
-                resetChecks = existingRule.resetChecks,
-                isCustom = existingRule.interval > 1 || !existingRule.weekDays.isNullOrEmpty()
-            )
-        } else {
-            state.savedRepeatConfig ?: PendingRepeatConfig()
-        }
-        updateContentState {
-            it.copy(showRepeatRuleSheet = true, pendingRepeatConfig = config, showReminderSheet = false)
-        }
-    }
 
     private fun handleRepeatTypeSelected(type: RepeatType) {
         updatePendingRepeatConfig {
@@ -728,52 +790,6 @@ class ChecklistDetailViewModel(
                 config.weekDays + dayNumber
             }
             config.copy(weekDays = updated)
-        }
-    }
-
-    private fun saveRepeatRule() {
-        val state = _screenState.value as? ChecklistDetailState.Content ?: return
-        val config = state.pendingRepeatConfig
-
-        // Close sheet
-        val summary = config?.let { c -> buildRepeatSummary(c) }
-        updateContentState {
-            it.copy(
-                showRepeatRuleSheet = false,
-                pendingRepeatConfig = null,
-                showEndConditionPicker = false,
-                repeatRuleSummary = summary,
-                savedRepeatConfig = config
-            )
-        }
-
-        // If no reminder set yet, just store the pending config — actual save happens via saveReminder
-        // If reminder already set, update the rule on the existing reminder
-        val existingReminder = state.checklist.reminderAt ?: return
-
-        viewModelScope.launch {
-            val rule = config?.toRule()
-            repository.setReminderWithRule(state.checklist.id, existingReminder, rule)
-            updateContentState {
-                it.copy(
-                    checklist = it.checklist.copy(
-                        repeatRule = rule,
-                        repeatOccurrenceCount = 0
-                    ),
-                    savedRepeatConfig = null
-                )
-            }
-            // Reschedule alarm (rule change may affect behavior but trigger time stays the same)
-            reminderScheduler.schedule(state.checklist.id, existingReminder)
-            if (rule != null) {
-                analyticsTracker.event("recurring_reminder_set", mapOf(
-                    "type" to rule.type.name,
-                    "interval" to rule.interval.toString(),
-                    "weekdays" to (rule.weekDays?.joinToString(",") ?: ""),
-                    "end_condition" to rule.endCondition::class.simpleName.orEmpty(),
-                    "reset_checks" to rule.resetChecks.toString()
-                ))
-            }
         }
     }
 
@@ -882,7 +898,7 @@ class ChecklistDetailViewModel(
         const val PREF_EXACT_ALARM_DONT_SHOW = "exact_alarm_dont_show"
         const val SNACKBAR_EXACT_GRANTED = "exact_alarm_granted"
         const val SNACKBAR_EXACT_DENIED = "exact_alarm_denied"
-        /** Max recurring reminders for free users. Matches Remote Config default. */
-        const val MAX_FREE_RECURRING_REMINDERS = 1
+        /** Max independent repeat schedules for free users. Matches Remote Config default. */
+        const val MAX_FREE_REPEAT_SCHEDULES = 1
     }
 }

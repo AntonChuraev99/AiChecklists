@@ -13,6 +13,8 @@ data class ChecklistEntity(
     val items: List<ChecklistItem>,
     val reminderAt: Long? = null,
     val repeatRule: ReminderRepeatRule? = null,
+    val repeatTimeOfDayMinutes: Int? = null,
+    val repeatNextAt: Long? = null,
     val repeatOccurrenceCount: Int = 0,
     val separateCompleted: Boolean = false,
     val position: Int = 0,
@@ -25,6 +27,8 @@ fun ChecklistEntity.toDomain() = Checklist(
     items = items,
     reminderAt = reminderAt,
     repeatRule = repeatRule,
+    repeatTimeOfDayMinutes = repeatTimeOfDayMinutes,
+    repeatNextAt = repeatNextAt,
     repeatOccurrenceCount = repeatOccurrenceCount,
     separateCompleted = separateCompleted,
     position = position,
@@ -37,9 +41,10 @@ fun Checklist.toEntity() = ChecklistEntity(
     items = items,
     reminderAt = reminderAt,
     repeatRule = repeatRule,
+    repeatTimeOfDayMinutes = repeatTimeOfDayMinutes,
+    repeatNextAt = repeatNextAt,
     repeatOccurrenceCount = repeatOccurrenceCount,
     separateCompleted = separateCompleted,
     position = position,
     autoDeleteCompleted = autoDeleteCompleted
 )
-

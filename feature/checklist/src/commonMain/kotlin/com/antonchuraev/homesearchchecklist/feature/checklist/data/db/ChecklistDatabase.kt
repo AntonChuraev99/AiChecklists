@@ -50,9 +50,19 @@ val MIGRATION_7_8 = object : Migration(7, 8) {
     }
 }
 
+val MIGRATION_8_9 = object : Migration(8, 9) {
+    override fun migrate(connection: SQLiteConnection) {
+        // Add new columns for independent repeat schedule
+        connection.execSQL("ALTER TABLE checklists ADD COLUMN repeatTimeOfDayMinutes INTEGER DEFAULT NULL")
+        connection.execSQL("ALTER TABLE checklists ADD COLUMN repeatNextAt INTEGER DEFAULT NULL")
+        // Reset existing repeat data (not on prod, safe to clear)
+        connection.execSQL("UPDATE checklists SET repeatRule = NULL, repeatOccurrenceCount = 0")
+    }
+}
+
 @Database(
     entities = [ChecklistEntity::class, ChecklistFillEntity::class],
-    version = 8,
+    version = 9,
     exportSchema = false
 )
 @TypeConverters(ChecklistItemConverters::class, ReminderConverters::class)
@@ -66,7 +76,7 @@ abstract class ChecklistDatabase : RoomDatabase() {
             builder: Builder<ChecklistDatabase>
         ): ChecklistDatabase {
             return builder
-                .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+                .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
                 .fallbackToDestructiveMigration(dropAllTables = false)
                 .setQueryCoroutineContext(Dispatchers.IO)
                 .build()

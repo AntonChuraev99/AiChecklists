@@ -13,12 +13,12 @@ import kotlinx.coroutines.launch
 import org.koin.core.context.GlobalContext
 
 /**
- * Reschedules all active reminders after device reboot.
+ * Reschedules all active alarms after device reboot.
  * AlarmManager alarms are lost when the device powers off.
  *
- * For one-shot reminders: [rescheduleAllActive] re-registers future alarms.
- * For recurring reminders: [RecoverRecurringRemindersUseCase] advances
- * past-due occurrences to the next future time.
+ * For one-shot reminders: [rescheduleAllActiveReminders] re-registers future alarms.
+ * For repeat schedules: [rescheduleAllActiveRepeats] re-registers future repeat alarms,
+ * and [RecoverRecurringRemindersUseCase] advances past-due occurrences.
  */
 class BootCompletedReceiver : BroadcastReceiver() {
 
@@ -29,12 +29,15 @@ class BootCompletedReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val koin = GlobalContext.getOrNull() ?: return@launch
+                val scheduler: ChecklistReminderScheduler = koin.get()
 
                 // 1. Reschedule one-shot reminders that are still in the future
-                val scheduler: ChecklistReminderScheduler = koin.get()
-                scheduler.rescheduleAllActive()
+                scheduler.rescheduleAllActiveReminders()
 
-                // 2. Recover recurring reminders that were due while device was off
+                // 2. Reschedule repeat schedules that are still in the future
+                scheduler.rescheduleAllActiveRepeats()
+
+                // 3. Recover past-due repeat schedules (advance to next future occurrence)
                 val recoverUseCase: RecoverRecurringRemindersUseCase = koin.get()
                 recoverUseCase(nowMillis = System.currentTimeMillis())
             } catch (e: CancellationException) {
