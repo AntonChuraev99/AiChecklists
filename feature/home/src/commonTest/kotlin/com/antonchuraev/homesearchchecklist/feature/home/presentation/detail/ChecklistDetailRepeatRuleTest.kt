@@ -7,6 +7,7 @@ import com.antonchuraev.homesearchchecklist.core.datastore.api.AppDatastore
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistReminderInfo
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistRepeatInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
@@ -126,10 +127,11 @@ class ChecklistDetailRepeatRuleTest {
     @Test
     fun onRepeatRuleClick_opensSheet_withDefaultConfig() = runTest {
         val vm = createViewModel()
-        vm.onIntent(ChecklistDetailIntent.OnRepeatRuleClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderTabSelected(ReminderTab.REPEAT))
 
         val state = contentState(vm)
-        assertTrue(state.showRepeatRuleSheet)
+        assertNotNull(state.pendingRepeatConfig)
         val config = checkNotNull(state.pendingRepeatConfig)
         assertEquals(RepeatType.DAILY, config.type)
         assertEquals(1, config.interval)
@@ -138,12 +140,14 @@ class ChecklistDetailRepeatRuleTest {
     @Test
     fun onRepeatRuleClick_closesReminderSheet() = runTest {
         val vm = createViewModel()
-        // Simulate reminder sheet is open
-        vm.onIntent(ChecklistDetailIntent.OnRepeatRuleClick)
+        // Open reminder sheet then switch to repeat tab
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderTabSelected(ReminderTab.REPEAT))
 
         val state = contentState(vm)
-        assertFalse(state.showReminderSheet)
-        assertTrue(state.showRepeatRuleSheet)
+        // Repeat is shown as a tab inside the reminder sheet
+        assertTrue(state.showReminderSheet)
+        assertNotNull(state.pendingRepeatConfig)
     }
 
     @Test
@@ -160,7 +164,8 @@ class ChecklistDetailRepeatRuleTest {
         )
 
         val vm = createViewModel()
-        vm.onIntent(ChecklistDetailIntent.OnRepeatRuleClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderTabSelected(ReminderTab.REPEAT))
 
         val config = contentState(vm).pendingRepeatConfig!!
         assertEquals(RepeatType.WEEKLY, config.type)
@@ -174,7 +179,8 @@ class ChecklistDetailRepeatRuleTest {
     @Test
     fun onRepeatTypeSelected_daily_updatesConfig() = runTest {
         val vm = createViewModel()
-        vm.onIntent(ChecklistDetailIntent.OnRepeatRuleClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderTabSelected(ReminderTab.REPEAT))
         vm.onIntent(ChecklistDetailIntent.OnRepeatTypeSelected(RepeatType.DAILY))
 
         val config = contentState(vm).pendingRepeatConfig!!
@@ -185,7 +191,8 @@ class ChecklistDetailRepeatRuleTest {
     @Test
     fun onRepeatTypeSelected_weekly_updatesConfig() = runTest {
         val vm = createViewModel()
-        vm.onIntent(ChecklistDetailIntent.OnRepeatRuleClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderTabSelected(ReminderTab.REPEAT))
         vm.onIntent(ChecklistDetailIntent.OnRepeatTypeSelected(RepeatType.WEEKLY))
 
         assertEquals(RepeatType.WEEKLY, contentState(vm).pendingRepeatConfig!!.type)
@@ -196,7 +203,8 @@ class ChecklistDetailRepeatRuleTest {
     @Test
     fun onRepeatIntervalChanged_updatesConfig() = runTest {
         val vm = createViewModel()
-        vm.onIntent(ChecklistDetailIntent.OnRepeatRuleClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderTabSelected(ReminderTab.REPEAT))
         vm.onIntent(ChecklistDetailIntent.OnRepeatIntervalChanged(3))
 
         assertEquals(3, contentState(vm).pendingRepeatConfig!!.interval)
@@ -205,7 +213,8 @@ class ChecklistDetailRepeatRuleTest {
     @Test
     fun onRepeatIntervalChanged_clampsToRange() = runTest {
         val vm = createViewModel()
-        vm.onIntent(ChecklistDetailIntent.OnRepeatRuleClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderTabSelected(ReminderTab.REPEAT))
 
         vm.onIntent(ChecklistDetailIntent.OnRepeatIntervalChanged(0))
         assertEquals(1, contentState(vm).pendingRepeatConfig!!.interval)
@@ -219,7 +228,8 @@ class ChecklistDetailRepeatRuleTest {
     @Test
     fun onWeekDayToggled_addsDay() = runTest {
         val vm = createViewModel()
-        vm.onIntent(ChecklistDetailIntent.OnRepeatRuleClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderTabSelected(ReminderTab.REPEAT))
         vm.onIntent(ChecklistDetailIntent.OnWeekDayToggled(1)) // Monday
 
         assertTrue(1 in contentState(vm).pendingRepeatConfig!!.weekDays)
@@ -228,7 +238,8 @@ class ChecklistDetailRepeatRuleTest {
     @Test
     fun onWeekDayToggled_removesDay() = runTest {
         val vm = createViewModel()
-        vm.onIntent(ChecklistDetailIntent.OnRepeatRuleClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderTabSelected(ReminderTab.REPEAT))
         vm.onIntent(ChecklistDetailIntent.OnWeekDayToggled(1))
         vm.onIntent(ChecklistDetailIntent.OnWeekDayToggled(1))
 
@@ -240,7 +251,8 @@ class ChecklistDetailRepeatRuleTest {
     @Test
     fun onResetChecksToggled_updatesConfig() = runTest {
         val vm = createViewModel()
-        vm.onIntent(ChecklistDetailIntent.OnRepeatRuleClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderTabSelected(ReminderTab.REPEAT))
         vm.onIntent(ChecklistDetailIntent.OnResetChecksToggled(true))
 
         assertTrue(contentState(vm).pendingRepeatConfig!!.resetChecks)
@@ -251,7 +263,8 @@ class ChecklistDetailRepeatRuleTest {
     @Test
     fun onEndConditionClick_showsPicker() = runTest {
         val vm = createViewModel()
-        vm.onIntent(ChecklistDetailIntent.OnRepeatRuleClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderTabSelected(ReminderTab.REPEAT))
         vm.onIntent(ChecklistDetailIntent.OnEndConditionClick)
 
         assertTrue(contentState(vm).showEndConditionPicker)
@@ -260,7 +273,8 @@ class ChecklistDetailRepeatRuleTest {
     @Test
     fun onEndConditionSelected_updatesConfig_closesPicker() = runTest {
         val vm = createViewModel()
-        vm.onIntent(ChecklistDetailIntent.OnRepeatRuleClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderTabSelected(ReminderTab.REPEAT))
         vm.onIntent(ChecklistDetailIntent.OnEndConditionClick)
         vm.onIntent(ChecklistDetailIntent.OnEndConditionSelected(RepeatEndCondition.AfterCount(5)))
 
@@ -274,11 +288,12 @@ class ChecklistDetailRepeatRuleTest {
     @Test
     fun onDismissRepeatRuleSheet_closesAll() = runTest {
         val vm = createViewModel()
-        vm.onIntent(ChecklistDetailIntent.OnRepeatRuleClick)
-        vm.onIntent(ChecklistDetailIntent.OnDismissRepeatRuleSheet)
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderTabSelected(ReminderTab.REPEAT))
+        vm.onIntent(ChecklistDetailIntent.OnDismissReminderUI)
 
         val state = contentState(vm)
-        assertFalse(state.showRepeatRuleSheet)
+        assertFalse(state.showReminderSheet)
         assertNull(state.pendingRepeatConfig)
         assertFalse(state.showEndConditionPicker)
     }
@@ -290,14 +305,15 @@ class ChecklistDetailRepeatRuleTest {
         repository.storedChecklist = testChecklist.copy(reminderAt = 5000L)
 
         val vm = createViewModel()
-        vm.onIntent(ChecklistDetailIntent.OnRepeatRuleClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderTabSelected(ReminderTab.REPEAT))
         vm.onIntent(ChecklistDetailIntent.OnRepeatTypeSelected(RepeatType.WEEKLY))
         vm.onIntent(ChecklistDetailIntent.OnWeekDayToggled(1))
         vm.onIntent(ChecklistDetailIntent.OnWeekDayToggled(3))
-        vm.onIntent(ChecklistDetailIntent.OnSaveRepeatRule)
+        vm.onIntent(ChecklistDetailIntent.OnSaveRepeatSchedule)
 
         val state = contentState(vm)
-        assertFalse(state.showRepeatRuleSheet)
+        assertFalse(state.showReminderSheet)
         assertNull(state.pendingRepeatConfig)
         assertNotNull(state.checklist.repeatRule)
         assertEquals(RepeatType.WEEKLY, state.checklist.repeatRule!!.type)
@@ -306,18 +322,19 @@ class ChecklistDetailRepeatRuleTest {
     }
 
     @Test
-    fun onSaveRepeatRule_withoutReminder_closesSheetOnly() = runTest {
-        // No reminder set
+    fun onSaveRepeatRule_withoutReminder_savesRepeatSchedule() = runTest {
+        // No reminder set — repeat saves independently
         val vm = createViewModel()
-        vm.onIntent(ChecklistDetailIntent.OnRepeatRuleClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderTabSelected(ReminderTab.REPEAT))
         vm.onIntent(ChecklistDetailIntent.OnRepeatTypeSelected(RepeatType.DAILY))
-        vm.onIntent(ChecklistDetailIntent.OnSaveRepeatRule)
+        vm.onIntent(ChecklistDetailIntent.OnSaveRepeatSchedule)
 
         val state = contentState(vm)
-        assertFalse(state.showRepeatRuleSheet)
-        assertNotNull(state.repeatRuleSummary) // Summary saved for later use
-        // Rule not persisted until reminder is set
-        assertNull(state.checklist.repeatRule)
+        assertFalse(state.showReminderSheet)
+        assertNotNull(state.repeatRuleSummary) // Summary saved
+        // Repeat schedule is persisted (independent of reminder)
+        assertNotNull(repository.lastRepeatSchedule)
     }
 
     // --- PendingRepeatConfig.toRule() ---
@@ -355,35 +372,36 @@ class ChecklistDetailRepeatRuleTest {
 
     @Test
     fun onRepeatRuleClick_freeUser_withExistingRecurring_navigatesToPaywall() = runTest {
-        repository.recurringReminderCount = 1 // Already at limit
+        repository.repeatScheduleCount = 1 // Already at limit
         val navigator = FakeAppNavigator()
         val vm = createViewModel(navigator = navigator)
-        vm.onIntent(ChecklistDetailIntent.OnRepeatRuleClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderTabSelected(ReminderTab.REPEAT))
 
-        // Wait for coroutine to complete
 
 
         assertEquals("detail_recurring_limit", navigator.lastPaywallSource)
-        // Sheet should NOT be open
+        // Pending config should NOT be initialized
         val state = contentState(vm)
-        assertFalse(state.showRepeatRuleSheet)
+        assertNull(state.pendingRepeatConfig)
     }
 
     @Test
     fun onRepeatRuleClick_freeUser_noExistingRecurring_opensSheet() = runTest {
-        repository.recurringReminderCount = 0
+        repository.repeatScheduleCount = 0
         val vm = createViewModel()
-        vm.onIntent(ChecklistDetailIntent.OnRepeatRuleClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderTabSelected(ReminderTab.REPEAT))
 
 
 
         val state = contentState(vm)
-        assertTrue(state.showRepeatRuleSheet)
+        assertNotNull(state.pendingRepeatConfig)
     }
 
     @Test
     fun onRepeatRuleClick_premiumUser_alwaysOpensSheet() = runTest {
-        repository.recurringReminderCount = 10 // Many recurring, but premium
+        repository.repeatScheduleCount = 10 // Many recurring, but premium
         val premiumStatus = SubscriptionStatus(
             isActive = true,
             activeEntitlements = setOf(Entitlements.PREMIUM)
@@ -391,18 +409,19 @@ class ChecklistDetailRepeatRuleTest {
         val vm = createViewModel(
             paywallRepository = FakePaywallRepository(premiumStatus)
         )
-        vm.onIntent(ChecklistDetailIntent.OnRepeatRuleClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderTabSelected(ReminderTab.REPEAT))
 
 
 
         val state = contentState(vm)
-        assertTrue(state.showRepeatRuleSheet)
+        assertNotNull(state.pendingRepeatConfig)
     }
 
     @Test
     fun onRepeatRuleClick_freeUser_editingExistingRule_skipsLimitCheck() = runTest {
         // Even at limit, editing existing recurring should be allowed
-        repository.recurringReminderCount = 1
+        repository.repeatScheduleCount = 1
         repository.storedChecklist = testChecklist.copy(
             repeatRule = ReminderRepeatRule(
                 type = RepeatType.DAILY,
@@ -413,13 +432,14 @@ class ChecklistDetailRepeatRuleTest {
         )
         val navigator = FakeAppNavigator()
         val vm = createViewModel(navigator = navigator)
-        vm.onIntent(ChecklistDetailIntent.OnRepeatRuleClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderTabSelected(ReminderTab.REPEAT))
 
 
 
-        // Sheet should open (editing, not creating new)
+        // Pending config should be initialized (editing, not creating new)
         val state = contentState(vm)
-        assertTrue(state.showRepeatRuleSheet)
+        assertNotNull(state.pendingRepeatConfig)
         assertNull(navigator.lastPaywallSource)
     }
 
@@ -427,10 +447,11 @@ class ChecklistDetailRepeatRuleTest {
 
     @Test
     fun onRepeatRuleClick_limitHit_tracksAnalytics() = runTest {
-        repository.recurringReminderCount = 1
+        repository.repeatScheduleCount = 1
         val tracker = FakeAnalyticsTracker()
         val vm = createViewModel(analyticsTracker = tracker)
-        vm.onIntent(ChecklistDetailIntent.OnRepeatRuleClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderTabSelected(ReminderTab.REPEAT))
 
 
 
@@ -477,7 +498,8 @@ class ChecklistDetailRepeatRuleTest {
     @Test
     fun smartPreset_weekdays_setsCorrectConfig() = runTest {
         val vm = createViewModel()
-        vm.onIntent(ChecklistDetailIntent.OnRepeatRuleClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderTabSelected(ReminderTab.REPEAT))
 
         val preset = PendingRepeatConfig(
             type = RepeatType.WEEKLY,
@@ -498,7 +520,8 @@ class ChecklistDetailRepeatRuleTest {
     @Test
     fun smartPreset_biweekly_setsCorrectConfig() = runTest {
         val vm = createViewModel()
-        vm.onIntent(ChecklistDetailIntent.OnRepeatRuleClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderTabSelected(ReminderTab.REPEAT))
 
         val preset = PendingRepeatConfig(
             type = RepeatType.WEEKLY,
@@ -517,7 +540,8 @@ class ChecklistDetailRepeatRuleTest {
     @Test
     fun smartPreset_quarterly_setsCorrectConfig() = runTest {
         val vm = createViewModel()
-        vm.onIntent(ChecklistDetailIntent.OnRepeatRuleClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderTabSelected(ReminderTab.REPEAT))
 
         val preset = PendingRepeatConfig(
             type = RepeatType.MONTHLY,
@@ -535,7 +559,8 @@ class ChecklistDetailRepeatRuleTest {
     @Test
     fun smartPreset_yearly_setsCorrectConfig() = runTest {
         val vm = createViewModel()
-        vm.onIntent(ChecklistDetailIntent.OnRepeatRuleClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderTabSelected(ReminderTab.REPEAT))
 
         vm.onIntent(ChecklistDetailIntent.OnRepeatTypeSelected(RepeatType.YEARLY))
 
@@ -551,7 +576,8 @@ class ChecklistDetailRepeatRuleTest {
     fun smartPreset_weekdays_savesCorrectRule() = runTest {
         repository.storedChecklist = testChecklist.copy(reminderAt = 1000L)
         val vm = createViewModel()
-        vm.onIntent(ChecklistDetailIntent.OnRepeatRuleClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderTabSelected(ReminderTab.REPEAT))
 
         val preset = PendingRepeatConfig(
             type = RepeatType.WEEKLY,
@@ -559,11 +585,11 @@ class ChecklistDetailRepeatRuleTest {
             weekDays = setOf(1, 2, 3, 4, 5)
         )
         vm.onIntent(ChecklistDetailIntent.OnSmartPresetSelected(preset))
-        vm.onIntent(ChecklistDetailIntent.OnSaveRepeatRule)
+        vm.onIntent(ChecklistDetailIntent.OnSaveRepeatSchedule)
 
-        val saved = repository.lastReminderWithRule
+        val saved = repository.lastRepeatSchedule
         assertNotNull(saved)
-        val rule = saved.third
+        val rule = saved.second
         assertNotNull(rule)
         assertEquals(RepeatType.WEEKLY, rule.type)
         assertEquals(setOf(1, 2, 3, 4, 5), rule.weekDays)
@@ -573,14 +599,15 @@ class ChecklistDetailRepeatRuleTest {
     fun smartPreset_yearly_savesCorrectRule() = runTest {
         repository.storedChecklist = testChecklist.copy(reminderAt = 1000L)
         val vm = createViewModel()
-        vm.onIntent(ChecklistDetailIntent.OnRepeatRuleClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderTabSelected(ReminderTab.REPEAT))
 
         vm.onIntent(ChecklistDetailIntent.OnRepeatTypeSelected(RepeatType.YEARLY))
-        vm.onIntent(ChecklistDetailIntent.OnSaveRepeatRule)
+        vm.onIntent(ChecklistDetailIntent.OnSaveRepeatSchedule)
 
-        val saved = repository.lastReminderWithRule
+        val saved = repository.lastRepeatSchedule
         assertNotNull(saved)
-        val rule = saved.third
+        val rule = saved.second
         assertNotNull(rule)
         assertEquals(RepeatType.YEARLY, rule.type)
         assertEquals(1, rule.interval)
@@ -601,7 +628,8 @@ class ChecklistDetailRepeatRuleTest {
     private class FakeChecklistRepository : ChecklistRepository {
         var storedChecklist: Checklist? = null
         val defaultFillFlow = MutableStateFlow<ChecklistFill?>(null)
-        var lastReminderWithRule: Triple<Long, Long?, ReminderRepeatRule?>? = null
+        // Tracks calls to setRepeatSchedule: (checklistId, rule, timeOfDayMinutes, firstTriggerAt)
+        var lastRepeatSchedule: Pair<Long, ReminderRepeatRule>? = null
 
         override val checklists: Flow<List<Checklist>> = flowOf(emptyList())
         override suspend fun addChecklist(checklist: Checklist): Long = 1L
@@ -624,16 +652,16 @@ class ChecklistDetailRepeatRuleTest {
         override suspend fun updateFill(fill: ChecklistFill) {}
         override suspend fun deleteFill(fill: ChecklistFill) {}
         override suspend fun reorderChecklists(orderedIds: List<Long>) {}
-        override suspend fun setReminderWithRule(checklistId: Long, reminderAt: Long?, repeatRule: ReminderRepeatRule?) {
-            lastReminderWithRule = Triple(checklistId, reminderAt, repeatRule)
+        override suspend fun setRepeatSchedule(checklistId: Long, rule: ReminderRepeatRule, timeOfDayMinutes: Int, firstTriggerAt: Long) {
+            lastRepeatSchedule = checklistId to rule
         }
-        override suspend fun advanceRecurringReminder(checklistId: Long, nextReminderAt: Long?, newCount: Int) {}
-        override suspend fun clearRecurringReminder(checklistId: Long) {}
-        override suspend fun setRepeatRule(checklistId: Long, rule: ReminderRepeatRule?) {}
+        override suspend fun advanceRepeatSchedule(checklistId: Long, nextAt: Long?, newCount: Int) {}
+        override suspend fun clearRepeatSchedule(checklistId: Long) {}
         override suspend fun resetDefaultFillChecks(checklistId: Long) {}
-        var recurringReminderCount: Int = 0
-        override suspend fun countRecurringReminders(): Int = recurringReminderCount
-        override suspend fun getPastDueRecurringReminders(nowMillis: Long): List<com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistRecurringInfo> = emptyList()
+        var repeatScheduleCount: Int = 0
+        override suspend fun countActiveRepeatSchedules(): Int = repeatScheduleCount
+        override suspend fun getActiveRepeatSchedules(): List<ChecklistRepeatInfo> = emptyList()
+        override suspend fun getPastDueRepeatSchedules(nowMillis: Long): List<ChecklistRepeatInfo> = emptyList()
     }
 
     private class FakeAppNavigator : AppNavigator {
@@ -680,10 +708,13 @@ class ChecklistDetailRepeatRuleTest {
 
     private class FakeReminderScheduler : ChecklistReminderScheduler {
         val scheduled = mutableListOf<Pair<Long, Long>>()
-        override fun schedule(checklistId: Long, triggerAtMillis: Long) {
+        override fun scheduleReminder(checklistId: Long, triggerAtMillis: Long) {
             scheduled.add(checklistId to triggerAtMillis)
         }
-        override fun cancel(checklistId: Long) {}
-        override suspend fun rescheduleAllActive() {}
+        override fun cancelReminder(checklistId: Long) {}
+        override suspend fun rescheduleAllActiveReminders() {}
+        override fun scheduleRepeat(checklistId: Long, triggerAtMillis: Long) {}
+        override fun cancelRepeat(checklistId: Long) {}
+        override suspend fun rescheduleAllActiveRepeats() {}
     }
 }

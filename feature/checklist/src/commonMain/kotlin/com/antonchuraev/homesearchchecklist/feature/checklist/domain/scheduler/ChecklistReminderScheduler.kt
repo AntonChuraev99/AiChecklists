@@ -1,9 +1,15 @@
 package com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler
 
 interface ChecklistReminderScheduler {
-    fun schedule(checklistId: Long, triggerAtMillis: Long)
-    fun cancel(checklistId: Long)
-    suspend fun rescheduleAllActive()
+    // One-shot reminders
+    fun scheduleReminder(checklistId: Long, triggerAtMillis: Long)
+    fun cancelReminder(checklistId: Long)
+    suspend fun rescheduleAllActiveReminders()
+
+    // Independent repeat schedule
+    fun scheduleRepeat(checklistId: Long, triggerAtMillis: Long)
+    fun cancelRepeat(checklistId: Long)
+    suspend fun rescheduleAllActiveRepeats()
 
     /** Returns true if exact alarms can be scheduled (always true below API 31). */
     fun canScheduleExactAlarms(): Boolean = true

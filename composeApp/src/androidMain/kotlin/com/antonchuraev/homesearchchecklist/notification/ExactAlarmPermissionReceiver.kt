@@ -27,7 +27,8 @@ class ExactAlarmPermissionReceiver : BroadcastReceiver() {
             try {
                 val scheduler: ChecklistReminderScheduler =
                     GlobalContext.getOrNull()?.get() ?: return@launch
-                scheduler.rescheduleAllActive()
+                scheduler.rescheduleAllActiveReminders()
+                scheduler.rescheduleAllActiveRepeats()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

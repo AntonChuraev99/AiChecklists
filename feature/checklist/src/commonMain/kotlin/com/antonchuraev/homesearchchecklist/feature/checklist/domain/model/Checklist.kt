@@ -12,8 +12,12 @@ data class Checklist(
     val id: Long = 0L,
     val name: String,
     val items: List<ChecklistItem>,
+    // One-shot reminder (independent of repeat)
     val reminderAt: Long? = null,
+    // Recurring repeat schedule (independent of reminder)
     val repeatRule: ReminderRepeatRule? = null,
+    val repeatTimeOfDayMinutes: Int? = null,
+    val repeatNextAt: Long? = null,
     val repeatOccurrenceCount: Int = 0,
     val separateCompleted: Boolean = false,
     val position: Int = 0,

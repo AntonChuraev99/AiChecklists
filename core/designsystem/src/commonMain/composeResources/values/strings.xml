@@ -410,6 +410,13 @@
     <string name="reminder_repeat_summary_quarterly">Every 3 months</string>
     <string name="reminder_repeat_summary_yearly">Every year</string>
 
+    <!-- Reminder sheet tabs -->
+    <string name="reminder_tab_once">Once</string>
+    <string name="reminder_tab_repeat">Repeat</string>
+    <string name="reminder_repeat_time_label">Time of day</string>
+    <string name="reminder_remove_repeat">Remove Repeat Schedule</string>
+    <string name="reminder_repeat_active">Repeats: %1$s at %2$s</string>
+
     <!-- Repeat rule sheet -->
     <string name="reminder_repeat_title">Repeat</string>
     <string name="reminder_repeat_save">Save</string>
