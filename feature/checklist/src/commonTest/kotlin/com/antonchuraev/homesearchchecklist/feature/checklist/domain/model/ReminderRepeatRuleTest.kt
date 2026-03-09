@@ -596,4 +596,137 @@ class ReminderRepeatRuleTest {
 
         assertNull(next, "Should return null when monthly fast-forward passes end date")
     }
+
+    // ─── YEARLY ──────────────────────────────────────────
+
+    @Test
+    fun yearly_nextOccurrence_addsOneYear() {
+        val rule = ReminderRepeatRule(type = RepeatType.YEARLY)
+        val trigger = dateTimeToMillis(2026, 3, 15, 9, 0)
+        val now = trigger + 1000
+
+        val next = rule.computeNextOccurrence(trigger, 0, now)
+
+        assertNotNull(next)
+        assertEquals(dateTimeToMillis(2027, 3, 15, 9, 0), next)
+    }
+
+    @Test
+    fun yearly_everyTwoYears() {
+        val rule = ReminderRepeatRule(type = RepeatType.YEARLY, interval = 2)
+        val trigger = dateTimeToMillis(2026, 6, 1, 10, 0)
+        val now = trigger + 1000
+
+        val next = rule.computeNextOccurrence(trigger, 0, now)
+
+        assertNotNull(next)
+        assertEquals(dateTimeToMillis(2028, 6, 1, 10, 0), next)
+    }
+
+    @Test
+    fun yearly_leapYear_feb29ToFeb28() {
+        val rule = ReminderRepeatRule(type = RepeatType.YEARLY)
+        // 2028 is a leap year
+        val trigger = dateTimeToMillis(2028, 2, 29, 9, 0)
+        val now = trigger + 1000
+
+        val next = rule.computeNextOccurrence(trigger, 0, now)
+
+        assertNotNull(next)
+        // 2029 is not a leap year — Feb 29 -> Feb 28
+        assertEquals(dateTimeToMillis(2029, 2, 28, 9, 0), next)
+    }
+
+    @Test
+    fun yearly_preservesTimeOfDay() {
+        val rule = ReminderRepeatRule(type = RepeatType.YEARLY)
+        val trigger = dateTimeToMillis(2026, 1, 1, 14, 30)
+        val now = trigger + 1000
+
+        val next = rule.computeNextOccurrence(trigger, 0, now)
+
+        assertNotNull(next)
+        assertEquals(dateTimeToMillis(2027, 1, 1, 14, 30), next)
+    }
+
+    @Test
+    fun yearly_fastForward_deviceOffThreeYears() {
+        val rule = ReminderRepeatRule(type = RepeatType.YEARLY)
+        val trigger = dateTimeToMillis(2024, 7, 4, 9, 0)
+        // Device off for 3+ years
+        val now = dateTimeToMillis(2027, 8, 1, 10, 0)
+
+        val next = rule.computeNextOccurrence(trigger, 0, now)
+
+        assertNotNull(next)
+        assertEquals(dateTimeToMillis(2028, 7, 4, 9, 0), next)
+    }
+
+    @Test
+    fun yearly_fastForward_everyTwoYears() {
+        val rule = ReminderRepeatRule(type = RepeatType.YEARLY, interval = 2)
+        val trigger = dateTimeToMillis(2024, 1, 1, 9, 0)
+        // Device off for 5 years
+        val now = dateTimeToMillis(2029, 6, 1, 10, 0)
+
+        val next = rule.computeNextOccurrence(trigger, 0, now)
+
+        assertNotNull(next)
+        assertEquals(dateTimeToMillis(2030, 1, 1, 9, 0), next)
+    }
+
+    @Test
+    fun yearly_afterCount_reachesLimit() {
+        val rule = ReminderRepeatRule(
+            type = RepeatType.YEARLY,
+            endCondition = RepeatEndCondition.AfterCount(maxCount = 3)
+        )
+        val trigger = dateTimeToMillis(2026, 1, 1, 9, 0)
+        val now = trigger + 1000
+
+        // Already fired 2 times, maxCount=3 → null (no more)
+        val next = rule.computeNextOccurrence(trigger, 2, now)
+
+        assertNull(next)
+    }
+
+    @Test
+    fun yearly_untilDate_stopsWhenPast() {
+        val endDate = dateTimeToMillis(2028, 1, 1, 0, 0)
+        val rule = ReminderRepeatRule(
+            type = RepeatType.YEARLY,
+            endCondition = RepeatEndCondition.UntilDate(dateMillis = endDate)
+        )
+        val trigger = dateTimeToMillis(2027, 6, 15, 9, 0)
+        val now = trigger + 1000
+
+        val next = rule.computeNextOccurrence(trigger, 0, now)
+
+        assertNull(next, "Should return null — next occurrence (2028-06-15) is past end date")
+    }
+
+    @Test
+    fun yearly_serialization_roundTrip() {
+        val rule = ReminderRepeatRule(
+            type = RepeatType.YEARLY,
+            interval = 2,
+            endCondition = RepeatEndCondition.AfterCount(maxCount = 5),
+            resetChecks = true
+        )
+
+        val jsonString = json.encodeToString(rule)
+        val decoded = json.decodeFromString<ReminderRepeatRule>(jsonString)
+
+        assertEquals(rule, decoded)
+        assertTrue(jsonString.contains("\"yearly\""), "Should serialize as 'yearly'")
+    }
+
+    @Test
+    fun yearly_backwardCompat_missingYearlyType_decodesWithDefault() {
+        // Existing JSON without yearly — should decode fine with other types
+        val jsonString = """{"type":"daily","interval":1}"""
+        val decoded = json.decodeFromString<ReminderRepeatRule>(jsonString)
+
+        assertEquals(RepeatType.DAILY, decoded.type)
+    }
 }

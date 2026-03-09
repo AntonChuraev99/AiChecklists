@@ -66,7 +66,8 @@ sealed interface ChecklistDetailState : State {
         val showRepeatRuleSheet: Boolean = false,
         val pendingRepeatConfig: PendingRepeatConfig? = null,
         val showEndConditionPicker: Boolean = false,
-        val repeatRuleSummary: String? = null
+        val repeatRuleSummary: String? = null,
+        val savedRepeatConfig: PendingRepeatConfig? = null
     ) : ChecklistDetailState
 }
 
@@ -141,6 +142,7 @@ sealed interface ChecklistDetailIntent : Intent {
     // Repeat rule
     data object OnRepeatRuleClick : ChecklistDetailIntent
     data class OnRepeatTypeSelected(val type: RepeatType) : ChecklistDetailIntent
+    data class OnSmartPresetSelected(val config: PendingRepeatConfig) : ChecklistDetailIntent
     data class OnRepeatIntervalChanged(val interval: Int) : ChecklistDetailIntent
     data class OnWeekDayToggled(val dayNumber: Int) : ChecklistDetailIntent
     data class OnResetChecksToggled(val enabled: Boolean) : ChecklistDetailIntent

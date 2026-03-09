@@ -1,32 +1,56 @@
 package com.antonchuraev.homesearchchecklist.feature.debug.presentation
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Screenshot
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonText
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
@@ -43,6 +67,7 @@ fun DebugScreen(
     onShowCsat: () -> Unit = {},
 ) {
     val screenState by viewModel.screenState.collectAsStateWithLifecycle()
+    var showRepeatRulePreview by rememberSaveable { mutableStateOf(false) }
 
     val items = listOf(
         DebugItem(Icons.Default.Info, stringResource(Res.string.debug_app_info), stringResource(Res.string.debug_app_info_description)) {
@@ -66,6 +91,13 @@ fun DebugScreen(
             stringResource(Res.string.debug_test_restore_credits_description)
         ) {
             viewModel.sendIntent(DebugScreenIntent.TestRestoreCredits)
+        },
+        DebugItem(
+            Icons.Default.Notifications,
+            "Repeat Rule Presets",
+            "Preview the 8 smart repeat presets sheet"
+        ) {
+            showRepeatRulePreview = true
         },
         DebugItem(
             Icons.Default.ThumbUp,
@@ -168,6 +200,10 @@ fun DebugScreen(
                 shape = MaterialTheme.shapes.large
             )
         }
+
+        if (showRepeatRulePreview) {
+            RepeatPresetPreviewSheet(onDismiss = { showRepeatRulePreview = false })
+        }
     }
 }
 
@@ -237,6 +273,180 @@ private fun InfoRow(label: String, value: String) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RepeatPresetPreviewSheet(onDismiss: () -> Unit) {
+    var selectedIndex by rememberSaveable { mutableStateOf(0) }
+    var customExpanded by rememberSaveable { mutableStateOf(false) }
+
+    val presets = listOf(
+        stringResource(Res.string.reminder_repeat_daily) to "DAILY, interval=1",
+        stringResource(Res.string.reminder_repeat_weekdays) to "WEEKLY, interval=1, weekDays={1,2,3,4,5}",
+        stringResource(Res.string.reminder_repeat_weekly) to "WEEKLY, interval=1",
+        stringResource(Res.string.reminder_repeat_biweekly) to "WEEKLY, interval=2",
+        stringResource(Res.string.reminder_repeat_monthly) to "MONTHLY, interval=1",
+        stringResource(Res.string.reminder_repeat_quarterly) to "MONTHLY, interval=3",
+        stringResource(Res.string.reminder_repeat_yearly) to "YEARLY, interval=1",
+    )
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .navigationBarsPadding()
+                .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
+                .padding(bottom = AppDimens.SpacingXxl),
+            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
+        ) {
+            Text(
+                text = stringResource(Res.string.reminder_repeat_title),
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(bottom = AppDimens.SpacingSm)
+            )
+
+            presets.forEachIndexed { index, (label, config) ->
+                val selected = selectedIndex == index && !customExpanded
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable {
+                            selectedIndex = index
+                            customExpanded = false
+                        }
+                        .padding(vertical = AppDimens.SpacingSm, horizontal = AppDimens.SpacingXs),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
+                ) {
+                    Icon(
+                        imageVector = if (selected) Icons.Filled.CheckCircle else Icons.Outlined.CheckCircle,
+                        contentDescription = null,
+                        tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal
+                        )
+                        if (selected) {
+                            Text(
+                                text = config,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Custom option
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { customExpanded = !customExpanded }
+                    .padding(vertical = AppDimens.SpacingSm, horizontal = AppDimens.SpacingXs),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
+            ) {
+                Icon(
+                    imageVector = if (customExpanded) Icons.Filled.CheckCircle else Icons.Outlined.CheckCircle,
+                    contentDescription = null,
+                    tint = if (customExpanded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.size(24.dp)
+                )
+                Text(
+                    text = stringResource(Res.string.reminder_repeat_custom),
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = if (customExpanded) FontWeight.Medium else FontWeight.Normal
+                )
+            }
+
+            // Custom section preview
+            AnimatedVisibility(visible = customExpanded) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(AppDimens.SpacingLg),
+                        verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
+                    ) {
+                        // Type chips row
+                        Text(
+                            text = "Every [N] [type]",
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)) {
+                            listOf("days", "weeks", "months", "years").forEachIndexed { i, label ->
+                                Surface(
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = if (i == 0) MaterialTheme.colorScheme.primaryContainer
+                                    else MaterialTheme.colorScheme.surface
+                                ) {
+                                    Text(
+                                        text = label,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = if (i == 0) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.padding(
+                                            horizontal = AppDimens.SpacingMd,
+                                            vertical = AppDimens.SpacingXs
+                                        )
+                                    )
+                                }
+                            }
+                        }
+
+                        // Weekday circles preview
+                        Text(
+                            text = "Weekday chips (WEEKLY type only):",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs)) {
+                            listOf("M", "T", "W", "T", "F", "S", "S").forEachIndexed { i, label ->
+                                val isSelected = i < 5 // Mon-Fri selected
+                                Surface(
+                                    modifier = Modifier.size(36.dp),
+                                    shape = CircleShape,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.surfaceVariant
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(
+                                            text = label,
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary
+                                            else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
+
+            Text(
+                text = "This is a debug preview. Tap presets to see their config.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 
