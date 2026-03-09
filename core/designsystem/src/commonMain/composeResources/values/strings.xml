@@ -366,6 +366,10 @@
     <string name="reminder_repeat_daily">Every day</string>
     <string name="reminder_repeat_weekly">Every week</string>
     <string name="reminder_repeat_monthly">Every month</string>
+    <string name="reminder_repeat_weekdays">Weekdays</string>
+    <string name="reminder_repeat_biweekly">Every 2 weeks</string>
+    <string name="reminder_repeat_quarterly">Every 3 months</string>
+    <string name="reminder_repeat_yearly">Every year</string>
     <string name="reminder_repeat_custom">Custom…</string>
 
     <!-- Repeat interval -->
@@ -373,7 +377,9 @@
     <string name="reminder_repeat_days">days</string>
     <string name="reminder_repeat_weeks">weeks</string>
     <string name="reminder_repeat_months">months</string>
+    <string name="reminder_repeat_years">years</string>
 
+    <string name="reminder_repeat_on">Repeat on</string>
     <!-- Weekdays (short) -->
     <string name="reminder_weekday_mon">M</string>
     <string name="reminder_weekday_tue">T</string>
@@ -400,6 +406,9 @@
     <string name="reminder_repeat_summary_weekly">Every week</string>
     <string name="reminder_repeat_summary_monthly">Every month</string>
     <string name="reminder_repeat_summary_weekdays">Mon–Fri</string>
+    <string name="reminder_repeat_summary_biweekly">Every 2 weeks</string>
+    <string name="reminder_repeat_summary_quarterly">Every 3 months</string>
+    <string name="reminder_repeat_summary_yearly">Every year</string>
 
     <!-- Repeat rule sheet -->
     <string name="reminder_repeat_title">Repeat</string>

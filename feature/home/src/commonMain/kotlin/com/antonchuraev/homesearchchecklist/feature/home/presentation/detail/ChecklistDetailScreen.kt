@@ -609,6 +609,7 @@ private fun ChecklistDetailContent(
             config = state.pendingRepeatConfig,
             showEndConditionPicker = state.showEndConditionPicker,
             onTypeSelected = { onIntent(ChecklistDetailIntent.OnRepeatTypeSelected(it)) },
+            onSmartPresetSelected = { onIntent(ChecklistDetailIntent.OnSmartPresetSelected(it)) },
             onCustomToggle = {
                 onIntent(ChecklistDetailIntent.OnRepeatTypeSelected(state.pendingRepeatConfig.type))
                 // Toggle custom mode by updating isCustom
@@ -1488,6 +1489,7 @@ private fun buildRepeatRuleSummaryText(rule: ReminderRepeatRule): String {
             else "Every ${rule.interval} weeks"
         }
         RepeatType.MONTHLY -> if (rule.interval == 1) "Every month" else "Every ${rule.interval} months"
+        RepeatType.YEARLY -> if (rule.interval == 1) "Every year" else "Every ${rule.interval} years"
     }
 }
 
@@ -1497,6 +1499,7 @@ private fun RepeatRuleSheet(
     config: PendingRepeatConfig,
     showEndConditionPicker: Boolean,
     onTypeSelected: (RepeatType) -> Unit,
+    onSmartPresetSelected: (PendingRepeatConfig) -> Unit,
     onCustomToggle: () -> Unit,
     onIntervalChanged: (Int) -> Unit,
     onWeekDayToggled: (Int) -> Unit,
@@ -1528,33 +1531,73 @@ private fun RepeatRuleSheet(
                 modifier = Modifier.padding(bottom = AppDimens.SpacingSm)
             )
 
+            // Custom state must be declared before presets so they can check it
+            var customExpanded by rememberSaveable { mutableStateOf(config.isCustom) }
+            val isCustomActive = config.isCustom || customExpanded
+
             // Type options
             RepeatTypeOption(
                 text = stringResource(Res.string.reminder_repeat_daily),
-                selected = !config.isCustom && config.type == RepeatType.DAILY && config.interval == 1,
-                onClick = { onTypeSelected(RepeatType.DAILY) }
+                selected = !isCustomActive && config.type == RepeatType.DAILY && config.interval == 1,
+                onClick = { customExpanded = false; onTypeSelected(RepeatType.DAILY) }
+            )
+            RepeatTypeOption(
+                text = stringResource(Res.string.reminder_repeat_weekdays),
+                selected = !isCustomActive && config.type == RepeatType.WEEKLY && config.interval == 1
+                        && config.weekDays == setOf(1, 2, 3, 4, 5),
+                onClick = {
+                    customExpanded = false
+                    onSmartPresetSelected(PendingRepeatConfig(
+                        type = RepeatType.WEEKLY, interval = 1,
+                        weekDays = setOf(1, 2, 3, 4, 5)
+                    ))
+                }
             )
             RepeatTypeOption(
                 text = stringResource(Res.string.reminder_repeat_weekly),
-                selected = !config.isCustom && config.type == RepeatType.WEEKLY && config.interval == 1 && config.weekDays.isEmpty(),
-                onClick = { onTypeSelected(RepeatType.WEEKLY) }
+                selected = !isCustomActive && config.type == RepeatType.WEEKLY && config.interval == 1 && config.weekDays.isEmpty(),
+                onClick = { customExpanded = false; onTypeSelected(RepeatType.WEEKLY) }
+            )
+            RepeatTypeOption(
+                text = stringResource(Res.string.reminder_repeat_biweekly),
+                selected = !isCustomActive && config.type == RepeatType.WEEKLY && config.interval == 2 && config.weekDays.isEmpty(),
+                onClick = {
+                    customExpanded = false
+                    onSmartPresetSelected(PendingRepeatConfig(
+                        type = RepeatType.WEEKLY, interval = 2
+                    ))
+                }
             )
             RepeatTypeOption(
                 text = stringResource(Res.string.reminder_repeat_monthly),
-                selected = !config.isCustom && config.type == RepeatType.MONTHLY && config.interval == 1,
-                onClick = { onTypeSelected(RepeatType.MONTHLY) }
+                selected = !isCustomActive && config.type == RepeatType.MONTHLY && config.interval == 1,
+                onClick = { customExpanded = false; onTypeSelected(RepeatType.MONTHLY) }
+            )
+            RepeatTypeOption(
+                text = stringResource(Res.string.reminder_repeat_quarterly),
+                selected = !isCustomActive && config.type == RepeatType.MONTHLY && config.interval == 3,
+                onClick = {
+                    customExpanded = false
+                    onSmartPresetSelected(PendingRepeatConfig(
+                        type = RepeatType.MONTHLY, interval = 3
+                    ))
+                }
+            )
+            RepeatTypeOption(
+                text = stringResource(Res.string.reminder_repeat_yearly),
+                selected = !isCustomActive && config.type == RepeatType.YEARLY && config.interval == 1,
+                onClick = { customExpanded = false; onTypeSelected(RepeatType.YEARLY) }
             )
 
             // Custom option
-            var customExpanded by rememberSaveable { mutableStateOf(config.isCustom) }
             RepeatTypeOption(
                 text = stringResource(Res.string.reminder_repeat_custom),
-                selected = config.isCustom || customExpanded,
+                selected = isCustomActive,
                 onClick = { customExpanded = !customExpanded }
             )
 
             // Custom interval section
-            AnimatedVisibility(visible = customExpanded || config.isCustom) {
+            AnimatedVisibility(visible = isCustomActive) {
                 CustomRepeatSection(
                     config = config,
                     onTypeChanged = { onTypeSelected(it) },
@@ -1695,7 +1738,7 @@ private fun CustomRepeatSection(
             modifier = Modifier.padding(AppDimens.SpacingLg),
             verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
         ) {
-            // "Every [N] [type]" row
+            // "Every [N]" row
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
@@ -1720,12 +1763,17 @@ private fun CustomRepeatSection(
                         imeAction = ImeAction.Done
                     )
                 )
+            }
 
-                // Type selector chips
+            // Type selector chips
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
+            ) {
                 val types = listOf(
                     RepeatType.DAILY to stringResource(Res.string.reminder_repeat_days),
                     RepeatType.WEEKLY to stringResource(Res.string.reminder_repeat_weeks),
-                    RepeatType.MONTHLY to stringResource(Res.string.reminder_repeat_months)
+                    RepeatType.MONTHLY to stringResource(Res.string.reminder_repeat_months),
+                    RepeatType.YEARLY to stringResource(Res.string.reminder_repeat_years)
                 )
                 types.forEach { (type, label) ->
                     val selected = config.type == type
@@ -1753,6 +1801,11 @@ private fun CustomRepeatSection(
 
             // Weekday chips (only for WEEKLY type)
             if (config.type == RepeatType.WEEKLY) {
+                Text(
+                    text = stringResource(Res.string.reminder_repeat_on),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 val dayLabels = listOf(
                     1 to stringResource(Res.string.reminder_weekday_mon),
                     2 to stringResource(Res.string.reminder_weekday_tue),

@@ -20,7 +20,10 @@ enum class RepeatType {
     WEEKLY,
 
     @SerialName("monthly")
-    MONTHLY
+    MONTHLY,
+
+    @SerialName("yearly")
+    YEARLY
 }
 
 @Serializable
@@ -85,6 +88,11 @@ fun ReminderRepeatRule.computeNextOccurrence(
         RepeatType.MONTHLY -> {
             // kotlinx-datetime handles month-end clamping: Jan 31 + 1 month -> Feb 28/29
             current.date.plus(interval, DateTimeUnit.MONTH)
+        }
+
+        RepeatType.YEARLY -> {
+            // kotlinx-datetime handles leap year: Feb 29 + 1 year -> Feb 28
+            current.date.plus(interval, DateTimeUnit.YEAR)
         }
     }
 
@@ -159,6 +167,10 @@ private fun skipToFuture(
         RepeatType.MONTHLY -> {
             return skipMonthlyToFuture(firstNextMillis, nowMillis, rule, tz, time)
         }
+
+        RepeatType.YEARLY -> {
+            return skipYearlyToFuture(firstNextMillis, nowMillis, rule, tz, time)
+        }
     }
 
     require(intervalMillis > 0) { "intervalMillis must be positive" }
@@ -214,6 +226,33 @@ private fun skipMonthlyToFuture(
 
     repeat(120) {
         val nextDate = candidate.plus(rule.interval, DateTimeUnit.MONTH)
+        val nextMillis = LocalDateTime(nextDate, time)
+            .toInstant(tz).toEpochMilliseconds()
+        if (nextMillis > nowMillis) return nextMillis
+        candidate = nextDate
+    }
+
+    return LocalDateTime(candidate, time)
+        .toInstant(tz).toEpochMilliseconds()
+}
+
+/**
+ * Skip yearly reminders to the future.
+ * Must iterate because leap years have variable day counts.
+ * Bounded: max 100 iterations (100 years).
+ */
+private fun skipYearlyToFuture(
+    firstNextMillis: Long,
+    nowMillis: Long,
+    rule: ReminderRepeatRule,
+    tz: TimeZone,
+    time: kotlinx.datetime.LocalTime
+): Long {
+    var candidate = Instant.fromEpochMilliseconds(firstNextMillis)
+        .toLocalDateTime(tz).date
+
+    repeat(100) {
+        val nextDate = candidate.plus(rule.interval, DateTimeUnit.YEAR)
         val nextMillis = LocalDateTime(nextDate, time)
             .toInstant(tz).toEpochMilliseconds()
         if (nextMillis > nowMillis) return nextMillis

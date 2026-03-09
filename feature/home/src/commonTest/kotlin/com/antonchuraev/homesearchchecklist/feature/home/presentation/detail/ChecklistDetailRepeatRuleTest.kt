@@ -472,6 +472,121 @@ class ChecklistDetailRepeatRuleTest {
         assertFalse(tracker.events.any { it.first == "recurring_reminder_cancelled" })
     }
 
+    // ─── Smart preset tests ────────────────────────────────
+
+    @Test
+    fun smartPreset_weekdays_setsCorrectConfig() = runTest {
+        val vm = createViewModel()
+        vm.onIntent(ChecklistDetailIntent.OnRepeatRuleClick)
+
+        val preset = PendingRepeatConfig(
+            type = RepeatType.WEEKLY,
+            interval = 1,
+            weekDays = setOf(1, 2, 3, 4, 5)
+        )
+        vm.onIntent(ChecklistDetailIntent.OnSmartPresetSelected(preset))
+
+        val state = vm.screenState.value as ChecklistDetailState.Content
+        val config = state.pendingRepeatConfig
+        assertNotNull(config)
+        assertEquals(RepeatType.WEEKLY, config.type)
+        assertEquals(1, config.interval)
+        assertEquals(setOf(1, 2, 3, 4, 5), config.weekDays)
+        assertFalse(config.isCustom)
+    }
+
+    @Test
+    fun smartPreset_biweekly_setsCorrectConfig() = runTest {
+        val vm = createViewModel()
+        vm.onIntent(ChecklistDetailIntent.OnRepeatRuleClick)
+
+        val preset = PendingRepeatConfig(
+            type = RepeatType.WEEKLY,
+            interval = 2
+        )
+        vm.onIntent(ChecklistDetailIntent.OnSmartPresetSelected(preset))
+
+        val state = vm.screenState.value as ChecklistDetailState.Content
+        val config = state.pendingRepeatConfig
+        assertNotNull(config)
+        assertEquals(RepeatType.WEEKLY, config.type)
+        assertEquals(2, config.interval)
+        assertTrue(config.weekDays.isEmpty())
+    }
+
+    @Test
+    fun smartPreset_quarterly_setsCorrectConfig() = runTest {
+        val vm = createViewModel()
+        vm.onIntent(ChecklistDetailIntent.OnRepeatRuleClick)
+
+        val preset = PendingRepeatConfig(
+            type = RepeatType.MONTHLY,
+            interval = 3
+        )
+        vm.onIntent(ChecklistDetailIntent.OnSmartPresetSelected(preset))
+
+        val state = vm.screenState.value as ChecklistDetailState.Content
+        val config = state.pendingRepeatConfig
+        assertNotNull(config)
+        assertEquals(RepeatType.MONTHLY, config.type)
+        assertEquals(3, config.interval)
+    }
+
+    @Test
+    fun smartPreset_yearly_setsCorrectConfig() = runTest {
+        val vm = createViewModel()
+        vm.onIntent(ChecklistDetailIntent.OnRepeatRuleClick)
+
+        vm.onIntent(ChecklistDetailIntent.OnRepeatTypeSelected(RepeatType.YEARLY))
+
+        val state = vm.screenState.value as ChecklistDetailState.Content
+        val config = state.pendingRepeatConfig
+        assertNotNull(config)
+        assertEquals(RepeatType.YEARLY, config.type)
+        assertEquals(1, config.interval)
+        assertTrue(config.weekDays.isEmpty())
+    }
+
+    @Test
+    fun smartPreset_weekdays_savesCorrectRule() = runTest {
+        repository.storedChecklist = testChecklist.copy(reminderAt = 1000L)
+        val vm = createViewModel()
+        vm.onIntent(ChecklistDetailIntent.OnRepeatRuleClick)
+
+        val preset = PendingRepeatConfig(
+            type = RepeatType.WEEKLY,
+            interval = 1,
+            weekDays = setOf(1, 2, 3, 4, 5)
+        )
+        vm.onIntent(ChecklistDetailIntent.OnSmartPresetSelected(preset))
+        vm.onIntent(ChecklistDetailIntent.OnSaveRepeatRule)
+
+        val saved = repository.lastReminderWithRule
+        assertNotNull(saved)
+        val rule = saved.third
+        assertNotNull(rule)
+        assertEquals(RepeatType.WEEKLY, rule.type)
+        assertEquals(setOf(1, 2, 3, 4, 5), rule.weekDays)
+    }
+
+    @Test
+    fun smartPreset_yearly_savesCorrectRule() = runTest {
+        repository.storedChecklist = testChecklist.copy(reminderAt = 1000L)
+        val vm = createViewModel()
+        vm.onIntent(ChecklistDetailIntent.OnRepeatRuleClick)
+
+        vm.onIntent(ChecklistDetailIntent.OnRepeatTypeSelected(RepeatType.YEARLY))
+        vm.onIntent(ChecklistDetailIntent.OnSaveRepeatRule)
+
+        val saved = repository.lastReminderWithRule
+        assertNotNull(saved)
+        val rule = saved.third
+        assertNotNull(rule)
+        assertEquals(RepeatType.YEARLY, rule.type)
+        assertEquals(1, rule.interval)
+        assertNull(rule.weekDays)
+    }
+
     // --- Test doubles ---
 
     private class FakeAnalyticsTracker : AnalyticsTracker {

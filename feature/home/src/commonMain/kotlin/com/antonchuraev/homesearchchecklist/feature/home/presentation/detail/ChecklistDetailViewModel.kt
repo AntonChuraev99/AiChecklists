@@ -227,6 +227,7 @@ class ChecklistDetailViewModel(
             // Repeat rule
             ChecklistDetailIntent.OnRepeatRuleClick -> openRepeatRuleSheet()
             is ChecklistDetailIntent.OnRepeatTypeSelected -> handleRepeatTypeSelected(intent.type)
+            is ChecklistDetailIntent.OnSmartPresetSelected -> updatePendingRepeatConfig { intent.config }
             is ChecklistDetailIntent.OnRepeatIntervalChanged -> updatePendingRepeatConfig { it.copy(interval = intent.interval.coerceIn(1, 99)) }
             is ChecklistDetailIntent.OnWeekDayToggled -> toggleWeekDay(intent.dayNumber)
             is ChecklistDetailIntent.OnResetChecksToggled -> updatePendingRepeatConfig { it.copy(resetChecks = intent.enabled) }
@@ -538,7 +539,8 @@ class ChecklistDetailViewModel(
     private fun saveReminder(triggerAtMillis: Long) {
         viewModelScope.launch {
             val state = _screenState.value as? ChecklistDetailState.Content ?: return@launch
-            val pendingRule = state.pendingRepeatConfig?.toRule()
+            val configForRule = state.pendingRepeatConfig ?: state.savedRepeatConfig
+            val pendingRule = configForRule?.toRule()
 
             if (pendingRule != null) {
                 // Atomic save: reminder + repeat rule + reset occurrence count
@@ -551,7 +553,8 @@ class ChecklistDetailViewModel(
                             repeatOccurrenceCount = 0
                         ),
                         pendingRepeatConfig = null,
-                        repeatRuleSummary = buildRepeatSummary(state.pendingRepeatConfig)
+                        savedRepeatConfig = null,
+                        repeatRuleSummary = buildRepeatSummary(configForRule)
                     )
                 }
             } else {
@@ -662,8 +665,8 @@ class ChecklistDetailViewModel(
         val state = _screenState.value as? ChecklistDetailState.Content ?: return
         val existingRule = state.checklist.repeatRule
 
-        // If editing an existing rule, skip the limit check
-        if (existingRule != null) {
+        // If editing an existing rule or restoring a pending config, skip the limit check
+        if (existingRule != null || state.savedRepeatConfig != null) {
             showRepeatRuleSheetWithConfig(state, existingRule)
             return
         }
@@ -699,7 +702,7 @@ class ChecklistDetailViewModel(
                 isCustom = existingRule.interval > 1 || !existingRule.weekDays.isNullOrEmpty()
             )
         } else {
-            PendingRepeatConfig()
+            state.savedRepeatConfig ?: PendingRepeatConfig()
         }
         updateContentState {
             it.copy(showRepeatRuleSheet = true, pendingRepeatConfig = config, showReminderSheet = false)
@@ -712,7 +715,7 @@ class ChecklistDetailViewModel(
                 type = type,
                 isCustom = false,
                 interval = 1,
-                weekDays = if (type != RepeatType.WEEKLY) emptySet() else it.weekDays
+                weekDays = emptySet()
             )
         }
     }
@@ -733,16 +736,18 @@ class ChecklistDetailViewModel(
         val config = state.pendingRepeatConfig
 
         // Close sheet
+        val summary = config?.let { c -> buildRepeatSummary(c) }
         updateContentState {
             it.copy(
                 showRepeatRuleSheet = false,
                 pendingRepeatConfig = null,
                 showEndConditionPicker = false,
-                repeatRuleSummary = config?.let { c -> buildRepeatSummary(c) }
+                repeatRuleSummary = summary,
+                savedRepeatConfig = config
             )
         }
 
-        // If no reminder set yet, just store the pending config in summary — actual save happens via saveReminder
+        // If no reminder set yet, just store the pending config — actual save happens via saveReminder
         // If reminder already set, update the rule on the existing reminder
         val existingReminder = state.checklist.reminderAt ?: return
 
@@ -750,10 +755,13 @@ class ChecklistDetailViewModel(
             val rule = config?.toRule()
             repository.setReminderWithRule(state.checklist.id, existingReminder, rule)
             updateContentState {
-                it.copy(checklist = it.checklist.copy(
-                    repeatRule = rule,
-                    repeatOccurrenceCount = 0
-                ))
+                it.copy(
+                    checklist = it.checklist.copy(
+                        repeatRule = rule,
+                        repeatOccurrenceCount = 0
+                    ),
+                    savedRepeatConfig = null
+                )
             }
             // Reschedule alarm (rule change may affect behavior but trigger time stays the same)
             reminderScheduler.schedule(state.checklist.id, existingReminder)
@@ -777,7 +785,7 @@ class ChecklistDetailViewModel(
     }
 
     private fun buildRepeatSummary(config: PendingRepeatConfig): String {
-        val base = when (config.type) {
+        return when (config.type) {
             RepeatType.DAILY -> if (config.interval == 1) "Every day" else "Every ${config.interval} days"
             RepeatType.WEEKLY -> {
                 if (config.weekDays.isNotEmpty()) {
@@ -795,8 +803,8 @@ class ChecklistDetailViewModel(
                 }
             }
             RepeatType.MONTHLY -> if (config.interval == 1) "Every month" else "Every ${config.interval} months"
+            RepeatType.YEARLY -> if (config.interval == 1) "Every year" else "Every ${config.interval} years"
         }
-        return base
     }
 
     // ─── Reorder / delete helpers ──────────────────────────────────────
