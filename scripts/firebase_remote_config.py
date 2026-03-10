@@ -75,7 +75,7 @@ DEFAULT_PARAMETERS = {
         "valueType": "NUMBER"
     },
     "max_checklists_free": {
-        "defaultValue": {"value": "3"},
+        "defaultValue": {"value": "4"},
         "description": "Maximum checklists for free users",
         "valueType": "NUMBER"
     },
