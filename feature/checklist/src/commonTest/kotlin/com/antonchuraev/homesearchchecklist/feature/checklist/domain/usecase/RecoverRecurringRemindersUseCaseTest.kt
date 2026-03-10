@@ -1,5 +1,6 @@
 package com.antonchuraev.homesearchchecklist.feature.checklist.domain.usecase
 
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistRepeatInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
@@ -14,6 +15,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class RecoverRecurringRemindersUseCaseTest {
@@ -178,6 +180,86 @@ class RecoverRecurringRemindersUseCaseTest {
         assertEquals(setOf(1L, 2L), repo.advancedSchedules.map { it.first }.toSet())
     }
 
+    // ─── Analytics tests ─────────────────────────────────────────────
+
+    @Test
+    fun pastDueRecovery_tracksRecoveredEvent() = runTest {
+        val repo = FakeRepository()
+        val scheduler = FakeScheduler()
+        val tracker = FakeAnalyticsTracker()
+        val useCase = RecoverRecurringRemindersUseCase(repo, scheduler, tracker)
+
+        val rule = ReminderRepeatRule(type = RepeatType.DAILY, interval = 1)
+        val pastDueTime = 1_000_000_000L
+        val now = pastDueTime + 2 * 86_400_000L
+
+        repo.pastDueSchedules = listOf(
+            ChecklistRepeatInfo(
+                id = 42L, name = "Test",
+                repeatNextAt = pastDueTime, repeatRule = rule,
+                repeatOccurrenceCount = 5
+            )
+        )
+
+        useCase(nowMillis = now)
+
+        val event = tracker.events.find { it.first == "recurring_reminder_recovered" }
+        assertNotNull(event)
+        assertEquals("42", event.second["checklist_id"])
+        assertEquals("1", event.second["skipped_occurrences"])
+    }
+
+    @Test
+    fun endConditionReachedDuringRecovery_tracksEndedEvent() = runTest {
+        val repo = FakeRepository()
+        val scheduler = FakeScheduler()
+        val tracker = FakeAnalyticsTracker()
+        val useCase = RecoverRecurringRemindersUseCase(repo, scheduler, tracker)
+
+        val rule = ReminderRepeatRule(
+            type = RepeatType.DAILY, interval = 1,
+            endCondition = RepeatEndCondition.AfterCount(maxCount = 3)
+        )
+
+        repo.pastDueSchedules = listOf(
+            ChecklistRepeatInfo(
+                id = 99L, name = "Limited",
+                repeatNextAt = 1_000_000_000L, repeatRule = rule,
+                repeatOccurrenceCount = 2
+            )
+        )
+
+        useCase(nowMillis = 1_000_000_000L + 86_400_000L)
+
+        val event = tracker.events.find { it.first == "recurring_reminder_ended" }
+        assertNotNull(event)
+        assertEquals("99", event.second["checklist_id"])
+        assertEquals("AfterCount", event.second["end_reason"])
+        assertEquals("2", event.second["total_occurrences"])
+    }
+
+    @Test
+    fun nullAnalyticsTracker_doesNotCrash() = runTest {
+        val repo = FakeRepository()
+        val scheduler = FakeScheduler()
+        val useCase = RecoverRecurringRemindersUseCase(repo, scheduler, null)
+
+        val rule = ReminderRepeatRule(type = RepeatType.DAILY, interval = 1)
+        repo.pastDueSchedules = listOf(
+            ChecklistRepeatInfo(
+                id = 1L, name = "Test",
+                repeatNextAt = 500L, repeatRule = rule,
+                repeatOccurrenceCount = 0
+            )
+        )
+
+        useCase(nowMillis = 1000L)
+
+        assertEquals(1, repo.advancedSchedules.size)
+    }
+
+    // ─── Original tests (continued) ─────────────────────────────────
+
     @Test
     fun nullRepeatRule_skipped() = runTest {
         val repo = FakeRepository()
@@ -193,5 +275,16 @@ class RecoverRecurringRemindersUseCaseTest {
         assertTrue(repo.advancedSchedules.isEmpty())
         assertTrue(repo.clearedSchedules.isEmpty())
         assertTrue(scheduler.scheduled.isEmpty())
+    }
+
+    // ─── Fakes (analytics) ─────────────────────────────────────────
+
+    private class FakeAnalyticsTracker : AnalyticsTracker {
+        val events = mutableListOf<Pair<String, Map<String, Any>>>()
+        override fun setUserId(userId: String) {}
+        override fun screenView(name: String) {}
+        override fun event(name: String, params: Map<String, Any>) {
+            events.add(name to params)
+        }
     }
 }
