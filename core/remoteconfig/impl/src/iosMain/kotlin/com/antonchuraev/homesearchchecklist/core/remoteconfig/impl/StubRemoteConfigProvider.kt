@@ -16,7 +16,6 @@ class StubRemoteConfigProvider : RemoteConfigProvider {
 
     private val defaults: Map<String, Any> = mapOf(
         RemoteConfigKeys.FEATURE_AI_ANALYSIS_ENABLED to RemoteConfigDefaults.FEATURE_AI_ANALYSIS_ENABLED,
-        RemoteConfigKeys.FEATURE_PAYWALL_ENABLED to RemoteConfigDefaults.FEATURE_PAYWALL_ENABLED,
         RemoteConfigKeys.MAX_CHECKLIST_ITEMS to RemoteConfigDefaults.MAX_CHECKLIST_ITEMS,
         RemoteConfigKeys.AI_ANALYSIS_MAX_INPUT_LENGTH to RemoteConfigDefaults.AI_ANALYSIS_MAX_INPUT_LENGTH,
         RemoteConfigKeys.MIN_APP_VERSION to RemoteConfigDefaults.MIN_APP_VERSION,
