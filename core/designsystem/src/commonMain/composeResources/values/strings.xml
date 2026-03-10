@@ -179,11 +179,10 @@
     <string name="checklist_add_fill_dialog_title">New Fill</string>
     <string name="checklist_fill_name_label">Fill name</string>
     <string name="checklist_fill_name_placeholder">e.g., Apartment on Main St</string>
-    <string name="detail_delete_item_title">Delete Item?</string>
-    <string name="detail_delete_item_message">"%1$s" will be removed from this checklist.</string>
     <string name="reorder">Reorder</string>
     <string name="done">Done</string>
     <string name="delete_item">Delete item</string>
+    <string name="undo">Undo</string>
     <string name="more_options">More options</string>
     <string name="separate_completed">Separate completed</string>
     <string name="auto_delete_completed">Delete items after completion</string>

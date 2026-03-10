@@ -44,6 +44,8 @@ class ChecklistDetailViewModel(
     /** True when user navigated to exact alarm settings; used to detect return. */
     private var wentToExactAlarmSettings = false
 
+    private var pendingUndoJob: Job? = null
+
     init {
         loadData()
     }
@@ -132,13 +134,8 @@ class ChecklistDetailViewModel(
 
             // Item reorder and delete
             is ChecklistDetailIntent.OnFinalizeReorder -> finalizeReorder(intent.orderedItemIds)
-            is ChecklistDetailIntent.OnDeleteItemClick -> {
-                updateContentState { it.copy(itemPendingDeleteId = intent.itemId, showDeleteItemConfirmation = true) }
-            }
-            ChecklistDetailIntent.OnConfirmDeleteItem -> confirmDeleteItem()
-            ChecklistDetailIntent.OnDismissDeleteItemDialog -> {
-                updateContentState { it.copy(itemPendingDeleteId = null, showDeleteItemConfirmation = false) }
-            }
+            is ChecklistDetailIntent.OnSwipeDeleteItem -> swipeDeleteItem(intent.itemId)
+            ChecklistDetailIntent.OnUndoDeleteItem -> undoDeleteItem()
 
             // Overflow menu
             ChecklistDetailIntent.OnOverflowMenuClick -> {
@@ -236,7 +233,7 @@ class ChecklistDetailViewModel(
             // Repeat schedule
             is ChecklistDetailIntent.OnRepeatTypeSelected -> handleRepeatTypeSelected(intent.type)
             is ChecklistDetailIntent.OnSmartPresetSelected -> updatePendingRepeatConfig { intent.config }
-            is ChecklistDetailIntent.OnRepeatIntervalChanged -> updatePendingRepeatConfig { it.copy(interval = intent.interval.coerceIn(1, 99)) }
+            is ChecklistDetailIntent.OnRepeatIntervalChanged -> updatePendingRepeatConfig { it.copy(interval = intent.interval.coerceIn(1, 99), isCustom = true) }
             is ChecklistDetailIntent.OnWeekDayToggled -> toggleWeekDay(intent.dayNumber)
             is ChecklistDetailIntent.OnResetChecksToggled -> updatePendingRepeatConfig { it.copy(resetChecks = intent.enabled) }
             is ChecklistDetailIntent.OnRepeatTimeChanged -> updatePendingRepeatConfig { it.copy(timeHour = intent.hour, timeMinute = intent.minute) }
@@ -689,12 +686,19 @@ class ChecklistDetailViewModel(
                 )
             }
 
-            analyticsTracker.event("repeat_schedule_set", mapOf(
-                "type" to rule.type.name,
-                "interval" to rule.interval.toString(),
-                "time_of_day" to "$timeMinutes",
-                "reset_checks" to rule.resetChecks.toString()
-            ))
+            analyticsTracker.event("repeat_schedule_set", buildMap {
+                put("type", rule.type.name)
+                put("interval", rule.interval.toString())
+                put("time_of_day", "$timeMinutes")
+                put("reset_checks", rule.resetChecks.toString())
+                put("preset", resolvePresetName(config))
+                put("is_edit", (state.checklist.repeatRule != null).toString())
+                put("end_condition", rule.endCondition::class.simpleName.orEmpty())
+                val days = rule.weekDays
+                if (!days.isNullOrEmpty()) {
+                    put("week_days", days.sorted().joinToString(","))
+                }
+            })
             maybeShowExactAlarmInstruction()
         }
     }
@@ -718,7 +722,8 @@ class ChecklistDetailViewModel(
                 )
             }
             analyticsTracker.event("repeat_schedule_cancelled", mapOf(
-                "checklist_id" to state.checklist.id.toString()
+                "checklist_id" to state.checklist.id.toString(),
+                "total_occurrences" to state.checklist.repeatOccurrenceCount.toString()
             ))
         }
     }
@@ -789,7 +794,7 @@ class ChecklistDetailViewModel(
             } else {
                 config.weekDays + dayNumber
             }
-            config.copy(weekDays = updated)
+            config.copy(weekDays = updated, isCustom = true)
         }
     }
 
@@ -820,6 +825,27 @@ class ChecklistDetailViewModel(
             }
             RepeatType.MONTHLY -> if (config.interval == 1) "Every month" else "Every ${config.interval} months"
             RepeatType.YEARLY -> if (config.interval == 1) "Every year" else "Every ${config.interval} years"
+        }
+    }
+
+    /**
+     * Map a [PendingRepeatConfig] to a preset analytics name.
+     * Returns "custom" when [isCustom] is true or the config does not match any known preset.
+     */
+    private fun resolvePresetName(config: PendingRepeatConfig): String {
+        if (config.isCustom) return "custom"
+        return when {
+            config.type == RepeatType.DAILY && config.interval == 1 -> "daily"
+            config.type == RepeatType.WEEKLY && config.interval == 1
+                && config.weekDays == setOf(1, 2, 3, 4, 5) -> "weekdays"
+            config.type == RepeatType.WEEKLY && config.interval == 1
+                && config.weekDays.isEmpty() -> "weekly"
+            config.type == RepeatType.WEEKLY && config.interval == 2
+                && config.weekDays.isEmpty() -> "biweekly"
+            config.type == RepeatType.MONTHLY && config.interval == 1 -> "monthly"
+            config.type == RepeatType.MONTHLY && config.interval == 3 -> "quarterly"
+            config.type == RepeatType.YEARLY && config.interval == 1 -> "yearly"
+            else -> "custom"
         }
     }
 
@@ -858,23 +884,32 @@ class ChecklistDetailViewModel(
         }
     }
 
-    private fun confirmDeleteItem() {
+    private fun swipeDeleteItem(itemId: String) {
         val state = _screenState.value as? ChecklistDetailState.Content ?: return
         val fill = state.defaultFill ?: return
-        val itemId = state.itemPendingDeleteId ?: return
+        val itemIndex = fill.items.indexOfFirst { it.id == itemId }
+        if (itemIndex == -1) return
+        val item = fill.items[itemIndex]
 
-        val itemToDelete = fill.items.firstOrNull { it.id == itemId } ?: return
-        val updatedFillItems = fill.items.filter { it.id != itemId }
+        val checklistIndex = state.checklist.items.indexOfFirst { it.text == item.text }
+
+        val updatedFillItems = fill.items.filterIndexed { i, _ -> i != itemIndex }
         val updatedFill = fill.copy(items = updatedFillItems)
+        val updatedChecklist = if (checklistIndex >= 0) {
+            state.checklist.copy(items = state.checklist.items.filterIndexed { i, _ -> i != checklistIndex })
+        } else state.checklist
 
-        val updatedChecklistItems = state.checklist.items.filter { it.text != itemToDelete.text }
-        val updatedChecklist = state.checklist.copy(items = updatedChecklistItems)
+        pendingUndoJob?.cancel()
 
         updateContentState {
             it.copy(
                 checklist = updatedChecklist,
-                showDeleteItemConfirmation = false,
-                itemPendingDeleteId = null
+                pendingUndoItem = UndoableDeleteItem(
+                    fillItem = item,
+                    checklistItemText = item.text,
+                    originalFillIndex = itemIndex,
+                    originalChecklistIndex = checklistIndex,
+                ),
             )
         }
 
@@ -883,7 +918,49 @@ class ChecklistDetailViewModel(
             repository.updateChecklistTemplate(updatedChecklist)
             analyticsTracker.event("item_deleted", mapOf(
                 "checklist_id" to checklistId.toString(),
+                "method" to "swipe",
                 "item_count" to updatedFillItems.size.toString()
+            ))
+        }
+
+        pendingUndoJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(4000)
+            updateContentState { it.copy(pendingUndoItem = null) }
+        }
+    }
+
+    private fun undoDeleteItem() {
+        val state = _screenState.value as? ChecklistDetailState.Content ?: return
+        val undo = state.pendingUndoItem ?: return
+        val fill = state.defaultFill ?: return
+
+        pendingUndoJob?.cancel()
+
+        val restoredFillItems = fill.items.toMutableList().apply {
+            add(undo.originalFillIndex.coerceAtMost(size), undo.fillItem)
+        }
+        val restoredFill = fill.copy(items = restoredFillItems)
+
+        val restoredChecklistItems = state.checklist.items.toMutableList().apply {
+            if (undo.originalChecklistIndex >= 0) {
+                add(undo.originalChecklistIndex.coerceAtMost(size),
+                    ChecklistItem(text = undo.checklistItemText))
+            }
+        }
+        val restoredChecklist = state.checklist.copy(items = restoredChecklistItems)
+
+        updateContentState {
+            it.copy(
+                checklist = restoredChecklist,
+                pendingUndoItem = null,
+            )
+        }
+
+        viewModelScope.launch {
+            repository.updateFill(restoredFill)
+            repository.updateChecklistTemplate(restoredChecklist)
+            analyticsTracker.event("item_undo_delete", mapOf(
+                "checklist_id" to checklistId.toString()
             ))
         }
     }
