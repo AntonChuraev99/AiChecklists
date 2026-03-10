@@ -493,6 +493,127 @@ class ChecklistDetailRepeatRuleTest {
         assertFalse(tracker.events.any { it.first == "recurring_reminder_cancelled" })
     }
 
+    // ─── Analytics params tests ─────────────────────────────
+
+    @Test
+    fun saveRepeatSchedule_tracksPresetName_daily() = runTest {
+        val tracker = FakeAnalyticsTracker()
+        val vm = createViewModel(analyticsTracker = tracker)
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderTabSelected(ReminderTab.REPEAT))
+        vm.onIntent(ChecklistDetailIntent.OnSmartPresetSelected(
+            PendingRepeatConfig(type = RepeatType.DAILY, interval = 1)
+        ))
+        vm.onIntent(ChecklistDetailIntent.OnSaveRepeatSchedule)
+
+        val event = tracker.events.find { it.first == "repeat_schedule_set" }
+        assertNotNull(event)
+        assertEquals("daily", event.second["preset"])
+        assertEquals("false", event.second["is_edit"])
+        assertEquals("Never", event.second["end_condition"])
+    }
+
+    @Test
+    fun saveRepeatSchedule_tracksPresetName_weekdays() = runTest {
+        val tracker = FakeAnalyticsTracker()
+        val vm = createViewModel(analyticsTracker = tracker)
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderTabSelected(ReminderTab.REPEAT))
+        vm.onIntent(ChecklistDetailIntent.OnSmartPresetSelected(
+            PendingRepeatConfig(type = RepeatType.WEEKLY, interval = 1, weekDays = setOf(1, 2, 3, 4, 5))
+        ))
+        vm.onIntent(ChecklistDetailIntent.OnSaveRepeatSchedule)
+
+        val event = tracker.events.find { it.first == "repeat_schedule_set" }
+        assertNotNull(event)
+        assertEquals("weekdays", event.second["preset"])
+        assertEquals("1,2,3,4,5", event.second["week_days"])
+    }
+
+    @Test
+    fun saveRepeatSchedule_tracksPresetName_custom() = runTest {
+        val tracker = FakeAnalyticsTracker()
+        val vm = createViewModel(analyticsTracker = tracker)
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderTabSelected(ReminderTab.REPEAT))
+        vm.onIntent(ChecklistDetailIntent.OnSmartPresetSelected(
+            PendingRepeatConfig(type = RepeatType.DAILY, interval = 1, isCustom = true)
+        ))
+        vm.onIntent(ChecklistDetailIntent.OnSaveRepeatSchedule)
+
+        val event = tracker.events.find { it.first == "repeat_schedule_set" }
+        assertNotNull(event)
+        assertEquals("custom", event.second["preset"])
+    }
+
+    @Test
+    fun saveRepeatSchedule_existingRule_tracksIsEditTrue() = runTest {
+        repository.storedChecklist = testChecklist.copy(
+            repeatRule = ReminderRepeatRule(type = RepeatType.DAILY, interval = 1),
+            repeatOccurrenceCount = 3
+        )
+        val tracker = FakeAnalyticsTracker()
+        val vm = createViewModel(analyticsTracker = tracker)
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderTabSelected(ReminderTab.REPEAT))
+        vm.onIntent(ChecklistDetailIntent.OnSmartPresetSelected(
+            PendingRepeatConfig(type = RepeatType.WEEKLY, interval = 2)
+        ))
+        vm.onIntent(ChecklistDetailIntent.OnSaveRepeatSchedule)
+
+        val event = tracker.events.find { it.first == "repeat_schedule_set" }
+        assertNotNull(event)
+        assertEquals("true", event.second["is_edit"])
+        assertEquals("biweekly", event.second["preset"])
+    }
+
+    @Test
+    fun removeRepeatSchedule_tracksTotalOccurrences() = runTest {
+        repository.storedChecklist = testChecklist.copy(
+            repeatRule = ReminderRepeatRule(type = RepeatType.DAILY, interval = 1),
+            repeatOccurrenceCount = 7
+        )
+        val tracker = FakeAnalyticsTracker()
+        val vm = createViewModel(analyticsTracker = tracker)
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderTabSelected(ReminderTab.REPEAT))
+        vm.onIntent(ChecklistDetailIntent.OnRemoveRepeatSchedule)
+
+        val event = tracker.events.find { it.first == "repeat_schedule_cancelled" }
+        assertNotNull(event)
+        assertEquals("7", event.second["total_occurrences"])
+    }
+
+    // ─── isCustom fix tests ──────────────────────────────────
+
+    @Test
+    fun intervalChange_afterPreset_setsIsCustomTrue() = runTest {
+        val vm = createViewModel()
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderTabSelected(ReminderTab.REPEAT))
+        vm.onIntent(ChecklistDetailIntent.OnSmartPresetSelected(
+            PendingRepeatConfig(type = RepeatType.DAILY, interval = 1)
+        ))
+        assertFalse(contentState(vm).pendingRepeatConfig!!.isCustom)
+
+        vm.onIntent(ChecklistDetailIntent.OnRepeatIntervalChanged(3))
+        assertTrue(contentState(vm).pendingRepeatConfig!!.isCustom)
+    }
+
+    @Test
+    fun weekDayToggle_afterPreset_setsIsCustomTrue() = runTest {
+        val vm = createViewModel()
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
+        vm.onIntent(ChecklistDetailIntent.OnReminderTabSelected(ReminderTab.REPEAT))
+        vm.onIntent(ChecklistDetailIntent.OnSmartPresetSelected(
+            PendingRepeatConfig(type = RepeatType.WEEKLY, interval = 1, weekDays = setOf(1, 2, 3, 4, 5))
+        ))
+        assertFalse(contentState(vm).pendingRepeatConfig!!.isCustom)
+
+        vm.onIntent(ChecklistDetailIntent.OnWeekDayToggled(5)) // Remove Friday
+        assertTrue(contentState(vm).pendingRepeatConfig!!.isCustom)
+    }
+
     // ─── Smart preset tests ────────────────────────────────
 
     @Test

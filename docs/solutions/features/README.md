@@ -31,6 +31,15 @@ Comprehensive guide covering the AI-powered analysis feature that transforms con
 - Type-safe sealed classes prevent input type errors
 - Comprehensive quota management for free vs. premium users
 
+### Enhanced Repeat Rule Picker (`enhanced-repeat-rule-picker.md`)
+
+Extended recurring reminders with yearly repeat, 7 smart presets, independent repeat/reminder UI flows, comprehensive analytics (preset tracking, boot recovery events), and `isCustom` bug fix.
+
+**Key Patterns**:
+- `isCustom` flag for preset vs custom analytics differentiation
+- Optional `AnalyticsTracker?` injection via Koin `getOrNull()` for boot-time use cases
+- Bounded calendar iteration for variable-length units (months, years)
+
 ### Debug Menu Release Build Access (`debug-menu-release-build-access.md`)
 
 Guide for accessing developer debug features in release builds via hidden menu.

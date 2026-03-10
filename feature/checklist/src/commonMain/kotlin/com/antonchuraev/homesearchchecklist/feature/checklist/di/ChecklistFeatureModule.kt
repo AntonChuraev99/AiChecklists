@@ -9,6 +9,6 @@ val checklistFeatureModule = module {
     single { checklistDao }
     single { checklistFillDao }
     single<ChecklistRepository> { ChecklistRepositoryImpl(checklistDao, checklistFillDao) }
-    single { RecoverRecurringRemindersUseCase(get(), get()) }
+    single { RecoverRecurringRemindersUseCase(get(), get(), getOrNull()) }
 }
 
