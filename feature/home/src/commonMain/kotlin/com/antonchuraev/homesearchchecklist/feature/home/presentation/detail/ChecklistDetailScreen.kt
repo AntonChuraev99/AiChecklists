@@ -44,7 +44,6 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.RemoveCircle
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.CheckCircle
@@ -52,8 +51,13 @@ import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.PlaylistRemove
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.rememberSwipeToDismissBoxState
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material.icons.outlined.RemoveDone
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.NoteAdd
@@ -221,6 +225,20 @@ private fun ChecklistDetailContent(
         }
         snackbarHostState.showSnackbar(text)
         onIntent(ChecklistDetailIntent.OnSnackbarDismissed)
+    }
+
+    // Undo snackbar for swipe-to-delete
+    val undoLabel = stringResource(Res.string.undo)
+    LaunchedEffect(state.pendingUndoItem) {
+        val undo = state.pendingUndoItem ?: return@LaunchedEffect
+        val result = snackbarHostState.showSnackbar(
+            message = "\"${undo.fillItem.text}\" deleted",
+            actionLabel = undoLabel,
+            duration = SnackbarDuration.Short,
+        )
+        if (result == SnackbarResult.ActionPerformed) {
+            onIntent(ChecklistDetailIntent.OnUndoDeleteItem)
+        }
     }
 
     var addItemActive by remember { mutableStateOf(false) }
@@ -427,32 +445,39 @@ private fun ChecklistDetailContent(
                         key = item.id,
                         enabled = isEditMode
                     ) { isDragging ->
-                        ChecklistItemCard(
-                            item = item,
-                            isDragging = isDragging,
+                        SwipeableChecklistItemCard(
                             isEditMode = isEditMode,
-                            wiggleAngle = wiggleAngle,
-                            onCheckedChange = { checked ->
-                                onIntent(ChecklistDetailIntent.OnItemCheckedChange(item.id, checked))
+                            onSwipeDelete = {
+                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onIntent(ChecklistDetailIntent.OnSwipeDeleteItem(item.id))
                             },
-                            onNoteClick = { onIntent(ChecklistDetailIntent.OnAddNoteClick(item.id)) },
-                            onLongClick = {
-                                if (!isEditMode) {
-                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    isEditMode = true
-                                }
-                            },
-                            onDeleteClick = { onIntent(ChecklistDetailIntent.OnDeleteItemClick(item.id)) },
-                            cardDragModifier = Modifier.draggableHandle(
-                                onDragStarted = {
-                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                        ) {
+                            ChecklistItemCard(
+                                item = item,
+                                isDragging = isDragging,
+                                isEditMode = isEditMode,
+                                wiggleAngle = wiggleAngle,
+                                onCheckedChange = { checked ->
+                                    onIntent(ChecklistDetailIntent.OnItemCheckedChange(item.id, checked))
                                 },
-                                onDragStopped = {
-                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    onIntent(ChecklistDetailIntent.OnFinalizeReorder(localUnchecked.map { it.id }))
-                                }
+                                onNoteClick = { onIntent(ChecklistDetailIntent.OnAddNoteClick(item.id)) },
+                                onLongClick = {
+                                    if (!isEditMode) {
+                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        isEditMode = true
+                                    }
+                                },
+                                cardDragModifier = Modifier.draggableHandle(
+                                    onDragStarted = {
+                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    },
+                                    onDragStopped = {
+                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        onIntent(ChecklistDetailIntent.OnFinalizeReorder(localUnchecked.map { it.id }))
+                                    }
+                                )
                             )
-                        )
+                        }
                     }
                 }
 
@@ -492,23 +517,30 @@ private fun ChecklistDetailContent(
                             key = { completedItems[it].id }
                         ) { index ->
                             val item = completedItems[index]
-                            ChecklistItemCard(
-                                item = item,
-                                isDragging = false,
+                            SwipeableChecklistItemCard(
                                 isEditMode = isEditMode,
-                                wiggleAngle = wiggleAngle,
-                                onCheckedChange = { checked ->
-                                    onIntent(ChecklistDetailIntent.OnItemCheckedChange(item.id, checked))
+                                onSwipeDelete = {
+                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    onIntent(ChecklistDetailIntent.OnSwipeDeleteItem(item.id))
                                 },
-                                onNoteClick = { onIntent(ChecklistDetailIntent.OnAddNoteClick(item.id)) },
-                                onLongClick = {
-                                    if (!isEditMode) {
-                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        isEditMode = true
-                                    }
-                                },
-                                onDeleteClick = { onIntent(ChecklistDetailIntent.OnDeleteItemClick(item.id)) }
-                            )
+                            ) {
+                                ChecklistItemCard(
+                                    item = item,
+                                    isDragging = false,
+                                    isEditMode = isEditMode,
+                                    wiggleAngle = wiggleAngle,
+                                    onCheckedChange = { checked ->
+                                        onIntent(ChecklistDetailIntent.OnItemCheckedChange(item.id, checked))
+                                    },
+                                    onNoteClick = { onIntent(ChecklistDetailIntent.OnAddNoteClick(item.id)) },
+                                    onLongClick = {
+                                        if (!isEditMode) {
+                                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            isEditMode = true
+                                        }
+                                    },
+                                )
+                            }
                         }
                     }
                 }
@@ -549,17 +581,6 @@ private fun ChecklistDetailContent(
             checklistName = state.checklist.name,
             onConfirm = { onIntent(ChecklistDetailIntent.OnConfirmDeleteChecklist) },
             onDismiss = { onIntent(ChecklistDetailIntent.OnDismissDeleteConfirmation) }
-        )
-    }
-
-    // Delete item confirmation dialog
-    if (state.showDeleteItemConfirmation && state.itemPendingDeleteId != null) {
-        val itemText = state.defaultFill?.items
-            ?.firstOrNull { it.id == state.itemPendingDeleteId }?.text.orEmpty()
-        DeleteItemConfirmationDialog(
-            itemText = itemText,
-            onConfirm = { onIntent(ChecklistDetailIntent.OnConfirmDeleteItem) },
-            onDismiss = { onIntent(ChecklistDetailIntent.OnDismissDeleteItemDialog) }
         )
     }
 
@@ -784,6 +805,58 @@ private fun ViewAllFillsCard(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeableChecklistItemCard(
+    isEditMode: Boolean,
+    onSwipeDelete: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    if (isEditMode) {
+        Box(modifier = modifier) { content() }
+        return
+    }
+
+    val dismissState = rememberSwipeToDismissBoxState()
+
+    // Observe dismiss: delete item and immediately reset state so re-swipe works after undo
+    LaunchedEffect(dismissState.currentValue) {
+        if (dismissState.currentValue == SwipeToDismissBoxValue.EndToStart) {
+            onSwipeDelete()
+            dismissState.snapTo(SwipeToDismissBoxValue.Settled)
+        }
+    }
+
+    SwipeToDismissBox(
+        state = dismissState,
+        modifier = modifier,
+        backgroundContent = { SwipeDeleteBackground() },
+        enableDismissFromStartToEnd = false,
+        enableDismissFromEndToStart = true,
+    ) {
+        content()
+    }
+}
+
+@Composable
+private fun SwipeDeleteBackground() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clip(MaterialTheme.shapes.medium)
+            .background(MaterialTheme.colorScheme.error)
+            .padding(horizontal = AppDimens.SpacingXl),
+        contentAlignment = Alignment.CenterEnd,
+    ) {
+        Icon(
+            Icons.Filled.Delete,
+            contentDescription = stringResource(Res.string.delete_item),
+            tint = MaterialTheme.colorScheme.onError,
+        )
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ChecklistItemCard(
@@ -794,7 +867,6 @@ private fun ChecklistItemCard(
     onCheckedChange: (Boolean) -> Unit,
     onNoteClick: () -> Unit,
     onLongClick: () -> Unit,
-    onDeleteClick: () -> Unit,
     cardDragModifier: Modifier = Modifier,
     modifier: Modifier = Modifier
 ) {
@@ -831,22 +903,6 @@ private fun ChecklistItemCard(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (isEditMode) {
-                    // Edit mode: red delete button
-                    IconButton(
-                        onClick = onDeleteClick,
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Icon(
-                            Icons.Filled.RemoveCircle,
-                            contentDescription = stringResource(Res.string.delete_item),
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(4.dp))
-                }
-
                 if (!isEditMode) {
                     Checkbox(
                         checked = item.checked,
@@ -988,35 +1044,6 @@ private fun AddFillDialog(
                     onClick = onDismiss
                 )
             }
-        },
-        containerColor = MaterialTheme.colorScheme.surface,
-        shape = MaterialTheme.shapes.large
-    )
-}
-
-@Composable
-private fun DeleteItemConfirmationDialog(
-    itemText: String,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(Res.string.detail_delete_item_title)) },
-        text = {
-            Text(stringResource(Res.string.detail_delete_item_message, itemText))
-        },
-        confirmButton = {
-            AppButton(
-                text = stringResource(Res.string.delete),
-                onClick = onConfirm
-            )
-        },
-        dismissButton = {
-            AppButtonText(
-                text = stringResource(Res.string.cancel),
-                onClick = onDismiss
-            )
         },
         containerColor = MaterialTheme.colorScheme.surface,
         shape = MaterialTheme.shapes.large

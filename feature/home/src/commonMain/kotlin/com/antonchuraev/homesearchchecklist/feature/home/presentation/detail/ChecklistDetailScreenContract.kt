@@ -4,12 +4,23 @@ import com.antonchuraev.homesearchchecklist.core.common.api.Intent
 import com.antonchuraev.homesearchchecklist.core.common.api.State
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatEndCondition
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatType
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.UserLimits
 
 enum class ReminderTab { ONCE, REPEAT }
+
+/**
+ * Holds a recently deleted item so it can be restored via undo snackbar.
+ */
+data class UndoableDeleteItem(
+    val fillItem: ChecklistFillItem,
+    val checklistItemText: String,
+    val originalFillIndex: Int,
+    val originalChecklistIndex: Int,
+)
 
 /**
  * Groups all mutable repeat configuration fields into a single object.
@@ -64,8 +75,7 @@ sealed interface ChecklistDetailState : State {
         val showOverflowSheet: Boolean = false,
         val separateCompleted: Boolean = false,
         val autoDeleteCompleted: Boolean = false,
-        val showDeleteItemConfirmation: Boolean = false,
-        val itemPendingDeleteId: String? = null,
+        val pendingUndoItem: UndoableDeleteItem? = null,
         // Reminder sheet tab state
         val activeReminderTab: ReminderTab = ReminderTab.ONCE,
         // Repeat configuration (active while editing on the REPEAT tab)
@@ -137,9 +147,8 @@ sealed interface ChecklistDetailIntent : Intent {
 
     // Item reorder and delete
     data class OnFinalizeReorder(val orderedItemIds: List<String>) : ChecklistDetailIntent
-    data class OnDeleteItemClick(val itemId: String) : ChecklistDetailIntent
-    data object OnConfirmDeleteItem : ChecklistDetailIntent
-    data object OnDismissDeleteItemDialog : ChecklistDetailIntent
+    data class OnSwipeDeleteItem(val itemId: String) : ChecklistDetailIntent
+    data object OnUndoDeleteItem : ChecklistDetailIntent
 
     // Analytics-only intents (UI events tracked via ViewModel for testability)
     data class OnCompletedSectionToggle(val expanded: Boolean, val completedCount: Int) : ChecklistDetailIntent
