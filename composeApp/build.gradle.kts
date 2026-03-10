@@ -109,7 +109,7 @@ android {
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 23
-        versionName = "1.10.2"
+        versionName = "1.11.1"
 
         testInstrumentationRunner = "com.antonchuraev.aichecklists.TestRunner"
 
