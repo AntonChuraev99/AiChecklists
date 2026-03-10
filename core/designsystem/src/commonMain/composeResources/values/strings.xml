@@ -17,15 +17,13 @@
     <!-- Onboarding -->
     <string name="onboarding_skip">Skip</string>
     <string name="onboarding_continue">Continue</string>
-    <string name="onboarding_get_started">Get Started</string>
-
     <!-- Onboarding Page 1 - Create via AI -->
     <string name="onboarding_page1_title">Create via AI</string>
     <string name="onboarding_page1_description">Photo, PDF, link, text, or voice — AI instantly turns any content into a clear checklist.</string>
 
     <!-- Onboarding Page 2 - Fill via AI -->
     <string name="onboarding_page2_title">Fill via AI</string>
-    <string name="onboarding_page2_description">Visiting apartments? Inspecting cars? Drop a photo and AI auto-fills your checklist for each scenario.</string>
+    <string name="onboarding_page2_description">Got new content? Drop a photo, link, or file — AI checks off matching items in your checklist automatically.</string>
 
     <!-- Onboarding Page 3 - Export & Share -->
     <string name="onboarding_page3_title">Export &amp; Share</string>
