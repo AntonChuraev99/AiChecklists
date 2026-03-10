@@ -38,7 +38,7 @@ object RemoteConfigDefaults {
     const val AI_DAILY_LIMIT_PREMIUM = 100L
 
     // Free user limits
-    const val MAX_CHECKLISTS_FREE = 3L
+    const val MAX_CHECKLISTS_FREE = 4L
     const val MAX_FILLS_FREE = 5L
     const val MAX_RECURRING_REMINDERS_FREE = 1L
 
