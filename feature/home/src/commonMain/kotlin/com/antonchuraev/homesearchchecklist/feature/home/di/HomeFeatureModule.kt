@@ -14,7 +14,7 @@ val homeFeatureModule = module {
         ChecklistDetailViewModel(checklistId, get(), get(), get(), get(), get(), get())
     }
     viewModel { (fillId: Long) ->
-        FillDetailViewModel(fillId, get(), get())
+        FillDetailViewModel(fillId, get(), get(), get())
     }
     viewModel { (checklistId: Long) ->
         FillsListViewModel(checklistId, get(), get())

@@ -313,6 +313,21 @@ class ChecklistDetailViewModel(
 
         val updatedFill = state.defaultFill.copy(items = updatedItems)
 
+        val eventName = if (checked) "item_checked" else "item_unchecked"
+        val totalItems = updatedItems.size
+        val checkedCount = updatedItems.count { it.checked }
+        analyticsTracker.event(eventName, mapOf(
+            "checklist_id" to checklistId.toString(),
+            "progress" to if (totalItems > 0) "${checkedCount * 100 / totalItems}" else "0"
+        ))
+
+        if (checked && totalItems > 0 && checkedCount == totalItems) {
+            analyticsTracker.event("fill_completed", mapOf(
+                "checklist_id" to checklistId.toString(),
+                "item_count" to totalItems.toString()
+            ))
+        }
+
         viewModelScope.launch {
             repository.updateFill(updatedFill)
         }

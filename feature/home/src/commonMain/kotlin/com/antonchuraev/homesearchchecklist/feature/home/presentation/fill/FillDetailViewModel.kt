@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation.fill
 
 import androidx.lifecycle.viewModelScope
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
@@ -13,13 +14,15 @@ import kotlinx.coroutines.launch
 class FillDetailViewModel(
     private val fillId: Long,
     private val repository: ChecklistRepository,
-    private val navigator: AppNavigator
+    private val navigator: AppNavigator,
+    private val analyticsTracker: AnalyticsTracker
 ) : AppViewModel<FillDetailState, FillDetailIntent, Nothing>() {
 
     private val _screenState = MutableStateFlow<FillDetailState>(FillDetailState.Loading)
     override val screenState: StateFlow<FillDetailState> = _screenState.asStateFlow()
 
     init {
+        analyticsTracker.screenView("fill_detail")
         loadFill()
     }
 
@@ -112,6 +115,21 @@ class FillDetailViewModel(
                 updatedItems[itemIndex] = updatedItems[itemIndex].withChecked(checked)
                 val updatedFill = state.fill.copy(items = updatedItems)
                 _screenState.value = state.copy(fill = updatedFill)
+
+                val totalItems = updatedItems.size
+                val checkedCount = updatedItems.count { it.checked }
+                val eventName = if (checked) "item_checked" else "item_unchecked"
+                analyticsTracker.event(eventName, mapOf(
+                    "fill_id" to fillId.toString(),
+                    "progress" to if (totalItems > 0) "${checkedCount * 100 / totalItems}" else "0"
+                ))
+
+                if (totalItems > 0 && checkedCount == totalItems) {
+                    analyticsTracker.event("fill_completed", mapOf(
+                        "fill_id" to fillId.toString(),
+                        "item_count" to totalItems.toString()
+                    ))
+                }
 
                 viewModelScope.launch {
                     repository.updateFill(updatedFill)

@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.glance.GlanceId
 import androidx.glance.action.ActionParameters
 import androidx.glance.appwidget.action.ActionCallback
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.widget.ChecklistWidget
 import com.antonchuraev.homesearchchecklist.widget.data.WidgetRepository
 import kotlinx.coroutines.sync.Mutex
@@ -39,12 +40,18 @@ class ToggleItemAction : ActionCallback {
         val fillId = parameters[FILL_ID_KEY]?.takeIf { it != -1L }
         val itemIndex = parameters[ITEM_INDEX_KEY] ?: return
 
-        val repository: WidgetRepository = GlobalContext.getOrNull()?.get() ?: return
+        val koin = GlobalContext.getOrNull() ?: return
+        val repository: WidgetRepository = koin.get()
+        val analyticsTracker: AnalyticsTracker = koin.get()
 
         // Serialize all toggle operations to prevent race conditions on rapid tapping
         toggleMutex.withLock {
             // 1. Update data in Room database
             repository.toggleItem(checklistId, fillId, itemIndex)
+
+            analyticsTracker.event("widget_item_toggled", mapOf(
+                "checklist_id" to checklistId.toString()
+            ))
 
             // 2. Trigger widget update - provideGlance() will be called,
             // and collectAsState() will receive new data from Flow

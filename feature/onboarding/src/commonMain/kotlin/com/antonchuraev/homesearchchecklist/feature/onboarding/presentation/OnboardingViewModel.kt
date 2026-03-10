@@ -39,10 +39,18 @@ class OnboardingViewModel(
 
     private fun updatePage(page: Int) {
         _screenState.update { it.copy(currentPage = page) }
+        analyticsTracker.event("onboarding_page_viewed", mapOf("page" to page.toString()))
     }
 
     private fun completeOnboarding() {
+        val currentPage = _screenState.value.currentPage
+        val totalPages = _screenState.value.totalPages
+        val wasSkipped = currentPage < totalPages - 1
+
         viewModelScope.launch {
+            if (wasSkipped) {
+                analyticsTracker.event("onboarding_skipped", mapOf("page" to currentPage.toString()))
+            }
             analyticsTracker.event("onboarding_completed")
             completeOnboardingUseCase()
             navigator.navigateToMainScreen(clearBackStack = true)
