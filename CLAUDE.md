@@ -112,7 +112,11 @@ The project follows a modular architecture with API/impl separation:
 
 ```
 composeApp/              # Main application entry points (Android/iOS)
-                         # Contains AppBuildConfig (expect/actual) for debug detection
+  # Contains AppBuildConfig (expect/actual) for debug detection
+  # Android-only platform features:
+  widget/                # Glance home screen widget (config, actions, UI)
+  csat/                  # Customer satisfaction survey + in-app review
+  notification/          # Reminder scheduling (ReminderReceiver, BootCompletedReceiver)
 
 core/
   common/api|impl        # AppViewModel, AppDispatchersProvider, AppLogger
@@ -122,15 +126,15 @@ core/
   remoteconfig/api|impl  # Firebase Remote Config abstraction
 
 feature/
-  checklist/             # Domain models, Room database, repository
+  checklist/             # Domain models, Room database, repository, reminder repeat rules
   create/                # Create checklist + templates screens
-  home/                  # Main screen, checklist detail, fills
+  home/                  # Main screen, checklist detail, fills, reminders UI
   onboarding/            # First-run experience
   splash/                # Launch screen
   analyze/               # AI-powered analysis (Gemini integration)
   paywall/               # Subscriptions (RevenueCat)
   sharing/               # Export checklists (text/PDF)
-  user/                  # User profile, device ID
+  user/                  # User profile, device ID, credits API
   debug/                 # Developer tools (debug builds only)
 ```
 
@@ -163,8 +167,8 @@ CreateChecklistRoute.Templates
 CreateChecklistRoute.TemplatePreview(templateId)
 
 // Feature routes
-Analyze(checklistId?), AnalyzeResultPreview
-Paywall, SubscriptionStatus
+Analyze(checklistId?, fillDefault?), AnalyzeResultPreview
+Paywall(source), SubscriptionStatus(showSuccessMessage?)
 ShareChecklist(checklistId)
 ```
 
@@ -243,7 +247,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 ## Key Patterns
 
 - **API/impl split**: Core modules expose interfaces in `api`, implementations in `impl`
-- **expect/actual**: Platform-specific code (logging, database, file pickers, audio, build config)
+- **expect/actual**: Platform-specific code (logging, database, file pickers, audio, build config, reminders, in-app review)
 - **StateFlow**: All reactive state management
 - **Typesafe project accessors**: Reference modules as `projects.core.common.api`
 - **AppBuildConfig**: Debug/release build detection via expect/actual pattern
@@ -271,7 +275,11 @@ APIs that do NOT work in `commonMain` — verify availability before using:
 | `onFocusChanged` for keyboard hide | Focus stays `true` when keyboard hides | Track `WindowInsets.ime.getBottom()` |
 | `Switch` + `Row(clickable)` | Double-toggle bug | `AppSwitch(onCheckedChange = null)`, Row handles click |
 
-Per-entity preferences (e.g., `separateCompleted`) belong in Room, not DataStore. DataStore is for global app preferences only.
+Per-entity preferences (e.g., `separateCompleted`, `autoDeleteCompleted`, `position`) belong in Room, not DataStore. DataStore is for global app preferences only.
+
+### Checklist Model Fields
+
+The `Checklist` model has grown beyond simple items — it now includes reminder scheduling, repeat rules, and per-checklist preferences. See "Feature: Reminders" section for details. `ChecklistFill` supports `coverImagePath` for fill cover images.
 
 ## UI Best Practices
 
@@ -448,6 +456,96 @@ feature/sharing/
     SharingFeatureModule.kt
 ```
 
+## Feature: Reminders
+
+Reminders are split into two independent systems: **one-shot reminders** and **recurring repeat schedules**.
+
+### Checklist Model Fields
+
+```kotlin
+data class Checklist(
+    // ... other fields
+    val reminderAt: Long? = null,              // One-shot reminder timestamp
+    val repeatRule: ReminderRepeatRule? = null, // Recurring schedule (daily, weekly, etc.)
+    val repeatTimeOfDayMinutes: Int? = null,    // Time of day for repeat
+    val repeatNextAt: Long? = null,             // Next repeat fire time
+    val repeatOccurrenceCount: Int = 0,         // How many times repeated so far
+    val separateCompleted: Boolean = false,      // Group completed items separately
+    val position: Int = 0,                       // Drag-and-drop ordering
+    val autoDeleteCompleted: Boolean = false     // Auto-remove checked items
+)
+```
+
+### Repeat Rules (ReminderRepeatRule)
+
+Defined in `feature/checklist/domain/model/ReminderRepeatRule.kt`. Supports: Daily, Weekly, Monthly, Weekdays, Biweekly, Quarterly, Yearly, Custom (interval + unit + weekdays + end condition).
+
+### Platform Implementation (Android)
+
+- `ReminderReceiver` — handles one-shot and repeat alarm broadcasts
+- `ReminderScheduler` — schedules exact alarms via `AlarmManager`
+- `BootCompletedReceiver` — reschedules all reminders after device reboot
+- `ExactAlarmPermissionReceiver` — upgrades to exact alarms when permission granted
+
+### Free User Limits
+
+Free users: 1 recurring reminder (`MAX_RECURRING_REMINDERS_FREE`). Premium: unlimited.
+
+## Feature: Widget
+
+Android home screen widget built with **Jetpack Glance** (1.1.1). Located in `composeApp/src/androidMain/.../widget/`.
+
+### Architecture
+
+```
+widget/
+  ChecklistWidget.kt           # GlanceAppWidget implementation
+  ChecklistWidgetReceiver.kt   # GlanceAppWidgetReceiver
+  WidgetUpdateWorker.kt        # WorkManager periodic sync
+  config/
+    WidgetConfigActivity.kt    # Checklist picker on widget add
+  data/
+    WidgetRepository.kt        # Bridge to Room database
+    WidgetStateManager.kt      # GlanceStateDefinition
+    ChecklistWidgetData.kt     # Widget state model
+  actions/
+    ToggleItemAction.kt        # Check/uncheck from widget
+    OpenChecklistAction.kt     # Deep-link to checklist detail
+    ReconfigureAction.kt       # Change bound checklist
+  ui/
+    ChecklistWidgetContent.kt  # Glance composables
+    WidgetStates.kt            # Loading/error/empty states
+  di/
+    WidgetModule.kt            # Koin DI for widget
+```
+
+### Key Points
+
+- Widget binds to a specific checklist via `WidgetConfigActivity`
+- Items can be toggled directly from the home screen
+- `WorkManager` syncs widget state periodically
+- Declared in `AndroidManifest.xml` with `checklist_widget_info.xml` metadata
+
+## Feature: CSAT Survey
+
+Customer satisfaction survey + Google Play in-app review. Located in `composeApp/src/commonMain/.../csat/`.
+
+### Components
+
+- `CsatManager` — triggers survey based on usage milestones
+- `CsatViewModel` — handles survey state (rating → chips → free text → thank you)
+- `CsatBottomSheet` — 3-step survey UI (Not Good / Okay / Love It)
+- `InAppReviewLauncher` — expect/actual for Google Play In-App Review API
+- `ObservableAnalyticsTracker` — tracks CSAT events
+
+### Flow
+
+1. User reaches usage milestone → `CsatManager` triggers
+2. Bottom sheet: rating selection (3 smileys)
+3. Context chips based on rating (e.g., "Buggy", "Nice Design")
+4. Optional free text feedback
+5. Thank you screen → offer to rate on Google Play
+
 ## Localization
 
 Strings in `core/designsystem/src/commonMain/composeResources/values/strings.xml`.
@@ -520,10 +618,16 @@ Versions in `gradle/libs.versions.toml`:
 | Koin | 4.1.1 | Dependency Injection |
 | Room | 2.8.4 | Database |
 | Navigation Compose | 2.9.1 | Navigation |
-| RevenueCat | 2.2.17 | Subscriptions |
+| RevenueCat | 2.2.17+17.26.1 | Subscriptions |
 | Firebase BOM | 33.7.0 | Analytics, Crashlytics, Remote Config |
 | Ktor | 3.0.3 | HTTP Client |
-| Generative AI KMP | 0.9.0 | Gemini AI |
+| Generative AI KMP | 0.9.0-1.1.0 | Gemini AI |
+| Glance | 1.1.1 | Android home screen widgets |
+| WorkManager | 2.10.0 | Background widget sync |
+| Play Review | 2.0.2 | Google Play In-App Review |
+| Kotlinx Datetime | 0.6.2 | Date/time handling |
+| Amplitude | 1.16.8 | Analytics (Android) |
+| Reorderable | 2.4.3 | Drag-and-drop for LazyColumn |
 
 ## Feature: Debug
 
@@ -580,12 +684,19 @@ Splash → Onboarding → Main
                         ├─→ ChecklistDetail → FillDetail
                         │                   → FillsList
                         │                   → ShareChecklist
+                        │                   → Reminder sheet (bottom sheet)
                         ├─→ Templates → TemplatePreview
                         ├─→ CreateChecklist
                         ├─→ Analyze → AnalyzeResultPreview
-                        ├─→ Paywall
+                        ├─→ Paywall(source)
                         ├─→ SubscriptionStatus
+                        ├─→ CSAT Survey (bottom sheet, triggered by CsatManager)
                         └─→ Debug → StoreScreenshot (debug only)
+
+Widget (Android home screen):
+  WidgetConfigActivity → select checklist → widget displays items
+  ToggleItemAction → check/uncheck from home screen
+  OpenChecklistAction → deep-link to ChecklistDetail
 ```
 
 ## Copy Guidelines
@@ -614,19 +725,20 @@ Splash → Onboarding → Main
 | Цена подписки | $1.99/мес |
 | Комиссия Google (Small Business) | 15% |
 | Чистый доход | $1.69/мес |
-| AI модель | gemini-1.5-flash (в коде) |
+| AI модель | gemini-2.0-flash-lite (в firebase-functions/main.py) |
 
 ### Лимиты (Remote Config)
 
 | Параметр | Free | Premium |
 |----------|------|---------|
 | AI запросов/день | 10 | 300 |
-| Max чек-листов | 3 | ∞ |
+| Max чек-листов | 4 | ∞ |
 | Max fills/чек-лист | 5 | ∞ |
+| Recurring reminders | 1 | ∞ |
 
 ### Себестоимость AI
 
-Расчёт на основе gemini-2.0-flash (консервативная оценка):
+Расчёт на основе gemini-2.0-flash-lite:
 - Input: $0.10/1M tokens
 - Output: $0.40/1M tokens
 - **~$0.0002 за запрос** (5,000 запросов на $1)
