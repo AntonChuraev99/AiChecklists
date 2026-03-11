@@ -29,6 +29,23 @@
     <string name="onboarding_page3_title">Export &amp; Share</string>
     <string name="onboarding_page3_description">Share your progress as PDF or text. Perfect for reports, clients, or just keeping records.</string>
 
+    <!-- Interactive Onboarding -->
+    <string name="onboarding_interactive_welcome_title">Create your first checklist</string>
+    <string name="onboarding_interactive_welcome_subtitle">Answer one question and we set things up for you</string>
+    <string name="onboarding_interactive_welcome_button">Get Started</string>
+    <string name="onboarding_interactive_category_title">What do you want to organize?</string>
+    <string name="onboarding_interactive_category_subtitle">Pick one to get started</string>
+    <string name="onboarding_interactive_category_travel">Travel &amp; Events</string>
+    <string name="onboarding_interactive_category_home">Home &amp; Moving</string>
+    <string name="onboarding_interactive_category_shopping">Shopping &amp; Groceries</string>
+    <string name="onboarding_interactive_category_work">Work &amp; Projects</string>
+    <string name="onboarding_interactive_category_health">Health &amp; Fitness</string>
+    <string name="onboarding_interactive_category_education">Learning &amp; Education</string>
+    <string name="onboarding_interactive_preview_title">Your first checklist is ready!</string>
+    <string name="onboarding_interactive_preview_subtitle">We created this based on your choice</string>
+    <string name="onboarding_interactive_preview_button">Save &amp; Continue</string>
+    <string name="onboarding_interactive_creating">Creating your checklist...</string>
+
     <!-- Main Screen -->
     <string name="main_title">My Checklists</string>
     <string name="main_empty_title">Ready to get organized?</string>

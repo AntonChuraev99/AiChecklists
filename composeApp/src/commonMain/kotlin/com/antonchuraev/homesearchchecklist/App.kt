@@ -20,6 +20,7 @@ import com.antonchuraev.homesearchchecklist.feature.debug.presentation.DebugScre
 import com.antonchuraev.homesearchchecklist.feature.debug.presentation.StoreScreenshotScreen
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.MainScreen
 import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.OnboardingScreen
+import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive.InteractiveOnboardingScreen
 import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.AnalyzeScreen
 import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.preview.AnalyzeResultPreviewScreen
 import com.antonchuraev.homesearchchecklist.feature.splash.presentation.SplashScreen
@@ -62,6 +63,10 @@ fun App() {
 
                 composable<AppNavRoute.Onboarding> {
                     OnboardingScreen()
+                }
+
+                composable<AppNavRoute.InteractiveOnboarding> {
+                    InteractiveOnboardingScreen()
                 }
 
                 composable<AppNavRoute.Main> {

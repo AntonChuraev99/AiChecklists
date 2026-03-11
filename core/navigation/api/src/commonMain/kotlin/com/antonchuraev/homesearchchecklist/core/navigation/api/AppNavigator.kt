@@ -10,6 +10,8 @@ interface AppNavigator {
 
     fun navigateToOnboarding()
 
+    fun navigateToInteractiveOnboarding()
+
     /**
      * Navigate to main screen, clearing all screens from back stack.
      */

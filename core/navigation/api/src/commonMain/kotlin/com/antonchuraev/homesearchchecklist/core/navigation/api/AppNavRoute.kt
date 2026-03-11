@@ -11,6 +11,9 @@ sealed interface AppNavRoute {
     data object Onboarding : AppNavRoute
 
     @Serializable
+    data object InteractiveOnboarding : AppNavRoute
+
+    @Serializable
     data object Main : AppNavRoute
 
     @Serializable

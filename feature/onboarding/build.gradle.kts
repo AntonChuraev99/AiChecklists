@@ -22,12 +22,19 @@ kotlin {
     }
 
     sourceSets {
+        commonTest.dependencies {
+            implementation(libs.kotlin.test)
+            implementation(libs.kotlinx.coroutines.test)
+            implementation(libs.androidx.navigation.compose)
+        }
         commonMain.dependencies {
             implementation(projects.core.navigation.api)
             implementation(projects.core.common.api)
             implementation(projects.core.designsystem)
             implementation(projects.feature.user)
             implementation(projects.feature.paywall)
+            implementation(projects.feature.create)
+            implementation(projects.feature.checklist)
 
             implementation(compose.runtime)
             implementation(compose.foundation)
