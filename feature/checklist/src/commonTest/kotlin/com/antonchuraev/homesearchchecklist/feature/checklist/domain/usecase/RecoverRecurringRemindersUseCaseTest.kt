@@ -74,6 +74,7 @@ class RecoverRecurringRemindersUseCaseTest {
         override suspend fun addFill(fill: ChecklistFill): Long = 0L
         override suspend fun updateFill(fill: ChecklistFill) {}
         override suspend fun deleteFill(fill: ChecklistFill) {}
+        override suspend fun getTotalAdditionalFillCount(): Int = 0
     }
 
     // ─── Tests ────────────────────────────────────────────────────────
@@ -282,6 +283,7 @@ class RecoverRecurringRemindersUseCaseTest {
     private class FakeAnalyticsTracker : AnalyticsTracker {
         val events = mutableListOf<Pair<String, Map<String, Any>>>()
         override fun setUserId(userId: String) {}
+        override fun setUserProperties(properties: Map<String, Any>) {}
         override fun screenView(name: String) {}
         override fun event(name: String, params: Map<String, Any>) {
             events.add(name to params)

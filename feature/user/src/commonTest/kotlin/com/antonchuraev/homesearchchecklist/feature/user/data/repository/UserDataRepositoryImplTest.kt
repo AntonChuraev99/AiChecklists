@@ -474,6 +474,7 @@ class UserDataRepositoryImplTest {
 
     private class NoOpAnalyticsTracker : AnalyticsTracker {
         override fun setUserId(userId: String) {}
+        override fun setUserProperties(properties: Map<String, Any>) {}
         override fun screenView(name: String) {}
         override fun event(name: String, params: Map<String, Any>) {}
     }
@@ -485,6 +486,7 @@ class UserDataRepositoryImplTest {
         private val events = mutableListOf<Pair<String, Map<String, Any>>>()
 
         override fun setUserId(userId: String) {}
+        override fun setUserProperties(properties: Map<String, Any>) {}
         override fun screenView(name: String) {}
         override fun event(name: String, params: Map<String, Any>) {
             events.add(name to params)

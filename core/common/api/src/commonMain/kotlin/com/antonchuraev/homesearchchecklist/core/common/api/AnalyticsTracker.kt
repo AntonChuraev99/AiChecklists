@@ -7,6 +7,7 @@ package com.antonchuraev.homesearchchecklist.core.common.api
  */
 interface AnalyticsTracker {
     fun setUserId(userId: String)
+    fun setUserProperties(properties: Map<String, Any>)
     fun screenView(name: String)
     fun event(name: String, params: Map<String, Any> = emptyMap())
 }

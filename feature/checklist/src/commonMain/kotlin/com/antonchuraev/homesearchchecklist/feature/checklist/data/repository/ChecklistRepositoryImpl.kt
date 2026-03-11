@@ -156,6 +156,11 @@ class ChecklistRepositoryImpl(
         return checklistDao.getPastDueRepeatSchedules(nowMillis)
     }
 
+    // Analytics
+    override suspend fun getTotalAdditionalFillCount(): Int {
+        return fillDao.getTotalAdditionalFillCount()
+    }
+
     // Fills (instances)
     override fun getFillsByChecklistId(checklistId: Long): Flow<List<ChecklistFill>> {
         return fillDao.observeFillsByChecklistId(checklistId).map { list ->

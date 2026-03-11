@@ -11,6 +11,7 @@ import platform.Foundation.NSBundle
 
 private object StubAnalyticsTracker : AnalyticsTracker {
     override fun setUserId(userId: String) = Unit
+    override fun setUserProperties(properties: Map<String, Any>) = Unit
     override fun screenView(name: String) = Unit
     override fun event(name: String, params: Map<String, Any>) = Unit
 }

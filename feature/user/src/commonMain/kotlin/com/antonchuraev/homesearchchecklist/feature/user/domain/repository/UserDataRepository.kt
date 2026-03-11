@@ -51,4 +51,10 @@ interface UserDataRepository {
      * @return Result with restored credits info or error
      */
     suspend fun restoreCreditsAfterPurchase(): Result<Int>
+
+    /**
+     * Returns the timestamp (millis) of the user's first app launch.
+     * Returns 0 if not yet recorded.
+     */
+    suspend fun getFirstLaunchAtMillis(): Long
 }
