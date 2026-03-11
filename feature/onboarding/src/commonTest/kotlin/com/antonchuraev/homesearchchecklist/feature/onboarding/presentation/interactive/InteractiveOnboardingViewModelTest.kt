@@ -51,7 +51,7 @@ class InteractiveOnboardingViewModelTest {
         name = "Travel Packing",
         icon = "luggage",
         category = "travel",
-        items = listOf("Passport", "Tickets", "Hotel booking", "Adapter", "Camera")
+        items = listOf("Passport", "Tickets", "Hotel booking", "Adapter", "Camera", "Charger", "Clothes")
     )
 
     private val workTemplate = ChecklistTemplate(
@@ -91,17 +91,35 @@ class InteractiveOnboardingViewModelTest {
         )
     }
 
+    /** Navigate VM through category → style → template selection. Returns the VM. */
+    private fun createViewModelAtCustomize(
+        category: OnboardingCategory = OnboardingCategory.TRAVEL,
+        style: OrganizingStyle = OrganizingStyle.DETAILED,
+        template: ChecklistTemplate = travelTemplate
+    ): InteractiveOnboardingViewModel {
+        val vm = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+        vm.onIntent(InteractiveOnboardingIntent.OnCategorySelected(category))
+        vm.onIntent(InteractiveOnboardingIntent.OnStyleSelected(style))
+        vm.onIntent(InteractiveOnboardingIntent.OnTemplateSelected(template))
+        return vm
+    }
+
     // --- Initial state ---
 
     @Test
-    fun initialState_isWelcomeStep() = runTest {
+    fun initialState_isCategorySelectionStep() = runTest {
         val vm = createViewModel()
 
-        assertEquals(InteractiveOnboardingStep.Welcome, vm.screenState.value.currentStep)
-        assertNull(vm.screenState.value.selectedCategory)
-        assertNull(vm.screenState.value.matchedTemplate)
-        assertFalse(vm.screenState.value.isCreatingChecklist)
-        assertFalse(vm.screenState.value.checklistCreated)
+        val state = vm.screenState.value
+        assertEquals(InteractiveOnboardingStep.CategorySelection, state.currentStep)
+        assertNull(state.selectedCategory)
+        assertNull(state.selectedStyle)
+        assertNull(state.selectedTemplate)
+        assertTrue(state.customizedItems.isEmpty())
+        assertEquals("", state.checklistName)
+        assertFalse(state.isCreatingChecklist)
+        assertFalse(state.checklistCreated)
     }
 
     @Test
@@ -112,80 +130,36 @@ class InteractiveOnboardingViewModelTest {
         assertEquals("interactive", fakeAnalyticsTracker.getEventParam("onboarding_started", "variant"))
     }
 
-    // --- Step navigation ---
-
-    @Test
-    fun onGetStarted_updatesStepToCategorySelection() = runTest {
-        val vm = createViewModel()
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        vm.onIntent(InteractiveOnboardingIntent.OnGetStarted)
-
-        assertEquals(InteractiveOnboardingStep.CategorySelection, vm.screenState.value.currentStep)
-    }
-
-    @Test
-    fun onGetStarted_tracksStepCompleted() = runTest {
-        val vm = createViewModel()
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        vm.onIntent(InteractiveOnboardingIntent.OnGetStarted)
-
-        val events = fakeAnalyticsTracker.eventsNamed("onboarding_step_completed")
-        val welcomeEvent = events.firstOrNull { it["step"] == "welcome_completed" }
-        assertNotNull(welcomeEvent)
-        assertEquals("interactive", welcomeEvent["variant"])
-    }
-
     // --- Category selection ---
 
     @Test
-    fun onCategorySelected_templateFound_setsMatchedTemplate() = runTest {
+    fun onCategorySelected_filtersTemplatesAndAdvancesToStyleSelection() = runTest {
         val vm = createViewModel()
         testDispatcher.scheduler.advanceUntilIdle()
 
         vm.onIntent(InteractiveOnboardingIntent.OnCategorySelected(OnboardingCategory.TRAVEL))
 
         val state = vm.screenState.value
-        assertEquals(InteractiveOnboardingStep.ChecklistPreview, state.currentStep)
+        assertEquals(InteractiveOnboardingStep.StyleSelection, state.currentStep)
         assertEquals(OnboardingCategory.TRAVEL, state.selectedCategory)
-        val template = assertNotNull(state.matchedTemplate)
-        assertEquals("travel_packing", template.id)
+        assertTrue(state.availableTemplates.isNotEmpty())
+        assertEquals("travel_packing", state.availableTemplates.first().id)
     }
 
     @Test
-    fun onCategorySelected_noTemplate_usesFallback() = runTest {
+    fun onCategorySelected_noTemplates_usesFallback() = runTest {
         val vm = createViewModel(templatesRepository = FakeTemplatesRepository(emptyList()))
         testDispatcher.scheduler.advanceUntilIdle()
 
         vm.onIntent(InteractiveOnboardingIntent.OnCategorySelected(OnboardingCategory.EDUCATION))
 
         val state = vm.screenState.value
-        assertEquals(InteractiveOnboardingStep.ChecklistPreview, state.currentStep)
-        val fallback = assertNotNull(state.matchedTemplate)
-        // Fallback template has id prefixed with "onboarding_fallback_"
+        assertEquals(InteractiveOnboardingStep.StyleSelection, state.currentStep)
+        assertEquals(1, state.availableTemplates.size)
+        val fallback = state.availableTemplates.first()
         assertTrue(fallback.id.startsWith("onboarding_fallback_"))
         assertEquals("My Checklist", fallback.name)
         assertEquals(5, fallback.items.size)
-    }
-
-    @Test
-    fun onCategorySelected_matchesByCategory_whenPreferredIdMissing() = runTest {
-        val travelByCategory = ChecklistTemplate(
-            id = "some_travel_list",
-            name = "Travel Essentials",
-            icon = "plane",
-            category = "travel",
-            items = listOf("Item 1", "Item 2")
-        )
-        val vm = createViewModel(templatesRepository = FakeTemplatesRepository(listOf(travelByCategory)))
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        vm.onIntent(InteractiveOnboardingIntent.OnCategorySelected(OnboardingCategory.TRAVEL))
-
-        val state = vm.screenState.value
-        val matched = assertNotNull(state.matchedTemplate)
-        assertEquals("some_travel_list", matched.id)
     }
 
     @Test
@@ -199,16 +173,185 @@ class InteractiveOnboardingViewModelTest {
         val categoryEvent = events.firstOrNull { it["step"] == "category_selected" }
         assertNotNull(categoryEvent)
         assertEquals("WORK", categoryEvent["category"])
+        assertEquals("interactive", categoryEvent["variant"])
+    }
+
+    // --- Style selection ---
+
+    @Test
+    fun onStyleSelected_advancesToTemplateSelection() = runTest {
+        val vm = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        vm.onIntent(InteractiveOnboardingIntent.OnCategorySelected(OnboardingCategory.TRAVEL))
+        vm.onIntent(InteractiveOnboardingIntent.OnStyleSelected(OrganizingStyle.MINIMALIST))
+
+        val state = vm.screenState.value
+        assertEquals(InteractiveOnboardingStep.TemplateSelection, state.currentStep)
+        assertEquals(OrganizingStyle.MINIMALIST, state.selectedStyle)
+    }
+
+    @Test
+    fun onStyleSelected_tracksAnalytics() = runTest {
+        val vm = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        vm.onIntent(InteractiveOnboardingIntent.OnCategorySelected(OnboardingCategory.TRAVEL))
+        vm.onIntent(InteractiveOnboardingIntent.OnStyleSelected(OrganizingStyle.CHAOTIC))
+
+        val events = fakeAnalyticsTracker.eventsNamed("onboarding_step_completed")
+        val styleEvent = events.firstOrNull { it["step"] == "style_selected" }
+        assertNotNull(styleEvent)
+        assertEquals("CHAOTIC", styleEvent["style"])
+    }
+
+    // --- Template selection & style application ---
+
+    @Test
+    fun onTemplateSelected_minimalist_takesFiveItems() = runTest {
+        val vm = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        vm.onIntent(InteractiveOnboardingIntent.OnCategorySelected(OnboardingCategory.TRAVEL))
+        vm.onIntent(InteractiveOnboardingIntent.OnStyleSelected(OrganizingStyle.MINIMALIST))
+        vm.onIntent(InteractiveOnboardingIntent.OnTemplateSelected(travelTemplate))
+
+        val state = vm.screenState.value
+        assertEquals(InteractiveOnboardingStep.Customize, state.currentStep)
+        assertEquals(5, state.customizedItems.size)
+        assertEquals("Passport", state.customizedItems.first().text)
+        assertTrue(state.customizedItems.all { it.isEnabled })
+    }
+
+    @Test
+    fun onTemplateSelected_detailed_takesAllItems() = runTest {
+        val vm = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        vm.onIntent(InteractiveOnboardingIntent.OnCategorySelected(OnboardingCategory.TRAVEL))
+        vm.onIntent(InteractiveOnboardingIntent.OnStyleSelected(OrganizingStyle.DETAILED))
+        vm.onIntent(InteractiveOnboardingIntent.OnTemplateSelected(travelTemplate))
+
+        val state = vm.screenState.value
+        assertEquals(travelTemplate.items.size, state.customizedItems.size)
+    }
+
+    @Test
+    fun onTemplateSelected_chaotic_addsExtraItems() = runTest {
+        val vm = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        vm.onIntent(InteractiveOnboardingIntent.OnCategorySelected(OnboardingCategory.TRAVEL))
+        vm.onIntent(InteractiveOnboardingIntent.OnStyleSelected(OrganizingStyle.CHAOTIC))
+        vm.onIntent(InteractiveOnboardingIntent.OnTemplateSelected(travelTemplate))
+
+        val state = vm.screenState.value
+        // Original items + 3 extras
+        assertEquals(travelTemplate.items.size + 3, state.customizedItems.size)
+        assertTrue(state.customizedItems.any { it.text == "Emergency snack stash" })
+    }
+
+    @Test
+    fun onTemplateSelected_setsChecklistNameFromTemplate() = runTest {
+        val vm = createViewModelAtCustomize()
+
+        assertEquals("Travel Packing", vm.screenState.value.checklistName)
+        assertEquals(travelTemplate, vm.screenState.value.selectedTemplate)
+    }
+
+    @Test
+    fun onTemplateSelected_tracksAnalytics() = runTest {
+        val vm = createViewModelAtCustomize()
+
+        val events = fakeAnalyticsTracker.eventsNamed("onboarding_step_completed")
+        val templateEvent = events.firstOrNull { it["step"] == "template_selected" }
+        assertNotNull(templateEvent)
+        assertEquals("travel_packing", templateEvent["template"])
+    }
+
+    // --- Customize step ---
+
+    @Test
+    fun onToggleItem_togglesIsEnabled() = runTest {
+        val vm = createViewModelAtCustomize()
+
+        assertTrue(vm.screenState.value.customizedItems[0].isEnabled)
+
+        vm.onIntent(InteractiveOnboardingIntent.OnToggleItem(0))
+
+        assertFalse(vm.screenState.value.customizedItems[0].isEnabled)
+    }
+
+    @Test
+    fun onToggleItem_toggleBack() = runTest {
+        val vm = createViewModelAtCustomize()
+
+        vm.onIntent(InteractiveOnboardingIntent.OnToggleItem(0))
+        assertFalse(vm.screenState.value.customizedItems[0].isEnabled)
+
+        vm.onIntent(InteractiveOnboardingIntent.OnToggleItem(0))
+        assertTrue(vm.screenState.value.customizedItems[0].isEnabled)
+    }
+
+    @Test
+    fun onToggleItem_invalidIndex_noOp() = runTest {
+        val vm = createViewModelAtCustomize()
+        val itemsBefore = vm.screenState.value.customizedItems
+
+        vm.onIntent(InteractiveOnboardingIntent.OnToggleItem(999))
+
+        assertEquals(itemsBefore, vm.screenState.value.customizedItems)
+    }
+
+    @Test
+    fun onChecklistNameChanged_updatesName() = runTest {
+        val vm = createViewModelAtCustomize()
+
+        vm.onIntent(InteractiveOnboardingIntent.OnChecklistNameChanged("My Trip"))
+
+        assertEquals("My Trip", vm.screenState.value.checklistName)
+    }
+
+    @Test
+    fun onContinueFromCustomize_advancesToCreating() = runTest {
+        val vm = createViewModelAtCustomize()
+
+        vm.onIntent(InteractiveOnboardingIntent.OnContinueFromCustomize)
+
+        assertEquals(InteractiveOnboardingStep.Creating, vm.screenState.value.currentStep)
+    }
+
+    @Test
+    fun onContinueFromCustomize_tracksAnalytics() = runTest {
+        val vm = createViewModelAtCustomize()
+
+        vm.onIntent(InteractiveOnboardingIntent.OnContinueFromCustomize)
+
+        val events = fakeAnalyticsTracker.eventsNamed("onboarding_step_completed")
+        assertNotNull(events.firstOrNull { it["step"] == "customization_completed" })
+    }
+
+    // --- Creating step ---
+
+    @Test
+    fun onCreatingComplete_advancesToChecklistPreview() = runTest {
+        val vm = createViewModelAtCustomize()
+        vm.onIntent(InteractiveOnboardingIntent.OnContinueFromCustomize)
+        assertEquals(InteractiveOnboardingStep.Creating, vm.screenState.value.currentStep)
+
+        vm.onIntent(InteractiveOnboardingIntent.OnCreatingComplete)
+
+        assertEquals(InteractiveOnboardingStep.ChecklistPreview, vm.screenState.value.currentStep)
     }
 
     // --- Save checklist ---
 
     @Test
     fun onSaveChecklist_success_createsAndMovesToPaywall() = runTest {
-        val vm = createViewModel()
-        testDispatcher.scheduler.advanceUntilIdle()
+        val vm = createViewModelAtCustomize()
+        vm.onIntent(InteractiveOnboardingIntent.OnContinueFromCustomize)
+        vm.onIntent(InteractiveOnboardingIntent.OnCreatingComplete)
 
-        vm.onIntent(InteractiveOnboardingIntent.OnCategorySelected(OnboardingCategory.TRAVEL))
         vm.onIntent(InteractiveOnboardingIntent.OnSaveChecklist)
         testDispatcher.scheduler.advanceUntilIdle()
 
@@ -220,44 +363,62 @@ class InteractiveOnboardingViewModelTest {
     }
 
     @Test
-    fun onSaveChecklist_createsChecklistWithTemplateItems() = runTest {
-        val vm = createViewModel()
+    fun onSaveChecklist_usesChecklistNameAndEnabledItemsOnly() = runTest {
+        val vm = createViewModelAtCustomize()
+        // Disable first item, change name
+        vm.onIntent(InteractiveOnboardingIntent.OnToggleItem(0))
+        vm.onIntent(InteractiveOnboardingIntent.OnChecklistNameChanged("My Custom List"))
+        vm.onIntent(InteractiveOnboardingIntent.OnContinueFromCustomize)
+        vm.onIntent(InteractiveOnboardingIntent.OnCreatingComplete)
+
+        vm.onIntent(InteractiveOnboardingIntent.OnSaveChecklist)
         testDispatcher.scheduler.advanceUntilIdle()
 
-        vm.onIntent(InteractiveOnboardingIntent.OnCategorySelected(OnboardingCategory.TRAVEL))
+        val saved = assertNotNull(fakeChecklistRepository.lastAddedChecklist)
+        assertEquals("My Custom List", saved.name)
+        // First item was disabled, so item count = total - 1
+        assertEquals(travelTemplate.items.size - 1, saved.items.size)
+        // "Passport" (index 0) was disabled, should not be in saved items
+        assertFalse(saved.items.any { it.text == "Passport" })
+    }
+
+    @Test
+    fun onSaveChecklist_blankName_usesTemplateName() = runTest {
+        val vm = createViewModelAtCustomize()
+        vm.onIntent(InteractiveOnboardingIntent.OnChecklistNameChanged(""))
+        vm.onIntent(InteractiveOnboardingIntent.OnContinueFromCustomize)
+        vm.onIntent(InteractiveOnboardingIntent.OnCreatingComplete)
+
         vm.onIntent(InteractiveOnboardingIntent.OnSaveChecklist)
         testDispatcher.scheduler.advanceUntilIdle()
 
         val saved = assertNotNull(fakeChecklistRepository.lastAddedChecklist)
         assertEquals("Travel Packing", saved.name)
-        assertEquals(travelTemplate.items.size, saved.items.size)
-        assertEquals("Passport", saved.items.first().text)
     }
 
     @Test
     fun onSaveChecklist_roomError_proceedsToPaywallWithoutCrash() = runTest {
         fakeChecklistRepository.shouldThrowOnAdd = true
-        val vm = createViewModel()
-        testDispatcher.scheduler.advanceUntilIdle()
+        val vm = createViewModelAtCustomize()
+        vm.onIntent(InteractiveOnboardingIntent.OnContinueFromCustomize)
+        vm.onIntent(InteractiveOnboardingIntent.OnCreatingComplete)
 
-        vm.onIntent(InteractiveOnboardingIntent.OnCategorySelected(OnboardingCategory.TRAVEL))
         vm.onIntent(InteractiveOnboardingIntent.OnSaveChecklist)
         testDispatcher.scheduler.advanceUntilIdle()
 
         val state = vm.screenState.value
         assertEquals(InteractiveOnboardingStep.Paywall, state.currentStep)
         assertFalse(state.isCreatingChecklist)
-        // checklistCreated stays false when save failed
         assertFalse(state.checklistCreated)
     }
 
     @Test
     fun onSaveChecklist_roomError_tracksErrorAnalytics() = runTest {
         fakeChecklistRepository.shouldThrowOnAdd = true
-        val vm = createViewModel()
-        testDispatcher.scheduler.advanceUntilIdle()
+        val vm = createViewModelAtCustomize()
+        vm.onIntent(InteractiveOnboardingIntent.OnContinueFromCustomize)
+        vm.onIntent(InteractiveOnboardingIntent.OnCreatingComplete)
 
-        vm.onIntent(InteractiveOnboardingIntent.OnCategorySelected(OnboardingCategory.TRAVEL))
         vm.onIntent(InteractiveOnboardingIntent.OnSaveChecklist)
         testDispatcher.scheduler.advanceUntilIdle()
 
@@ -265,11 +426,30 @@ class InteractiveOnboardingViewModelTest {
     }
 
     @Test
-    fun onSaveChecklist_success_tracksChecklistCreated() = runTest {
-        val vm = createViewModel()
+    fun onSaveChecklist_allItemsDisabled_doesNothing() = runTest {
+        val vm = createViewModelAtCustomize()
+        // Disable all items
+        for (i in vm.screenState.value.customizedItems.indices) {
+            vm.onIntent(InteractiveOnboardingIntent.OnToggleItem(i))
+        }
+        assertTrue(vm.screenState.value.customizedItems.all { !it.isEnabled })
+
+        vm.onIntent(InteractiveOnboardingIntent.OnContinueFromCustomize)
+        vm.onIntent(InteractiveOnboardingIntent.OnCreatingComplete)
+
+        vm.onIntent(InteractiveOnboardingIntent.OnSaveChecklist)
         testDispatcher.scheduler.advanceUntilIdle()
 
-        vm.onIntent(InteractiveOnboardingIntent.OnCategorySelected(OnboardingCategory.TRAVEL))
+        assertEquals(0, fakeChecklistRepository.addChecklistCallCount)
+        assertEquals(InteractiveOnboardingStep.ChecklistPreview, vm.screenState.value.currentStep)
+    }
+
+    @Test
+    fun onSaveChecklist_success_tracksChecklistCreated() = runTest {
+        val vm = createViewModelAtCustomize()
+        vm.onIntent(InteractiveOnboardingIntent.OnContinueFromCustomize)
+        vm.onIntent(InteractiveOnboardingIntent.OnCreatingComplete)
+
         vm.onIntent(InteractiveOnboardingIntent.OnSaveChecklist)
         testDispatcher.scheduler.advanceUntilIdle()
 
@@ -277,21 +457,7 @@ class InteractiveOnboardingViewModelTest {
         val createdEvent = events.firstOrNull { it["step"] == "checklist_created" }
         assertNotNull(createdEvent)
         assertEquals("travel_packing", createdEvent["template"])
-    }
-
-    @Test
-    fun onSaveChecklist_withNoMatchedTemplate_doesNothing() = runTest {
-        val vm = createViewModel()
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        // Skip category selection so matchedTemplate is null
-        vm.onIntent(InteractiveOnboardingIntent.OnSaveChecklist)
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        // No checklist should be created when template is null
-        assertEquals(0, fakeChecklistRepository.addChecklistCallCount)
-        // Step should not change
-        assertEquals(InteractiveOnboardingStep.Welcome, vm.screenState.value.currentStep)
+        assertEquals("DETAILED", createdEvent["style"])
     }
 
     // --- Skip ---
@@ -315,12 +481,24 @@ class InteractiveOnboardingViewModelTest {
         val vm = createViewModel()
         testDispatcher.scheduler.advanceUntilIdle()
 
-        // Skip from Welcome step
         vm.onIntent(InteractiveOnboardingIntent.OnSkip)
         testDispatcher.scheduler.advanceUntilIdle()
 
         assertEquals(
-            InteractiveOnboardingStep.Welcome.name,
+            InteractiveOnboardingStep.CategorySelection.name,
+            fakeAnalyticsTracker.getEventParam("onboarding_skipped", "step")
+        )
+    }
+
+    @Test
+    fun onSkip_fromLaterStep_includesCorrectStep() = runTest {
+        val vm = createViewModelAtCustomize()
+
+        vm.onIntent(InteractiveOnboardingIntent.OnSkip)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(
+            InteractiveOnboardingStep.Customize.name,
             fakeAnalyticsTracker.getEventParam("onboarding_skipped", "step")
         )
     }
@@ -328,42 +506,91 @@ class InteractiveOnboardingViewModelTest {
     // --- Back navigation ---
 
     @Test
-    fun onBack_fromPreview_returnsToCategoryAndClearsTemplate() = runTest {
+    fun onBack_fromCategorySelection_isNoOp() = runTest {
         val vm = createViewModel()
         testDispatcher.scheduler.advanceUntilIdle()
 
-        vm.onIntent(InteractiveOnboardingIntent.OnGetStarted)
+        assertEquals(InteractiveOnboardingStep.CategorySelection, vm.screenState.value.currentStep)
+
+        vm.onIntent(InteractiveOnboardingIntent.OnBack)
+
+        assertEquals(InteractiveOnboardingStep.CategorySelection, vm.screenState.value.currentStep)
+    }
+
+    @Test
+    fun onBack_fromStyleSelection_returnsToCategoryAndClearsState() = runTest {
+        val vm = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
         vm.onIntent(InteractiveOnboardingIntent.OnCategorySelected(OnboardingCategory.TRAVEL))
-        assertEquals(InteractiveOnboardingStep.ChecklistPreview, vm.screenState.value.currentStep)
+        assertEquals(InteractiveOnboardingStep.StyleSelection, vm.screenState.value.currentStep)
 
         vm.onIntent(InteractiveOnboardingIntent.OnBack)
 
         val state = vm.screenState.value
         assertEquals(InteractiveOnboardingStep.CategorySelection, state.currentStep)
-        assertNull(state.matchedTemplate)
         assertNull(state.selectedCategory)
+        assertTrue(state.availableTemplates.isEmpty())
     }
 
     @Test
-    fun onBack_fromCategory_returnsToWelcome() = runTest {
+    fun onBack_fromTemplateSelection_returnsToStyleAndClearsStyle() = runTest {
         val vm = createViewModel()
         testDispatcher.scheduler.advanceUntilIdle()
 
-        vm.onIntent(InteractiveOnboardingIntent.OnGetStarted)
-        assertEquals(InteractiveOnboardingStep.CategorySelection, vm.screenState.value.currentStep)
+        vm.onIntent(InteractiveOnboardingIntent.OnCategorySelected(OnboardingCategory.TRAVEL))
+        vm.onIntent(InteractiveOnboardingIntent.OnStyleSelected(OrganizingStyle.DETAILED))
+        assertEquals(InteractiveOnboardingStep.TemplateSelection, vm.screenState.value.currentStep)
 
         vm.onIntent(InteractiveOnboardingIntent.OnBack)
 
-        assertEquals(InteractiveOnboardingStep.Welcome, vm.screenState.value.currentStep)
+        val state = vm.screenState.value
+        assertEquals(InteractiveOnboardingStep.StyleSelection, state.currentStep)
+        assertNull(state.selectedStyle)
+    }
+
+    @Test
+    fun onBack_fromCustomize_returnsToTemplateAndClearsItems() = runTest {
+        val vm = createViewModelAtCustomize()
+        assertEquals(InteractiveOnboardingStep.Customize, vm.screenState.value.currentStep)
+
+        vm.onIntent(InteractiveOnboardingIntent.OnBack)
+
+        val state = vm.screenState.value
+        assertEquals(InteractiveOnboardingStep.TemplateSelection, state.currentStep)
+        assertNull(state.selectedTemplate)
+        assertTrue(state.customizedItems.isEmpty())
+        assertEquals("", state.checklistName)
+    }
+
+    @Test
+    fun onBack_fromCreating_isNoOp() = runTest {
+        val vm = createViewModelAtCustomize()
+        vm.onIntent(InteractiveOnboardingIntent.OnContinueFromCustomize)
+        assertEquals(InteractiveOnboardingStep.Creating, vm.screenState.value.currentStep)
+
+        vm.onIntent(InteractiveOnboardingIntent.OnBack)
+
+        assertEquals(InteractiveOnboardingStep.Creating, vm.screenState.value.currentStep)
+    }
+
+    @Test
+    fun onBack_fromChecklistPreview_returnsToCustomize() = runTest {
+        val vm = createViewModelAtCustomize()
+        vm.onIntent(InteractiveOnboardingIntent.OnContinueFromCustomize)
+        vm.onIntent(InteractiveOnboardingIntent.OnCreatingComplete)
+        assertEquals(InteractiveOnboardingStep.ChecklistPreview, vm.screenState.value.currentStep)
+
+        vm.onIntent(InteractiveOnboardingIntent.OnBack)
+
+        assertEquals(InteractiveOnboardingStep.Customize, vm.screenState.value.currentStep)
     }
 
     @Test
     fun onBack_fromPaywall_returnsToChecklistPreview() = runTest {
-        val vm = createViewModel()
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        vm.onIntent(InteractiveOnboardingIntent.OnGetStarted)
-        vm.onIntent(InteractiveOnboardingIntent.OnCategorySelected(OnboardingCategory.TRAVEL))
+        val vm = createViewModelAtCustomize()
+        vm.onIntent(InteractiveOnboardingIntent.OnContinueFromCustomize)
+        vm.onIntent(InteractiveOnboardingIntent.OnCreatingComplete)
         vm.onIntent(InteractiveOnboardingIntent.OnSaveChecklist)
         testDispatcher.scheduler.advanceUntilIdle()
 
@@ -374,16 +601,38 @@ class InteractiveOnboardingViewModelTest {
         assertEquals(InteractiveOnboardingStep.ChecklistPreview, vm.screenState.value.currentStep)
     }
 
+    // --- Full flow ---
+
     @Test
-    fun onBack_fromWelcome_isNoOp() = runTest {
+    fun fullFlow_categoryToPaywall() = runTest {
         val vm = createViewModel()
         testDispatcher.scheduler.advanceUntilIdle()
 
-        assertEquals(InteractiveOnboardingStep.Welcome, vm.screenState.value.currentStep)
+        // Step 1: CategorySelection → StyleSelection
+        vm.onIntent(InteractiveOnboardingIntent.OnCategorySelected(OnboardingCategory.TRAVEL))
+        assertEquals(InteractiveOnboardingStep.StyleSelection, vm.screenState.value.currentStep)
 
-        vm.onIntent(InteractiveOnboardingIntent.OnBack)
+        // Step 2: StyleSelection → TemplateSelection
+        vm.onIntent(InteractiveOnboardingIntent.OnStyleSelected(OrganizingStyle.DETAILED))
+        assertEquals(InteractiveOnboardingStep.TemplateSelection, vm.screenState.value.currentStep)
 
-        assertEquals(InteractiveOnboardingStep.Welcome, vm.screenState.value.currentStep)
+        // Step 3: TemplateSelection → Customize
+        vm.onIntent(InteractiveOnboardingIntent.OnTemplateSelected(travelTemplate))
+        assertEquals(InteractiveOnboardingStep.Customize, vm.screenState.value.currentStep)
+
+        // Step 4: Customize → Creating
+        vm.onIntent(InteractiveOnboardingIntent.OnContinueFromCustomize)
+        assertEquals(InteractiveOnboardingStep.Creating, vm.screenState.value.currentStep)
+
+        // Step 5: Creating → ChecklistPreview
+        vm.onIntent(InteractiveOnboardingIntent.OnCreatingComplete)
+        assertEquals(InteractiveOnboardingStep.ChecklistPreview, vm.screenState.value.currentStep)
+
+        // Step 6: ChecklistPreview → Paywall (save)
+        vm.onIntent(InteractiveOnboardingIntent.OnSaveChecklist)
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(InteractiveOnboardingStep.Paywall, vm.screenState.value.currentStep)
+        assertTrue(vm.screenState.value.checklistCreated)
     }
 
     // --- Test doubles ---

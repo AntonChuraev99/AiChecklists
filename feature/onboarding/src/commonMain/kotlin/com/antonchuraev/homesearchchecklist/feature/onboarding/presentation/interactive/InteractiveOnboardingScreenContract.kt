@@ -7,25 +7,65 @@ import aichecklists.core.designsystem.generated.resources.onboarding_interactive
 import aichecklists.core.designsystem.generated.resources.onboarding_interactive_category_shopping
 import aichecklists.core.designsystem.generated.resources.onboarding_interactive_category_travel
 import aichecklists.core.designsystem.generated.resources.onboarding_interactive_category_work
+import aichecklists.core.designsystem.generated.resources.onboarding_interactive_style_chaotic
+import aichecklists.core.designsystem.generated.resources.onboarding_interactive_style_chaotic_desc
+import aichecklists.core.designsystem.generated.resources.onboarding_interactive_style_detailed
+import aichecklists.core.designsystem.generated.resources.onboarding_interactive_style_detailed_desc
+import aichecklists.core.designsystem.generated.resources.onboarding_interactive_style_minimalist
+import aichecklists.core.designsystem.generated.resources.onboarding_interactive_style_minimalist_desc
 import com.antonchuraev.homesearchchecklist.core.common.api.Intent
 import com.antonchuraev.homesearchchecklist.core.common.api.State
 import com.antonchuraev.homesearchchecklist.feature.create.domain.model.ChecklistTemplate
 import org.jetbrains.compose.resources.StringResource
 
 data class InteractiveOnboardingState(
-    val currentStep: InteractiveOnboardingStep = InteractiveOnboardingStep.Welcome,
+    val currentStep: InteractiveOnboardingStep = InteractiveOnboardingStep.CategorySelection,
     val selectedCategory: OnboardingCategory? = null,
-    val matchedTemplate: ChecklistTemplate? = null,
+    val selectedStyle: OrganizingStyle? = null,
+    val availableTemplates: List<ChecklistTemplate> = emptyList(),
+    val selectedTemplate: ChecklistTemplate? = null,
+    val customizedItems: List<CustomizableItem> = emptyList(),
+    val checklistName: String = "",
     val isCreatingChecklist: Boolean = false,
     val checklistCreated: Boolean = false,
     val error: String? = null
 ) : State
 
+data class CustomizableItem(
+    val text: String,
+    val isEnabled: Boolean = true
+)
+
 enum class InteractiveOnboardingStep {
-    Welcome,
     CategorySelection,
+    StyleSelection,
+    TemplateSelection,
+    Customize,
+    Creating,
     ChecklistPreview,
     Paywall
+}
+
+enum class OrganizingStyle(
+    val titleRes: StringResource,
+    val descriptionRes: StringResource,
+    val emoji: String
+) {
+    MINIMALIST(
+        Res.string.onboarding_interactive_style_minimalist,
+        Res.string.onboarding_interactive_style_minimalist_desc,
+        "\u2728" // ✨
+    ),
+    DETAILED(
+        Res.string.onboarding_interactive_style_detailed,
+        Res.string.onboarding_interactive_style_detailed_desc,
+        "\uD83D\uDCCB" // 📋
+    ),
+    CHAOTIC(
+        Res.string.onboarding_interactive_style_chaotic,
+        Res.string.onboarding_interactive_style_chaotic_desc,
+        "\uD83C\uDF2A\uFE0F" // 🌪️
+    )
 }
 
 enum class OnboardingCategory(
@@ -43,8 +83,13 @@ enum class OnboardingCategory(
 }
 
 sealed interface InteractiveOnboardingIntent : Intent {
-    data object OnGetStarted : InteractiveOnboardingIntent
     data class OnCategorySelected(val category: OnboardingCategory) : InteractiveOnboardingIntent
+    data class OnStyleSelected(val style: OrganizingStyle) : InteractiveOnboardingIntent
+    data class OnTemplateSelected(val template: ChecklistTemplate) : InteractiveOnboardingIntent
+    data class OnToggleItem(val index: Int) : InteractiveOnboardingIntent
+    data class OnChecklistNameChanged(val name: String) : InteractiveOnboardingIntent
+    data object OnContinueFromCustomize : InteractiveOnboardingIntent
+    data object OnCreatingComplete : InteractiveOnboardingIntent
     data object OnSaveChecklist : InteractiveOnboardingIntent
     data object OnSkip : InteractiveOnboardingIntent
     data object OnBack : InteractiveOnboardingIntent

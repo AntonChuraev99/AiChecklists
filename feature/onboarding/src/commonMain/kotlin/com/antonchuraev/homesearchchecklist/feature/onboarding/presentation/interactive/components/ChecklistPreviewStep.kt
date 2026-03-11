@@ -1,7 +1,6 @@
 package com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive.components
 
 import aichecklists.core.designsystem.generated.resources.Res
-import aichecklists.core.designsystem.generated.resources.onboarding_interactive_creating
 import aichecklists.core.designsystem.generated.resources.onboarding_interactive_preview_button
 import aichecklists.core.designsystem.generated.resources.onboarding_interactive_preview_subtitle
 import aichecklists.core.designsystem.generated.resources.onboarding_interactive_preview_title
@@ -21,14 +20,12 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CheckBoxOutlineBlank
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -39,14 +36,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
-import com.antonchuraev.homesearchchecklist.feature.create.domain.model.ChecklistTemplate
+import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive.CustomizableItem
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun ChecklistPreviewStep(
-    template: ChecklistTemplate?,
+    checklistName: String,
+    items: List<CustomizableItem>,
     isCreating: Boolean,
     onSave: () -> Unit,
     modifier: Modifier = Modifier
@@ -80,39 +79,37 @@ fun ChecklistPreviewStep(
 
         Spacer(modifier = Modifier.height(AppDimens.SpacingXl))
 
-        if (template != null) {
-            // Checklist name
-            Text(
-                text = template.name,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.fillMaxWidth()
+        // Checklist name
+        Text(
+            text = checklistName,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
+
+        // Staggered animated items
+        Card(
+            modifier = Modifier.fillMaxWidth().weight(1f),
+            shape = RoundedCornerShape(AppDimens.SpacingMd),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
             )
-
-            Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
-
-            // Checklist items card with staggered animation
-            Card(
-                modifier = Modifier.fillMaxWidth().weight(1f),
-                shape = RoundedCornerShape(AppDimens.SpacingMd),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+        ) {
+            LazyColumn(
+                modifier = Modifier.padding(AppDimens.SpacingMd)
             ) {
-                LazyColumn(
-                    modifier = Modifier.padding(AppDimens.SpacingMd)
-                ) {
-                    itemsIndexed(
-                        items = template.items,
-                        key = { index, _ -> index }
-                    ) { index, item ->
-                        AnimatedChecklistItem(
-                            text = item,
-                            delayMs = index * 80L
-                        )
-                    }
+                itemsIndexed(
+                    items = items,
+                    key = { index, _ -> index }
+                ) { index, item ->
+                    AnimatedChecklistItem(
+                        text = item.text,
+                        delayMs = index * 80L
+                    )
                 }
             }
         }
@@ -120,32 +117,12 @@ fun ChecklistPreviewStep(
         Spacer(modifier = Modifier.height(AppDimens.SpacingXl))
 
         // Save button
-        Button(
+        AppButton(
+            text = stringResource(Res.string.onboarding_interactive_preview_button),
             onClick = onSave,
-            enabled = !isCreating && template != null,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(AppDimens.ButtonHeight),
-            shape = MaterialTheme.shapes.small,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = Color.White
-            )
-        ) {
-            if (isCreating) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(22.dp),
-                    color = Color.White,
-                    strokeWidth = 2.dp
-                )
-            } else {
-                Text(
-                    text = stringResource(Res.string.onboarding_interactive_preview_button),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
+            enabled = !isCreating,
+            modifier = Modifier.fillMaxWidth()
+        )
 
         Spacer(modifier = Modifier.height(AppDimens.SpacingXl))
     }
