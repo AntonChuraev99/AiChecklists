@@ -15,6 +15,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -24,8 +25,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -86,14 +89,32 @@ fun InteractiveOnboardingScreen(
             .statusBarsPadding()
             .navigationBarsPadding()
     ) {
-        // Skip button — hidden during Creating step
+        // Top bar — Back + Skip, hidden during Creating step
+        val showBack = state.currentStep != InteractiveOnboardingStep.CategorySelection
+            && state.currentStep != InteractiveOnboardingStep.Creating
+
         if (state.currentStep != InteractiveOnboardingStep.Creating) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = AppDimens.SpacingSm),
-                horizontalArrangement = Arrangement.End
+                    .padding(top = AppDimens.SpacingXs),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                if (showBack) {
+                    IconButton(
+                        onClick = { viewModel.sendIntent(InteractiveOnboardingIntent.OnBack) }
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                } else {
+                    Spacer(modifier = Modifier.size(48.dp))
+                }
+
                 Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(AppDimens.SpacingSm))
