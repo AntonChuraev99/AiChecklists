@@ -48,7 +48,7 @@
     <string name="onboarding_interactive_style_chaotic_desc">Extra tips you might forget</string>
     <string name="onboarding_interactive_template_title">Choose a checklist</string>
     <string name="onboarding_interactive_template_subtitle">Pick your starting point</string>
-    <string name="onboarding_interactive_template_items_count">%d items</string>
+    <string name="onboarding_interactive_template_items_count">%1$d items</string>
     <string name="onboarding_interactive_customize_title">Make it yours</string>
     <string name="onboarding_interactive_customize_subtitle">Toggle off what you don't need</string>
     <string name="onboarding_interactive_customize_continue">Continue</string>

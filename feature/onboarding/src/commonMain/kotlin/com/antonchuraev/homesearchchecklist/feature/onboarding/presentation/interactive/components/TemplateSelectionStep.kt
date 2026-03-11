@@ -4,6 +4,7 @@ import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.onboarding_interactive_template_items_count
 import aichecklists.core.designsystem.generated.resources.onboarding_interactive_template_subtitle
 import aichecklists.core.designsystem.generated.resources.onboarding_interactive_template_title
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -89,13 +90,20 @@ private fun TemplateCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val shape = RoundedCornerShape(AppDimens.SpacingMd)
+
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(AppDimens.SpacingMd))
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(AppDimens.SpacingMd),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+            .clip(shape)
+            .clickable(onClick = onClick)
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant,
+                shape = shape
+            ),
+        shape = shape,
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         )

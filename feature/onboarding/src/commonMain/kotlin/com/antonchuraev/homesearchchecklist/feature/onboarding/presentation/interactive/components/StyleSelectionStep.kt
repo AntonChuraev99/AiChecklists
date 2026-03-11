@@ -100,23 +100,27 @@ private fun StyleCard(
     val title = stringResource(style.titleRes)
     val description = stringResource(style.descriptionRes)
 
+    val shape = RoundedCornerShape(AppDimens.SpacingMd)
+
     Card(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 80.dp)
             .graphicsLayer(scaleX = scale, scaleY = scale)
-            .clip(RoundedCornerShape(AppDimens.SpacingMd))
+            .clip(shape)
             .clickable(onClick = onClick)
             .semantics { contentDescription = title }
-            .then(
-                if (isSelected) Modifier.border(
-                    width = 2.dp,
-                    color = MaterialTheme.colorScheme.primary,
-                    shape = RoundedCornerShape(AppDimens.SpacingMd)
-                ) else Modifier
+            .border(
+                width = if (isSelected) 2.dp else 1.dp,
+                color = if (isSelected) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.outlineVariant
+                },
+                shape = shape
             ),
-        shape = RoundedCornerShape(AppDimens.SpacingMd),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = shape,
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (isSelected) {
                 MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)
