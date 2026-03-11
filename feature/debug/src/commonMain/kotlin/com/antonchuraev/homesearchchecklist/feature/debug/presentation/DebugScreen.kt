@@ -105,6 +105,13 @@ fun DebugScreen(
             "Force show CSAT bottom sheet for testing"
         ) {
             onShowCsat()
+        },
+        DebugItem(
+            Icons.Outlined.CheckCircle,
+            "Interactive Onboarding",
+            "Open the new interactive onboarding flow"
+        ) {
+            viewModel.sendIntent(DebugScreenIntent.OpenInteractiveOnboarding)
         }
     )
 

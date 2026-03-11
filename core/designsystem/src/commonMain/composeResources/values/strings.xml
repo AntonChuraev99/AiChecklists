@@ -30,9 +30,6 @@
     <string name="onboarding_page3_description">Share your progress as PDF or text. Perfect for reports, clients, or just keeping records.</string>
 
     <!-- Interactive Onboarding -->
-    <string name="onboarding_interactive_welcome_title">Create your first checklist</string>
-    <string name="onboarding_interactive_welcome_subtitle">Answer one question and we set things up for you</string>
-    <string name="onboarding_interactive_welcome_button">Get Started</string>
     <string name="onboarding_interactive_category_title">What do you want to organize?</string>
     <string name="onboarding_interactive_category_subtitle">Pick one to get started</string>
     <string name="onboarding_interactive_category_travel">Travel &amp; Events</string>
@@ -41,10 +38,25 @@
     <string name="onboarding_interactive_category_work">Work &amp; Projects</string>
     <string name="onboarding_interactive_category_health">Health &amp; Fitness</string>
     <string name="onboarding_interactive_category_education">Learning &amp; Education</string>
-    <string name="onboarding_interactive_preview_title">Your first checklist is ready!</string>
-    <string name="onboarding_interactive_preview_subtitle">We created this based on your choice</string>
+    <string name="onboarding_interactive_style_title">How do you prefer your lists?</string>
+    <string name="onboarding_interactive_style_subtitle">This shapes your first checklist</string>
+    <string name="onboarding_interactive_style_minimalist">Minimalist</string>
+    <string name="onboarding_interactive_style_minimalist_desc">Just the essentials</string>
+    <string name="onboarding_interactive_style_detailed">Detailed</string>
+    <string name="onboarding_interactive_style_detailed_desc">Every step covered</string>
+    <string name="onboarding_interactive_style_chaotic">Everything &amp; more</string>
+    <string name="onboarding_interactive_style_chaotic_desc">Extra tips you might forget</string>
+    <string name="onboarding_interactive_template_title">Choose a checklist</string>
+    <string name="onboarding_interactive_template_subtitle">Pick your starting point</string>
+    <string name="onboarding_interactive_template_items_count">%d items</string>
+    <string name="onboarding_interactive_customize_title">Make it yours</string>
+    <string name="onboarding_interactive_customize_subtitle">Toggle off what you don't need</string>
+    <string name="onboarding_interactive_customize_continue">Continue</string>
+    <string name="onboarding_interactive_creating_title">Creating your checklist…</string>
+    <string name="onboarding_interactive_creating_social">12,000+ checklists created with Gisti</string>
+    <string name="onboarding_interactive_preview_title">Your checklist is ready!</string>
+    <string name="onboarding_interactive_preview_subtitle">Personalized based on your choices</string>
     <string name="onboarding_interactive_preview_button">Save &amp; Continue</string>
-    <string name="onboarding_interactive_creating">Creating your checklist...</string>
 
     <!-- Main Screen -->
     <string name="main_title">My Checklists</string>

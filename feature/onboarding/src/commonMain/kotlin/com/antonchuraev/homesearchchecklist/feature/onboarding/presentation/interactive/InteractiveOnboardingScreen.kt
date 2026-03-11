@@ -13,7 +13,6 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -42,7 +41,10 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive.components.CategorySelectionStep
 import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive.components.ChecklistPreviewStep
-import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive.components.WelcomeStep
+import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive.components.CreatingStep
+import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive.components.CustomizeStep
+import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive.components.StyleSelectionStep
+import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive.components.TemplateSelectionStep
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.PaywallIntent
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.PaywallViewModel
 import org.jetbrains.compose.resources.stringResource
@@ -84,31 +86,33 @@ fun InteractiveOnboardingScreen(
             .statusBarsPadding()
             .navigationBarsPadding()
     ) {
-        // Skip button
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = AppDimens.SpacingSm),
-            horizontalArrangement = Arrangement.End
-        ) {
+        // Skip button — hidden during Creating step
+        if (state.currentStep != InteractiveOnboardingStep.Creating) {
             Row(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(AppDimens.SpacingSm))
-                    .clickable { viewModel.sendIntent(InteractiveOnboardingIntent.OnSkip) }
-                    .padding(AppDimens.SpacingSm),
-                verticalAlignment = Alignment.CenterVertically
+                    .fillMaxWidth()
+                    .padding(top = AppDimens.SpacingSm),
+                horizontalArrangement = Arrangement.End
             ) {
-                Text(
-                    text = stringResource(Res.string.onboarding_skip),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(AppDimens.SpacingSm))
+                        .clickable { viewModel.sendIntent(InteractiveOnboardingIntent.OnSkip) }
+                        .padding(AppDimens.SpacingSm),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = stringResource(Res.string.onboarding_skip),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
 
@@ -131,11 +135,9 @@ fun InteractiveOnboardingScreen(
                     (slideInVertically { it / 2 } + fadeIn()) togetherWith
                         (slideOutVertically { -it / 2 } + fadeOut())
                 } else if (targetState.ordinal > initialState.ordinal) {
-                    // Forward: slide in from right
                     (slideInHorizontally { it } + fadeIn()) togetherWith
                         (slideOutHorizontally { -it } + fadeOut())
                 } else {
-                    // Back: slide in from left
                     (slideInHorizontally { -it } + fadeIn()) togetherWith
                         (slideOutHorizontally { it } + fadeOut())
                 }
@@ -143,17 +145,45 @@ fun InteractiveOnboardingScreen(
             label = "onboarding_step"
         ) { step ->
             when (step) {
-                InteractiveOnboardingStep.Welcome -> WelcomeStep(
-                    onGetStarted = { viewModel.sendIntent(InteractiveOnboardingIntent.OnGetStarted) }
-                )
                 InteractiveOnboardingStep.CategorySelection -> CategorySelectionStep(
                     selectedCategory = state.selectedCategory,
                     onCategorySelected = {
                         viewModel.sendIntent(InteractiveOnboardingIntent.OnCategorySelected(it))
                     }
                 )
+                InteractiveOnboardingStep.StyleSelection -> StyleSelectionStep(
+                    selectedStyle = state.selectedStyle,
+                    onStyleSelected = {
+                        viewModel.sendIntent(InteractiveOnboardingIntent.OnStyleSelected(it))
+                    }
+                )
+                InteractiveOnboardingStep.TemplateSelection -> TemplateSelectionStep(
+                    templates = state.availableTemplates,
+                    onTemplateSelected = {
+                        viewModel.sendIntent(InteractiveOnboardingIntent.OnTemplateSelected(it))
+                    }
+                )
+                InteractiveOnboardingStep.Customize -> CustomizeStep(
+                    items = state.customizedItems,
+                    checklistName = state.checklistName,
+                    onToggleItem = {
+                        viewModel.sendIntent(InteractiveOnboardingIntent.OnToggleItem(it))
+                    },
+                    onNameChanged = {
+                        viewModel.sendIntent(InteractiveOnboardingIntent.OnChecklistNameChanged(it))
+                    },
+                    onContinue = {
+                        viewModel.sendIntent(InteractiveOnboardingIntent.OnContinueFromCustomize)
+                    }
+                )
+                InteractiveOnboardingStep.Creating -> CreatingStep(
+                    onComplete = {
+                        viewModel.sendIntent(InteractiveOnboardingIntent.OnCreatingComplete)
+                    }
+                )
                 InteractiveOnboardingStep.ChecklistPreview -> ChecklistPreviewStep(
-                    template = state.matchedTemplate,
+                    checklistName = state.checklistName,
+                    items = state.customizedItems.filter { it.isEnabled },
                     isCreating = state.isCreatingChecklist,
                     onSave = { viewModel.sendIntent(InteractiveOnboardingIntent.OnSaveChecklist) }
                 )
