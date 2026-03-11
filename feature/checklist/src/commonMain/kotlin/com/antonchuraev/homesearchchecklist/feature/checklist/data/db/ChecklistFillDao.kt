@@ -26,6 +26,9 @@ interface ChecklistFillDao {
     @Query("SELECT COUNT(*) FROM checklist_fills WHERE checklistId = :checklistId")
     suspend fun getCountByChecklistId(checklistId: Long): Int
 
+    @Query("SELECT COUNT(*) FROM checklist_fills WHERE isDefault = 0")
+    suspend fun getTotalAdditionalFillCount(): Int
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(fill: ChecklistFillEntity): Long
 

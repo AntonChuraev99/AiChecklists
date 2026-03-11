@@ -2,6 +2,7 @@ package com.antonchuraev.homesearchchecklist.feature.user.data.repository
 
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
+import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppDatastore
 import com.antonchuraev.homesearchchecklist.feature.user.data.device.DeviceIdProvider
 import com.antonchuraev.homesearchchecklist.feature.user.data.device.getPlatformName
@@ -37,6 +38,7 @@ class UserDataRepositoryImpl(
         private const val IS_PREMIUM_KEY = "is_premium"
         private const val AI_CREDITS_KEY = "ai_credits"
         internal const val IS_PAYWALL_LINKED_KEY = "is_paywall_linked"
+        private const val FIRST_LAUNCH_AT_KEY = "first_launch_at"
 
         private const val MAX_RESTORE_RETRIES = 3
         private const val RESTORE_RETRY_BASE_DELAY_MS = 2000L
@@ -178,6 +180,17 @@ class UserDataRepositoryImpl(
         return Result.failure(lastError ?: IllegalStateException("All retries failed"))
     }
 
+    override suspend fun getFirstLaunchAtMillis(): Long {
+        return appDatastore.observeString(FIRST_LAUNCH_AT_KEY, "").first().toLongOrNull() ?: 0L
+    }
+
+    private suspend fun ensureFirstLaunchRecorded() {
+        val existing = appDatastore.observeString(FIRST_LAUNCH_AT_KEY, "").first()
+        if (existing.isBlank()) {
+            appDatastore.saveString(FIRST_LAUNCH_AT_KEY, currentTimeMillis().toString())
+        }
+    }
+
     private suspend fun registerAndSave(deviceId: String): Result<RegistrationData> {
         return userApiService.registerUser(
             deviceId = deviceId,
@@ -189,6 +202,7 @@ class UserDataRepositoryImpl(
             appDatastore.saveString(USER_ID_KEY, result.userId)
             appDatastore.saveBoolean(IS_PREMIUM_KEY, result.isPremium)
             appDatastore.saveInt(AI_CREDITS_KEY, result.aiCredits)
+            ensureFirstLaunchRecorded()
             logger.debug(TAG, "registerAndSave: saved to datastore")
         }.onFailure { error ->
             logger.error(TAG, "registerAndSave: FAILED - ${error.message}", error)

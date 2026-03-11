@@ -36,6 +36,9 @@ interface ChecklistRepository {
     suspend fun getActiveRepeatSchedules(): List<ChecklistRepeatInfo>
     suspend fun getPastDueRepeatSchedules(nowMillis: Long): List<ChecklistRepeatInfo>
 
+    // Analytics
+    suspend fun getTotalAdditionalFillCount(): Int
+
     // Fills (instances)
     fun getFillsByChecklistId(checklistId: Long): Flow<List<ChecklistFill>>
     fun getDefaultFillByChecklistId(checklistId: Long): Flow<ChecklistFill?>

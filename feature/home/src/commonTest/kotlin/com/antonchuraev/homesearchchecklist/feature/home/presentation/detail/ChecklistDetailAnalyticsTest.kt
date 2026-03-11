@@ -198,6 +198,7 @@ class ChecklistDetailAnalyticsTest {
         private val events = mutableListOf<Pair<String, Map<String, Any>>>()
 
         override fun setUserId(userId: String) {}
+        override fun setUserProperties(properties: Map<String, Any>) {}
         override fun screenView(name: String) {}
         override fun event(name: String, params: Map<String, Any>) {
             events.add(name to params)
@@ -244,6 +245,7 @@ class ChecklistDetailAnalyticsTest {
         override suspend fun countActiveRepeatSchedules(): Int = 0
         override suspend fun getActiveRepeatSchedules(): List<ChecklistRepeatInfo> = emptyList()
         override suspend fun getPastDueRepeatSchedules(nowMillis: Long): List<ChecklistRepeatInfo> = emptyList()
+        override suspend fun getTotalAdditionalFillCount(): Int = 0
     }
 
     private class FakeAppNavigator : AppNavigator {

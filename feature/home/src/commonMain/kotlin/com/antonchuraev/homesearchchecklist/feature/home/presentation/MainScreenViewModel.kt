@@ -1,6 +1,8 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation
 
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
+import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
 import com.antonchuraev.homesearchchecklist.core.common.api.formatExpirationDate
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
@@ -11,6 +13,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -24,9 +27,14 @@ class MainScreenViewModel(
     private val getSubscriptionStatusUseCase: GetSubscriptionStatusUseCase,
     private val userDataRepository: UserDataRepository,
     private val getUserLimitsUseCase: GetUserLimitsUseCase,
+    private val analyticsTracker: AnalyticsTracker,
 ) : AppViewModel<MainScreenState, MainScreenIntent, Nothing>() {
 
     private val _showLimitDialog = MutableStateFlow(false)
+
+    init {
+        syncUserProperties()
+    }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     private val checklistsWithProgress = repository.checklists.flatMapLatest { checklists ->
@@ -97,6 +105,29 @@ class MainScreenViewModel(
             _showLimitDialog.update { true }
         } else {
             appNavigator.navigateToTemplatesScreen()
+        }
+    }
+
+    private fun syncUserProperties() {
+        viewModelScope.launch {
+            val userData = userDataRepository.getUserData()
+            val checklistCount = repository.checklists.first().size
+            val totalFills = repository.getTotalAdditionalFillCount()
+            val firstLaunchAt = userDataRepository.getFirstLaunchAtMillis()
+            val daysSinceInstall = if (firstLaunchAt > 0) {
+                ((currentTimeMillis() - firstLaunchAt) / (24 * 60 * 60 * 1000)).toInt()
+            } else {
+                0
+            }
+
+            analyticsTracker.setUserProperties(
+                mapOf(
+                    "is_premium" to userData.isPremium,
+                    "checklist_count" to checklistCount,
+                    "total_fills" to totalFills,
+                    "days_since_install" to daysSinceInstall
+                )
+            )
         }
     }
 
