@@ -20,6 +20,10 @@ class AppNavigatorImpl() : AppNavigator {
         navController.navigate(AppNavRoute.Onboarding)
     }
 
+    override fun navigateToInteractiveOnboarding() {
+        navController.navigate(AppNavRoute.InteractiveOnboarding)
+    }
+
     override fun navigateToMainScreen(clearBackStack: Boolean) {
         if (clearBackStack) {
             navController.navigate(AppNavRoute.Main) {

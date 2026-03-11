@@ -49,9 +49,12 @@ class OnboardingViewModel(
 
         viewModelScope.launch {
             if (wasSkipped) {
-                analyticsTracker.event("onboarding_skipped", mapOf("page" to currentPage.toString()))
+                analyticsTracker.event("onboarding_skipped", mapOf(
+                    "variant" to "slides",
+                    "page" to currentPage.toString()
+                ))
             }
-            analyticsTracker.event("onboarding_completed")
+            analyticsTracker.event("onboarding_completed", mapOf("variant" to "slides"))
             completeOnboardingUseCase()
             navigator.navigateToMainScreen(clearBackStack = true)
         }

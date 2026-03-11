@@ -25,6 +25,7 @@ kotlin {
             implementation(projects.core.common.api)
             implementation(projects.core.datastore.api)
             implementation(projects.core.datastore.impl)
+            implementation(projects.core.remoteconfig.api)
 
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)

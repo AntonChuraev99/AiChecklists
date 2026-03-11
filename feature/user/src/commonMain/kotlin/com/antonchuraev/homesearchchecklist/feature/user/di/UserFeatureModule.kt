@@ -6,6 +6,7 @@ import com.antonchuraev.homesearchchecklist.feature.user.data.remote.UserApiServ
 import com.antonchuraev.homesearchchecklist.feature.user.data.repository.UserDataRepositoryImpl
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.CompleteOnboardingUseCase
+import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.GetOnboardingVariantUseCase
 import org.koin.dsl.bind
 import org.koin.dsl.module
 
@@ -26,4 +27,5 @@ val userFeatureModule = module {
     } bind UserDataRepository::class
 
     factory { CompleteOnboardingUseCase(get()) }
+    factory { GetOnboardingVariantUseCase(get()) }
 }

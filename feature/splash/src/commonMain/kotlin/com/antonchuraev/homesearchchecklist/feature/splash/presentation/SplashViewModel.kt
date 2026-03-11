@@ -8,6 +8,8 @@ import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.Resto
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
+import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.GetOnboardingVariantUseCase
+import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.GetOnboardingVariantUseCase.OnboardingVariant
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -20,7 +22,8 @@ class SplashViewModel(
     private val appNavigator: AppNavigator,
     private val appScope: CoroutineScope,
     private val logger: AppLogger,
-    private val analyticsTracker: AnalyticsTracker
+    private val analyticsTracker: AnalyticsTracker,
+    private val getOnboardingVariant: GetOnboardingVariantUseCase
 ) : ViewModel() {
 
     init {
@@ -71,8 +74,14 @@ class SplashViewModel(
 
     private fun navigateTo(isOnboardingPassed: Boolean) {
         with(appNavigator) {
-            if (isOnboardingPassed) navigateToMainScreen(clearBackStack = true)
-            else navigateToOnboarding()
+            if (isOnboardingPassed) {
+                navigateToMainScreen(clearBackStack = true)
+            } else {
+                when (getOnboardingVariant()) {
+                    OnboardingVariant.INTERACTIVE -> navigateToInteractiveOnboarding()
+                    OnboardingVariant.SLIDES -> navigateToOnboarding()
+                }
+            }
         }
     }
 

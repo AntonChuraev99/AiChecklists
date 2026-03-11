@@ -281,6 +281,27 @@ class TemplatesRepositoryImpl(
                 )
             ),
 
+            // Education
+            ChecklistTemplate(
+                id = "study_plan",
+                name = "Study Plan",
+                description = "Organize your learning goals",
+                icon = "school",
+                category = "education",
+                items = listOf(
+                    "Review course syllabus",
+                    "Set weekly study goals",
+                    "Gather textbooks and materials",
+                    "Create study schedule",
+                    "Join study group or forum",
+                    "Complete practice exercises",
+                    "Review notes before class",
+                    "Prepare questions for instructor",
+                    "Track assignment deadlines",
+                    "Review and summarize key concepts"
+                )
+            ),
+
             // Home
             ChecklistTemplate(
                 id = "spring_cleaning",
