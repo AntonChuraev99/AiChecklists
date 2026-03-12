@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive
 
 import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.onboarding_discover_maybe_later
 import aichecklists.core.designsystem.generated.resources.onboarding_skip
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
@@ -45,6 +46,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive.components.CategorySelectionStep
 import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive.components.ChecklistPreviewStep
 import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive.components.CreatingStep
+import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive.components.DiscoverMoreStep
 import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive.components.CustomizeStep
 import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive.components.StyleSelectionStep
 import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive.components.TemplateSelectionStep
@@ -121,7 +123,11 @@ fun InteractiveOnboardingScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = stringResource(Res.string.onboarding_skip),
+                    text = if (state.currentStep == InteractiveOnboardingStep.DiscoverMore) {
+                        stringResource(Res.string.onboarding_discover_maybe_later)
+                    } else {
+                        stringResource(Res.string.onboarding_skip)
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -212,6 +218,21 @@ fun InteractiveOnboardingScreen(
                     items = state.customizedItems.filter { it.isEnabled },
                     isCreating = state.isCreatingChecklist,
                     onSave = { viewModel.sendIntent(InteractiveOnboardingIntent.OnSaveChecklist) }
+                )
+                InteractiveOnboardingStep.DiscoverMore -> DiscoverMoreStep(
+                    state = state.discoverMore,
+                    onReminderPreset = {
+                        viewModel.sendIntent(InteractiveOnboardingIntent.OnReminderPresetSelected(it))
+                    },
+                    onWidgetDone = {
+                        viewModel.sendIntent(InteractiveOnboardingIntent.OnWidgetInstructionDone)
+                    },
+                    onShareCompleted = {
+                        viewModel.sendIntent(InteractiveOnboardingIntent.OnShareCompleted)
+                    },
+                    onContinue = {
+                        viewModel.sendIntent(InteractiveOnboardingIntent.OnDiscoverMoreContinue)
+                    }
                 )
                 InteractiveOnboardingStep.Paywall -> {
                     com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive.components.PaywallStep(

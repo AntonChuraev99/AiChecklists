@@ -35,8 +35,17 @@ data class InteractiveOnboardingState(
     val isCreatingChecklist: Boolean = false,
     val checklistCreated: Boolean = false,
     val wasTemplateStepSkipped: Boolean = false,
+    val createdChecklistId: Long? = null,
+    val discoverMore: DiscoverMoreState = DiscoverMoreState(),
     val error: String? = null
 ) : State
+
+data class DiscoverMoreState(
+    val reminderCompleted: Boolean = false,
+    val widgetCompleted: Boolean = false,
+    val shareCompleted: Boolean = false,
+    val shareText: String? = null
+)
 
 data class CustomizableItem(
     val text: String,
@@ -50,7 +59,14 @@ enum class InteractiveOnboardingStep {
     Customize,
     Creating,
     ChecklistPreview,
+    DiscoverMore,
     Paywall
+}
+
+enum class ReminderPreset {
+    TONIGHT,
+    DAILY,
+    WEEKLY
 }
 
 enum class OrganizingStyle(
@@ -106,4 +122,10 @@ sealed interface InteractiveOnboardingIntent : Intent {
     data object OnSaveChecklist : InteractiveOnboardingIntent
     data object OnSkip : InteractiveOnboardingIntent
     data object OnBack : InteractiveOnboardingIntent
+
+    // Discover More step
+    data class OnReminderPresetSelected(val preset: ReminderPreset) : InteractiveOnboardingIntent
+    data object OnWidgetInstructionDone : InteractiveOnboardingIntent
+    data object OnShareCompleted : InteractiveOnboardingIntent
+    data object OnDiscoverMoreContinue : InteractiveOnboardingIntent
 }
