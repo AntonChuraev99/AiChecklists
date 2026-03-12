@@ -1,7 +1,6 @@
 package com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive.components
 
 import aichecklists.core.designsystem.generated.resources.Res
-import aichecklists.core.designsystem.generated.resources.onboarding_interactive_template_items_count
 import aichecklists.core.designsystem.generated.resources.onboarding_interactive_template_subtitle
 import aichecklists.core.designsystem.generated.resources.onboarding_interactive_template_title
 import androidx.compose.foundation.border
@@ -131,12 +130,6 @@ private fun TemplateCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Spacer(modifier = Modifier.height(AppDimens.SpacingXs))
-                Text(
-                    text = stringResource(Res.string.onboarding_interactive_template_items_count, template.items.size),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
             }
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
