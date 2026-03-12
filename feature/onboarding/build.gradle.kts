@@ -35,6 +35,7 @@ kotlin {
             implementation(projects.feature.paywall)
             implementation(projects.feature.create)
             implementation(projects.feature.checklist)
+            implementation(projects.feature.sharing)
 
             implementation(compose.runtime)
             implementation(compose.foundation)
@@ -46,6 +47,7 @@ kotlin {
             implementation(libs.androidx.lifecycle.runtimeCompose)
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.bundles.koin.feature)
+            implementation(libs.kotlinx.datetime)
         }
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)

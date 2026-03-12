@@ -9,19 +9,33 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Check
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.create.domain.model.ChecklistTemplate
 import com.antonchuraev.homesearchchecklist.feature.create.domain.repository.TemplatesRepository
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatType
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
+import com.antonchuraev.homesearchchecklist.feature.sharing.domain.formatter.ChecklistFormatter
 import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.CompleteOnboardingUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.datetime.Clock
+import kotlinx.datetime.DatePeriod
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.LocalTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.plus
+import kotlinx.datetime.toInstant
+import kotlinx.datetime.toLocalDateTime
 
 class InteractiveOnboardingViewModel(
     private val navigator: AppNavigator,
     private val completeOnboardingUseCase: CompleteOnboardingUseCase,
     private val templatesRepository: TemplatesRepository,
     private val checklistRepository: ChecklistRepository,
-    private val analyticsTracker: AnalyticsTracker
+    private val analyticsTracker: AnalyticsTracker,
+    private val reminderScheduler: ChecklistReminderScheduler,
+    private val checklistFormatter: ChecklistFormatter
 ) : AppViewModel<InteractiveOnboardingState, InteractiveOnboardingIntent, Nothing>() {
 
     private val _screenState = MutableStateFlow(InteractiveOnboardingState())
@@ -50,6 +64,10 @@ class InteractiveOnboardingViewModel(
             InteractiveOnboardingIntent.OnSaveChecklist -> handleSaveChecklist()
             InteractiveOnboardingIntent.OnSkip -> handleSkip()
             InteractiveOnboardingIntent.OnBack -> handleBack()
+            is InteractiveOnboardingIntent.OnReminderPresetSelected -> handleReminderPreset(intent.preset)
+            InteractiveOnboardingIntent.OnWidgetInstructionDone -> handleWidgetDone()
+            InteractiveOnboardingIntent.OnShareCompleted -> handleShareCompleted()
+            InteractiveOnboardingIntent.OnDiscoverMoreContinue -> handleDiscoverMoreContinue()
         }
     }
 
@@ -209,6 +227,7 @@ class InteractiveOnboardingViewModel(
 
     private fun handleSaveChecklist() {
         val state = _screenState.value
+        if (state.createdChecklistId != null) return // Guard: already saved
         val enabledItems = state.customizedItems.filter { it.isEnabled }
         if (enabledItems.isEmpty() || state.isCreatingChecklist) return
 
@@ -223,12 +242,22 @@ class InteractiveOnboardingViewModel(
                     separateCompleted = state.separateCompleted,
                     autoDeleteCompleted = state.autoDeleteCompleted
                 )
-                checklistRepository.addChecklist(checklist)
+                val checklistId = checklistRepository.addChecklist(checklist)
+
+                // Prepare share text
+                val savedChecklist = checklistRepository.getChecklistById(checklistId)
+                val fill = checklistRepository.getDefaultFillOneShot(checklistId)
+                val shareText = if (savedChecklist != null && fill != null) {
+                    checklistFormatter.formatAsText(savedChecklist, fill)
+                } else null
+
                 _screenState.update {
                     it.copy(
                         isCreatingChecklist = false,
                         checklistCreated = true,
-                        currentStep = InteractiveOnboardingStep.Paywall
+                        createdChecklistId = checklistId,
+                        discoverMore = it.discoverMore.copy(shareText = shareText),
+                        currentStep = InteractiveOnboardingStep.DiscoverMore
                     )
                 }
                 trackStep(
@@ -254,12 +283,17 @@ class InteractiveOnboardingViewModel(
 
     private fun handleSkip() {
         val state = _screenState.value
-        viewModelScope.launch {
-            analyticsTracker.event(
-                "onboarding_skipped",
-                mapOf("variant" to "interactive", "step" to state.currentStep.name)
-            )
-            completeOnboarding()
+        analyticsTracker.event(
+            "onboarding_skipped",
+            mapOf("variant" to "interactive", "step" to state.currentStep.name)
+        )
+        when (state.currentStep) {
+            InteractiveOnboardingStep.DiscoverMore -> {
+                _screenState.update { it.copy(currentStep = InteractiveOnboardingStep.Paywall) }
+            }
+            else -> {
+                viewModelScope.launch { completeOnboarding() }
+            }
         }
     }
 
@@ -312,12 +346,104 @@ class InteractiveOnboardingViewModel(
                     it.copy(currentStep = InteractiveOnboardingStep.Customize)
                 }
             }
+            InteractiveOnboardingStep.DiscoverMore -> {
+                // Can't go back from discover more — checklist already saved
+            }
             InteractiveOnboardingStep.Paywall -> {
                 _screenState.update {
-                    it.copy(currentStep = InteractiveOnboardingStep.ChecklistPreview)
+                    it.copy(currentStep = InteractiveOnboardingStep.DiscoverMore)
                 }
             }
         }
+    }
+
+    private fun handleReminderPreset(preset: ReminderPreset) {
+        val checklistId = _screenState.value.createdChecklistId ?: return
+        viewModelScope.launch {
+            try {
+                val now = Clock.System.now()
+                val tz = TimeZone.currentSystemDefault()
+                val today = now.toLocalDateTime(tz)
+
+                when (preset) {
+                    ReminderPreset.TONIGHT -> {
+                        // One-shot: today at 21:00
+                        val todayAt21 = LocalDateTime(
+                            today.date, LocalTime(21, 0)
+                        )
+                        val triggerMillis = todayAt21.toInstant(tz).toEpochMilliseconds()
+                        val adjustedTrigger = if (triggerMillis <= now.toEpochMilliseconds()) {
+                            triggerMillis + 24 * 60 * 60 * 1000L // Next day if past 9 PM
+                        } else triggerMillis
+                        checklistRepository.setReminder(checklistId, adjustedTrigger)
+                        reminderScheduler.scheduleReminder(checklistId, adjustedTrigger)
+                    }
+                    ReminderPreset.DAILY -> {
+                        // Recurring: daily at 9:00 AM
+                        val rule = ReminderRepeatRule(type = RepeatType.DAILY)
+                        val timeMinutes = 9 * 60 // 9:00 AM
+                        val tomorrowAt9 = LocalDateTime(
+                            today.date, LocalTime(9, 0)
+                        )
+                        var triggerMillis = tomorrowAt9.toInstant(tz).toEpochMilliseconds()
+                        if (triggerMillis <= now.toEpochMilliseconds()) {
+                            triggerMillis += 24 * 60 * 60 * 1000L
+                        }
+                        checklistRepository.setRepeatSchedule(checklistId, rule, timeMinutes, triggerMillis)
+                        reminderScheduler.scheduleRepeat(checklistId, triggerMillis)
+                    }
+                    ReminderPreset.WEEKLY -> {
+                        // Recurring: weekly on Monday at 9:00 AM
+                        val rule = ReminderRepeatRule(
+                            type = RepeatType.WEEKLY,
+                            weekDays = setOf(1) // Monday (ISO day number)
+                        )
+                        val timeMinutes = 9 * 60
+                        val nextMonday = run {
+                            // DayOfWeek: MONDAY=0..SUNDAY=6 in kotlinx-datetime
+                            val dayOfWeek = today.dayOfWeek.ordinal // 0=Monday
+                            val daysUntilMonday = if (dayOfWeek == 0) 7 else (7 - dayOfWeek)
+                            val mondayDate = today.date.plus(DatePeriod(days = daysUntilMonday))
+                            LocalDateTime(mondayDate, LocalTime(9, 0))
+                        }
+                        val triggerMillis = nextMonday.toInstant(tz).toEpochMilliseconds()
+                        checklistRepository.setRepeatSchedule(checklistId, rule, timeMinutes, triggerMillis)
+                        reminderScheduler.scheduleRepeat(checklistId, triggerMillis)
+                    }
+                }
+
+                _screenState.update {
+                    it.copy(discoverMore = it.discoverMore.copy(reminderCompleted = true))
+                }
+                trackStep("discover_more_reminder", "preset" to preset.name)
+            } catch (e: Exception) {
+                analyticsTracker.event(
+                    "onboarding_reminder_error",
+                    mapOf("error" to e.message.orEmpty())
+                )
+            }
+        }
+    }
+
+    private fun handleWidgetDone() {
+        _screenState.update {
+            it.copy(discoverMore = it.discoverMore.copy(widgetCompleted = true))
+        }
+        trackStep("discover_more_widget")
+    }
+
+    private fun handleShareCompleted() {
+        _screenState.update {
+            it.copy(discoverMore = it.discoverMore.copy(shareCompleted = true))
+        }
+        trackStep("discover_more_share")
+    }
+
+    private fun handleDiscoverMoreContinue() {
+        val dm = _screenState.value.discoverMore
+        val completedCount = listOf(dm.reminderCompleted, dm.widgetCompleted, dm.shareCompleted).count { it }
+        trackStep("discover_more_completed", "actions_done" to completedCount.toString())
+        _screenState.update { it.copy(currentStep = InteractiveOnboardingStep.Paywall) }
     }
 
     fun completeOnboarding() {

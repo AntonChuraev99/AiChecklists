@@ -9,7 +9,10 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Check
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
 import com.antonchuraev.homesearchchecklist.feature.create.domain.model.ChecklistTemplate
+import com.antonchuraev.homesearchchecklist.feature.sharing.domain.formatter.ChecklistFormatter
 import com.antonchuraev.homesearchchecklist.feature.create.domain.model.TemplateCategory
 import com.antonchuraev.homesearchchecklist.feature.create.domain.repository.TemplatesRepository
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.RegistrationData
@@ -45,6 +48,8 @@ class InteractiveOnboardingViewModelTest {
     private lateinit var fakeChecklistRepository: FakeChecklistRepository
     private lateinit var fakeAnalyticsTracker: RecordingAnalyticsTracker
     private lateinit var fakeUserDataRepository: FakeUserDataRepository
+    private lateinit var fakeReminderScheduler: FakeReminderScheduler
+    private val checklistFormatter = ChecklistFormatter()
 
     private val travelTemplate = ChecklistTemplate(
         id = "travel_packing",
@@ -80,6 +85,7 @@ class InteractiveOnboardingViewModelTest {
         fakeChecklistRepository = FakeChecklistRepository()
         fakeAnalyticsTracker = RecordingAnalyticsTracker()
         fakeUserDataRepository = FakeUserDataRepository()
+        fakeReminderScheduler = FakeReminderScheduler()
     }
 
     @AfterTest
@@ -95,7 +101,9 @@ class InteractiveOnboardingViewModelTest {
             completeOnboardingUseCase = CompleteOnboardingUseCase(fakeUserDataRepository),
             templatesRepository = templatesRepository,
             checklistRepository = fakeChecklistRepository,
-            analyticsTracker = fakeAnalyticsTracker
+            analyticsTracker = fakeAnalyticsTracker,
+            reminderScheduler = fakeReminderScheduler,
+            checklistFormatter = checklistFormatter
         )
     }
 
@@ -434,7 +442,7 @@ class InteractiveOnboardingViewModelTest {
     // --- Save checklist ---
 
     @Test
-    fun onSaveChecklist_success_createsAndMovesToPaywall() = runTest {
+    fun onSaveChecklist_success_createsAndMovesToDiscoverMore() = runTest {
         val vm = createViewModelAtCustomize()
         vm.onIntent(InteractiveOnboardingIntent.OnContinueFromCustomize)
         vm.onIntent(InteractiveOnboardingIntent.OnCreatingComplete)
@@ -443,9 +451,10 @@ class InteractiveOnboardingViewModelTest {
         testDispatcher.scheduler.advanceUntilIdle()
 
         val state = vm.screenState.value
-        assertEquals(InteractiveOnboardingStep.Paywall, state.currentStep)
+        assertEquals(InteractiveOnboardingStep.DiscoverMore, state.currentStep)
         assertTrue(state.checklistCreated)
         assertFalse(state.isCreatingChecklist)
+        assertNotNull(state.createdChecklistId)
         assertEquals(1, fakeChecklistRepository.addChecklistCallCount)
     }
 
@@ -674,18 +683,20 @@ class InteractiveOnboardingViewModelTest {
     }
 
     @Test
-    fun onBack_fromPaywall_returnsToChecklistPreview() = runTest {
+    fun onBack_fromPaywall_returnsToDiscoverMore() = runTest {
         val vm = createViewModelAtCustomize()
         vm.onIntent(InteractiveOnboardingIntent.OnContinueFromCustomize)
         vm.onIntent(InteractiveOnboardingIntent.OnCreatingComplete)
         vm.onIntent(InteractiveOnboardingIntent.OnSaveChecklist)
         testDispatcher.scheduler.advanceUntilIdle()
+        // Now at DiscoverMore, advance to Paywall
+        vm.onIntent(InteractiveOnboardingIntent.OnDiscoverMoreContinue)
 
         assertEquals(InteractiveOnboardingStep.Paywall, vm.screenState.value.currentStep)
 
         vm.onIntent(InteractiveOnboardingIntent.OnBack)
 
-        assertEquals(InteractiveOnboardingStep.ChecklistPreview, vm.screenState.value.currentStep)
+        assertEquals(InteractiveOnboardingStep.DiscoverMore, vm.screenState.value.currentStep)
     }
 
     // --- Full flow ---
@@ -715,11 +726,196 @@ class InteractiveOnboardingViewModelTest {
         vm.onIntent(InteractiveOnboardingIntent.OnCreatingComplete)
         assertEquals(InteractiveOnboardingStep.ChecklistPreview, vm.screenState.value.currentStep)
 
-        // Step 6: ChecklistPreview → Paywall (save)
+        // Step 6: ChecklistPreview → DiscoverMore (save)
         vm.onIntent(InteractiveOnboardingIntent.OnSaveChecklist)
         testDispatcher.scheduler.advanceUntilIdle()
-        assertEquals(InteractiveOnboardingStep.Paywall, vm.screenState.value.currentStep)
+        assertEquals(InteractiveOnboardingStep.DiscoverMore, vm.screenState.value.currentStep)
         assertTrue(vm.screenState.value.checklistCreated)
+
+        // Step 7: DiscoverMore → Paywall
+        vm.onIntent(InteractiveOnboardingIntent.OnDiscoverMoreContinue)
+        assertEquals(InteractiveOnboardingStep.Paywall, vm.screenState.value.currentStep)
+    }
+
+    // --- Discover More step ---
+
+    /** Helper: get VM to DiscoverMore step (save checklist from customize) */
+    private fun createViewModelAtDiscoverMore(): InteractiveOnboardingViewModel {
+        val vm = createViewModelAtCustomize()
+        vm.onIntent(InteractiveOnboardingIntent.OnContinueFromCustomize)
+        vm.onIntent(InteractiveOnboardingIntent.OnCreatingComplete)
+        vm.onIntent(InteractiveOnboardingIntent.OnSaveChecklist)
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(InteractiveOnboardingStep.DiscoverMore, vm.screenState.value.currentStep)
+        return vm
+    }
+
+    @Test
+    fun onDiscoverMoreContinue_advancesToPaywall() = runTest {
+        val vm = createViewModelAtDiscoverMore()
+
+        vm.onIntent(InteractiveOnboardingIntent.OnDiscoverMoreContinue)
+
+        assertEquals(InteractiveOnboardingStep.Paywall, vm.screenState.value.currentStep)
+    }
+
+    @Test
+    fun onDiscoverMoreContinue_tracksCompletedActionsCount() = runTest {
+        val vm = createViewModelAtDiscoverMore()
+        // Complete widget action
+        vm.onIntent(InteractiveOnboardingIntent.OnWidgetInstructionDone)
+
+        vm.onIntent(InteractiveOnboardingIntent.OnDiscoverMoreContinue)
+
+        val events = fakeAnalyticsTracker.eventsNamed("onboarding_step_completed")
+        val discoverEvent = events.firstOrNull { it["step"] == "discover_more_completed" }
+        assertNotNull(discoverEvent)
+        assertEquals("1", discoverEvent["actions_done"])
+    }
+
+    @Test
+    fun onSkip_fromDiscoverMore_advancesToPaywall() = runTest {
+        val vm = createViewModelAtDiscoverMore()
+
+        vm.onIntent(InteractiveOnboardingIntent.OnSkip)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(InteractiveOnboardingStep.Paywall, vm.screenState.value.currentStep)
+        // Should NOT complete onboarding (skip from DiscoverMore goes to Paywall, not exit)
+        assertFalse(fakeUserDataRepository.onboardingMarkedPassed)
+    }
+
+    @Test
+    fun onBack_fromDiscoverMore_isNoOp() = runTest {
+        val vm = createViewModelAtDiscoverMore()
+
+        vm.onIntent(InteractiveOnboardingIntent.OnBack)
+
+        assertEquals(InteractiveOnboardingStep.DiscoverMore, vm.screenState.value.currentStep)
+    }
+
+    @Test
+    fun onWidgetInstructionDone_marksWidgetCompleted() = runTest {
+        val vm = createViewModelAtDiscoverMore()
+
+        vm.onIntent(InteractiveOnboardingIntent.OnWidgetInstructionDone)
+
+        assertTrue(vm.screenState.value.discoverMore.widgetCompleted)
+        assertFalse(vm.screenState.value.discoverMore.reminderCompleted)
+        assertFalse(vm.screenState.value.discoverMore.shareCompleted)
+    }
+
+    @Test
+    fun onShareCompleted_marksShareCompleted() = runTest {
+        val vm = createViewModelAtDiscoverMore()
+
+        vm.onIntent(InteractiveOnboardingIntent.OnShareCompleted)
+
+        assertTrue(vm.screenState.value.discoverMore.shareCompleted)
+        assertFalse(vm.screenState.value.discoverMore.reminderCompleted)
+        assertFalse(vm.screenState.value.discoverMore.widgetCompleted)
+    }
+
+    @Test
+    fun onReminderPresetSelected_marksReminderCompleted() = runTest {
+        val vm = createViewModelAtDiscoverMore()
+
+        vm.onIntent(InteractiveOnboardingIntent.OnReminderPresetSelected(ReminderPreset.TONIGHT))
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue(vm.screenState.value.discoverMore.reminderCompleted)
+    }
+
+    @Test
+    fun onReminderPresetSelected_tonight_schedulesOneShot() = runTest {
+        val vm = createViewModelAtDiscoverMore()
+
+        vm.onIntent(InteractiveOnboardingIntent.OnReminderPresetSelected(ReminderPreset.TONIGHT))
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(1, fakeReminderScheduler.scheduleReminderCalls.size)
+        assertEquals(0, fakeReminderScheduler.scheduleRepeatCalls.size)
+    }
+
+    @Test
+    fun onReminderPresetSelected_daily_schedulesRepeat() = runTest {
+        val vm = createViewModelAtDiscoverMore()
+
+        vm.onIntent(InteractiveOnboardingIntent.OnReminderPresetSelected(ReminderPreset.DAILY))
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(0, fakeReminderScheduler.scheduleReminderCalls.size)
+        assertEquals(1, fakeReminderScheduler.scheduleRepeatCalls.size)
+    }
+
+    @Test
+    fun onReminderPresetSelected_weekly_schedulesRepeat() = runTest {
+        val vm = createViewModelAtDiscoverMore()
+
+        vm.onIntent(InteractiveOnboardingIntent.OnReminderPresetSelected(ReminderPreset.WEEKLY))
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(0, fakeReminderScheduler.scheduleReminderCalls.size)
+        assertEquals(1, fakeReminderScheduler.scheduleRepeatCalls.size)
+    }
+
+    @Test
+    fun onReminderPresetSelected_noChecklistId_isNoOp() = runTest {
+        // Create VM at customize (no checklist saved yet, no createdChecklistId)
+        val vm = createViewModelAtCustomize()
+        // Force step to DiscoverMore without saving (edge case guard test)
+        // Since we can't set step directly, test the guard via the handler:
+        // If createdChecklistId is null, handleReminderPreset should return early
+        // The VM at customize has no createdChecklistId
+        vm.onIntent(InteractiveOnboardingIntent.OnReminderPresetSelected(ReminderPreset.TONIGHT))
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(0, fakeReminderScheduler.scheduleReminderCalls.size)
+        assertFalse(vm.screenState.value.discoverMore.reminderCompleted)
+    }
+
+    @Test
+    fun onSaveChecklist_duplicate_isGuarded() = runTest {
+        val vm = createViewModelAtDiscoverMore()
+        // Already saved, try saving again
+        vm.onIntent(InteractiveOnboardingIntent.OnSaveChecklist)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Should still be 1 call, not 2
+        assertEquals(1, fakeChecklistRepository.addChecklistCallCount)
+    }
+
+    @Test
+    fun onWidgetInstructionDone_tracksAnalytics() = runTest {
+        val vm = createViewModelAtDiscoverMore()
+
+        vm.onIntent(InteractiveOnboardingIntent.OnWidgetInstructionDone)
+
+        val events = fakeAnalyticsTracker.eventsNamed("onboarding_step_completed")
+        assertNotNull(events.firstOrNull { it["step"] == "discover_more_widget" })
+    }
+
+    @Test
+    fun onShareCompleted_tracksAnalytics() = runTest {
+        val vm = createViewModelAtDiscoverMore()
+
+        vm.onIntent(InteractiveOnboardingIntent.OnShareCompleted)
+
+        val events = fakeAnalyticsTracker.eventsNamed("onboarding_step_completed")
+        assertNotNull(events.firstOrNull { it["step"] == "discover_more_share" })
+    }
+
+    @Test
+    fun onReminderPresetSelected_tracksAnalytics() = runTest {
+        val vm = createViewModelAtDiscoverMore()
+
+        vm.onIntent(InteractiveOnboardingIntent.OnReminderPresetSelected(ReminderPreset.DAILY))
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val events = fakeAnalyticsTracker.eventsNamed("onboarding_step_completed")
+        val reminderEvent = events.firstOrNull { it["step"] == "discover_more_reminder" }
+        assertNotNull(reminderEvent)
+        assertEquals("DAILY", reminderEvent["preset"])
     }
 
     // --- Test doubles ---
@@ -733,10 +929,30 @@ class InteractiveOnboardingViewModelTest {
             templates.firstOrNull { it.id == id }
     }
 
+    private class FakeReminderScheduler : ChecklistReminderScheduler {
+        data class ReminderCall(val checklistId: Long, val triggerAtMillis: Long)
+        data class RepeatCall(val checklistId: Long, val triggerAtMillis: Long)
+
+        val scheduleReminderCalls = mutableListOf<ReminderCall>()
+        val scheduleRepeatCalls = mutableListOf<RepeatCall>()
+
+        override fun scheduleReminder(checklistId: Long, triggerAtMillis: Long) {
+            scheduleReminderCalls.add(ReminderCall(checklistId, triggerAtMillis))
+        }
+        override fun cancelReminder(checklistId: Long) {}
+        override suspend fun rescheduleAllActiveReminders() {}
+        override fun scheduleRepeat(checklistId: Long, triggerAtMillis: Long) {
+            scheduleRepeatCalls.add(RepeatCall(checklistId, triggerAtMillis))
+        }
+        override fun cancelRepeat(checklistId: Long) {}
+        override suspend fun rescheduleAllActiveRepeats() {}
+    }
+
     private class FakeChecklistRepository : ChecklistRepository {
         var shouldThrowOnAdd = false
         var addChecklistCallCount = 0
         var lastAddedChecklist: Checklist? = null
+        private var savedChecklistId: Long? = null
 
         override val checklists: Flow<List<Checklist>> = flowOf(emptyList())
 
@@ -744,20 +960,36 @@ class InteractiveOnboardingViewModelTest {
             addChecklistCallCount++
             if (shouldThrowOnAdd) throw RuntimeException("Room write error")
             lastAddedChecklist = checklist
+            savedChecklistId = 1L
             return 1L
         }
 
         override suspend fun updateChecklist(checklist: Checklist) {}
         override suspend fun updateChecklistTemplate(checklist: Checklist) {}
         override suspend fun deleteChecklist(checklist: Checklist) {}
-        override suspend fun getChecklistById(id: Long): Checklist? = null
+
+        override suspend fun getChecklistById(id: Long): Checklist? {
+            // Return saved checklist after addChecklist was called
+            return if (id == savedChecklistId) lastAddedChecklist?.copy(id = id) else null
+        }
         override suspend fun reorderChecklists(orderedIds: List<Long>) {}
         override suspend fun setSeparateCompleted(checklistId: Long, value: Boolean) {}
         override suspend fun setAutoDeleteCompleted(checklistId: Long, value: Boolean) {}
         override suspend fun setReminder(checklistId: Long, reminderAt: Long?) {}
         override suspend fun countActiveReminders(): Int = 0
         override suspend fun getActiveReminders(): List<ChecklistReminderInfo> = emptyList()
-        override suspend fun getDefaultFillOneShot(checklistId: Long): ChecklistFill? = null
+        override suspend fun getDefaultFillOneShot(checklistId: Long): ChecklistFill? {
+            // Return a default fill matching the saved checklist
+            val checklist = lastAddedChecklist ?: return null
+            if (checklistId != savedChecklistId) return null
+            return ChecklistFill(
+                id = 1L,
+                checklistId = checklistId,
+                name = "",
+                items = checklist.items.map { ChecklistFillItem(text = it.text, checked = false) },
+                isDefault = true
+            )
+        }
         override fun getFillsByChecklistId(checklistId: Long): Flow<List<ChecklistFill>> = flowOf(emptyList())
         override fun getDefaultFillByChecklistId(checklistId: Long): Flow<ChecklistFill?> = flowOf(null)
         override fun getAdditionalFillsByChecklistId(checklistId: Long): Flow<List<ChecklistFill>> = flowOf(emptyList())

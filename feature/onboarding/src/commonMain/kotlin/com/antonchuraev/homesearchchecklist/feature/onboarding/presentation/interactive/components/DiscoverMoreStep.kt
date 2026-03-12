@@ -1,0 +1,493 @@
+package com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive.components
+
+import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.onboarding_discover_completed
+import aichecklists.core.designsystem.generated.resources.onboarding_discover_maybe_later
+import aichecklists.core.designsystem.generated.resources.onboarding_discover_reminder_daily
+import aichecklists.core.designsystem.generated.resources.onboarding_discover_reminder_done
+import aichecklists.core.designsystem.generated.resources.onboarding_discover_reminder_sheet_title
+import aichecklists.core.designsystem.generated.resources.onboarding_discover_reminder_subtitle
+import aichecklists.core.designsystem.generated.resources.onboarding_discover_reminder_title
+import aichecklists.core.designsystem.generated.resources.onboarding_discover_reminder_tonight
+import aichecklists.core.designsystem.generated.resources.onboarding_discover_reminder_weekly
+import aichecklists.core.designsystem.generated.resources.onboarding_discover_share_subtitle
+import aichecklists.core.designsystem.generated.resources.onboarding_discover_share_title
+import aichecklists.core.designsystem.generated.resources.onboarding_discover_subtitle
+import aichecklists.core.designsystem.generated.resources.onboarding_discover_title
+import aichecklists.core.designsystem.generated.resources.onboarding_discover_widget_done
+import aichecklists.core.designsystem.generated.resources.onboarding_discover_widget_sheet_title
+import aichecklists.core.designsystem.generated.resources.onboarding_discover_widget_step1
+import aichecklists.core.designsystem.generated.resources.onboarding_discover_widget_step2
+import aichecklists.core.designsystem.generated.resources.onboarding_discover_widget_step3
+import aichecklists.core.designsystem.generated.resources.onboarding_discover_widget_subtitle
+import aichecklists.core.designsystem.generated.resources.onboarding_discover_widget_title
+import aichecklists.core.designsystem.generated.resources.onboarding_continue
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.Widgets
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import com.antonchuraev.homesearchchecklist.feature.onboarding.isWidgetSupported
+import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive.DiscoverMoreState
+import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive.ReminderPreset
+import com.antonchuraev.homesearchchecklist.feature.onboarding.rememberNotificationPermissionRequester
+import com.antonchuraev.homesearchchecklist.feature.sharing.presentation.share.ShareLauncher
+import org.jetbrains.compose.resources.stringResource
+
+private val Blue50 = Color(0xFFE3F2FD)
+
+private enum class DiscoverSheet {
+    REMINDER, WIDGET
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DiscoverMoreStep(
+    state: DiscoverMoreState,
+    onReminderPreset: (ReminderPreset) -> Unit,
+    onWidgetDone: () -> Unit,
+    onShareCompleted: () -> Unit,
+    onContinue: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var activeSheet by remember { mutableStateOf<DiscoverSheet?>(null) }
+    var triggerShare by remember { mutableStateOf(false) }
+
+    // Notification permission requester
+    val requestNotificationPermission = rememberNotificationPermissionRequester { granted ->
+        if (granted) {
+            activeSheet = DiscoverSheet.REMINDER
+        }
+    }
+
+    // Share launcher — composable, fires when triggerShare is true
+    if (triggerShare && state.shareText != null) {
+        ShareLauncher(
+            textContent = state.shareText,
+            pdfFilePath = null,
+            onShareComplete = {
+                triggerShare = false
+                onShareCompleted()
+            }
+        )
+    }
+
+    val completedCount = listOf(
+        state.reminderCompleted,
+        if (isWidgetSupported()) state.widgetCompleted else false,
+        state.shareCompleted
+    ).count { it }
+    val totalCount = if (isWidgetSupported()) 3 else 2
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = AppDimens.ScreenPaddingHorizontal),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Spacer(modifier = Modifier.height(AppDimens.SpacingXxl))
+
+        Text(
+            text = stringResource(Res.string.onboarding_discover_title),
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
+
+        Text(
+            text = stringResource(Res.string.onboarding_discover_subtitle),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        if (completedCount > 0) {
+            Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
+            Text(
+                text = stringResource(
+                    Res.string.onboarding_discover_completed,
+                    completedCount,
+                    totalCount
+                ),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        Spacer(modifier = Modifier.height(AppDimens.SpacingXl))
+
+        // Reminder card
+        ActionCard(
+            icon = Icons.Outlined.Notifications,
+            title = stringResource(Res.string.onboarding_discover_reminder_title),
+            subtitle = stringResource(Res.string.onboarding_discover_reminder_subtitle),
+            isCompleted = state.reminderCompleted,
+            onClick = {
+                if (!state.reminderCompleted) {
+                    requestNotificationPermission()
+                }
+            }
+        )
+
+        Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
+
+        // Widget card (Android only)
+        if (isWidgetSupported()) {
+            ActionCard(
+                icon = Icons.Outlined.Widgets,
+                title = stringResource(Res.string.onboarding_discover_widget_title),
+                subtitle = stringResource(Res.string.onboarding_discover_widget_subtitle),
+                isCompleted = state.widgetCompleted,
+                onClick = {
+                    if (!state.widgetCompleted) {
+                        activeSheet = DiscoverSheet.WIDGET
+                    }
+                }
+            )
+
+            Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
+        }
+
+        // Share card
+        ActionCard(
+            icon = Icons.Outlined.Share,
+            title = stringResource(Res.string.onboarding_discover_share_title),
+            subtitle = stringResource(Res.string.onboarding_discover_share_subtitle),
+            isCompleted = state.shareCompleted,
+            onClick = {
+                if (!state.shareCompleted) {
+                    triggerShare = true
+                }
+            }
+        )
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        AppButton(
+            text = stringResource(Res.string.onboarding_continue),
+            onClick = onContinue,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(AppDimens.SpacingLg))
+    }
+
+    // Reminder bottom sheet
+    if (activeSheet == DiscoverSheet.REMINDER) {
+        ModalBottomSheet(
+            onDismissRequest = { activeSheet = null },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+
+        ) {
+            QuickReminderSheetContent(
+                onPresetSelected = { preset ->
+                    activeSheet = null
+                    onReminderPreset(preset)
+                }
+            )
+        }
+    }
+
+    // Widget instruction bottom sheet
+    if (activeSheet == DiscoverSheet.WIDGET) {
+        ModalBottomSheet(
+            onDismissRequest = { activeSheet = null },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+
+        ) {
+            WidgetInstructionSheetContent(
+                onDone = {
+                    activeSheet = null
+                    onWidgetDone()
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun ActionCard(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    isCompleted: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val scale by animateFloatAsState(
+        targetValue = if (isCompleted) 1f else 1f,
+        animationSpec = spring(stiffness = Spring.StiffnessMedium),
+        label = "action_card_scale"
+    )
+    val iconTint by animateColorAsState(
+        targetValue = if (isCompleted) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        label = "icon_tint"
+    )
+
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .graphicsLayer(scaleX = scale, scaleY = scale)
+            .clip(RoundedCornerShape(AppDimens.SpacingMd))
+            .clickable(enabled = !isCompleted, onClick = onClick),
+        shape = RoundedCornerShape(AppDimens.SpacingMd),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(AppDimens.SpacingLg),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Icon in Blue50 container
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(Blue50, RoundedCornerShape(10.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = iconTint,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(AppDimens.SpacingMd))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Spacer(modifier = Modifier.width(AppDimens.SpacingSm))
+
+            if (isCompleted) {
+                Icon(
+                    imageVector = Icons.Outlined.CheckCircle,
+                    contentDescription = "Completed",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Outlined.ChevronRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuickReminderSheetContent(
+    onPresetSelected: (ReminderPreset) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
+            .padding(bottom = AppDimens.SpacingXl)
+    ) {
+        Text(
+            text = stringResource(Res.string.onboarding_discover_reminder_sheet_title),
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(AppDimens.SpacingXl))
+
+        ReminderPresetItem(
+            text = stringResource(Res.string.onboarding_discover_reminder_tonight),
+            emoji = "\uD83C\uDF19", // 🌙
+            onClick = { onPresetSelected(ReminderPreset.TONIGHT) }
+        )
+        Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
+        ReminderPresetItem(
+            text = stringResource(Res.string.onboarding_discover_reminder_daily),
+            emoji = "\u2600\uFE0F", // ☀️
+            onClick = { onPresetSelected(ReminderPreset.DAILY) }
+        )
+        Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
+        ReminderPresetItem(
+            text = stringResource(Res.string.onboarding_discover_reminder_weekly),
+            emoji = "\uD83D\uDCC5", // 📅
+            onClick = { onPresetSelected(ReminderPreset.WEEKLY) }
+        )
+    }
+}
+
+@Composable
+private fun ReminderPresetItem(
+    text: String,
+    emoji: String,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(AppDimens.SpacingMd))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(AppDimens.SpacingMd),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(AppDimens.SpacingLg),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(text = emoji, style = MaterialTheme.typography.titleMedium)
+            Spacer(modifier = Modifier.width(AppDimens.SpacingMd))
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+    }
+}
+
+@Composable
+private fun WidgetInstructionSheetContent(
+    onDone: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
+            .padding(bottom = AppDimens.SpacingXl)
+    ) {
+        Text(
+            text = stringResource(Res.string.onboarding_discover_widget_sheet_title),
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(AppDimens.SpacingXl))
+
+        WidgetStep(number = 1, text = stringResource(Res.string.onboarding_discover_widget_step1))
+        Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
+        WidgetStep(number = 2, text = stringResource(Res.string.onboarding_discover_widget_step2))
+        Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
+        WidgetStep(number = 3, text = stringResource(Res.string.onboarding_discover_widget_step3))
+
+        Spacer(modifier = Modifier.height(AppDimens.SpacingXl))
+
+        AppButton(
+            text = stringResource(Res.string.onboarding_discover_widget_done),
+            onClick = onDone,
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
+@Composable
+private fun WidgetStep(
+    number: Int,
+    text: String
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .background(Blue50, RoundedCornerShape(16.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = number.toString(),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}

@@ -62,6 +62,33 @@
     <string name="onboarding_interactive_preview_subtitle">Personalized based on your choices</string>
     <string name="onboarding_interactive_preview_button">Save &amp; Continue</string>
 
+    <!-- Discover More Step -->
+    <string name="onboarding_discover_title">Your checklist is ready!</string>
+    <string name="onboarding_discover_subtitle">Make it work for you</string>
+
+    <string name="onboarding_discover_reminder_title">Set Up Reminders</string>
+    <string name="onboarding_discover_reminder_subtitle">Get reminded at the right time</string>
+    <string name="onboarding_discover_widget_title">Add Widget</string>
+    <string name="onboarding_discover_widget_subtitle">Quick access from home screen</string>
+    <string name="onboarding_discover_share_title">Share Checklist</string>
+    <string name="onboarding_discover_share_subtitle">Export or share instantly</string>
+
+    <string name="onboarding_discover_reminder_sheet_title">Quick Reminder</string>
+    <string name="onboarding_discover_reminder_tonight">Tonight, 9 PM</string>
+    <string name="onboarding_discover_reminder_daily">Daily, 9 AM</string>
+    <string name="onboarding_discover_reminder_weekly">Weekly, Monday</string>
+    <string name="onboarding_discover_reminder_custom">Custom…</string>
+    <string name="onboarding_discover_reminder_done">Reminder set!</string>
+
+    <string name="onboarding_discover_widget_sheet_title">Add Widget to Home Screen</string>
+    <string name="onboarding_discover_widget_step1">Long press on your home screen</string>
+    <string name="onboarding_discover_widget_step2">Tap \"Widgets\" and find Gisti</string>
+    <string name="onboarding_discover_widget_step3">Drag the widget to your home screen</string>
+    <string name="onboarding_discover_widget_done">Got it</string>
+
+    <string name="onboarding_discover_maybe_later">Maybe Later</string>
+    <string name="onboarding_discover_completed">%1$d of %2$d completed</string>
+
     <!-- Main Screen -->
     <string name="main_title">My Checklists</string>
     <string name="main_empty_title">Ready to get organized?</string>
