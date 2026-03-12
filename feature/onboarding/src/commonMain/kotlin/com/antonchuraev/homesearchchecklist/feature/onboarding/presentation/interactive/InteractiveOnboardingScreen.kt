@@ -89,51 +89,48 @@ fun InteractiveOnboardingScreen(
             .statusBarsPadding()
             .navigationBarsPadding()
     ) {
-        // Top bar — Back + Skip, hidden during Creating step
+        // Top bar — Back + Skip
         val showBack = state.currentStep != InteractiveOnboardingStep.CategorySelection
-            && state.currentStep != InteractiveOnboardingStep.Creating
 
-        if (state.currentStep != InteractiveOnboardingStep.Creating) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = AppDimens.SpacingXs),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (showBack) {
-                    IconButton(
-                        onClick = { viewModel.sendIntent(InteractiveOnboardingIntent.OnBack) }
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                } else {
-                    Spacer(modifier = Modifier.size(48.dp))
-                }
-
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(AppDimens.SpacingSm))
-                        .clickable { viewModel.sendIntent(InteractiveOnboardingIntent.OnSkip) }
-                        .padding(AppDimens.SpacingSm),
-                    verticalAlignment = Alignment.CenterVertically
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = AppDimens.SpacingXs),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (showBack) {
+                IconButton(
+                    onClick = { viewModel.sendIntent(InteractiveOnboardingIntent.OnBack) }
                 ) {
-                    Text(
-                        text = stringResource(Res.string.onboarding_skip),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                     Icon(
-                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+            } else {
+                Spacer(modifier = Modifier.size(48.dp))
+            }
+
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(AppDimens.SpacingSm))
+                    .clickable { viewModel.sendIntent(InteractiveOnboardingIntent.OnSkip) }
+                    .padding(AppDimens.SpacingSm),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(Res.string.onboarding_skip),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
 
