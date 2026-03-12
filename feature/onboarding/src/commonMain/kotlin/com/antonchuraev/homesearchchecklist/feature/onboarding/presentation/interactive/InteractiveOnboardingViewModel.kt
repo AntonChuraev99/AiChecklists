@@ -71,18 +71,39 @@ class InteractiveOnboardingViewModel(
     }
 
     private fun handleStyleSelected(style: OrganizingStyle) {
-        _screenState.update {
-            it.copy(
-                selectedStyle = style,
-                currentStep = InteractiveOnboardingStep.TemplateSelection
-            )
+        val currentState = _screenState.value
+        val categoryTemplates = currentState.availableTemplates
+
+        if (categoryTemplates.size == 1) {
+            val template = categoryTemplates.first()
+            val category = currentState.selectedCategory ?: return
+            val items = applyStyleToItems(template.items, style, category)
+            _screenState.update {
+                it.copy(
+                    selectedStyle = style,
+                    selectedTemplate = template,
+                    customizedItems = items.map { text -> CustomizableItem(text = text) },
+                    checklistName = template.name,
+                    wasTemplateStepSkipped = true,
+                    currentStep = InteractiveOnboardingStep.Customize
+                )
+            }
+            trackStep("style_selected", "style" to style.name)
+            trackStep("template_auto_selected", "template" to template.id)
+        } else {
+            _screenState.update {
+                it.copy(
+                    selectedStyle = style,
+                    currentStep = InteractiveOnboardingStep.TemplateSelection
+                )
+            }
+            trackStep("style_selected", "style" to style.name)
         }
-        trackStep("style_selected", "style" to style.name)
     }
 
     private fun handleTemplateSelected(template: ChecklistTemplate) {
         val style = _screenState.value.selectedStyle ?: OrganizingStyle.DETAILED
-        val category = _screenState.value.selectedCategory
+        val category = _screenState.value.selectedCategory ?: return
         val items = applyStyleToItems(template.items, style, category)
 
         _screenState.update {
@@ -99,7 +120,7 @@ class InteractiveOnboardingViewModel(
     private fun applyStyleToItems(
         items: List<String>,
         style: OrganizingStyle,
-        category: OnboardingCategory?
+        category: OnboardingCategory
     ): List<String> {
         return when (style) {
             OrganizingStyle.MINIMALIST -> items.take(5)
@@ -108,7 +129,7 @@ class InteractiveOnboardingViewModel(
         }
     }
 
-    private fun getExtraItems(category: OnboardingCategory?): List<String> {
+    private fun getExtraItems(category: OnboardingCategory): List<String> {
         return when (category) {
             OnboardingCategory.TRAVEL -> listOf(
                 "Download entertainment for offline",
@@ -140,7 +161,26 @@ class InteractiveOnboardingViewModel(
                 "Set reward for completion",
                 "Prepare a quiet study space"
             )
-            null -> emptyList()
+            OnboardingCategory.FITNESS -> listOf(
+                "Stretch before starting",
+                "Prepare a water bottle",
+                "Track your progress"
+            )
+            OnboardingCategory.COOKING -> listOf(
+                "Check pantry for ingredients",
+                "Preheat oven if needed",
+                "Clean as you go"
+            )
+            OnboardingCategory.FINANCE -> listOf(
+                "Review recent transactions",
+                "Set a savings target",
+                "Check subscription renewals"
+            )
+            OnboardingCategory.EVENTS -> listOf(
+                "Confirm guest count",
+                "Check weather forecast",
+                "Prepare a backup plan"
+            )
         }
     }
 
@@ -246,14 +286,21 @@ class InteractiveOnboardingViewModel(
                 }
             }
             InteractiveOnboardingStep.Customize -> {
+                val wasSkipped = _screenState.value.wasTemplateStepSkipped
                 _screenState.update {
                     it.copy(
-                        currentStep = InteractiveOnboardingStep.TemplateSelection,
+                        currentStep = if (wasSkipped) {
+                            InteractiveOnboardingStep.StyleSelection
+                        } else {
+                            InteractiveOnboardingStep.TemplateSelection
+                        },
+                        selectedStyle = if (wasSkipped) null else it.selectedStyle,
                         selectedTemplate = null,
                         customizedItems = emptyList(),
                         checklistName = "",
                         separateCompleted = false,
-                        autoDeleteCompleted = false
+                        autoDeleteCompleted = false,
+                        wasTemplateStepSkipped = false
                     )
                 }
             }

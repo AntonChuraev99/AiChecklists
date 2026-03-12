@@ -30,6 +30,9 @@ class TemplatesRepositoryImpl(
         "home" to "Home & Garden",
         "events" to "Events & Planning",
         "education" to "Education",
+        "fitness" to "Fitness",
+        "cooking" to "Cooking",
+        "finance" to "Finance",
         "other" to "Other"
     )
 

@@ -32,12 +32,16 @@
     <!-- Interactive Onboarding -->
     <string name="onboarding_interactive_category_title">What do you want to organize?</string>
     <string name="onboarding_interactive_category_subtitle">Pick one to get started</string>
-    <string name="onboarding_interactive_category_travel">Travel &amp; Events</string>
+    <string name="onboarding_interactive_category_travel">Travel</string>
     <string name="onboarding_interactive_category_home">Home &amp; Moving</string>
-    <string name="onboarding_interactive_category_shopping">Shopping &amp; Groceries</string>
+    <string name="onboarding_interactive_category_shopping">Shopping</string>
     <string name="onboarding_interactive_category_work">Work &amp; Projects</string>
-    <string name="onboarding_interactive_category_health">Health &amp; Fitness</string>
-    <string name="onboarding_interactive_category_education">Learning &amp; Education</string>
+    <string name="onboarding_interactive_category_health">Health</string>
+    <string name="onboarding_interactive_category_education">Education</string>
+    <string name="onboarding_interactive_category_fitness">Fitness</string>
+    <string name="onboarding_interactive_category_cooking">Cooking</string>
+    <string name="onboarding_interactive_category_finance">Finance</string>
+    <string name="onboarding_interactive_category_events">Events</string>
     <string name="onboarding_interactive_style_title">How do you prefer your lists?</string>
     <string name="onboarding_interactive_style_subtitle">This shapes your first checklist</string>
     <string name="onboarding_interactive_style_minimalist">Minimalist</string>

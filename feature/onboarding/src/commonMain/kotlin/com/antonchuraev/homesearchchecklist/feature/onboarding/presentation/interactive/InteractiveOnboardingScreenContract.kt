@@ -1,7 +1,11 @@
 package com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive
 
 import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.onboarding_interactive_category_cooking
 import aichecklists.core.designsystem.generated.resources.onboarding_interactive_category_education
+import aichecklists.core.designsystem.generated.resources.onboarding_interactive_category_events
+import aichecklists.core.designsystem.generated.resources.onboarding_interactive_category_finance
+import aichecklists.core.designsystem.generated.resources.onboarding_interactive_category_fitness
 import aichecklists.core.designsystem.generated.resources.onboarding_interactive_category_health
 import aichecklists.core.designsystem.generated.resources.onboarding_interactive_category_home
 import aichecklists.core.designsystem.generated.resources.onboarding_interactive_category_shopping
@@ -30,6 +34,7 @@ data class InteractiveOnboardingState(
     val autoDeleteCompleted: Boolean = false,
     val isCreatingChecklist: Boolean = false,
     val checklistCreated: Boolean = false,
+    val wasTemplateStepSkipped: Boolean = false,
     val error: String? = null
 ) : State
 
@@ -76,12 +81,16 @@ enum class OnboardingCategory(
     val templateCategories: List<String>,
     val preferredTemplateId: String
 ) {
-    TRAVEL(Res.string.onboarding_interactive_category_travel, "\u2708\uFE0F", listOf("travel", "events"), "travel_packing"),
+    TRAVEL(Res.string.onboarding_interactive_category_travel, "\u2708\uFE0F", listOf("travel"), "travel_packing"),
     HOME(Res.string.onboarding_interactive_category_home, "\uD83C\uDFE0", listOf("real_estate", "home"), "moving_house"),
     SHOPPING(Res.string.onboarding_interactive_category_shopping, "\uD83D\uDED2", listOf("shopping"), "grocery_essentials"),
     WORK(Res.string.onboarding_interactive_category_work, "\uD83D\uDCBC", listOf("work"), "meeting_prep"),
     HEALTH(Res.string.onboarding_interactive_category_health, "\uD83D\uDCAA", listOf("health"), "doctor_visit"),
-    EDUCATION(Res.string.onboarding_interactive_category_education, "\uD83D\uDCDA", listOf("education"), "study_plan")
+    EDUCATION(Res.string.onboarding_interactive_category_education, "\uD83D\uDCDA", listOf("education"), "study_plan"),
+    FITNESS(Res.string.onboarding_interactive_category_fitness, "\uD83C\uDFCB\uFE0F", listOf("fitness"), ""),
+    COOKING(Res.string.onboarding_interactive_category_cooking, "\uD83C\uDF73", listOf("cooking"), ""),
+    FINANCE(Res.string.onboarding_interactive_category_finance, "\uD83D\uDCB0", listOf("finance"), ""),
+    EVENTS(Res.string.onboarding_interactive_category_events, "\uD83C\uDF89", listOf("events"), "party_planning")
 }
 
 sealed interface InteractiveOnboardingIntent : Intent {
