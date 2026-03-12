@@ -8,14 +8,13 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -77,17 +76,19 @@ fun CategorySelectionStep(
             modifier = Modifier.fillMaxWidth()
         )
 
-        Spacer(modifier = Modifier.height(AppDimens.SpacingXxl))
+        Spacer(modifier = Modifier.height(AppDimens.SpacingXl))
 
-        // Category cards
-        Column(
+        FlowRow(
+            maxItemsInEachRow = 2,
+            horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd),
             verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
         ) {
             OnboardingCategory.entries.forEach { category ->
                 CategoryCard(
                     category = category,
                     isSelected = category == selectedCategory,
-                    onClick = { onCategorySelected(category) }
+                    onClick = { onCategorySelected(category) },
+                    modifier = Modifier.weight(1f)
                 )
             }
         }
@@ -104,7 +105,7 @@ private fun CategoryCard(
     modifier: Modifier = Modifier
 ) {
     val scale by animateFloatAsState(
-        targetValue = if (isSelected) 1.02f else 1f,
+        targetValue = if (isSelected) 1.01f else 1f,
         label = "card_scale"
     )
     val categoryTitle = stringResource(category.titleRes)
@@ -113,9 +114,8 @@ private fun CategoryCard(
 
     Card(
         modifier = modifier
-            .fillMaxWidth()
-            .graphicsLayer(scaleX = scale, scaleY = scale)
             .clip(shape)
+            .graphicsLayer(scaleX = scale, scaleY = scale)
             .clickable(onClick = onClick)
             .semantics { contentDescription = categoryTitle }
             .border(
@@ -137,20 +137,23 @@ private fun CategoryCard(
             }
         )
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 72.dp)
-                .padding(horizontal = AppDimens.SpacingLg, vertical = AppDimens.SpacingMd),
-            verticalAlignment = Alignment.CenterVertically
+                .heightIn(min = 96.dp)
+                .padding(vertical = AppDimens.SpacingMd),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
             Text(text = category.icon, fontSize = 28.sp)
-            Spacer(modifier = Modifier.width(AppDimens.SpacingLg))
+            Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
             Text(
                 text = categoryTitle,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
-                color = if (isSelected) Blue700 else MaterialTheme.colorScheme.onSurface
+                color = if (isSelected) Blue700 else MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
             )
         }
     }

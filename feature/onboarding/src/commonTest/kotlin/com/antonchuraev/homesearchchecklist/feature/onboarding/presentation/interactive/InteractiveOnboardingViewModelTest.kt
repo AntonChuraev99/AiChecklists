@@ -54,6 +54,14 @@ class InteractiveOnboardingViewModelTest {
         items = listOf("Passport", "Tickets", "Hotel booking", "Adapter", "Camera", "Charger", "Clothes")
     )
 
+    private val vacationTemplate = ChecklistTemplate(
+        id = "vacation_prep",
+        name = "Vacation Prep",
+        icon = "flight",
+        category = "travel",
+        items = listOf("Book flights", "Check passport", "Notify bank", "Pack bags")
+    )
+
     private val workTemplate = ChecklistTemplate(
         id = "meeting_prep",
         name = "Meeting Prep",
@@ -62,7 +70,7 @@ class InteractiveOnboardingViewModelTest {
         items = listOf("Agenda", "Slides", "Notes", "Recording setup")
     )
 
-    private val testTemplates = listOf(travelTemplate, workTemplate)
+    private val testTemplates = listOf(travelTemplate, vacationTemplate, workTemplate)
 
     @BeforeTest
     fun setup() {
@@ -120,6 +128,7 @@ class InteractiveOnboardingViewModelTest {
         assertEquals("", state.checklistName)
         assertFalse(state.isCreatingChecklist)
         assertFalse(state.checklistCreated)
+        assertFalse(state.wasTemplateStepSkipped)
     }
 
     @Test
@@ -203,6 +212,84 @@ class InteractiveOnboardingViewModelTest {
         val styleEvent = events.firstOrNull { it["step"] == "style_selected" }
         assertNotNull(styleEvent)
         assertEquals("CHAOTIC", styleEvent["style"])
+    }
+
+    // --- Auto-skip template selection (single template) ---
+
+    @Test
+    fun onStyleSelected_singleTemplate_autoSkipsToCustomize() = runTest {
+        val vm = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        vm.onIntent(InteractiveOnboardingIntent.OnCategorySelected(OnboardingCategory.WORK))
+        vm.onIntent(InteractiveOnboardingIntent.OnStyleSelected(OrganizingStyle.DETAILED))
+
+        val state = vm.screenState.value
+        assertEquals(InteractiveOnboardingStep.Customize, state.currentStep)
+        assertEquals(workTemplate, state.selectedTemplate)
+        assertEquals(workTemplate.items.size, state.customizedItems.size)
+        assertEquals("Meeting Prep", state.checklistName)
+    }
+
+    @Test
+    fun onStyleSelected_singleTemplate_setsWasTemplateStepSkipped() = runTest {
+        val vm = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        vm.onIntent(InteractiveOnboardingIntent.OnCategorySelected(OnboardingCategory.WORK))
+        vm.onIntent(InteractiveOnboardingIntent.OnStyleSelected(OrganizingStyle.DETAILED))
+
+        assertTrue(vm.screenState.value.wasTemplateStepSkipped)
+    }
+
+    @Test
+    fun onStyleSelected_multipleTemplates_doesNotAutoSkip() = runTest {
+        val vm = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        vm.onIntent(InteractiveOnboardingIntent.OnCategorySelected(OnboardingCategory.TRAVEL))
+        vm.onIntent(InteractiveOnboardingIntent.OnStyleSelected(OrganizingStyle.DETAILED))
+
+        val state = vm.screenState.value
+        assertEquals(InteractiveOnboardingStep.TemplateSelection, state.currentStep)
+        assertFalse(state.wasTemplateStepSkipped)
+        assertNull(state.selectedTemplate)
+    }
+
+    @Test
+    fun onStyleSelected_singleTemplate_tracksAutoSkipAnalytics() = runTest {
+        val vm = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        vm.onIntent(InteractiveOnboardingIntent.OnCategorySelected(OnboardingCategory.WORK))
+        vm.onIntent(InteractiveOnboardingIntent.OnStyleSelected(OrganizingStyle.MINIMALIST))
+
+        val events = fakeAnalyticsTracker.eventsNamed("onboarding_step_completed")
+        assertNotNull(events.firstOrNull { it["step"] == "style_selected" })
+        val autoEvent = events.firstOrNull { it["step"] == "template_auto_selected" }
+        assertNotNull(autoEvent)
+        assertEquals("meeting_prep", autoEvent["template"])
+    }
+
+    @Test
+    fun onBack_fromCustomize_whenSkipped_returnsToStyleAndClearsState() = runTest {
+        val vm = createViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        vm.onIntent(InteractiveOnboardingIntent.OnCategorySelected(OnboardingCategory.WORK))
+        vm.onIntent(InteractiveOnboardingIntent.OnStyleSelected(OrganizingStyle.DETAILED))
+        assertEquals(InteractiveOnboardingStep.Customize, vm.screenState.value.currentStep)
+        assertTrue(vm.screenState.value.wasTemplateStepSkipped)
+
+        vm.onIntent(InteractiveOnboardingIntent.OnBack)
+
+        val state = vm.screenState.value
+        assertEquals(InteractiveOnboardingStep.StyleSelection, state.currentStep)
+        assertNull(state.selectedStyle)
+        assertNull(state.selectedTemplate)
+        assertTrue(state.customizedItems.isEmpty())
+        assertEquals("", state.checklistName)
+        assertFalse(state.wasTemplateStepSkipped)
     }
 
     // --- Template selection & style application ---

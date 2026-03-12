@@ -109,8 +109,8 @@ private fun StyleCard(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 80.dp)
-            .graphicsLayer(scaleX = scale, scaleY = scale)
             .clip(shape)
+            .graphicsLayer(scaleX = scale, scaleY = scale)
             .clickable(onClick = onClick)
             .semantics { contentDescription = title }
             .border(
