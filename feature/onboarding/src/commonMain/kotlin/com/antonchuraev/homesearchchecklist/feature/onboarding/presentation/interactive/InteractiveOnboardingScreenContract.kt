@@ -26,6 +26,8 @@ data class InteractiveOnboardingState(
     val selectedTemplate: ChecklistTemplate? = null,
     val customizedItems: List<CustomizableItem> = emptyList(),
     val checklistName: String = "",
+    val separateCompleted: Boolean = false,
+    val autoDeleteCompleted: Boolean = false,
     val isCreatingChecklist: Boolean = false,
     val checklistCreated: Boolean = false,
     val error: String? = null
@@ -88,6 +90,8 @@ sealed interface InteractiveOnboardingIntent : Intent {
     data class OnTemplateSelected(val template: ChecklistTemplate) : InteractiveOnboardingIntent
     data class OnToggleItem(val index: Int) : InteractiveOnboardingIntent
     data class OnChecklistNameChanged(val name: String) : InteractiveOnboardingIntent
+    data object OnToggleSeparateCompleted : InteractiveOnboardingIntent
+    data object OnToggleAutoDeleteCompleted : InteractiveOnboardingIntent
     data object OnContinueFromCustomize : InteractiveOnboardingIntent
     data object OnCreatingComplete : InteractiveOnboardingIntent
     data object OnSaveChecklist : InteractiveOnboardingIntent

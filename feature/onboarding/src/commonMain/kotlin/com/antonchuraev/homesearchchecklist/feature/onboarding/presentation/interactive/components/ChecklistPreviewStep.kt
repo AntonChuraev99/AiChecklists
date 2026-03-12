@@ -7,6 +7,7 @@ import aichecklists.core.designsystem.generated.resources.onboarding_interactive
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -100,7 +101,7 @@ fun ChecklistPreviewStep(
             )
         ) {
             LazyColumn(
-                modifier = Modifier.padding(AppDimens.SpacingMd)
+                contentPadding = PaddingValues(AppDimens.SpacingMd)
             ) {
                 itemsIndexed(
                     items = items,

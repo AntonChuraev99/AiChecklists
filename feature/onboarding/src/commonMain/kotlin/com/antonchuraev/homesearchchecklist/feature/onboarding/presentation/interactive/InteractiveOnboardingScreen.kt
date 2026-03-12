@@ -184,11 +184,19 @@ fun InteractiveOnboardingScreen(
                 InteractiveOnboardingStep.Customize -> CustomizeStep(
                     items = state.customizedItems,
                     checklistName = state.checklistName,
+                    separateCompleted = state.separateCompleted,
+                    autoDeleteCompleted = state.autoDeleteCompleted,
                     onToggleItem = {
                         viewModel.sendIntent(InteractiveOnboardingIntent.OnToggleItem(it))
                     },
                     onNameChanged = {
                         viewModel.sendIntent(InteractiveOnboardingIntent.OnChecklistNameChanged(it))
+                    },
+                    onToggleSeparateCompleted = {
+                        viewModel.sendIntent(InteractiveOnboardingIntent.OnToggleSeparateCompleted)
+                    },
+                    onToggleAutoDeleteCompleted = {
+                        viewModel.sendIntent(InteractiveOnboardingIntent.OnToggleAutoDeleteCompleted)
                     },
                     onContinue = {
                         viewModel.sendIntent(InteractiveOnboardingIntent.OnContinueFromCustomize)

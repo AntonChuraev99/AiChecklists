@@ -43,6 +43,8 @@ class InteractiveOnboardingViewModel(
             is InteractiveOnboardingIntent.OnTemplateSelected -> handleTemplateSelected(intent.template)
             is InteractiveOnboardingIntent.OnToggleItem -> handleToggleItem(intent.index)
             is InteractiveOnboardingIntent.OnChecklistNameChanged -> handleChecklistNameChanged(intent.name)
+            InteractiveOnboardingIntent.OnToggleSeparateCompleted -> _screenState.update { it.copy(separateCompleted = !it.separateCompleted) }
+            InteractiveOnboardingIntent.OnToggleAutoDeleteCompleted -> _screenState.update { it.copy(autoDeleteCompleted = !it.autoDeleteCompleted) }
             InteractiveOnboardingIntent.OnContinueFromCustomize -> handleContinueFromCustomize()
             InteractiveOnboardingIntent.OnCreatingComplete -> handleCreatingComplete()
             InteractiveOnboardingIntent.OnSaveChecklist -> handleSaveChecklist()
@@ -177,7 +179,9 @@ class InteractiveOnboardingViewModel(
                     name = state.checklistName.ifBlank {
                         state.selectedTemplate?.name ?: "My Checklist"
                     },
-                    items = enabledItems.map { ChecklistItem(text = it.text) }
+                    items = enabledItems.map { ChecklistItem(text = it.text) },
+                    separateCompleted = state.separateCompleted,
+                    autoDeleteCompleted = state.autoDeleteCompleted
                 )
                 checklistRepository.addChecklist(checklist)
                 _screenState.update {
@@ -247,7 +251,9 @@ class InteractiveOnboardingViewModel(
                         currentStep = InteractiveOnboardingStep.TemplateSelection,
                         selectedTemplate = null,
                         customizedItems = emptyList(),
-                        checklistName = ""
+                        checklistName = "",
+                        separateCompleted = false,
+                        autoDeleteCompleted = false
                     )
                 }
             }
