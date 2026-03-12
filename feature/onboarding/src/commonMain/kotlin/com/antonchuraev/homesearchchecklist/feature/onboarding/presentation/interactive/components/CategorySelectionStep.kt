@@ -114,7 +114,6 @@ private fun CategoryCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = 72.dp)
             .graphicsLayer(scaleX = scale, scaleY = scale)
             .clip(shape)
             .clickable(onClick = onClick)
@@ -141,6 +140,7 @@ private fun CategoryCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .heightIn(min = 72.dp)
                 .padding(horizontal = AppDimens.SpacingLg, vertical = AppDimens.SpacingMd),
             verticalAlignment = Alignment.CenterVertically
         ) {
