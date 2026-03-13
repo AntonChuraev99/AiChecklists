@@ -93,6 +93,7 @@ fun InteractiveOnboardingScreen(
     ) {
         // Top bar — Back + Skip
         val showBack = state.currentStep != InteractiveOnboardingStep.CategorySelection
+                && state.currentStep != InteractiveOnboardingStep.DiscoverMore
 
         Row(
             modifier = Modifier
