@@ -27,7 +27,6 @@ kotlin {
             implementation(projects.core.common.api)
             implementation(projects.core.designsystem)
             implementation(projects.core.navigation.api)
-            implementation(projects.core.remoteconfig.api)
 
             implementation(projects.feature.checklist)
 

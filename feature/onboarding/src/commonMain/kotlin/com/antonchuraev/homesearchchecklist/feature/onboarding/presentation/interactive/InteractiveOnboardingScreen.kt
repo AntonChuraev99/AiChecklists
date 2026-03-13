@@ -66,6 +66,13 @@ fun InteractiveOnboardingScreen(
 
     val state by viewModel.screenState.collectAsState()
 
+    // System back = same as top bar back button
+    com.antonchuraev.homesearchchecklist.feature.onboarding.PlatformBackHandler(
+        enabled = true
+    ) {
+        viewModel.sendIntent(InteractiveOnboardingIntent.OnBack)
+    }
+
     // Lazy PaywallViewModel — only instantiated at paywall step
     val paywallViewModel: PaywallViewModel? =
         if (state.currentStep == InteractiveOnboardingStep.Paywall) {
@@ -217,8 +224,14 @@ fun InteractiveOnboardingScreen(
                 )
                 InteractiveOnboardingStep.ChecklistPreview -> ChecklistPreviewStep(
                     checklistName = state.checklistName,
-                    items = state.customizedItems.filter { it.isEnabled },
+                    previewItems = state.preview.items,
+                    originalItemCount = state.preview.originalItemCount,
+                    separateCompleted = state.separateCompleted,
+                    autoDeleteCompleted = state.autoDeleteCompleted,
                     isCreating = state.isCreatingChecklist,
+                    onItemToggle = { itemId ->
+                        viewModel.sendIntent(InteractiveOnboardingIntent.OnPreviewItemToggle(itemId))
+                    },
                     onSave = { viewModel.sendIntent(InteractiveOnboardingIntent.OnSaveChecklist) }
                 )
                 InteractiveOnboardingStep.DiscoverMore -> DiscoverMoreStep(

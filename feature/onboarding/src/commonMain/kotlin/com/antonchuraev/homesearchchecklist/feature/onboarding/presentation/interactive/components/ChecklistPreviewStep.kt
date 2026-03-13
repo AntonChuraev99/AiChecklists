@@ -1,13 +1,22 @@
 package com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive.components
 
 import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.collapse
+import aichecklists.core.designsystem.generated.resources.completed_count
+import aichecklists.core.designsystem.generated.resources.expand
 import aichecklists.core.designsystem.generated.resources.onboarding_interactive_preview_button
 import aichecklists.core.designsystem.generated.resources.onboarding_interactive_preview_subtitle
 import aichecklists.core.designsystem.generated.resources.onboarding_interactive_preview_title
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.layout.Column
+import aichecklists.core.designsystem.generated.resources.onboarding_preview_all_checked
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,40 +26,55 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.CheckBoxOutlineBlank
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
-import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive.CustomizableItem
-import kotlinx.coroutines.delay
+import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive.PreviewChecklistItem
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun ChecklistPreviewStep(
     checklistName: String,
-    items: List<CustomizableItem>,
+    previewItems: List<PreviewChecklistItem>,
+    originalItemCount: Int,
+    separateCompleted: Boolean,
+    autoDeleteCompleted: Boolean,
     isCreating: Boolean,
+    onItemToggle: (String) -> Unit,
     onSave: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val uncheckedItems = remember(previewItems, separateCompleted) {
+        if (separateCompleted) previewItems.filter { !it.isChecked }
+        else previewItems
+    }
+    val completedItems = remember(previewItems, separateCompleted) {
+        if (separateCompleted) previewItems.filter { it.isChecked }
+        else emptyList()
+    }
+    var completedExpanded by remember { mutableStateOf(true) }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -91,26 +115,52 @@ fun ChecklistPreviewStep(
 
         Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
 
-        // Staggered animated items
-        Card(
+        // Interactive items list
+        LazyColumn(
             modifier = Modifier.fillMaxWidth().weight(1f),
-            shape = RoundedCornerShape(AppDimens.SpacingMd),
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            )
+            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
+            contentPadding = PaddingValues(bottom = AppDimens.SpacingSm)
         ) {
-            LazyColumn(
-                contentPadding = PaddingValues(AppDimens.SpacingMd)
-            ) {
-                itemsIndexed(
-                    items = items,
-                    key = { index, _ -> index }
-                ) { index, item ->
-                    AnimatedChecklistItem(
-                        text = item.text,
-                        delayMs = index * 80L
+            // Unchecked items (or all when separateCompleted is off)
+            if (uncheckedItems.isEmpty() && completedItems.isEmpty()) {
+                item(key = "all_checked") {
+                    AllCheckedMessage()
+                }
+            }
+
+            items(
+                items = uncheckedItems,
+                key = { it.id }
+            ) { item ->
+                PreviewItemCard(
+                    item = item,
+                    onToggle = { onItemToggle(item.id) },
+                    modifier = Modifier.animateItem()
+                )
+            }
+
+            // Completed section
+            if (separateCompleted && completedItems.isNotEmpty()) {
+                item(key = "completed_header") {
+                    CompletedSectionHeader(
+                        completedCount = completedItems.size,
+                        expanded = completedExpanded,
+                        onToggle = { completedExpanded = !completedExpanded },
+                        modifier = Modifier.animateItem()
                     )
+                }
+
+                if (completedExpanded) {
+                    items(
+                        items = completedItems,
+                        key = { it.id }
+                    ) { item ->
+                        PreviewItemCard(
+                            item = item,
+                            onToggle = { onItemToggle(item.id) },
+                            modifier = Modifier.animateItem()
+                        )
+                    }
                 }
             }
         }
@@ -130,36 +180,96 @@ fun ChecklistPreviewStep(
 }
 
 @Composable
-private fun AnimatedChecklistItem(
-    text: String,
-    delayMs: Long,
+private fun PreviewItemCard(
+    item: PreviewChecklistItem,
+    onToggle: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val alpha = remember { Animatable(0f) }
-
-    LaunchedEffect(Unit) {
-        delay(delayMs)
-        alpha.animateTo(1f, animationSpec = tween(300))
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable { onToggle() },
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = AppDimens.CardElevation)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(AppDimens.CardPadding),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // KMP double-toggle bug: onCheckedChange = null, Row handles click
+            Checkbox(
+                checked = item.isChecked,
+                onCheckedChange = null
+            )
+            Spacer(modifier = Modifier.width(AppDimens.SpacingSm))
+            Text(
+                text = item.text,
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (item.isChecked) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
+                textDecoration = if (item.isChecked) TextDecoration.LineThrough else null,
+                modifier = Modifier.weight(1f)
+            )
+        }
     }
+}
 
+@Composable
+private fun CompletedSectionHeader(
+    completedCount: Int,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .alpha(alpha.value)
-            .padding(vertical = 6.dp),
+            .clickable { onToggle() }
+            .padding(vertical = AppDimens.SpacingSm),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
-            imageVector = Icons.Outlined.CheckBoxOutlineBlank,
+            imageVector = Icons.Filled.CheckCircle,
             contentDescription = null,
-            modifier = Modifier.size(20.dp),
-            tint = MaterialTheme.colorScheme.outline
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp)
         )
-        Spacer(modifier = Modifier.width(AppDimens.SpacingMd))
+        Spacer(modifier = Modifier.width(AppDimens.SpacingSm))
         Text(
-            text = text,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface
+            text = stringResource(Res.string.completed_count, completedCount),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f)
+        )
+        Icon(
+            imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+            contentDescription = if (expanded) {
+                stringResource(Res.string.collapse)
+            } else {
+                stringResource(Res.string.expand)
+            },
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
+}
+
+@Composable
+private fun AllCheckedMessage() {
+    Text(
+        text = stringResource(Res.string.onboarding_preview_all_checked),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.Center,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = AppDimens.SpacingXl)
+    )
 }

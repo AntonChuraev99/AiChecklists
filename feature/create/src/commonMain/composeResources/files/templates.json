@@ -1,0 +1,897 @@
+{
+  "templates": [
+    {
+      "id": "apartment_viewing",
+      "name": "Apartment Viewing",
+      "description": "Check everything before signing a lease",
+      "icon": "apartment",
+      "category": "real_estate",
+      "items": [
+        "Check water pressure in kitchen and bathroom",
+        "Test all light switches and electrical outlets",
+        "Look for signs of water damage or mold",
+        "Check window conditions and seals",
+        "Test heating and cooling systems",
+        "Inspect flooring for damage",
+        "Check storage space and closets",
+        "Note noise levels from neighbors/street",
+        "Verify included appliances work",
+        "Check cell phone signal strength"
+      ]
+    },
+    {
+      "id": "house_inspection",
+      "name": "House Inspection",
+      "description": "Thorough home inspection guide",
+      "icon": "home",
+      "category": "real_estate",
+      "items": [
+        "Check roof condition and gutters",
+        "Inspect foundation for cracks",
+        "Test plumbing in all bathrooms",
+        "Check electrical panel and wiring",
+        "Inspect HVAC system and filters",
+        "Look for pest damage or infestation",
+        "Check attic insulation",
+        "Inspect basement for moisture",
+        "Test garage door operation",
+        "Verify property boundaries"
+      ]
+    },
+    {
+      "id": "rental_agreement",
+      "name": "Rental Agreement Review",
+      "description": "Review key terms before signing",
+      "icon": "description",
+      "category": "real_estate",
+      "items": [
+        "Read lease terms carefully",
+        "Check deposit amount and conditions",
+        "Review pet and guest policies",
+        "Note maintenance responsibilities",
+        "Confirm move-in and move-out dates",
+        "Check utility payment arrangements",
+        "Document existing damages with photos",
+        "Review early termination clause",
+        "Confirm parking and storage details",
+        "Save landlord contact information"
+      ]
+    },
+    {
+      "id": "home_buying",
+      "name": "Home Buying Checklist",
+      "description": "Navigate the home purchase process",
+      "icon": "real_estate_agent",
+      "category": "real_estate",
+      "items": [
+        "Get mortgage pre-approval",
+        "Set a realistic budget range",
+        "Research neighborhoods and schools",
+        "Schedule property viewings",
+        "Hire a home inspector",
+        "Review property title and history",
+        "Compare insurance quotes",
+        "Plan for closing costs",
+        "Schedule final walkthrough",
+        "Sign closing documents"
+      ]
+    },
+    {
+      "id": "travel_packing",
+      "name": "Travel Packing",
+      "description": "Never forget essentials again",
+      "icon": "luggage",
+      "category": "travel",
+      "items": [
+        "Passport and travel documents",
+        "Phone charger and power bank",
+        "Toiletries and medications",
+        "Weather-appropriate clothing",
+        "Comfortable walking shoes",
+        "Travel adapter if needed",
+        "Headphones and entertainment",
+        "Snacks for the journey",
+        "Copy of hotel reservations",
+        "Travel insurance documents"
+      ]
+    },
+    {
+      "id": "vacation_prep",
+      "name": "Vacation Preparation",
+      "description": "Get ready before your trip",
+      "icon": "flight_takeoff",
+      "category": "travel",
+      "items": [
+        "Book flights and accommodation",
+        "Arrange airport transfer",
+        "Check passport validity",
+        "Apply for visa if required",
+        "Notify bank of travel dates",
+        "Set up out-of-office replies",
+        "Arrange pet care if needed",
+        "Stop mail and newspaper delivery",
+        "Check weather at destination",
+        "Download offline maps"
+      ]
+    },
+    {
+      "id": "road_trip",
+      "name": "Road Trip Essentials",
+      "description": "Hit the road fully prepared",
+      "icon": "directions_car",
+      "category": "travel",
+      "items": [
+        "Check tire pressure and oil level",
+        "Plan route and download offline maps",
+        "Pack snacks and water bottles",
+        "Prepare a road trip playlist",
+        "Charge all devices and bring chargers",
+        "Pack a first aid kit",
+        "Check roadside assistance coverage",
+        "Bring cash for tolls",
+        "Pack comfortable pillows and blankets",
+        "Share itinerary with someone"
+      ]
+    },
+    {
+      "id": "business_trip",
+      "name": "Business Trip",
+      "description": "Travel for work without stress",
+      "icon": "business_center",
+      "category": "travel",
+      "items": [
+        "Confirm flight and hotel reservations",
+        "Pack business attire and accessories",
+        "Print or save meeting agenda",
+        "Charge laptop and bring adapters",
+        "Pack business cards",
+        "Set out-of-office email reply",
+        "Research local restaurants for dinners",
+        "Download expense tracking app",
+        "Confirm ground transportation",
+        "Back up important presentations"
+      ]
+    },
+    {
+      "id": "camping_trip",
+      "name": "Camping Trip",
+      "description": "Enjoy the outdoors prepared",
+      "icon": "forest",
+      "category": "travel",
+      "items": [
+        "Reserve campsite in advance",
+        "Pack tent and sleeping bags",
+        "Bring camping stove and fuel",
+        "Pack flashlights and extra batteries",
+        "Prepare a meal plan",
+        "Bring water purification supplies",
+        "Pack insect repellent and sunscreen",
+        "Bring a first aid kit",
+        "Check weather forecast",
+        "Pack garbage bags for cleanup"
+      ]
+    },
+    {
+      "id": "grocery_essentials",
+      "name": "Grocery Essentials",
+      "description": "Weekly shopping basics",
+      "icon": "shopping_cart",
+      "category": "shopping",
+      "items": [
+        "Bread and bakery items",
+        "Milk and dairy products",
+        "Fresh fruits and vegetables",
+        "Meat or protein alternatives",
+        "Eggs",
+        "Rice, pasta, or grains",
+        "Cooking oil",
+        "Salt and basic spices",
+        "Coffee or tea",
+        "Cleaning supplies"
+      ]
+    },
+    {
+      "id": "wardrobe_update",
+      "name": "Wardrobe Season Update",
+      "description": "Refresh your closet smartly",
+      "icon": "checkroom",
+      "category": "shopping",
+      "items": [
+        "Review current wardrobe for gaps",
+        "Decide on a color palette",
+        "Check for essential basics needed",
+        "Set a shopping budget",
+        "Research current trends",
+        "Try on items before buying",
+        "Check fabric and care labels",
+        "Look for versatile pieces",
+        "Compare prices across stores",
+        "Donate items you no longer wear"
+      ]
+    },
+    {
+      "id": "electronics_purchase",
+      "name": "Electronics Purchase Guide",
+      "description": "Make smart tech decisions",
+      "icon": "devices",
+      "category": "shopping",
+      "items": [
+        "Define your primary use case",
+        "Set a budget range",
+        "Research and compare models",
+        "Read user reviews and ratings",
+        "Check warranty and return policy",
+        "Compare prices across retailers",
+        "Verify compatibility with existing devices",
+        "Check for upcoming sales or discounts",
+        "Review accessories included",
+        "Keep receipt and warranty documents"
+      ]
+    },
+    {
+      "id": "gift_shopping",
+      "name": "Gift Shopping List",
+      "description": "Find perfect gifts for everyone",
+      "icon": "card_giftcard",
+      "category": "shopping",
+      "items": [
+        "Make a list of recipients",
+        "Set a budget per person",
+        "Note interests and preferences",
+        "Check for wish lists",
+        "Consider handmade or personalized gifts",
+        "Buy gift wrap and cards",
+        "Order early for shipping",
+        "Keep receipts for exchanges",
+        "Track what you've already purchased",
+        "Set aside time for wrapping"
+      ]
+    },
+    {
+      "id": "meeting_prep",
+      "name": "Meeting Preparation",
+      "description": "Run effective meetings",
+      "icon": "groups",
+      "category": "work",
+      "items": [
+        "Review meeting agenda",
+        "Prepare presentation materials",
+        "Test video conferencing setup",
+        "Gather relevant documents",
+        "Prepare questions to ask",
+        "Review attendee list",
+        "Set up meeting room or link",
+        "Send reminder to participants",
+        "Prepare notes template",
+        "Have backup plan for tech issues"
+      ]
+    },
+    {
+      "id": "project_launch",
+      "name": "Project Launch",
+      "description": "Launch projects successfully",
+      "icon": "rocket_launch",
+      "category": "work",
+      "items": [
+        "Complete final testing",
+        "Update documentation",
+        "Prepare launch announcement",
+        "Brief support team",
+        "Set up monitoring alerts",
+        "Create rollback plan",
+        "Schedule launch window",
+        "Notify stakeholders",
+        "Archive previous version",
+        "Celebrate with team"
+      ]
+    },
+    {
+      "id": "job_interview",
+      "name": "Job Interview Prep",
+      "description": "Land your dream job",
+      "icon": "work",
+      "category": "work",
+      "items": [
+        "Research the company thoroughly",
+        "Review the job description",
+        "Prepare answers to common questions",
+        "Plan your outfit the night before",
+        "Print copies of your resume",
+        "Prepare questions to ask interviewer",
+        "Plan your route and timing",
+        "Practice a confident introduction",
+        "Bring a notepad and pen",
+        "Send a thank-you email after"
+      ]
+    },
+    {
+      "id": "first_day_job",
+      "name": "First Day at New Job",
+      "description": "Start strong at your new workplace",
+      "icon": "badge",
+      "category": "work",
+      "items": [
+        "Confirm start time and location",
+        "Prepare professional outfit",
+        "Bring necessary documents and ID",
+        "Pack lunch and snacks",
+        "Arrive 15 minutes early",
+        "Introduce yourself to colleagues",
+        "Set up your workstation",
+        "Review onboarding materials",
+        "Note key contacts and resources",
+        "Write down questions as they arise"
+      ]
+    },
+    {
+      "id": "weekly_review",
+      "name": "Weekly Work Review",
+      "description": "Reflect and plan ahead",
+      "icon": "event_note",
+      "category": "work",
+      "items": [
+        "Review completed tasks this week",
+        "Check progress on ongoing projects",
+        "Update task priorities for next week",
+        "Clear and organize your inbox",
+        "Review upcoming deadlines",
+        "Follow up on pending items",
+        "Update project documentation",
+        "Reflect on what went well",
+        "Identify areas for improvement",
+        "Plan key goals for next week"
+      ]
+    },
+    {
+      "id": "party_planning",
+      "name": "Party Planning",
+      "description": "Host memorable events",
+      "icon": "celebration",
+      "category": "events",
+      "items": [
+        "Create guest list",
+        "Send invitations",
+        "Plan menu and drinks",
+        "Order or bake cake",
+        "Buy decorations",
+        "Arrange music playlist",
+        "Plan activities or games",
+        "Confirm RSVPs",
+        "Prepare venue setup",
+        "Buy party supplies"
+      ]
+    },
+    {
+      "id": "moving_house",
+      "name": "Moving House",
+      "description": "Stress-free relocation guide",
+      "icon": "local_shipping",
+      "category": "events",
+      "items": [
+        "Book moving company",
+        "Start packing non-essentials",
+        "Change address with post office",
+        "Update address with bank/bills",
+        "Cancel or transfer utilities",
+        "Clean old residence",
+        "Take meter readings",
+        "Collect all keys",
+        "Unpack essentials first",
+        "Meet new neighbors"
+      ]
+    },
+    {
+      "id": "wedding_prep",
+      "name": "Wedding Preparation",
+      "description": "Plan your perfect day",
+      "icon": "favorite",
+      "category": "events",
+      "items": [
+        "Set a wedding budget",
+        "Choose and book the venue",
+        "Send save-the-date notices",
+        "Select wedding party members",
+        "Book photographer and videographer",
+        "Plan the menu and cake",
+        "Choose flowers and decorations",
+        "Send formal invitations",
+        "Arrange transportation",
+        "Plan rehearsal dinner"
+      ]
+    },
+    {
+      "id": "birthday_party",
+      "name": "Birthday Party Planning",
+      "description": "Throw a memorable celebration",
+      "icon": "cake",
+      "category": "events",
+      "items": [
+        "Choose a date and venue",
+        "Create a guest list",
+        "Send invitations",
+        "Plan a theme or decorations",
+        "Order or bake a cake",
+        "Plan activities and games",
+        "Prepare a playlist",
+        "Buy party supplies and favors",
+        "Arrange food and drinks",
+        "Prepare a camera for photos"
+      ]
+    },
+    {
+      "id": "holiday_prep",
+      "name": "Holiday Season Prep",
+      "description": "Get ready for the holidays",
+      "icon": "holiday_village",
+      "category": "events",
+      "items": [
+        "Set a holiday budget",
+        "Plan gift list and budget per person",
+        "Decorate the home",
+        "Plan holiday meals and menus",
+        "Send holiday cards or greetings",
+        "Schedule family gatherings",
+        "Shop for gifts early",
+        "Wrap and label all gifts",
+        "Plan travel arrangements",
+        "Prepare for year-end tasks"
+      ]
+    },
+    {
+      "id": "doctor_visit",
+      "name": "Doctor Visit Prep",
+      "description": "Make the most of your visit",
+      "icon": "medical_services",
+      "category": "health",
+      "items": [
+        "List current symptoms",
+        "Note when symptoms started",
+        "Bring current medications list",
+        "Prepare questions to ask",
+        "Bring insurance information",
+        "Bring ID documents",
+        "List allergies",
+        "Note family medical history",
+        "Write down recent test results",
+        "Bring someone for support if needed"
+      ]
+    },
+    {
+      "id": "morning_routine",
+      "name": "Morning Wellness Routine",
+      "description": "Start each day feeling great",
+      "icon": "wb_sunny",
+      "category": "health",
+      "items": [
+        "Drink a glass of water",
+        "Stretch or do light exercise",
+        "Eat a balanced breakfast",
+        "Take vitamins and supplements",
+        "Practice mindfulness or meditation",
+        "Review your daily goals",
+        "Prepare a healthy lunch",
+        "Apply sunscreen",
+        "Check in with your mood",
+        "Step outside for fresh air"
+      ]
+    },
+    {
+      "id": "medication_tracker",
+      "name": "Medication Tracker",
+      "description": "Stay on top of your medications",
+      "icon": "medication",
+      "category": "health",
+      "items": [
+        "List all current medications",
+        "Note dosage for each medication",
+        "Set daily reminder alarms",
+        "Check for drug interactions",
+        "Track refill dates",
+        "Note any side effects",
+        "Keep pharmacy contact handy",
+        "Store medications properly",
+        "Bring medication list to appointments",
+        "Review with doctor regularly"
+      ]
+    },
+    {
+      "id": "dental_visit",
+      "name": "Dental Visit Prep",
+      "description": "Prepare for your dental appointment",
+      "icon": "dentistry",
+      "category": "health",
+      "items": [
+        "Confirm appointment date and time",
+        "Brush and floss before visit",
+        "Bring insurance card",
+        "List any dental concerns",
+        "Note any medication changes",
+        "Prepare questions for dentist",
+        "Arrive 15 minutes early",
+        "Update medical history form",
+        "Ask about next cleaning date",
+        "Schedule follow-up if needed"
+      ]
+    },
+    {
+      "id": "study_plan",
+      "name": "Study Plan",
+      "description": "Organize your learning goals",
+      "icon": "school",
+      "category": "education",
+      "items": [
+        "Review course syllabus",
+        "Set weekly study goals",
+        "Gather textbooks and materials",
+        "Create study schedule",
+        "Join study group or forum",
+        "Complete practice exercises",
+        "Review notes before class",
+        "Prepare questions for instructor",
+        "Track assignment deadlines",
+        "Review and summarize key concepts"
+      ]
+    },
+    {
+      "id": "exam_prep",
+      "name": "Exam Preparation",
+      "description": "Ace your next exam",
+      "icon": "quiz",
+      "category": "education",
+      "items": [
+        "Gather all study materials",
+        "Create a study schedule",
+        "Review lecture notes and highlights",
+        "Practice with past exams",
+        "Form or join a study group",
+        "Prepare summary sheets",
+        "Get enough sleep the night before",
+        "Prepare exam supplies",
+        "Review key formulas and concepts",
+        "Arrive early on exam day"
+      ]
+    },
+    {
+      "id": "research_paper",
+      "name": "Research Paper Checklist",
+      "description": "Write a great paper step by step",
+      "icon": "edit_document",
+      "category": "education",
+      "items": [
+        "Choose and narrow your topic",
+        "Research and gather sources",
+        "Create an outline",
+        "Write a thesis statement",
+        "Draft the introduction",
+        "Write body paragraphs with citations",
+        "Write the conclusion",
+        "Format bibliography correctly",
+        "Proofread and edit for errors",
+        "Submit before the deadline"
+      ]
+    },
+    {
+      "id": "online_course",
+      "name": "Online Course Tracker",
+      "description": "Complete your course on time",
+      "icon": "computer",
+      "category": "education",
+      "items": [
+        "Set up your learning environment",
+        "Review the course syllabus",
+        "Create a weekly study schedule",
+        "Complete assigned readings",
+        "Watch all lecture videos",
+        "Take notes on key concepts",
+        "Participate in discussions",
+        "Complete assignments on time",
+        "Review and prepare for quizzes",
+        "Track your overall progress"
+      ]
+    },
+    {
+      "id": "spring_cleaning",
+      "name": "Spring Cleaning",
+      "description": "Refresh your living space",
+      "icon": "cleaning_services",
+      "category": "home",
+      "items": [
+        "Deep clean kitchen appliances",
+        "Wash windows inside and out",
+        "Clean behind furniture",
+        "Organize and declutter closets",
+        "Shampoo carpets or rugs",
+        "Clean light fixtures",
+        "Wash curtains and blinds",
+        "Clean out garage/storage",
+        "Service HVAC system",
+        "Check smoke detectors"
+      ]
+    },
+    {
+      "id": "weekly_cleaning",
+      "name": "Weekly Cleaning Routine",
+      "description": "Keep your home fresh and tidy",
+      "icon": "mop",
+      "category": "home",
+      "items": [
+        "Vacuum all floors and carpets",
+        "Mop kitchen and bathroom floors",
+        "Clean kitchen counters and appliances",
+        "Scrub bathroom surfaces",
+        "Dust shelves and furniture",
+        "Change bed linens",
+        "Take out trash and recycling",
+        "Wipe mirrors and glass surfaces",
+        "Organize cluttered areas",
+        "Do laundry and put away clothes"
+      ]
+    },
+    {
+      "id": "home_maintenance",
+      "name": "Seasonal Home Maintenance",
+      "description": "Protect your home year-round",
+      "icon": "handyman",
+      "category": "home",
+      "items": [
+        "Inspect roof and gutters",
+        "Check HVAC filters",
+        "Test smoke and CO detectors",
+        "Inspect plumbing for leaks",
+        "Clean dryer vent",
+        "Check weather stripping on doors",
+        "Service lawn mower or snow blower",
+        "Inspect exterior paint and siding",
+        "Clean refrigerator coils",
+        "Flush water heater"
+      ]
+    },
+    {
+      "id": "move_in",
+      "name": "New Home Move-In",
+      "description": "Settle into your new place",
+      "icon": "home_work",
+      "category": "home",
+      "items": [
+        "Change locks and set up security",
+        "Deep clean before unpacking",
+        "Set up utilities and internet",
+        "Update your address everywhere",
+        "Meet your neighbors",
+        "Locate main water shutoff",
+        "Check all light fixtures work",
+        "Stock essential cleaning supplies",
+        "Unpack essentials box first",
+        "Take photos of initial condition"
+      ]
+    },
+    {
+      "id": "gym_workout",
+      "name": "Gym Workout Routine",
+      "description": "Maximize your gym session",
+      "icon": "fitness_center",
+      "category": "fitness",
+      "items": [
+        "Warm up for 10 minutes",
+        "Complete upper body exercises",
+        "Complete lower body exercises",
+        "Do core strengthening exercises",
+        "Stretch all major muscle groups",
+        "Track weights and reps",
+        "Stay hydrated throughout",
+        "Wipe down equipment after use",
+        "Cool down and stretch",
+        "Log your workout"
+      ]
+    },
+    {
+      "id": "running_prep",
+      "name": "Running Preparation",
+      "description": "Get ready for a great run",
+      "icon": "directions_run",
+      "category": "fitness",
+      "items": [
+        "Check weather and dress accordingly",
+        "Lace up proper running shoes",
+        "Do dynamic warm-up stretches",
+        "Plan your running route",
+        "Start with a warm-up jog",
+        "Maintain steady pace",
+        "Stay hydrated",
+        "Cool down with a walk",
+        "Do post-run stretches",
+        "Log your distance and time"
+      ]
+    },
+    {
+      "id": "yoga_session",
+      "name": "Yoga Session Plan",
+      "description": "Find your balance and peace",
+      "icon": "self_improvement",
+      "category": "fitness",
+      "items": [
+        "Set up your yoga mat",
+        "Begin with breathing exercises",
+        "Do gentle warm-up poses",
+        "Practice standing poses",
+        "Move to balance poses",
+        "Do seated stretches",
+        "Practice backbends",
+        "Include hip openers",
+        "End with savasana relaxation",
+        "Reflect on your practice"
+      ]
+    },
+    {
+      "id": "home_workout",
+      "name": "Home Workout",
+      "description": "Stay fit without a gym",
+      "icon": "exercise",
+      "category": "fitness",
+      "items": [
+        "Clear space and lay out mat",
+        "Do 5-minute warm-up",
+        "Complete bodyweight exercises",
+        "Do cardio intervals",
+        "Add resistance band exercises",
+        "Focus on core exercises",
+        "Include flexibility work",
+        "Stay hydrated",
+        "Cool down and stretch",
+        "Track your progress"
+      ]
+    },
+    {
+      "id": "dinner_party_menu",
+      "name": "Dinner Party Menu",
+      "description": "Impress your guests with a great meal",
+      "icon": "restaurant",
+      "category": "cooking",
+      "items": [
+        "Decide on a cuisine theme",
+        "Plan appetizers and starters",
+        "Choose main course and sides",
+        "Select a dessert",
+        "Plan drinks and beverages",
+        "Make a shopping list",
+        "Prep ingredients in advance",
+        "Set the table",
+        "Plan the cooking timeline",
+        "Prepare a backup dish"
+      ]
+    },
+    {
+      "id": "meal_prep",
+      "name": "Weekly Meal Prep",
+      "description": "Save time with batch cooking",
+      "icon": "kitchen",
+      "category": "cooking",
+      "items": [
+        "Plan meals for the week",
+        "Check pantry and fridge inventory",
+        "Create a grocery list",
+        "Shop for ingredients",
+        "Wash and chop vegetables",
+        "Cook grains and proteins in batch",
+        "Portion meals into containers",
+        "Label containers with dates",
+        "Store properly in fridge or freezer",
+        "Prepare grab-and-go snacks"
+      ]
+    },
+    {
+      "id": "baking_day",
+      "name": "Baking Day Checklist",
+      "description": "Bake with confidence",
+      "icon": "bakery_dining",
+      "category": "cooking",
+      "items": [
+        "Choose recipes to bake",
+        "Check ingredient availability",
+        "Preheat oven to correct temperature",
+        "Gather all tools and equipment",
+        "Measure ingredients precisely",
+        "Follow recipe steps carefully",
+        "Set timers for each batch",
+        "Cool baked goods properly",
+        "Decorate or glaze if needed",
+        "Store in airtight containers"
+      ]
+    },
+    {
+      "id": "kitchen_essentials",
+      "name": "Kitchen Essentials",
+      "description": "Keep your kitchen well-stocked",
+      "icon": "countertops",
+      "category": "cooking",
+      "items": [
+        "Stock cooking oils and vinegars",
+        "Restock spices and herbs",
+        "Check flour and sugar supply",
+        "Buy fresh fruits and vegetables",
+        "Restock dairy and eggs",
+        "Check cleaning supplies",
+        "Replace worn kitchen tools",
+        "Organize pantry shelves",
+        "Check expiration dates",
+        "Restock foil, wrap, and bags"
+      ]
+    },
+    {
+      "id": "monthly_budget",
+      "name": "Monthly Budget Review",
+      "description": "Take control of your finances",
+      "icon": "account_balance_wallet",
+      "category": "finance",
+      "items": [
+        "Review last month's spending",
+        "Categorize all expenses",
+        "Compare spending vs. budget",
+        "Identify areas to cut back",
+        "Set savings goal for the month",
+        "Plan for upcoming large expenses",
+        "Review subscriptions and memberships",
+        "Update budget spreadsheet",
+        "Set up automatic savings transfer",
+        "Review progress on financial goals"
+      ]
+    },
+    {
+      "id": "tax_preparation",
+      "name": "Tax Preparation",
+      "description": "File your taxes stress-free",
+      "icon": "receipt_long",
+      "category": "finance",
+      "items": [
+        "Gather all income statements",
+        "Collect deduction receipts",
+        "Review last year's tax return",
+        "Organize charitable donations",
+        "Gather investment statements",
+        "Check for available tax credits",
+        "Review health insurance documents",
+        "Prepare home office deductions",
+        "File or schedule with accountant",
+        "Set aside money for payment"
+      ]
+    },
+    {
+      "id": "investment_review",
+      "name": "Investment Review",
+      "description": "Grow your wealth wisely",
+      "icon": "trending_up",
+      "category": "finance",
+      "items": [
+        "Review portfolio performance",
+        "Check asset allocation balance",
+        "Review investment fees",
+        "Assess risk tolerance",
+        "Research new opportunities",
+        "Rebalance if needed",
+        "Check dividend reinvestment",
+        "Review retirement contributions",
+        "Update beneficiary information",
+        "Document investment decisions"
+      ]
+    },
+    {
+      "id": "financial_goals",
+      "name": "Financial Goals Tracker",
+      "description": "Plan your financial future",
+      "icon": "savings",
+      "category": "finance",
+      "items": [
+        "Define short-term savings goals",
+        "Set long-term investment targets",
+        "Create an emergency fund plan",
+        "Track debt repayment progress",
+        "Review insurance coverage",
+        "Plan for major purchases",
+        "Set retirement savings target",
+        "Review estate planning",
+        "Check credit score",
+        "Schedule quarterly review"
+      ]
+    }
+  ]
+}
