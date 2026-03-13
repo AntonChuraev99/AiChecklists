@@ -1,27 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive.components
 
 import aichecklists.core.designsystem.generated.resources.Res
-import aichecklists.core.designsystem.generated.resources.onboarding_discover_completed
-import aichecklists.core.designsystem.generated.resources.onboarding_discover_maybe_later
-import aichecklists.core.designsystem.generated.resources.onboarding_discover_reminder_daily
-import aichecklists.core.designsystem.generated.resources.onboarding_discover_reminder_done
-import aichecklists.core.designsystem.generated.resources.onboarding_discover_reminder_sheet_title
-import aichecklists.core.designsystem.generated.resources.onboarding_discover_reminder_subtitle
-import aichecklists.core.designsystem.generated.resources.onboarding_discover_reminder_title
-import aichecklists.core.designsystem.generated.resources.onboarding_discover_reminder_tonight
-import aichecklists.core.designsystem.generated.resources.onboarding_discover_reminder_weekly
-import aichecklists.core.designsystem.generated.resources.onboarding_discover_share_subtitle
-import aichecklists.core.designsystem.generated.resources.onboarding_discover_share_title
-import aichecklists.core.designsystem.generated.resources.onboarding_discover_subtitle
-import aichecklists.core.designsystem.generated.resources.onboarding_discover_title
-import aichecklists.core.designsystem.generated.resources.onboarding_discover_widget_done
-import aichecklists.core.designsystem.generated.resources.onboarding_discover_widget_sheet_title
-import aichecklists.core.designsystem.generated.resources.onboarding_discover_widget_step1
-import aichecklists.core.designsystem.generated.resources.onboarding_discover_widget_step2
-import aichecklists.core.designsystem.generated.resources.onboarding_discover_widget_step3
-import aichecklists.core.designsystem.generated.resources.onboarding_discover_widget_subtitle
-import aichecklists.core.designsystem.generated.resources.onboarding_discover_widget_title
-import aichecklists.core.designsystem.generated.resources.onboarding_continue
+import aichecklists.core.designsystem.generated.resources.*
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -71,36 +51,33 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderDateTimePicker
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderSheet
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderSheetCallbacks
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderSheetState
 import com.antonchuraev.homesearchchecklist.feature.onboarding.isWidgetSupported
 import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive.DiscoverMoreState
-import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive.ReminderPreset
+import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive.InteractiveOnboardingIntent
 import com.antonchuraev.homesearchchecklist.feature.onboarding.rememberNotificationPermissionRequester
 import com.antonchuraev.homesearchchecklist.feature.sharing.presentation.share.ShareLauncher
 import org.jetbrains.compose.resources.stringResource
 
 private val Blue50 = Color(0xFFE3F2FD)
 
-private enum class DiscoverSheet {
-    REMINDER, WIDGET
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DiscoverMoreStep(
     state: DiscoverMoreState,
-    onReminderPreset: (ReminderPreset) -> Unit,
-    onWidgetDone: () -> Unit,
-    onShareCompleted: () -> Unit,
-    onContinue: () -> Unit,
+    onIntent: (InteractiveOnboardingIntent) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var activeSheet by remember { mutableStateOf<DiscoverSheet?>(null) }
+    var showWidgetSheet by remember { mutableStateOf(false) }
     var triggerShare by remember { mutableStateOf(false) }
 
-    // Notification permission requester
+    // Notification permission requester — opens reminder sheet on grant
     val requestNotificationPermission = rememberNotificationPermissionRequester { granted ->
         if (granted) {
-            activeSheet = DiscoverSheet.REMINDER
+            onIntent(InteractiveOnboardingIntent.OnReminderClick)
         }
     }
 
@@ -111,7 +88,7 @@ fun DiscoverMoreStep(
             pdfFilePath = null,
             onShareComplete = {
                 triggerShare = false
-                onShareCompleted()
+                onIntent(InteractiveOnboardingIntent.OnShareCompleted)
             }
         )
     }
@@ -191,7 +168,7 @@ fun DiscoverMoreStep(
                 isCompleted = state.widgetCompleted,
                 onClick = {
                     if (!state.widgetCompleted) {
-                        activeSheet = DiscoverSheet.WIDGET
+                        showWidgetSheet = true
                     }
                 }
             )
@@ -216,40 +193,69 @@ fun DiscoverMoreStep(
 
         AppButton(
             text = stringResource(Res.string.onboarding_continue),
-            onClick = onContinue,
+            onClick = { onIntent(InteractiveOnboardingIntent.OnDiscoverMoreContinue) },
             modifier = Modifier.fillMaxWidth()
         )
 
         Spacer(modifier = Modifier.height(AppDimens.SpacingLg))
     }
 
-    // Reminder bottom sheet
-    if (activeSheet == DiscoverSheet.REMINDER) {
-        ModalBottomSheet(
-            onDismissRequest = { activeSheet = null },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-
-        ) {
-            QuickReminderSheetContent(
-                onPresetSelected = { preset ->
-                    activeSheet = null
-                    onReminderPreset(preset)
-                }
+    // Shared Reminder bottom sheet
+    if (state.showReminderSheet) {
+        ReminderSheet(
+            state = ReminderSheetState(
+                activeTab = state.activeReminderTab,
+                currentReminder = state.currentReminder,
+                currentRepeatRule = state.currentRepeatRule,
+                repeatRuleSummary = state.repeatRuleSummary,
+                pendingRepeatConfig = state.pendingRepeatConfig,
+                showEndConditionPicker = state.showEndConditionPicker
+            ),
+            callbacks = ReminderSheetCallbacks(
+                onTabSelected = { onIntent(InteractiveOnboardingIntent.OnReminderTabSelected(it)) },
+                onPresetSelected = { onIntent(InteractiveOnboardingIntent.OnReminderPresetSelected(it)) },
+                onCustomDateRequested = { onIntent(InteractiveOnboardingIntent.OnCustomDateRequested) },
+                onRemoveReminder = { onIntent(InteractiveOnboardingIntent.OnRemoveReminder) },
+                onRepeatTypeSelected = { onIntent(InteractiveOnboardingIntent.OnRepeatTypeSelected(it)) },
+                onSmartPresetSelected = { onIntent(InteractiveOnboardingIntent.OnSmartPresetSelected(it)) },
+                onRepeatIntervalChanged = { onIntent(InteractiveOnboardingIntent.OnRepeatIntervalChanged(it)) },
+                onWeekDayToggled = { onIntent(InteractiveOnboardingIntent.OnWeekDayToggled(it)) },
+                onResetChecksToggled = { onIntent(InteractiveOnboardingIntent.OnResetChecksToggled(it)) },
+                onRepeatTimeChanged = { h, m -> onIntent(InteractiveOnboardingIntent.OnRepeatTimeChanged(h, m)) },
+                onEndConditionClick = { onIntent(InteractiveOnboardingIntent.OnEndConditionClick) },
+                onEndConditionSelected = { onIntent(InteractiveOnboardingIntent.OnEndConditionSelected(it)) },
+                onDismissEndCondition = { onIntent(InteractiveOnboardingIntent.OnDismissEndConditionPicker) },
+                onSaveRepeat = { onIntent(InteractiveOnboardingIntent.OnSaveRepeatSchedule) },
+                onRemoveRepeat = { onIntent(InteractiveOnboardingIntent.OnRemoveRepeatSchedule) },
+                onDismiss = { onIntent(InteractiveOnboardingIntent.OnDismissReminderUI) }
             )
-        }
+        )
+    }
+
+    // Custom date/time picker
+    if (state.showCustomPicker) {
+        ReminderDateTimePicker(
+            selectedDateMillis = state.customPickerDateMillis,
+            minDateMillis = state.customPickerMinDateMillis,
+            initialHour = state.customPickerInitialHour,
+            isTimeInPast = state.isCustomTimeInPast,
+            onDateSelected = { onIntent(InteractiveOnboardingIntent.OnDateSelected(it)) },
+            onTimeChanged = { h, m -> onIntent(InteractiveOnboardingIntent.OnCustomTimeChanged(h, m)) },
+            onTimeSelected = { h, m -> onIntent(InteractiveOnboardingIntent.OnTimeSelected(h, m)) },
+            onDismiss = { onIntent(InteractiveOnboardingIntent.OnDismissReminderUI) }
+        )
     }
 
     // Widget instruction bottom sheet
-    if (activeSheet == DiscoverSheet.WIDGET) {
+    if (showWidgetSheet) {
         ModalBottomSheet(
-            onDismissRequest = { activeSheet = null },
+            onDismissRequest = { showWidgetSheet = false },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-
         ) {
             WidgetInstructionSheetContent(
                 onDone = {
-                    activeSheet = null
-                    onWidgetDone()
+                    showWidgetSheet = false
+                    onIntent(InteractiveOnboardingIntent.OnWidgetInstructionDone)
                 }
             )
         }
@@ -345,81 +351,6 @@ private fun ActionCard(
                     modifier = Modifier.size(24.dp)
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun QuickReminderSheetContent(
-    onPresetSelected: (ReminderPreset) -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
-            .padding(bottom = AppDimens.SpacingXl)
-    ) {
-        Text(
-            text = stringResource(Res.string.onboarding_discover_reminder_sheet_title),
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(AppDimens.SpacingXl))
-
-        ReminderPresetItem(
-            text = stringResource(Res.string.onboarding_discover_reminder_tonight),
-            emoji = "\uD83C\uDF19", // 🌙
-            onClick = { onPresetSelected(ReminderPreset.TONIGHT) }
-        )
-        Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
-        ReminderPresetItem(
-            text = stringResource(Res.string.onboarding_discover_reminder_daily),
-            emoji = "\u2600\uFE0F", // ☀️
-            onClick = { onPresetSelected(ReminderPreset.DAILY) }
-        )
-        Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
-        ReminderPresetItem(
-            text = stringResource(Res.string.onboarding_discover_reminder_weekly),
-            emoji = "\uD83D\uDCC5", // 📅
-            onClick = { onPresetSelected(ReminderPreset.WEEKLY) }
-        )
-    }
-}
-
-@Composable
-private fun ReminderPresetItem(
-    text: String,
-    emoji: String,
-    onClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(AppDimens.SpacingMd))
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(AppDimens.SpacingMd),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(AppDimens.SpacingLg),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(text = emoji, style = MaterialTheme.typography.titleMedium)
-            Spacer(modifier = Modifier.width(AppDimens.SpacingMd))
-            Text(
-                text = text,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
         }
     }
 }

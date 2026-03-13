@@ -61,8 +61,8 @@ docs/
 SECURITY.md
 SECURITY_DELIVERY_SUMMARY.txt
 
-# Generated/vendored stubs (not project source)
-commonMain/
+# Generated/vendored stubs in root (not project source)
+/commonMain/
 
 # Temp images in root (move to proper location)
 *.png

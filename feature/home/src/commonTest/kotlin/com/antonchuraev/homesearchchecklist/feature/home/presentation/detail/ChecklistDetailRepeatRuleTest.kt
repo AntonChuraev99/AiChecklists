@@ -16,6 +16,8 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Remin
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatEndCondition
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatType
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.PendingRepeatConfig
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderTab
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.LoginResult
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallOffering
@@ -807,6 +809,7 @@ class ChecklistDetailRepeatRuleTest {
         override fun navigateToPaywall(source: String) { lastPaywallSource = source }
         override fun navigateToSubscriptionStatus(showSuccessMessage: Boolean) {}
         override fun navigateToShareChecklist(checklistId: Long) {}
+        override fun navigateToInteractiveOnboarding() {}
     }
 
     private class FakeRemoteConfigProvider : RemoteConfigProvider {

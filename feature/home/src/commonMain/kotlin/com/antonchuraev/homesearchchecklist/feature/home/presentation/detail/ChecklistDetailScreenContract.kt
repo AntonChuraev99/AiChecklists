@@ -5,12 +5,11 @@ import com.antonchuraev.homesearchchecklist.core.common.api.State
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
-import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatEndCondition
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatType
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.PendingRepeatConfig
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderTab
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.UserLimits
-
-enum class ReminderTab { ONCE, REPEAT }
 
 /**
  * Holds a recently deleted item so it can be restored via undo snackbar.
@@ -21,29 +20,6 @@ data class UndoableDeleteItem(
     val originalFillIndex: Int,
     val originalChecklistIndex: Int,
 )
-
-/**
- * Groups all mutable repeat configuration fields into a single object.
- * Null when repeat tab is not active; non-null with defaults when open.
- */
-data class PendingRepeatConfig(
-    val type: RepeatType = RepeatType.DAILY,
-    val interval: Int = 1,
-    val weekDays: Set<Int> = emptySet(),
-    val endCondition: RepeatEndCondition = RepeatEndCondition.Never,
-    val resetChecks: Boolean = false,
-    val isCustom: Boolean = false,
-    val timeHour: Int = 9,
-    val timeMinute: Int = 0
-) {
-    fun toRule(): ReminderRepeatRule = ReminderRepeatRule(
-        type = type,
-        interval = interval,
-        weekDays = weekDays.takeIf { it.isNotEmpty() && type == RepeatType.WEEKLY },
-        endCondition = endCondition,
-        resetChecks = resetChecks
-    )
-}
 
 sealed interface ChecklistDetailState : State {
     data object Loading : ChecklistDetailState

@@ -819,18 +819,20 @@ class InteractiveOnboardingViewModelTest {
     @Test
     fun onReminderPresetSelected_marksReminderCompleted() = runTest {
         val vm = createViewModelAtDiscoverMore()
+        val futureMillis = com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis() + 3_600_000L
 
-        vm.onIntent(InteractiveOnboardingIntent.OnReminderPresetSelected(ReminderPreset.TONIGHT))
+        vm.onIntent(InteractiveOnboardingIntent.OnReminderPresetSelected(futureMillis))
         testDispatcher.scheduler.advanceUntilIdle()
 
         assertTrue(vm.screenState.value.discoverMore.reminderCompleted)
     }
 
     @Test
-    fun onReminderPresetSelected_tonight_schedulesOneShot() = runTest {
+    fun onReminderPresetSelected_schedulesOneShot() = runTest {
         val vm = createViewModelAtDiscoverMore()
+        val futureMillis = com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis() + 3_600_000L
 
-        vm.onIntent(InteractiveOnboardingIntent.OnReminderPresetSelected(ReminderPreset.TONIGHT))
+        vm.onIntent(InteractiveOnboardingIntent.OnReminderPresetSelected(futureMillis))
         testDispatcher.scheduler.advanceUntilIdle()
 
         assertEquals(1, fakeReminderScheduler.scheduleReminderCalls.size)
@@ -838,36 +840,26 @@ class InteractiveOnboardingViewModelTest {
     }
 
     @Test
-    fun onReminderPresetSelected_daily_schedulesRepeat() = runTest {
+    fun onSaveRepeatSchedule_schedulesRepeat() = runTest {
         val vm = createViewModelAtDiscoverMore()
-
-        vm.onIntent(InteractiveOnboardingIntent.OnReminderPresetSelected(ReminderPreset.DAILY))
+        // Switch to REPEAT tab to init pendingRepeatConfig
+        vm.onIntent(InteractiveOnboardingIntent.OnReminderTabSelected(
+            com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderTab.REPEAT
+        ))
+        vm.onIntent(InteractiveOnboardingIntent.OnSaveRepeatSchedule)
         testDispatcher.scheduler.advanceUntilIdle()
 
         assertEquals(0, fakeReminderScheduler.scheduleReminderCalls.size)
         assertEquals(1, fakeReminderScheduler.scheduleRepeatCalls.size)
-    }
-
-    @Test
-    fun onReminderPresetSelected_weekly_schedulesRepeat() = runTest {
-        val vm = createViewModelAtDiscoverMore()
-
-        vm.onIntent(InteractiveOnboardingIntent.OnReminderPresetSelected(ReminderPreset.WEEKLY))
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        assertEquals(0, fakeReminderScheduler.scheduleReminderCalls.size)
-        assertEquals(1, fakeReminderScheduler.scheduleRepeatCalls.size)
+        assertTrue(vm.screenState.value.discoverMore.reminderCompleted)
     }
 
     @Test
     fun onReminderPresetSelected_noChecklistId_isNoOp() = runTest {
-        // Create VM at customize (no checklist saved yet, no createdChecklistId)
         val vm = createViewModelAtCustomize()
-        // Force step to DiscoverMore without saving (edge case guard test)
-        // Since we can't set step directly, test the guard via the handler:
-        // If createdChecklistId is null, handleReminderPreset should return early
-        // The VM at customize has no createdChecklistId
-        vm.onIntent(InteractiveOnboardingIntent.OnReminderPresetSelected(ReminderPreset.TONIGHT))
+        val futureMillis = com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis() + 3_600_000L
+
+        vm.onIntent(InteractiveOnboardingIntent.OnReminderPresetSelected(futureMillis))
         testDispatcher.scheduler.advanceUntilIdle()
 
         assertEquals(0, fakeReminderScheduler.scheduleReminderCalls.size)
@@ -908,14 +900,15 @@ class InteractiveOnboardingViewModelTest {
     @Test
     fun onReminderPresetSelected_tracksAnalytics() = runTest {
         val vm = createViewModelAtDiscoverMore()
+        val futureMillis = com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis() + 3_600_000L
 
-        vm.onIntent(InteractiveOnboardingIntent.OnReminderPresetSelected(ReminderPreset.DAILY))
+        vm.onIntent(InteractiveOnboardingIntent.OnReminderPresetSelected(futureMillis))
         testDispatcher.scheduler.advanceUntilIdle()
 
         val events = fakeAnalyticsTracker.eventsNamed("onboarding_step_completed")
         val reminderEvent = events.firstOrNull { it["step"] == "discover_more_reminder" }
         assertNotNull(reminderEvent)
-        assertEquals("DAILY", reminderEvent["preset"])
+        assertEquals("once", reminderEvent["type"])
     }
 
     // --- Test doubles ---

@@ -15,6 +15,11 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Repea
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatType
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.PendingRepeatConfig
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderTab
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.buildRepeatSummary
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.combinePickerResults
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.resolvePresetName
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetUserLimitsUseCase
 import kotlinx.datetime.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -817,50 +822,6 @@ class ChecklistDetailViewModel(
         updateContentState { state ->
             val current = state.pendingRepeatConfig ?: PendingRepeatConfig()
             state.copy(pendingRepeatConfig = update(current))
-        }
-    }
-
-    private fun buildRepeatSummary(config: PendingRepeatConfig): String {
-        return when (config.type) {
-            RepeatType.DAILY -> if (config.interval == 1) "Every day" else "Every ${config.interval} days"
-            RepeatType.WEEKLY -> {
-                if (config.weekDays.isNotEmpty()) {
-                    val dayNames = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
-                    val selected = config.weekDays.sorted().map { dayNames[it - 1] }
-                    if (selected == listOf("Mon", "Tue", "Wed", "Thu", "Fri")) {
-                        "Mon–Fri"
-                    } else {
-                        selected.joinToString(", ")
-                    }
-                } else if (config.interval == 1) {
-                    "Every week"
-                } else {
-                    "Every ${config.interval} weeks"
-                }
-            }
-            RepeatType.MONTHLY -> if (config.interval == 1) "Every month" else "Every ${config.interval} months"
-            RepeatType.YEARLY -> if (config.interval == 1) "Every year" else "Every ${config.interval} years"
-        }
-    }
-
-    /**
-     * Map a [PendingRepeatConfig] to a preset analytics name.
-     * Returns "custom" when [isCustom] is true or the config does not match any known preset.
-     */
-    private fun resolvePresetName(config: PendingRepeatConfig): String {
-        if (config.isCustom) return "custom"
-        return when {
-            config.type == RepeatType.DAILY && config.interval == 1 -> "daily"
-            config.type == RepeatType.WEEKLY && config.interval == 1
-                && config.weekDays == setOf(1, 2, 3, 4, 5) -> "weekdays"
-            config.type == RepeatType.WEEKLY && config.interval == 1
-                && config.weekDays.isEmpty() -> "weekly"
-            config.type == RepeatType.WEEKLY && config.interval == 2
-                && config.weekDays.isEmpty() -> "biweekly"
-            config.type == RepeatType.MONTHLY && config.interval == 1 -> "monthly"
-            config.type == RepeatType.MONTHLY && config.interval == 3 -> "quarterly"
-            config.type == RepeatType.YEARLY && config.interval == 1 -> "yearly"
-            else -> "custom"
         }
     }
 
