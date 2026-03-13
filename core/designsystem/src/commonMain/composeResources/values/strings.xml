@@ -59,8 +59,9 @@
     <string name="onboarding_interactive_creating_title">Creating your checklist…</string>
     <string name="onboarding_interactive_creating_social">12,000+ checklists created with Gisti</string>
     <string name="onboarding_interactive_preview_title">Your checklist is ready!</string>
-    <string name="onboarding_interactive_preview_subtitle">Personalized based on your choices</string>
+    <string name="onboarding_interactive_preview_subtitle">Tap items to check them off</string>
     <string name="onboarding_interactive_preview_button">Save &amp; Continue</string>
+    <string name="onboarding_preview_all_checked">All checked off!</string>
 
     <!-- Discover More Step -->
     <string name="onboarding_discover_title">Your checklist is ready!</string>

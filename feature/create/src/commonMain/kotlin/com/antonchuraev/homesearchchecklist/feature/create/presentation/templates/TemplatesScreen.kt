@@ -23,22 +23,55 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Apartment
+import androidx.compose.material.icons.filled.Badge
+import androidx.compose.material.icons.filled.BakeryDining
+import androidx.compose.material.icons.filled.BusinessCenter
+import androidx.compose.material.icons.filled.Cake
+import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material.icons.filled.Celebration
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Checkroom
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Computer
+import androidx.compose.material.icons.filled.Countertops
+import androidx.compose.material.icons.filled.Devices
+import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.FlightTakeoff
+import androidx.compose.material.icons.filled.Forest
 import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.Handyman
+import androidx.compose.material.icons.filled.HealthAndSafety
+import androidx.compose.material.icons.filled.HolidayVillage
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.HomeWork
+import androidx.compose.material.icons.filled.Kitchen
 import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.Luggage
 import androidx.compose.material.icons.filled.MedicalServices
+import androidx.compose.material.icons.filled.Medication
+import androidx.compose.material.icons.filled.Quiz
+import androidx.compose.material.icons.filled.RealEstateAgent
+import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.RocketLaunch
+import androidx.compose.material.icons.filled.Savings
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SelfImprovement
 import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.WbSunny
+import androidx.compose.material.icons.filled.Work
+import androidx.compose.material.icons.automirrored.filled.DirectionsRun
+import androidx.compose.material.icons.automirrored.filled.EventNote
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material3.CircularProgressIndicator
@@ -410,21 +443,68 @@ private fun TemplateCard(
 }
 
 /**
- * Maps icon name from Remote Config to Material Icon.
+ * Maps icon name from template JSON to Material Icon.
  */
 private fun getIconForTemplate(iconName: String): ImageVector {
     return when (iconName.lowercase()) {
+        // Real Estate
         "apartment" -> Icons.Default.Apartment
         "home" -> Icons.Default.Home
+        "description" -> Icons.Outlined.Description
+        "real_estate_agent" -> Icons.Default.RealEstateAgent
+        // Travel
         "luggage" -> Icons.Default.Luggage
         "flight_takeoff" -> Icons.Default.FlightTakeoff
+        "directions_car" -> Icons.Default.DirectionsCar
+        "business_center" -> Icons.Default.BusinessCenter
+        "forest" -> Icons.Default.Forest
+        // Shopping
         "shopping_cart" -> Icons.Default.ShoppingCart
+        "checkroom" -> Icons.Default.Checkroom
+        "devices" -> Icons.Default.Devices
+        "card_giftcard" -> Icons.Default.CardGiftcard
+        // Work
         "groups" -> Icons.Default.Groups
         "rocket_launch" -> Icons.Default.RocketLaunch
+        "work" -> Icons.Default.Work
+        "badge" -> Icons.Default.Badge
+        "event_note" -> Icons.AutoMirrored.Filled.EventNote
+        // Events
         "celebration" -> Icons.Default.Celebration
         "local_shipping" -> Icons.Default.LocalShipping
+        "favorite" -> Icons.Default.Favorite
+        "cake" -> Icons.Default.Cake
+        "holiday_village" -> Icons.Default.HolidayVillage
+        // Health
         "medical_services" -> Icons.Default.MedicalServices
+        "wb_sunny" -> Icons.Default.WbSunny
+        "medication" -> Icons.Default.Medication
+        "dentistry" -> Icons.Default.HealthAndSafety
+        // Education
+        "school" -> Icons.Default.School
+        "quiz" -> Icons.Default.Quiz
+        "edit_document" -> Icons.Default.EditNote
+        "computer" -> Icons.Default.Computer
+        // Home
         "cleaning_services" -> Icons.Default.CleaningServices
+        "mop" -> Icons.Default.CleaningServices
+        "handyman" -> Icons.Default.Handyman
+        "home_work" -> Icons.Default.HomeWork
+        // Fitness
+        "fitness_center" -> Icons.Default.FitnessCenter
+        "directions_run" -> Icons.AutoMirrored.Filled.DirectionsRun
+        "self_improvement" -> Icons.Default.SelfImprovement
+        "exercise" -> Icons.Default.FitnessCenter
+        // Cooking
+        "restaurant" -> Icons.Default.Restaurant
+        "kitchen" -> Icons.Default.Kitchen
+        "bakery_dining" -> Icons.Default.BakeryDining
+        "countertops" -> Icons.Default.Countertops
+        // Finance
+        "account_balance_wallet" -> Icons.Default.AccountBalanceWallet
+        "receipt_long" -> Icons.AutoMirrored.Filled.ReceiptLong
+        "trending_up" -> Icons.AutoMirrored.Filled.TrendingUp
+        "savings" -> Icons.Default.Savings
         else -> Icons.Default.Check
     }
 }
@@ -442,6 +522,10 @@ private fun getIconBackgroundColor(category: String): Color {
         "events" -> Color(0xFFFFEBEE) // Light red
         "health" -> Color(0xFFE0F7FA) // Light cyan
         "home" -> Color(0xFFFFFDE7) // Light yellow
+        "education" -> Color(0xFFE8EAF6) // Light indigo
+        "fitness" -> Color(0xFFFCE4EC) // Light pink
+        "cooking" -> Color(0xFFFFF8E1) // Light amber
+        "finance" -> Color(0xFFE0F2F1) // Light teal
         else -> MaterialTheme.colorScheme.primaryContainer
     }
 }
@@ -459,6 +543,10 @@ private fun getIconColor(category: String): Color {
         "events" -> Color(0xFFC62828) // Red
         "health" -> Color(0xFF00838F) // Cyan
         "home" -> Color(0xFFF9A825) // Yellow/Amber
+        "education" -> Color(0xFF303F9F) // Indigo
+        "fitness" -> Color(0xFFC2185B) // Pink
+        "cooking" -> Color(0xFFFF8F00) // Amber
+        "finance" -> Color(0xFF00695C) // Teal
         else -> MaterialTheme.colorScheme.primary
     }
 }

@@ -41,9 +41,21 @@ data class InteractiveOnboardingState(
     val checklistCreated: Boolean = false,
     val wasTemplateStepSkipped: Boolean = false,
     val createdChecklistId: Long? = null,
+    val preview: PreviewState = PreviewState(),
     val discoverMore: DiscoverMoreState = DiscoverMoreState(),
     val error: String? = null
 ) : State
+
+data class PreviewState(
+    val items: List<PreviewChecklistItem> = emptyList(),
+    val originalItemCount: Int = 0
+)
+
+data class PreviewChecklistItem(
+    val id: String,
+    val text: String,
+    val isChecked: Boolean = false
+)
 
 data class DiscoverMoreState(
     val reminderCompleted: Boolean = false,
@@ -116,9 +128,9 @@ enum class OnboardingCategory(
     WORK(Res.string.onboarding_interactive_category_work, "\uD83D\uDCBC", listOf("work"), "meeting_prep"),
     HEALTH(Res.string.onboarding_interactive_category_health, "\uD83D\uDCAA", listOf("health"), "doctor_visit"),
     EDUCATION(Res.string.onboarding_interactive_category_education, "\uD83D\uDCDA", listOf("education"), "study_plan"),
-    FITNESS(Res.string.onboarding_interactive_category_fitness, "\uD83C\uDFCB\uFE0F", listOf("fitness"), ""),
-    COOKING(Res.string.onboarding_interactive_category_cooking, "\uD83C\uDF73", listOf("cooking"), ""),
-    FINANCE(Res.string.onboarding_interactive_category_finance, "\uD83D\uDCB0", listOf("finance"), ""),
+    FITNESS(Res.string.onboarding_interactive_category_fitness, "\uD83C\uDFCB\uFE0F", listOf("fitness"), "gym_workout"),
+    COOKING(Res.string.onboarding_interactive_category_cooking, "\uD83C\uDF73", listOf("cooking"), "meal_prep"),
+    FINANCE(Res.string.onboarding_interactive_category_finance, "\uD83D\uDCB0", listOf("finance"), "monthly_budget"),
     EVENTS(Res.string.onboarding_interactive_category_events, "\uD83C\uDF89", listOf("events"), "party_planning")
 }
 
@@ -133,6 +145,7 @@ sealed interface InteractiveOnboardingIntent : Intent {
     data object OnContinueFromCustomize : InteractiveOnboardingIntent
     data object OnCreatingComplete : InteractiveOnboardingIntent
     data object OnSaveChecklist : InteractiveOnboardingIntent
+    data class OnPreviewItemToggle(val itemId: String) : InteractiveOnboardingIntent
     data object OnSkip : InteractiveOnboardingIntent
     data object OnBack : InteractiveOnboardingIntent
 

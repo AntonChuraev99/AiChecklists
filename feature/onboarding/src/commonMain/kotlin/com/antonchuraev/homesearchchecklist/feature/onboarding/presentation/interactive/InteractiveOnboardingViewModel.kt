@@ -58,6 +58,7 @@ class InteractiveOnboardingViewModel(
             InteractiveOnboardingIntent.OnToggleAutoDeleteCompleted -> _screenState.update { it.copy(autoDeleteCompleted = !it.autoDeleteCompleted) }
             InteractiveOnboardingIntent.OnContinueFromCustomize -> handleContinueFromCustomize()
             InteractiveOnboardingIntent.OnCreatingComplete -> handleCreatingComplete()
+            is InteractiveOnboardingIntent.OnPreviewItemToggle -> handlePreviewItemToggle(intent.itemId)
             InteractiveOnboardingIntent.OnSaveChecklist -> handleSaveChecklist()
             InteractiveOnboardingIntent.OnSkip -> handleSkip()
             InteractiveOnboardingIntent.OnBack -> handleBack()
@@ -311,7 +312,41 @@ class InteractiveOnboardingViewModel(
     }
 
     private fun handleCreatingComplete() {
-        _screenState.update { it.copy(currentStep = InteractiveOnboardingStep.ChecklistPreview) }
+        val state = _screenState.value
+        val previewItems = state.customizedItems
+            .filter { it.isEnabled }
+            .mapIndexed { index, item ->
+                PreviewChecklistItem(id = "preview_$index", text = item.text)
+            }
+        _screenState.update {
+            it.copy(
+                currentStep = InteractiveOnboardingStep.ChecklistPreview,
+                preview = PreviewState(
+                    items = previewItems,
+                    originalItemCount = previewItems.size
+                )
+            )
+        }
+    }
+
+    private fun handlePreviewItemToggle(itemId: String) {
+        _screenState.update { state ->
+            val items = state.preview.items
+            val item = items.firstOrNull { it.id == itemId } ?: return@update state
+            val updatedItems = if (!item.isChecked && state.autoDeleteCompleted) {
+                items.filter { it.id != itemId }
+            } else {
+                items.map { if (it.id == itemId) it.copy(isChecked = !it.isChecked) else it }
+            }
+            state.copy(preview = state.preview.copy(items = updatedItems))
+        }
+        analyticsTracker.event(
+            "onboarding_preview_item_toggled",
+            mapOf(
+                "auto_delete" to _screenState.value.autoDeleteCompleted.toString(),
+                "separate_completed" to _screenState.value.separateCompleted.toString()
+            )
+        )
     }
 
     private fun handleSaveChecklist() {
@@ -432,7 +467,10 @@ class InteractiveOnboardingViewModel(
             }
             InteractiveOnboardingStep.ChecklistPreview -> {
                 _screenState.update {
-                    it.copy(currentStep = InteractiveOnboardingStep.Customize)
+                    it.copy(
+                        currentStep = InteractiveOnboardingStep.Customize,
+                        preview = PreviewState()
+                    )
                 }
             }
             InteractiveOnboardingStep.DiscoverMore -> {

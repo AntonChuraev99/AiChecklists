@@ -439,6 +439,148 @@ class InteractiveOnboardingViewModelTest {
         assertEquals(InteractiveOnboardingStep.ChecklistPreview, vm.screenState.value.currentStep)
     }
 
+    // --- Preview step ---
+
+    /** Helper: navigate to ChecklistPreview step */
+    private fun createViewModelAtPreview(
+        category: OnboardingCategory = OnboardingCategory.TRAVEL,
+        style: OrganizingStyle = OrganizingStyle.DETAILED,
+        template: ChecklistTemplate = travelTemplate
+    ): InteractiveOnboardingViewModel {
+        val vm = createViewModelAtCustomize(category, style, template)
+        vm.onIntent(InteractiveOnboardingIntent.OnContinueFromCustomize)
+        vm.onIntent(InteractiveOnboardingIntent.OnCreatingComplete)
+        assertEquals(InteractiveOnboardingStep.ChecklistPreview, vm.screenState.value.currentStep)
+        return vm
+    }
+
+    @Test
+    fun onCreatingComplete_initializesPreviewState() = runTest {
+        val vm = createViewModelAtPreview()
+
+        val state = vm.screenState.value
+        val preview = state.preview
+        // All enabled items from customize become preview items
+        val enabledCount = state.customizedItems.count { it.isEnabled }
+        assertEquals(enabledCount, preview.items.size)
+        assertEquals(enabledCount, preview.originalItemCount)
+        // All items start unchecked
+        assertTrue(preview.items.all { !it.isChecked })
+        // IDs are stable and unique
+        assertEquals(preview.items.map { it.id }.toSet().size, preview.items.size)
+    }
+
+    @Test
+    fun onCreatingComplete_disabledItems_excludedFromPreview() = runTest {
+        val vm = createViewModelAtCustomize()
+        // Disable first item ("Passport")
+        vm.onIntent(InteractiveOnboardingIntent.OnToggleItem(0))
+        vm.onIntent(InteractiveOnboardingIntent.OnContinueFromCustomize)
+        vm.onIntent(InteractiveOnboardingIntent.OnCreatingComplete)
+
+        val preview = vm.screenState.value.preview
+        assertFalse(preview.items.any { it.text == "Passport" })
+        assertEquals(travelTemplate.items.size - 1, preview.items.size)
+    }
+
+    @Test
+    fun onPreviewItemToggle_togglesItemCheckedState() = runTest {
+        val vm = createViewModelAtPreview()
+        val itemId = vm.screenState.value.preview.items.first().id
+
+        vm.onIntent(InteractiveOnboardingIntent.OnPreviewItemToggle(itemId))
+
+        val toggled = vm.screenState.value.preview.items.first()
+        assertTrue(toggled.isChecked)
+
+        // Toggle back
+        vm.onIntent(InteractiveOnboardingIntent.OnPreviewItemToggle(itemId))
+
+        val unToggled = vm.screenState.value.preview.items.first()
+        assertFalse(unToggled.isChecked)
+    }
+
+    @Test
+    fun onPreviewItemToggle_autoDeleteCompleted_removesItem() = runTest {
+        val vm = createViewModelAtCustomize()
+        vm.onIntent(InteractiveOnboardingIntent.OnToggleAutoDeleteCompleted)
+        assertTrue(vm.screenState.value.autoDeleteCompleted)
+        vm.onIntent(InteractiveOnboardingIntent.OnContinueFromCustomize)
+        vm.onIntent(InteractiveOnboardingIntent.OnCreatingComplete)
+
+        val originalCount = vm.screenState.value.preview.items.size
+        val itemId = vm.screenState.value.preview.items.first().id
+
+        vm.onIntent(InteractiveOnboardingIntent.OnPreviewItemToggle(itemId))
+
+        val afterToggle = vm.screenState.value.preview
+        assertEquals(originalCount - 1, afterToggle.items.size)
+        assertFalse(afterToggle.items.any { it.id == itemId })
+        // originalItemCount stays the same
+        assertEquals(originalCount, afterToggle.originalItemCount)
+    }
+
+    @Test
+    fun onPreviewItemToggle_withoutAutoDelete_preservesItemCount() = runTest {
+        val vm = createViewModelAtPreview()
+        val originalCount = vm.screenState.value.preview.items.size
+        val itemId = vm.screenState.value.preview.items.first().id
+
+        vm.onIntent(InteractiveOnboardingIntent.OnPreviewItemToggle(itemId))
+
+        assertEquals(originalCount, vm.screenState.value.preview.items.size)
+    }
+
+    @Test
+    fun onPreviewItemToggle_invalidId_isNoOp() = runTest {
+        val vm = createViewModelAtPreview()
+        val beforeState = vm.screenState.value.preview
+
+        vm.onIntent(InteractiveOnboardingIntent.OnPreviewItemToggle("nonexistent_id"))
+
+        assertEquals(beforeState, vm.screenState.value.preview)
+    }
+
+    @Test
+    fun onPreviewItemToggle_tracksAnalytics() = runTest {
+        val vm = createViewModelAtPreview()
+        val itemId = vm.screenState.value.preview.items.first().id
+
+        vm.onIntent(InteractiveOnboardingIntent.OnPreviewItemToggle(itemId))
+
+        assertTrue(fakeAnalyticsTracker.hasEvent("onboarding_preview_item_toggled"))
+    }
+
+    @Test
+    fun onBack_fromChecklistPreview_resetsPreviewState() = runTest {
+        val vm = createViewModelAtPreview()
+        val itemId = vm.screenState.value.preview.items.first().id
+        vm.onIntent(InteractiveOnboardingIntent.OnPreviewItemToggle(itemId))
+        assertTrue(vm.screenState.value.preview.items.any { it.isChecked })
+
+        vm.onIntent(InteractiveOnboardingIntent.OnBack)
+
+        assertEquals(InteractiveOnboardingStep.Customize, vm.screenState.value.currentStep)
+        // Preview state fully reset
+        assertTrue(vm.screenState.value.preview.items.isEmpty())
+        assertEquals(0, vm.screenState.value.preview.originalItemCount)
+    }
+
+    @Test
+    fun onSaveChecklist_usesCustomizedItemsNotPreview() = runTest {
+        val vm = createViewModelAtPreview()
+        // Check off some items in preview
+        val firstId = vm.screenState.value.preview.items.first().id
+        vm.onIntent(InteractiveOnboardingIntent.OnPreviewItemToggle(firstId))
+
+        vm.onIntent(InteractiveOnboardingIntent.OnSaveChecklist)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Saved checklist should have ALL enabled items (not affected by preview checks)
+        val saved = assertNotNull(fakeChecklistRepository.lastAddedChecklist)
+        assertEquals(travelTemplate.items.size, saved.items.size)
+    }
+
     // --- Save checklist ---
 
     @Test
