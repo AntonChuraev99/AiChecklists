@@ -6,12 +6,16 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatType
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.PendingRepeatConfig
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderTab
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.buildRepeatSummary
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.combinePickerResults
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.resolvePresetName
 import com.antonchuraev.homesearchchecklist.feature.create.domain.model.ChecklistTemplate
 import com.antonchuraev.homesearchchecklist.feature.create.domain.repository.TemplatesRepository
-import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
-import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatType
-import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
 import com.antonchuraev.homesearchchecklist.feature.sharing.domain.formatter.ChecklistFormatter
 import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.CompleteOnboardingUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,14 +23,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.datetime.Clock
-import kotlinx.datetime.DatePeriod
-import kotlinx.datetime.LocalDateTime
-import kotlinx.datetime.LocalTime
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.plus
-import kotlinx.datetime.toInstant
-import kotlinx.datetime.toLocalDateTime
+import kotlinx.datetime.*
 
 class InteractiveOnboardingViewModel(
     private val navigator: AppNavigator,
@@ -64,10 +61,102 @@ class InteractiveOnboardingViewModel(
             InteractiveOnboardingIntent.OnSaveChecklist -> handleSaveChecklist()
             InteractiveOnboardingIntent.OnSkip -> handleSkip()
             InteractiveOnboardingIntent.OnBack -> handleBack()
-            is InteractiveOnboardingIntent.OnReminderPresetSelected -> handleReminderPreset(intent.preset)
             InteractiveOnboardingIntent.OnWidgetInstructionDone -> handleWidgetDone()
             InteractiveOnboardingIntent.OnShareCompleted -> handleShareCompleted()
             InteractiveOnboardingIntent.OnDiscoverMoreContinue -> handleDiscoverMoreContinue()
+
+            // Reminders (shared ReminderSheet)
+            InteractiveOnboardingIntent.OnReminderClick -> updateDiscoverMore { it.copy(showReminderSheet = true) }
+            is InteractiveOnboardingIntent.OnReminderPresetSelected -> {
+                val now = Clock.System.now().toEpochMilliseconds()
+                if (intent.triggerAtMillis <= now) return
+                saveOnboardingReminder(intent.triggerAtMillis)
+                updateDiscoverMore { it.copy(showReminderSheet = false) }
+            }
+            InteractiveOnboardingIntent.OnCustomDateRequested -> {
+                val tz = TimeZone.currentSystemDefault()
+                val todayDate = Clock.System.now().toLocalDateTime(tz).date
+                val todayUtcMidnight = LocalDateTime(todayDate, LocalTime(0, 0))
+                    .toInstant(TimeZone.UTC).toEpochMilliseconds()
+                updateDiscoverMore {
+                    it.copy(
+                        showReminderSheet = false,
+                        showCustomPicker = true,
+                        customPickerDateMillis = null,
+                        customPickerMinDateMillis = todayUtcMidnight,
+                        customPickerInitialHour = 9,
+                        isCustomTimeInPast = false
+                    )
+                }
+            }
+            is InteractiveOnboardingIntent.OnDateSelected -> {
+                val tz = TimeZone.currentSystemDefault()
+                val nowLocal = Clock.System.now().toLocalDateTime(tz)
+                val selectedDate = Instant.fromEpochMilliseconds(intent.dateMillis)
+                    .toLocalDateTime(TimeZone.UTC).date
+                val isToday = selectedDate == nowLocal.date
+                val initialHour = if (isToday) (nowLocal.hour + 1).coerceAtMost(23) else 9
+                updateDiscoverMore {
+                    it.copy(
+                        customPickerDateMillis = intent.dateMillis,
+                        customPickerInitialHour = initialHour,
+                        isCustomTimeInPast = false
+                    )
+                }
+            }
+            is InteractiveOnboardingIntent.OnCustomTimeChanged -> {
+                val dm = _screenState.value.discoverMore
+                val dateMillis = dm.customPickerDateMillis ?: return
+                val tz = TimeZone.currentSystemDefault()
+                val nowLocal = Clock.System.now().toLocalDateTime(tz)
+                val selectedDate = Instant.fromEpochMilliseconds(dateMillis)
+                    .toLocalDateTime(TimeZone.UTC).date
+                val isToday = selectedDate == nowLocal.date
+                val isInPast = isToday && LocalTime(intent.hour, intent.minute) <= nowLocal.time
+                updateDiscoverMore { it.copy(isCustomTimeInPast = isInPast) }
+            }
+            is InteractiveOnboardingIntent.OnTimeSelected -> {
+                val dateMillis = _screenState.value.discoverMore.customPickerDateMillis ?: return
+                val triggerAt = combinePickerResults(dateMillis, intent.hour, intent.minute)
+                val now = Clock.System.now().toEpochMilliseconds()
+                if (triggerAt <= now) return
+                saveOnboardingReminder(triggerAt)
+                updateDiscoverMore { it.copy(showCustomPicker = false, customPickerDateMillis = null) }
+            }
+            InteractiveOnboardingIntent.OnRemoveReminder -> {
+                removeOnboardingReminder()
+                updateDiscoverMore { it.copy(showReminderSheet = false) }
+            }
+            InteractiveOnboardingIntent.OnDismissReminderUI -> {
+                updateDiscoverMore {
+                    it.copy(
+                        showReminderSheet = false,
+                        showCustomPicker = false,
+                        customPickerDateMillis = null,
+                        pendingRepeatConfig = null,
+                        showEndConditionPicker = false
+                    )
+                }
+            }
+            is InteractiveOnboardingIntent.OnReminderTabSelected -> handleReminderTabSelected(intent.tab)
+
+            // Repeat schedule
+            is InteractiveOnboardingIntent.OnRepeatTypeSelected -> handleRepeatTypeSelected(intent.type)
+            is InteractiveOnboardingIntent.OnSmartPresetSelected -> updatePendingRepeatConfig { intent.config }
+            is InteractiveOnboardingIntent.OnRepeatIntervalChanged -> updatePendingRepeatConfig { it.copy(interval = intent.interval.coerceIn(1, 99), isCustom = true) }
+            is InteractiveOnboardingIntent.OnWeekDayToggled -> toggleWeekDay(intent.dayNumber)
+            is InteractiveOnboardingIntent.OnResetChecksToggled -> updatePendingRepeatConfig { it.copy(resetChecks = intent.enabled) }
+            is InteractiveOnboardingIntent.OnRepeatTimeChanged -> updatePendingRepeatConfig { it.copy(timeHour = intent.hour, timeMinute = intent.minute) }
+            InteractiveOnboardingIntent.OnSaveRepeatSchedule -> saveRepeatSchedule()
+            InteractiveOnboardingIntent.OnRemoveRepeatSchedule -> removeRepeatSchedule()
+
+            // End condition
+            InteractiveOnboardingIntent.OnEndConditionClick -> updateDiscoverMore { it.copy(showEndConditionPicker = true) }
+            is InteractiveOnboardingIntent.OnEndConditionSelected -> {
+                updatePendingRepeatConfig { it.copy(endCondition = intent.condition) }
+                updateDiscoverMore { it.copy(showEndConditionPicker = false) }
+            }
+            InteractiveOnboardingIntent.OnDismissEndConditionPicker -> updateDiscoverMore { it.copy(showEndConditionPicker = false) }
         }
     }
 
@@ -357,71 +446,145 @@ class InteractiveOnboardingViewModel(
         }
     }
 
-    private fun handleReminderPreset(preset: ReminderPreset) {
+    // ─── Reminder helpers ─────────────────────────────────────────────
+
+    private fun saveOnboardingReminder(triggerAtMillis: Long) {
         val checklistId = _screenState.value.createdChecklistId ?: return
         viewModelScope.launch {
             try {
-                val now = Clock.System.now()
-                val tz = TimeZone.currentSystemDefault()
-                val today = now.toLocalDateTime(tz)
-
-                when (preset) {
-                    ReminderPreset.TONIGHT -> {
-                        // One-shot: today at 21:00
-                        val todayAt21 = LocalDateTime(
-                            today.date, LocalTime(21, 0)
-                        )
-                        val triggerMillis = todayAt21.toInstant(tz).toEpochMilliseconds()
-                        val adjustedTrigger = if (triggerMillis <= now.toEpochMilliseconds()) {
-                            triggerMillis + 24 * 60 * 60 * 1000L // Next day if past 9 PM
-                        } else triggerMillis
-                        checklistRepository.setReminder(checklistId, adjustedTrigger)
-                        reminderScheduler.scheduleReminder(checklistId, adjustedTrigger)
-                    }
-                    ReminderPreset.DAILY -> {
-                        // Recurring: daily at 9:00 AM
-                        val rule = ReminderRepeatRule(type = RepeatType.DAILY)
-                        val timeMinutes = 9 * 60 // 9:00 AM
-                        val tomorrowAt9 = LocalDateTime(
-                            today.date, LocalTime(9, 0)
-                        )
-                        var triggerMillis = tomorrowAt9.toInstant(tz).toEpochMilliseconds()
-                        if (triggerMillis <= now.toEpochMilliseconds()) {
-                            triggerMillis += 24 * 60 * 60 * 1000L
-                        }
-                        checklistRepository.setRepeatSchedule(checklistId, rule, timeMinutes, triggerMillis)
-                        reminderScheduler.scheduleRepeat(checklistId, triggerMillis)
-                    }
-                    ReminderPreset.WEEKLY -> {
-                        // Recurring: weekly on Monday at 9:00 AM
-                        val rule = ReminderRepeatRule(
-                            type = RepeatType.WEEKLY,
-                            weekDays = setOf(1) // Monday (ISO day number)
-                        )
-                        val timeMinutes = 9 * 60
-                        val nextMonday = run {
-                            // DayOfWeek: MONDAY=0..SUNDAY=6 in kotlinx-datetime
-                            val dayOfWeek = today.dayOfWeek.ordinal // 0=Monday
-                            val daysUntilMonday = if (dayOfWeek == 0) 7 else (7 - dayOfWeek)
-                            val mondayDate = today.date.plus(DatePeriod(days = daysUntilMonday))
-                            LocalDateTime(mondayDate, LocalTime(9, 0))
-                        }
-                        val triggerMillis = nextMonday.toInstant(tz).toEpochMilliseconds()
-                        checklistRepository.setRepeatSchedule(checklistId, rule, timeMinutes, triggerMillis)
-                        reminderScheduler.scheduleRepeat(checklistId, triggerMillis)
-                    }
+                checklistRepository.setReminder(checklistId, triggerAtMillis)
+                reminderScheduler.scheduleReminder(checklistId, triggerAtMillis)
+                updateDiscoverMore {
+                    it.copy(reminderCompleted = true, currentReminder = triggerAtMillis)
                 }
-
-                _screenState.update {
-                    it.copy(discoverMore = it.discoverMore.copy(reminderCompleted = true))
-                }
-                trackStep("discover_more_reminder", "preset" to preset.name)
+                trackStep("discover_more_reminder", "type" to "once")
             } catch (e: Exception) {
                 analyticsTracker.event(
                     "onboarding_reminder_error",
                     mapOf("error" to e.message.orEmpty())
                 )
             }
+        }
+    }
+
+    private fun removeOnboardingReminder() {
+        val checklistId = _screenState.value.createdChecklistId ?: return
+        viewModelScope.launch {
+            checklistRepository.setReminder(checklistId, null)
+            reminderScheduler.cancelReminder(checklistId)
+            val dm = _screenState.value.discoverMore
+            if (dm.currentRepeatRule != null) {
+                checklistRepository.clearRepeatSchedule(checklistId)
+                reminderScheduler.cancelRepeat(checklistId)
+            }
+            updateDiscoverMore {
+                it.copy(
+                    reminderCompleted = false,
+                    currentReminder = null,
+                    currentRepeatRule = null,
+                    repeatRuleSummary = null
+                )
+            }
+        }
+    }
+
+    private fun handleReminderTabSelected(tab: ReminderTab) {
+        if (tab == ReminderTab.REPEAT && _screenState.value.discoverMore.pendingRepeatConfig == null) {
+            updateDiscoverMore {
+                it.copy(activeReminderTab = ReminderTab.REPEAT, pendingRepeatConfig = PendingRepeatConfig())
+            }
+        } else {
+            updateDiscoverMore { it.copy(activeReminderTab = tab) }
+        }
+    }
+
+    private fun handleRepeatTypeSelected(type: RepeatType) {
+        updatePendingRepeatConfig {
+            it.copy(type = type, isCustom = false, interval = 1, weekDays = emptySet())
+        }
+    }
+
+    private fun toggleWeekDay(dayNumber: Int) {
+        updatePendingRepeatConfig { config ->
+            val updated = if (dayNumber in config.weekDays) config.weekDays - dayNumber else config.weekDays + dayNumber
+            config.copy(weekDays = updated, isCustom = true)
+        }
+    }
+
+    private fun saveRepeatSchedule() {
+        val checklistId = _screenState.value.createdChecklistId ?: return
+        val config = _screenState.value.discoverMore.pendingRepeatConfig ?: return
+        val rule = config.toRule()
+        val timeMinutes = config.timeHour * 60 + config.timeMinute
+
+        viewModelScope.launch {
+            try {
+                val tz = TimeZone.currentSystemDefault()
+                val now = Clock.System.now()
+                val today = now.toLocalDateTime(tz).date
+                val triggerTime = LocalTime(config.timeHour, config.timeMinute)
+                val todayTrigger = LocalDateTime(today, triggerTime).toInstant(tz).toEpochMilliseconds()
+
+                val firstTriggerAt = if (todayTrigger > now.toEpochMilliseconds()) {
+                    todayTrigger
+                } else {
+                    val tomorrow = today.plus(1, DateTimeUnit.DAY)
+                    LocalDateTime(tomorrow, triggerTime).toInstant(tz).toEpochMilliseconds()
+                }
+
+                checklistRepository.setRepeatSchedule(checklistId, rule, timeMinutes, firstTriggerAt)
+                reminderScheduler.scheduleRepeat(checklistId, firstTriggerAt)
+
+                updateDiscoverMore {
+                    it.copy(
+                        reminderCompleted = true,
+                        currentRepeatRule = rule,
+                        showReminderSheet = false,
+                        pendingRepeatConfig = null,
+                        repeatRuleSummary = buildRepeatSummary(config)
+                    )
+                }
+
+                analyticsTracker.event("repeat_schedule_set", buildMap {
+                    put("type", rule.type.name)
+                    put("interval", rule.interval.toString())
+                    put("preset", resolvePresetName(config))
+                    put("source", "onboarding")
+                })
+            } catch (e: Exception) {
+                analyticsTracker.event(
+                    "onboarding_reminder_error",
+                    mapOf("error" to e.message.orEmpty())
+                )
+            }
+        }
+    }
+
+    private fun removeRepeatSchedule() {
+        val checklistId = _screenState.value.createdChecklistId ?: return
+        viewModelScope.launch {
+            checklistRepository.clearRepeatSchedule(checklistId)
+            reminderScheduler.cancelRepeat(checklistId)
+            updateDiscoverMore {
+                it.copy(
+                    reminderCompleted = false,
+                    currentRepeatRule = null,
+                    showReminderSheet = false,
+                    pendingRepeatConfig = null,
+                    repeatRuleSummary = null
+                )
+            }
+        }
+    }
+
+    private inline fun updateDiscoverMore(update: (DiscoverMoreState) -> DiscoverMoreState) {
+        _screenState.update { it.copy(discoverMore = update(it.discoverMore)) }
+    }
+
+    private inline fun updatePendingRepeatConfig(update: (PendingRepeatConfig) -> PendingRepeatConfig) {
+        updateDiscoverMore { dm ->
+            val current = dm.pendingRepeatConfig ?: PendingRepeatConfig()
+            dm.copy(pendingRepeatConfig = update(current))
         }
     }
 

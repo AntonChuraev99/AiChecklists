@@ -221,18 +221,7 @@ fun InteractiveOnboardingScreen(
                 )
                 InteractiveOnboardingStep.DiscoverMore -> DiscoverMoreStep(
                     state = state.discoverMore,
-                    onReminderPreset = {
-                        viewModel.sendIntent(InteractiveOnboardingIntent.OnReminderPresetSelected(it))
-                    },
-                    onWidgetDone = {
-                        viewModel.sendIntent(InteractiveOnboardingIntent.OnWidgetInstructionDone)
-                    },
-                    onShareCompleted = {
-                        viewModel.sendIntent(InteractiveOnboardingIntent.OnShareCompleted)
-                    },
-                    onContinue = {
-                        viewModel.sendIntent(InteractiveOnboardingIntent.OnDiscoverMoreContinue)
-                    }
+                    onIntent = { viewModel.sendIntent(it) }
                 )
                 InteractiveOnboardingStep.Paywall -> {
                     com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive.components.PaywallStep(

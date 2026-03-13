@@ -19,6 +19,11 @@ import aichecklists.core.designsystem.generated.resources.onboarding_interactive
 import aichecklists.core.designsystem.generated.resources.onboarding_interactive_style_minimalist_desc
 import com.antonchuraev.homesearchchecklist.core.common.api.Intent
 import com.antonchuraev.homesearchchecklist.core.common.api.State
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatEndCondition
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatType
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.PendingRepeatConfig
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderTab
 import com.antonchuraev.homesearchchecklist.feature.create.domain.model.ChecklistTemplate
 import org.jetbrains.compose.resources.StringResource
 
@@ -44,7 +49,21 @@ data class DiscoverMoreState(
     val reminderCompleted: Boolean = false,
     val widgetCompleted: Boolean = false,
     val shareCompleted: Boolean = false,
-    val shareText: String? = null
+    val shareText: String? = null,
+    // Reminder sheet state
+    val showReminderSheet: Boolean = false,
+    val activeReminderTab: ReminderTab = ReminderTab.ONCE,
+    val currentReminder: Long? = null,
+    val currentRepeatRule: ReminderRepeatRule? = null,
+    val pendingRepeatConfig: PendingRepeatConfig? = null,
+    val showEndConditionPicker: Boolean = false,
+    val repeatRuleSummary: String? = null,
+    // Custom date/time picker
+    val showCustomPicker: Boolean = false,
+    val customPickerDateMillis: Long? = null,
+    val customPickerMinDateMillis: Long = 0L,
+    val customPickerInitialHour: Int = 9,
+    val isCustomTimeInPast: Boolean = false,
 )
 
 data class CustomizableItem(
@@ -61,12 +80,6 @@ enum class InteractiveOnboardingStep {
     ChecklistPreview,
     DiscoverMore,
     Paywall
-}
-
-enum class ReminderPreset {
-    TONIGHT,
-    DAILY,
-    WEEKLY
 }
 
 enum class OrganizingStyle(
@@ -124,8 +137,33 @@ sealed interface InteractiveOnboardingIntent : Intent {
     data object OnBack : InteractiveOnboardingIntent
 
     // Discover More step
-    data class OnReminderPresetSelected(val preset: ReminderPreset) : InteractiveOnboardingIntent
     data object OnWidgetInstructionDone : InteractiveOnboardingIntent
     data object OnShareCompleted : InteractiveOnboardingIntent
     data object OnDiscoverMoreContinue : InteractiveOnboardingIntent
+
+    // Reminders (shared ReminderSheet)
+    data object OnReminderClick : InteractiveOnboardingIntent
+    data class OnReminderPresetSelected(val triggerAtMillis: Long) : InteractiveOnboardingIntent
+    data object OnCustomDateRequested : InteractiveOnboardingIntent
+    data class OnDateSelected(val dateMillis: Long) : InteractiveOnboardingIntent
+    data class OnTimeSelected(val hour: Int, val minute: Int) : InteractiveOnboardingIntent
+    data class OnCustomTimeChanged(val hour: Int, val minute: Int) : InteractiveOnboardingIntent
+    data object OnRemoveReminder : InteractiveOnboardingIntent
+    data object OnDismissReminderUI : InteractiveOnboardingIntent
+    data class OnReminderTabSelected(val tab: ReminderTab) : InteractiveOnboardingIntent
+
+    // Repeat schedule
+    data class OnRepeatTypeSelected(val type: RepeatType) : InteractiveOnboardingIntent
+    data class OnSmartPresetSelected(val config: PendingRepeatConfig) : InteractiveOnboardingIntent
+    data class OnRepeatIntervalChanged(val interval: Int) : InteractiveOnboardingIntent
+    data class OnWeekDayToggled(val dayNumber: Int) : InteractiveOnboardingIntent
+    data class OnResetChecksToggled(val enabled: Boolean) : InteractiveOnboardingIntent
+    data class OnRepeatTimeChanged(val hour: Int, val minute: Int) : InteractiveOnboardingIntent
+    data object OnSaveRepeatSchedule : InteractiveOnboardingIntent
+    data object OnRemoveRepeatSchedule : InteractiveOnboardingIntent
+
+    // End condition
+    data object OnEndConditionClick : InteractiveOnboardingIntent
+    data class OnEndConditionSelected(val condition: RepeatEndCondition) : InteractiveOnboardingIntent
+    data object OnDismissEndConditionPicker : InteractiveOnboardingIntent
 }
