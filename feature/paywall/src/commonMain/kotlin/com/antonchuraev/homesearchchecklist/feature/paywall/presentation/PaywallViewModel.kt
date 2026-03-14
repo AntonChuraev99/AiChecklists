@@ -7,6 +7,7 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavRoute
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.paywall.data.PaywallConfig
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.ConversionEventHelper
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallException
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PurchaseResult
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.RestoreResult
@@ -143,6 +144,7 @@ class PaywallViewModel(
                         "source" to source,
                         "product_id" to selectedProduct.id
                     ))
+                    conversionEventHelper.logConversionEvent(result, selectedProduct)
                     _screenState.update {
                         it.copy(isPurchasing = false, purchaseSuccess = true)
                     }
@@ -207,6 +209,8 @@ class PaywallViewModel(
             }
         }
     }
+
+    private val conversionEventHelper = ConversionEventHelper(analyticsTracker)
 
     private fun dismissError() {
         _screenState.update { it.copy(error = null) }

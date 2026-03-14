@@ -10,8 +10,13 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
+import com.antonchuraev.homesearchchecklist.consent.ConsentDialog
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppContextHolder
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
@@ -51,6 +56,24 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             App()
+
+            // Show consent dialog for EEA/UK users on first launch
+            val consentManager = GistiApplication.consentManager
+            var showConsentDialog by remember {
+                mutableStateOf(consentManager.isConsentRequired())
+            }
+            if (showConsentDialog) {
+                ConsentDialog(
+                    onAccept = {
+                        consentManager.setConsent(granted = true)
+                        showConsentDialog = false
+                    },
+                    onDecline = {
+                        consentManager.setConsent(granted = false)
+                        showConsentDialog = false
+                    }
+                )
+            }
 
             // Consume pending deep link after NavController is ready (cold start from notification)
             LaunchedEffect(Unit) {
