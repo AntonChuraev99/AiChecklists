@@ -1,7 +1,11 @@
 package com.antonchuraev.homesearchchecklist.feature.paywall.domain.model
 
 sealed interface PurchaseResult {
-    data class Success(val subscriptionStatus: SubscriptionStatus) : PurchaseResult
+    data class Success(
+        val subscriptionStatus: SubscriptionStatus,
+        val transactionId: String? = null,
+        val hasFreeTrial: Boolean = false
+    ) : PurchaseResult
     data object Cancelled : PurchaseResult
     data class Error(
         val message: String,
