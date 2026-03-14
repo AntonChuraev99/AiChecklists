@@ -17,7 +17,7 @@ import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.Purchas
 class ConversionEventHelper(private val analyticsTracker: AnalyticsTracker) {
 
     fun logConversionEvent(result: PurchaseResult.Success, product: PaywallProduct) {
-        if (result.hasFreeTrial) {
+        if (product.hasFreeTrial) {
             analyticsTracker.event(EVENT_FREE_TRIAL_START, mapOf(
                 PARAM_ITEM_ID to product.id,
                 PARAM_ITEM_NAME to PRODUCT_NAME,
