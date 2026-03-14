@@ -167,10 +167,25 @@ class PaywallRepositoryImpl : PaywallRepository {
                         )
                     }
                 },
-                onSuccess = { _: StoreTransaction, customerInfo: CustomerInfo ->
+                onSuccess = { storeTransaction: StoreTransaction, customerInfo: CustomerInfo ->
                     val status = customerInfo.toSubscriptionStatus()
                     _subscriptionStatus.value = status
-                    continuation.resume(PurchaseResult.Success(status))
+
+                    // Determine trial status from the purchased package
+                    val storeProduct = packageToPurchase.storeProduct
+                    val introPrice = storeProduct.introductoryDiscount
+                    val hasFreeTrial = introPrice != null && (
+                        introPrice.price.amountMicros == 0L ||
+                        introPrice.subscriptionPeriod.value > 0
+                    )
+
+                    continuation.resume(
+                        PurchaseResult.Success(
+                            subscriptionStatus = status,
+                            transactionId = storeTransaction.transactionId,
+                            hasFreeTrial = hasFreeTrial
+                        )
+                    )
                 }
             )
         }
