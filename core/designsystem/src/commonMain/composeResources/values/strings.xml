@@ -83,7 +83,7 @@
 
     <string name="onboarding_discover_widget_sheet_title">Add Widget to Home Screen</string>
     <string name="onboarding_discover_widget_step1">Long press on your home screen</string>
-    <string name="onboarding_discover_widget_step2">Tap \"Widgets\" and find Gisti</string>
+    <string name="onboarding_discover_widget_step2">Tap "Widgets" and find Gisti</string>
     <string name="onboarding_discover_widget_step3">Drag the widget to your home screen</string>
     <string name="onboarding_discover_widget_done">Got it</string>
 
