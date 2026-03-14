@@ -7,17 +7,17 @@ import kotlin.test.assertEquals
 
 class GetOnboardingVariantUseCaseTest {
 
-    private fun createUseCase(configJson: String): GetOnboardingVariantUseCase {
+    private fun createUseCase(onboardingValue: String): GetOnboardingVariantUseCase {
         return GetOnboardingVariantUseCase(
             remoteConfigProvider = FakeRemoteConfigProvider(
-                onboardingConfig = configJson
+                onboardingValue = onboardingValue
             )
         )
     }
 
     @Test
-    fun invoke_interactiveConfig_returnsInteractive() {
-        val useCase = createUseCase("""{"type":"interactive"}""")
+    fun invoke_interactive_returnsInteractive() {
+        val useCase = createUseCase("interactive")
 
         val result = useCase()
 
@@ -25,51 +25,42 @@ class GetOnboardingVariantUseCaseTest {
     }
 
     @Test
-    fun invoke_slidesConfig_returnsSlides() {
-        val useCase = createUseCase("""{"type":"slides"}""")
+    fun invoke_default_returnsDefault() {
+        val useCase = createUseCase("default")
 
         val result = useCase()
 
-        assertEquals(GetOnboardingVariantUseCase.OnboardingVariant.SLIDES, result)
+        assertEquals(GetOnboardingVariantUseCase.OnboardingVariant.DEFAULT, result)
     }
 
     @Test
-    fun invoke_emptyString_returnsSlidesDefault() {
+    fun invoke_emptyString_returnsDefault() {
         val useCase = createUseCase("")
 
         val result = useCase()
 
-        assertEquals(GetOnboardingVariantUseCase.OnboardingVariant.SLIDES, result)
+        assertEquals(GetOnboardingVariantUseCase.OnboardingVariant.DEFAULT, result)
     }
 
     @Test
-    fun invoke_malformedJson_returnsSlidesDefault() {
-        val useCase = createUseCase("{not valid json}")
+    fun invoke_unknownValue_returnsDefault() {
+        val useCase = createUseCase("unknown_variant")
 
         val result = useCase()
 
-        assertEquals(GetOnboardingVariantUseCase.OnboardingVariant.SLIDES, result)
-    }
-
-    @Test
-    fun invoke_unknownType_returnsSlidesDefault() {
-        val useCase = createUseCase("""{"type":"unknown_variant"}""")
-
-        val result = useCase()
-
-        assertEquals(GetOnboardingVariantUseCase.OnboardingVariant.SLIDES, result)
+        assertEquals(GetOnboardingVariantUseCase.OnboardingVariant.DEFAULT, result)
     }
 
     // --- Test doubles ---
 
     private class FakeRemoteConfigProvider(
-        private val onboardingConfig: String
+        private val onboardingValue: String
     ) : RemoteConfigProvider {
         override suspend fun fetchAndActivate(): Boolean = true
         override fun getBoolean(key: String, defaultValue: Boolean): Boolean = defaultValue
         override fun getLong(key: String, defaultValue: Long): Long = defaultValue
         override fun getString(key: String, defaultValue: String): String {
-            return if (key == RemoteConfigKeys.ONBOARDING_CONFIG) onboardingConfig else defaultValue
+            return if (key == RemoteConfigKeys.ONBOARDING) onboardingValue else defaultValue
         }
     }
 }
