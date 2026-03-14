@@ -77,7 +77,13 @@ class SplashViewModel(
             if (isOnboardingPassed) {
                 navigateToMainScreen(clearBackStack = true)
             } else {
-                when (getOnboardingVariant()) {
+                val variant = getOnboardingVariant()
+                val variantName = when (variant) {
+                    OnboardingVariant.INTERACTIVE -> "interactive"
+                    OnboardingVariant.DEFAULT -> "slides"
+                }
+                analyticsTracker.setUserProperties(mapOf("onboarding_type" to variantName))
+                when (variant) {
                     OnboardingVariant.INTERACTIVE -> navigateToInteractiveOnboarding()
                     OnboardingVariant.DEFAULT -> navigateToOnboarding()
                 }
