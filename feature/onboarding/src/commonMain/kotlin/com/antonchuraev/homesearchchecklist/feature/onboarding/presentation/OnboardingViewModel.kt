@@ -20,6 +20,10 @@ class OnboardingViewModel(
     private val _screenState = MutableStateFlow(OnboardingState())
     override val screenState: StateFlow<OnboardingState> = _screenState.asStateFlow()
 
+    init {
+        analyticsTracker.event("onboarding_started", mapOf("variant" to "slides"))
+    }
+
     override fun onIntent(intent: OnboardingIntent) {
         when (intent) {
             OnboardingIntent.OnNextPage -> handleNextPage()
