@@ -53,9 +53,28 @@ private fun getFileDetails(context: Context, uri: Uri, type: FilePickerType): Fi
 
     mimeType = context.contentResolver.getType(uri)
 
+    // Copy content:// URI to a temp file so FileReader can read it via File API
+    val tempFile = copyUriToTempFile(context, uri, fileName)
+    val filePath = tempFile?.absolutePath ?: uri.toString()
+
     return FilePickerResult(
-        filePath = uri.toString(),
+        filePath = filePath,
         fileName = fileName,
         mimeType = mimeType
     )
+}
+
+private fun copyUriToTempFile(context: Context, uri: Uri, fileName: String): java.io.File? {
+    return try {
+        val extension = fileName.substringAfterLast('.', "tmp")
+        val tempFile = java.io.File.createTempFile("analyze_", ".$extension", context.cacheDir)
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            tempFile.outputStream().use { output ->
+                input.copyTo(output)
+            }
+        }
+        tempFile
+    } catch (e: Exception) {
+        null
+    }
 }
