@@ -47,5 +47,5 @@ object RemoteConfigDefaults {
     const val TEMPLATES_JSON = ""
 
     // Onboarding type: "interactive" or "default"
-    const val ONBOARDING = "default"
+    const val ONBOARDING = "interactive"
 }
