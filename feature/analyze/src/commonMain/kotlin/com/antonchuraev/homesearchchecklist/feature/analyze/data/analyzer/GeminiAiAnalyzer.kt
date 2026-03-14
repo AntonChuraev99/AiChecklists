@@ -111,20 +111,23 @@ class GeminiAiAnalyzer(
         val inputContent = content {
             image(PlatformImage(imageBytes))
             text("""
-                Проанализируй это изображение и создай список пунктов для проверки (чек-лист).
+                Look at this image carefully. Based on what you see in the image, create a practical checklist.
+
+                If the image contains text (a document, recipe, instructions, etc.), extract actionable items from that text.
+                If the image shows objects or a scene (e.g. a fridge with food, a room, a suitcase), create a checklist relevant to what you see (e.g. grocery list, inspection checklist, packing list).
 
                 $contextPrompt
 
-                Требования:
-                1. Каждый пункт должен быть конкретным и проверяемым
-                2. Пункты должны быть на русском языке
-                3. Формат ответа - каждый пункт с новой строки, начиная с "- "
-                4. Только список пунктов, без дополнительного текста
-                5. Максимум 10 пунктов
+                Rules:
+                1. Each item must be specific and actionable
+                2. Respond in English
+                3. Format: each item on a new line, starting with "- "
+                4. Only the list of items, no extra text before or after
+                5. Maximum 10 items
 
-                Пример формата:
-                - Проверить состояние стен
-                - Осмотреть окна
+                Example format:
+                - Buy milk
+                - Check expiration dates
             """.trimIndent())
         }
 
