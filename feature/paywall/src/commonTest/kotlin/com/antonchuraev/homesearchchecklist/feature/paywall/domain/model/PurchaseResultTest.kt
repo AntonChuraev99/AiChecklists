@@ -2,6 +2,7 @@ package com.antonchuraev.homesearchchecklist.feature.paywall.domain.model
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -33,6 +34,58 @@ class PurchaseResultTest {
     fun purchaseResult_error_is_sealed_interface_member() {
         val error: PurchaseResult = PurchaseResult.Error("test")
         assertTrue(error is PurchaseResult.Error)
+    }
+
+    @Test
+    fun purchaseResult_success_defaultValues_noMetadata() {
+        val status = SubscriptionStatus(isActive = true, activeEntitlements = setOf("premium"))
+        val success = PurchaseResult.Success(subscriptionStatus = status)
+
+        assertNull(success.transactionId)
+        assertFalse(success.hasFreeTrial)
+        assertTrue(success.subscriptionStatus.isActive)
+    }
+
+    @Test
+    fun purchaseResult_success_withTrialMetadata() {
+        val status = SubscriptionStatus(isActive = true, activeEntitlements = setOf("premium"))
+        val success = PurchaseResult.Success(
+            subscriptionStatus = status,
+            transactionId = null,
+            hasFreeTrial = true
+        )
+
+        assertNull(success.transactionId)
+        assertTrue(success.hasFreeTrial)
+    }
+
+    @Test
+    fun purchaseResult_success_withTransactionId() {
+        val status = SubscriptionStatus(isActive = true, activeEntitlements = setOf("premium"))
+        val success = PurchaseResult.Success(
+            subscriptionStatus = status,
+            transactionId = "GPA.1234-5678-9012",
+            hasFreeTrial = false
+        )
+
+        assertEquals("GPA.1234-5678-9012", success.transactionId)
+        assertFalse(success.hasFreeTrial)
+    }
+
+    @Test
+    fun purchaseResult_success_isCheck_worksWithDataClass() {
+        val status = SubscriptionStatus(isActive = true, activeEntitlements = setOf("premium"))
+        val result: PurchaseResult = PurchaseResult.Success(
+            subscriptionStatus = status,
+            transactionId = "GPA.test",
+            hasFreeTrial = true
+        )
+
+        assertTrue(result is PurchaseResult.Success)
+        if (result is PurchaseResult.Success) {
+            assertEquals("GPA.test", result.transactionId)
+            assertTrue(result.hasFreeTrial)
+        }
     }
 
     @Test
