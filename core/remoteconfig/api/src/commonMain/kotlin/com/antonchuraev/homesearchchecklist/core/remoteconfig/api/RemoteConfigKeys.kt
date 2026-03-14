@@ -21,8 +21,8 @@ object RemoteConfigKeys {
     // Templates
     const val TEMPLATES_JSON = "templates_json"
 
-    // Onboarding A/B test
-    const val ONBOARDING_CONFIG = "onboarding_config"
+    // Onboarding type: "interactive" or "default"
+    const val ONBOARDING = "onboarding"
 }
 
 /**
@@ -46,6 +46,6 @@ object RemoteConfigDefaults {
     // Templates - default empty, populated from Remote Config
     const val TEMPLATES_JSON = ""
 
-    // Onboarding A/B test - default to slides (control group)
-    const val ONBOARDING_CONFIG = """{"type":"slides"}"""
+    // Onboarding type: "interactive" or "default"
+    const val ONBOARDING = "default"
 }

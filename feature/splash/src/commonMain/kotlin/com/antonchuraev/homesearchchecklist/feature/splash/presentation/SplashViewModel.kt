@@ -79,7 +79,7 @@ class SplashViewModel(
             } else {
                 when (getOnboardingVariant()) {
                     OnboardingVariant.INTERACTIVE -> navigateToInteractiveOnboarding()
-                    OnboardingVariant.SLIDES -> navigateToOnboarding()
+                    OnboardingVariant.DEFAULT -> navigateToOnboarding()
                 }
             }
         }
