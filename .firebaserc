@@ -1,5 +1,15 @@
 {
   "projects": {
     "default": "aichecklists-40230"
-  }
+  },
+  "targets": {
+    "aichecklists-40230": {
+      "hosting": {
+        "gisti-app": [
+          "gisti-app"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }
