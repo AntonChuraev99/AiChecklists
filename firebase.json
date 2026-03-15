@@ -3,6 +3,7 @@
     {
       "target": "gisti-app",
       "public": "hosting/public",
+      "cleanUrls": true,
       "ignore": [
         "firebase.json",
         "**/.*",
