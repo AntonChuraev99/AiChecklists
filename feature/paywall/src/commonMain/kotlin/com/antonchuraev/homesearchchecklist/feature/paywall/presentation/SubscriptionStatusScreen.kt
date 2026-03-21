@@ -46,11 +46,10 @@ fun SubscriptionStatusScreen(
 ) {
     val state by viewModel.screenState.collectAsState()
 
-    // Handle success message: set from nav param and auto-dismiss after 3s
-    LaunchedEffect(showSuccessMessage, state.showSuccessMessage) {
-        if (showSuccessMessage && !state.showSuccessMessage) {
+    // Show success message from nav param and auto-dismiss after 3s
+    LaunchedEffect(showSuccessMessage) {
+        if (showSuccessMessage) {
             viewModel.setShowSuccessMessage(true)
-        } else if (state.showSuccessMessage) {
             delay(3000)
             viewModel.sendIntent(SubscriptionStatusIntent.DismissSuccessMessage)
         }
@@ -73,7 +72,7 @@ fun SubscriptionStatusScreen(
                     formattedExpirationDate = state.formattedExpirationDate,
                     aiCredits = state.aiCredits,
                     isPremium = state.subscriptionStatus.isActive,
-                    onManageClick = { viewModel.sendIntent(SubscriptionStatusIntent.OnManageSubscriptionClick) }
+                    onBackClick = { viewModel.sendIntent(SubscriptionStatusIntent.OnBackClick) }
                 )
             }
 
@@ -104,7 +103,7 @@ private fun SubscriptionStatusContent(
     formattedExpirationDate: String?,
     aiCredits: Int,
     isPremium: Boolean,
-    onManageClick: () -> Unit
+    onBackClick: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -208,10 +207,10 @@ private fun SubscriptionStatusContent(
 
         Spacer(modifier = Modifier.height(AppDimens.SpacingXxl))
 
-        // Manage subscription button
+        // Back to home button
         AppButtonSecondary(
-            text = stringResource(Res.string.subscription_status_manage),
-            onClick = onManageClick,
+            text = stringResource(Res.string.subscription_status_back),
+            onClick = onBackClick,
             modifier = Modifier.fillMaxWidth()
         )
     }

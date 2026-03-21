@@ -34,11 +34,6 @@ class SubscriptionStatusViewModel(
     override fun onIntent(intent: SubscriptionStatusIntent) {
         when (intent) {
             SubscriptionStatusIntent.OnBackClick -> navigator.onBack()
-            SubscriptionStatusIntent.OnManageSubscriptionClick -> {
-                // TODO: Open platform-specific subscription management
-                // Android: Play Store subscriptions
-                // iOS: App Store subscriptions
-            }
             SubscriptionStatusIntent.DismissSuccessMessage -> {
                 _screenState.update { it.copy(showSuccessMessage = false) }
             }

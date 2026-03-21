@@ -14,6 +14,5 @@ data class SubscriptionStatusState(
 
 sealed interface SubscriptionStatusIntent : Intent {
     data object OnBackClick : SubscriptionStatusIntent
-    data object OnManageSubscriptionClick : SubscriptionStatusIntent
     data object DismissSuccessMessage : SubscriptionStatusIntent
 }
