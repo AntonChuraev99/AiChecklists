@@ -21,7 +21,7 @@ val paywallFeatureModule = module {
     factory { GetOfferingsUseCase(get()) }
     factory { PurchaseProductUseCase(get(), get()) }
     factory { RestorePurchasesUseCase(get(), get()) }
-    factory { GetUserLimitsUseCase(get(), get(), get()) }
+    factory { GetUserLimitsUseCase(get(), get(), get(), get()) }
 
     // ViewModels
     viewModel { params ->
