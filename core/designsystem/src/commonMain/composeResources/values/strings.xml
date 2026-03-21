@@ -293,7 +293,7 @@
     <string name="subscription_status_title">Your Subscription</string>
     <string name="subscription_status_active">Premium Member</string>
     <string name="subscription_status_valid_until">Your premium access is valid until</string>
-    <string name="subscription_status_manage">Manage Subscription</string>
+    <string name="subscription_status_back">Back to Home</string>
     <string name="subscription_status_credits_section">AI Credits</string>
     <string name="subscription_status_credits_info">Your credits refill daily at 12:00 CET</string>
     <string name="subscription_status_daily_cap">Daily refill: up to %1$d credits</string>
