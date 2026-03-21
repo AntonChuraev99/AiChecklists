@@ -7,6 +7,7 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.Entitlements
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.UserLimits
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.repository.PaywallRepository
+import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
@@ -14,7 +15,8 @@ import kotlinx.coroutines.flow.map
 class GetUserLimitsUseCase(
     private val remoteConfigProvider: RemoteConfigProvider,
     private val checklistRepository: ChecklistRepository,
-    private val paywallRepository: PaywallRepository
+    private val paywallRepository: PaywallRepository,
+    private val userDataRepository: UserDataRepository
 ) {
     operator fun invoke(): Flow<UserLimits> {
         val maxChecklists = remoteConfigProvider.getLong(
@@ -29,14 +31,15 @@ class GetUserLimitsUseCase(
 
         return combine(
             checklistRepository.checklists.map { it.size },
-            paywallRepository.subscriptionStatus
-        ) { checklistCount, subscriptionStatus ->
-            val isPremium = subscriptionStatus.activeEntitlements.contains(Entitlements.PREMIUM)
+            paywallRepository.subscriptionStatus,
+            userDataRepository.getUserDataFlow().map { it.isPremium }
+        ) { checklistCount, subscriptionStatus, firestorePremium ->
+            val revenueCatPremium = subscriptionStatus.activeEntitlements.contains(Entitlements.PREMIUM)
             UserLimits(
                 maxChecklists = maxChecklists,
                 maxFillsPerChecklist = maxFillsPerChecklist,
                 currentChecklistCount = checklistCount,
-                isPremium = isPremium
+                isPremium = revenueCatPremium || firestorePremium
             )
         }
     }

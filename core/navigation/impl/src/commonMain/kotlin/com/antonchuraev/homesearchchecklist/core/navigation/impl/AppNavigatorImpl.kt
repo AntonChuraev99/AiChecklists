@@ -95,7 +95,10 @@ class AppNavigatorImpl() : AppNavigator {
     }
 
     override fun navigateToSubscriptionStatus(showSuccessMessage: Boolean) {
-        navController.navigate(AppNavRoute.SubscriptionStatus(showSuccessMessage))
+        navController.navigate(AppNavRoute.SubscriptionStatus(showSuccessMessage)) {
+            // Remove Paywall from back stack so "back" returns to the screen before Paywall
+            popUpTo<AppNavRoute.Paywall> { inclusive = true }
+        }
     }
 
     override fun navigateToShareChecklist(checklistId: Long) {
