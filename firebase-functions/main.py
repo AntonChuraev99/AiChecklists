@@ -262,7 +262,7 @@ def reserve_credits(user_id: str) -> int | None:
 
 def call_gemini(prompt: str, input_type: str, input_data: str):
     """Call Gemini API with appropriate content type."""
-    model = genai.GenerativeModel("gemini-2.0-flash-lite")
+    model = genai.GenerativeModel("gemini-2.5-flash-lite")
     if input_type == "image_base64" and input_data:
         return model.generate_content([
             prompt, {"mime_type": "image/jpeg", "data": base64.b64decode(input_data)}

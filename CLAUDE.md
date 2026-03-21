@@ -369,7 +369,7 @@ Key rules (also in Public Repository section above):
 
 ## Unit Economics
 
-Details in `docs/unit-economics.md`. Summary: $1.99/mo subscription, 15% Google commission, ~$0.0002/AI request (gemini-2.0-flash-lite). Positive unit economics even at max usage (300 req/day = 65% margin).
+Details in `docs/unit-economics.md`. Summary: $1.99/mo subscription, 15% Google commission, ~$0.0002/AI request (gemini-2.5-flash-lite). Positive unit economics even at max usage (300 req/day = 65% margin).
 
 ### Limits (Remote Config)
 

@@ -23,14 +23,14 @@ class GeminiAiAnalyzer(
 
     private val textModel: GenerativeModel by lazy {
         GenerativeModel(
-            modelName = "gemini-1.5-flash",
+            modelName = "gemini-2.5-flash",
             apiKey = apiKey
         )
     }
 
     private val visionModel: GenerativeModel by lazy {
         GenerativeModel(
-            modelName = "gemini-1.5-flash",
+            modelName = "gemini-2.5-flash",
             apiKey = apiKey
         )
     }
