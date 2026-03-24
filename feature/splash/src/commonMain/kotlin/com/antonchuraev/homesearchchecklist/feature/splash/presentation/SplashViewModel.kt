@@ -73,21 +73,28 @@ class SplashViewModel(
     }
 
     private fun navigateTo(isOnboardingPassed: Boolean) {
-        with(appNavigator) {
-            if (isOnboardingPassed) {
-                navigateToMainScreen(clearBackStack = true)
-            } else {
-                val variant = getOnboardingVariant()
-                val variantName = when (variant) {
-                    OnboardingVariant.INTERACTIVE -> "interactive"
-                    OnboardingVariant.DEFAULT -> "slides"
-                }
-                analyticsTracker.setUserProperties(mapOf("onboarding_type" to variantName))
-                when (variant) {
-                    OnboardingVariant.INTERACTIVE -> navigateToInteractiveOnboarding()
-                    OnboardingVariant.DEFAULT -> navigateToOnboarding()
+        try {
+            with(appNavigator) {
+                if (isOnboardingPassed) {
+                    navigateToMainScreen(clearBackStack = true)
+                } else {
+                    val variant = getOnboardingVariant()
+                    val variantName = when (variant) {
+                        OnboardingVariant.INTERACTIVE -> "interactive"
+                        OnboardingVariant.DEFAULT -> "slides"
+                    }
+                    analyticsTracker.setUserProperties(mapOf("onboarding_type" to variantName))
+                    when (variant) {
+                        OnboardingVariant.INTERACTIVE -> navigateToInteractiveOnboarding()
+                        OnboardingVariant.DEFAULT -> navigateToOnboarding()
+                    }
                 }
             }
+        } catch (e: IllegalStateException) {
+            // Navigation lifecycle conflict after process death restore —
+            // restored NavBackStackEntry may not have reached CREATED state yet.
+            // Safe to ignore: user is already on the correct destination.
+            log("navigateTo skipped: ${e.message}")
         }
     }
 

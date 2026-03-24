@@ -17,11 +17,17 @@ class AppNavigatorImpl() : AppNavigator {
     }
 
     override fun navigateToOnboarding() {
-        navController.navigate(AppNavRoute.Onboarding)
+        navController.navigate(AppNavRoute.Onboarding) {
+            popUpTo<AppNavRoute.Splash> { inclusive = true }
+            launchSingleTop = true
+        }
     }
 
     override fun navigateToInteractiveOnboarding() {
-        navController.navigate(AppNavRoute.InteractiveOnboarding)
+        navController.navigate(AppNavRoute.InteractiveOnboarding) {
+            popUpTo<AppNavRoute.Splash> { inclusive = true }
+            launchSingleTop = true
+        }
     }
 
     override fun navigateToMainScreen(clearBackStack: Boolean) {
