@@ -1,5 +1,6 @@
 package com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
@@ -26,6 +27,7 @@ import kotlinx.coroutines.launch
 import kotlinx.datetime.*
 
 class InteractiveOnboardingViewModel(
+    private val savedStateHandle: SavedStateHandle,
     private val navigator: AppNavigator,
     private val completeOnboardingUseCase: CompleteOnboardingUseCase,
     private val templatesRepository: TemplatesRepository,
@@ -44,7 +46,16 @@ class InteractiveOnboardingViewModel(
         viewModelScope.launch {
             allTemplates = templatesRepository.getTemplates()
         }
-        analyticsTracker.event("onboarding_started", mapOf("variant" to "interactive"))
+        val alreadyTracked = savedStateHandle.get<Boolean>(KEY_STARTED_TRACKED) == true
+        if (!alreadyTracked) {
+            analyticsTracker.event("onboarding_started", mapOf("variant" to "interactive"))
+            savedStateHandle[KEY_STARTED_TRACKED] = true
+        }
+        // Always track ViewModel creation for diagnostics (helps identify process death)
+        analyticsTracker.event("onboarding_vm_created", mapOf(
+            "variant" to "interactive",
+            "is_restored" to alreadyTracked.toString()
+        ))
     }
 
     override fun onIntent(intent: InteractiveOnboardingIntent) {
@@ -682,5 +693,9 @@ class InteractiveOnboardingViewModel(
         val baseParams = mutableMapOf("variant" to "interactive", "step" to stepName)
         params.forEach { baseParams[it.first] = it.second }
         analyticsTracker.event("onboarding_step_completed", baseParams)
+    }
+
+    companion object {
+        private const val KEY_STARTED_TRACKED = "onboarding_started_tracked"
     }
 }

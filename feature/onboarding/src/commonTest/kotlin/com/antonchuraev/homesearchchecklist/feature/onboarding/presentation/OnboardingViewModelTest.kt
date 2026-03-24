@@ -46,6 +46,7 @@ class OnboardingViewModelTest {
 
     private fun createViewModel(): OnboardingViewModel {
         return OnboardingViewModel(
+            savedStateHandle = androidx.lifecycle.SavedStateHandle(),
             navigator = fakeNavigator,
             completeOnboardingUseCase = CompleteOnboardingUseCase(fakeUserDataRepository),
             analyticsTracker = fakeAnalyticsTracker

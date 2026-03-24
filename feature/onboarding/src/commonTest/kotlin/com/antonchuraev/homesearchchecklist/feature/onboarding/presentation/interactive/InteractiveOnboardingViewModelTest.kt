@@ -97,6 +97,7 @@ class InteractiveOnboardingViewModelTest {
         templatesRepository: FakeTemplatesRepository = fakeTemplatesRepository
     ): InteractiveOnboardingViewModel {
         return InteractiveOnboardingViewModel(
+            savedStateHandle = androidx.lifecycle.SavedStateHandle(),
             navigator = fakeNavigator,
             completeOnboardingUseCase = CompleteOnboardingUseCase(fakeUserDataRepository),
             templatesRepository = templatesRepository,

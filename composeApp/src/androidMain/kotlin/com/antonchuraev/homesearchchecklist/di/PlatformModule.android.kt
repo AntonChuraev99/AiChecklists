@@ -2,7 +2,10 @@ package com.antonchuraev.homesearchchecklist.di
 
 import com.antonchuraev.aichecklists.BuildConfig
 import com.antonchuraev.homesearchchecklist.Analytics
+import com.antonchuraev.homesearchchecklist.CrashlyticsAppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
+import com.antonchuraev.homesearchchecklist.core.common.impl.AndroidAppLogger
 import com.antonchuraev.homesearchchecklist.csat.ObservableAnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppContextHolder
 import com.antonchuraev.homesearchchecklist.core.datastore.api.UserAppDatastoreProvider
@@ -22,4 +25,7 @@ actual fun platformModule(): Module = module {
     single { DeviceIdProvider(UserAppDatastoreProvider.instance) }
     single<AnalyticsTracker> { ObservableAnalyticsTracker(Analytics) }
     single<ChecklistReminderScheduler> { ReminderScheduler(get(), get()) }
+
+    // Override AppLogger with Crashlytics breadcrumbs and non-fatal recording
+    single<AppLogger> { CrashlyticsAppLogger(AndroidAppLogger()) }
 }

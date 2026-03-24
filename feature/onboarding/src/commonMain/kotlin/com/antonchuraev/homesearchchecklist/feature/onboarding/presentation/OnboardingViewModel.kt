@@ -1,5 +1,6 @@
 package com.antonchuraev.homesearchchecklist.feature.onboarding.presentation
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
@@ -12,6 +13,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class OnboardingViewModel(
+    private val savedStateHandle: SavedStateHandle,
     private val navigator: AppNavigator,
     private val completeOnboardingUseCase: CompleteOnboardingUseCase,
     private val analyticsTracker: AnalyticsTracker
@@ -21,7 +23,16 @@ class OnboardingViewModel(
     override val screenState: StateFlow<OnboardingState> = _screenState.asStateFlow()
 
     init {
-        analyticsTracker.event("onboarding_started", mapOf("variant" to "slides"))
+        val alreadyTracked = savedStateHandle.get<Boolean>(KEY_STARTED_TRACKED) == true
+        if (!alreadyTracked) {
+            analyticsTracker.event("onboarding_started", mapOf("variant" to "slides"))
+            savedStateHandle[KEY_STARTED_TRACKED] = true
+        }
+        // Always track ViewModel creation for diagnostics (helps identify process death)
+        analyticsTracker.event("onboarding_vm_created", mapOf(
+            "variant" to "slides",
+            "is_restored" to alreadyTracked.toString()
+        ))
     }
 
     override fun onIntent(intent: OnboardingIntent) {
@@ -62,5 +73,9 @@ class OnboardingViewModel(
             completeOnboardingUseCase()
             navigator.navigateToMainScreen(clearBackStack = true)
         }
+    }
+
+    companion object {
+        private const val KEY_STARTED_TRACKED = "onboarding_started_tracked"
     }
 }
