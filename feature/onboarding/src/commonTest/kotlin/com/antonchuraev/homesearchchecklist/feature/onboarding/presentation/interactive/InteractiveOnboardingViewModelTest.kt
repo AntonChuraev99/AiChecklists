@@ -1054,6 +1054,43 @@ class InteractiveOnboardingViewModelTest {
         assertEquals("once", reminderEvent["type"])
     }
 
+    // ── Mutual exclusion: separateCompleted vs autoDeleteCompleted ──
+
+    @Test
+    fun toggleSeparateCompleted_disablesAutoDelete() = runTest {
+        val vm = createViewModelAtCustomize()
+        vm.onIntent(InteractiveOnboardingIntent.OnToggleAutoDeleteCompleted)
+        assertTrue(vm.screenState.value.autoDeleteCompleted)
+
+        vm.onIntent(InteractiveOnboardingIntent.OnToggleSeparateCompleted)
+
+        assertTrue(vm.screenState.value.separateCompleted)
+        assertFalse(vm.screenState.value.autoDeleteCompleted)
+    }
+
+    @Test
+    fun toggleAutoDeleteCompleted_disablesSeparateCompleted() = runTest {
+        val vm = createViewModelAtCustomize()
+        vm.onIntent(InteractiveOnboardingIntent.OnToggleSeparateCompleted)
+        assertTrue(vm.screenState.value.separateCompleted)
+
+        vm.onIntent(InteractiveOnboardingIntent.OnToggleAutoDeleteCompleted)
+
+        assertTrue(vm.screenState.value.autoDeleteCompleted)
+        assertFalse(vm.screenState.value.separateCompleted)
+    }
+
+    @Test
+    fun toggleSeparateCompletedOff_doesNotReenableAutoDelete() = runTest {
+        val vm = createViewModelAtCustomize()
+        // Both are false initially. Turn separate on, then off.
+        vm.onIntent(InteractiveOnboardingIntent.OnToggleSeparateCompleted)
+        vm.onIntent(InteractiveOnboardingIntent.OnToggleSeparateCompleted)
+
+        assertFalse(vm.screenState.value.separateCompleted)
+        assertFalse(vm.screenState.value.autoDeleteCompleted)
+    }
+
     // --- Test doubles ---
 
     private class FakeTemplatesRepository(
