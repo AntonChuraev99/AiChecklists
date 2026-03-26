@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -44,8 +45,13 @@ fun AppButton(
         }
         Text(
             text = text,
-            style = MaterialTheme.typography.labelLarge
+            style = MaterialTheme.typography.labelLarge,
+            maxLines = 1,
+            autoSize = TextAutoSize.StepBased(MaterialTheme.typography.labelLarge.fontSize / 2 , MaterialTheme.typography.labelLarge.fontSize)
         )
+        if (icon != null) {
+            Spacer(modifier = Modifier.width(18.dp + AppDimens.SpacingSm))
+        }
     }
 }
 
