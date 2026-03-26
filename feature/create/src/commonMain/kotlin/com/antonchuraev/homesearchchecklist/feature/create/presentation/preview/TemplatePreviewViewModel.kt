@@ -7,6 +7,9 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Check
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.create.domain.repository.TemplatesRepository
+import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.*
+import org.jetbrains.compose.resources.getString
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -54,12 +57,12 @@ class TemplatePreviewViewModel(
                     }
                 } else {
                     _screenState.update {
-                        it.copy(isLoading = false, error = "Template not found")
+                        it.copy(isLoading = false, error = getString(Res.string.error_template_not_found))
                     }
                 }
             } catch (e: Exception) {
                 _screenState.update {
-                    it.copy(isLoading = false, error = e.message ?: "Failed to load template")
+                    it.copy(isLoading = false, error = e.message ?: getString(Res.string.error_template_load_failed))
                 }
             }
         }
@@ -94,12 +97,12 @@ class TemplatePreviewViewModel(
         val state = _screenState.value
         val template = state.template ?: return
 
-        if (state.editableItems.isEmpty()) {
-            _screenState.update { it.copy(error = "Add at least one item") }
-            return
-        }
-
         viewModelScope.launch {
+            if (state.editableItems.isEmpty()) {
+                _screenState.update { it.copy(error = getString(Res.string.error_add_at_least_one_item)) }
+                return@launch
+            }
+
             _screenState.update { it.copy(isCreating = true) }
 
             try {
@@ -115,7 +118,7 @@ class TemplatePreviewViewModel(
                 appNavigator.navigateToChecklistDetail(checklistId, clearBackStack = true)
             } catch (e: Exception) {
                 _screenState.update {
-                    it.copy(isCreating = false, error = e.message ?: "Failed to create checklist")
+                    it.copy(isCreating = false, error = e.message ?: getString(Res.string.error_create_checklist_failed))
                 }
             }
         }

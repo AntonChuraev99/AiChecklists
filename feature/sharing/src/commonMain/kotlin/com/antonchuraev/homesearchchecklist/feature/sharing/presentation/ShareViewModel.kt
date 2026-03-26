@@ -8,6 +8,9 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.
 import com.antonchuraev.homesearchchecklist.feature.sharing.domain.formatter.ChecklistFormatter
 import com.antonchuraev.homesearchchecklist.feature.sharing.domain.model.ShareFormat
 import com.antonchuraev.homesearchchecklist.feature.sharing.presentation.pdf.PdfGenerator
+import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.*
+import org.jetbrains.compose.resources.getString
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,7 +37,7 @@ class ShareViewModel(
         viewModelScope.launch {
             val checklist = repository.getChecklistById(checklistId)
             if (checklist == null) {
-                _screenState.update { it.copy(isLoading = false, error = "Checklist not found") }
+                _screenState.update { it.copy(isLoading = false, error = getString(Res.string.checklist_not_found)) }
                 return@launch
             }
 
@@ -118,7 +121,7 @@ class ShareViewModel(
                         _screenState.update {
                             it.copy(
                                 isGeneratingPdf = false,
-                                error = "Failed to generate PDF"
+                                error = getString(Res.string.error_generate_pdf_failed)
                             )
                         }
                     }

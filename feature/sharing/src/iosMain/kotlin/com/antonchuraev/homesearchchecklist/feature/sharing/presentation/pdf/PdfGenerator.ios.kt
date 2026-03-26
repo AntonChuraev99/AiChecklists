@@ -1,11 +1,14 @@
 package com.antonchuraev.homesearchchecklist.feature.sharing.presentation.pdf
 
+import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.*
 import com.antonchuraev.homesearchchecklist.feature.sharing.domain.formatter.PdfContent
 import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.withContext
+import org.jetbrains.compose.resources.getString
 import platform.CoreGraphics.CGContextSetFillColorWithColor
 import platform.CoreGraphics.CGContextSetStrokeColorWithColor
 import platform.CoreGraphics.CGContextFillRect
@@ -31,6 +34,7 @@ import platform.UIKit.drawInRect
 actual class PdfGenerator {
 
     actual suspend fun generatePdf(content: PdfContent, fileName: String): String? {
+        val noteLabel = getString(Res.string.pdf_note_label)
         return withContext(Dispatchers.IO) {
             try {
                 // Get cache directory
@@ -127,7 +131,7 @@ actual class PdfGenerator {
 
                     // Draw note if present
                     item.note?.let { note ->
-                        drawAttributedText("Note: $note", textX + 8.0, yOffset, noteFont, grayColor, pageWidth - textX - margin - 8.0)
+                        drawAttributedText("$noteLabel $note", textX + 8.0, yOffset, noteFont, grayColor, pageWidth - textX - margin - 8.0)
                         yOffset += 18.0
                     }
 

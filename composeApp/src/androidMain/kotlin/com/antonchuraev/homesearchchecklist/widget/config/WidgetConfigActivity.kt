@@ -37,6 +37,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.lifecycle.lifecycleScope
+import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppTheme
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.widget.ChecklistWidget
@@ -101,10 +104,10 @@ class WidgetConfigActivity : ComponentActivity() {
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text("Select Checklist") },
+                    title = { Text(stringResource(Res.string.widget_config_title)) },
                     navigationIcon = {
                         IconButton(onClick = onCancel) {
-                            Icon(Icons.Default.Close, contentDescription = "Cancel")
+                            Icon(Icons.Default.Close, contentDescription = stringResource(Res.string.cancel))
                         }
                     }
                 )
@@ -159,7 +162,7 @@ class WidgetConfigActivity : ComponentActivity() {
                     style = MaterialTheme.typography.bodyLarge
                 )
                 Text(
-                    text = "${checklist.items.size} items",
+                    text = stringResource(Res.string.widget_config_items_count, checklist.items.size),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -178,14 +181,14 @@ class WidgetConfigActivity : ComponentActivity() {
             Spacer(modifier = Modifier.height(48.dp))
 
             Text(
-                text = "No checklists yet",
+                text = stringResource(Res.string.widget_config_empty_title),
                 style = MaterialTheme.typography.titleMedium
             )
 
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Create a checklist in the app first, then come back to configure the widget.",
+                text = stringResource(Res.string.widget_config_empty_description),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

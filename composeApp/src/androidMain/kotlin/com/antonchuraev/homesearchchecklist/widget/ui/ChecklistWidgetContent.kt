@@ -5,6 +5,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
+import androidx.glance.LocalContext
 import androidx.glance.action.ActionParameters
 import androidx.glance.action.actionParametersOf
 import androidx.glance.action.clickable
@@ -204,9 +205,10 @@ private fun CheckboxIndicator(checked: Boolean) {
         GlanceTheme.colors.outline
     }
 
+    val context = LocalContext.current
     Image(
         provider = ImageProvider(iconRes),
-        contentDescription = if (checked) "Checked" else "Unchecked",
+        contentDescription = if (checked) context.getString(R.string.widget_checked) else context.getString(R.string.widget_unchecked),
         modifier = GlanceModifier.size(24.dp),
         colorFilter = ColorFilter.tint(tintColor)
     )
@@ -223,7 +225,7 @@ private fun EmptyItemsContent() {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = "No items",
+            text = LocalContext.current.getString(R.string.widget_no_items),
             style = TextStyle(
                 fontSize = 14.sp,
                 color = GlanceTheme.colors.outline

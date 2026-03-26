@@ -337,6 +337,15 @@
     <!-- Splash Screen -->
     <string name="splash_loading">Getting things ready...</string>
 
+    <!-- Errors (used in ViewModels via getString) -->
+    <string name="error_add_at_least_one_item">Add at least one item</string>
+    <string name="error_create_checklist_failed">Failed to create checklist</string>
+    <string name="error_generate_pdf_failed">Failed to generate PDF</string>
+    <string name="error_no_data_available">No data available</string>
+    <string name="error_template_not_found">Template not found</string>
+    <string name="error_template_load_failed">Failed to load template</string>
+    <string name="error_fill_not_found">Default fill not found</string>
+
     <!-- Share Screen -->
     <string name="share">Share</string>
     <string name="share_screen_title">Share Checklist</string>
@@ -480,7 +489,63 @@
     <string name="reminder_repeat_save">Save</string>
     <string name="reminder_ends_done">Done</string>
 
+    <!-- Common Accessibility -->
+    <string name="back">Back</string>
+    <string name="feedback">Feedback</string>
+    <string name="completed_label">Completed</string>
+
+    <!-- Checklist Detail - Undo -->
+    <string name="checklist_item_deleted">"%1$s" deleted</string>
+
+    <!-- Share Screen - Preview -->
+    <string name="share_items_progress">%1$d/%2$d items</string>
+
+    <!-- Onboarding - Interactive - Customize Step -->
+    <string name="onboarding_interactive_settings">Settings</string>
+
+    <!-- Consent Dialog -->
+    <string name="consent_title">Privacy &amp; Data Usage</string>
+    <string name="consent_body">We use analytics to improve the app and measure ad effectiveness. Your data helps us understand how features are used and optimize your experience.\n\nDo you consent to data collection for analytics and advertising purposes?</string>
+    <string name="consent_accept">Accept</string>
+    <string name="consent_decline">Decline</string>
+
+    <!-- Widget Config -->
+    <string name="widget_config_title">Select Checklist</string>
+    <string name="widget_config_items_count">%1$d items</string>
+    <string name="widget_config_empty_title">No checklists yet</string>
+    <string name="widget_config_empty_description">Create a checklist in the app first, then come back to configure the widget.</string>
+
+    <!-- Feature Illustrations -->
+    <string name="illustration_photo">Photo</string>
+    <string name="illustration_pdf">PDF</string>
+    <string name="illustration_text">Text</string>
+    <string name="illustration_link">Link</string>
+    <string name="illustration_voice">Voice</string>
+    <string name="illustration_task_extracted">Task extracted from content</string>
+    <string name="illustration_another_item">Another item from your input</string>
+    <string name="illustration_ai_generated">AI-generated checklist item</string>
+    <string name="illustration_apartment_check">🏠 Apartment Check</string>
+    <string name="illustration_kitchen">Kitchen condition</string>
+    <string name="illustration_windows">Windows &amp; doors</string>
+    <string name="illustration_plumbing">Plumbing works</string>
+    <string name="illustration_main_street">✅ Main Street Apt</string>
+    <string name="illustration_project_review">Project Review</string>
+    <string name="illustration_progress">3/3 ✓</string>
+    <string name="illustration_review_document">Review document</string>
+    <string name="illustration_send_email">Send email</string>
+    <string name="illustration_final_approval">Final approval</string>
+    <string name="illustration_share">Share</string>
+    <string name="illustration_ai_badge">✨ AI</string>
+    <string name="illustration_unlimited_create">Unlimited Create via AI</string>
+    <string name="illustration_unlimited_fill">Unlimited Fill via AI</string>
+    <string name="illustration_pdf_text_export">PDF &amp; Text Export</string>
+    <string name="illustration_credits_daily">300 AI credits daily</string>
+
     <!-- Debug Screen -->
+    <!-- PDF Export -->
+    <string name="pdf_note_label">Note:</string>
+    <string name="pdf_page_number">Page %1$d of %2$d</string>
+
     <string name="debug_title">Debug Menu</string>
     <string name="debug_developer_tools">Developer Tools</string>
     <string name="debug_app_info">App Info</string>
@@ -499,4 +564,12 @@
     <string name="debug_test_restore_credits_description">Simulate credit restore after purchase</string>
     <string name="debug_restore_credits_success">Credits restored: %1$d</string>
     <string name="debug_restore_credits_error">Failed to restore credits</string>
+    <string name="debug_store_screenshots">Store Screenshots</string>
+    <string name="debug_store_screenshots_description">Preview screens for App Store/Play Store</string>
+    <string name="debug_repeat_rule_presets">Repeat Rule Presets</string>
+    <string name="debug_repeat_rule_presets_description">Preview the 8 smart repeat presets sheet</string>
+    <string name="debug_show_csat">Show CSAT Survey</string>
+    <string name="debug_show_csat_description">Force show CSAT bottom sheet for testing</string>
+    <string name="debug_interactive_onboarding">Interactive Onboarding</string>
+    <string name="debug_interactive_onboarding_description">Open the new interactive onboarding flow</string>
 </resources>

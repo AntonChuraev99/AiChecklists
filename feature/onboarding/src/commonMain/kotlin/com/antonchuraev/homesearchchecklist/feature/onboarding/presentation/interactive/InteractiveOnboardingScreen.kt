@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive
 
 import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.back
 import aichecklists.core.designsystem.generated.resources.onboarding_discover_maybe_later
 import aichecklists.core.designsystem.generated.resources.onboarding_skip
 import androidx.compose.animation.AnimatedContent
@@ -116,7 +117,7 @@ fun InteractiveOnboardingScreen(
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
+                        contentDescription = stringResource(Res.string.back),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }

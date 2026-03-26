@@ -29,6 +29,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -58,9 +61,9 @@ fun CreateViaAiIllustration() {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            InputIcon(Icons.Outlined.PhotoCamera, "Photo")
-            InputIcon(Icons.Outlined.Description, "PDF")
-            InputIcon(Icons.AutoMirrored.Outlined.TextSnippet, "Text")
+            InputIcon(Icons.Outlined.PhotoCamera, stringResource(Res.string.illustration_photo))
+            InputIcon(Icons.Outlined.Description, stringResource(Res.string.illustration_pdf))
+            InputIcon(Icons.AutoMirrored.Outlined.TextSnippet, stringResource(Res.string.illustration_text))
         }
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -69,8 +72,8 @@ fun CreateViaAiIllustration() {
             modifier = Modifier.fillMaxWidth(0.7f),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            InputIcon(Icons.Outlined.Link, "Link")
-            InputIcon(Icons.Outlined.Mic, "Voice")
+            InputIcon(Icons.Outlined.Link, stringResource(Res.string.illustration_link))
+            InputIcon(Icons.Outlined.Mic, stringResource(Res.string.illustration_voice))
         }
 
         Spacer(modifier = Modifier.height(20.dp))
@@ -93,9 +96,9 @@ fun CreateViaAiIllustration() {
         // Result: Checklist
         ChecklistPreview(
             items = listOf(
-                "Task extracted from content" to false,
-                "Another item from your input" to false,
-                "AI-generated checklist item" to false
+                stringResource(Res.string.illustration_task_extracted) to false,
+                stringResource(Res.string.illustration_another_item) to false,
+                stringResource(Res.string.illustration_ai_generated) to false
             )
         )
     }
@@ -125,15 +128,15 @@ fun FillViaAiIllustration() {
         ) {
             Column {
                 Text(
-                    text = "🏠 Apartment Check",
+                    text = stringResource(Res.string.illustration_apartment_check),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                ChecklistItemRow("Kitchen condition", false)
-                ChecklistItemRow("Windows & doors", false)
-                ChecklistItemRow("Plumbing works", false)
+                ChecklistItemRow(stringResource(Res.string.illustration_kitchen), false)
+                ChecklistItemRow(stringResource(Res.string.illustration_windows), false)
+                ChecklistItemRow(stringResource(Res.string.illustration_plumbing), false)
             }
         }
 
@@ -184,15 +187,15 @@ fun FillViaAiIllustration() {
         ) {
             Column {
                 Text(
-                    text = "✅ Main Street Apt",
+                    text = stringResource(Res.string.illustration_main_street),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                ChecklistItemRow("Kitchen condition", true)
-                ChecklistItemRow("Windows & doors", true)
-                ChecklistItemRow("Plumbing works", false)
+                ChecklistItemRow(stringResource(Res.string.illustration_kitchen), true)
+                ChecklistItemRow(stringResource(Res.string.illustration_windows), true)
+                ChecklistItemRow(stringResource(Res.string.illustration_plumbing), false)
             }
         }
     }
@@ -225,22 +228,22 @@ fun ExportShareIllustration() {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Project Review",
+                        text = stringResource(Res.string.illustration_project_review),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "3/3 ✓",
+                        text = stringResource(Res.string.illustration_progress),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary
                     )
                 }
                 Spacer(modifier = Modifier.height(8.dp))
-                ChecklistItemRow("Review document", true)
-                ChecklistItemRow("Send email", true)
-                ChecklistItemRow("Final approval", true)
+                ChecklistItemRow(stringResource(Res.string.illustration_review_document), true)
+                ChecklistItemRow(stringResource(Res.string.illustration_send_email), true)
+                ChecklistItemRow(stringResource(Res.string.illustration_final_approval), true)
             }
         }
 
@@ -258,11 +261,11 @@ fun ExportShareIllustration() {
         ) {
             ExportOption(
                 icon = Icons.Outlined.PictureAsPdf,
-                label = "PDF"
+                label = stringResource(Res.string.illustration_pdf)
             )
             ExportOption(
                 icon = Icons.AutoMirrored.Outlined.TextSnippet,
-                label = "Text"
+                label = stringResource(Res.string.illustration_text)
             )
         }
 
@@ -286,7 +289,7 @@ fun ExportShareIllustration() {
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Share",
+                    text = stringResource(Res.string.illustration_share),
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onPrimary
@@ -318,10 +321,10 @@ fun PremiumBenefitsIllustration() {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            PremiumBenefitRow("✨", "Unlimited Create via AI")
-            PremiumBenefitRow("🔄", "Unlimited Fill via AI")
-            PremiumBenefitRow("📄", "PDF & Text Export")
-            PremiumBenefitRow("⚡", "300 AI credits daily")
+            PremiumBenefitRow("✨", stringResource(Res.string.illustration_unlimited_create))
+            PremiumBenefitRow("🔄", stringResource(Res.string.illustration_unlimited_fill))
+            PremiumBenefitRow("📄", stringResource(Res.string.illustration_pdf_text_export))
+            PremiumBenefitRow("⚡", stringResource(Res.string.illustration_credits_daily))
         }
     }
 }
@@ -374,7 +377,7 @@ private fun AiBadge() {
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text = "✨ AI",
+            text = stringResource(Res.string.illustration_ai_badge),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary

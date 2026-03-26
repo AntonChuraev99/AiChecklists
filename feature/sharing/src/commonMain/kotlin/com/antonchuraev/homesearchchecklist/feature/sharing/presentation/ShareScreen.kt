@@ -218,7 +218,7 @@ private fun ChecklistPreviewCard(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "$checkedCount/$itemCount items",
+                    text = stringResource(Res.string.share_items_progress, checkedCount, itemCount),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

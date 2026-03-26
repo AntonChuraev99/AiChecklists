@@ -71,7 +71,7 @@ fun MainScreen(
                 IconButton(onClick = onFeedbackClick) {
                     Icon(
                         imageVector = Icons.Outlined.Email,
-                        contentDescription = "Feedback",
+                        contentDescription = stringResource(Res.string.feedback),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
