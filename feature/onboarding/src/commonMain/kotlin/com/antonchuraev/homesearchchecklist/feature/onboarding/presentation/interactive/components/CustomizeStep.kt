@@ -5,6 +5,7 @@ import aichecklists.core.designsystem.generated.resources.auto_delete_completed
 import aichecklists.core.designsystem.generated.resources.onboarding_interactive_customize_continue
 import aichecklists.core.designsystem.generated.resources.onboarding_interactive_customize_subtitle
 import aichecklists.core.designsystem.generated.resources.onboarding_interactive_customize_title
+import aichecklists.core.designsystem.generated.resources.onboarding_interactive_settings
 import aichecklists.core.designsystem.generated.resources.separate_completed
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -117,7 +118,7 @@ fun CustomizeStep(
                 Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
 
                 Text(
-                    text = "Settings",
+                    text = stringResource(Res.string.onboarding_interactive_settings),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(vertical = AppDimens.SpacingXs)

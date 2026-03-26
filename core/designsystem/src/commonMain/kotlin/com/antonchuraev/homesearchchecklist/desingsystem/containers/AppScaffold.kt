@@ -15,6 +15,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,7 +49,7 @@ fun AppScaffold(
                             IconButton(onClick = onBackButtonClick) {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Filled.ArrowBackIos,
-                                    contentDescription = "Back",
+                                    contentDescription = stringResource(Res.string.back),
                                     tint = MaterialTheme.colorScheme.primary
                                 )
                             }

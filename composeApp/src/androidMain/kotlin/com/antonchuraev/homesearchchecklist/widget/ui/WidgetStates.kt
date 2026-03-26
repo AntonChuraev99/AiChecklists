@@ -6,9 +6,11 @@ import androidx.compose.ui.unit.sp
 import androidx.glance.Button
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
+import androidx.glance.LocalContext
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.background
+import com.antonchuraev.aichecklists.R
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Column
 import androidx.glance.layout.Spacer
@@ -34,7 +36,7 @@ fun LoadingContent() {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = "Loading...",
+            text = LocalContext.current.getString(R.string.widget_loading),
             style = TextStyle(
                 fontSize = 14.sp,
                 color = GlanceTheme.colors.onBackground
@@ -57,7 +59,7 @@ fun NotFoundContent(appWidgetId: Int) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = "Checklist not found",
+            text = LocalContext.current.getString(R.string.widget_not_found),
             style = TextStyle(
                 fontSize = 14.sp,
                 color = GlanceTheme.colors.error,
@@ -68,7 +70,7 @@ fun NotFoundContent(appWidgetId: Int) {
         Spacer(modifier = GlanceModifier.height(12.dp))
 
         Button(
-            text = "Select another",
+            text = LocalContext.current.getString(R.string.widget_select_another),
             onClick = actionRunCallback<ReconfigureAction>()
         )
     }
@@ -89,7 +91,7 @@ fun NotConfiguredContent() {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = "Tap to configure",
+            text = LocalContext.current.getString(R.string.widget_tap_to_configure),
             style = TextStyle(
                 fontSize = 14.sp,
                 color = GlanceTheme.colors.onBackground,
@@ -100,7 +102,7 @@ fun NotConfiguredContent() {
         Spacer(modifier = GlanceModifier.height(8.dp))
 
         Text(
-            text = "Select a checklist to display",
+            text = LocalContext.current.getString(R.string.widget_select_checklist_display),
             style = TextStyle(
                 fontSize = 12.sp,
                 color = GlanceTheme.colors.outline,

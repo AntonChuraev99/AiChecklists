@@ -82,7 +82,7 @@ fun DebugScreen(
         DebugItem(Icons.Default.Add, stringResource(Res.string.debug_create_test), stringResource(Res.string.debug_create_test_description)) {
             viewModel.sendIntent(DebugScreenIntent.CreateTestChecklists)
         },
-        DebugItem(Icons.Outlined.Screenshot, "Store Screenshots", "Preview screens for App Store/Play Store") {
+        DebugItem(Icons.Outlined.Screenshot, stringResource(Res.string.debug_store_screenshots), stringResource(Res.string.debug_store_screenshots_description)) {
             viewModel.sendIntent(DebugScreenIntent.OpenStoreScreenshot)
         },
         DebugItem(
@@ -94,22 +94,22 @@ fun DebugScreen(
         },
         DebugItem(
             Icons.Default.Notifications,
-            "Repeat Rule Presets",
-            "Preview the 8 smart repeat presets sheet"
+            stringResource(Res.string.debug_repeat_rule_presets),
+            stringResource(Res.string.debug_repeat_rule_presets_description)
         ) {
             showRepeatRulePreview = true
         },
         DebugItem(
             Icons.Default.ThumbUp,
-            "Show CSAT Survey",
-            "Force show CSAT bottom sheet for testing"
+            stringResource(Res.string.debug_show_csat),
+            stringResource(Res.string.debug_show_csat_description)
         ) {
             onShowCsat()
         },
         DebugItem(
             Icons.Outlined.CheckCircle,
-            "Interactive Onboarding",
-            "Open the new interactive onboarding flow"
+            stringResource(Res.string.debug_interactive_onboarding),
+            stringResource(Res.string.debug_interactive_onboarding_description)
         ) {
             viewModel.sendIntent(DebugScreenIntent.OpenInteractiveOnboarding)
         }

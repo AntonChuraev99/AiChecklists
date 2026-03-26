@@ -5,9 +5,12 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
+import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.*
 import com.antonchuraev.homesearchchecklist.feature.sharing.domain.formatter.PdfContent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.jetbrains.compose.resources.getString
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import java.io.File
@@ -18,6 +21,7 @@ actual class PdfGenerator : KoinComponent {
     private val context: Context by inject()
 
     actual suspend fun generatePdf(content: PdfContent, fileName: String): String? {
+        val noteLabel = getString(Res.string.pdf_note_label)
         return withContext(Dispatchers.IO) {
             try {
                 val document = PdfDocument()
@@ -171,7 +175,7 @@ actual class PdfGenerator : KoinComponent {
 
                         // Draw note if present
                         item.note?.let { note ->
-                            canvas.drawText("Note: $note", textX + 8f, yOffset + 12f, notePaint)
+                            canvas.drawText("$noteLabel $note", textX + 8f, yOffset + 12f, notePaint)
                             yOffset += 18f
                         }
 
@@ -180,7 +184,7 @@ actual class PdfGenerator : KoinComponent {
 
                     // Page number
                     if (totalPages > 1) {
-                        val pageNumText = "Page ${pageIndex + 1} of $totalPages"
+                        val pageNumText = getString(Res.string.pdf_page_number, pageIndex + 1, totalPages)
                         val pageNumWidth = notePaint.measureText(pageNumText)
                         canvas.drawText(
                             pageNumText,

@@ -339,7 +339,7 @@ private fun ActionCard(
             if (isCompleted) {
                 Icon(
                     imageVector = Icons.Outlined.CheckCircle,
-                    contentDescription = "Completed",
+                    contentDescription = stringResource(Res.string.completed_label),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(24.dp)
                 )

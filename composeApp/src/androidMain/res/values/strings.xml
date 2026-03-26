@@ -6,6 +6,15 @@
     <string name="widget_description">Display and check off items from your checklist</string>
     <string name="widget_loading">Loading…</string>
 
+    <!-- Widget UI States -->
+    <string name="widget_not_found">Checklist not found</string>
+    <string name="widget_select_another">Select another</string>
+    <string name="widget_tap_to_configure">Tap to configure</string>
+    <string name="widget_select_checklist_display">Select a checklist to display</string>
+    <string name="widget_no_items">No items</string>
+    <string name="widget_checked">Checked</string>
+    <string name="widget_unchecked">Unchecked</string>
+
     <!-- Reminder Notifications -->
     <string name="reminder_all_completed">All items completed!</string>
     <string name="reminder_notification_channel">Checklist Reminders</string>

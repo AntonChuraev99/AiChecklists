@@ -144,6 +144,7 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.Remind
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderDateTimePicker
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
+import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import kotlinx.coroutines.launch
@@ -235,8 +236,9 @@ private fun ChecklistDetailContent(
     val undoLabel = stringResource(Res.string.undo)
     LaunchedEffect(state.pendingUndoItem) {
         val undo = state.pendingUndoItem ?: return@LaunchedEffect
+        val deletedMessage = getString(Res.string.checklist_item_deleted, undo.fillItem.text)
         val result = snackbarHostState.showSnackbar(
-            message = "\"${undo.fillItem.text}\" deleted",
+            message = deletedMessage,
             actionLabel = undoLabel,
             duration = SnackbarDuration.Short,
         )

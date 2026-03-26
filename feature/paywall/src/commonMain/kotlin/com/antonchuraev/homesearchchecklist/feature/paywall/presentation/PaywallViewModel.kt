@@ -14,6 +14,9 @@ import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.Restore
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetOfferingsUseCase
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.PurchaseProductUseCase
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.RestorePurchasesUseCase
+import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.*
+import org.jetbrains.compose.resources.getString
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -111,12 +114,13 @@ class PaywallViewModel(
         }
     }
 
-    private fun handleEmptyProducts() {
+    private suspend fun handleEmptyProducts() {
+        val errorMessage = getString(Res.string.paywall_load_error)
         _screenState.update {
             it.copy(
                 isLoading = false,
                 products = emptyList(),
-                error = "Unable to load subscription options. Please check your internet connection and try again."
+                error = errorMessage
             )
         }
     }
@@ -192,7 +196,7 @@ class PaywallViewModel(
                 is RestoreResult.NoActiveSubscription -> {
                     analyticsTracker.event("restore_no_subscription", mapOf("source" to source))
                     _screenState.update {
-                        it.copy(isPurchasing = false, error = "No active subscription found")
+                        it.copy(isPurchasing = false, error = getString(Res.string.paywall_no_subscription_found))
                     }
                 }
                 is RestoreResult.Error -> {

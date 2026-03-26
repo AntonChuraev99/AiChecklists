@@ -5,6 +5,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * Simple consent dialog for EEA/UK users.
@@ -19,26 +22,24 @@ fun ConsentDialog(
         onDismissRequest = { /* Non-dismissible — user must choose */ },
         title = {
             Text(
-                text = "Privacy & Data Usage",
+                text = stringResource(Res.string.consent_title),
                 style = MaterialTheme.typography.titleLarge
             )
         },
         text = {
             Text(
-                text = "We use analytics to improve the app and measure ad effectiveness. " +
-                    "Your data helps us understand how features are used and optimize your experience.\n\n" +
-                    "Do you consent to data collection for analytics and advertising purposes?",
+                text = stringResource(Res.string.consent_body),
                 style = MaterialTheme.typography.bodyMedium
             )
         },
         confirmButton = {
             TextButton(onClick = onAccept) {
-                Text("Accept")
+                Text(stringResource(Res.string.consent_accept))
             }
         },
         dismissButton = {
             TextButton(onClick = onDecline) {
-                Text("Decline")
+                Text(stringResource(Res.string.consent_decline))
             }
         },
         containerColor = MaterialTheme.colorScheme.surface,
