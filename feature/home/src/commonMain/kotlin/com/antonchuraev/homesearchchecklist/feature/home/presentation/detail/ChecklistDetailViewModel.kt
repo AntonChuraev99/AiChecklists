@@ -362,9 +362,15 @@ class ChecklistDetailViewModel(
     private fun toggleSeparateCompleted() {
         val current = (_screenState.value as? ChecklistDetailState.Content)?.separateCompleted ?: false
         val newValue = !current
-        updateContentState { it.copy(separateCompleted = newValue) }
+        updateContentState {
+            it.copy(
+                separateCompleted = newValue,
+                autoDeleteCompleted = if (newValue) false else it.autoDeleteCompleted,
+            )
+        }
         viewModelScope.launch {
             repository.setSeparateCompleted(checklistId, newValue)
+            if (newValue) repository.setAutoDeleteCompleted(checklistId, false)
         }
         analyticsTracker.event(
             "separate_completed_toggled",
@@ -375,9 +381,15 @@ class ChecklistDetailViewModel(
     private fun toggleAutoDeleteCompleted() {
         val current = (_screenState.value as? ChecklistDetailState.Content)?.autoDeleteCompleted ?: false
         val newValue = !current
-        updateContentState { it.copy(autoDeleteCompleted = newValue) }
+        updateContentState {
+            it.copy(
+                autoDeleteCompleted = newValue,
+                separateCompleted = if (newValue) false else it.separateCompleted,
+            )
+        }
         viewModelScope.launch {
             repository.setAutoDeleteCompleted(checklistId, newValue)
+            if (newValue) repository.setSeparateCompleted(checklistId, false)
         }
         analyticsTracker.event(
             "auto_delete_completed_toggled",

@@ -152,6 +152,62 @@ class ChecklistDetailViewModelTest {
         assertEquals(-1, undo.originalChecklistIndex)
     }
 
+    // ── Mutual exclusion: separateCompleted vs autoDeleteCompleted ──
+
+    @Test
+    fun `Enabling separateCompleted should disable autoDeleteCompleted`() {
+        val state = ChecklistDetailState.Content(
+            checklist = Checklist(id = 1L, name = "Test", items = emptyList()),
+            defaultFill = null,
+            autoDeleteCompleted = true,
+            separateCompleted = false
+        )
+
+        val updated = state.copy(
+            separateCompleted = true,
+            autoDeleteCompleted = if (true) false else state.autoDeleteCompleted,
+        )
+
+        assertTrue(updated.separateCompleted)
+        assertEquals(false, updated.autoDeleteCompleted)
+    }
+
+    @Test
+    fun `Enabling autoDeleteCompleted should disable separateCompleted`() {
+        val state = ChecklistDetailState.Content(
+            checklist = Checklist(id = 1L, name = "Test", items = emptyList()),
+            defaultFill = null,
+            autoDeleteCompleted = false,
+            separateCompleted = true
+        )
+
+        val updated = state.copy(
+            autoDeleteCompleted = true,
+            separateCompleted = if (true) false else state.separateCompleted,
+        )
+
+        assertTrue(updated.autoDeleteCompleted)
+        assertEquals(false, updated.separateCompleted)
+    }
+
+    @Test
+    fun `Disabling separateCompleted should not re-enable autoDeleteCompleted`() {
+        val state = ChecklistDetailState.Content(
+            checklist = Checklist(id = 1L, name = "Test", items = emptyList()),
+            defaultFill = null,
+            separateCompleted = true,
+            autoDeleteCompleted = false
+        )
+
+        val updated = state.copy(
+            separateCompleted = false,
+            autoDeleteCompleted = if (false) false else state.autoDeleteCompleted,
+        )
+
+        assertEquals(false, updated.separateCompleted)
+        assertEquals(false, updated.autoDeleteCompleted)
+    }
+
     @Test
     fun `Content state should calculate progress correctly from default fill`() {
         val checklist = Checklist(

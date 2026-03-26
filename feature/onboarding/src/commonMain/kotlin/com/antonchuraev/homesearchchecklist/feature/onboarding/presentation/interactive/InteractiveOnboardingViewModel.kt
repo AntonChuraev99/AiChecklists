@@ -65,8 +65,20 @@ class InteractiveOnboardingViewModel(
             is InteractiveOnboardingIntent.OnTemplateSelected -> handleTemplateSelected(intent.template)
             is InteractiveOnboardingIntent.OnToggleItem -> handleToggleItem(intent.index)
             is InteractiveOnboardingIntent.OnChecklistNameChanged -> handleChecklistNameChanged(intent.name)
-            InteractiveOnboardingIntent.OnToggleSeparateCompleted -> _screenState.update { it.copy(separateCompleted = !it.separateCompleted) }
-            InteractiveOnboardingIntent.OnToggleAutoDeleteCompleted -> _screenState.update { it.copy(autoDeleteCompleted = !it.autoDeleteCompleted) }
+            InteractiveOnboardingIntent.OnToggleSeparateCompleted -> _screenState.update {
+                val newValue = !it.separateCompleted
+                it.copy(
+                    separateCompleted = newValue,
+                    autoDeleteCompleted = if (newValue) false else it.autoDeleteCompleted,
+                )
+            }
+            InteractiveOnboardingIntent.OnToggleAutoDeleteCompleted -> _screenState.update {
+                val newValue = !it.autoDeleteCompleted
+                it.copy(
+                    autoDeleteCompleted = newValue,
+                    separateCompleted = if (newValue) false else it.separateCompleted,
+                )
+            }
             InteractiveOnboardingIntent.OnContinueFromCustomize -> handleContinueFromCustomize()
             InteractiveOnboardingIntent.OnCreatingComplete -> handleCreatingComplete()
             is InteractiveOnboardingIntent.OnPreviewItemToggle -> handlePreviewItemToggle(intent.itemId)
