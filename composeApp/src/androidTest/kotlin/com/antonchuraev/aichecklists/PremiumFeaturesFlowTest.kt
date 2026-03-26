@@ -51,18 +51,18 @@ class PremiumFeaturesFlowTest : BaseUiTest() {
             .onNodeWithText("Checklist 3")
             .assertIsDisplayed()
 
-        // At limit: button changes to "Unlock More Checklists"
+        // At limit: button changes to "Become Premium to Unlock More"
         waitUntil(5000) {
-            composeTestRule.onAllNodesWithText("Unlock More Checklists")
+            composeTestRule.onAllNodesWithText("Become Premium to Unlock More")
                 .fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule
-            .onNodeWithText("Unlock More Checklists")
+            .onNodeWithText("Become Premium to Unlock More")
             .assertIsDisplayed()
 
         // Click it - should show paywall
         composeTestRule
-            .onNodeWithText("Unlock More Checklists")
+            .onNodeWithText("Become Premium to Unlock More")
             .performClick()
         waitForIdle()
 
@@ -125,13 +125,13 @@ class PremiumFeaturesFlowTest : BaseUiTest() {
         createChecklistWithItems("Checklist 2", "Item 2")
         createChecklistWithItems("Checklist 3", "Item 3")
 
-        // At limit: button becomes "Unlock More Checklists"
+        // At limit: button becomes "Become Premium to Unlock More"
         waitUntil(5000) {
-            composeTestRule.onAllNodesWithText("Unlock More Checklists")
+            composeTestRule.onAllNodesWithText("Become Premium to Unlock More")
                 .fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule
-            .onNodeWithText("Unlock More Checklists")
+            .onNodeWithText("Become Premium to Unlock More")
             .performClick()
         waitForIdle()
 
