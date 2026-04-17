@@ -24,6 +24,7 @@ import org.jetbrains.compose.resources.stringResource
 fun AppScaffold(
     title: String? = null,
     onBackButtonClick: (() -> Unit)? = null,
+    navigationIcon: (@Composable () -> Unit)? = null,
     actions: @Composable () -> Unit = {},
     bottomBar: @Composable () -> Unit = {},
     snackbarHost: @Composable () -> Unit = {},
@@ -33,7 +34,7 @@ fun AppScaffold(
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = snackbarHost,
         topBar = {
-            if (title != null || onBackButtonClick != null) {
+            if (title != null || onBackButtonClick != null || navigationIcon != null) {
                 CenterAlignedTopAppBar(
                     title = {
                         title?.let {
@@ -45,13 +46,16 @@ fun AppScaffold(
                         }
                     },
                     navigationIcon = {
-                        onBackButtonClick?.let {
-                            IconButton(onClick = onBackButtonClick) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowBackIos,
-                                    contentDescription = stringResource(Res.string.back),
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
+                        when {
+                            navigationIcon != null -> navigationIcon()
+                            onBackButtonClick != null -> {
+                                IconButton(onClick = onBackButtonClick) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.ArrowBackIos,
+                                        contentDescription = stringResource(Res.string.back),
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
                             }
                         }
                     },

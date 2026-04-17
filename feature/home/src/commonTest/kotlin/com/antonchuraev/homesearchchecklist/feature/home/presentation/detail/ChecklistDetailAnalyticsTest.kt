@@ -268,6 +268,7 @@ class ChecklistDetailAnalyticsTest {
         override fun navigateToSubscriptionStatus(showSuccessMessage: Boolean) {}
         override fun navigateToShareChecklist(checklistId: Long) {}
         override fun navigateToInteractiveOnboarding() {}
+        override fun navigateToUpdateFeed() {}
     }
 
     private class FakeRemoteConfigProvider : RemoteConfigProvider {

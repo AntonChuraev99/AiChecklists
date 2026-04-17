@@ -89,6 +89,7 @@ class MainScreenViewModel(
             is MainScreenIntent.OnReorderChecklists -> {
                 viewModelScope.launch { repository.reorderChecklists(intent.orderedIds) }
             }
+            MainScreenIntent.OnUpdateFeedClick -> appNavigator.navigateToUpdateFeed()
         }
     }
 

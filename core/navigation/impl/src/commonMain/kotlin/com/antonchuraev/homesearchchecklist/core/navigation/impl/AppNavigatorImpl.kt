@@ -110,5 +110,11 @@ class AppNavigatorImpl() : AppNavigator {
     override fun navigateToShareChecklist(checklistId: Long) {
         navController.navigate(AppNavRoute.ShareChecklist(checklistId))
     }
+
+    override fun navigateToUpdateFeed() {
+        navController.navigate(AppNavRoute.UpdateFeed) {
+            launchSingleTop = true
+        }
+    }
 }
 

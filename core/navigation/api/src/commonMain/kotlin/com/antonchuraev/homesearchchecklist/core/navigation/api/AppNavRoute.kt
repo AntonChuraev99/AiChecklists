@@ -57,4 +57,7 @@ sealed interface AppNavRoute {
 
     @Serializable
     data class ShareChecklist(val checklistId: Long) : AppNavRoute
+
+    @Serializable
+    data object UpdateFeed : AppNavRoute
 }

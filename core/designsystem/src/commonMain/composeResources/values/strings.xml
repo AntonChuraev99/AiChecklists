@@ -98,6 +98,14 @@
     <string name="main_create_checklist_locked">Become Premium to Unlock More</string>
     <string name="main_ai_analysis">AI Analysis</string>
     <string name="main_no_items">Empty</string>
+    <string name="main_menu">Menu</string>
+    <string name="main_menu_support">Support</string>
+
+    <!-- Update Feed Screen -->
+    <string name="update_feed_title">Updates</string>
+    <string name="update_feed_menu_item">Updates</string>
+    <string name="update_feed_empty_title">No updates yet</string>
+    <string name="update_feed_empty_description">Check back later for news and tips</string>
 
     <!-- Create Screen -->
     <string name="create_title">New Checklist</string>
