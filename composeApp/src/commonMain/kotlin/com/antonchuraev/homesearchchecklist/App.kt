@@ -6,6 +6,7 @@ import com.antonchuraev.homesearchchecklist.csat.CsatViewModel
 import com.antonchuraev.homesearchchecklist.csat.InAppReviewLauncher
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.navigation.compose.NavHost
@@ -30,29 +31,29 @@ import com.antonchuraev.homesearchchecklist.feature.home.presentation.fills.Fill
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.PaywallScreen
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.SubscriptionStatusScreen
 import com.antonchuraev.homesearchchecklist.feature.sharing.presentation.ShareScreen
+import com.antonchuraev.homesearchchecklist.feature.updatefeed.presentation.UpdateFeedScreen
 import androidx.navigation.toRoute
 import org.jetbrains.compose.ui.tooling.preview.Preview
-import org.koin.compose.KoinApplication
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 @Preview
 fun App() {
-    KoinApplication(
-        application = { modules(appModule) }
-    ) {
+    // Koin is already initialized globally in GistiApplication.onCreate().
+    // Do NOT wrap with KoinApplication composable — it calls stopKoin() on dispose
+    // which causes IllegalStateException on NavHost destinations after back navigation.
+    val viewModel: AppViewModel = koinViewModel()
 
-        val viewModel: AppViewModel = koinViewModel()
+    val navController = rememberNavController()
+    LaunchedEffect(navController) {
+        viewModel.installNavController(navController)
+    }
 
-        val navController = rememberNavController().also {
-            viewModel.installNavController(it)
-        }
+    val csatViewModel: CsatViewModel = koinInject()
+    val csatState by csatViewModel.screenState.collectAsState()
 
-        val csatViewModel: CsatViewModel = koinInject()
-        val csatState by csatViewModel.screenState.collectAsState()
-
-        AppTheme {
+    AppTheme {
             NavHost(
                 navController = navController,
                 startDestination = AppNavRoute.Splash
@@ -139,6 +140,10 @@ fun App() {
                     val route = backStackEntry.toRoute<AppNavRoute.ShareChecklist>()
                     ShareScreen(checklistId = route.checklistId)
                 }
+
+                composable<AppNavRoute.UpdateFeed> {
+                    UpdateFeedScreen()
+                }
             }
 
             // CSAT survey — global overlay
@@ -155,5 +160,4 @@ fun App() {
                 onComplete = { csatViewModel.sendIntent(CsatIntent.ReviewComplete) },
             )
         }
-    }
 }
