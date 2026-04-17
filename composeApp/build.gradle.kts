@@ -71,7 +71,8 @@ kotlin {
             implementation(projects.feature.analyze)
             implementation(projects.feature.paywall)
             implementation(projects.feature.sharing)
-            
+            implementation(projects.feature.updatefeed)
+
             implementation(compose.runtime)
             implementation(compose.foundation)
             implementation(compose.material3)

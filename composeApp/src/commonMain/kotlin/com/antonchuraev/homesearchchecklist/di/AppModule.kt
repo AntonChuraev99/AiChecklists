@@ -17,6 +17,7 @@ import com.antonchuraev.homesearchchecklist.feature.user.di.userFeatureModule
 import com.antonchuraev.homesearchchecklist.feature.analyze.di.analyzeFeatureModule
 import com.antonchuraev.homesearchchecklist.feature.paywall.di.paywallFeatureModule
 import com.antonchuraev.homesearchchecklist.feature.sharing.di.sharingFeatureModule
+import com.antonchuraev.homesearchchecklist.feature.updatefeed.di.updateFeedFeatureModule
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.impl.di.remoteConfigModule
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.viewModelOf
@@ -37,6 +38,7 @@ val appModule = module {
         paywallFeatureModule,  // Must be before splashFeatureModule (SplashViewModel depends on PaywallRepository)
         userFeatureModule,
         sharingFeatureModule,
+        updateFeedFeatureModule,
         platformModule()
     )
     single<AppDatastore> { UserAppDatastoreProvider.instance }

@@ -1212,6 +1212,7 @@ class InteractiveOnboardingViewModelTest {
         override fun navigateToPaywall(source: String) {}
         override fun navigateToSubscriptionStatus(showSuccessMessage: Boolean) {}
         override fun navigateToShareChecklist(checklistId: Long) {}
+        override fun navigateToUpdateFeed() {}
     }
 
     private class FakeUserDataRepository : UserDataRepository {

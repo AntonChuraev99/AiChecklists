@@ -23,6 +23,9 @@ object RemoteConfigKeys {
 
     // Onboarding type: "interactive" or "default"
     const val ONBOARDING = "onboarding"
+
+    // Update Feed
+    const val UPDATE_FEED_JSON = "update_feed_json"
 }
 
 /**
@@ -48,4 +51,7 @@ object RemoteConfigDefaults {
 
     // Onboarding type: "interactive" or "default"
     const val ONBOARDING = "interactive"
+
+    // Update Feed
+    const val UPDATE_FEED_JSON = """{"posts":[{"id":"welcome_v1","title":"Welcome to Gisti","description":"Turn any content into a checklist using AI.","publishedAtMillis":1713312000000,"iconName":"AutoAwesome","actions":[{"label":"Browse templates","deepLink":"gisti://templates"},{"label":"Create from scratch","deepLink":"gisti://create"}]},{"id":"ai_analyze_v1","title":"New: AI Analysis","description":"Snap a photo, paste a link, or record a voice note — Gisti fills checklists for you.","publishedAtMillis":1713398400000,"iconName":"Bolt","actions":[{"label":"Try AI Analysis","deepLink":"gisti://analyze"}]},{"id":"premium_promo_v1","title":"Go Premium","description":"Unlimited checklists, 300 AI credits/day, 3-day free trial. Cancel anytime.","publishedAtMillis":1713484800000,"iconName":"Star","actions":[{"label":"Start Free Trial","deepLink":"gisti://paywall?source=update_feed"},{"label":"See plans","deepLink":"gisti://subscription_status"}]}]}"""
 }

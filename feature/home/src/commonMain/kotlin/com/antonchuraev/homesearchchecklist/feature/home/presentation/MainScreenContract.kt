@@ -54,4 +54,6 @@ sealed interface MainScreenIntent : Intent {
     data object OnUpgradeToPremiumClick : MainScreenIntent
 
     data class OnReorderChecklists(val orderedIds: List<Long>) : MainScreenIntent
+
+    data object OnUpdateFeedClick : MainScreenIntent
 }

@@ -53,5 +53,7 @@ interface AppNavigator {
     fun navigateToSubscriptionStatus(showSuccessMessage: Boolean = false)
 
     fun navigateToShareChecklist(checklistId: Long)
+
+    fun navigateToUpdateFeed()
 }
 
