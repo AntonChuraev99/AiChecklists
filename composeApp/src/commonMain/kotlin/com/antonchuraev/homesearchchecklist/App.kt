@@ -101,8 +101,8 @@ fun App() {
         }
 
         val themeRepository: ThemeRepository = remember { koin.get<ThemeRepository>() }
-        val themeMode by themeRepository.themeMode.collectAsStateWithLifecycle(initialValue = AppThemeMode.System)
-        val dynamicColor by themeRepository.dynamicColor.collectAsStateWithLifecycle(initialValue = true)
+        val themeMode by themeRepository.themeMode.collectAsStateWithLifecycle(initialValue = AppThemeMode.Light)
+        val dynamicColor by themeRepository.dynamicColor.collectAsStateWithLifecycle(initialValue = false)
         val systemDark = isSystemInDarkTheme()
         val darkTheme = when (themeMode) {
             AppThemeMode.Light -> false

@@ -6,8 +6,8 @@ import com.antonchuraev.homesearchchecklist.core.common.api.State
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppThemeMode
 
 data class SettingsState(
-    val selectedTheme: AppThemeMode = AppThemeMode.System,
-    val dynamicColorEnabled: Boolean = true,
+    val selectedTheme: AppThemeMode = AppThemeMode.Light,
+    val dynamicColorEnabled: Boolean = false,
     val dynamicColorSupported: Boolean = false,
     val isLoading: Boolean = true,
 ) : State
