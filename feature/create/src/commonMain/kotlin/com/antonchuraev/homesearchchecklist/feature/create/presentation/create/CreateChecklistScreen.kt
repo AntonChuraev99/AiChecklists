@@ -11,8 +11,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -20,8 +24,16 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AddItemInputField
@@ -127,27 +139,52 @@ fun CreateChecklistScreen(
                 items = screenState.items,
                 key = { _, item -> item.id }
             ) { _, item ->
-                AppCard(modifier = Modifier.animateItem()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = item.text,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.weight(1f)
-                        )
-                        IconButton(
-                            onClick = { viewModel.sendIntent(CreateChecklistIntent.OnDeleteItem(item)) },
-                            modifier = Modifier.size(40.dp)
+                val isEditing = screenState.editingItemId == item.id
+                if (isEditing) {
+                    InlineItemEditCard(
+                        text = screenState.editingItemText,
+                        onTextChange = { viewModel.sendIntent(CreateChecklistIntent.OnItemEditTextChange(it)) },
+                        onConfirm = { viewModel.sendIntent(CreateChecklistIntent.OnConfirmItemEdit) },
+                        onFocusLost = { viewModel.sendIntent(CreateChecklistIntent.OnConfirmItemEdit) },
+                        confirmContentDescription = stringResource(Res.string.create_confirm_item_edit),
+                        modifier = Modifier.animateItem()
+                    )
+                } else {
+                    AppCard(modifier = Modifier.animateItem()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Close,
-                                contentDescription = stringResource(Res.string.delete),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            Text(
+                                text = item.text,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.weight(1f)
                             )
+                            // Trailing action group: Edit + Delete
+                            Row(horizontalArrangement = Arrangement.End) {
+                                IconButton(
+                                    onClick = { viewModel.sendIntent(CreateChecklistIntent.OnStartItemEdit(item.id)) },
+                                    modifier = Modifier.size(40.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Edit,
+                                        contentDescription = stringResource(Res.string.create_edit_item),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { viewModel.sendIntent(CreateChecklistIntent.OnDeleteItem(item)) },
+                                    modifier = Modifier.size(40.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Close,
+                                        contentDescription = stringResource(Res.string.delete),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -156,3 +193,68 @@ fun CreateChecklistScreen(
     }
 }
 
+@Composable
+private fun InlineItemEditCard(
+    text: String,
+    onTextChange: (String) -> Unit,
+    onConfirm: () -> Unit,
+    onFocusLost: () -> Unit,
+    confirmContentDescription: String,
+    modifier: Modifier = Modifier
+) {
+    val focusRequester = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    // Guard against the initial isFocused=false fire that happens before LaunchedEffect
+    // requests focus — without it onFocusLost fires on mount and the field disappears.
+    var hasBeenFocused by remember { mutableStateOf(false) }
+
+    AppCard(modifier = modifier) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top
+        ) {
+            AppTextField(
+                value = text,
+                onValueChange = onTextChange,
+                singleLine = false,
+                modifier = Modifier
+                    .weight(1f)
+                    .focusRequester(focusRequester)
+                    .onFocusChanged { focusState ->
+                        if (focusState.isFocused) {
+                            hasBeenFocused = true
+                        } else if (hasBeenFocused) {
+                            onFocusLost()
+                        }
+                    },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(
+                    onDone = {
+                        onConfirm()
+                        keyboard?.hide()
+                    }
+                )
+            )
+
+            IconButton(
+                onClick = {
+                    onConfirm()
+                    keyboard?.hide()
+                },
+                modifier = Modifier.size(48.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Check,
+                    contentDescription = confirmContentDescription,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+        keyboard?.show()
+    }
+}

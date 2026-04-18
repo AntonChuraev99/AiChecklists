@@ -10,7 +10,10 @@ data class CreateChecklistState(
     val nameError: String? = null,
     val isEditMode: Boolean = false,
     val editChecklistId: Long? = null,
-    val newItemText: String = ""
+    val newItemText: String = "",
+    // Inline item editing
+    val editingItemId: String? = null,
+    val editingItemText: String = ""
 ) : State
 
 sealed interface CreateChecklistIntent : Intent {
@@ -20,4 +23,9 @@ sealed interface CreateChecklistIntent : Intent {
     data class OnNewItemTextChange(val text: String) : CreateChecklistIntent
     data object OnAddItemFromInput : CreateChecklistIntent
     data class OnDeleteItem(val item: ChecklistItem) : CreateChecklistIntent
+    // Inline item editing
+    data class OnStartItemEdit(val itemId: String) : CreateChecklistIntent
+    data class OnItemEditTextChange(val text: String) : CreateChecklistIntent
+    data object OnConfirmItemEdit : CreateChecklistIntent
+    data object OnCancelItemEdit : CreateChecklistIntent
 }

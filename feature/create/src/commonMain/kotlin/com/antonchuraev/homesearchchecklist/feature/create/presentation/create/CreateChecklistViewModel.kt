@@ -60,6 +60,40 @@ class CreateChecklistViewModel(
             is CreateChecklistIntent.OnDeleteItem -> _screenState.update {
                 it.copy(items = it.items - intent.item)
             }
+            is CreateChecklistIntent.OnStartItemEdit -> startEdit(intent.itemId)
+            is CreateChecklistIntent.OnItemEditTextChange -> _screenState.update {
+                it.copy(editingItemText = intent.text)
+            }
+            CreateChecklistIntent.OnConfirmItemEdit -> commitPendingEdit()
+            CreateChecklistIntent.OnCancelItemEdit -> _screenState.update {
+                it.copy(editingItemId = null, editingItemText = "")
+            }
+        }
+    }
+
+    private fun startEdit(itemId: String) {
+        // Called before starting a new edit to avoid losing in-flight text
+        commitPendingEdit()
+        val text = _screenState.value.items.find { it.id == itemId }?.text.orEmpty()
+        _screenState.update { it.copy(editingItemId = itemId, editingItemText = text) }
+    }
+
+    private fun commitPendingEdit() {
+        val state = _screenState.value
+        val id = state.editingItemId ?: return
+        val trimmed = state.editingItemText.trim()
+        if (trimmed.isNotBlank()) {
+            _screenState.update {
+                it.copy(
+                    items = it.items.map { item ->
+                        if (item.id == id) item.withText(trimmed) else item
+                    },
+                    editingItemId = null,
+                    editingItemText = ""
+                )
+            }
+        } else {
+            _screenState.update { it.copy(editingItemId = null, editingItemText = "") }
         }
     }
 
@@ -77,6 +111,8 @@ class CreateChecklistViewModel(
     }
 
     private fun onSaveClick() {
+        commitPendingEdit()
+
         // Auto-add unsaved text from input field before saving
         val unsavedText = _screenState.value.newItemText.trim()
         if (unsavedText.isNotBlank()) {
