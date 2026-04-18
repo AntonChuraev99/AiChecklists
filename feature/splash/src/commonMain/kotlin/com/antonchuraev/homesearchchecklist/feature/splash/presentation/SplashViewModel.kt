@@ -3,6 +3,7 @@ package com.antonchuraev.homesearchchecklist.feature.splash.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.repository.PaywallRepository
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.RestorePurchasesUseCase
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
@@ -13,6 +14,8 @@ import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.GetOnboa
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.measureTimedValue
 
 class SplashViewModel(
@@ -23,7 +26,8 @@ class SplashViewModel(
     private val appScope: CoroutineScope,
     private val logger: AppLogger,
     private val analyticsTracker: AnalyticsTracker,
-    private val getOnboardingVariant: GetOnboardingVariantUseCase
+    private val getOnboardingVariant: GetOnboardingVariantUseCase,
+    private val remoteConfigProvider: RemoteConfigProvider
 ) : ViewModel() {
 
     init {
@@ -43,6 +47,8 @@ class SplashViewModel(
             if (cached.userId.isNotBlank()) {
                 // Set analytics userId BEFORE navigation to avoid unattributed screen_view events
                 analyticsTracker.setUserId(cached.userId)
+                // Returning user: navigate immediately from cache; Remote Config fetch
+                // runs in background (startBackgroundSync) so A/B variant applies next launch.
                 navigateTo(cached.isOnboardingPassed)
             } else {
                 // New user (first launch only): must wait for registration
@@ -50,9 +56,19 @@ class SplashViewModel(
                 val userData = result.getOrNull()?.userData ?: cached
 
                 result.onSuccess { data ->
+                    // Analytics userId MUST be set before fetchAndActivate so the
+                    // Firebase A/B experiment can attribute this user to a variant.
                     analyticsTracker.setUserId(data.userData.userId)
                     appScope.launch { linkWithPaywall(data.userData.userId, isNewUser = data.isNewUser) }
                 }
+
+                // Block navigation until Remote Config is activated, so the correct
+                // onboarding variant is known before the first screen is shown.
+                // Timeout keeps Splash responsive on poor networks (falls back to defaults).
+                val activated = withTimeoutOrNull(REMOTE_CONFIG_FETCH_TIMEOUT) {
+                    runCatching { remoteConfigProvider.fetchAndActivate() }.getOrDefault(false)
+                }
+                log("fetchAndActivate (new user) activated=$activated")
 
                 navigateTo(userData.isOnboardingPassed)
             }
@@ -69,6 +85,8 @@ class SplashViewModel(
             analyticsTracker.setUserId(cached.userId)
             launch { runCatching { userDataRepository.syncWithServer() } }
             launch { runCatching { linkWithPaywall(cached.userId, isNewUser = false) } }
+            // Refresh Remote Config so A/B variants & feature flags apply on next launch.
+            launch { runCatching { remoteConfigProvider.fetchAndActivate() } }
         }
     }
 
@@ -100,30 +118,38 @@ class SplashViewModel(
 
     /**
      * Links the user with RevenueCat after successful registration.
-     * For returning users (isNewUser=false), also triggers auto-restore.
-     * For already linked users, refreshes subscription status from RevenueCat.
+     *
+     * Always calls [PaywallRepository.logIn] regardless of the local linked flag —
+     * RevenueCat's logIn is idempotent (no-op when appUserId already matches), so
+     * this guarantees drift between the anonymous RC customer and our server UUID
+     * is corrected on every launch.
+     *
+     * Auto-restore runs exactly once: the first time logIn succeeds for a returning
+     * user whose account was not yet linked locally ([wasLinked] == false).
      */
     private suspend fun linkWithPaywall(userId: String, isNewUser: Boolean) {
-        // Check if RevenueCat is configured
-        if (!paywallRepository.isConfigured()) {
-            return
-        }
+        if (!paywallRepository.isConfigured()) return
 
-        // If already linked, just refresh subscription status
-        if (userDataRepository.isPaywallLinked()) {
-            paywallRepository.refreshSubscriptionStatus()
-            return
-        }
+        // Read before logIn — used to gate one-time auto-restore
+        val wasLinked = userDataRepository.isPaywallLinked()
 
-        // Link with RevenueCat
         paywallRepository.logIn(userId)
             .onSuccess { loginResult ->
-                userDataRepository.setPaywallLinked(true)
+                if (!wasLinked) {
+                    userDataRepository.setPaywallLinked(true)
+                }
+                // Defensive refresh: logIn may return cached status; server call ensures fresh data
+                paywallRepository.refreshSubscriptionStatus()
 
-                // For returning users, auto-restore purchases + credits via UseCase
-                if (!isNewUser && !loginResult.isNewCustomer) {
+                // Auto-restore only on first successful link for returning users
+                if (!wasLinked && !isNewUser && !loginResult.isNewCustomer) {
                     restorePurchasesUseCase()
                 }
+
+                log("linkWithPaywall: logIn success, isNewCustomer=${loginResult.isNewCustomer}, wasLinked=$wasLinked")
+            }
+            .onFailure { err ->
+                logger.error(TAG, "linkWithPaywall failed: ${err.message}")
             }
     }
 
@@ -133,5 +159,6 @@ class SplashViewModel(
 
     companion object {
         private const val TAG = "SplashViewModel"
+        private val REMOTE_CONFIG_FETCH_TIMEOUT = 3.seconds
     }
 }

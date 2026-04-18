@@ -26,6 +26,7 @@ from firebase_admin import credentials, firestore
 from flask import Request, jsonify
 import google.generativeai as genai
 import functions_framework
+from firebase_functions import firestore_fn  # 2nd gen Firestore trigger
 import requests as http_requests  # avoid conflict with flask Request
 
 # Initialize Firebase Admin
@@ -146,7 +147,11 @@ def create_success_response(data: dict):
 
 def verify_premium_with_revenuecat(user_id: str) -> str:
     """
-    Verify user has active subscription via RevenueCat API.
+    Verify user has active subscription via RevenueCat REST API.
+
+    Kept as a fallback for verify_premium() during the rollout of the
+    RevenueCat Firebase Extension and for direct backfill / admin scripts.
+
     Returns: VERIFIED, NOT_VERIFIED, or UNAVAILABLE.
     """
     if not REVENUECAT_API_KEY:
@@ -178,6 +183,86 @@ def verify_premium_with_revenuecat(user_id: str) -> str:
         return UNAVAILABLE
     except Exception:
         return NOT_VERIFIED
+
+
+def _parse_iso_timestamp(value: Any) -> datetime | None:
+    """Parse a RevenueCat Extension timestamp (ISO string or Firestore Timestamp)."""
+    if value is None:
+        return None
+    # Firestore Timestamp (has .to_datetime() or is already datetime)
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    if hasattr(value, "to_datetime"):
+        try:
+            parsed = value.to_datetime()
+            return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+        except Exception:
+            return None
+    # ISO 8601 string
+    try:
+        s = str(value).replace("Z", "+00:00")
+        parsed = datetime.fromisoformat(s)
+        return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+    except (ValueError, TypeError):
+        return None
+
+
+def verify_premium_from_firestore(user_id: str) -> str:
+    """
+    Verify premium via rc_customers/{user_id} — populated by the RevenueCat
+    Firebase Extension on every subscription event.
+
+    Mirrors the REST contract: VERIFIED / NOT_VERIFIED / UNAVAILABLE.
+    NOT_VERIFIED is returned both when the customer has no active sub AND
+    when no document exists (extension not installed, or new user never
+    surfaced to the extension yet). Callers should chain with the REST
+    fallback via verify_premium().
+    """
+    try:
+        doc = db.collection("rc_customers").document(user_id).get()
+        if not doc.exists:
+            return NOT_VERIFIED
+        data = doc.to_dict() or {}
+        subs = data.get("subscriptions", {}) or {}
+        now = datetime.now(timezone.utc)
+        for _product_id, sub in subs.items():
+            if not isinstance(sub, dict):
+                continue
+            expires = sub.get("expires_date")
+            if expires is None:
+                # Non-expiring entitlement (lifetime / NON_RENEWING_PURCHASE)
+                return VERIFIED
+            expires_dt = _parse_iso_timestamp(expires)
+            if expires_dt is not None and expires_dt > now:
+                return VERIFIED
+        return NOT_VERIFIED
+    except Exception:
+        return UNAVAILABLE
+
+
+def verify_premium(user_id: str) -> str:
+    """
+    Premium verification with defence-in-depth:
+    1. Read from Firestore (rc_customers/{user_id}) — fast, no external call,
+       race-condition-free because the Extension writes before webhook ACK.
+    2. Fall back to RevenueCat REST when Firestore has no active record. This
+       protects against (a) extension not yet installed, (b) transient sync
+       lag, (c) historical users created before the extension went live.
+
+    Callsites: restore_credits_after_purchase, refill_premium_credits.
+    """
+    firestore_result = verify_premium_from_firestore(user_id)
+    if firestore_result == VERIFIED:
+        return VERIFIED
+
+    rest_result = verify_premium_with_revenuecat(user_id)
+    if rest_result == VERIFIED:
+        return VERIFIED
+    # Prefer a definitive NOT_VERIFIED over REST UNAVAILABLE so clients see 403
+    # (actionable) rather than 503 (retry storm) when both paths disagree.
+    if rest_result == UNAVAILABLE and firestore_result == NOT_VERIFIED:
+        return NOT_VERIFIED
+    return rest_result
 
 
 # ============================================================================
@@ -744,8 +829,8 @@ def refill_premium_credits(request: Request):
         users_expired = 0
 
         for user_doc in premium_users:
-            # Verify subscription is still active via RevenueCat
-            status = verify_premium_with_revenuecat(user_doc.id)
+            # Verify subscription via Firestore (RC Extension) with REST fallback
+            status = verify_premium(user_doc.id)
 
             if status == NOT_VERIFIED:
                 # Subscription expired or cancelled — revoke premium
@@ -841,8 +926,14 @@ def restore_credits_after_purchase(request: Request):
         if not user_doc.exists:
             return create_error_response("User not found", 404)
 
-        # Verify purchase with RevenueCat
-        status = verify_premium_with_revenuecat(user_id)
+        prev = user_doc.to_dict() or {}
+        prev_state = {
+            "is_premium": prev.get("is_premium", False),
+            "ai_credits": prev.get("ai_credits", 0),
+        }
+
+        # Verify via Firestore (RC Extension) with REST fallback
+        status = verify_premium(user_id)
         if status == UNAVAILABLE:
             return create_error_response(
                 "Verification service temporarily unavailable. Please try again.", 503
@@ -855,6 +946,7 @@ def restore_credits_after_purchase(request: Request):
         credits_cap = config["premium_daily_credits_cap"]
 
         now = datetime.now(timezone.utc).isoformat()
+        now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
 
         # Update user: set premium status and restore credits
         user_ref.update({
@@ -865,12 +957,18 @@ def restore_credits_after_purchase(request: Request):
             "updated_at": now
         })
 
-        # Log the restore operation
+        # Log the restore operation with before/after state for audit queries
         db.collection("credits_restore_log").add({
             "user_id": user_id,
+            "amplitude_id": prev.get("amplitude_id"),
             "timestamp": now,
+            "timestamp_ms": now_ms,
             "credits_restored": credits_cap,
-            "trigger": "purchase"
+            "trigger": "purchase",
+            "source": "client_restore",
+            "previous_state": prev_state,
+            "new_state": {"is_premium": True, "ai_credits": credits_cap},
+            "revenuecat_verification_result": status,
         })
 
         return create_success_response({
@@ -927,3 +1025,153 @@ def get_credits_info(request: Request):
         },
         "user_credits": credits
     })
+
+
+# ============================================================================
+# FUNCTION 8: Firestore trigger — bridge rc_events → users/{userId} + audit log
+# ============================================================================
+
+# RevenueCat event types that grant or extend premium access.
+_RC_GRANT_EVENT_TYPES = frozenset({
+    "INITIAL_PURCHASE",
+    "TRIAL_STARTED",
+    "RENEWAL",
+    "UNCANCELLATION",
+    "PRODUCT_CHANGE",
+    "TRANSFER",
+    "NON_RENEWING_PURCHASE",
+})
+
+# RevenueCat event types that revoke premium access.
+_RC_REVOKE_EVENT_TYPES = frozenset({
+    "EXPIRATION",
+    "CANCELLATION",
+    "SUBSCRIPTION_PAUSED",
+})
+
+
+def _handle_rc_event_payload(data: dict, event_id: str | None) -> None:
+    """
+    Pure handler for a RevenueCat Firebase Extension webhook payload.
+
+    Kept separate from the trigger decorator so we can unit-test the logic
+    without the 2nd gen firestore_fn wiring. Responsibilities:
+
+    1. Reconcile users/{app_user_id}.is_premium and ai_credits so the rest of
+       the app sees a consistent premium state within seconds of a purchase
+       or expiration — no client restore round-trip required for the happy path.
+    2. Append a rich, query-friendly document to premium_events_log/{autoId}
+       so we can answer audit questions without paging through raw webhook JSON.
+
+    All writes are best-effort: a bad/partial payload is logged and skipped so
+    one malformed event never blocks subsequent triggers.
+    """
+    if not data:
+        return
+
+    event_type = data.get("type")
+    app_user_id = data.get("app_user_id")
+
+    # Skip events without an app_user_id — we can't attribute them to a user,
+    # and $RCAnonymousID:... events are uninteresting for our audit log.
+    if not app_user_id or str(app_user_id).startswith("$RCAnonymousID"):
+        return
+
+    now_dt = datetime.now(timezone.utc)
+    now_iso = now_dt.isoformat()
+    now_ms = int(now_dt.timestamp() * 1000)
+
+    user_ref = db.collection("users").document(app_user_id)
+    user_doc = user_ref.get()
+    prev = user_doc.to_dict() if user_doc.exists else {}
+    prev_state = {
+        "is_premium": prev.get("is_premium", False),
+        "ai_credits": prev.get("ai_credits", 0),
+    }
+
+    new_state = dict(prev_state)
+
+    try:
+        if event_type in _RC_GRANT_EVENT_TYPES:
+            credits_cap = get_credits_config()["premium_daily_credits_cap"]
+            new_state = {"is_premium": True, "ai_credits": credits_cap}
+            if user_doc.exists:
+                user_ref.update({
+                    "is_premium": True,
+                    "ai_credits": credits_cap,
+                    "premium_activated_at": now_iso,
+                    "credits_restored_at": now_iso,
+                    "updated_at": now_iso,
+                })
+        elif event_type in _RC_REVOKE_EVENT_TYPES:
+            # Credits stay untouched on revoke — the user keeps what they have
+            # until the next daily refill cycle, which will see is_premium=False.
+            new_state = {"is_premium": False, "ai_credits": prev_state["ai_credits"]}
+            if user_doc.exists:
+                user_ref.update({
+                    "is_premium": False,
+                    "premium_expired_at": now_iso,
+                    "updated_at": now_iso,
+                })
+    except Exception as e:
+        # Reconciliation failed — still write the audit log so the event isn't lost.
+        print(f"on_rc_event_created: reconciliation failed for {app_user_id}: {e}")
+
+    log_entry = {
+        "user_id": app_user_id,
+        "amplitude_id": prev.get("amplitude_id"),
+        "rc_event_id": event_id,
+        "rc_event_type": event_type,
+        "server_timestamp": now_iso,
+        "server_timestamp_ms": now_ms,
+        "event_timestamp_ms": data.get("event_timestamp_ms"),
+        "purchased_at_ms": data.get("purchased_at_ms"),
+        "expiration_at_ms": data.get("expiration_at_ms"),
+        "product_id": data.get("product_id"),
+        "entitlement_ids": data.get("entitlement_ids", []),
+        "store": data.get("store"),
+        "environment": data.get("environment"),
+        "transaction_id": data.get("transaction_id"),
+        "original_transaction_id": data.get("original_transaction_id"),
+        "price": data.get("price"),
+        "currency": data.get("currency"),
+        "country_code": data.get("country_code"),
+        "is_family_share": data.get("is_family_share"),
+        "previous_state": prev_state,
+        "new_state": new_state,
+        "state_changed": prev_state != new_state,
+        "source": f"webhook:{event_type}" if event_type else "webhook:unknown",
+    }
+
+    try:
+        db.collection("premium_events_log").add(log_entry)
+    except Exception as e:
+        # Swallow — one lost audit row should never re-trigger and duplicate
+        # the user-facing reconciliation above.
+        print(f"on_rc_event_created: audit log write failed: {e}")
+
+
+@firestore_fn.on_document_created(
+    document="rc_events/{eventId}",
+    region="us-central1",
+)
+def on_rc_event_created(event: firestore_fn.Event) -> None:
+    """
+    Firestore trigger wrapper — delegates to _handle_rc_event_payload so the
+    business logic stays testable without the 2nd gen runtime.
+    """
+    snap = event.data
+    if snap is None:
+        return
+
+    data = snap.to_dict() or {}
+
+    event_id = None
+    try:
+        params = getattr(event, "params", None)
+        if isinstance(params, dict):
+            event_id = params.get("eventId")
+    except Exception:
+        pass
+
+    _handle_rc_event_payload(data, event_id)
