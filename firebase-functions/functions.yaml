@@ -47,3 +47,16 @@ endpoints:
     httpsTrigger: {}
     region: us-central1
     platform: gcfv2
+
+  on_rc_event_created:
+    entryPoint: on_rc_event_created
+    eventTrigger:
+      eventType: google.cloud.firestore.document.v1.created
+      retry: false
+      eventFilters:
+        database: (default)
+        namespace: (default)
+      eventFilterPathPatterns:
+        document: rc_events/{eventId}
+    region: us-central1
+    platform: gcfv2

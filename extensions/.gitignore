@@ -1,0 +1,2 @@
+# Local secret values — never commit
+*.secret.local

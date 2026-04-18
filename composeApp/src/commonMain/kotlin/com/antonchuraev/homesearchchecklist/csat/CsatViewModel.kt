@@ -42,6 +42,7 @@ data class CsatState(
     val isSubmitting: Boolean = false,
     val shouldLaunchReview: Boolean = false,
     val isFeedbackOnly: Boolean = false,
+    val showFeedbackThanks: Boolean = false,
 ) : State
 
 sealed interface CsatIntent : Intent {
@@ -55,6 +56,7 @@ sealed interface CsatIntent : Intent {
     data object ReviewComplete : CsatIntent
     data object ForceShow : CsatIntent
     data object ForceShowFeedback : CsatIntent
+    data object FeedbackThanksShown : CsatIntent
 }
 
 sealed interface CsatSideEffect : SideEffect
@@ -107,6 +109,7 @@ class CsatViewModel(
             CsatIntent.ReviewComplete -> handleReviewComplete()
             CsatIntent.ForceShow -> handleForceShow()
             CsatIntent.ForceShowFeedback -> handleForceShowFeedback()
+            CsatIntent.FeedbackThanksShown -> _screenState.update { it.copy(showFeedbackThanks = false) }
         }
     }
 
@@ -167,7 +170,14 @@ class CsatViewModel(
                 "feedback_submitted",
                 mapOf("text" to state.feedbackText),
             )
-            handleClose()
+            _screenState.update {
+                it.copy(
+                    showBottomSheet = false,
+                    isFeedbackOnly = false,
+                    feedbackText = "",
+                    showFeedbackThanks = true,
+                )
+            }
             return
         }
 
@@ -190,7 +200,10 @@ class CsatViewModel(
             CsatRating.LoveIt -> {
                 _screenState.update { it.copy(isSubmitted = true) }
             }
-            else -> handleClose()
+            else -> {
+                _screenState.update { it.copy(showFeedbackThanks = true) }
+                handleClose()
+            }
         }
     }
 

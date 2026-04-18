@@ -1,7 +1,10 @@
 package com.antonchuraev.homesearchchecklist.feature.updatefeed.domain.deeplink
 
 import androidx.navigation.NavController
+import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -16,13 +19,17 @@ class UpdateFeedDeepLinkHandlerTest {
         var createCallCount = 0
         var subscriptionStatusCallCount = 0
         var updateFeedCallCount = 0
+        var mainScreenCallCount = 0
+        var widgetInstructionCallCount = 0
         var backCallCount = 0
+
+        override val events: SharedFlow<AppNavEvent> = MutableSharedFlow()
 
         override fun installNavController(navController: NavController) {}
         override fun onBack() { backCallCount++ }
         override fun navigateToOnboarding() {}
         override fun navigateToInteractiveOnboarding() {}
-        override fun navigateToMainScreen(clearBackStack: Boolean) {}
+        override fun navigateToMainScreen(clearBackStack: Boolean) { mainScreenCallCount++ }
         override fun navigateToDebugMenu() {}
         override fun navigateToStoreScreenshot() {}
         override fun navigateToCreateChecklistScreen(templateId: Int?) { createCallCount++ }
@@ -38,6 +45,7 @@ class UpdateFeedDeepLinkHandlerTest {
         override fun navigateToSubscriptionStatus(showSuccessMessage: Boolean) { subscriptionStatusCallCount++ }
         override fun navigateToShareChecklist(checklistId: Long) {}
         override fun navigateToUpdateFeed() { updateFeedCallCount++ }
+        override fun showWidgetInstruction() { widgetInstructionCallCount++ }
     }
 
     private fun createHandler(): Pair<UpdateFeedDeepLinkHandler, FakeNavigator> {
@@ -153,5 +161,30 @@ class UpdateFeedDeepLinkHandlerTest {
         val result = handler.handle("gisti://paywall?source=update_feed&extra=ignored")
         assertTrue(result)
         assertEquals("update_feed", nav.paywallCalls[0])
+    }
+
+    @Test
+    fun `handle_homeUri_navigatesToMainScreen`() {
+        val (handler, nav) = createHandler()
+        val result = handler.handle("gisti://home")
+        assertTrue(result)
+        assertEquals(1, nav.mainScreenCallCount)
+    }
+
+    @Test
+    fun `handle_widgetInstructionUri_callsShowWidgetInstruction`() {
+        val (handler, nav) = createHandler()
+        val result = handler.handle("gisti://widget_instruction")
+        assertTrue(result)
+        assertEquals(1, nav.widgetInstructionCallCount)
+    }
+
+    @Test
+    fun `handle_unknownHostWithNewHosts_returnsFalse`() {
+        val (handler, nav) = createHandler()
+        val result = handler.handle("gisti://nonexistent_feature")
+        assertFalse(result)
+        assertEquals(0, nav.mainScreenCallCount)
+        assertEquals(0, nav.widgetInstructionCallCount)
     }
 }

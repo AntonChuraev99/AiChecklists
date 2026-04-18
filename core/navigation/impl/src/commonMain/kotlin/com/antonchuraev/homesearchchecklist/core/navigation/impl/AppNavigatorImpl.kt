@@ -1,12 +1,23 @@
 package com.antonchuraev.homesearchchecklist.core.navigation.impl
 
 import androidx.navigation.NavController
+import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavRoute
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 
 class AppNavigatorImpl() : AppNavigator {
 
     private lateinit var navController: NavController
+
+    private val _events = MutableSharedFlow<AppNavEvent>(replay = 0, extraBufferCapacity = 1)
+    override val events: SharedFlow<AppNavEvent> = _events.asSharedFlow()
+
+    override fun showWidgetInstruction() {
+        _events.tryEmit(AppNavEvent.ShowWidgetInstruction)
+    }
 
     override fun installNavController(navController: NavController) {
         this@AppNavigatorImpl.navController = navController
