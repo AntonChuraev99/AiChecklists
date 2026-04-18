@@ -64,7 +64,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             // Reactive edge-to-edge: switch status bar icon style when app theme changes
             val themeRepository: ThemeRepository = koinInject()
-            val themeMode by themeRepository.themeMode.collectAsStateWithLifecycle(initialValue = AppThemeMode.System)
+            val themeMode by themeRepository.themeMode.collectAsStateWithLifecycle(initialValue = AppThemeMode.Light)
             val systemDark = isSystemInDarkTheme()
             val darkTheme = when (themeMode) {
                 AppThemeMode.Light -> false
