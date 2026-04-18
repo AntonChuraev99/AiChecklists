@@ -100,6 +100,8 @@
     <string name="main_no_items">Empty</string>
     <string name="main_menu">Menu</string>
     <string name="main_menu_support">Support</string>
+    <string name="main_menu_rate_app">Rate App</string>
+    <string name="main_menu_leave_feedback">Leave Feedback</string>
 
     <!-- Update Feed Screen -->
     <string name="update_feed_title">Updates</string>
@@ -366,6 +368,10 @@
     <string name="share_generating_pdf">Generating PDF...</string>
     <string name="share_error">Failed to share</string>
 
+    <!-- Feedback-only sheet -->
+    <string name="feedback_only_title">Leave Feedback</string>
+    <string name="feedback_only_description">Tell us what's on your mind</string>
+
     <!-- CSAT Survey -->
     <string name="csat_title">How do you like Gisti?</string>
     <string name="csat_not_good">Not Good</string>
@@ -392,7 +398,7 @@
     <string name="csat_chip_nice_design">Nice Design</string>
     <string name="csat_chip_easy_export">Easy Export</string>
     <string name="csat_chip_easy_to_use">Easy to Use</string>
-    <string name="csat_feedback_placeholder">Tell us more (optional)...</string>
+    <string name="csat_feedback_placeholder">Share your thoughts…</string>
     <string name="csat_submit">Submit</string>
     <string name="csat_thank_you_title">Thank you for your feedback!</string>
     <string name="csat_thank_you_description">Would you mind leaving a review?\nIt helps us a lot!</string>

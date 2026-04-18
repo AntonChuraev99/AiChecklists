@@ -41,6 +41,7 @@ data class CsatState(
     val isSubmitted: Boolean = false,
     val isSubmitting: Boolean = false,
     val shouldLaunchReview: Boolean = false,
+    val isFeedbackOnly: Boolean = false,
 ) : State
 
 sealed interface CsatIntent : Intent {
@@ -53,6 +54,7 @@ sealed interface CsatIntent : Intent {
     data object Dismiss : CsatIntent
     data object ReviewComplete : CsatIntent
     data object ForceShow : CsatIntent
+    data object ForceShowFeedback : CsatIntent
 }
 
 sealed interface CsatSideEffect : SideEffect
@@ -104,12 +106,23 @@ class CsatViewModel(
             CsatIntent.Dismiss -> handleDismiss()
             CsatIntent.ReviewComplete -> handleReviewComplete()
             CsatIntent.ForceShow -> handleForceShow()
+            CsatIntent.ForceShowFeedback -> handleForceShowFeedback()
         }
     }
 
     private fun handleForceShow() {
         analyticsTracker.event("csat_opened", mapOf("source" to "manual"))
         _screenState.update { it.copy(showBottomSheet = true) }
+    }
+
+    private fun handleForceShowFeedback() {
+        analyticsTracker.event("feedback_opened")
+        _screenState.update {
+            it.copy(
+                showBottomSheet = true,
+                isFeedbackOnly = true,
+            )
+        }
     }
 
     private fun handleSelectRating(rating: CsatRating) {
@@ -148,6 +161,16 @@ class CsatViewModel(
 
     private fun handleSubmit() {
         val state = _screenState.value
+
+        if (state.isFeedbackOnly) {
+            analyticsTracker.event(
+                "feedback_submitted",
+                mapOf("text" to state.feedbackText),
+            )
+            handleClose()
+            return
+        }
+
         val rating = state.selectedRating ?: return
 
         analyticsTracker.event(
@@ -206,6 +229,7 @@ class CsatViewModel(
                 isSubmitted = false,
                 isSubmitting = false,
                 shouldLaunchReview = false,
+                isFeedbackOnly = false,
             )
         }
     }

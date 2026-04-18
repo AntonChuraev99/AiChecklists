@@ -12,8 +12,12 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import kotlinx.coroutines.delay
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
@@ -30,16 +34,36 @@ import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun UpdateFeedScreen(
-    viewModel: UpdateFeedViewModel = koinViewModel()
+    onBackClick: () -> Unit = {},
+) {
+    UpdateFeedScreenContent(onBackClick = onBackClick)
+}
+
+@Composable
+private fun UpdateFeedScreenContent(
+    onBackClick: () -> Unit,
+    viewModel: UpdateFeedViewModel = koinViewModel(),
 ) {
     val analyticsTracker: AnalyticsTracker = koinInject()
     LaunchedEffect(Unit) { analyticsTracker.screenView("update_feed") }
 
     val state by viewModel.screenState.collectAsStateWithLifecycle()
 
+    // Double-back guard: rapid double-tap на back иногда выполняет popBackStack
+    // дважды — второй pop выскакивает за Main в destination, которого уже нет
+    // в стеке (визуально "обход стека"). Флаг сворачивает серию тапов в одну
+    // навигацию. При повторном заходе на экран composable создаётся заново —
+    // новый remember даёт чистый consumed=false.
+    var consumed by remember { mutableStateOf(false) }
+
     AppScaffold(
         title = stringResource(Res.string.update_feed_title),
-        onBackButtonClick = { viewModel.sendIntent(UpdateFeedScreenIntent.OnBackClick) }
+        onBackButtonClick = {
+            if (!consumed) {
+                consumed = true
+                onBackClick()
+            }
+        }
     ) {
         when (val currentState = state) {
             UpdateFeedScreenState.Loading -> {

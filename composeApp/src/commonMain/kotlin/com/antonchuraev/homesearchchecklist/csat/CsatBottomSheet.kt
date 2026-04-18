@@ -16,19 +16,19 @@ import aichecklists.core.designsystem.generated.resources.csat_chip_nice_design
 import aichecklists.core.designsystem.generated.resources.csat_chip_slow
 import aichecklists.core.designsystem.generated.resources.csat_chip_templates
 import aichecklists.core.designsystem.generated.resources.csat_chip_too_expensive
-import aichecklists.core.designsystem.generated.resources.csat_feedback_placeholder
 import aichecklists.core.designsystem.generated.resources.csat_love_it
 import aichecklists.core.designsystem.generated.resources.csat_maybe_later
 import aichecklists.core.designsystem.generated.resources.csat_not_good
 import aichecklists.core.designsystem.generated.resources.csat_okay
 import aichecklists.core.designsystem.generated.resources.csat_rate_button
-import aichecklists.core.designsystem.generated.resources.csat_submit
 import aichecklists.core.designsystem.generated.resources.csat_thank_you_description
 import aichecklists.core.designsystem.generated.resources.csat_thank_you_title
 import aichecklists.core.designsystem.generated.resources.csat_title
 import aichecklists.core.designsystem.generated.resources.csat_what_could_be_better
 import aichecklists.core.designsystem.generated.resources.csat_what_do_you_like
 import aichecklists.core.designsystem.generated.resources.csat_whats_the_problem
+import aichecklists.core.designsystem.generated.resources.feedback_only_description
+import aichecklists.core.designsystem.generated.resources.feedback_only_title
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.fadeIn
@@ -68,7 +68,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonText
-import com.antonchuraev.homesearchchecklist.desingsystem.components.AppTextField
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
@@ -92,79 +91,87 @@ fun CsatBottomSheet(
                 .padding(bottom = AppDimens.SpacingXxl),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // Title
-            Text(
-                text = stringResource(Res.string.csat_title),
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Center,
-            )
+            if (state.isFeedbackOnly) {
+                FeedbackOnlyContent(
+                    feedbackText = state.feedbackText,
+                    onTextChange = { onIntent(CsatIntent.UpdateText(it)) },
+                    onSubmit = { onIntent(CsatIntent.Submit) },
+                )
+            } else {
+                // Title
+                Text(
+                    text = stringResource(Res.string.csat_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center,
+                )
 
-            Spacer(Modifier.height(AppDimens.SpacingXl))
+                Spacer(Modifier.height(AppDimens.SpacingXl))
 
-            // Emoji row
-            EmojiRow(
-                selectedRating = state.selectedRating,
-                onSelect = { onIntent(CsatIntent.SelectRating(it)) },
-            )
+                // Emoji row
+                EmojiRow(
+                    selectedRating = state.selectedRating,
+                    onSelect = { onIntent(CsatIntent.SelectRating(it)) },
+                )
 
-            Spacer(Modifier.height(AppDimens.SpacingLg))
+                Spacer(Modifier.height(AppDimens.SpacingLg))
 
-            // Animated state-dependent content
-            AnimatedContent(
-                targetState = ContentState.from(state),
-                transitionSpec = {
-                    (fadeIn(tween(220, delayMillis = 90)) + slideInVertically { it / 4 })
-                        .togetherWith(fadeOut(tween(90)))
-                        .using(SizeTransform(clip = false))
-                },
-                label = "csat_content",
-            ) { contentState ->
-                when (contentState) {
-                    ContentState.Empty -> {
-                        Spacer(Modifier.height(0.dp))
-                    }
+                // Animated state-dependent content
+                AnimatedContent(
+                    targetState = ContentState.from(state),
+                    transitionSpec = {
+                        (fadeIn(tween(220, delayMillis = 90)) + slideInVertically { it / 4 })
+                            .togetherWith(fadeOut(tween(90)))
+                            .using(SizeTransform(clip = false))
+                    },
+                    label = "csat_content",
+                ) { contentState ->
+                    when (contentState) {
+                        ContentState.Empty -> {
+                            Spacer(Modifier.height(0.dp))
+                        }
 
-                    ContentState.NotGoodFeedback -> {
-                        NegativeFeedbackContent(
-                            title = stringResource(Res.string.csat_whats_the_problem),
-                            chips = FeedbackChip.notGoodChips,
-                            selectedChips = state.selectedChips,
-                            feedbackText = state.feedbackText,
-                            onToggleChip = { onIntent(CsatIntent.ToggleChip(it)) },
-                            onTextChange = { onIntent(CsatIntent.UpdateText(it)) },
-                            onSubmit = { onIntent(CsatIntent.Submit) },
-                        )
-                    }
+                        ContentState.NotGoodFeedback -> {
+                            NegativeFeedbackContent(
+                                title = stringResource(Res.string.csat_whats_the_problem),
+                                chips = FeedbackChip.notGoodChips,
+                                selectedChips = state.selectedChips,
+                                feedbackText = state.feedbackText,
+                                onToggleChip = { onIntent(CsatIntent.ToggleChip(it)) },
+                                onTextChange = { onIntent(CsatIntent.UpdateText(it)) },
+                                onSubmit = { onIntent(CsatIntent.Submit) },
+                            )
+                        }
 
-                    ContentState.OkayFeedback -> {
-                        NegativeFeedbackContent(
-                            title = stringResource(Res.string.csat_what_could_be_better),
-                            chips = FeedbackChip.okayChips,
-                            selectedChips = state.selectedChips,
-                            feedbackText = state.feedbackText,
-                            onToggleChip = { onIntent(CsatIntent.ToggleChip(it)) },
-                            onTextChange = { onIntent(CsatIntent.UpdateText(it)) },
-                            onSubmit = { onIntent(CsatIntent.Submit) },
-                        )
-                    }
+                        ContentState.OkayFeedback -> {
+                            NegativeFeedbackContent(
+                                title = stringResource(Res.string.csat_what_could_be_better),
+                                chips = FeedbackChip.okayChips,
+                                selectedChips = state.selectedChips,
+                                feedbackText = state.feedbackText,
+                                onToggleChip = { onIntent(CsatIntent.ToggleChip(it)) },
+                                onTextChange = { onIntent(CsatIntent.UpdateText(it)) },
+                                onSubmit = { onIntent(CsatIntent.Submit) },
+                            )
+                        }
 
-                    ContentState.PositiveFeedback -> {
-                        PositiveFeedbackContent(
-                            chips = FeedbackChip.positiveChips,
-                            selectedChips = state.selectedChips,
-                            feedbackText = state.feedbackText,
-                            onToggleChip = { onIntent(CsatIntent.ToggleChip(it)) },
-                            onTextChange = { onIntent(CsatIntent.UpdateText(it)) },
-                            onSubmit = { onIntent(CsatIntent.Submit) },
-                        )
-                    }
+                        ContentState.PositiveFeedback -> {
+                            PositiveFeedbackContent(
+                                chips = FeedbackChip.positiveChips,
+                                selectedChips = state.selectedChips,
+                                feedbackText = state.feedbackText,
+                                onToggleChip = { onIntent(CsatIntent.ToggleChip(it)) },
+                                onTextChange = { onIntent(CsatIntent.UpdateText(it)) },
+                                onSubmit = { onIntent(CsatIntent.Submit) },
+                            )
+                        }
 
-                    ContentState.ThankYou -> {
-                        ThankYouContent(
-                            onRate = { onIntent(CsatIntent.LaunchReview) },
-                            onSkip = { onIntent(CsatIntent.SkipReview) },
-                        )
+                        ContentState.ThankYou -> {
+                            ThankYouContent(
+                                onRate = { onIntent(CsatIntent.LaunchReview) },
+                                onSkip = { onIntent(CsatIntent.SkipReview) },
+                            )
+                        }
                     }
                 }
             }
@@ -306,6 +313,44 @@ private fun FeedbackChipsRow(
 }
 
 @Composable
+private fun FeedbackOnlyContent(
+    feedbackText: String,
+    onTextChange: (String) -> Unit,
+    onSubmit: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = stringResource(Res.string.feedback_only_title),
+            style = MaterialTheme.typography.titleLarge,
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Center,
+        )
+
+        Spacer(Modifier.height(AppDimens.SpacingSm))
+
+        Text(
+            text = stringResource(Res.string.feedback_only_description),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Center,
+        )
+
+        Spacer(Modifier.height(AppDimens.SpacingXl))
+
+        FeedbackInputSection(
+            value = feedbackText,
+            onValueChange = onTextChange,
+            onSubmitClick = onSubmit,
+            submitEnabled = true,
+        )
+    }
+}
+
+@Composable
 private fun NegativeFeedbackContent(
     title: String,
     chips: List<FeedbackChip>,
@@ -328,21 +373,11 @@ private fun NegativeFeedbackContent(
 
         Spacer(Modifier.height(AppDimens.SpacingMd))
 
-        AppTextField(
+        FeedbackInputSection(
             value = feedbackText,
             onValueChange = onTextChange,
-            placeholder = stringResource(Res.string.csat_feedback_placeholder),
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = false,
-            maxLines = 4,
-        )
-
-        Spacer(Modifier.height(AppDimens.SpacingLg))
-
-        AppButton(
-            text = stringResource(Res.string.csat_submit),
-            onClick = onSubmit,
-            modifier = Modifier.fillMaxWidth(),
+            onSubmitClick = onSubmit,
+            submitEnabled = true,
         )
     }
 }
@@ -369,21 +404,11 @@ private fun PositiveFeedbackContent(
 
         Spacer(Modifier.height(AppDimens.SpacingMd))
 
-        AppTextField(
+        FeedbackInputSection(
             value = feedbackText,
             onValueChange = onTextChange,
-            placeholder = stringResource(Res.string.csat_feedback_placeholder),
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = false,
-            maxLines = 4,
-        )
-
-        Spacer(Modifier.height(AppDimens.SpacingLg))
-
-        AppButton(
-            text = stringResource(Res.string.csat_submit),
-            onClick = onSubmit,
-            modifier = Modifier.fillMaxWidth(),
+            onSubmitClick = onSubmit,
+            submitEnabled = true,
         )
     }
 }

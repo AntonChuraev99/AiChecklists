@@ -123,7 +123,7 @@ class CsatFlowTest : BaseUiTest() {
 
         // And: Feedback text field and submit button are shown
         composeTestRule
-            .onNodeWithText("Tell us more (optional)...")
+            .onNodeWithText("Share your thoughts…")
             .assertIsDisplayed()
 
         composeTestRule
@@ -160,7 +160,7 @@ class CsatFlowTest : BaseUiTest() {
 
         // And: Feedback form appears
         composeTestRule
-            .onNodeWithText("Tell us more (optional)...")
+            .onNodeWithText("Share your thoughts…")
             .assertIsDisplayed()
 
         composeTestRule
@@ -237,7 +237,7 @@ class CsatFlowTest : BaseUiTest() {
 
         // Enter optional feedback
         composeTestRule
-            .onNode(hasText("Tell us more (optional)..."))
+            .onNode(hasText("Share your thoughts…"))
             .performTextInput("The app could be better")
 
         waitForIdle()
