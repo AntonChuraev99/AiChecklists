@@ -1,5 +1,6 @@
 package com.antonchuraev.homesearchchecklist.settings.presentation
 
+import androidx.compose.material3.DrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -8,9 +9,18 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.antonchuraev.homesearchchecklist.settings.ui.SettingsScreenContent
 import org.koin.compose.viewmodel.koinViewModel
 
+/**
+ * Settings screen. Reachable from the app drawer (item "Settings").
+ * When `drawerState` is provided, a hamburger affordance replaces the
+ * back-arrow in the TopAppBar — satisfies MD3 "Drawer Affordance Scope"
+ * rule (every in-app destination reachable from a drawer must expose
+ * the drawer). When called without a drawer (e.g. deep link), falls back
+ * to the standard back-arrow.
+ */
 @Composable
-internal fun SettingsRoute(
+fun SettingsScreen(
     onBackClick: () -> Unit,
+    drawerState: DrawerState? = null,
     modifier: Modifier = Modifier,
 ) {
     val viewModel = koinViewModel<SettingsViewModel>()
@@ -28,6 +38,7 @@ internal fun SettingsRoute(
         selectedTheme = state.selectedTheme,
         onThemeChange = { viewModel.sendIntent(SettingsIntent.SelectTheme(it)) },
         onBackClick = { viewModel.sendIntent(SettingsIntent.BackClick) },
+        drawerState = drawerState,
         modifier = modifier,
     )
 }
