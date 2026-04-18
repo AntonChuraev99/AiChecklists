@@ -5,21 +5,33 @@ import com.antonchuraev.homesearchchecklist.csat.CsatIntent
 import com.antonchuraev.homesearchchecklist.csat.CsatViewModel
 import com.antonchuraev.homesearchchecklist.csat.InAppReviewLauncher
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppTheme
+import com.antonchuraev.homesearchchecklist.navigation.AppNavigationDrawerContent
+import com.antonchuraev.homesearchchecklist.navigation.DrawerDestination
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.material3.DrawerState
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import kotlinx.coroutines.launch
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.feedback_thanks_message
 import org.jetbrains.compose.resources.stringResource
@@ -107,11 +119,44 @@ fun App() {
                 }
 
                 composable<AppNavRoute.Main> {
-                    MainScreen(
-                        onRateAppClick = { csatViewModel.sendIntent(CsatIntent.ForceShow) },
-                        onLeaveFeedbackClick = { csatViewModel.sendIntent(CsatIntent.ForceShowFeedback) },
-                        versionName = AppBuildConfig.versionName,
-                    )
+                    // Use plain `remember` instead of `rememberDrawerState` to avoid
+                    // the Saver restoring an Open state after back navigation — a fresh
+                    // Closed state on every composition is the correct UX contract.
+                    val drawerState = remember { DrawerState(initialValue = DrawerValue.Closed) }
+                    val scope = rememberCoroutineScope()
+                    var isEditMode by rememberSaveable { mutableStateOf(false) }
+
+                    ModalNavigationDrawer(
+                        drawerState = drawerState,
+                        gesturesEnabled = !isEditMode,
+                        drawerContent = {
+                            ModalDrawerSheet(
+                                drawerContainerColor = MaterialTheme.colorScheme.surface
+                            ) {
+                                AppNavigationDrawerContent(
+                                    selectedItemId = DrawerDestination.Main,
+                                    onCloseDrawer = { scope.launch { drawerState.close() } },
+                                    onHomeClick = { /* already on Main; drawer close is enough */ },
+                                    onUpdateFeedClick = {
+                                        navController.navigate(AppNavRoute.UpdateFeed)
+                                    },
+                                    onRateAppClick = {
+                                        csatViewModel.sendIntent(CsatIntent.ForceShow)
+                                    },
+                                    onLeaveFeedbackClick = {
+                                        csatViewModel.sendIntent(CsatIntent.ForceShowFeedback)
+                                    },
+                                    versionName = AppBuildConfig.versionName,
+                                )
+                            }
+                        }
+                    ) {
+                        MainScreen(
+                            drawerState = drawerState,
+                            isEditMode = isEditMode,
+                            onEditModeChange = { isEditMode = it },
+                        )
+                    }
                 }
 
                 composable<AppNavRoute.CreateChecklistRoute.CreateChecklist> { backStackEntry ->
@@ -180,9 +225,37 @@ fun App() {
                 }
 
                 composable<AppNavRoute.UpdateFeed> {
-                    UpdateFeedScreen(
-                        onBackClick = { navController.popBackStack() }
-                    )
+                    // Fresh Closed DrawerState per entry — same rationale as Main route.
+                    val drawerState = remember { DrawerState(initialValue = DrawerValue.Closed) }
+                    val scope = rememberCoroutineScope()
+
+                    ModalNavigationDrawer(
+                        drawerState = drawerState,
+                        drawerContent = {
+                            ModalDrawerSheet(
+                                drawerContainerColor = MaterialTheme.colorScheme.surface
+                            ) {
+                                AppNavigationDrawerContent(
+                                    selectedItemId = DrawerDestination.UpdateFeed,
+                                    onCloseDrawer = { scope.launch { drawerState.close() } },
+                                    onHomeClick = { navController.popBackStack() },
+                                    onUpdateFeedClick = { /* already here */ },
+                                    onRateAppClick = {
+                                        csatViewModel.sendIntent(CsatIntent.ForceShow)
+                                    },
+                                    onLeaveFeedbackClick = {
+                                        csatViewModel.sendIntent(CsatIntent.ForceShowFeedback)
+                                    },
+                                    versionName = AppBuildConfig.versionName,
+                                )
+                            }
+                        }
+                    ) {
+                        UpdateFeedScreen(
+                            onBackClick = { navController.popBackStack() },
+                            drawerState = drawerState,
+                        )
+                    }
                 }
             }
             SnackbarHost(

@@ -54,7 +54,7 @@
     <string name="onboarding_interactive_template_subtitle">Pick your starting point</string>
     <string name="onboarding_interactive_template_items_count">%1$d items</string>
     <string name="onboarding_interactive_customize_title">Make it yours</string>
-    <string name="onboarding_interactive_customize_subtitle">Toggle off what you don't need</string>
+    <string name="onboarding_interactive_customize_subtitle">Toggle off what you don\'t need</string>
     <string name="onboarding_interactive_customize_continue">Continue</string>
     <string name="onboarding_interactive_creating_title">Creating your checklist…</string>
     <string name="onboarding_interactive_creating_social">12,000+ checklists created with Gisti</string>
@@ -91,12 +91,13 @@
     <string name="onboarding_discover_completed">%1$d of %2$d completed</string>
 
     <!-- Navigation Drawer -->
-    <string name="drawer_section_whats_new">What\'s New</string>
+    <string name="drawer_section_navigate">Navigate</string>
     <string name="drawer_section_help">Help &amp; Feedback</string>
     <string name="drawer_section_about">About</string>
     <string name="drawer_tagline">AI Checklists</string>
     <string name="drawer_version_label">Version %1$s</string>
     <string name="drawer_logo_content_description">Gisti logo</string>
+    <string name="drawer_item_home">Home</string>
 
     <!-- Main Screen -->
     <string name="main_title">My Checklists</string>
@@ -185,7 +186,7 @@
     <string name="analyze_select_photo">Choose Photo</string>
     <string name="analyze_select_pdf">Choose PDF</string>
     <string name="analyze_select_file">Choose File</string>
-    <string name="analyze_result_title">Here's your checklist!</string>
+    <string name="analyze_result_title">Here\'s your checklist!</string>
     <string name="analyze_items_found">Items extracted:</string>
     <string name="analyze_and_more">... and %1$d more</string>
     <string name="analyze_checklist_name_label">Checklist name</string>
@@ -292,10 +293,10 @@
 
     <!-- Limits -->
     <string name="limit_reached_title">Checklist Limit Reached</string>
-    <string name="limit_reached_message">You've reached the maximum of %1$d checklists on the free plan. Upgrade to Premium for unlimited checklists.</string>
+    <string name="limit_reached_message">You\'ve reached the maximum of %1$d checklists on the free plan. Upgrade to Premium for unlimited checklists.</string>
     <string name="limit_upgrade">Upgrade to Premium</string>
     <string name="limit_fill_reached_title">Fill Limit Reached</string>
-    <string name="limit_fill_reached_message">You've reached the maximum of %1$d fills for this checklist. Upgrade to Premium for unlimited fills.</string>
+    <string name="limit_fill_reached_message">You\'ve reached the maximum of %1$d fills for this checklist. Upgrade to Premium for unlimited fills.</string>
     <string name="limit_checklist_count">%1$d/%2$d checklists</string>
     <string name="limit_fill_count">%1$d/%2$d fills</string>
 
@@ -378,15 +379,15 @@
 
     <!-- Feedback-only sheet -->
     <string name="feedback_only_title">Leave Feedback</string>
-    <string name="feedback_only_description">Tell us what's on your mind</string>
+    <string name="feedback_only_description">Tell us what\'s on your mind</string>
     <string name="feedback_thanks_message">Thanks for feedback!</string>
 
     <!-- CSAT Survey -->
     <string name="csat_title">How do you like Gisti?</string>
     <string name="csat_not_good">Not Good</string>
-    <string name="csat_okay">It's Okay</string>
+    <string name="csat_okay">It\'s Okay</string>
     <string name="csat_love_it">Love It!</string>
-    <string name="csat_whats_the_problem">What's the biggest problem?</string>
+    <string name="csat_whats_the_problem">What\'s the biggest problem?</string>
     <string name="csat_what_could_be_better">What could be better?</string>
     <string name="csat_what_do_you_like">What do you like most?</string>
     <!-- Not Good chips -->
@@ -436,7 +437,7 @@
     <string name="reminder_exact_alarm_step2">Find "Alarms &amp; reminders"</string>
     <string name="reminder_exact_alarm_step3">Toggle ON for Gisti</string>
     <string name="reminder_exact_alarm_description">Without this, reminders may be delayed by a few minutes.</string>
-    <string name="reminder_exact_alarm_dont_show">Don't show again</string>
+    <string name="reminder_exact_alarm_dont_show">Don\'t show again</string>
     <string name="reminder_exact_alarm_open_settings">Open Settings</string>
     <string name="reminder_exact_alarm_skip">Skip</string>
     <string name="reminder_exact_alarm_granted">Precise reminders enabled!</string>
@@ -452,7 +453,7 @@
     <string name="reminder_notification_permission_skip">Not Now</string>
 
     <!-- Repeat types -->
-    <string name="reminder_repeat_none">Don't repeat</string>
+    <string name="reminder_repeat_none">Don\'t repeat</string>
     <string name="reminder_repeat_daily">Every day</string>
     <string name="reminder_repeat_weekly">Every week</string>
     <string name="reminder_repeat_monthly">Every month</string>
