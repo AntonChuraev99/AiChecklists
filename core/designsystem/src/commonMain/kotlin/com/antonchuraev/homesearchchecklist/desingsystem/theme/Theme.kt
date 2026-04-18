@@ -19,14 +19,22 @@ val LocalIsDarkTheme = staticCompositionLocalOf { false }
  *   The caller is responsible for reading the user's theme preference from DataStore
  *   and passing the correct value. Call-sites that omit this parameter keep light theme
  *   behavior unchanged — no breaking change.
+ * @param dynamicColor Whether to prefer the platform-provided Material You palette
+ *   over the static [LightColorScheme] / [DarkColorScheme]. Has effect only on
+ *   platforms where [supportsDynamicColor] returns `true` (Android 12+). On any
+ *   other platform the flag is silently ignored and the static scheme is used.
+ *   Default is `false` to keep existing call-sites unchanged.
  * @param content The composable content to theme.
  */
 @Composable
 fun AppTheme(
     darkTheme: Boolean = false,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    val dynamicScheme = if (dynamicColor) rememberDynamicColorScheme(darkTheme) else null
+    val colorScheme = dynamicScheme
+        ?: if (darkTheme) DarkColorScheme else LightColorScheme
 
     CompositionLocalProvider(LocalIsDarkTheme provides darkTheme) {
         MaterialTheme(

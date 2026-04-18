@@ -17,6 +17,9 @@ private fun SettingsLightPreview() {
         SettingsScreenContent(
             selectedTheme = AppThemeMode.System,
             onThemeChange = {},
+            dynamicColorEnabled = true,
+            dynamicColorSupported = true,
+            onDynamicColorChange = {},
             onBackClick = {},
         )
     }
@@ -34,6 +37,9 @@ private fun SettingsDarkPreview() {
         SettingsScreenContent(
             selectedTheme = AppThemeMode.Dark,
             onThemeChange = {},
+            dynamicColorEnabled = true,
+            dynamicColorSupported = true,
+            onDynamicColorChange = {},
             onBackClick = {},
         )
     }
@@ -46,6 +52,24 @@ private fun SettingsLightSelectedPreview() {
         SettingsScreenContent(
             selectedTheme = AppThemeMode.Light,
             onThemeChange = {},
+            dynamicColorEnabled = false,
+            dynamicColorSupported = true,
+            onDynamicColorChange = {},
+            onBackClick = {},
+        )
+    }
+}
+
+@Preview(name = "Settings — Unsupported platform (no toggle)", showBackground = true)
+@Composable
+private fun SettingsUnsupportedPreview() {
+    AppTheme(darkTheme = false) {
+        SettingsScreenContent(
+            selectedTheme = AppThemeMode.System,
+            onThemeChange = {},
+            dynamicColorEnabled = false,
+            dynamicColorSupported = false,
+            onDynamicColorChange = {},
             onBackClick = {},
         )
     }
