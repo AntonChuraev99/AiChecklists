@@ -5,15 +5,22 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material3.DrawerState
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.main_menu
 import aichecklists.core.designsystem.generated.resources.settings_theme
 import aichecklists.core.designsystem.generated.resources.settings_theme_dark
 import aichecklists.core.designsystem.generated.resources.settings_theme_light
@@ -22,6 +29,7 @@ import aichecklists.core.designsystem.generated.resources.settings_title
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.settings.domain.AppThemeMode
+import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -53,11 +61,24 @@ fun SettingsScreenContent(
     selectedTheme: AppThemeMode,
     onThemeChange: (AppThemeMode) -> Unit,
     onBackClick: () -> Unit,
+    drawerState: DrawerState? = null,
     modifier: Modifier = Modifier,
 ) {
+    val scope = rememberCoroutineScope()
     AppScaffold(
         title = stringResource(Res.string.settings_title),
-        onBackButtonClick = onBackClick,
+        navigationIcon = if (drawerState != null) {
+            {
+                IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                    Icon(
+                        imageVector = Icons.Filled.Menu,
+                        contentDescription = stringResource(Res.string.main_menu),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        } else null,
+        onBackButtonClick = if (drawerState == null) onBackClick else null,
     ) {
         Column(
             modifier = modifier

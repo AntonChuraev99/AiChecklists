@@ -8,7 +8,7 @@ import com.antonchuraev.homesearchchecklist.csat.InAppReviewLauncher
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppThemeMode
 import com.antonchuraev.homesearchchecklist.core.datastore.api.ThemeRepository
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppTheme
-import com.antonchuraev.homesearchchecklist.settings.navigation.settingsScreen
+import com.antonchuraev.homesearchchecklist.settings.presentation.SettingsScreen
 import com.antonchuraev.homesearchchecklist.feature.updatefeed.presentation.components.WidgetInstructionOverlay
 import com.antonchuraev.homesearchchecklist.navigation.AppNavigationDrawerContent
 import com.antonchuraev.homesearchchecklist.navigation.DrawerDestination
@@ -41,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.feedback_thanks_message
@@ -160,6 +161,16 @@ fun App() {
                     val drawerState = remember { DrawerState(initialValue = DrawerValue.Closed) }
                     val scope = rememberCoroutineScope()
                     var isEditMode by rememberSaveable { mutableStateOf(false) }
+                    // Debounce guard: rapid drawer clicks can double-navigate and flash an
+                    // empty screen while Koin rebinds the second entry. See memory
+                    // feedback_rapid_click_vs_di_race.md.
+                    var navConsumed by remember { mutableStateOf(false) }
+                    LaunchedEffect(navConsumed) {
+                        if (navConsumed) {
+                            delay(500)
+                            navConsumed = false
+                        }
+                    }
 
                     ModalNavigationDrawer(
                         drawerState = drawerState,
@@ -173,10 +184,18 @@ fun App() {
                                     onCloseDrawer = { scope.launch { drawerState.close() } },
                                     onHomeClick = { /* already on Main; drawer close is enough */ },
                                     onUpdateFeedClick = {
-                                        navController.navigate(AppNavRoute.UpdateFeed)
+                                        if (navConsumed) return@AppNavigationDrawerContent
+                                        navConsumed = true
+                                        navController.navigate(AppNavRoute.UpdateFeed) {
+                                            launchSingleTop = true
+                                        }
                                     },
                                     onSettingsClick = {
-                                        navController.navigate(AppNavRoute.Settings)
+                                        if (navConsumed) return@AppNavigationDrawerContent
+                                        navConsumed = true
+                                        navController.navigate(AppNavRoute.Settings) {
+                                            launchSingleTop = true
+                                        }
                                     },
                                     onRateAppClick = {
                                         csatViewModel.sendIntent(CsatIntent.ForceShow)
@@ -262,14 +281,68 @@ fun App() {
                     ShareScreen(checklistId = route.checklistId)
                 }
 
-                settingsScreen(
-                    onBackClick = { navController.popBackStack() }
-                )
+                composable<AppNavRoute.Settings> {
+                    val drawerState = remember { DrawerState(initialValue = DrawerValue.Closed) }
+                    val scope = rememberCoroutineScope()
+                    var navConsumed by remember { mutableStateOf(false) }
+                    LaunchedEffect(navConsumed) {
+                        if (navConsumed) {
+                            delay(500)
+                            navConsumed = false
+                        }
+                    }
+
+                    ModalNavigationDrawer(
+                        drawerState = drawerState,
+                        drawerContent = {
+                            ModalDrawerSheet(
+                                drawerContainerColor = MaterialTheme.colorScheme.surface
+                            ) {
+                                AppNavigationDrawerContent(
+                                    selectedItemId = DrawerDestination.Settings,
+                                    onCloseDrawer = { scope.launch { drawerState.close() } },
+                                    onHomeClick = {
+                                        if (navConsumed) return@AppNavigationDrawerContent
+                                        navConsumed = true
+                                        navController.popBackStack(AppNavRoute.Main, inclusive = false)
+                                    },
+                                    onUpdateFeedClick = {
+                                        if (navConsumed) return@AppNavigationDrawerContent
+                                        navConsumed = true
+                                        navController.navigate(AppNavRoute.UpdateFeed) {
+                                            launchSingleTop = true
+                                        }
+                                    },
+                                    onSettingsClick = { /* already here */ },
+                                    onRateAppClick = {
+                                        csatViewModel.sendIntent(CsatIntent.ForceShow)
+                                    },
+                                    onLeaveFeedbackClick = {
+                                        csatViewModel.sendIntent(CsatIntent.ForceShowFeedback)
+                                    },
+                                    versionName = AppBuildConfig.versionName,
+                                )
+                            }
+                        }
+                    ) {
+                        SettingsScreen(
+                            onBackClick = { navController.popBackStack() },
+                            drawerState = drawerState,
+                        )
+                    }
+                }
 
                 composable<AppNavRoute.UpdateFeed> {
                     // Fresh Closed DrawerState per entry — same rationale as Main route.
                     val drawerState = remember { DrawerState(initialValue = DrawerValue.Closed) }
                     val scope = rememberCoroutineScope()
+                    var navConsumed by remember { mutableStateOf(false) }
+                    LaunchedEffect(navConsumed) {
+                        if (navConsumed) {
+                            delay(500)
+                            navConsumed = false
+                        }
+                    }
 
                     ModalNavigationDrawer(
                         drawerState = drawerState,
@@ -280,10 +353,18 @@ fun App() {
                                 AppNavigationDrawerContent(
                                     selectedItemId = DrawerDestination.UpdateFeed,
                                     onCloseDrawer = { scope.launch { drawerState.close() } },
-                                    onHomeClick = { navController.popBackStack() },
+                                    onHomeClick = {
+                                        if (navConsumed) return@AppNavigationDrawerContent
+                                        navConsumed = true
+                                        navController.popBackStack()
+                                    },
                                     onUpdateFeedClick = { /* already here */ },
                                     onSettingsClick = {
-                                        navController.navigate(AppNavRoute.Settings)
+                                        if (navConsumed) return@AppNavigationDrawerContent
+                                        navConsumed = true
+                                        navController.navigate(AppNavRoute.Settings) {
+                                            launchSingleTop = true
+                                        }
                                     },
                                     onRateAppClick = {
                                         csatViewModel.sendIntent(CsatIntent.ForceShow)
