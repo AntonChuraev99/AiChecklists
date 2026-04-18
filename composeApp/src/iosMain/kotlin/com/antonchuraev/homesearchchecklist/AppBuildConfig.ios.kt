@@ -13,4 +13,7 @@ actual object AppBuildConfig {
         configuration?.contains("Debug", ignoreCase = true) == true
                 || kotlin.native.Platform.isDebugBinary
     }
+
+    actual val versionName: String =
+        (NSBundle.mainBundle.infoDictionary?.get("CFBundleShortVersionString") as? String).orEmpty()
 }

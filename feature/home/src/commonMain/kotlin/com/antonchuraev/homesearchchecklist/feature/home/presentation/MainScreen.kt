@@ -4,8 +4,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -16,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.automirrored.outlined.Article
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Campaign
 import androidx.compose.material.icons.outlined.Feedback
@@ -58,15 +61,15 @@ import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import com.antonchuraev.homesearchchecklist.feature.paywall.data.PaywallConfig
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
-
-private const val SUPPORT_EMAIL = "churaevanton@gmail.com"
 
 @Composable
 fun MainScreen(
     onRateAppClick: () -> Unit = {},
     onLeaveFeedbackClick: () -> Unit = {},
+    versionName: String = "",
     viewModel: MainScreenViewModel = koinViewModel(),
 ) {
     val analyticsTracker: AnalyticsTracker = koinInject()
@@ -84,6 +87,11 @@ fun MainScreen(
     val drawerState = remember { DrawerState(initialValue = DrawerValue.Closed) }
     val scope = rememberCoroutineScope()
 
+    val drawerItemColors = NavigationDrawerItemDefaults.colors(
+        unselectedTextColor = MaterialTheme.colorScheme.onSurface,
+        unselectedIconColor = MaterialTheme.colorScheme.onSurface,
+    )
+
     ModalNavigationDrawer(
         drawerState = drawerState,
         gesturesEnabled = !isEditMode,
@@ -91,82 +99,128 @@ fun MainScreen(
             ModalDrawerSheet(
                 drawerContainerColor = MaterialTheme.colorScheme.surface
             ) {
-                Spacer(modifier = Modifier.height(AppDimens.SpacingLg))
-                Text(
-                    text = "Gisti",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(
-                        horizontal = AppDimens.SpacingLg,
-                        vertical = AppDimens.SpacingMd
+                Column(modifier = Modifier.fillMaxHeight()) {
+                    // ── Brand header ──────────────────────────────────────
+                    DrawerBrandHeader()
+
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = AppDimens.SpacingLg)
                     )
-                )
-                HorizontalDivider(
-                    modifier = Modifier.padding(horizontal = AppDimens.SpacingMd)
-                )
-                Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
-                NavigationDrawerItem(
-                    label = { Text(stringResource(Res.string.update_feed_menu_item)) },
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Outlined.Campaign,
-                            contentDescription = null
-                        )
-                    },
-                    selected = false,
-                    onClick = {
-                        scope.launch {
-                            drawerState.close()
-                            viewModel.sendIntent(MainScreenIntent.OnUpdateFeedClick)
-                        }
-                    },
-                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
-                )
-                NavigationDrawerItem(
-                    label = { Text(stringResource(Res.string.main_menu_rate_app)) },
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Outlined.Star,
-                            contentDescription = null
-                        )
-                    },
-                    selected = false,
-                    onClick = {
-                        scope.launch { drawerState.close() }
-                        onRateAppClick()
-                    },
-                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
-                )
-                NavigationDrawerItem(
-                    label = { Text(stringResource(Res.string.main_menu_leave_feedback)) },
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Outlined.Feedback,
-                            contentDescription = null
-                        )
-                    },
-                    selected = false,
-                    onClick = {
-                        scope.launch { drawerState.close() }
-                        onLeaveFeedbackClick()
-                    },
-                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
-                )
-                NavigationDrawerItem(
-                    label = { Text(stringResource(Res.string.main_menu_support)) },
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Outlined.MailOutline,
-                            contentDescription = null
-                        )
-                    },
-                    selected = false,
-                    onClick = {
-                        scope.launch { drawerState.close() }
-                        uriHandler.openUri("mailto:$SUPPORT_EMAIL")
-                    },
-                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
-                )
+                    Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
+
+                    // ── Section: What's New ───────────────────────────────
+                    DrawerSectionLabel(stringResource(Res.string.drawer_section_whats_new))
+                    NavigationDrawerItem(
+                        label = { Text(stringResource(Res.string.update_feed_menu_item)) },
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Outlined.Campaign,
+                                contentDescription = null
+                            )
+                        },
+                        selected = false,
+                        onClick = {
+                            scope.launch {
+                                drawerState.close()
+                                viewModel.sendIntent(MainScreenIntent.OnUpdateFeedClick)
+                            }
+                        },
+                        colors = drawerItemColors,
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                    )
+
+                    // ── Section: Help & Feedback ──────────────────────────
+                    Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
+                    DrawerSectionLabel(stringResource(Res.string.drawer_section_help))
+                    NavigationDrawerItem(
+                        label = { Text(stringResource(Res.string.main_menu_rate_app)) },
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Outlined.Star,
+                                contentDescription = null
+                            )
+                        },
+                        selected = false,
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            onRateAppClick()
+                        },
+                        colors = drawerItemColors,
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                    )
+                    NavigationDrawerItem(
+                        label = { Text(stringResource(Res.string.main_menu_leave_feedback)) },
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Outlined.Feedback,
+                                contentDescription = null
+                            )
+                        },
+                        selected = false,
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            onLeaveFeedbackClick()
+                        },
+                        colors = drawerItemColors,
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                    )
+                    NavigationDrawerItem(
+                        label = { Text(stringResource(Res.string.main_menu_support)) },
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Outlined.MailOutline,
+                                contentDescription = null
+                            )
+                        },
+                        selected = false,
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            uriHandler.openUri("mailto:${PaywallConfig.SUPPORT_EMAIL}")
+                        },
+                        colors = drawerItemColors,
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                    )
+
+                    // ── Section: About ────────────────────────────────────
+                    Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
+                    DrawerSectionLabel(stringResource(Res.string.drawer_section_about))
+                    NavigationDrawerItem(
+                        label = { Text(stringResource(Res.string.paywall_privacy)) },
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Outlined.Lock,
+                                contentDescription = null
+                            )
+                        },
+                        selected = false,
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            uriHandler.openUri(PaywallConfig.PRIVACY_POLICY_URL)
+                        },
+                        colors = drawerItemColors,
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                    )
+                    NavigationDrawerItem(
+                        label = { Text(stringResource(Res.string.paywall_terms)) },
+                        icon = {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Outlined.Article,
+                                contentDescription = null
+                            )
+                        },
+                        selected = false,
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            uriHandler.openUri(PaywallConfig.TERMS_OF_USE_URL)
+                        },
+                        colors = drawerItemColors,
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                    )
+
+                    // ── Footer (version) ──────────────────────────────────
+                    Spacer(modifier = Modifier.weight(1f))
+                    DrawerFooter(versionName)
+                }
             }
         }
     ) {
@@ -267,6 +321,76 @@ fun MainScreen(
             }
         }
     }
+    }
+}
+
+@Composable
+private fun DrawerBrandHeader() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(
+                horizontal = AppDimens.SpacingLg,
+                vertical = AppDimens.SpacingLg
+            ),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(MaterialTheme.shapes.medium)
+                .background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.AutoAwesome,
+                contentDescription = stringResource(Res.string.drawer_logo_content_description),
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+        Column {
+            Text(
+                text = "Gisti",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = stringResource(Res.string.drawer_tagline),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun DrawerSectionLabel(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(
+            start = AppDimens.SpacingLg,
+            end = AppDimens.SpacingLg,
+            top = AppDimens.SpacingMd,
+            bottom = AppDimens.SpacingSm
+        )
+    )
+}
+
+@Composable
+private fun DrawerFooter(versionName: String) {
+    if (versionName.isNotBlank()) {
+        Text(
+            text = stringResource(Res.string.drawer_version_label, versionName),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .padding(horizontal = AppDimens.SpacingLg, vertical = AppDimens.SpacingMd)
+                .navigationBarsPadding()
+        )
     }
 }
 

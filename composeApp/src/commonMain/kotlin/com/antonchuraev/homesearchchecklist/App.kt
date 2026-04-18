@@ -5,14 +5,24 @@ import com.antonchuraev.homesearchchecklist.csat.CsatIntent
 import com.antonchuraev.homesearchchecklist.csat.CsatViewModel
 import com.antonchuraev.homesearchchecklist.csat.InAppReviewLauncher
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppTheme
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.feedback_thanks_message
+import org.jetbrains.compose.resources.stringResource
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavRoute
 import com.antonchuraev.homesearchchecklist.di.appModule
 import com.antonchuraev.homesearchchecklist.feature.create.presentation.create.CreateChecklistScreen
@@ -70,6 +80,16 @@ fun App() {
         val csatState by csatViewModel.screenState.collectAsState()
 
         AppTheme {
+            val snackbarHostState = remember { SnackbarHostState() }
+            val feedbackThanksMessage = stringResource(Res.string.feedback_thanks_message)
+            LaunchedEffect(csatState.showFeedbackThanks) {
+                if (csatState.showFeedbackThanks) {
+                    snackbarHostState.showSnackbar(feedbackThanksMessage)
+                    csatViewModel.sendIntent(CsatIntent.FeedbackThanksShown)
+                }
+            }
+
+            Box(modifier = Modifier.fillMaxSize()) {
             NavHost(
                 navController = navController,
                 startDestination = AppNavRoute.Splash
@@ -90,6 +110,7 @@ fun App() {
                     MainScreen(
                         onRateAppClick = { csatViewModel.sendIntent(CsatIntent.ForceShow) },
                         onLeaveFeedbackClick = { csatViewModel.sendIntent(CsatIntent.ForceShowFeedback) },
+                        versionName = AppBuildConfig.versionName,
                     )
                 }
 
@@ -163,6 +184,13 @@ fun App() {
                         onBackClick = { navController.popBackStack() }
                     )
                 }
+            }
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding(),
+            )
             }
 
             // CSAT survey — global overlay
