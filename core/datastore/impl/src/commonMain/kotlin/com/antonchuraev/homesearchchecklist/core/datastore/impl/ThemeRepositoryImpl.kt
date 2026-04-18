@@ -8,16 +8,17 @@ import kotlinx.coroutines.flow.map
 
 private const val KEY_THEME_MODE = "theme_mode"
 private const val KEY_DYNAMIC_COLOR = "dynamic_color"
-private const val DEFAULT_DYNAMIC_COLOR = true
+private const val DEFAULT_DYNAMIC_COLOR = false
+private val DEFAULT_THEME_MODE = AppThemeMode.Light
 
 class ThemeRepositoryImpl(
     private val dataStore: AppDatastore,
 ) : ThemeRepository {
 
     override val themeMode: Flow<AppThemeMode> =
-        dataStore.observeString(KEY_THEME_MODE, AppThemeMode.System.name)
+        dataStore.observeString(KEY_THEME_MODE, DEFAULT_THEME_MODE.name)
             .map { stored ->
-                AppThemeMode.entries.firstOrNull { it.name == stored } ?: AppThemeMode.System
+                AppThemeMode.entries.firstOrNull { it.name == stored } ?: DEFAULT_THEME_MODE
             }
 
     override suspend fun setThemeMode(mode: AppThemeMode) {

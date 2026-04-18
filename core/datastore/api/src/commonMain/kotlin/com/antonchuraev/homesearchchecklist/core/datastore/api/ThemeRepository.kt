@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.Flow
  * Repository for persisting and observing the user's chosen theme mode.
  *
  * The implementation stores the preference in DataStore.
- * The default value before any explicit selection is [AppThemeMode.System].
+ * The default value before any explicit selection is [AppThemeMode.Light].
  */
 interface ThemeRepository {
     /** Emits the current theme mode and subsequent updates. Never throws. */
@@ -25,9 +25,9 @@ interface ThemeRepository {
      * Android 12 device keeps the opt-in if they later restore onto an iOS
      * build or an older phone.
      *
-     * Default for new installs: `true`. On Android 12+ this means Material You
-     * is active out of the box; on other platforms the flag has no visible
-     * effect.
+     * Default for new installs: `false`. Users must explicitly opt in to
+     * Material You via Settings — keeps the default brand palette stable
+     * across devices until the user chooses the wallpaper-based look.
      */
     val dynamicColor: Flow<Boolean>
 
