@@ -102,6 +102,7 @@ fun App() {
 
         val themeRepository: ThemeRepository = remember { koin.get<ThemeRepository>() }
         val themeMode by themeRepository.themeMode.collectAsStateWithLifecycle(initialValue = AppThemeMode.System)
+        val dynamicColor by themeRepository.dynamicColor.collectAsStateWithLifecycle(initialValue = true)
         val systemDark = isSystemInDarkTheme()
         val darkTheme = when (themeMode) {
             AppThemeMode.Light -> false
@@ -126,7 +127,7 @@ fun App() {
             }
         }
 
-        AppTheme(darkTheme = darkTheme) {
+        AppTheme(darkTheme = darkTheme, dynamicColor = dynamicColor) {
             val snackbarHostState = remember { SnackbarHostState() }
             val feedbackThanksMessage = stringResource(Res.string.feedback_thanks_message)
             LaunchedEffect(csatState.showFeedbackThanks) {
