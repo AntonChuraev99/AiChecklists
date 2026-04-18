@@ -8,7 +8,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -16,12 +18,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.antonchuraev.homesearchchecklist.consent.ConsentDialog
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppContextHolder
+import com.antonchuraev.homesearchchecklist.core.datastore.api.AppThemeMode
+import com.antonchuraev.homesearchchecklist.core.datastore.api.ThemeRepository
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.notification.ReminderReceiver
 import org.koin.android.ext.android.inject
+import org.koin.compose.koinInject
 
 class MainActivity : ComponentActivity() {
 
@@ -44,8 +50,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         AppContextHolder.init(applicationContext)
+        // Initial edge-to-edge (light default) — overridden reactively in setContent once theme is resolved
         enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.light(Color.TRANSPARENT , Color.TRANSPARENT),
+            statusBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
         )
         super.onCreate(savedInstanceState)
 
@@ -55,6 +62,31 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
+            // Reactive edge-to-edge: switch status bar icon style when app theme changes
+            val themeRepository: ThemeRepository = koinInject()
+            val themeMode by themeRepository.themeMode.collectAsStateWithLifecycle(initialValue = AppThemeMode.System)
+            val systemDark = isSystemInDarkTheme()
+            val darkTheme = when (themeMode) {
+                AppThemeMode.Light -> false
+                AppThemeMode.Dark -> true
+                AppThemeMode.System -> systemDark
+            }
+            DisposableEffect(darkTheme) {
+                enableEdgeToEdge(
+                    statusBarStyle = if (darkTheme) {
+                        SystemBarStyle.dark(Color.TRANSPARENT)
+                    } else {
+                        SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
+                    },
+                    navigationBarStyle = if (darkTheme) {
+                        SystemBarStyle.dark(Color.TRANSPARENT)
+                    } else {
+                        SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
+                    },
+                )
+                onDispose {}
+            }
+
             App()
 
             // Show consent dialog for EEA/UK users on first launch

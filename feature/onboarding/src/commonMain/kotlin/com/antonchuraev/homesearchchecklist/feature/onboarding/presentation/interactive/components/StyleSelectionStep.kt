@@ -4,7 +4,6 @@ import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.onboarding_interactive_style_subtitle
 import aichecklists.core.designsystem.generated.resources.onboarding_interactive_style_title
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -17,7 +16,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.material3.Card
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -34,6 +36,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
 import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive.OrganizingStyle
 import org.jetbrains.compose.resources.stringResource
 
@@ -103,35 +106,14 @@ private fun StyleCard(
     val title = stringResource(style.titleRes)
     val description = stringResource(style.descriptionRes)
 
+    val isDark = LocalIsDarkTheme.current
     val shape = RoundedCornerShape(AppDimens.SpacingMd)
-
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .heightIn(min = 80.dp)
-            .clip(shape)
-            .graphicsLayer(scaleX = scale, scaleY = scale)
-            .clickable(onClick = onClick)
-            .semantics { contentDescription = title }
-            .border(
-                width = if (isSelected) 2.dp else 1.dp,
-                color = if (isSelected) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.outlineVariant
-                },
-                shape = shape
-            ),
-        shape = shape,
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) {
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)
-            } else {
-                MaterialTheme.colorScheme.surface
-            }
-        )
-    ) {
+    val containerColor = if (isSelected) {
+        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
+    val cardContent: @Composable () -> Unit = {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -152,5 +134,43 @@ private fun StyleCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+    }
+
+    if (isDark) {
+        OutlinedCard(
+            modifier = modifier
+                .fillMaxWidth()
+                .heightIn(min = 80.dp)
+                .clip(shape)
+                .graphicsLayer(scaleX = scale, scaleY = scale)
+                .clickable(onClick = onClick)
+                .semantics { contentDescription = title },
+            shape = shape,
+            border = BorderStroke(
+                width = if (isSelected) 2.dp else 1.dp,
+                color = if (isSelected) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.outline
+            ),
+            colors = CardDefaults.outlinedCardColors(containerColor = containerColor)
+        ) { cardContent() }
+    } else {
+        Card(
+            modifier = modifier
+                .fillMaxWidth()
+                .heightIn(min = 80.dp)
+                .clip(shape)
+                .graphicsLayer(scaleX = scale, scaleY = scale)
+                .then(
+                    if (isSelected) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, shape)
+                    else Modifier
+                )
+                .clickable(onClick = onClick)
+                .semantics { contentDescription = title },
+            shape = shape,
+            colors = CardDefaults.cardColors(containerColor = containerColor),
+            elevation = CardDefaults.cardElevation(
+                defaultElevation = if (isSelected) 0.dp else AppDimens.CardElevation
+            )
+        ) { cardContent() }
     }
 }

@@ -20,6 +20,7 @@ import androidx.compose.material.icons.outlined.Feedback
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.MailOutline
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -48,6 +49,7 @@ import aichecklists.core.designsystem.generated.resources.main_menu_rate_app
 import aichecklists.core.designsystem.generated.resources.main_menu_support
 import aichecklists.core.designsystem.generated.resources.paywall_privacy
 import aichecklists.core.designsystem.generated.resources.paywall_terms
+import aichecklists.core.designsystem.generated.resources.settings_title
 import aichecklists.core.designsystem.generated.resources.update_feed_menu_item
 import org.jetbrains.compose.resources.stringResource
 
@@ -64,6 +66,7 @@ import org.jetbrains.compose.resources.stringResource
 object DrawerDestination {
     const val Main = "main"
     const val UpdateFeed = "update_feed"
+    const val Settings = "settings"
 }
 
 @Composable
@@ -72,6 +75,7 @@ fun AppNavigationDrawerContent(
     onCloseDrawer: () -> Unit,
     onHomeClick: () -> Unit,
     onUpdateFeedClick: () -> Unit,
+    onSettingsClick: () -> Unit,
     onRateAppClick: () -> Unit,
     onLeaveFeedbackClick: () -> Unit,
     versionName: String,
@@ -109,6 +113,17 @@ fun AppNavigationDrawerContent(
             onClick = {
                 onCloseDrawer()
                 onUpdateFeedClick()
+            },
+            colors = drawerItemColors,
+            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+        )
+        NavigationDrawerItem(
+            label = { Text(stringResource(Res.string.settings_title)) },
+            icon = { Icon(Icons.Outlined.Settings, contentDescription = null) },
+            selected = selectedItemId == DrawerDestination.Settings,
+            onClick = {
+                onCloseDrawer()
+                onSettingsClick()
             },
             colors = drawerItemColors,
             modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)

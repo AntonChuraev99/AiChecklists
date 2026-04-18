@@ -6,7 +6,9 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -85,6 +87,7 @@ import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.material3.Card
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
@@ -133,6 +136,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppTextField
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
@@ -880,34 +884,27 @@ private fun ChecklistItemCard(
     cardDragModifier: Modifier = Modifier,
     modifier: Modifier = Modifier
 ) {
-    val elevation by animateDpAsState(
-        if (isDragging) 8.dp else AppDimens.CardElevation
-    )
+    val isDark = LocalIsDarkTheme.current
 
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .graphicsLayer {
-                if (isEditMode && !isDragging) {
-                    rotationZ = wiggleAngle
-                }
+    val cardModifier = modifier
+        .fillMaxWidth()
+        .graphicsLayer {
+            if (isEditMode && !isDragging) {
+                rotationZ = wiggleAngle
             }
-            .then(
-                if (isEditMode) {
-                    cardDragModifier
-                } else {
-                    Modifier.combinedClickable(
-                        onClick = { onCheckedChange(!item.checked) },
-                        onLongClick = onLongClick
-                    )
-                }
-            ),
-        shape = MaterialTheme.shapes.medium,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = elevation)
-    ) {
+        }
+        .then(
+            if (isEditMode) {
+                cardDragModifier
+            } else {
+                Modifier.combinedClickable(
+                    onClick = { onCheckedChange(!item.checked) },
+                    onLongClick = onLongClick
+                )
+            }
+        )
+
+    val cardContent: @Composable () -> Unit = {
         Column(modifier = Modifier.fillMaxWidth().padding(AppDimens.CardPadding)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -963,6 +960,39 @@ private fun ChecklistItemCard(
                 }
             }
         }
+    }
+
+    if (isDark) {
+        val borderColor by animateColorAsState(
+            targetValue = if (isDragging) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.outline,
+            label = "border_color"
+        )
+        val borderWidth by animateDpAsState(
+            targetValue = if (isDragging) 2.dp else 1.dp,
+            label = "border_width"
+        )
+        OutlinedCard(
+            modifier = cardModifier,
+            shape = MaterialTheme.shapes.medium,
+            colors = CardDefaults.outlinedCardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            ),
+            border = BorderStroke(borderWidth, borderColor)
+        ) { cardContent() }
+    } else {
+        val elevation by animateDpAsState(
+            targetValue = if (isDragging) 8.dp else AppDimens.CardElevation,
+            label = "card_elevation"
+        )
+        Card(
+            modifier = cardModifier,
+            shape = MaterialTheme.shapes.medium,
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = elevation)
+        ) { cardContent() }
     }
 }
 

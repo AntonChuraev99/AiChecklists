@@ -31,7 +31,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.Card
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
@@ -50,6 +52,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
 import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive.PreviewChecklistItem
 import org.jetbrains.compose.resources.stringResource
 
@@ -185,16 +188,8 @@ private fun PreviewItemCard(
     onToggle: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable { onToggle() },
-        shape = MaterialTheme.shapes.medium,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = AppDimens.CardElevation)
-    ) {
+    val isDark = LocalIsDarkTheme.current
+    val cardContent: @Composable () -> Unit = {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -219,6 +214,30 @@ private fun PreviewItemCard(
                 modifier = Modifier.weight(1f)
             )
         }
+    }
+
+    if (isDark) {
+        OutlinedCard(
+            modifier = modifier
+                .fillMaxWidth()
+                .clickable { onToggle() },
+            shape = MaterialTheme.shapes.medium,
+            colors = CardDefaults.outlinedCardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            ),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+        ) { cardContent() }
+    } else {
+        Card(
+            modifier = modifier
+                .fillMaxWidth()
+                .clickable { onToggle() },
+            shape = MaterialTheme.shapes.medium,
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = AppDimens.CardElevation)
+        ) { cardContent() }
     }
 }
 
