@@ -116,6 +116,11 @@ fun PaywallScreen(
         pageCount = { pages.size }
     )
 
+    // Rapid-tap guard: Skip fires navigator.onBack(); two taps within ~50ms
+    // would pop twice and escape the backstack past Main, rendering blank.
+    // remember resets on re-entry, so the next visit still works.
+    var skipConsumed by remember { mutableStateOf(false) }
+
     // Track page swipes
     var previousPage by remember { mutableStateOf(pagerState.settledPage) }
     LaunchedEffect(pagerState.settledPage) {
@@ -149,7 +154,11 @@ fun PaywallScreen(
                 Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(AppDimens.SpacingSm))
-                        .clickable { viewModel.sendIntent(PaywallIntent.Close) }
+                        .clickable {
+                            if (skipConsumed) return@clickable
+                            skipConsumed = true
+                            viewModel.sendIntent(PaywallIntent.Close)
+                        }
                         .padding(AppDimens.SpacingSm),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
