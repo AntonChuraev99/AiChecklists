@@ -112,7 +112,7 @@ android {
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 32
-        versionName = "1.12.3"
+        versionName = "1.12.4"
 
         testInstrumentationRunner = "com.antonchuraev.aichecklists.TestRunner"
 
