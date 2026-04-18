@@ -65,8 +65,6 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
-// Background color for paywall
-private val BackgroundGray = Color(0xFFF8F8F8)
 
 
 
@@ -134,7 +132,7 @@ fun PaywallScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundGray)
+            .background(MaterialTheme.colorScheme.background)
     ) {
         Column(
             modifier = Modifier.fillMaxSize()

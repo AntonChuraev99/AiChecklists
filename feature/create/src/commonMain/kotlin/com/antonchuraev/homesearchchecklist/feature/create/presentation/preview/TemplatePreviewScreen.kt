@@ -20,7 +20,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.Card
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -42,6 +44,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.AddItemInput
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
 import com.antonchuraev.homesearchchecklist.feature.create.domain.model.ChecklistTemplate
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
@@ -196,14 +199,9 @@ private fun ChecklistItemCard(
     text: String,
     onRemove: () -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
+    val isDark = LocalIsDarkTheme.current
+    val shape = RoundedCornerShape(12.dp)
+    val cardContent: @Composable () -> Unit = {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -241,6 +239,26 @@ private fun ChecklistItemCard(
                 )
             }
         }
+    }
+
+    if (isDark) {
+        OutlinedCard(
+            modifier = Modifier.fillMaxWidth(),
+            shape = shape,
+            colors = CardDefaults.outlinedCardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            ),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+        ) { cardContent() }
+    } else {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = shape,
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = AppDimens.CardElevation)
+        ) { cardContent() }
     }
 }
 

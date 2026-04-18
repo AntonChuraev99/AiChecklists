@@ -1,5 +1,6 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
@@ -23,7 +24,9 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Checklist
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.Card
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -40,9 +43,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
 import com.antonchuraev.homesearchchecklist.desingsystem.components.PremiumBanner
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
@@ -138,59 +143,53 @@ fun MainScreenContent(
                     key = checklistWithProgress.checklist.id,
                     enabled = isEditMode
                 ) { isDragging ->
-                    val elevation by animateDpAsState(
-                        if (isDragging) 8.dp else AppDimens.CardElevation
-                    )
+                    val isDark = LocalIsDarkTheme.current
 
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .graphicsLayer {
-                                if (isEditMode && !isDragging) {
-                                    rotationZ = wiggleAngle
-                                }
+                    val cardModifier = Modifier
+                        .fillMaxWidth()
+                        .graphicsLayer {
+                            if (isEditMode && !isDragging) {
+                                rotationZ = wiggleAngle
                             }
-                            .then(
-                                if (isEditMode) {
-                                    Modifier.draggableHandle(
-                                        onDragStarted = {
-                                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        },
-                                        onDragStopped = {
-                                            hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            onReorderChecklists(localList.map { it.checklist.id })
-                                        }
-                                    )
-                                } else {
-                                    Modifier.combinedClickable(
-                                        onClick = { onChecklistClick(checklistWithProgress) },
-                                        onLongClick = {
-                                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                            onEnterEditMode()
-                                        }
-                                    )
-                                }
-                            ),
-                        shape = MaterialTheme.shapes.medium,
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surface
-                        ),
-                        elevation = CardDefaults.cardElevation(defaultElevation = elevation)
-                    ) {
+                        }
+                        .then(
+                            if (isEditMode) {
+                                Modifier.draggableHandle(
+                                    onDragStarted = {
+                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    },
+                                    onDragStopped = {
+                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        onReorderChecklists(localList.map { it.checklist.id })
+                                    }
+                                )
+                            } else {
+                                Modifier.combinedClickable(
+                                    onClick = { onChecklistClick(checklistWithProgress) },
+                                    onLongClick = {
+                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        onEnterEditMode()
+                                    }
+                                )
+                            }
+                        )
+
+                    val cardContent: @Composable () -> Unit = {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(AppDimens.CardPadding),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-
                             Column(
                                 modifier = Modifier.weight(1f),
                                 verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs)
                             ) {
                                 Text(
                                     text = checklistWithProgress.checklist.name,
-                                    style = MaterialTheme.typography.titleMedium,
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.Normal
+                                    ),
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
 
@@ -231,6 +230,39 @@ fun MainScreenContent(
                                 )
                             }
                         }
+                    }
+
+                    if (isDark) {
+                        val borderColor by animateColorAsState(
+                            targetValue = if (isDragging) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.outline,
+                            label = "border_color"
+                        )
+                        val borderWidth by animateDpAsState(
+                            targetValue = if (isDragging) 2.dp else 1.dp,
+                            label = "border_width"
+                        )
+                        OutlinedCard(
+                            modifier = cardModifier,
+                            shape = MaterialTheme.shapes.medium,
+                            colors = CardDefaults.outlinedCardColors(
+                                containerColor = MaterialTheme.colorScheme.surface
+                            ),
+                            border = BorderStroke(borderWidth, borderColor)
+                        ) { cardContent() }
+                    } else {
+                        val elevation by animateDpAsState(
+                            targetValue = if (isDragging) 8.dp else AppDimens.CardElevation,
+                            label = "card_elevation"
+                        )
+                        Card(
+                            modifier = cardModifier,
+                            shape = MaterialTheme.shapes.medium,
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surface
+                            ),
+                            elevation = CardDefaults.cardElevation(defaultElevation = elevation)
+                        ) { cardContent() }
                     }
                 }
             }
