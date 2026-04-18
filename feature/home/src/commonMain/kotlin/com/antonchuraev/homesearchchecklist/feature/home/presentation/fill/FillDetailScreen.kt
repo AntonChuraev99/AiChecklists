@@ -371,7 +371,8 @@ private fun NoteDialog(
                 value = note,
                 onValueChange = onNoteChanged,
                 label = "",
-                placeholder = stringResource(Res.string.fill_note_placeholder)
+                placeholder = stringResource(Res.string.fill_note_placeholder),
+                singleLine = false
             )
         },
         confirmButton = {

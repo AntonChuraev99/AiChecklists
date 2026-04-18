@@ -126,6 +126,8 @@
     <string name="create_add_item">Add Item</string>
     <string name="create_add_item_dialog_title">Add Item</string>
     <string name="create_item_name_label">Item text</string>
+    <string name="create_edit_item">Edit item</string>
+    <string name="create_confirm_item_edit">Save item edit</string>
 
     <!-- Templates Screen -->
     <string name="templates_title">Templates</string>

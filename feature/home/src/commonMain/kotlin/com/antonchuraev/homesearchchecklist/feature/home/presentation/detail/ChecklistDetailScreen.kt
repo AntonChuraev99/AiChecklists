@@ -981,7 +981,8 @@ private fun NoteDialog(
                 value = note,
                 onValueChange = onNoteChanged,
                 label = "",
-                placeholder = stringResource(Res.string.fill_note_placeholder)
+                placeholder = stringResource(Res.string.fill_note_placeholder),
+                singleLine = false
             )
         },
         confirmButton = {
@@ -1639,12 +1640,13 @@ private fun InlineAddItemInput(
 
     Row(
         modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.Top
     ) {
         AppTextField(
             value = text,
             onValueChange = { text = it },
             placeholder = stringResource(Res.string.add_item_placeholder),
+            singleLine = false,
             modifier = Modifier
                 .weight(1f)
                 .focusRequester(focusRequester),

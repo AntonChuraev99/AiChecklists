@@ -41,6 +41,9 @@ data class ChecklistItem private constructor(
         id = generateId()
     )
 
+    /** Update text while preserving id and checked state */
+    fun withText(text: String) = ChecklistItem(text, checked, id)
+
     companion object {
         private fun generateId() = "${currentTimeMillis()}_${Random.nextInt(0, 10000)}"
     }
