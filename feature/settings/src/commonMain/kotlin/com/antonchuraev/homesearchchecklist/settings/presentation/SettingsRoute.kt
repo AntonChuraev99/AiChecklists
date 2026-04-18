@@ -27,6 +27,9 @@ internal fun SettingsRoute(
     SettingsScreenContent(
         selectedTheme = state.selectedTheme,
         onThemeChange = { viewModel.sendIntent(SettingsIntent.SelectTheme(it)) },
+        dynamicColorEnabled = state.dynamicColorEnabled,
+        dynamicColorSupported = state.dynamicColorSupported,
+        onDynamicColorChange = { viewModel.sendIntent(SettingsIntent.ToggleDynamicColor(it)) },
         onBackClick = { viewModel.sendIntent(SettingsIntent.BackClick) },
         modifier = modifier,
     )

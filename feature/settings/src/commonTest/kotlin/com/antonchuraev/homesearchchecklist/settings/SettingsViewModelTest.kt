@@ -21,6 +21,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SettingsViewModelTest {
@@ -71,7 +72,7 @@ class SettingsViewModelTest {
         viewModel.sendIntent(SettingsIntent.SelectTheme(AppThemeMode.Light))
         advanceUntilIdle()
 
-        assertEquals(AppThemeMode.Light, fakeRepository.lastSaved)
+        assertEquals(AppThemeMode.Light, fakeRepository.lastSavedTheme)
     }
 
     @Test
@@ -87,20 +88,64 @@ class SettingsViewModelTest {
 
         assertEquals(SettingsSideEffect.NavigateBack, receivedEffect)
     }
+
+    @Test
+    fun init_loadsCurrentDynamicColorFromRepository() = runTest {
+        fakeRepository.emitDynamicColor(false)
+        advanceUntilIdle()
+
+        assertFalse(viewModel.screenState.value.dynamicColorEnabled)
+    }
+
+    @Test
+    fun toggleDynamicColor_persistsAndReflectsInState() = runTest {
+        fakeRepository.emitDynamicColor(true)
+        advanceUntilIdle()
+
+        viewModel.sendIntent(SettingsIntent.ToggleDynamicColor(false))
+        advanceUntilIdle()
+
+        assertEquals(false, fakeRepository.lastSavedDynamicColor)
+        assertFalse(viewModel.screenState.value.dynamicColorEnabled)
+    }
+
+    @Test
+    fun toggleDynamicColor_canBeReEnabled() = runTest {
+        fakeRepository.emitDynamicColor(false)
+        advanceUntilIdle()
+
+        viewModel.sendIntent(SettingsIntent.ToggleDynamicColor(true))
+        advanceUntilIdle()
+
+        assertTrue(viewModel.screenState.value.dynamicColorEnabled)
+        assertEquals(true, fakeRepository.lastSavedDynamicColor)
+    }
 }
 
 private class FakeThemeRepository : ThemeRepository {
-    private val _flow = MutableStateFlow(AppThemeMode.System)
-    var lastSaved: AppThemeMode? = null
+    private val _themeFlow = MutableStateFlow(AppThemeMode.System)
+    private val _dynamicColorFlow = MutableStateFlow(true)
+    var lastSavedTheme: AppThemeMode? = null
+    var lastSavedDynamicColor: Boolean? = null
 
-    override val themeMode: Flow<AppThemeMode> = _flow
+    override val themeMode: Flow<AppThemeMode> = _themeFlow
+    override val dynamicColor: Flow<Boolean> = _dynamicColorFlow
 
     override suspend fun setThemeMode(mode: AppThemeMode) {
-        lastSaved = mode
-        _flow.value = mode
+        lastSavedTheme = mode
+        _themeFlow.value = mode
+    }
+
+    override suspend fun setDynamicColor(enabled: Boolean) {
+        lastSavedDynamicColor = enabled
+        _dynamicColorFlow.value = enabled
     }
 
     fun emitTheme(mode: AppThemeMode) {
-        _flow.value = mode
+        _themeFlow.value = mode
+    }
+
+    fun emitDynamicColor(enabled: Boolean) {
+        _dynamicColorFlow.value = enabled
     }
 }

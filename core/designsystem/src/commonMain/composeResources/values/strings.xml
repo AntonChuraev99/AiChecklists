@@ -571,6 +571,8 @@
     <string name="settings_theme_light">Light</string>
     <string name="settings_theme_dark">Dark</string>
     <string name="settings_theme_system">System default</string>
+    <string name="settings_dynamic_color">Dynamic color</string>
+    <string name="settings_dynamic_color_description">Use colors from your wallpaper (Android 12+)</string>
     <string name="settings_back">Back</string>
 
     <!-- Debug Screen -->

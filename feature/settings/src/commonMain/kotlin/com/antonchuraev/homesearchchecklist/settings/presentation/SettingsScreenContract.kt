@@ -7,11 +7,14 @@ import com.antonchuraev.homesearchchecklist.core.datastore.api.AppThemeMode
 
 data class SettingsState(
     val selectedTheme: AppThemeMode = AppThemeMode.System,
+    val dynamicColorEnabled: Boolean = true,
+    val dynamicColorSupported: Boolean = false,
     val isLoading: Boolean = true,
 ) : State
 
 sealed interface SettingsIntent : Intent {
     data class SelectTheme(val mode: AppThemeMode) : SettingsIntent
+    data class ToggleDynamicColor(val enabled: Boolean) : SettingsIntent
     data object BackClick : SettingsIntent
 }
 

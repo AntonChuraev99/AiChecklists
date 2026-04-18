@@ -14,4 +14,23 @@ interface ThemeRepository {
 
     /** Persist [mode] as the user's active theme preference. */
     suspend fun setThemeMode(mode: AppThemeMode)
+
+    /**
+     * Emits whether the user opted in to Material You (dynamic color).
+     *
+     * Platform support (Android 12+) is orthogonal to this preference — the
+     * flag is persisted regardless of platform, and the UI layer decides
+     * whether to honor it via `supportsDynamicColor()`. Keeping the
+     * preference storage platform-agnostic means a user who opts in on an
+     * Android 12 device keeps the opt-in if they later restore onto an iOS
+     * build or an older phone.
+     *
+     * Default for new installs: `true`. On Android 12+ this means Material You
+     * is active out of the box; on other platforms the flag has no visible
+     * effect.
+     */
+    val dynamicColor: Flow<Boolean>
+
+    /** Persist the user's Material You opt-in. */
+    suspend fun setDynamicColor(enabled: Boolean)
 }
