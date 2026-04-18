@@ -16,11 +16,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Campaign
+import androidx.compose.material.icons.outlined.Feedback
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.MailOutline
+import androidx.compose.material.icons.outlined.Star
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DrawerState
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -32,11 +36,11 @@ import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -57,25 +61,28 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
+private const val SUPPORT_EMAIL = "churaevanton@gmail.com"
+
 @Composable
 fun MainScreen(
-    onFeedbackClick: () -> Unit = {},
+    onRateAppClick: () -> Unit = {},
+    onLeaveFeedbackClick: () -> Unit = {},
     viewModel: MainScreenViewModel = koinViewModel(),
 ) {
     val analyticsTracker: AnalyticsTracker = koinInject()
     LaunchedEffect(Unit) { analyticsTracker.screenView("main") }
 
+    val uriHandler = LocalUriHandler.current
     val screenState: MainScreenState by viewModel.screenState.collectAsStateWithLifecycle()
     var isEditMode by rememberSaveable { mutableStateOf(false) }
-    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    // Use plain `remember` instead of `rememberDrawerState` to avoid the Saver
+    // restoring an Open state after back navigation. rememberDrawerState wraps
+    // DrawerState in rememberSaveable; the Saver applies AFTER LaunchedEffect runs,
+    // winning the race and rendering Main under scrim (visually: "white screen"
+    // after returning from UpdateFeed). A fresh Closed state on every composition
+    // is correct UX — drawer should never auto-open on navigation return.
+    val drawerState = remember { DrawerState(initialValue = DrawerValue.Closed) }
     val scope = rememberCoroutineScope()
-
-    // Guarantee drawer is closed after returning from child screens.
-    // Without this, rememberDrawerState's Saver may restore Open state,
-    // causing Main to appear empty under scrim after back navigation.
-    LaunchedEffect(Unit) {
-        if (drawerState.isOpen) drawerState.close()
-    }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -116,19 +123,47 @@ fun MainScreen(
                     modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                 )
                 NavigationDrawerItem(
-                    label = { Text(stringResource(Res.string.main_menu_support)) },
+                    label = { Text(stringResource(Res.string.main_menu_rate_app)) },
                     icon = {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Outlined.HelpOutline,
+                            imageVector = Icons.Outlined.Star,
                             contentDescription = null
                         )
                     },
                     selected = false,
                     onClick = {
-                        scope.launch {
-                            drawerState.close()
-                            onFeedbackClick()
-                        }
+                        scope.launch { drawerState.close() }
+                        onRateAppClick()
+                    },
+                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                )
+                NavigationDrawerItem(
+                    label = { Text(stringResource(Res.string.main_menu_leave_feedback)) },
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Outlined.Feedback,
+                            contentDescription = null
+                        )
+                    },
+                    selected = false,
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        onLeaveFeedbackClick()
+                    },
+                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                )
+                NavigationDrawerItem(
+                    label = { Text(stringResource(Res.string.main_menu_support)) },
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Outlined.MailOutline,
+                            contentDescription = null
+                        )
+                    },
+                    selected = false,
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        uriHandler.openUri("mailto:$SUPPORT_EMAIL")
                     },
                     modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                 )

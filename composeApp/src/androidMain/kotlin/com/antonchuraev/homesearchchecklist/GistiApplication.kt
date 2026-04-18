@@ -33,12 +33,16 @@ open class GistiApplication : Application() {
         initConsent()
 
         // Initialize Koin if not already started (for widget support)
-        if (GlobalContext.getOrNull() == null) {
+        val koinAlreadyStarted = GlobalContext.getOrNull() != null
+        if (!koinAlreadyStarted) {
             startKoin {
                 androidLogger()
                 androidContext(this@GistiApplication)
                 modules(appModule)
             }
+            android.util.Log.d("Koin", "startKoin called from GistiApplication.onCreate")
+        } else {
+            android.util.Log.d("Koin", "startKoin skipped — already started (probably by widget)")
         }
 
         initRevenueCat()

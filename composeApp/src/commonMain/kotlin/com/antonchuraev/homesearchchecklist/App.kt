@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -33,27 +34,42 @@ import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.Subscri
 import com.antonchuraev.homesearchchecklist.feature.sharing.presentation.ShareScreen
 import com.antonchuraev.homesearchchecklist.feature.updatefeed.presentation.UpdateFeedScreen
 import androidx.navigation.toRoute
+import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import org.jetbrains.compose.ui.tooling.preview.Preview
+import org.koin.compose.KoinContext
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
+import org.koin.core.context.GlobalContext
 
 @Composable
 @Preview
 fun App() {
-    // Koin is already initialized globally in GistiApplication.onCreate().
-    // Do NOT wrap with KoinApplication composable — it calls stopKoin() on dispose
-    // which causes IllegalStateException on NavHost destinations after back navigation.
-    val viewModel: AppViewModel = koinViewModel()
+    // Koin is started globally in GistiApplication.onCreate().
+    // We hold a remembered reference to the already-started Koin so that
+    // NavHost recompositions (which may recreate this composable) never lose
+    // the scope — `remember` keeps the same instance across recompositions
+    // without ever calling stopKoin. KoinContext then simply provides
+    // LocalKoinScope to children. This pattern fixes Crashlytics issue
+    // edf060726547384d4e61afa21b1529ea (Koin #2240, marked wontfix).
+    val koin = remember { GlobalContext.get() }
+    KoinContext(koin) {
+        val logger: AppLogger = remember { koin.get<AppLogger>() }
+        LaunchedEffect(Unit) {
+            logger.debug("App", "App composable start, Koin ref stable")
+        }
 
-    val navController = rememberNavController()
-    LaunchedEffect(navController) {
-        viewModel.installNavController(navController)
-    }
+        val viewModel: AppViewModel = koinViewModel()
 
-    val csatViewModel: CsatViewModel = koinInject()
-    val csatState by csatViewModel.screenState.collectAsState()
+        val navController = rememberNavController()
+        LaunchedEffect(navController) {
+            viewModel.installNavController(navController)
+            logger.debug("App", "NavController installed")
+        }
 
-    AppTheme {
+        val csatViewModel: CsatViewModel = koinInject()
+        val csatState by csatViewModel.screenState.collectAsState()
+
+        AppTheme {
             NavHost(
                 navController = navController,
                 startDestination = AppNavRoute.Splash
@@ -72,7 +88,8 @@ fun App() {
 
                 composable<AppNavRoute.Main> {
                     MainScreen(
-                        onFeedbackClick = { csatViewModel.sendIntent(CsatIntent.ForceShow) }
+                        onRateAppClick = { csatViewModel.sendIntent(CsatIntent.ForceShow) },
+                        onLeaveFeedbackClick = { csatViewModel.sendIntent(CsatIntent.ForceShowFeedback) },
                     )
                 }
 
@@ -142,7 +159,9 @@ fun App() {
                 }
 
                 composable<AppNavRoute.UpdateFeed> {
-                    UpdateFeedScreen()
+                    UpdateFeedScreen(
+                        onBackClick = { navController.popBackStack() }
+                    )
                 }
             }
 
@@ -160,4 +179,5 @@ fun App() {
                 onComplete = { csatViewModel.sendIntent(CsatIntent.ReviewComplete) },
             )
         }
+    }
 }
