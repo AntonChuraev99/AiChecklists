@@ -72,6 +72,8 @@ kotlin {
             implementation(projects.feature.paywall)
             implementation(projects.feature.sharing)
             implementation(projects.feature.updatefeed)
+            implementation(projects.feature.settings)
+            implementation(projects.core.datastore.impl)
 
             implementation(compose.runtime)
             implementation(compose.foundation)

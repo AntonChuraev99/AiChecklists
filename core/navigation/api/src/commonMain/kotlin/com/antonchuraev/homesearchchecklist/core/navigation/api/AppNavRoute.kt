@@ -60,4 +60,7 @@ sealed interface AppNavRoute {
 
     @Serializable
     data object UpdateFeed : AppNavRoute
+
+    @Serializable
+    data object Settings : AppNavRoute
 }

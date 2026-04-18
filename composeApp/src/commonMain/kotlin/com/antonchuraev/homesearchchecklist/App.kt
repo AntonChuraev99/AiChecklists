@@ -5,7 +5,10 @@ import com.antonchuraev.homesearchchecklist.csat.CsatBottomSheet
 import com.antonchuraev.homesearchchecklist.csat.CsatIntent
 import com.antonchuraev.homesearchchecklist.csat.CsatViewModel
 import com.antonchuraev.homesearchchecklist.csat.InAppReviewLauncher
+import com.antonchuraev.homesearchchecklist.core.datastore.api.AppThemeMode
+import com.antonchuraev.homesearchchecklist.core.datastore.api.ThemeRepository
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppTheme
+import com.antonchuraev.homesearchchecklist.settings.navigation.settingsScreen
 import com.antonchuraev.homesearchchecklist.feature.updatefeed.presentation.components.WidgetInstructionOverlay
 import com.antonchuraev.homesearchchecklist.navigation.AppNavigationDrawerContent
 import com.antonchuraev.homesearchchecklist.navigation.DrawerDestination
@@ -25,6 +28,8 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -95,6 +100,15 @@ fun App() {
             logger.debug("App", "NavController installed")
         }
 
+        val themeRepository: ThemeRepository = remember { koin.get<ThemeRepository>() }
+        val themeMode by themeRepository.themeMode.collectAsStateWithLifecycle(initialValue = AppThemeMode.System)
+        val systemDark = isSystemInDarkTheme()
+        val darkTheme = when (themeMode) {
+            AppThemeMode.Light -> false
+            AppThemeMode.Dark -> true
+            AppThemeMode.System -> systemDark
+        }
+
         val csatViewModel: CsatViewModel = koinInject()
         val csatState by csatViewModel.screenState.collectAsState()
 
@@ -112,7 +126,7 @@ fun App() {
             }
         }
 
-        AppTheme {
+        AppTheme(darkTheme = darkTheme) {
             val snackbarHostState = remember { SnackbarHostState() }
             val feedbackThanksMessage = stringResource(Res.string.feedback_thanks_message)
             LaunchedEffect(csatState.showFeedbackThanks) {
@@ -160,6 +174,9 @@ fun App() {
                                     onHomeClick = { /* already on Main; drawer close is enough */ },
                                     onUpdateFeedClick = {
                                         navController.navigate(AppNavRoute.UpdateFeed)
+                                    },
+                                    onSettingsClick = {
+                                        navController.navigate(AppNavRoute.Settings)
                                     },
                                     onRateAppClick = {
                                         csatViewModel.sendIntent(CsatIntent.ForceShow)
@@ -245,6 +262,10 @@ fun App() {
                     ShareScreen(checklistId = route.checklistId)
                 }
 
+                settingsScreen(
+                    onBackClick = { navController.popBackStack() }
+                )
+
                 composable<AppNavRoute.UpdateFeed> {
                     // Fresh Closed DrawerState per entry — same rationale as Main route.
                     val drawerState = remember { DrawerState(initialValue = DrawerValue.Closed) }
@@ -261,6 +282,9 @@ fun App() {
                                     onCloseDrawer = { scope.launch { drawerState.close() } },
                                     onHomeClick = { navController.popBackStack() },
                                     onUpdateFeedClick = { /* already here */ },
+                                    onSettingsClick = {
+                                        navController.navigate(AppNavRoute.Settings)
+                                    },
                                     onRateAppClick = {
                                         csatViewModel.sendIntent(CsatIntent.ForceShow)
                                     },
