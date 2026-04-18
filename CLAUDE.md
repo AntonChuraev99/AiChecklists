@@ -265,6 +265,18 @@ Premium subscriptions via RevenueCat. Free user limits: `UserLimits(maxChecklist
 ### Sharing (`feature/sharing/`)
 Export checklists as `ShareFormat.Text` or `ShareFormat.Pdf`. Platform-specific `ShareLauncher` and `PdfGenerator` via expect/actual.
 
+### Updates Feed (`feature/updatefeed/`)
+Version-grouped release feed shown from the drawer ("Updates"). Content sourced from Firebase Remote Config (key: `update_feed_json`) with in-code fallback in `RemoteConfigDefaults`. Posts use **main-version** format only (`1.X`, never `1.X.Y`); patch versions fold to main at the repository layer. Store release notes (Google Play copy) and feature posts are de-duplicated — the same line never appears twice across the feed.
+
+**Hard rules** (break at your peril):
+- Action buttons only for **non-obvious** features. Currently the only allowed deeplink is `gisti://widget_instruction`. CTAs pointing at home/analyze/templates/create duplicate the bottom nav and drawer — **do not add them**.
+- `ReleaseCard` state MUST use `rememberSaveable` (not `remember`) — LazyColumn recycles items; plain `remember` loses expanded state on scroll.
+- Card tap target MUST be lifted to the outer `AppCard` modifier (not the inner header `Row`), otherwise `CardPadding` eats the edges.
+- Spacing between header and `AnimatedVisibility` body MUST live **inside** the animated content (as `padding(top = SpacingMd)` on the inner column), not as outer `Arrangement.spacedBy` — otherwise the collapse animation snaps by 12dp at the end.
+- After merging changes to `UPDATE_FEED_JSON`, mirror the same JSON into Firebase RC Console — the in-code value is fallback only.
+
+Full feature playbook (content rules, icon whitelist, publication flow, anti-patterns): **`docs/guidelines/updates-feed.md`**.
+
 ### Reminders
 
 Checklist model includes reminder and preference fields:

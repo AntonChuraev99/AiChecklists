@@ -1,10 +1,12 @@
 package com.antonchuraev.homesearchchecklist
 
+import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
 import com.antonchuraev.homesearchchecklist.csat.CsatBottomSheet
 import com.antonchuraev.homesearchchecklist.csat.CsatIntent
 import com.antonchuraev.homesearchchecklist.csat.CsatViewModel
 import com.antonchuraev.homesearchchecklist.csat.InAppReviewLauncher
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppTheme
+import com.antonchuraev.homesearchchecklist.feature.updatefeed.presentation.components.WidgetInstructionOverlay
 import com.antonchuraev.homesearchchecklist.navigation.AppNavigationDrawerContent
 import com.antonchuraev.homesearchchecklist.navigation.DrawerDestination
 import androidx.compose.foundation.layout.Box
@@ -12,11 +14,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -58,11 +63,13 @@ import com.antonchuraev.homesearchchecklist.feature.updatefeed.presentation.Upda
 import androidx.navigation.toRoute
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import org.jetbrains.compose.ui.tooling.preview.Preview
+import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import org.koin.compose.KoinContext
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.context.GlobalContext
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Preview
 fun App() {
@@ -90,6 +97,20 @@ fun App() {
 
         val csatViewModel: CsatViewModel = koinInject()
         val csatState by csatViewModel.screenState.collectAsState()
+
+        val navigator: AppNavigator = remember { koin.get<AppNavigator>() }
+        var showWidgetInstruction by remember { mutableStateOf(false) }
+        LaunchedEffect(Unit) {
+            navigator.events.collect { event ->
+                when (event) {
+                    AppNavEvent.ShowWidgetInstruction -> {
+                        if (!showWidgetInstruction) {
+                            showWidgetInstruction = true
+                        }
+                    }
+                }
+            }
+        }
 
         AppTheme {
             val snackbarHostState = remember { SnackbarHostState() }
@@ -272,6 +293,18 @@ fun App() {
                     state = csatState,
                     onIntent = csatViewModel::sendIntent,
                 )
+            }
+
+            // Widget instruction overlay — triggered by gisti://widget_instruction deeplink
+            if (showWidgetInstruction) {
+                ModalBottomSheet(
+                    onDismissRequest = { showWidgetInstruction = false },
+                    sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+                ) {
+                    WidgetInstructionOverlay(
+                        onDone = { showWidgetInstruction = false }
+                    )
+                }
             }
 
             // In-App Review launcher — side-effect composable, no UI

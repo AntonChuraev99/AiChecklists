@@ -359,66 +359,7 @@ private fun ActionCard(
 private fun WidgetInstructionSheetContent(
     onDone: () -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
-            .padding(bottom = AppDimens.SpacingXl)
-    ) {
-        Text(
-            text = stringResource(Res.string.onboarding_discover_widget_sheet_title),
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(AppDimens.SpacingXl))
-
-        WidgetStep(number = 1, text = stringResource(Res.string.onboarding_discover_widget_step1))
-        Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
-        WidgetStep(number = 2, text = stringResource(Res.string.onboarding_discover_widget_step2))
-        Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
-        WidgetStep(number = 3, text = stringResource(Res.string.onboarding_discover_widget_step3))
-
-        Spacer(modifier = Modifier.height(AppDimens.SpacingXl))
-
-        AppButton(
-            text = stringResource(Res.string.onboarding_discover_widget_done),
-            onClick = onDone,
-            modifier = Modifier.fillMaxWidth()
-        )
-    }
-}
-
-@Composable
-private fun WidgetStep(
-    number: Int,
-    text: String
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(32.dp)
-                .background(Blue50, RoundedCornerShape(16.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = number.toString(),
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-        }
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f)
-        )
-    }
+    com.antonchuraev.homesearchchecklist.feature.updatefeed.presentation.components.WidgetInstructionOverlay(
+        onDone = onDone
+    )
 }

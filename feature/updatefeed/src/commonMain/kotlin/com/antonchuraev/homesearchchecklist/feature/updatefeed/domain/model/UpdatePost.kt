@@ -5,6 +5,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class UpdatePost(
     val id: String,
+    val version: String,
     val title: String,
     val description: String,
     val publishedAtMillis: Long,

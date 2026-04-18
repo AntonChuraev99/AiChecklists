@@ -28,5 +28,8 @@
         ".pytest_cache"
       ]
     }
-  ]
+  ],
+  "extensions": {
+    "firestore-revenuecat-purchases": "revenuecat/firestore-revenuecat-purchases@0.1.18"
+  }
 }

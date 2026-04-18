@@ -27,9 +27,10 @@ import kotlinx.coroutines.launch
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
+import com.antonchuraev.homesearchchecklist.desingsystem.components.PremiumBanner
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
-import com.antonchuraev.homesearchchecklist.feature.updatefeed.presentation.components.UpdatePostCard
+import com.antonchuraev.homesearchchecklist.feature.updatefeed.presentation.components.ReleaseCard
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.main_menu
 import aichecklists.core.designsystem.generated.resources.update_feed_empty_description
@@ -122,16 +123,28 @@ private fun UpdateFeedScreenContent(
                         vertical = AppDimens.SpacingLg
                     )
                 ) {
+                    item(key = "premium_banner") {
+                        PremiumBanner(
+                            isActive = currentState.isPremium,
+                            formattedExpirationDate = currentState.formattedExpirationDate,
+                            onUpgradeClick = {
+                                viewModel.sendIntent(UpdateFeedScreenIntent.OnPremiumBannerClick)
+                            },
+                            onSubscriptionClick = {
+                                viewModel.sendIntent(UpdateFeedScreenIntent.OnPremiumBannerClick)
+                            }
+                        )
+                    }
                     items(
-                        items = currentState.posts,
-                        key = { it.id }
-                    ) { post ->
-                        UpdatePostCard(
-                            post = post,
-                            onActionClick = { action ->
+                        items = currentState.releases,
+                        key = { it.version }
+                    ) { release ->
+                        ReleaseCard(
+                            release = release,
+                            onActionClick = { postId, action ->
                                 viewModel.sendIntent(
                                     UpdateFeedScreenIntent.OnActionClick(
-                                        postId = post.id,
+                                        postId = postId,
                                         action = action
                                     )
                                 )

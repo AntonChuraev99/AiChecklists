@@ -198,7 +198,11 @@ class TestRestoreCreditsRevenueCat:
 # ===========================================================================
 
 class TestVerifyPremiumFromFirestore:
-    """verify_premium_from_firestore reads rc_customers/{user_id}."""
+    """verify_premium_from_firestore reads rc_customers/{user_id}.entitlements.
+
+    Schema matches the official RevenueCat Firebase Extension (v0.1.18):
+    {entitlements: {<id>: {expires_date, grace_period_expires_date, ...}}}.
+    """
 
     def _set_rc_customer(self, main, doc_exists, doc_data=None):
         mock_doc = MagicMock()
@@ -206,37 +210,62 @@ class TestVerifyPremiumFromFirestore:
         mock_doc.to_dict.return_value = doc_data or {}
         main.db.collection.return_value.document.return_value.get.return_value = mock_doc
 
-    def test_active_subscription_returns_verified(self, _import_main):
+    def test_active_entitlement_returns_verified(self, _import_main):
         main = _import_main
         future = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
         self._set_rc_customer(main, True, {
-            "subscriptions": {"premium_monthly:monthly": {"expires_date": future}}
+            "entitlements": {"premium": {"expires_date": future}}
         })
         assert main.verify_premium_from_firestore("user-1") == main.VERIFIED
 
-    def test_expired_subscription_returns_not_verified(self, _import_main):
+    def test_expired_entitlement_returns_not_verified(self, _import_main):
         main = _import_main
         past = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
         self._set_rc_customer(main, True, {
-            "subscriptions": {"premium_monthly:monthly": {"expires_date": past}}
+            "entitlements": {"premium": {"expires_date": past}}
         })
         assert main.verify_premium_from_firestore("user-1") == main.NOT_VERIFIED
 
-    def test_lifetime_subscription_returns_verified(self, _import_main):
+    def test_lifetime_entitlement_returns_verified(self, _import_main):
         main = _import_main
         self._set_rc_customer(main, True, {
-            "subscriptions": {"lifetime": {"expires_date": None}}
+            "entitlements": {"lifetime": {"expires_date": None}}
         })
         assert main.verify_premium_from_firestore("user-1") == main.VERIFIED
+
+    def test_grace_period_keeps_user_premium(self, _import_main):
+        """Billing retry window: expires_date passed but grace still active."""
+        main = _import_main
+        past = (datetime.now(timezone.utc) - timedelta(hours=6)).isoformat()
+        future_grace = (datetime.now(timezone.utc) + timedelta(days=2)).isoformat()
+        self._set_rc_customer(main, True, {
+            "entitlements": {"premium": {
+                "expires_date": past,
+                "grace_period_expires_date": future_grace,
+            }}
+        })
+        assert main.verify_premium_from_firestore("user-1") == main.VERIFIED
+
+    def test_expired_grace_period_returns_not_verified(self, _import_main):
+        main = _import_main
+        past = (datetime.now(timezone.utc) - timedelta(days=10)).isoformat()
+        past_grace = (datetime.now(timezone.utc) - timedelta(days=3)).isoformat()
+        self._set_rc_customer(main, True, {
+            "entitlements": {"premium": {
+                "expires_date": past,
+                "grace_period_expires_date": past_grace,
+            }}
+        })
+        assert main.verify_premium_from_firestore("user-1") == main.NOT_VERIFIED
 
     def test_missing_document_returns_not_verified(self, _import_main):
         main = _import_main
         self._set_rc_customer(main, False)
         assert main.verify_premium_from_firestore("user-1") == main.NOT_VERIFIED
 
-    def test_no_subscriptions_returns_not_verified(self, _import_main):
+    def test_no_entitlements_returns_not_verified(self, _import_main):
         main = _import_main
-        self._set_rc_customer(main, True, {"subscriptions": {}})
+        self._set_rc_customer(main, True, {"entitlements": {}})
         assert main.verify_premium_from_firestore("user-1") == main.NOT_VERIFIED
 
     def test_firestore_failure_returns_unavailable(self, _import_main):

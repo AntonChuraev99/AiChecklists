@@ -37,6 +37,14 @@ class UpdateFeedDeepLinkHandler(private val navigator: AppNavigator) {
                 navigator.navigateToUpdateFeed()
                 true
             }
+            "home" -> {
+                navigator.navigateToMainScreen()
+                true
+            }
+            "widget_instruction" -> {
+                navigator.showWidgetInstruction()
+                true
+            }
             else -> false
         }
     }

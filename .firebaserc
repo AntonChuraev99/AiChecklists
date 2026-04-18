@@ -11,5 +11,11 @@
       }
     }
   },
-  "etags": {}
+  "etags": {
+    "aichecklists-40230": {
+      "extensionInstances": {
+        "firestore-revenuecat-purchases": "149910115d98545a8b182c6f460819c9ffb37c818d6d173dd3f49f695be3a31e"
+      }
+    }
+  }
 }

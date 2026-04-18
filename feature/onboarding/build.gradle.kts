@@ -31,6 +31,7 @@ kotlin {
             implementation(projects.core.navigation.api)
             implementation(projects.core.common.api)
             implementation(projects.core.designsystem)
+            implementation(projects.feature.updatefeed)
             implementation(projects.feature.user)
             implementation(projects.feature.paywall)
             implementation(projects.feature.create)

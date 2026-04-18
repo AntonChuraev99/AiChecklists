@@ -93,6 +93,7 @@ class CsatViewModelTest {
         assertFalse(state.showBottomSheet, "Expected showBottomSheet = false after submit")
         assertFalse(state.isSubmitted, "Expected isSubmitted = false — no ThankYou step")
         assertFalse(state.isFeedbackOnly, "Expected isFeedbackOnly reset to false after close")
+        assertTrue(state.showFeedbackThanks, "Expected showFeedbackThanks = true for snackbar trigger")
         assertTrue(
             fakeAnalyticsTracker.hasEvent("feedback_submitted"),
             "Expected feedback_submitted analytics event",
@@ -101,6 +102,46 @@ class CsatViewModelTest {
             fakeAnalyticsTracker.hasEvent("csat_submitted"),
             "Expected NO csat_submitted event in feedback-only mode",
         )
+    }
+
+    // --- Submit with NotGood/Okay rating triggers the thanks snackbar ---
+
+    @Test
+    fun submit_negativeRating_closesAndShowsThanks() = runTest {
+        val vm = createViewModel()
+
+        vm.onIntent(CsatIntent.ForceShow)
+        vm.onIntent(CsatIntent.SelectRating(CsatRating.NotGood))
+        vm.onIntent(CsatIntent.UpdateText("Crashes a lot"))
+        vm.onIntent(CsatIntent.Submit)
+        advanceUntilIdle()
+
+        val state = vm.screenState.value
+        assertFalse(state.showBottomSheet, "Sheet must close after Negative submit")
+        assertFalse(state.isSubmitted, "ThankYou step must NOT show for Negative")
+        assertTrue(state.showFeedbackThanks, "Snackbar flag must be true for Negative submit")
+        assertTrue(
+            fakeAnalyticsTracker.hasEvent("csat_submitted"),
+            "csat_submitted must still be tracked for rating flow",
+        )
+    }
+
+    // --- FeedbackThanksShown clears the snackbar trigger ---
+
+    @Test
+    fun feedbackThanksShown_clearsShowFeedbackThanksFlag() = runTest {
+        val vm = createViewModel()
+
+        vm.onIntent(CsatIntent.ForceShowFeedback)
+        vm.onIntent(CsatIntent.UpdateText("Nice"))
+        vm.onIntent(CsatIntent.Submit)
+        advanceUntilIdle()
+        assertTrue(vm.screenState.value.showFeedbackThanks)
+
+        vm.onIntent(CsatIntent.FeedbackThanksShown)
+        advanceUntilIdle()
+
+        assertFalse(vm.screenState.value.showFeedbackThanks)
     }
 
     // --- Dismiss resets feedbackOnly flag ---

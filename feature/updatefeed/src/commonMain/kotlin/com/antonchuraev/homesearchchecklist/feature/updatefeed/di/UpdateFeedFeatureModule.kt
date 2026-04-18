@@ -10,5 +10,6 @@ import org.koin.dsl.module
 val updateFeedFeatureModule = module {
     single<UpdateFeedRepository> { UpdateFeedRepositoryImpl(get(), get()) }
     single { UpdateFeedDeepLinkHandler(get()) }
-    viewModel { UpdateFeedViewModel(get(), get(), get(), get(), get()) }
+    // get() order: repository, navigator, deepLinkHandler, getSubscriptionStatusUseCase, analyticsTracker, logger
+    viewModel { UpdateFeedViewModel(get(), get(), get(), get(), get(), get()) }
 }

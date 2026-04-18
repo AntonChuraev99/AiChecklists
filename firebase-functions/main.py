@@ -210,11 +210,28 @@ def _parse_iso_timestamp(value: Any) -> datetime | None:
 def verify_premium_from_firestore(user_id: str) -> str:
     """
     Verify premium via rc_customers/{user_id} — populated by the RevenueCat
-    Firebase Extension on every subscription event.
+    Firebase Extension (firestore-revenuecat-purchases) on every subscription
+    event. Extension schema (per extension v0.1.18):
+
+        {
+          "original_app_user_id": "<uuid>",
+          "entitlements": {
+            "<entitlement_id>": {
+              "expires_date": "<ISO 8601 string>",       # nullable for lifetime
+              "grace_period_expires_date": "<ISO 8601>",  # optional
+              "purchase_date": "<ISO 8601>",
+              "product_identifier": "<product_id>"
+            }
+          },
+          "aliases": ["<app_user_id>", ...]
+        }
+
+    Any entitlement whose expires_date or grace_period_expires_date is in the
+    future counts as premium. No entitlements = NOT_VERIFIED.
 
     Mirrors the REST contract: VERIFIED / NOT_VERIFIED / UNAVAILABLE.
-    NOT_VERIFIED is returned both when the customer has no active sub AND
-    when no document exists (extension not installed, or new user never
+    NOT_VERIFIED is returned both when the customer has no active entitlement
+    AND when no document exists (extension not installed, or new user never
     surfaced to the extension yet). Callers should chain with the REST
     fallback via verify_premium().
     """
@@ -223,18 +240,29 @@ def verify_premium_from_firestore(user_id: str) -> str:
         if not doc.exists:
             return NOT_VERIFIED
         data = doc.to_dict() or {}
-        subs = data.get("subscriptions", {}) or {}
+        entitlements = data.get("entitlements", {}) or {}
         now = datetime.now(timezone.utc)
-        for _product_id, sub in subs.items():
-            if not isinstance(sub, dict):
+        for _ent_id, ent in entitlements.items():
+            if not isinstance(ent, dict):
                 continue
-            expires = sub.get("expires_date")
+
+            # Lifetime / non-expiring entitlement
+            expires = ent.get("expires_date")
             if expires is None:
-                # Non-expiring entitlement (lifetime / NON_RENEWING_PURCHASE)
                 return VERIFIED
+
             expires_dt = _parse_iso_timestamp(expires)
             if expires_dt is not None and expires_dt > now:
                 return VERIFIED
+
+            # Grace period keeps the user premium past the paid-through date
+            # (typical billing retry window). Without this check a billing
+            # issue would flip the user to free for 24-48h.
+            grace = ent.get("grace_period_expires_date")
+            if grace:
+                grace_dt = _parse_iso_timestamp(grace)
+                if grace_dt is not None and grace_dt > now:
+                    return VERIFIED
         return NOT_VERIFIED
     except Exception:
         return UNAVAILABLE

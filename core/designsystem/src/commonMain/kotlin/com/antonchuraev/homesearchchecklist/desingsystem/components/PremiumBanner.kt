@@ -1,4 +1,4 @@
-package com.antonchuraev.homesearchchecklist.feature.home.presentation.components
+package com.antonchuraev.homesearchchecklist.desingsystem.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border

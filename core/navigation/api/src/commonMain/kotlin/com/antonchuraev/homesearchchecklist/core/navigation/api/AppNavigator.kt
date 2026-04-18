@@ -1,8 +1,18 @@
 package com.antonchuraev.homesearchchecklist.core.navigation.api
 
 import androidx.navigation.NavController
+import kotlinx.coroutines.flow.SharedFlow
 
 interface AppNavigator {
+
+    /**
+     * One-shot navigation events (replay=0). App.kt collects these to open
+     * global overlays that cannot be triggered via NavController.
+     */
+    val events: SharedFlow<AppNavEvent>
+
+    /** Publish ShowWidgetInstruction event so App.kt opens the overlay. */
+    fun showWidgetInstruction()
 
     fun installNavController(navController: NavController)
 
