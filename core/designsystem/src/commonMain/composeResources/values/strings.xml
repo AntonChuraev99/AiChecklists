@@ -90,6 +90,14 @@
     <string name="onboarding_discover_maybe_later">Maybe Later</string>
     <string name="onboarding_discover_completed">%1$d of %2$d completed</string>
 
+    <!-- Navigation Drawer -->
+    <string name="drawer_section_whats_new">What\'s New</string>
+    <string name="drawer_section_help">Help &amp; Feedback</string>
+    <string name="drawer_section_about">About</string>
+    <string name="drawer_tagline">AI Checklists</string>
+    <string name="drawer_version_label">Version %1$s</string>
+    <string name="drawer_logo_content_description">Gisti logo</string>
+
     <!-- Main Screen -->
     <string name="main_title">My Checklists</string>
     <string name="main_empty_title">Ready to get organized?</string>
@@ -371,6 +379,7 @@
     <!-- Feedback-only sheet -->
     <string name="feedback_only_title">Leave Feedback</string>
     <string name="feedback_only_description">Tell us what's on your mind</string>
+    <string name="feedback_thanks_message">Thanks for feedback!</string>
 
     <!-- CSAT Survey -->
     <string name="csat_title">How do you like Gisti?</string>
