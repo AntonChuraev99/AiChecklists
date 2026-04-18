@@ -63,7 +63,11 @@ def make_request(data: dict) -> MagicMock:
 # ===========================================================================
 
 class TestRestoreCreditsRevenueCat:
-    """Tests for restore_credits_after_purchase with RevenueCat verification."""
+    """Tests for restore_credits_after_purchase with RevenueCat verification.
+
+    Mocks verify_premium (the hybrid Firestore + REST helper) so we cover the
+    endpoint contract independently of which underlying path produced the result.
+    """
 
     def test_rejects_without_valid_subscription(self, _import_main):
         """403 when RevenueCat has no active subscription."""
@@ -75,8 +79,7 @@ class TestRestoreCreditsRevenueCat:
         mock_doc.to_dict.return_value = {"is_premium": False, "ai_credits": 0}
         main.db.collection.return_value.document.return_value.get.return_value = mock_doc
 
-        # Mock RevenueCat: no entitlements
-        with patch.object(main, "verify_premium_with_revenuecat", return_value=main.NOT_VERIFIED):
+        with patch.object(main, "verify_premium", return_value=main.NOT_VERIFIED):
             with app.test_request_context():
                 req = make_request({"user_id": "user-123"})
                 response, status = main.restore_credits_after_purchase(req)
@@ -93,7 +96,7 @@ class TestRestoreCreditsRevenueCat:
         mock_doc.to_dict.return_value = {"is_premium": False, "ai_credits": 0}
         main.db.collection.return_value.document.return_value.get.return_value = mock_doc
 
-        with patch.object(main, "verify_premium_with_revenuecat", return_value=main.VERIFIED):
+        with patch.object(main, "verify_premium", return_value=main.VERIFIED):
             with patch.object(main, "get_credits_config", return_value={
                 "initial_credits": 100, "action_cost": 30, "premium_daily_credits_cap": 300
             }):
@@ -116,7 +119,7 @@ class TestRestoreCreditsRevenueCat:
         mock_doc.exists = True
         main.db.collection.return_value.document.return_value.get.return_value = mock_doc
 
-        with patch.object(main, "verify_premium_with_revenuecat", return_value=main.UNAVAILABLE):
+        with patch.object(main, "verify_premium", return_value=main.UNAVAILABLE):
             with app.test_request_context():
                 req = make_request({"user_id": "user-123"})
                 response, status = main.restore_credits_after_purchase(req)
@@ -125,12 +128,12 @@ class TestRestoreCreditsRevenueCat:
                 assert "temporarily unavailable" in data["error"].lower()
 
     def test_rejects_expired_subscription(self, _import_main):
-        """403 when RevenueCat shows expired subscription."""
-        main = _import_main
+        """verify_premium_with_revenuecat returns NOT_VERIFIED for expired sub.
 
-        mock_doc = MagicMock()
-        mock_doc.exists = True
-        main.db.collection.return_value.document.return_value.get.return_value = mock_doc
+        Directly exercises the REST helper (still used as fallback inside
+        verify_premium) — proves the date-parsing contract is intact.
+        """
+        main = _import_main
 
         # Test actual verify function with expired date
         expired_date = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
@@ -148,6 +151,239 @@ class TestRestoreCreditsRevenueCat:
             with app.test_request_context():
                 result = main.verify_premium_with_revenuecat("user-123")
                 assert result == main.NOT_VERIFIED
+
+    def test_enriched_restore_log_fields(self, _import_main):
+        """credits_restore_log entry includes previous_state / new_state / source."""
+        main = _import_main
+
+        mock_user_doc = MagicMock()
+        mock_user_doc.exists = True
+        mock_user_doc.to_dict.return_value = {
+            "is_premium": False, "ai_credits": 42, "amplitude_id": "amp-xyz"
+        }
+        mock_user_ref = MagicMock()
+        mock_user_ref.get.return_value = mock_user_doc
+
+        mock_log_collection = MagicMock()
+
+        def collection_side_effect(name):
+            if name == "credits_restore_log":
+                return mock_log_collection
+            c = MagicMock()
+            c.document.return_value = mock_user_ref
+            return c
+
+        main.db.collection.side_effect = collection_side_effect
+
+        with patch.object(main, "verify_premium", return_value=main.VERIFIED):
+            with patch.object(main, "get_credits_config", return_value={
+                "initial_credits": 100, "action_cost": 30, "premium_daily_credits_cap": 300
+            }):
+                with app.test_request_context():
+                    req = make_request({"user_id": "user-123"})
+                    main.restore_credits_after_purchase(req)
+
+        assert mock_log_collection.add.called
+        log_row = mock_log_collection.add.call_args[0][0]
+        assert log_row["user_id"] == "user-123"
+        assert log_row["amplitude_id"] == "amp-xyz"
+        assert log_row["previous_state"] == {"is_premium": False, "ai_credits": 42}
+        assert log_row["new_state"] == {"is_premium": True, "ai_credits": 300}
+        assert log_row["source"] == "client_restore"
+        assert log_row["revenuecat_verification_result"] == main.VERIFIED
+
+
+# ===========================================================================
+# P0 Security: Firestore-based premium verification (RC Extension)
+# ===========================================================================
+
+class TestVerifyPremiumFromFirestore:
+    """verify_premium_from_firestore reads rc_customers/{user_id}."""
+
+    def _set_rc_customer(self, main, doc_exists, doc_data=None):
+        mock_doc = MagicMock()
+        mock_doc.exists = doc_exists
+        mock_doc.to_dict.return_value = doc_data or {}
+        main.db.collection.return_value.document.return_value.get.return_value = mock_doc
+
+    def test_active_subscription_returns_verified(self, _import_main):
+        main = _import_main
+        future = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
+        self._set_rc_customer(main, True, {
+            "subscriptions": {"premium_monthly:monthly": {"expires_date": future}}
+        })
+        assert main.verify_premium_from_firestore("user-1") == main.VERIFIED
+
+    def test_expired_subscription_returns_not_verified(self, _import_main):
+        main = _import_main
+        past = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
+        self._set_rc_customer(main, True, {
+            "subscriptions": {"premium_monthly:monthly": {"expires_date": past}}
+        })
+        assert main.verify_premium_from_firestore("user-1") == main.NOT_VERIFIED
+
+    def test_lifetime_subscription_returns_verified(self, _import_main):
+        main = _import_main
+        self._set_rc_customer(main, True, {
+            "subscriptions": {"lifetime": {"expires_date": None}}
+        })
+        assert main.verify_premium_from_firestore("user-1") == main.VERIFIED
+
+    def test_missing_document_returns_not_verified(self, _import_main):
+        main = _import_main
+        self._set_rc_customer(main, False)
+        assert main.verify_premium_from_firestore("user-1") == main.NOT_VERIFIED
+
+    def test_no_subscriptions_returns_not_verified(self, _import_main):
+        main = _import_main
+        self._set_rc_customer(main, True, {"subscriptions": {}})
+        assert main.verify_premium_from_firestore("user-1") == main.NOT_VERIFIED
+
+    def test_firestore_failure_returns_unavailable(self, _import_main):
+        main = _import_main
+        main.db.collection.return_value.document.return_value.get.side_effect = RuntimeError("boom")
+        assert main.verify_premium_from_firestore("user-1") == main.UNAVAILABLE
+
+
+class TestVerifyPremiumHybrid:
+    """verify_premium chains Firestore → REST fallback correctly."""
+
+    def test_firestore_verified_skips_rest(self, _import_main):
+        main = _import_main
+        with patch.object(main, "verify_premium_from_firestore", return_value=main.VERIFIED):
+            with patch.object(main, "verify_premium_with_revenuecat") as mock_rest:
+                assert main.verify_premium("user-1") == main.VERIFIED
+                mock_rest.assert_not_called()
+
+    def test_firestore_miss_falls_back_to_rest_verified(self, _import_main):
+        main = _import_main
+        with patch.object(main, "verify_premium_from_firestore", return_value=main.NOT_VERIFIED):
+            with patch.object(main, "verify_premium_with_revenuecat", return_value=main.VERIFIED):
+                assert main.verify_premium("user-1") == main.VERIFIED
+
+    def test_firestore_not_verified_and_rest_unavailable_returns_not_verified(self, _import_main):
+        """Definitive NOT_VERIFIED wins over REST UNAVAILABLE — 403 is actionable, 503 isn't."""
+        main = _import_main
+        with patch.object(main, "verify_premium_from_firestore", return_value=main.NOT_VERIFIED):
+            with patch.object(main, "verify_premium_with_revenuecat", return_value=main.UNAVAILABLE):
+                assert main.verify_premium("user-1") == main.NOT_VERIFIED
+
+    def test_both_unavailable_returns_unavailable(self, _import_main):
+        main = _import_main
+        with patch.object(main, "verify_premium_from_firestore", return_value=main.UNAVAILABLE):
+            with patch.object(main, "verify_premium_with_revenuecat", return_value=main.UNAVAILABLE):
+                assert main.verify_premium("user-1") == main.UNAVAILABLE
+
+
+# ===========================================================================
+# Firestore trigger: rc_events → premium reconcile + audit log
+# ===========================================================================
+
+class TestHandleRcEventPayload:
+    """_handle_rc_event_payload covers grant, revoke, skip, and logging paths."""
+
+    def _setup_user(self, main, prev_data=None):
+        """Arrange db mocks so users/{id} lookup returns prev_data."""
+        prev_data = prev_data or {}
+        mock_user_doc = MagicMock()
+        mock_user_doc.exists = True
+        mock_user_doc.to_dict.return_value = prev_data
+        mock_user_ref = MagicMock()
+        mock_user_ref.get.return_value = mock_user_doc
+
+        mock_log_collection = MagicMock()
+
+        def collection_side_effect(name):
+            if name == "premium_events_log":
+                return mock_log_collection
+            c = MagicMock()
+            c.document.return_value = mock_user_ref
+            return c
+
+        main.db.collection.side_effect = collection_side_effect
+        return mock_user_ref, mock_log_collection
+
+    def test_initial_purchase_grants_premium(self, _import_main):
+        main = _import_main
+        user_ref, log_coll = self._setup_user(main, {"is_premium": False, "ai_credits": 10})
+
+        with patch.object(main, "get_credits_config", return_value={
+            "initial_credits": 100, "action_cost": 30, "premium_daily_credits_cap": 300
+        }):
+            main._handle_rc_event_payload({
+                "type": "INITIAL_PURCHASE",
+                "app_user_id": "user-123",
+                "product_id": "premium_monthly:monthly",
+                "store": "PLAY_STORE",
+                "environment": "PRODUCTION",
+            }, event_id="evt-1")
+
+        user_ref.update.assert_called_once()
+        update_args = user_ref.update.call_args[0][0]
+        assert update_args["is_premium"] is True
+        assert update_args["ai_credits"] == 300
+
+        log_row = log_coll.add.call_args[0][0]
+        assert log_row["rc_event_type"] == "INITIAL_PURCHASE"
+        assert log_row["state_changed"] is True
+        assert log_row["new_state"] == {"is_premium": True, "ai_credits": 300}
+        assert log_row["source"] == "webhook:INITIAL_PURCHASE"
+
+    def test_expiration_revokes_premium(self, _import_main):
+        main = _import_main
+        user_ref, log_coll = self._setup_user(main, {"is_premium": True, "ai_credits": 300})
+
+        main._handle_rc_event_payload({
+            "type": "EXPIRATION",
+            "app_user_id": "user-123",
+        }, event_id="evt-2")
+
+        update_args = user_ref.update.call_args[0][0]
+        assert update_args["is_premium"] is False
+        # Credits stay untouched on revoke
+        assert "ai_credits" not in update_args
+
+        log_row = log_coll.add.call_args[0][0]
+        assert log_row["rc_event_type"] == "EXPIRATION"
+        assert log_row["new_state"]["is_premium"] is False
+        assert log_row["new_state"]["ai_credits"] == 300
+
+    def test_anonymous_user_is_skipped(self, _import_main):
+        """$RCAnonymousID events have no user to reconcile — no writes."""
+        main = _import_main
+        user_ref, log_coll = self._setup_user(main)
+
+        main._handle_rc_event_payload({
+            "type": "INITIAL_PURCHASE",
+            "app_user_id": "$RCAnonymousID:abc123",
+        }, event_id="evt-3")
+
+        user_ref.update.assert_not_called()
+        log_coll.add.assert_not_called()
+
+    def test_missing_app_user_id_is_skipped(self, _import_main):
+        main = _import_main
+        user_ref, log_coll = self._setup_user(main)
+
+        main._handle_rc_event_payload({"type": "RENEWAL"}, event_id="evt-4")
+
+        user_ref.update.assert_not_called()
+        log_coll.add.assert_not_called()
+
+    def test_unknown_event_type_logs_without_reconcile(self, _import_main):
+        """New/unhandled RC event types still land in the audit log."""
+        main = _import_main
+        user_ref, log_coll = self._setup_user(main, {"is_premium": True, "ai_credits": 300})
+
+        main._handle_rc_event_payload({
+            "type": "BILLING_ISSUE",
+            "app_user_id": "user-123",
+        }, event_id="evt-5")
+
+        user_ref.update.assert_not_called()
+        log_row = log_coll.add.call_args[0][0]
+        assert log_row["rc_event_type"] == "BILLING_ISSUE"
+        assert log_row["state_changed"] is False
 
 
 # ===========================================================================
@@ -400,7 +636,7 @@ class TestRefillPremiumCredits:
         main.db.collection.return_value.where.return_value.get.return_value = [user_doc]
         main.db.collection.return_value.add = MagicMock()
 
-        with patch.object(main, "verify_premium_with_revenuecat", return_value=main.VERIFIED):
+        with patch.object(main, "verify_premium", return_value=main.VERIFIED):
             with patch.object(main, "get_credits_config", return_value={
                 "initial_credits": 100, "action_cost": 30, "premium_daily_credits_cap": 300
             }):
@@ -426,7 +662,7 @@ class TestRefillPremiumCredits:
         main.db.collection.return_value.where.return_value.get.return_value = [user_doc]
         main.db.collection.return_value.add = MagicMock()
 
-        with patch.object(main, "verify_premium_with_revenuecat", return_value=main.NOT_VERIFIED):
+        with patch.object(main, "verify_premium", return_value=main.NOT_VERIFIED):
             with patch.object(main, "get_credits_config", return_value={
                 "initial_credits": 100, "action_cost": 30, "premium_daily_credits_cap": 300
             }):
@@ -451,7 +687,7 @@ class TestRefillPremiumCredits:
         main.db.collection.return_value.where.return_value.get.return_value = [user_doc]
         main.db.collection.return_value.add = MagicMock()
 
-        with patch.object(main, "verify_premium_with_revenuecat", return_value=main.UNAVAILABLE):
+        with patch.object(main, "verify_premium", return_value=main.UNAVAILABLE):
             with patch.object(main, "get_credits_config", return_value={
                 "initial_credits": 100, "action_cost": 30, "premium_daily_credits_cap": 300
             }):
@@ -484,7 +720,7 @@ class TestRefillPremiumCredits:
                 return main.NOT_VERIFIED
             return main.VERIFIED
 
-        with patch.object(main, "verify_premium_with_revenuecat", side_effect=verify_side_effect):
+        with patch.object(main, "verify_premium", side_effect=verify_side_effect):
             with patch.object(main, "get_credits_config", return_value={
                 "initial_credits": 100, "action_cost": 30, "premium_daily_credits_cap": 300
             }):
