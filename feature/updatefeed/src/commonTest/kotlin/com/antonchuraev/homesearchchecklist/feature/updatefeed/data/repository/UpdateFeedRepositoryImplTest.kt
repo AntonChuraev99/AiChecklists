@@ -34,13 +34,13 @@ class UpdateFeedRepositoryImplTest {
     // ---- getReleases() — default JSON ----
 
     @Test
-    fun `getReleases_withDefaultJson_returnsSixReleaseGroups`() = runTest {
+    fun `getReleases_withDefaultJson_returnsEightReleaseGroups`() = runTest {
         val repository = buildRepository(RemoteConfigDefaults.UPDATE_FEED_JSON)
 
         val releases = repository.getReleases()
 
-        // 13 posts across 6 main-versions (v1.6–v1.11); v1.12 omitted (no unique content)
-        assertEquals(6, releases.size)
+        // 17 posts across 8 main-versions (v1.6–v1.13)
+        assertEquals(8, releases.size)
     }
 
     @Test
@@ -49,8 +49,8 @@ class UpdateFeedRepositoryImplTest {
 
         val releases = repository.getReleases()
 
-        // Newest release first (v1.11 has the highest post timestamp)
-        assertEquals("1.11", releases.first().version)
+        // Newest release first (v1.13 has the highest post timestamp)
+        assertEquals("1.13", releases.first().version)
         // Oldest release last (v1.6)
         assertEquals("1.6", releases.last().version)
     }
@@ -62,18 +62,21 @@ class UpdateFeedRepositoryImplTest {
         val releases = repository.getReleases()
 
         assertEquals(
-            listOf("1.11", "1.10", "1.9", "1.8", "1.7", "1.6"),
+            listOf("1.13", "1.12", "1.11", "1.10", "1.9", "1.8", "1.7", "1.6"),
             releases.map { it.version }
         )
     }
 
     @Test
-    fun `getReleases_withDefaultJson_v1_12IsAbsent`() = runTest {
+    fun `getReleases_withDefaultJson_v1_12HasTwoPosts`() = runTest {
         val repository = buildRepository(RemoteConfigDefaults.UPDATE_FEED_JSON)
 
         val releases = repository.getReleases()
+        val v112 = releases.first { it.version == "1.12" }
 
-        assertTrue(releases.none { it.version == "1.12" }, "v1.12 must be absent — no unique content")
+        assertEquals(2, v112.posts.size)
+        // v1.12 has no storeDescription — recurring/drag/separate lines all covered by earlier posts
+        assertNull(v112.storeDescription)
     }
 
     @Test
@@ -257,13 +260,13 @@ class UpdateFeedRepositoryImplTest {
     }
 
     @Test
-    fun `getReleases_withDefaultJson_totalPostCountIsThirteen`() = runTest {
+    fun `getReleases_withDefaultJson_totalPostCountIsSeventeen`() = runTest {
         val repository = buildRepository(RemoteConfigDefaults.UPDATE_FEED_JSON)
 
         val releases = repository.getReleases()
         val totalPosts = releases.sumOf { it.posts.size }
 
-        assertEquals(13, totalPosts)
+        assertEquals(17, totalPosts)
     }
 
     @Test
