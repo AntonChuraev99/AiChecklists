@@ -6,6 +6,7 @@ import com.antonchuraev.homesearchchecklist.csat.CsatViewModel
 import com.antonchuraev.homesearchchecklist.core.common.impl.di.commonCoreModule
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppDatastore
 import com.antonchuraev.homesearchchecklist.core.datastore.api.UserAppDatastoreProvider
+import com.antonchuraev.homesearchchecklist.core.datastore.impl.di.datastoreModule
 import com.antonchuraev.homesearchchecklist.core.navigation.impl.di.navigationCoreModule
 import com.antonchuraev.homesearchchecklist.feature.checklist.di.checklistFeatureModule
 import com.antonchuraev.homesearchchecklist.feature.create.di.createFeatureModule
@@ -18,6 +19,7 @@ import com.antonchuraev.homesearchchecklist.feature.analyze.di.analyzeFeatureMod
 import com.antonchuraev.homesearchchecklist.feature.paywall.di.paywallFeatureModule
 import com.antonchuraev.homesearchchecklist.feature.sharing.di.sharingFeatureModule
 import com.antonchuraev.homesearchchecklist.feature.updatefeed.di.updateFeedFeatureModule
+import com.antonchuraev.homesearchchecklist.settings.di.settingsModule
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.impl.di.remoteConfigModule
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.viewModelOf
@@ -39,6 +41,8 @@ val appModule = module {
         userFeatureModule,
         sharingFeatureModule,
         updateFeedFeatureModule,
+        settingsModule,
+        datastoreModule,
         platformModule()
     )
     single<AppDatastore> { UserAppDatastoreProvider.instance }
