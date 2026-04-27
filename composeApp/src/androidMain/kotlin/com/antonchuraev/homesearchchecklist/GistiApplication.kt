@@ -36,6 +36,10 @@ open class GistiApplication : Application() {
         val koinAlreadyStarted = GlobalContext.getOrNull() != null
         if (!koinAlreadyStarted) {
             startKoin {
+                // Allow definition overrides so instrumented tests (TestApplication)
+                // can swap PaywallRepository → FakePaywallRepository for screenshot harness.
+                // Production code never overrides bindings.
+                allowOverride(true)
                 androidLogger()
                 androidContext(this@GistiApplication)
                 modules(appModule)
