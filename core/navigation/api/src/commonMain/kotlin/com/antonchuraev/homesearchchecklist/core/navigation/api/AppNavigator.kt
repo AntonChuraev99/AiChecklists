@@ -65,5 +65,9 @@ interface AppNavigator {
     fun navigateToShareChecklist(checklistId: Long)
 
     fun navigateToUpdateFeed()
+
+    fun navigateToSettings()
+
+    fun navigateToScreenCatalog()
 }
 
