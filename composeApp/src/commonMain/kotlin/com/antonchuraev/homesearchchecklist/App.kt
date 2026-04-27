@@ -52,6 +52,7 @@ import com.antonchuraev.homesearchchecklist.feature.create.presentation.create.C
 import com.antonchuraev.homesearchchecklist.feature.create.presentation.preview.TemplatePreviewScreen
 import com.antonchuraev.homesearchchecklist.feature.create.presentation.templates.TemplatesScreen
 import com.antonchuraev.homesearchchecklist.feature.debug.presentation.DebugScreen
+import com.antonchuraev.homesearchchecklist.feature.debug.presentation.ScreenCatalogScreen
 import com.antonchuraev.homesearchchecklist.feature.debug.presentation.StoreScreenshotScreen
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.MainScreen
 import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.OnboardingScreen
@@ -241,6 +242,10 @@ fun App() {
 
                     composable<AppNavRoute.StoreScreenshot> {
                         StoreScreenshotScreen()
+                    }
+
+                    composable<AppNavRoute.ScreenCatalog> {
+                        ScreenCatalogScreen()
                     }
                 }
 

@@ -40,6 +40,7 @@ class DebugViewModel(
             DebugScreenIntent.DismissRestoreCreditsResult -> _screenState.value =
                 _screenState.value.copy(restoreCreditsResult = null)
             DebugScreenIntent.OpenInteractiveOnboarding -> appNavigator.navigateToInteractiveOnboarding()
+            DebugScreenIntent.OpenScreenCatalog -> appNavigator.navigateToScreenCatalog()
         }
     }
 

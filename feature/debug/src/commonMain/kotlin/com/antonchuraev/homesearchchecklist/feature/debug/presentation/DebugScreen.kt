@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -70,6 +71,9 @@ fun DebugScreen(
     var showRepeatRulePreview by rememberSaveable { mutableStateOf(false) }
 
     val items = listOf(
+        DebugItem(Icons.Default.GridView, stringResource(Res.string.debug_catalog_title), stringResource(Res.string.debug_catalog_entry_description)) {
+            viewModel.sendIntent(DebugScreenIntent.OpenScreenCatalog)
+        },
         DebugItem(Icons.Default.Info, stringResource(Res.string.debug_app_info), stringResource(Res.string.debug_app_info_description)) {
             viewModel.sendIntent(DebugScreenIntent.ShowInfoDialog)
         },

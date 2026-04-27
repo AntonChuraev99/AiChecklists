@@ -127,5 +127,15 @@ class AppNavigatorImpl() : AppNavigator {
             launchSingleTop = true
         }
     }
+
+    override fun navigateToSettings() {
+        navController.navigate(AppNavRoute.Settings) {
+            launchSingleTop = true
+        }
+    }
+
+    override fun navigateToScreenCatalog() {
+        navController.navigate(AppNavRoute.ScreenCatalog)
+    }
 }
 
