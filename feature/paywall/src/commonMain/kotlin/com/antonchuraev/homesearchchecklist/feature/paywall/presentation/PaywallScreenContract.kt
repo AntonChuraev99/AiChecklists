@@ -26,14 +26,15 @@ enum class PaywallPlan { Yearly, Monthly }
  * Display-only pricing strings — filled from RevenueCat offerings in Phase 2.
  * Safe defaults shown until real prices load.
  *
- * yearlySavings = 1 - (20 / (5.99 * 12)) = 1 - 0.278 ≈ 72%
+ * Defaults match production prices: $20/yr, $1.99/mo.
+ * yearlySavings = 1 - (20 / (1.99 * 12)) = 1 - 0.838 ≈ 16%
  */
 data class PaywallUiState(
     val yearlyPrice: String        = "$20",
     val yearlyMonthly: String      = "$1.67/mo · billed annually",
     /** Nullable — null means savings badge is hidden (e.g. yearly is not actually cheaper). */
-    val yearlySavings: String?     = "Save 72%",
-    val monthlyPrice: String       = "$5.99",
+    val yearlySavings: String?     = "Save 16%",
+    val monthlyPrice: String       = "$1.99",
     val trialDays: Int             = 3,
     val ctaSubtext: String         = "Then $20/year. Auto-renews. Cancel anytime.",
     val selectedPlan: PaywallPlan  = PaywallPlan.Yearly,
