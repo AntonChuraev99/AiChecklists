@@ -25,16 +25,18 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 /**
  * FeatureRow — icon tile + title + body. Used in PaywallVariant.Features.
  *
- * `accentBg` lets callers cycle through primaryContainer / tertiaryContainer
- * / secondaryContainer for visual rhythm.
+ * Icon container is fixed Material Blue 50 (#E3F2FD); icon tinted with the
+ * theme's primary blue so the row reads as a single brand-color unit across
+ * all features instead of cycling through M3 container hues.
  */
+private val FeatureIconBg = Color(0xFFE3F2FD)
+
 @Composable
 internal fun FeatureRow(
     icon: ImageVector,
     title: String,
     body: String,
     modifier: Modifier = Modifier,
-    accentBg: Color? = null,
 ) {
     val cs = MaterialTheme.colorScheme
 
@@ -49,24 +51,21 @@ internal fun FeatureRow(
             modifier = Modifier
                 .size(40.dp)
                 .clip(MaterialTheme.shapes.medium)
-                .background(accentBg ?: cs.primaryContainer),
+                .background(FeatureIconBg),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = cs.onPrimaryContainer,
+                // Fixed black tint (not theme-derived) — gives the M3 Filled
+                // icon set maximum visual weight against the light-blue tile,
+                // so even icons with semi-outline geometry (Checklist,
+                // ContentCopy) read as solid shapes.
+                tint = Color.Black,
                 modifier = Modifier.size(22.dp),
             )
         }
-        // Aligns the title's first-line visual center (~12dp from text top) with the
-        // 40dp icon tile's vertical center (20dp). 8dp top padding compensates for
-        // titleMedium's ascent so the icon and title read as a single visual unit.
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .padding(top = 8.dp),
-        ) {
+        Column(modifier = Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.titleMedium, color = cs.onSurface)
             Spacer(Modifier.height(2.dp))
             Text(body, style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
