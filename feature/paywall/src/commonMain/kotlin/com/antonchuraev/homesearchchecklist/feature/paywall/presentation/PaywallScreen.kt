@@ -212,7 +212,7 @@ internal fun PaywallScreen(
                 TextButton(
                     onClick = onTermsClick,
                     contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
-                    modifier = Modifier.heightIn(min = 28.dp),
+                    modifier = Modifier.height(28.dp),
                 ) {
                     Text(
                         text = stringResource(Res.string.paywall_terms),
@@ -223,7 +223,7 @@ internal fun PaywallScreen(
                 TextButton(
                     onClick = onPrivacyClick,
                     contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
-                    modifier = Modifier.heightIn(min = 28.dp),
+                    modifier = Modifier.height(28.dp),
                 ) {
                     Text(
                         text = stringResource(Res.string.paywall_privacy),
@@ -234,7 +234,7 @@ internal fun PaywallScreen(
                 TextButton(
                     onClick = onRestore,
                     contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
-                    modifier = Modifier.heightIn(min = 28.dp),
+                    modifier = Modifier.height(28.dp),
                 ) {
                     Text(
                         text = stringResource(Res.string.paywall_restore),
@@ -245,7 +245,7 @@ internal fun PaywallScreen(
                 TextButton(
                     onClick = onSupportClick,
                     contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
-                    modifier = Modifier.heightIn(min = 28.dp),
+                    modifier = Modifier.height(28.dp),
                 ) {
                     Text(
                         text = stringResource(Res.string.paywall_support),
