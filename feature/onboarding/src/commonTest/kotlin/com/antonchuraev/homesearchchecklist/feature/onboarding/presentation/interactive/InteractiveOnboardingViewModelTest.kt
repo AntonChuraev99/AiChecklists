@@ -1,8 +1,9 @@
 package com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive
 
-import androidx.navigation.NavController
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
+import com.antonchuraev.homesearchchecklist.core.navigation.api.NavCommand
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistRepeatInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
@@ -22,8 +23,11 @@ import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.Complete
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -1190,7 +1194,9 @@ class InteractiveOnboardingViewModelTest {
         var navigatedToMainScreen = false
         var lastMainClearBackStack = false
 
-        override fun installNavController(navController: NavController) {}
+        override val commands: Flow<NavCommand> = emptyFlow()
+        override val events: SharedFlow<AppNavEvent> = MutableSharedFlow()
+        override fun showWidgetInstruction() {}
         override fun onBack() {}
         override fun navigateToOnboarding() {}
         override fun navigateToInteractiveOnboarding() {}
@@ -1210,9 +1216,12 @@ class InteractiveOnboardingViewModelTest {
         override fun navigateToFillDetail(fillId: Long, clearBackStack: Boolean) {}
         override fun navigateToFillsList(checklistId: Long) {}
         override fun navigateToPaywall(source: String) {}
+        override fun navigateToPaywallVariant(source: String, forceVariant: String) {}
         override fun navigateToSubscriptionStatus(showSuccessMessage: Boolean) {}
         override fun navigateToShareChecklist(checklistId: Long) {}
         override fun navigateToUpdateFeed() {}
+        override fun navigateToSettings() {}
+        override fun navigateToScreenCatalog() {}
     }
 
     private class FakeUserDataRepository : UserDataRepository {

@@ -1,9 +1,9 @@
 package com.antonchuraev.homesearchchecklist.feature.create.presentation.create
 
-import androidx.navigation.NavController
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
+import com.antonchuraev.homesearchchecklist.core.navigation.api.NavCommand
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistRepeatInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
@@ -274,11 +274,12 @@ class CreateChecklistViewModelTest {
         var backInvoked = false
         var navigatedToMainScreen = false
 
+        override val commands: Flow<NavCommand> = emptyFlow()
+
         private val _events = MutableSharedFlow<AppNavEvent>()
         override val events: SharedFlow<AppNavEvent> = _events.asSharedFlow()
 
         override fun showWidgetInstruction() {}
-        override fun installNavController(navController: NavController) {}
         override fun onBack() { backInvoked = true }
         override fun navigateToOnboarding() {}
         override fun navigateToInteractiveOnboarding() {}
@@ -295,9 +296,12 @@ class CreateChecklistViewModelTest {
         override fun navigateToFillDetail(fillId: Long, clearBackStack: Boolean) {}
         override fun navigateToFillsList(checklistId: Long) {}
         override fun navigateToPaywall(source: String) {}
+        override fun navigateToPaywallVariant(source: String, forceVariant: String) {}
         override fun navigateToSubscriptionStatus(showSuccessMessage: Boolean) {}
         override fun navigateToShareChecklist(checklistId: Long) {}
         override fun navigateToUpdateFeed() {}
+        override fun navigateToSettings() {}
+        override fun navigateToScreenCatalog() {}
     }
 
     private class RecordingAnalyticsTracker : AnalyticsTracker {
