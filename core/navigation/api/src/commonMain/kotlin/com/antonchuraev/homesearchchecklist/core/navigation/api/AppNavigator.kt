@@ -1,20 +1,29 @@
 package com.antonchuraev.homesearchchecklist.core.navigation.api
 
-import androidx.navigation.NavController
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharedFlow
 
 interface AppNavigator {
 
     /**
-     * One-shot navigation events (replay=0). App.kt collects these to open
+     * Cold flow of one-shot navigation commands. App.kt collects this and
+     * translates each command into a NavController call. NavController never
+     * leaves the Compose layer.
+     *
+     * Backed by a Channel.BUFFERED so commands emitted before collection starts
+     * are queued and delivered in order — no race between ViewModel.init and
+     * the Compose LaunchedEffect that sets up the collector.
+     */
+    val commands: Flow<NavCommand>
+
+    /**
+     * One-shot UI events (replay=0). App.kt collects these to open
      * global overlays that cannot be triggered via NavController.
      */
     val events: SharedFlow<AppNavEvent>
 
     /** Publish ShowWidgetInstruction event so App.kt opens the overlay. */
     fun showWidgetInstruction()
-
-    fun installNavController(navController: NavController)
 
     fun onBack()
 
@@ -23,7 +32,7 @@ interface AppNavigator {
     fun navigateToInteractiveOnboarding()
 
     /**
-     * Navigate to main screen, clearing all screens from back stack.
+     * Navigate to main screen, optionally clearing all screens from back stack.
      */
     fun navigateToMainScreen(clearBackStack: Boolean = false)
 
@@ -60,6 +69,9 @@ interface AppNavigator {
 
     fun navigateToPaywall(source: String = "unknown")
 
+    /** Navigate to paywall with a specific A/B variant forced (bypasses Remote Config). */
+    fun navigateToPaywallVariant(source: String = "debug", forceVariant: String)
+
     fun navigateToSubscriptionStatus(showSuccessMessage: Boolean = false)
 
     fun navigateToShareChecklist(checklistId: Long)
@@ -70,4 +82,3 @@ interface AppNavigator {
 
     fun navigateToScreenCatalog()
 }
-

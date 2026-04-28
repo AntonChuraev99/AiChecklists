@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist
 
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
+import com.antonchuraev.homesearchchecklist.core.navigation.api.NavCommand
 import com.antonchuraev.homesearchchecklist.csat.CsatBottomSheet
 import com.antonchuraev.homesearchchecklist.csat.CsatIntent
 import com.antonchuraev.homesearchchecklist.csat.CsatViewModel
@@ -38,6 +39,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -47,7 +49,6 @@ import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.feedback_thanks_message
 import org.jetbrains.compose.resources.stringResource
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavRoute
-import com.antonchuraev.homesearchchecklist.di.appModule
 import com.antonchuraev.homesearchchecklist.feature.create.presentation.create.CreateChecklistScreen
 import com.antonchuraev.homesearchchecklist.feature.create.presentation.preview.TemplatePreviewScreen
 import com.antonchuraev.homesearchchecklist.feature.create.presentation.templates.TemplatesScreen
@@ -63,7 +64,7 @@ import com.antonchuraev.homesearchchecklist.feature.splash.presentation.SplashSc
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.ChecklistDetailScreen
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.fill.FillDetailScreen
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.fills.FillsListScreen
-import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.PaywallScreen
+import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.PaywallRoute
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.SubscriptionStatusScreen
 import com.antonchuraev.homesearchchecklist.feature.sharing.presentation.ShareScreen
 import com.antonchuraev.homesearchchecklist.feature.updatefeed.presentation.UpdateFeedScreen
@@ -73,7 +74,6 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import org.koin.compose.KoinContext
 import org.koin.compose.koinInject
-import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.context.GlobalContext
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -94,12 +94,18 @@ fun App() {
             logger.debug("App", "App composable start, Koin ref stable")
         }
 
-        val viewModel: AppViewModel = koinViewModel()
-
         val navController = rememberNavController()
+
+        // Channel-based navigation: AppNavigator emits NavCommand, App.kt translates
+        // each command into a NavController call. NavController never leaves Compose layer.
+        // Channel.BUFFERED ensures commands emitted by ViewModel.init before this
+        // LaunchedEffect starts collecting are queued and delivered in order.
+        val navigator: AppNavigator = remember { koin.get<AppNavigator>() }
         LaunchedEffect(navController) {
-            viewModel.installNavController(navController)
-            logger.debug("App", "NavController installed")
+            logger.debug("App", "NavCommand collector started")
+            navigator.commands.collect { command ->
+                navController.handle(command)
+            }
         }
 
         val themeRepository: ThemeRepository = remember { koin.get<ThemeRepository>() }
@@ -115,7 +121,6 @@ fun App() {
         val csatViewModel: CsatViewModel = koinInject()
         val csatState by csatViewModel.screenState.collectAsState()
 
-        val navigator: AppNavigator = remember { koin.get<AppNavigator>() }
         var showWidgetInstruction by remember { mutableStateOf(false) }
         LaunchedEffect(Unit) {
             navigator.events.collect { event ->
@@ -274,7 +279,7 @@ fun App() {
                 }
 
                 composable<AppNavRoute.Paywall> {
-                    PaywallScreen()
+                    PaywallRoute()
                 }
 
                 composable<AppNavRoute.SubscriptionStatus> { backStackEntry ->
@@ -424,5 +429,102 @@ fun App() {
                 onComplete = { csatViewModel.sendIntent(CsatIntent.ReviewComplete) },
             )
         }
+    }
+}
+
+/**
+ * Translates a [NavCommand] into the corresponding [NavController] call.
+ * All navigation logic that was previously scattered across AppNavigatorImpl
+ * now lives here, next to the NavController that owns the back stack.
+ */
+private fun NavController.handle(command: NavCommand) {
+    when (command) {
+        is NavCommand.Back -> popBackStack()
+
+        is NavCommand.ToOnboarding -> navigate(AppNavRoute.Onboarding) {
+            popUpTo<AppNavRoute.Splash> { inclusive = true }
+            launchSingleTop = true
+        }
+
+        is NavCommand.ToInteractiveOnboarding -> navigate(AppNavRoute.InteractiveOnboarding) {
+            popUpTo<AppNavRoute.Splash> { inclusive = true }
+            launchSingleTop = true
+        }
+
+        is NavCommand.ToMainScreen -> {
+            if (command.clearBackStack) {
+                navigate(AppNavRoute.Main) {
+                    popUpTo(0) { inclusive = true }
+                }
+            } else {
+                navigate(AppNavRoute.Main)
+            }
+        }
+
+        is NavCommand.ToDebugMenu -> navigate(AppNavRoute.Debug)
+
+        is NavCommand.ToStoreScreenshot -> navigate(AppNavRoute.StoreScreenshot)
+
+        is NavCommand.ToCreateChecklistScreen ->
+            navigate(AppNavRoute.CreateChecklistRoute.CreateChecklist(command.templateId))
+
+        is NavCommand.ToEditChecklist ->
+            navigate(AppNavRoute.CreateChecklistRoute.CreateChecklist(editChecklistId = command.checklistId))
+
+        is NavCommand.ToTemplatesScreen ->
+            navigate(AppNavRoute.CreateChecklistRoute.Templates)
+
+        is NavCommand.ToTemplatePreview ->
+            navigate(AppNavRoute.CreateChecklistRoute.TemplatePreview(command.templateId))
+
+        is NavCommand.ToAnalyzeScreen ->
+            navigate(AppNavRoute.Analyze(command.checklistId, command.fillDefault))
+
+        is NavCommand.ToAnalyzeResultPreview -> navigate(AppNavRoute.AnalyzeResultPreview)
+
+        is NavCommand.ToChecklistDetail -> {
+            if (command.clearBackStack) {
+                navigate(AppNavRoute.ChecklistDetail(command.checklistId)) {
+                    popUpTo(AppNavRoute.Main) { inclusive = false }
+                }
+            } else {
+                navigate(AppNavRoute.ChecklistDetail(command.checklistId))
+            }
+        }
+
+        is NavCommand.ToFillDetail -> {
+            if (command.clearBackStack) {
+                navigate(AppNavRoute.FillDetail(command.fillId)) {
+                    popUpTo(AppNavRoute.Main) { inclusive = false }
+                }
+            } else {
+                navigate(AppNavRoute.FillDetail(command.fillId))
+            }
+        }
+
+        is NavCommand.ToFillsList -> navigate(AppNavRoute.FillsList(command.checklistId))
+
+        is NavCommand.ToPaywall -> navigate(AppNavRoute.Paywall(command.source))
+
+        is NavCommand.ToPaywallVariant ->
+            navigate(AppNavRoute.Paywall(source = command.source, forceVariant = command.forceVariant))
+
+        is NavCommand.ToSubscriptionStatus ->
+            navigate(AppNavRoute.SubscriptionStatus(command.showSuccessMessage)) {
+                // Remove Paywall from back stack so "back" returns to the screen before Paywall
+                popUpTo<AppNavRoute.Paywall> { inclusive = true }
+            }
+
+        is NavCommand.ToShareChecklist -> navigate(AppNavRoute.ShareChecklist(command.checklistId))
+
+        is NavCommand.ToUpdateFeed -> navigate(AppNavRoute.UpdateFeed) {
+            launchSingleTop = true
+        }
+
+        is NavCommand.ToSettings -> navigate(AppNavRoute.Settings) {
+            launchSingleTop = true
+        }
+
+        is NavCommand.ToScreenCatalog -> navigate(AppNavRoute.ScreenCatalog)
     }
 }

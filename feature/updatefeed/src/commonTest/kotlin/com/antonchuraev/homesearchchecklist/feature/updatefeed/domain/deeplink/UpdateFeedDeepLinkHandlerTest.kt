@@ -1,10 +1,12 @@
 package com.antonchuraev.homesearchchecklist.feature.updatefeed.domain.deeplink
 
-import androidx.navigation.NavController
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
+import com.antonchuraev.homesearchchecklist.core.navigation.api.NavCommand
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -23,9 +25,9 @@ class UpdateFeedDeepLinkHandlerTest {
         var widgetInstructionCallCount = 0
         var backCallCount = 0
 
+        override val commands: Flow<NavCommand> = emptyFlow()
         override val events: SharedFlow<AppNavEvent> = MutableSharedFlow()
 
-        override fun installNavController(navController: NavController) {}
         override fun onBack() { backCallCount++ }
         override fun navigateToOnboarding() {}
         override fun navigateToInteractiveOnboarding() {}
@@ -42,9 +44,12 @@ class UpdateFeedDeepLinkHandlerTest {
         override fun navigateToFillDetail(fillId: Long, clearBackStack: Boolean) {}
         override fun navigateToFillsList(checklistId: Long) {}
         override fun navigateToPaywall(source: String) { paywallCalls.add(source) }
+        override fun navigateToPaywallVariant(source: String, forceVariant: String) {}
         override fun navigateToSubscriptionStatus(showSuccessMessage: Boolean) { subscriptionStatusCallCount++ }
         override fun navigateToShareChecklist(checklistId: Long) {}
         override fun navigateToUpdateFeed() { updateFeedCallCount++ }
+        override fun navigateToSettings() {}
+        override fun navigateToScreenCatalog() {}
         override fun showWidgetInstruction() { widgetInstructionCallCount++ }
     }
 

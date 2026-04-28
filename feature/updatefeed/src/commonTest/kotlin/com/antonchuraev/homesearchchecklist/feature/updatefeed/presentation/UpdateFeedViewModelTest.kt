@@ -1,10 +1,10 @@
 package com.antonchuraev.homesearchchecklist.feature.updatefeed.presentation
 
-import androidx.navigation.NavController
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
+import com.antonchuraev.homesearchchecklist.core.navigation.api.NavCommand
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.LoginResult
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallOffering
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PurchaseResult
@@ -20,6 +20,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -63,8 +64,8 @@ class UpdateFeedViewModelTest {
         var paywallSource: String? = null
         var navigatedToSubscriptionStatus = false
 
+        override val commands: Flow<NavCommand> = emptyFlow()
         override val events: SharedFlow<AppNavEvent> = MutableSharedFlow()
-        override fun installNavController(navController: NavController) {}
         override fun onBack() {}
         override fun navigateToOnboarding() {}
         override fun navigateToInteractiveOnboarding() {}
@@ -81,9 +82,12 @@ class UpdateFeedViewModelTest {
         override fun navigateToFillDetail(fillId: Long, clearBackStack: Boolean) {}
         override fun navigateToFillsList(checklistId: Long) {}
         override fun navigateToPaywall(source: String) { paywallSource = source }
+        override fun navigateToPaywallVariant(source: String, forceVariant: String) {}
         override fun navigateToSubscriptionStatus(showSuccessMessage: Boolean) { navigatedToSubscriptionStatus = true }
         override fun navigateToShareChecklist(checklistId: Long) {}
         override fun navigateToUpdateFeed() {}
+        override fun navigateToSettings() {}
+        override fun navigateToScreenCatalog() {}
         override fun showWidgetInstruction() {}
     }
 

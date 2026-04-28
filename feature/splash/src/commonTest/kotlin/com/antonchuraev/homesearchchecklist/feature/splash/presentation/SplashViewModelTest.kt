@@ -2,8 +2,9 @@ package com.antonchuraev.homesearchchecklist.feature.splash.presentation
 
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
-import androidx.navigation.NavController
+import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
+import com.antonchuraev.homesearchchecklist.core.navigation.api.NavCommand
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.LoginResult
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.RestoreResult
@@ -17,8 +18,11 @@ import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.GetOnboa
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -249,7 +253,9 @@ class SplashViewModelTest {
     }
 
     private class NoOpNavigator : AppNavigator {
-        override fun installNavController(navController: NavController) {}
+        override val commands: Flow<NavCommand> = emptyFlow()
+        override val events: SharedFlow<AppNavEvent> = MutableSharedFlow()
+        override fun showWidgetInstruction() {}
         override fun onBack() {}
         override fun navigateToOnboarding() {}
         override fun navigateToInteractiveOnboarding() {}
@@ -266,9 +272,12 @@ class SplashViewModelTest {
         override fun navigateToFillDetail(fillId: Long, clearBackStack: Boolean) {}
         override fun navigateToFillsList(checklistId: Long) {}
         override fun navigateToPaywall(source: String) {}
+        override fun navigateToPaywallVariant(source: String, forceVariant: String) {}
         override fun navigateToSubscriptionStatus(showSuccessMessage: Boolean) {}
         override fun navigateToShareChecklist(checklistId: Long) {}
         override fun navigateToUpdateFeed() {}
+        override fun navigateToSettings() {}
+        override fun navigateToScreenCatalog() {}
     }
 
     private class NoOpLogger : AppLogger {
