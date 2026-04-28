@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -26,6 +27,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 
@@ -95,14 +97,26 @@ internal fun PlanRow(
                 ) {
                     Text(label, style = MaterialTheme.typography.titleMedium, color = onBg)
                     if (badge != null) {
+                        // weight(1f, fill = false) lets the Surface shrink when the
+                        // price column eats horizontal room (e.g. long currency
+                        // strings like "10 990,00 ₸"); TextAutoSize then scales
+                        // the badge text down to 8.sp instead of wrapping or
+                        // clipping. Stays inline at native size on wide layouts.
                         Surface(
                             shape = RoundedCornerShape(999.dp),
                             color = cs.primary,
+                            modifier = Modifier.weight(1f, fill = false),
                         ) {
                             Text(
                                 badge,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = cs.onPrimary,
+                                maxLines = 1,
+                                softWrap = false,
+                                autoSize = TextAutoSize.StepBased(
+                                    minFontSize = 8.sp,
+                                    maxFontSize = MaterialTheme.typography.labelSmall.fontSize,
+                                ),
                                 modifier = Modifier.padding(
                                     horizontal = AppDimens.SpacingSm,
                                     vertical = AppDimens.SpacingXxs,
