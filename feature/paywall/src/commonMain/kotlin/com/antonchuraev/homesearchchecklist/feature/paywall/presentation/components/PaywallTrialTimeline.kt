@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LockOpen
-import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -31,8 +30,6 @@ import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.paywall_v1_timeline_step1_body
 import aichecklists.core.designsystem.generated.resources.paywall_v1_timeline_step1_title
-import aichecklists.core.designsystem.generated.resources.paywall_v1_timeline_step2_body
-import aichecklists.core.designsystem.generated.resources.paywall_v1_timeline_step2_title
 import aichecklists.core.designsystem.generated.resources.paywall_v1_timeline_step3_body
 import aichecklists.core.designsystem.generated.resources.paywall_v1_timeline_step3_title
 import org.jetbrains.compose.resources.stringResource
@@ -51,18 +48,15 @@ internal fun PaywallTrialTimeline(modifier: Modifier = Modifier) {
 
     data class Step(val icon: ImageVector, val title: String, val body: String, val tertiary: Boolean)
 
+    // Two-step timeline: Today → trial-end. Removed the Day-2 "we'll notify you" step
+    // because we don't actually send pre-trial-end push notifications — keeping it would
+    // be a deceptive promise (Google Play "Deceptive behavior" policy risk).
     val steps = listOf(
         Step(
             icon = Icons.Filled.LockOpen,
             title = stringResource(Res.string.paywall_v1_timeline_step1_title),
             body = stringResource(Res.string.paywall_v1_timeline_step1_body),
             tertiary = false,
-        ),
-        Step(
-            icon = Icons.Filled.NotificationsActive,
-            title = stringResource(Res.string.paywall_v1_timeline_step2_title),
-            body = stringResource(Res.string.paywall_v1_timeline_step2_body),
-            tertiary = true,
         ),
         Step(
             icon = Icons.Filled.WorkspacePremium,

@@ -49,7 +49,7 @@ class PaywallViewModel(
         "timeline", "timeline_v1" -> PaywallVariant.Timeline
         "features", "features_v1" -> PaywallVariant.Features
         "compare", "compare_v1"   -> PaywallVariant.Compare
-        else -> PaywallVariant.Timeline  // safe default
+        else -> PaywallVariant.Features  // safe default
     }
 
     // Match yearly/monthly by id substring + period fallback. Hardcoded full ids
@@ -81,6 +81,9 @@ class PaywallViewModel(
         val resolvedVariant = parseVariant(forceVariant ?: rcVariant)
         _screenState.update { it.copy(variant = resolvedVariant) }
 
+        analyticsTracker.setUserProperties(
+            mapOf("paywall_variant" to resolvedVariant.name),
+        )
         analyticsTracker.event(
             "paywall_opened",
             mapOf("source" to source, "variant" to resolvedVariant.name),

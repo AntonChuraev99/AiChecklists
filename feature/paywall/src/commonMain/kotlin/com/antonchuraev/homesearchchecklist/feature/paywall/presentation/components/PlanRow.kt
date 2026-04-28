@@ -58,6 +58,7 @@ internal fun PlanRow(
     Surface(
         modifier = modifier
             .fillMaxWidth()
+            .height(84.dp)
             .semantics {
                 role = Role.RadioButton
                 this.selected = selected
@@ -126,7 +127,22 @@ internal fun PlanRow(
                     }
                 }
                 Spacer(Modifier.height(2.dp))
-                Text(sub, style = MaterialTheme.typography.bodySmall, color = onSub)
+                // Auto-shrink subtitle: locale-formatted prices vary in length
+                // ("$1.67/mo · billed annually" = 24 chars on USD vs
+                // "915,83 ₸/mo · billed annually" = 29 chars on KZT). With the
+                // 84dp fixed card height there's no room to wrap, so the text
+                // would otherwise truncate — autoSize steps down to 9.sp instead.
+                Text(
+                    sub,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = onSub,
+                    maxLines = 1,
+                    softWrap = false,
+                    autoSize = TextAutoSize.StepBased(
+                        minFontSize = 8.sp,
+                        maxFontSize = MaterialTheme.typography.bodySmall.fontSize,
+                    ),
+                )
             }
 
             Column(horizontalAlignment = Alignment.End) {

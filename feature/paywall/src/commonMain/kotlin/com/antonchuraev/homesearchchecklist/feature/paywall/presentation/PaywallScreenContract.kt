@@ -31,12 +31,14 @@ enum class PaywallPlan { Yearly, Monthly }
  */
 data class PaywallUiState(
     val yearlyPrice: String        = "$20",
-    val yearlyMonthly: String      = "$1.67/mo · billed annually",
+    /** Monthly equivalent of yearly price (formatted, no period suffix). Combined
+     *  with localized "/mo · billed annually" string in the UI layer. */
+    val yearlyMonthly: String      = "$1.67",
     /** Nullable — null means savings badge is hidden (e.g. yearly is not actually cheaper). */
     val yearlySavings: String?     = "Save 16%",
     val monthlyPrice: String       = "$1.99",
     val trialDays: Int             = 3,
-    val ctaSubtext: String         = "Then $20/year. Auto-renews. Cancel anytime.",
+    val ctaSubtext: String         = "Then $20/year. Cancel anytime.",
     val selectedPlan: PaywallPlan  = PaywallPlan.Yearly,
     val variant: PaywallVariant    = PaywallVariant.Timeline,
 )

@@ -10,8 +10,43 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.feature.paywall.data.PaywallConfig
+import kotlin.math.round
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
+
+/**
+ * Format the monthly equivalent of a yearly subscription price by replacing the
+ * numeric portion of the yearly priceString with the divided-by-12 amount.
+ *
+ * This preserves locale-specific currency formatting (symbol position, thousand
+ * and decimal separators, optional trailing currency code) since RC's priceString
+ * is already locale-aware. We avoid platform-specific NumberFormat (KMP common-
+ * Main has no locale APIs) and don't try to rebuild formatting from scratch.
+ *
+ * Examples (yearlyAmount/yearlyPriceString → output):
+ *   29.99    / "$29.99"        → "$2.50"
+ *   10990.00 / "10 990,00 ₸"   → "915,83 ₸"
+ *   29990    / "29 990 ₸"      → "2499 ₸"   (no decimals in source, no decimals in output)
+ */
+private fun monthlyEquivalent(yearlyPriceString: String, yearlyPriceAmount: Double): String {
+    if (yearlyPriceAmount <= 0.0) return yearlyPriceString
+    val monthly = yearlyPriceAmount / 12.0
+
+    val hasDecimals = Regex("[.,]\\d{2}").containsMatchIn(yearlyPriceString)
+    val decSeparator = if (Regex(",\\d{2}").containsMatchIn(yearlyPriceString)) "," else "."
+
+    val numberStr = if (hasDecimals) {
+        val cents = round(monthly * 100).toLong()
+        val whole = cents / 100
+        val frac = cents % 100
+        "$whole$decSeparator${if (frac < 10) "0$frac" else "$frac"}"
+    } else {
+        round(monthly).toLong().toString()
+    }
+
+    // Match number with optional thousand-separator spaces and decimal section.
+    return yearlyPriceString.replace(Regex("\\d[\\d\\s.,]*\\d|\\d"), numberStr)
+}
 /**
  * PaywallRoute — wires ViewModel, analytics, navigation and URI handling.
  *
@@ -64,10 +99,15 @@ fun PaywallRoute(
         if (savingsPct >= 5) "Save $savingsPct%" else null
     } else null
 
+    val yearlyMonthlyEq = if (yearlyProduct != null && yearlyProduct.priceAmount > 0.0) {
+        monthlyEquivalent(yearlyProduct.priceString, yearlyProduct.priceAmount)
+    } else PaywallUiState().yearlyMonthly
+
     val uiState = PaywallUiState(
         selectedPlan  = state.selectedPlan,
         variant       = state.variant,
         yearlyPrice   = yearlyProduct?.priceString  ?: PaywallUiState().yearlyPrice,
+        yearlyMonthly = yearlyMonthlyEq,
         monthlyPrice  = monthlyProduct?.priceString ?: PaywallUiState().monthlyPrice,
         trialDays     = yearlyProduct?.freeTrialDays?.takeIf { it > 0 }
             ?: monthlyProduct?.freeTrialDays?.takeIf { it > 0 }

@@ -25,7 +25,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -45,33 +44,28 @@ internal fun HeroIllustration(modifier: Modifier = Modifier) {
             .height(140.dp),
         contentAlignment = Alignment.Center,
     ) {
-        // Halo — radial gradient matches original design (no hard top edge cut-off)
+        // Halo — radial gradient sized to fit within parent (140dp) so the
+        // gradient fades to transparent before hitting the parent edges. Old
+        // 220×220dp halo was clipped top + bottom by the 140dp parent, leaving
+        // a hard arc edge that read as a "weird coloured shape" behind the
+        // card. Hardcoded to Material Blue 50 (#E3F2FD) — same brand colour as
+        // the FeatureRow icon tiles for visual coherence (replaces the M3
+        // primaryContainer token which on dynamic-colour builds drifted to
+        // unexpected hues).
         Box(
             modifier = Modifier
-                .width(220.dp)
-                .height(220.dp)
-                .padding(top = 8.dp)
+                .width(190.dp)
+                .height(120.dp)
                 .background(
                     Brush.radialGradient(
                         colors = listOf(
-                            cs.primaryContainer.copy(alpha = 0.85f),
+                            Color(0xFFE3F2FD).copy(alpha = 0.85f),
                             Color.Transparent,
                         ),
-                        radius = 320f,
+                        radius = 220f,
                     )
                 )
         )
-
-        // Tilted back card
-        Surface(
-            modifier = Modifier
-                .offset(x = (-55).dp, y = (-10).dp)
-                .size(width = 110.dp, height = 80.dp)
-                .rotate(-8f),
-            shape = RoundedCornerShape(14.dp),
-            color = cs.tertiaryContainer,
-            shadowElevation = 4.dp,
-        ) {}
 
         // Front checklist card
         Surface(

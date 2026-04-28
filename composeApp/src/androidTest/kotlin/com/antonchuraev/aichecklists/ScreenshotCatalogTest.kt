@@ -331,28 +331,28 @@ class ScreenshotCatalogTest : BaseUiTest() {
         // anchor: "Restore Purchase" is always present (paywall_restore)
         captureFromCatalog(
             tagName = "catalog_paywall",
-            anchor = "Restore Purchase",
+            anchor = "Restore",
             screenshotName = "paywall"
         )
 
         // 14a. paywall_variant_timeline — force Timeline A/B variant
         captureFromCatalog(
             tagName = "paywall_variant_timeline",
-            anchor = "Restore Purchase",
+            anchor = "Restore",
             screenshotName = "paywall_variant_timeline"
         )
 
         // 14b. paywall_variant_features — force Features A/B variant
         captureFromCatalog(
             tagName = "paywall_variant_features",
-            anchor = "Restore Purchase",
+            anchor = "Restore",
             screenshotName = "paywall_variant_features"
         )
 
         // 14c. paywall_variant_compare — force Compare A/B variant
         captureFromCatalog(
             tagName = "paywall_variant_compare",
-            anchor = "Restore Purchase",
+            anchor = "Restore",
             screenshotName = "paywall_variant_compare"
         )
 

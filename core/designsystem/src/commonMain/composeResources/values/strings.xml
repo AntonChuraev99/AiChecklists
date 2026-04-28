@@ -692,11 +692,11 @@
     <!-- Timeline section label -->
     <string name="paywall_v1_how_trial_works">HOW YOUR TRIAL WORKS</string>
 
-    <!-- Timeline steps -->
+    <!-- Timeline steps (2-step: Today → trial end. Day 2 step removed — promised a push
+         notification we don't actually send, which is a Google Play "Deceptive behavior"
+         policy risk. If we add real pre-trial-end push notifications, restore Day 2.) -->
     <string name="paywall_v1_timeline_step1_title">Today</string>
     <string name="paywall_v1_timeline_step1_body">Unlock Gisti Pro — 300 AI requests every day, unlimited checklists and recurring reminders.</string>
-    <string name="paywall_v1_timeline_step2_title">Day 2</string>
-    <string name="paywall_v1_timeline_step2_body">We'll send you a heads-up before your trial ends. Cancel anytime in one tap.</string>
     <string name="paywall_v1_timeline_step3_title">Day 3</string>
     <string name="paywall_v1_timeline_step3_body">Your free trial ends and your Pro subscription begins.</string>
 
@@ -765,7 +765,8 @@
     <string name="paywall_v1_monthly_label">Monthly</string>
     <string name="paywall_v1_best_value_badge">BEST VALUE</string>
     <string name="paywall_v1_billed_monthly">Billed monthly</string>
-    <string name="paywall_v1_billed_annually_subtitle">Billed annually</string>
+    <!-- %1$s = monthly equivalent of yearly price (e.g. "$2.50" or "915,83 ₸") -->
+    <string name="paywall_v1_billed_annually_subtitle">%1$s/mo · billed annually</string>
     <!-- DEPRECATED: savings % is now computed dynamically in PaywallRoute from real prices -->
     <string name="paywall_v1_save_72">Save 72%</string>
 
@@ -773,6 +774,12 @@
     <string name="paywall_v1_cta_start_trial">Start %1$d-day free trial</string>
     <!-- DEPRECATED: replaced by paywall_v1_cta_sub_yearly / paywall_v1_cta_sub_monthly -->
     <string name="paywall_v1_cta_sub">Then $20/year. Auto-renews. Cancel anytime.</string>
-    <string name="paywall_v1_cta_sub_yearly">Then %1$s/year. Auto-renews. Cancel anytime.</string>
-    <string name="paywall_v1_cta_sub_monthly">Then %1$s/month. Auto-renews. Cancel anytime.</string>
+    <!-- 1-line CTA disclosure. NOTE: Google Play subscription policy 4.5 requires
+         "auto-renewing" disclosure visible before purchase. We previously had a
+         rejection on this exact topic (docs/solutions/ui-improvements/
+         paywall-subscription-policy-compliance.md). The auto-renew language is
+         omitted here per product request — if Play review flags this again,
+         restore "Auto-renews. " between %1$s/year. and Cancel. -->
+    <string name="paywall_v1_cta_sub_yearly">Then %1$s/year. Cancel anytime.</string>
+    <string name="paywall_v1_cta_sub_monthly">Then %1$s/month. Cancel anytime.</string>
 </resources>

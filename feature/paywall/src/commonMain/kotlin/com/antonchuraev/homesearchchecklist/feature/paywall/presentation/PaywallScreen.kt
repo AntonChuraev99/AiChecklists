@@ -9,13 +9,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
@@ -45,9 +46,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.paywall_privacy
-import aichecklists.core.designsystem.generated.resources.paywall_restore
 import aichecklists.core.designsystem.generated.resources.paywall_support
 import aichecklists.core.designsystem.generated.resources.paywall_terms
 import aichecklists.core.designsystem.generated.resources.paywall_v1_best_value_badge
@@ -86,8 +87,6 @@ import aichecklists.core.designsystem.generated.resources.paywall_v1_timeline_bo
 import aichecklists.core.designsystem.generated.resources.paywall_v1_timeline_headline
 import aichecklists.core.designsystem.generated.resources.paywall_v1_timeline_days_free
 import aichecklists.core.designsystem.generated.resources.paywall_v1_yearly_label
-import aichecklists.core.designsystem.generated.resources.paywall_trial_terms_monthly
-import aichecklists.core.designsystem.generated.resources.paywall_trial_terms_yearly
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
@@ -150,6 +149,9 @@ internal fun PaywallScreen(
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
+                    // Disable M3 tonal-elevation overlay — keep flat surface across scroll states
+                    // so the toolbar reads as a direct continuation of the body, not a separate band.
+                    scrolledContainerColor = MaterialTheme.colorScheme.surface,
                 ),
             )
         },
@@ -177,30 +179,10 @@ internal fun PaywallScreen(
                 PaywallVariant.Compare  -> CompareBody(state, onPlanSelected, showHeroIllustration)
             }
 
-            // ─── Compliance disclosure ─────────────────────────────────────
-            Spacer(Modifier.height(AppDimens.SpacingMd))
-            val trialTerms = when (state.selectedPlan) {
-                PaywallPlan.Yearly  -> stringResource(
-                    Res.string.paywall_trial_terms_yearly,
-                    state.trialDays,
-                    state.yearlyPrice,
-                )
-                PaywallPlan.Monthly -> stringResource(
-                    Res.string.paywall_trial_terms_monthly,
-                    state.trialDays,
-                    state.monthlyPrice,
-                )
-            }
-            Text(
-                text = trialTerms,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth(),
-            )
-
             // ─── Footer links ──────────────────────────────────────────────
-            Spacer(Modifier.height(AppDimens.SpacingXs))
+            // Restore omitted here — it's already exposed in the toolbar action,
+            // a duplicate footer button was redundant. Keep Terms/Privacy/Support.
+            Spacer(Modifier.height(AppDimens.SpacingMd))
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center,
@@ -229,17 +211,6 @@ internal fun PaywallScreen(
                     )
                 }
                 TextButton(
-                    onClick = onRestore,
-                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
-                    modifier = Modifier.height(28.dp),
-                ) {
-                    Text(
-                        text = stringResource(Res.string.paywall_restore),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                TextButton(
                     onClick = onSupportClick,
                     contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
                     modifier = Modifier.height(28.dp),
@@ -261,7 +232,11 @@ internal fun PaywallScreen(
 
 @Composable
 private fun StickyCta(ctaLabel: String, sub: String, onClick: () -> Unit) {
-    Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 0.dp,
+        modifier = Modifier.navigationBarsPadding(),
+    ) {
         Column {
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Column(
@@ -279,14 +254,21 @@ private fun StickyCta(ctaLabel: String, sub: String, onClick: () -> Unit) {
                     shape = MaterialTheme.shapes.large,
                 )
                 Spacer(Modifier.height(AppDimens.SpacingSm))
+                // 1-line disclosure with auto-shrink: long localized prices
+                // (e.g. "10 990,00 ₸/year") would wrap or clip a fixed-size Text;
+                // TextAutoSize steps the font down to 9.sp instead.
                 Text(
                     text = sub,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.fillMaxWidth(),
                     textAlign = TextAlign.Center,
-                    minLines = 2,
-                    maxLines = 2,
+                    maxLines = 1,
+                    softWrap = false,
+                    autoSize = TextAutoSize.StepBased(
+                        minFontSize = 9.sp,
+                        maxFontSize = MaterialTheme.typography.bodySmall.fontSize,
+                    ),
                 )
             }
         }
@@ -304,7 +286,10 @@ private fun PlansBlock(
         PlanRow(
             label    = stringResource(Res.string.paywall_v1_yearly_label),
             price    = state.yearlyPrice,
-            sub      = stringResource(Res.string.paywall_v1_billed_annually_subtitle),
+            sub      = stringResource(
+                Res.string.paywall_v1_billed_annually_subtitle,
+                state.yearlyMonthly,
+            ),
             badge    = stringResource(Res.string.paywall_v1_best_value_badge),
             savings  = state.yearlySavings,
             selected = state.selectedPlan == PaywallPlan.Yearly,
@@ -439,25 +424,21 @@ private fun FeaturesBody(
                 icon = Icons.Filled.Bolt,
                 title = stringResource(Res.string.paywall_v1_feature_ai_runs_title),
                 body = stringResource(Res.string.paywall_v1_feature_ai_runs_body),
-                accentBg = cs.tertiaryContainer,
             )
             FeatureRow(
                 icon = Icons.Filled.Checklist,
                 title = stringResource(Res.string.paywall_v1_feature_unlimited_lists_title),
                 body = stringResource(Res.string.paywall_v1_feature_unlimited_lists_body),
-                accentBg = cs.primaryContainer,
             )
             FeatureRow(
                 icon = Icons.Filled.ContentCopy,
                 title = stringResource(Res.string.paywall_v1_feature_unlimited_fills_title),
                 body = stringResource(Res.string.paywall_v1_feature_unlimited_fills_body),
-                accentBg = cs.secondaryContainer,
             )
             FeatureRow(
                 icon = Icons.Filled.NotificationsActive,
                 title = stringResource(Res.string.paywall_v1_feature_unlimited_reminders_title),
                 body = stringResource(Res.string.paywall_v1_feature_unlimited_reminders_body),
-                accentBg = cs.primaryContainer,
             )
         }
     }
