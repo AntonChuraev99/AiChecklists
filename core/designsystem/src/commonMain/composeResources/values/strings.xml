@@ -694,7 +694,7 @@
 
     <!-- Timeline steps -->
     <string name="paywall_v1_timeline_step1_title">Today</string>
-    <string name="paywall_v1_timeline_step1_body">Unlock Gisti Pro — unlimited AI checklists, voice &amp; PDF input, smart reminders.</string>
+    <string name="paywall_v1_timeline_step1_body">Unlock Gisti Pro — 300 AI requests every day, unlimited checklists and recurring reminders.</string>
     <string name="paywall_v1_timeline_step2_title">Day 2</string>
     <string name="paywall_v1_timeline_step2_body">We'll send you a heads-up before your trial ends. Cancel anytime in one tap.</string>
     <string name="paywall_v1_timeline_step3_title">Day 3</string>
@@ -702,9 +702,13 @@
 
     <!-- Variant B: Features headline/body -->
     <string name="paywall_v1_features_headline">Everything Pro,\nfree for %1$d days</string>
-    <string name="paywall_v1_features_body">The full Gisti toolkit, no caps, no nags. Cancel anytime.</string>
+    <string name="paywall_v1_features_body">No daily caps, no checklist limits, no reminder cap. Cancel anytime.</string>
 
-    <!-- Variant B: Feature rows -->
+    <!-- Variant B: Feature rows — truthful Pro benefits (NOT exclusive features). -->
+    <!-- DEPRECATED (kept for translation continuity, no longer rendered):
+         paywall_v1_feature_photo_*, paywall_v1_feature_voice_*, paywall_v1_feature_pdf_*,
+         paywall_v1_feature_link_*. All four input types are available on Free too;
+         claiming them as Pro-only was misleading. Remove safely after string sync. -->
     <string name="paywall_v1_feature_photo_title">Photo to checklist</string>
     <string name="paywall_v1_feature_photo_body">Snap a fridge, a recipe, a whiteboard.</string>
     <string name="paywall_v1_feature_voice_title">Voice memos</string>
@@ -713,27 +717,48 @@
     <string name="paywall_v1_feature_pdf_body">Drop in syllabi, manuals, recipes.</string>
     <string name="paywall_v1_feature_link_title">Any link</string>
     <string name="paywall_v1_feature_link_body">Articles and posts, distilled into steps.</string>
-    <string name="paywall_v1_feature_ai_runs_title">300 AI checklists per day</string>
-    <string name="paywall_v1_feature_ai_runs_body">Enough to plan a week of trips, recipes, and projects.</string>
+    <!-- Active feature rows -->
+    <string name="paywall_v1_feature_ai_runs_title">300 AI requests every day</string>
+    <string name="paywall_v1_feature_ai_runs_body">Refilled daily. Plan a week of trips, recipes, and projects.</string>
+    <string name="paywall_v1_feature_unlimited_lists_title">Unlimited checklists</string>
+    <string name="paywall_v1_feature_unlimited_lists_body">No 4-checklist cap. Build as many as you need.</string>
+    <string name="paywall_v1_feature_unlimited_fills_title">Unlimited fills per checklist</string>
+    <string name="paywall_v1_feature_unlimited_fills_body">Reuse the same checklist across trips, sessions, projects.</string>
+    <string name="paywall_v1_feature_unlimited_reminders_title">Unlimited recurring reminders</string>
+    <string name="paywall_v1_feature_unlimited_reminders_body">Daily, weekly, custom — schedule as many as you want.</string>
     <!-- REMOVED: paywall_v1_feature_sync_title / _body — product is mobile-only, no cross-device sync exists -->
 
     <!-- Variant C: Compare headline/body -->
     <string name="paywall_v1_compare_headline">Compare and choose.</string>
-    <string name="paywall_v1_compare_body">Free works. Pro flies. Try Pro free for %1$d days.</string>
+    <string name="paywall_v1_compare_body">Same AI tools — Pro removes the limits. Try Pro free for %1$d days.</string>
 
     <!-- Variant C: Compare table headers -->
     <string name="paywall_v1_compare_feature">FEATURE</string>
     <string name="paywall_v1_compare_free">Free</string>
     <string name="paywall_v1_compare_pro">Pro</string>
 
-    <!-- Variant C: Compare rows -->
+    <!-- Variant C: Compare rows — only real differences between Free and Pro. -->
+    <!-- DEPRECATED (kept for translation continuity, no longer rendered):
+         paywall_v1_compare_row_photo, _voice, _pdf_link — all input types
+         are accessible on Free (server gates by credits, not type).
+         paywall_v1_compare_row_priority_ai — same Gemini model for everyone
+         (firebase-functions/main.py uses gemini-2.5-flash-lite for all users).
+         paywall_v1_compare_row_ai_checklists — replaced by _ai_requests with
+         truthful values ("100 once" instead of "10/day refilled"). -->
     <string name="paywall_v1_compare_row_ai_checklists">AI checklists / day</string>
     <string name="paywall_v1_compare_row_photo">Photo input</string>
     <string name="paywall_v1_compare_row_voice">Voice memo input</string>
     <string name="paywall_v1_compare_row_pdf_link">PDF &amp; link import</string>
     <string name="paywall_v1_compare_row_reminders">Smart reminders</string>
-    <!-- REMOVED: paywall_v1_compare_row_sync — no cross-device sync in product -->
     <string name="paywall_v1_compare_row_priority_ai">Best AI model (Gemini 2.5 Flash)</string>
+    <!-- Active compare rows + values -->
+    <string name="paywall_v1_compare_row_ai_requests">AI requests</string>
+    <string name="paywall_v1_compare_row_checklists">Checklists</string>
+    <string name="paywall_v1_compare_row_fills">Fills / list</string>
+    <string name="paywall_v1_compare_row_recurring_reminders">Recurring reminders</string>
+    <string name="paywall_v1_compare_value_free_credits">100 once</string>
+    <string name="paywall_v1_compare_value_pro_credits">300/day</string>
+    <string name="paywall_v1_compare_value_unlimited">Unlimited</string>
 
     <!-- Plan rows -->
     <string name="paywall_v1_yearly_label">Yearly</string>

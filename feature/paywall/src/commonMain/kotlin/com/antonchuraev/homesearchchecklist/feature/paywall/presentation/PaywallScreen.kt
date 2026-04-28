@@ -18,14 +18,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AllInclusive
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Link
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.PhotoCamera
-import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -61,25 +59,24 @@ import aichecklists.core.designsystem.generated.resources.paywall_v1_compare_fea
 import aichecklists.core.designsystem.generated.resources.paywall_v1_compare_free
 import aichecklists.core.designsystem.generated.resources.paywall_v1_compare_headline
 import aichecklists.core.designsystem.generated.resources.paywall_v1_compare_pro
-import aichecklists.core.designsystem.generated.resources.paywall_v1_compare_row_ai_checklists
-import aichecklists.core.designsystem.generated.resources.paywall_v1_compare_row_pdf_link
-import aichecklists.core.designsystem.generated.resources.paywall_v1_compare_row_photo
-import aichecklists.core.designsystem.generated.resources.paywall_v1_compare_row_priority_ai
-import aichecklists.core.designsystem.generated.resources.paywall_v1_compare_row_reminders
-import aichecklists.core.designsystem.generated.resources.paywall_v1_compare_row_voice
+import aichecklists.core.designsystem.generated.resources.paywall_v1_compare_row_ai_requests
+import aichecklists.core.designsystem.generated.resources.paywall_v1_compare_row_checklists
+import aichecklists.core.designsystem.generated.resources.paywall_v1_compare_row_fills
+import aichecklists.core.designsystem.generated.resources.paywall_v1_compare_row_recurring_reminders
+import aichecklists.core.designsystem.generated.resources.paywall_v1_compare_value_free_credits
+import aichecklists.core.designsystem.generated.resources.paywall_v1_compare_value_pro_credits
+import aichecklists.core.designsystem.generated.resources.paywall_v1_compare_value_unlimited
 import aichecklists.core.designsystem.generated.resources.paywall_v1_cta_sub_monthly
 import aichecklists.core.designsystem.generated.resources.paywall_v1_cta_sub_yearly
 import aichecklists.core.designsystem.generated.resources.paywall_v1_cta_start_trial
 import aichecklists.core.designsystem.generated.resources.paywall_v1_feature_ai_runs_body
 import aichecklists.core.designsystem.generated.resources.paywall_v1_feature_ai_runs_title
-import aichecklists.core.designsystem.generated.resources.paywall_v1_feature_link_body
-import aichecklists.core.designsystem.generated.resources.paywall_v1_feature_link_title
-import aichecklists.core.designsystem.generated.resources.paywall_v1_feature_pdf_body
-import aichecklists.core.designsystem.generated.resources.paywall_v1_feature_pdf_title
-import aichecklists.core.designsystem.generated.resources.paywall_v1_feature_photo_body
-import aichecklists.core.designsystem.generated.resources.paywall_v1_feature_photo_title
-import aichecklists.core.designsystem.generated.resources.paywall_v1_feature_voice_body
-import aichecklists.core.designsystem.generated.resources.paywall_v1_feature_voice_title
+import aichecklists.core.designsystem.generated.resources.paywall_v1_feature_unlimited_fills_body
+import aichecklists.core.designsystem.generated.resources.paywall_v1_feature_unlimited_fills_title
+import aichecklists.core.designsystem.generated.resources.paywall_v1_feature_unlimited_lists_body
+import aichecklists.core.designsystem.generated.resources.paywall_v1_feature_unlimited_lists_title
+import aichecklists.core.designsystem.generated.resources.paywall_v1_feature_unlimited_reminders_body
+import aichecklists.core.designsystem.generated.resources.paywall_v1_feature_unlimited_reminders_title
 import aichecklists.core.designsystem.generated.resources.paywall_v1_features_body
 import aichecklists.core.designsystem.generated.resources.paywall_v1_features_headline
 import aichecklists.core.designsystem.generated.resources.paywall_v1_how_trial_works
@@ -433,39 +430,35 @@ private fun FeaturesBody(
     }
     Spacer(Modifier.height(AppDimens.SpacingLg))
 
+    // Feature rows describe REAL Pro benefits (capacity, not feature exclusivity).
+    // Photo/voice/PDF/link inputs are accessible on Free too — server gates by credits,
+    // not by input type — so claiming them as Pro-exclusive was a lie.
     AppCard {
         Column(verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)) {
             FeatureRow(
-                icon = Icons.Filled.PhotoCamera,
-                title = stringResource(Res.string.paywall_v1_feature_photo_title),
-                body = stringResource(Res.string.paywall_v1_feature_photo_body),
-                accentBg = cs.primaryContainer,
-            )
-            FeatureRow(
-                icon = Icons.Filled.Mic,
-                title = stringResource(Res.string.paywall_v1_feature_voice_title),
-                body = stringResource(Res.string.paywall_v1_feature_voice_body),
-                accentBg = cs.tertiaryContainer,
-            )
-            FeatureRow(
-                icon = Icons.Filled.PictureAsPdf,
-                title = stringResource(Res.string.paywall_v1_feature_pdf_title),
-                body = stringResource(Res.string.paywall_v1_feature_pdf_body),
-                accentBg = cs.secondaryContainer,
-            )
-            FeatureRow(
-                icon = Icons.Filled.Link,
-                title = stringResource(Res.string.paywall_v1_feature_link_title),
-                body = stringResource(Res.string.paywall_v1_feature_link_body),
-                accentBg = cs.primaryContainer,
-            )
-            FeatureRow(
-                icon = Icons.Filled.AllInclusive,
+                icon = Icons.Filled.Bolt,
                 title = stringResource(Res.string.paywall_v1_feature_ai_runs_title),
                 body = stringResource(Res.string.paywall_v1_feature_ai_runs_body),
                 accentBg = cs.tertiaryContainer,
             )
-            // Sync removed — mobile-only product, no cross-device sync exists
+            FeatureRow(
+                icon = Icons.Filled.Checklist,
+                title = stringResource(Res.string.paywall_v1_feature_unlimited_lists_title),
+                body = stringResource(Res.string.paywall_v1_feature_unlimited_lists_body),
+                accentBg = cs.primaryContainer,
+            )
+            FeatureRow(
+                icon = Icons.Filled.ContentCopy,
+                title = stringResource(Res.string.paywall_v1_feature_unlimited_fills_title),
+                body = stringResource(Res.string.paywall_v1_feature_unlimited_fills_body),
+                accentBg = cs.secondaryContainer,
+            )
+            FeatureRow(
+                icon = Icons.Filled.NotificationsActive,
+                title = stringResource(Res.string.paywall_v1_feature_unlimited_reminders_title),
+                body = stringResource(Res.string.paywall_v1_feature_unlimited_reminders_body),
+                accentBg = cs.primaryContainer,
+            )
         }
     }
     Spacer(Modifier.height(AppDimens.SpacingLg))
@@ -485,15 +478,35 @@ private fun CompareBody(
 ) {
     val cs = MaterialTheme.colorScheme
 
+    // Only show REAL differences between Free and Pro:
+    //   - AI requests: Free gets 100 starter credits ONCE (no daily refill), Pro gets 300/day
+    //     (firebase-functions/main.py: DEFAULT_INITIAL_CREDITS=100, refill only for premium).
+    //   - Checklists / fills / recurring reminders: hard caps on Free, unlimited on Pro
+    //     (RemoteConfig: MAX_CHECKLISTS_FREE=4, MAX_FILLS_FREE=5, MAX_FREE_REPEAT_SCHEDULES=1).
+    // Removed lies: photo/voice/PDF/link rows (all accessible on Free) and "best AI model"
+    // (server uses gemini-2.5-flash-lite for everyone).
+    val unlimited = stringResource(Res.string.paywall_v1_compare_value_unlimited)
     val rows = listOf(
-        // Free limit: 10/day, Pro limit: 300/day (per RemoteConfig: AI_DAILY_LIMIT_FREE=10, AI_DAILY_LIMIT_PREMIUM=300)
-        CompareRowData(stringResource(Res.string.paywall_v1_compare_row_ai_checklists), "10", "300"),
-        CompareRowData(stringResource(Res.string.paywall_v1_compare_row_photo),       true,  true),
-        CompareRowData(stringResource(Res.string.paywall_v1_compare_row_voice),       false, true),
-        CompareRowData(stringResource(Res.string.paywall_v1_compare_row_pdf_link),    false, true),
-        CompareRowData(stringResource(Res.string.paywall_v1_compare_row_reminders),   false, true),
-        // Sync row removed — no cross-device sync in product
-        CompareRowData(stringResource(Res.string.paywall_v1_compare_row_priority_ai), false, true),
+        CompareRowData(
+            label = stringResource(Res.string.paywall_v1_compare_row_ai_requests),
+            free  = stringResource(Res.string.paywall_v1_compare_value_free_credits),
+            pro   = stringResource(Res.string.paywall_v1_compare_value_pro_credits),
+        ),
+        CompareRowData(
+            label = stringResource(Res.string.paywall_v1_compare_row_checklists),
+            free  = "4",
+            pro   = unlimited,
+        ),
+        CompareRowData(
+            label = stringResource(Res.string.paywall_v1_compare_row_fills),
+            free  = "5",
+            pro   = unlimited,
+        ),
+        CompareRowData(
+            label = stringResource(Res.string.paywall_v1_compare_row_recurring_reminders),
+            free  = "1",
+            pro   = unlimited,
+        ),
     )
 
     if (showHero) HeroIllustration()
@@ -525,11 +538,16 @@ private fun CompareBody(
                     )
                 },
                 free = {
+                    // fillMaxWidth() is required for TextAlign.Center to actually center
+                    // within the 80dp Free column. Without it, Text is sized to the word
+                    // "Free" (~28dp) and sits at column start, visually offset from the
+                    // centered body cells below.
                     Text(
                         stringResource(Res.string.paywall_v1_compare_free),
                         style = MaterialTheme.typography.labelLarge,
                         color = cs.onSurfaceVariant,
                         textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 },
                 pro = {
@@ -592,7 +610,14 @@ private fun CompareBody(
 }
 
 /**
- * 1fr | 72dp | 88dp three-column row used by the comparison table.
+ * 1fr | 80dp | 84dp three-column row used by the comparison table.
+ *
+ * Column widths tuned for the longest values in the new truthful copy:
+ *  - Free column 80dp fits "100 once" (labelLarge medium, ~68dp) with buffer.
+ *  - Pro column 84dp fits "Unlimited" (~64dp) with buffer.
+ *  - Feature column (weight 1f) gets ~155dp on Pixel-class screens, enough for
+ *    "Recurring reminders" without wrap. Old 72/88 widths were tuned for short
+ *    boolean cells ("✓"/"✗"/"10"/"300") and broke when text values grew.
  */
 @Composable
 private fun CompareGrid(
@@ -609,8 +634,8 @@ private fun CompareGrid(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Box(Modifier.weight(1f))    { feature() }
-        Box(Modifier.width(72.dp))  { free() }
-        Box(Modifier.width(88.dp))  { pro() }
+        Box(Modifier.width(80.dp))  { free() }
+        Box(Modifier.width(84.dp))  { pro() }
     }
 }
 
