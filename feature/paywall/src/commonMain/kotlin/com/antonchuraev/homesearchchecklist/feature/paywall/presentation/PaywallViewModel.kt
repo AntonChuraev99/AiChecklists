@@ -6,6 +6,9 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavRoute
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDefaults
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigKeys
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
 import com.antonchuraev.homesearchchecklist.feature.paywall.data.PaywallConfig
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.ConversionEventHelper
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallException
@@ -30,6 +33,7 @@ class PaywallViewModel(
     private val purchaseProductUseCase: PurchaseProductUseCase,
     private val restorePurchasesUseCase: RestorePurchasesUseCase,
     private val analyticsTracker: AnalyticsTracker,
+    private val remoteConfigProvider: RemoteConfigProvider,
     sourceOverride: String? = null
 ) : AppViewModel<PaywallState, PaywallIntent, Nothing>() {
 
@@ -40,8 +44,34 @@ class PaywallViewModel(
     private val _screenState = MutableStateFlow(PaywallState(source = source))
     override val screenState: StateFlow<PaywallState> = _screenState.asStateFlow()
 
+    // Maps raw string to PaywallVariant enum; forceVariant (from debug/nav arg) overrides RC.
+    private fun parseVariant(raw: String?): PaywallVariant = when (raw) {
+        "timeline", "timeline_v1" -> PaywallVariant.Timeline
+        "features", "features_v1" -> PaywallVariant.Features
+        "compare", "compare_v1"   -> PaywallVariant.Compare
+        else -> PaywallVariant.Timeline  // safe default
+    }
+
+    // Product IDs aligned with Google Play subscription_id:base_plan_id format.
+    private fun productIdForPlan(plan: PaywallPlan): String = when (plan) {
+        PaywallPlan.Yearly  -> "premium_yearly:main-20"
+        PaywallPlan.Monthly -> "premium_monthly:monthly"
+    }
+
     init {
-        analyticsTracker.event("paywall_opened", mapOf("source" to source))
+        // Resolve variant: forceVariant nav-arg takes priority over Remote Config
+        val forceVariant = savedStateHandle[AppNavRoute.Paywall::forceVariant.name] as? String
+        val rcVariant = remoteConfigProvider.getString(
+            key = RemoteConfigKeys.PAYWALL_VARIANT,
+            defaultValue = RemoteConfigDefaults.PAYWALL_VARIANT,
+        )
+        val resolvedVariant = parseVariant(forceVariant ?: rcVariant)
+        _screenState.update { it.copy(variant = resolvedVariant) }
+
+        analyticsTracker.event(
+            "paywall_opened",
+            mapOf("source" to source, "variant" to resolvedVariant.name),
+        )
         loadProducts()
     }
 
@@ -55,6 +85,16 @@ class PaywallViewModel(
             PaywallIntent.Close -> {
                 analyticsTracker.event("paywall_closed", mapOf("source" to source))
                 navigator.onBack()
+            }
+            is PaywallIntent.SelectPlan -> {
+                _screenState.update { it.copy(selectedPlan = intent.plan) }
+                analyticsTracker.event(
+                    "plan_selected",
+                    mapOf(
+                        "variant" to _screenState.value.variant.name,
+                        "plan"    to intent.plan.name,
+                    ),
+                )
             }
         }
     }
@@ -130,14 +170,39 @@ class PaywallViewModel(
     }
 
     private fun purchase() {
-        val selectedProduct = _screenState.value.products
-            .find { it.id == _screenState.value.selectedProductId }
-            ?: return
+        val currentState = _screenState.value
+        val targetProductId = productIdForPlan(currentState.selectedPlan)
+        val selectedProduct = currentState.products.find { it.id == targetProductId }
+        if (selectedProduct == null) {
+            // Expected product missing from offering — show error instead of silently
+            // buying a different product (compliance: user paid based on shown price).
+            analyticsTracker.event(
+                "purchase_product_not_found",
+                mapOf(
+                    "source"                to source,
+                    "selected_plan"         to currentState.selectedPlan.name,
+                    "expected_product_id"   to targetProductId,
+                    "available_product_ids" to currentState.products.joinToString(",") { it.id },
+                ),
+            )
+            viewModelScope.launch {
+                val errorMessage = getString(Res.string.paywall_load_error)
+                _screenState.update {
+                    it.copy(isPurchasing = false, error = errorMessage)
+                }
+            }
+            return
+        }
 
-        analyticsTracker.event("purchase_button_clicked", mapOf(
-            "source" to source,
-            "product_id" to selectedProduct.id
-        ))
+        analyticsTracker.event(
+            "purchase_button_clicked",
+            mapOf(
+                "source"        to source,
+                "product_id"    to selectedProduct.id,
+                "variant"       to currentState.variant.name,
+                "selected_plan" to currentState.selectedPlan.name,
+            ),
+        )
 
         viewModelScope.launch {
             _screenState.update { it.copy(isPurchasing = true, error = null) }

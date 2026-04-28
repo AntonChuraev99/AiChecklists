@@ -5,6 +5,10 @@ data class PaywallProduct(
     val title: String,
     val description: String,
     val priceString: String,
+    /** Numeric price in the product's currency (e.g. 20.0 for "$20.00"). Used for savings % calculation. */
+    val priceAmount: Double = 0.0,
+    /** ISO 4217 currency code (e.g. "USD"). Used for cross-currency consistency checks. */
+    val priceCurrencyCode: String = "",
     val periodString: String?,
     val packageId: String,
     val isPopular: Boolean = false,

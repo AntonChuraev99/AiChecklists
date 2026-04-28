@@ -1,581 +1,637 @@
 package com.antonchuraev.homesearchchecklist.feature.paywall.presentation
 
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material.icons.filled.AllInclusive
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.WorkspacePremium
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Snackbar
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
-import aichecklists.core.designsystem.generated.resources.*
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.wrapContentHeight
+import aichecklists.core.designsystem.generated.resources.paywall_privacy
+import aichecklists.core.designsystem.generated.resources.paywall_restore
+import aichecklists.core.designsystem.generated.resources.paywall_support
+import aichecklists.core.designsystem.generated.resources.paywall_terms
+import aichecklists.core.designsystem.generated.resources.paywall_v1_best_value_badge
+import aichecklists.core.designsystem.generated.resources.paywall_v1_billed_monthly
+import aichecklists.core.designsystem.generated.resources.paywall_v1_billed_annually_subtitle
+import aichecklists.core.designsystem.generated.resources.paywall_v1_close_cd
+import aichecklists.core.designsystem.generated.resources.paywall_v1_compare_body
+import aichecklists.core.designsystem.generated.resources.paywall_v1_compare_feature
+import aichecklists.core.designsystem.generated.resources.paywall_v1_compare_free
+import aichecklists.core.designsystem.generated.resources.paywall_v1_compare_headline
+import aichecklists.core.designsystem.generated.resources.paywall_v1_compare_pro
+import aichecklists.core.designsystem.generated.resources.paywall_v1_compare_row_ai_checklists
+import aichecklists.core.designsystem.generated.resources.paywall_v1_compare_row_pdf_link
+import aichecklists.core.designsystem.generated.resources.paywall_v1_compare_row_photo
+import aichecklists.core.designsystem.generated.resources.paywall_v1_compare_row_priority_ai
+import aichecklists.core.designsystem.generated.resources.paywall_v1_compare_row_reminders
+import aichecklists.core.designsystem.generated.resources.paywall_v1_compare_row_voice
+import aichecklists.core.designsystem.generated.resources.paywall_v1_cta_sub_monthly
+import aichecklists.core.designsystem.generated.resources.paywall_v1_cta_sub_yearly
+import aichecklists.core.designsystem.generated.resources.paywall_v1_cta_start_trial
+import aichecklists.core.designsystem.generated.resources.paywall_v1_feature_ai_runs_body
+import aichecklists.core.designsystem.generated.resources.paywall_v1_feature_ai_runs_title
+import aichecklists.core.designsystem.generated.resources.paywall_v1_feature_link_body
+import aichecklists.core.designsystem.generated.resources.paywall_v1_feature_link_title
+import aichecklists.core.designsystem.generated.resources.paywall_v1_feature_pdf_body
+import aichecklists.core.designsystem.generated.resources.paywall_v1_feature_pdf_title
+import aichecklists.core.designsystem.generated.resources.paywall_v1_feature_photo_body
+import aichecklists.core.designsystem.generated.resources.paywall_v1_feature_photo_title
+import aichecklists.core.designsystem.generated.resources.paywall_v1_feature_voice_body
+import aichecklists.core.designsystem.generated.resources.paywall_v1_feature_voice_title
+import aichecklists.core.designsystem.generated.resources.paywall_v1_features_body
+import aichecklists.core.designsystem.generated.resources.paywall_v1_features_headline
+import aichecklists.core.designsystem.generated.resources.paywall_v1_how_trial_works
+import aichecklists.core.designsystem.generated.resources.paywall_v1_monthly_label
+import aichecklists.core.designsystem.generated.resources.paywall_v1_restore_action
+import aichecklists.core.designsystem.generated.resources.paywall_v1_timeline_body
+import aichecklists.core.designsystem.generated.resources.paywall_v1_timeline_headline
+import aichecklists.core.designsystem.generated.resources.paywall_v1_timeline_days_free
+import aichecklists.core.designsystem.generated.resources.paywall_v1_yearly_label
+import aichecklists.core.designsystem.generated.resources.paywall_trial_terms_monthly
+import aichecklists.core.designsystem.generated.resources.paywall_trial_terms_yearly
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
-import com.antonchuraev.homesearchchecklist.desingsystem.illustrations.CreateViaAiIllustration
-import com.antonchuraev.homesearchchecklist.desingsystem.illustrations.FillViaAiIllustration
-import com.antonchuraev.homesearchchecklist.desingsystem.illustrations.ExportShareIllustration
-import com.antonchuraev.homesearchchecklist.desingsystem.sharedUI.TrialTimeline
-import com.antonchuraev.homesearchchecklist.feature.paywall.data.PaywallConfig
-import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallProduct
-import org.jetbrains.compose.resources.StringResource
+import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.components.FeatureRow
+import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.components.HeroIllustration
+import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.components.PaywallTrialTimeline
+import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.components.PlanRow
 import org.jetbrains.compose.resources.stringResource
-import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
-import org.koin.compose.koinInject
-import org.koin.compose.viewmodel.koinViewModel
 
-
-
-
-private data class PaywallPage(
-    val titleRes: StringResource,
-    val descriptionRes: StringResource,
-    val illustration: @Composable () -> Unit
-)
-
-@OptIn(ExperimentalFoundationApi::class)
+/**
+ * PaywallScreen — three layout variants behind a single entry point.
+ *
+ * Layout: Scaffold + scrollable body + sticky bottom CTA.
+ * Compliance: ctaSubtext includes "Auto-renews", trial disclosure is visible
+ * in body, footer links (Terms / Privacy / Restore / Support) always rendered.
+ *
+ * @param state         Display state from PaywallUiState (pricing, plan, variant)
+ * @param onPlanSelected Called when user taps a plan row
+ * @param onStartTrial  Called when user taps the CTA button
+ * @param onClose       Called when user taps the X icon
+ * @param onRestore     Called when user taps Restore (top bar or footer)
+ * @param onTermsClick  Called when user taps Terms of Use footer
+ * @param onPrivacyClick Called when user taps Privacy Policy footer
+ * @param onSupportClick Called when user taps Support footer
+ * @param showHeroIllustration Toggle hero illustration at the top
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PaywallScreen(
-    viewModel: PaywallViewModel = koinViewModel(),
-    onPurchaseSuccess: () -> Unit = {}
-) {
-    val analyticsTracker: AnalyticsTracker = koinInject()
-    LaunchedEffect(Unit) { analyticsTracker.screenView("paywall") }
-
-    val state by viewModel.screenState.collectAsState()
-    val uriHandler = LocalUriHandler.current
-
-    LaunchedEffect(state.purchaseSuccess) {
-        if (state.purchaseSuccess) {
-            onPurchaseSuccess()
-        }
-    }
-
-    // Same pages as onboarding
-    val pages = listOf(
-        PaywallPage(
-            titleRes = Res.string.onboarding_page1_title,
-            descriptionRes = Res.string.onboarding_page1_description,
-            illustration = { CreateViaAiIllustration() }
-        ),
-        PaywallPage(
-            titleRes = Res.string.onboarding_page2_title,
-            descriptionRes = Res.string.onboarding_page2_description,
-            illustration = { FillViaAiIllustration() }
-        ),
-        PaywallPage(
-            titleRes = Res.string.onboarding_page3_title,
-            descriptionRes = Res.string.onboarding_page3_description,
-            illustration = { ExportShareIllustration() }
-        )
-    )
-
-    val pagerState = rememberPagerState(
-        initialPage = 0,
-        pageCount = { pages.size }
-    )
-
-    // Rapid-tap guard: Skip fires navigator.onBack(); two taps within ~50ms
-    // would pop twice and escape the backstack past Main, rendering blank.
-    // remember resets on re-entry, so the next visit still works.
-    var skipConsumed by remember { mutableStateOf(false) }
-
-    // Track page swipes
-    var previousPage by remember { mutableStateOf(pagerState.settledPage) }
-    LaunchedEffect(pagerState.settledPage) {
-        if (pagerState.settledPage != previousPage) {
-            analyticsTracker.event("paywall_page_swiped", mapOf(
-                "source" to state.source,
-                "from_page" to previousPage,
-                "to_page" to pagerState.settledPage
-            ))
-            previousPage = pagerState.settledPage
-        }
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-    ) {
-        Column(
-            modifier = Modifier.fillMaxSize()
-        ) {
-            // Top section with close button and pager
-            // Skip button row (same style as OnboardingScreen)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .statusBarsPadding()
-                    .padding(top = AppDimens.SpacingSm, end = AppDimens.ScreenPaddingHorizontal),
-                horizontalArrangement = Arrangement.End
-            ) {
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(AppDimens.SpacingSm))
-                        .clickable {
-                            if (skipConsumed) return@clickable
-                            skipConsumed = true
-                            viewModel.sendIntent(PaywallIntent.Close)
-                        }
-                        .padding(AppDimens.SpacingSm),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = stringResource(Res.string.onboarding_skip),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            // Pager with illustrations
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier
-                    .weight(1F)
-                    .fillMaxWidth()
-            ) { pageIndex ->
-                PaywallPageContent(
-                    page = pages[pageIndex],
-                    modifier = Modifier
-                )
-            }
-
-            // Page indicators
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = AppDimens.SpacingLg),
-                horizontalArrangement = Arrangement.Center
-            ) {
-                repeat(pages.size) { index ->
-                    PageIndicator(
-                        isSelected = index == pagerState.currentPage,
-                        modifier = Modifier.padding(horizontal = 4.dp)
-                    )
-                }
-            }
-
-            // Bottom subscription card
-            val product = state.products.firstOrNull()
-            SubscriptionCard(
-                product = product,
-                isLoading = state.isLoading,
-                isPurchasing = state.isPurchasing,
-                onSubscribe = { viewModel.sendIntent(PaywallIntent.Purchase) },
-                onRetry = { viewModel.sendIntent(PaywallIntent.LoadProducts) },
-                onRestore = { viewModel.sendIntent(PaywallIntent.RestorePurchases) },
-                onTermsClick = {
-                    analyticsTracker.event("paywall_terms_clicked", mapOf("source" to state.source))
-                    uriHandler.openUri(PaywallConfig.TERMS_OF_USE_URL)
-                },
-                onPrivacyClick = {
-                    analyticsTracker.event("paywall_privacy_clicked", mapOf("source" to state.source))
-                    uriHandler.openUri(PaywallConfig.PRIVACY_POLICY_URL)
-                },
-                onSupportClick = {
-                    analyticsTracker.event("paywall_support_clicked", mapOf("source" to state.source))
-                    uriHandler.openUri("mailto:${PaywallConfig.SUPPORT_EMAIL}")
-                }
-            )
-        }
-
-        // Error snackbar
-        state.error?.let { error ->
-            Snackbar(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(AppDimens.SpacingLg)
-                    .navigationBarsPadding(),
-                action = {
-                    TextButton(onClick = {
-                        viewModel.sendIntent(PaywallIntent.DismissError)
-                        viewModel.sendIntent(PaywallIntent.LoadProducts)
-                    }) {
-                        Text(stringResource(Res.string.paywall_retry))
-                    }
-                },
-                dismissAction = {
-                    TextButton(onClick = { viewModel.sendIntent(PaywallIntent.DismissError) }) {
-                        Text(stringResource(Res.string.ok))
-                    }
-                }
-            ) {
-                Text(error)
-            }
-        }
-    }
-}
-
-@Composable
-private fun PaywallPageContent(
-    page: PaywallPage,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier.padding(horizontal = AppDimens.ScreenPaddingHorizontal),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        // Illustration container
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(24.dp))
-                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)),
-            contentAlignment = Alignment.Center
-        ) {
-            page.illustration()
-        }
-
-        Spacer(modifier = Modifier.height(AppDimens.SpacingLg))
-
-        // Title
-        Text(
-            text = stringResource(page.titleRes),
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
-
-        // Description
-        Text(
-            text = stringResource(page.descriptionRes),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(AppDimens.SpacingLg))
-    }
-}
-
-@Composable
-private fun PageIndicator(
-    isSelected: Boolean,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .size(if (isSelected) 10.dp else 8.dp)
-            .clip(CircleShape)
-            .background(
-                if (isSelected) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-                }
-            )
-    )
-}
-
-@Composable
-private fun ColumnScope.SubscriptionCard(
-    product: PaywallProduct?,
-    isLoading: Boolean,
-    isPurchasing: Boolean,
-    onSubscribe: () -> Unit,
-    onRetry: () -> Unit,
+internal fun PaywallScreen(
+    state: PaywallUiState,
+    onPlanSelected: (PaywallPlan) -> Unit,
+    onStartTrial: () -> Unit,
+    onClose: () -> Unit,
     onRestore: () -> Unit,
     onTermsClick: () -> Unit,
     onPrivacyClick: () -> Unit,
-    onSupportClick: () -> Unit
+    onSupportClick: () -> Unit,
+    showHeroIllustration: Boolean = true,
 ) {
-    val primaryColor = MaterialTheme.colorScheme.primary
-    val primaryContainerColor = MaterialTheme.colorScheme.primaryContainer
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.surface,
+        topBar = {
+            CenterAlignedTopAppBar(
+                title = {},
+                navigationIcon = {
+                    IconButton(onClick = onClose) {
+                        Icon(
+                            Icons.Filled.Close,
+                            contentDescription = stringResource(Res.string.paywall_v1_close_cd),
+                        )
+                    }
+                },
+                actions = {
+                    TextButton(onClick = onRestore) {
+                        Text(
+                            stringResource(Res.string.paywall_v1_restore_action),
+                            style = MaterialTheme.typography.labelLarge,
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                ),
+            )
+        },
+        bottomBar = {
+            val ctaSub = when (state.selectedPlan) {
+                PaywallPlan.Yearly  -> stringResource(Res.string.paywall_v1_cta_sub_yearly, state.yearlyPrice)
+                PaywallPlan.Monthly -> stringResource(Res.string.paywall_v1_cta_sub_monthly, state.monthlyPrice)
+            }
+            StickyCta(
+                ctaLabel = stringResource(Res.string.paywall_v1_cta_start_trial, state.trialDays),
+                sub = ctaSub,
+                onClick = onStartTrial,
+            )
+        },
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = AppDimens.ScreenPaddingHorizontal),
+        ) {
+            when (state.variant) {
+                PaywallVariant.Timeline -> TimelineBody(state, onPlanSelected, showHeroIllustration)
+                PaywallVariant.Features -> FeaturesBody(state, onPlanSelected, showHeroIllustration)
+                PaywallVariant.Compare  -> CompareBody(state, onPlanSelected, showHeroIllustration)
+            }
+
+            // ─── Compliance disclosure ─────────────────────────────────────
+            Spacer(Modifier.height(AppDimens.SpacingMd))
+            val trialTerms = when (state.selectedPlan) {
+                PaywallPlan.Yearly  -> stringResource(
+                    Res.string.paywall_trial_terms_yearly,
+                    state.trialDays,
+                    state.yearlyPrice,
+                )
+                PaywallPlan.Monthly -> stringResource(
+                    Res.string.paywall_trial_terms_monthly,
+                    state.trialDays,
+                    state.monthlyPrice,
+                )
+            }
+            Text(
+                text = trialTerms,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            // ─── Footer links ──────────────────────────────────────────────
+            Spacer(Modifier.height(AppDimens.SpacingXs))
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalArrangement = Arrangement.spacedBy(0.dp),
+            ) {
+                TextButton(
+                    onClick = onTermsClick,
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+                    modifier = Modifier.heightIn(min = 28.dp),
+                ) {
+                    Text(
+                        text = stringResource(Res.string.paywall_terms),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                TextButton(
+                    onClick = onPrivacyClick,
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+                    modifier = Modifier.heightIn(min = 28.dp),
+                ) {
+                    Text(
+                        text = stringResource(Res.string.paywall_privacy),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                TextButton(
+                    onClick = onRestore,
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+                    modifier = Modifier.heightIn(min = 28.dp),
+                ) {
+                    Text(
+                        text = stringResource(Res.string.paywall_restore),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                TextButton(
+                    onClick = onSupportClick,
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+                    modifier = Modifier.heightIn(min = 28.dp),
+                ) {
+                    Text(
+                        text = stringResource(Res.string.paywall_support),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(AppDimens.SpacingLg))
+        }
+    }
+}
+
+// ─── Sticky bottom CTA ────────────────────────────────────────────────────────
+
+@Composable
+private fun StickyCta(ctaLabel: String, sub: String, onClick: () -> Unit) {
+    Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
+        Column {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Column(
+                modifier = Modifier.padding(
+                    start = AppDimens.SpacingLg,
+                    end = AppDimens.SpacingLg,
+                    top = AppDimens.SpacingMd,
+                    bottom = AppDimens.SpacingLg,
+                ),
+            ) {
+                AppButton(
+                    text = ctaLabel,
+                    onClick = onClick,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.large,
+                )
+                Spacer(Modifier.height(AppDimens.SpacingSm))
+                Text(
+                    text = sub,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center,
+                    minLines = 2,
+                    maxLines = 2,
+                )
+            }
+        }
+    }
+}
+
+// ─── Plans block — reused by all three variants ───────────────────────────────
+
+@Composable
+private fun PlansBlock(
+    state: PaywallUiState,
+    onPlanSelected: (PaywallPlan) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)) {
+        PlanRow(
+            label    = stringResource(Res.string.paywall_v1_yearly_label),
+            price    = state.yearlyPrice,
+            sub      = stringResource(Res.string.paywall_v1_billed_annually_subtitle),
+            badge    = stringResource(Res.string.paywall_v1_best_value_badge),
+            savings  = state.yearlySavings,
+            selected = state.selectedPlan == PaywallPlan.Yearly,
+            onClick  = { onPlanSelected(PaywallPlan.Yearly) },
+        )
+        PlanRow(
+            label    = stringResource(Res.string.paywall_v1_monthly_label),
+            price    = state.monthlyPrice,
+            sub      = stringResource(Res.string.paywall_v1_billed_monthly),
+            selected = state.selectedPlan == PaywallPlan.Monthly,
+            onClick  = { onPlanSelected(PaywallPlan.Monthly) },
+        )
+    }
+}
+
+// ─── Variant A — Trial timeline focus ─────────────────────────────────────────
+
+@Composable
+private fun TimelineBody(
+    state: PaywallUiState,
+    onPlanSelected: (PaywallPlan) -> Unit,
+    showHero: Boolean,
+) {
+    val cs = MaterialTheme.colorScheme
+
+    if (showHero) HeroIllustration()
+    Spacer(Modifier.height(AppDimens.SpacingMd))
+
+    // Trial pill + headline
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Surface(
+            shape = RoundedCornerShape(999.dp),
+            color = cs.tertiaryContainer,
+        ) {
+            Row(
+                modifier = Modifier.padding(
+                    horizontal = AppDimens.SpacingMd,
+                    vertical = AppDimens.SpacingXs,
+                ),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Icon(
+                    Icons.Filled.Bolt,
+                    contentDescription = null,
+                    tint = cs.tertiary,
+                    modifier = Modifier.size(14.dp),
+                )
+                Text(
+                    stringResource(Res.string.paywall_v1_timeline_days_free, state.trialDays),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = cs.tertiary,
+                )
+            }
+        }
+        Spacer(Modifier.height(AppDimens.SpacingMd))
+        Text(
+            text = stringResource(Res.string.paywall_v1_timeline_headline),
+            style = MaterialTheme.typography.headlineMedium,
+            color = cs.onSurface,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(AppDimens.SpacingSm))
+        Text(
+            text = stringResource(Res.string.paywall_v1_timeline_body),
+            style = MaterialTheme.typography.bodyMedium,
+            color = cs.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.widthIn(max = 280.dp),
+        )
+    }
+    Spacer(Modifier.height(AppDimens.SpacingXl))
+
+    AppCard {
+        Column {
+            Text(
+                text = stringResource(Res.string.paywall_v1_how_trial_works),
+                style = MaterialTheme.typography.titleSmall,
+                color = cs.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(AppDimens.SpacingMd))
+            PaywallTrialTimeline()
+        }
+    }
+    Spacer(Modifier.height(AppDimens.SpacingLg))
+
+    PlansBlock(state, onPlanSelected)
+}
+
+// ─── Variant B — Feature grid ─────────────────────────────────────────────────
+
+@Composable
+private fun FeaturesBody(
+    state: PaywallUiState,
+    onPlanSelected: (PaywallPlan) -> Unit,
+    showHero: Boolean,
+) {
+    val cs = MaterialTheme.colorScheme
 
     Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        if (showHero) HeroIllustration()
+        Spacer(Modifier.height(AppDimens.SpacingSm))
+        Text(
+            text = stringResource(Res.string.paywall_v1_features_headline, state.trialDays),
+            style = MaterialTheme.typography.headlineMedium,
+            color = cs.onSurface,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(AppDimens.SpacingSm))
+        Text(
+            text = stringResource(Res.string.paywall_v1_features_body),
+            style = MaterialTheme.typography.bodyMedium,
+            color = cs.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.widthIn(max = 290.dp),
+        )
+    }
+    Spacer(Modifier.height(AppDimens.SpacingLg))
+
+    AppCard {
+        Column(verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)) {
+            FeatureRow(
+                icon = Icons.Filled.PhotoCamera,
+                title = stringResource(Res.string.paywall_v1_feature_photo_title),
+                body = stringResource(Res.string.paywall_v1_feature_photo_body),
+                accentBg = cs.primaryContainer,
+            )
+            FeatureRow(
+                icon = Icons.Filled.Mic,
+                title = stringResource(Res.string.paywall_v1_feature_voice_title),
+                body = stringResource(Res.string.paywall_v1_feature_voice_body),
+                accentBg = cs.tertiaryContainer,
+            )
+            FeatureRow(
+                icon = Icons.Filled.PictureAsPdf,
+                title = stringResource(Res.string.paywall_v1_feature_pdf_title),
+                body = stringResource(Res.string.paywall_v1_feature_pdf_body),
+                accentBg = cs.secondaryContainer,
+            )
+            FeatureRow(
+                icon = Icons.Filled.Link,
+                title = stringResource(Res.string.paywall_v1_feature_link_title),
+                body = stringResource(Res.string.paywall_v1_feature_link_body),
+                accentBg = cs.primaryContainer,
+            )
+            FeatureRow(
+                icon = Icons.Filled.AllInclusive,
+                title = stringResource(Res.string.paywall_v1_feature_ai_runs_title),
+                body = stringResource(Res.string.paywall_v1_feature_ai_runs_body),
+                accentBg = cs.tertiaryContainer,
+            )
+            // Sync removed — mobile-only product, no cross-device sync exists
+        }
+    }
+    Spacer(Modifier.height(AppDimens.SpacingLg))
+
+    PlansBlock(state, onPlanSelected)
+}
+
+// ─── Variant C — Comparison table ─────────────────────────────────────────────
+
+private data class CompareRowData(val label: String, val free: Any, val pro: Any)
+
+@Composable
+private fun CompareBody(
+    state: PaywallUiState,
+    onPlanSelected: (PaywallPlan) -> Unit,
+    showHero: Boolean,
+) {
+    val cs = MaterialTheme.colorScheme
+
+    val rows = listOf(
+        // Free limit: 10/day, Pro limit: 300/day (per RemoteConfig: AI_DAILY_LIMIT_FREE=10, AI_DAILY_LIMIT_PREMIUM=300)
+        CompareRowData(stringResource(Res.string.paywall_v1_compare_row_ai_checklists), "10", "300"),
+        CompareRowData(stringResource(Res.string.paywall_v1_compare_row_photo),       true,  true),
+        CompareRowData(stringResource(Res.string.paywall_v1_compare_row_voice),       false, true),
+        CompareRowData(stringResource(Res.string.paywall_v1_compare_row_pdf_link),    false, true),
+        CompareRowData(stringResource(Res.string.paywall_v1_compare_row_reminders),   false, true),
+        // Sync row removed — no cross-device sync in product
+        CompareRowData(stringResource(Res.string.paywall_v1_compare_row_priority_ai), false, true),
+    )
+
+    if (showHero) HeroIllustration()
+    Spacer(Modifier.height(AppDimens.SpacingMd))
+
+    Text(
+        text = stringResource(Res.string.paywall_v1_compare_headline),
+        style = MaterialTheme.typography.headlineMedium,
+        color = cs.onSurface,
+    )
+    Spacer(Modifier.height(AppDimens.SpacingSm))
+    Text(
+        text = stringResource(Res.string.paywall_v1_compare_body, state.trialDays),
+        style = MaterialTheme.typography.bodyMedium,
+        color = cs.onSurfaceVariant,
+    )
+    Spacer(Modifier.height(AppDimens.SpacingLg))
+
+    // zero contentPadding so CompareGrid rows touch the card edges
+    AppCard(contentPadding = PaddingValues(0.dp)) {
+        Column(modifier = Modifier.padding(AppDimens.SpacingMd)) {
+            // Header row
+            CompareGrid(
+                feature = {
+                    Text(
+                        stringResource(Res.string.paywall_v1_compare_feature),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = cs.onSurfaceVariant,
+                    )
+                },
+                free = {
+                    Text(
+                        stringResource(Res.string.paywall_v1_compare_free),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = cs.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                    )
+                },
+                pro = {
+                    Surface(shape = RoundedCornerShape(8.dp), color = cs.primary) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center,
+                        ) {
+                            Icon(
+                                Icons.Filled.WorkspacePremium,
+                                contentDescription = null,
+                                tint = cs.onPrimary,
+                                modifier = Modifier.size(14.dp),
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                stringResource(Res.string.paywall_v1_compare_pro),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = cs.onPrimary,
+                            )
+                        }
+                    }
+                },
+            )
+            HorizontalDivider(color = cs.outlineVariant)
+
+            rows.forEachIndexed { i, r ->
+                CompareGrid(
+                    verticalPad = 12,
+                    feature = {
+                        Text(r.label, style = MaterialTheme.typography.bodyMedium, color = cs.onSurface)
+                    },
+                    free = {
+                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            CompareCell(r.free, isPro = false)
+                        }
+                    },
+                    pro = {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .padding(vertical = 4.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            CompareCell(r.pro, isPro = true)
+                        }
+                    },
+                )
+                if (i != rows.lastIndex) HorizontalDivider(color = cs.outlineVariant)
+            }
+        }
+    }
+    Spacer(Modifier.height(AppDimens.SpacingLg))
+
+    PlansBlock(state, onPlanSelected)
+}
+
+/**
+ * 1fr | 72dp | 88dp three-column row used by the comparison table.
+ */
+@Composable
+private fun CompareGrid(
+    verticalPad: Int = 8,
+    feature: @Composable () -> Unit,
+    free: @Composable () -> Unit,
+    pro: @Composable () -> Unit,
+) {
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
-            .background(primaryContainerColor.copy(alpha = 0.3f))
-            .padding(horizontal = 24.dp)
-            .padding(top = 8.dp, bottom = 8.dp)
-            .navigationBarsPadding()
-            .wrapContentHeight()
-        ,
-        horizontalAlignment = Alignment.CenterHorizontally
+            .padding(vertical = verticalPad.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        // Fixed height container for content to prevent layout jumps
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(),
-            contentAlignment = Alignment.Center
-        ) {
-            when {
-                isLoading -> {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(40.dp),
-                        color = primaryColor
-                    )
-                }
-                product != null -> {
-                    SubscriptionContent(
-                        product = product,
-                        isPurchasing = isPurchasing,
-                        onSubscribe = onSubscribe,
-                        primaryColor = primaryColor
-                    )
-                }
-                else -> {
-                    // Products failed to load
-                    LoadingErrorContent(
-                        onRetry = onRetry,
-                        primaryColor = primaryColor
-                    )
-                }
-            }
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        // Footer links - more compact
-        FlowRow(
-            modifier = Modifier
-                .fillMaxWidth()
-                .wrapContentHeight()
-            ,
-            horizontalArrangement = Arrangement.Center,
-            verticalArrangement = Arrangement.Center,
-            itemVerticalAlignment = Alignment.CenterVertically
-        ) {
-            TextButton(
-                onClick = onTermsClick,
-                contentPadding = PaddingValues(horizontal = 6.dp),
-                modifier = Modifier.height(25.dp)
-            ) {
-                Text(
-                    text = stringResource(Res.string.paywall_terms),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            TextButton(
-                onClick = onPrivacyClick,
-                contentPadding = PaddingValues(horizontal = 6.dp),
-                modifier = Modifier.height(25.dp)
-            ) {
-                Text(
-                    text = stringResource(Res.string.paywall_privacy),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            TextButton(
-                onClick = onRestore,
-                contentPadding = PaddingValues(horizontal = 6.dp),
-                modifier = Modifier.height(25.dp)
-            ) {
-                Text(
-                    text = stringResource(Res.string.paywall_restore),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-
-            TextButton(
-                onClick = onSupportClick,
-                contentPadding = PaddingValues(horizontal = 6.dp),
-                modifier = Modifier.height(25.dp)
-            ) {
-                Text(
-                    text = stringResource(Res.string.paywall_support),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
+        Box(Modifier.weight(1f))    { feature() }
+        Box(Modifier.width(72.dp))  { free() }
+        Box(Modifier.width(88.dp))  { pro() }
     }
 }
 
 @Composable
-private fun LoadingErrorContent(
-    onRetry: () -> Unit,
-    primaryColor: Color
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = stringResource(Res.string.paywall_load_error),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(AppDimens.SpacingLg))
-
-        Button(
-            onClick = onRetry,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp),
-            shape = RoundedCornerShape(26.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = primaryColor,
-                contentColor = Color.White
+private fun CompareCell(value: Any, isPro: Boolean) {
+    val cs = MaterialTheme.colorScheme
+    when (value) {
+        is Boolean -> if (value) {
+            Icon(
+                Icons.Filled.CheckCircle,
+                contentDescription = null,
+                tint = if (isPro) cs.primary else cs.tertiary,
             )
-        ) {
-            Text(
-                text = stringResource(Res.string.paywall_retry),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
+        } else {
+            Icon(Icons.Filled.Remove, contentDescription = null, tint = cs.outline)
         }
+        is String -> Text(
+            value,
+            style = MaterialTheme.typography.labelLarge,
+            color = if (isPro) cs.primary else cs.onSurfaceVariant,
+            fontWeight = if (isPro) FontWeight.Medium else FontWeight.Normal,
+        )
     }
 }
-
-@Composable
-private fun SubscriptionContent(
-    product: PaywallProduct,
-    isPurchasing: Boolean,
-    onSubscribe: () -> Unit,
-    primaryColor: Color
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        // Main headline
-        Text(
-            text = if (product.hasFreeTrial) {
-                stringResource(Res.string.paywall_days_free, product.freeTrialDays)
-            } else {
-                stringResource(Res.string.paywall_go_premium)
-            },
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = primaryColor,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(modifier = Modifier.height(6.dp))
-
-        Text(
-            text = stringResource(Res.string.paywall_then_price, product.priceString),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(modifier = Modifier.height(6.dp))
-
-        // Trial Timeline (Blinkist style)
-        if (product.hasFreeTrial) {
-            TrialTimeline(
-                trialDays = product.freeTrialDays,
-                priceString = product.priceString,
-                primaryColor = primaryColor
-            )
-        }
-
-        // CTA Button
-        Button(
-            onClick = onSubscribe,
-            enabled = !isPurchasing,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp),
-            shape = RoundedCornerShape(26.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = primaryColor,
-                contentColor = Color.White,
-                disabledContainerColor = primaryColor.copy(alpha = 0.5f)
-            )
-        ) {
-            if (isPurchasing) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(22.dp),
-                    color = Color.White,
-                    strokeWidth = 2.dp
-                )
-            } else {
-                Text(
-                    text = if (product.hasFreeTrial) {
-                        stringResource(Res.string.paywall_start_free_trial)
-                    } else {
-                        stringResource(Res.string.paywall_subscribe_now)
-                    },
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(6.dp))
-
-        // Subscription disclosure (required by Google Play policy)
-        if (product.hasFreeTrial) {
-            Text(
-                text = stringResource(
-                    Res.string.paywall_trial_terms,
-                    product.freeTrialDays,
-                    product.priceString
-                ),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-    }
-}
-

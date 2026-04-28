@@ -54,7 +54,7 @@
     <string name="onboarding_interactive_template_subtitle">Pick your starting point</string>
     <string name="onboarding_interactive_template_items_count">%1$d items</string>
     <string name="onboarding_interactive_customize_title">Make it yours</string>
-    <string name="onboarding_interactive_customize_subtitle">Toggle off what you don\'t need</string>
+    <string name="onboarding_interactive_customize_subtitle">Toggle off what you don't need</string>
     <string name="onboarding_interactive_customize_continue">Continue</string>
     <string name="onboarding_interactive_creating_title">Creating your checklist…</string>
     <string name="onboarding_interactive_creating_social">12,000+ checklists created with Gisti</string>
@@ -188,7 +188,7 @@
     <string name="analyze_select_photo">Choose Photo</string>
     <string name="analyze_select_pdf">Choose PDF</string>
     <string name="analyze_select_file">Choose File</string>
-    <string name="analyze_result_title">Here\'s your checklist!</string>
+    <string name="analyze_result_title">Here's your checklist!</string>
     <string name="analyze_items_found">Items extracted:</string>
     <string name="analyze_and_more">... and %1$d more</string>
     <string name="analyze_checklist_name_label">Checklist name</string>
@@ -295,10 +295,10 @@
 
     <!-- Limits -->
     <string name="limit_reached_title">Checklist Limit Reached</string>
-    <string name="limit_reached_message">You\'ve reached the maximum of %1$d checklists on the free plan. Upgrade to Premium for unlimited checklists.</string>
+    <string name="limit_reached_message">You've reached the maximum of %1$d checklists on the free plan. Upgrade to Premium for unlimited checklists.</string>
     <string name="limit_upgrade">Upgrade to Premium</string>
     <string name="limit_fill_reached_title">Fill Limit Reached</string>
-    <string name="limit_fill_reached_message">You\'ve reached the maximum of %1$d fills for this checklist. Upgrade to Premium for unlimited fills.</string>
+    <string name="limit_fill_reached_message">You've reached the maximum of %1$d fills for this checklist. Upgrade to Premium for unlimited fills.</string>
     <string name="limit_checklist_count">%1$d/%2$d checklists</string>
     <string name="limit_fill_count">%1$d/%2$d fills</string>
 
@@ -332,7 +332,10 @@
     <string name="paywall_free_trial_badge">%1$d Days Free</string>
     <string name="paywall_start_trial">Start Free Trial</string>
     <string name="paywall_per_month">per month</string>
+    <!-- DEPRECATED: replaced by paywall_trial_terms_yearly / paywall_trial_terms_monthly -->
     <string name="paywall_trial_terms">%1$d-day free trial, then %2$s/month. Auto-renews. Cancel anytime.</string>
+    <string name="paywall_trial_terms_yearly">%1$d-day free trial, then %2$s/year. Auto-renews. Cancel anytime.</string>
+    <string name="paywall_trial_terms_monthly">%1$d-day free trial, then %2$s/month. Auto-renews. Cancel anytime.</string>
     <string name="paywall_no_subscription_found">No active subscription found</string>
     <string name="paywall_days_free">%1$d-Day Free Trial</string>
     <string name="paywall_go_premium">Go Premium</string>
@@ -381,15 +384,15 @@
 
     <!-- Feedback-only sheet -->
     <string name="feedback_only_title">Leave Feedback</string>
-    <string name="feedback_only_description">Tell us what\'s on your mind</string>
+    <string name="feedback_only_description">Tell us what's on your mind</string>
     <string name="feedback_thanks_message">Thanks for feedback!</string>
 
     <!-- CSAT Survey -->
     <string name="csat_title">How do you like Gisti?</string>
     <string name="csat_not_good">Not Good</string>
-    <string name="csat_okay">It\'s Okay</string>
+    <string name="csat_okay">It's Okay</string>
     <string name="csat_love_it">Love It!</string>
-    <string name="csat_whats_the_problem">What\'s the biggest problem?</string>
+    <string name="csat_whats_the_problem">What's the biggest problem?</string>
     <string name="csat_what_could_be_better">What could be better?</string>
     <string name="csat_what_do_you_like">What do you like most?</string>
     <!-- Not Good chips -->
@@ -439,7 +442,7 @@
     <string name="reminder_exact_alarm_step2">Find "Alarms &amp; reminders"</string>
     <string name="reminder_exact_alarm_step3">Toggle ON for Gisti</string>
     <string name="reminder_exact_alarm_description">Without this, reminders may be delayed by a few minutes.</string>
-    <string name="reminder_exact_alarm_dont_show">Don\'t show again</string>
+    <string name="reminder_exact_alarm_dont_show">Don't show again</string>
     <string name="reminder_exact_alarm_open_settings">Open Settings</string>
     <string name="reminder_exact_alarm_skip">Skip</string>
     <string name="reminder_exact_alarm_granted">Precise reminders enabled!</string>
@@ -455,7 +458,7 @@
     <string name="reminder_notification_permission_skip">Not Now</string>
 
     <!-- Repeat types -->
-    <string name="reminder_repeat_none">Don\'t repeat</string>
+    <string name="reminder_repeat_none">Don't repeat</string>
     <string name="reminder_repeat_daily">Every day</string>
     <string name="reminder_repeat_weekly">Every week</string>
     <string name="reminder_repeat_monthly">Every month</string>
@@ -655,8 +658,14 @@
     <string name="debug_catalog_analyze_for_checklist_desc">Analyze linked to first seeded checklist</string>
     <string name="debug_catalog_analyze_result_preview">Analyze Result Preview</string>
     <string name="debug_catalog_analyze_result_preview_desc">Shows empty result preview state</string>
-    <string name="debug_catalog_paywall">Paywall</string>
-    <string name="debug_catalog_paywall_desc">Subscription / trial screen</string>
+    <string name="debug_catalog_paywall">Paywall (RC variant)</string>
+    <string name="debug_catalog_paywall_desc">Subscription / trial screen (variant from Remote Config)</string>
+    <string name="debug_catalog_paywall_timeline">Paywall · Timeline</string>
+    <string name="debug_catalog_paywall_timeline_desc">Force A/B variant: Timeline (3-step trial)</string>
+    <string name="debug_catalog_paywall_features">Paywall · Features</string>
+    <string name="debug_catalog_paywall_features_desc">Force A/B variant: Features grid</string>
+    <string name="debug_catalog_paywall_compare">Paywall · Compare</string>
+    <string name="debug_catalog_paywall_compare_desc">Force A/B variant: Comparison table</string>
     <string name="debug_catalog_subscription_success">Subscription Status (success)</string>
     <string name="debug_catalog_subscription_success_desc">Success confirmation screen</string>
     <string name="debug_catalog_subscription_pending">Subscription Status (pending)</string>
@@ -667,4 +676,78 @@
     <string name="debug_catalog_update_feed_desc">Version changelog / update feed</string>
     <string name="debug_catalog_store_screenshot">Store Screenshot</string>
     <string name="debug_catalog_store_screenshot_desc">Marketing screenshot preview pages</string>
+
+    <!-- Paywall V1 — A/B redesign strings (paywall_v1_*) -->
+    <!-- Top bar actions -->
+    <string name="paywall_v1_close_cd">Close</string>
+    <string name="paywall_v1_restore_action">Restore</string>
+
+    <!-- Trial pill (Variant A) -->
+    <string name="paywall_v1_timeline_days_free">%1$d DAYS FREE</string>
+
+    <!-- Variant A: Timeline headline/body -->
+    <string name="paywall_v1_timeline_headline">Try Gisti Pro,\non the house.</string>
+    <string name="paywall_v1_timeline_body">Turn any photo, voice memo, or PDF into a smart checklist — instantly.</string>
+
+    <!-- Timeline section label -->
+    <string name="paywall_v1_how_trial_works">HOW YOUR TRIAL WORKS</string>
+
+    <!-- Timeline steps -->
+    <string name="paywall_v1_timeline_step1_title">Today</string>
+    <string name="paywall_v1_timeline_step1_body">Unlock Gisti Pro — unlimited AI checklists, voice &amp; PDF input, smart reminders.</string>
+    <string name="paywall_v1_timeline_step2_title">Day 2</string>
+    <string name="paywall_v1_timeline_step2_body">We'll send you a heads-up before your trial ends. Cancel anytime in one tap.</string>
+    <string name="paywall_v1_timeline_step3_title">Day 3</string>
+    <string name="paywall_v1_timeline_step3_body">Your free trial ends and your Pro subscription begins.</string>
+
+    <!-- Variant B: Features headline/body -->
+    <string name="paywall_v1_features_headline">Everything Pro,\nfree for %1$d days</string>
+    <string name="paywall_v1_features_body">The full Gisti toolkit, no caps, no nags. Cancel anytime.</string>
+
+    <!-- Variant B: Feature rows -->
+    <string name="paywall_v1_feature_photo_title">Photo to checklist</string>
+    <string name="paywall_v1_feature_photo_body">Snap a fridge, a recipe, a whiteboard.</string>
+    <string name="paywall_v1_feature_voice_title">Voice memos</string>
+    <string name="paywall_v1_feature_voice_body">Talk it out. Gisti structures it.</string>
+    <string name="paywall_v1_feature_pdf_title">PDF &amp; docs</string>
+    <string name="paywall_v1_feature_pdf_body">Drop in syllabi, manuals, recipes.</string>
+    <string name="paywall_v1_feature_link_title">Any link</string>
+    <string name="paywall_v1_feature_link_body">Articles and posts, distilled into steps.</string>
+    <string name="paywall_v1_feature_ai_runs_title">300 AI checklists per day</string>
+    <string name="paywall_v1_feature_ai_runs_body">Enough to plan a week of trips, recipes, and projects.</string>
+    <!-- REMOVED: paywall_v1_feature_sync_title / _body — product is mobile-only, no cross-device sync exists -->
+
+    <!-- Variant C: Compare headline/body -->
+    <string name="paywall_v1_compare_headline">Compare and choose.</string>
+    <string name="paywall_v1_compare_body">Free works. Pro flies. Try Pro free for %1$d days.</string>
+
+    <!-- Variant C: Compare table headers -->
+    <string name="paywall_v1_compare_feature">FEATURE</string>
+    <string name="paywall_v1_compare_free">Free</string>
+    <string name="paywall_v1_compare_pro">Pro</string>
+
+    <!-- Variant C: Compare rows -->
+    <string name="paywall_v1_compare_row_ai_checklists">AI checklists / day</string>
+    <string name="paywall_v1_compare_row_photo">Photo input</string>
+    <string name="paywall_v1_compare_row_voice">Voice memo input</string>
+    <string name="paywall_v1_compare_row_pdf_link">PDF &amp; link import</string>
+    <string name="paywall_v1_compare_row_reminders">Smart reminders</string>
+    <!-- REMOVED: paywall_v1_compare_row_sync — no cross-device sync in product -->
+    <string name="paywall_v1_compare_row_priority_ai">Best AI model (Gemini 2.5 Flash)</string>
+
+    <!-- Plan rows -->
+    <string name="paywall_v1_yearly_label">Yearly</string>
+    <string name="paywall_v1_monthly_label">Monthly</string>
+    <string name="paywall_v1_best_value_badge">BEST VALUE</string>
+    <string name="paywall_v1_billed_monthly">Billed monthly</string>
+    <string name="paywall_v1_billed_annually_subtitle">Billed annually</string>
+    <!-- DEPRECATED: savings % is now computed dynamically in PaywallRoute from real prices -->
+    <string name="paywall_v1_save_72">Save 72%</string>
+
+    <!-- Sticky CTA -->
+    <string name="paywall_v1_cta_start_trial">Start %1$d-day free trial</string>
+    <!-- DEPRECATED: replaced by paywall_v1_cta_sub_yearly / paywall_v1_cta_sub_monthly -->
+    <string name="paywall_v1_cta_sub">Then $20/year. Auto-renews. Cancel anytime.</string>
+    <string name="paywall_v1_cta_sub_yearly">Then %1$s/year. Auto-renews. Cancel anytime.</string>
+    <string name="paywall_v1_cta_sub_monthly">Then %1$s/month. Auto-renews. Cancel anytime.</string>
 </resources>

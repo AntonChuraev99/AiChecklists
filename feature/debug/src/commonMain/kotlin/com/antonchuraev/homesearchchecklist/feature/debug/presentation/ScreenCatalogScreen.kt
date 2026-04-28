@@ -233,6 +233,30 @@ fun ScreenCatalogScreen(
             )
 
             CatalogItem(
+                testTag = "paywall_variant_timeline",
+                title = stringResource(Res.string.debug_catalog_paywall_timeline),
+                subtitle = stringResource(Res.string.debug_catalog_paywall_timeline_desc),
+                isDisabled = state.isWorking,
+                onClick = { viewModel.sendIntent(ScreenCatalogIntent.NavigatePaywallTimeline) }
+            )
+
+            CatalogItem(
+                testTag = "paywall_variant_features",
+                title = stringResource(Res.string.debug_catalog_paywall_features),
+                subtitle = stringResource(Res.string.debug_catalog_paywall_features_desc),
+                isDisabled = state.isWorking,
+                onClick = { viewModel.sendIntent(ScreenCatalogIntent.NavigatePaywallFeatures) }
+            )
+
+            CatalogItem(
+                testTag = "paywall_variant_compare",
+                title = stringResource(Res.string.debug_catalog_paywall_compare),
+                subtitle = stringResource(Res.string.debug_catalog_paywall_compare_desc),
+                isDisabled = state.isWorking,
+                onClick = { viewModel.sendIntent(ScreenCatalogIntent.NavigatePaywallCompare) }
+            )
+
+            CatalogItem(
                 testTag = "catalog_subscription_success",
                 title = stringResource(Res.string.debug_catalog_subscription_success),
                 subtitle = stringResource(Res.string.debug_catalog_subscription_success_desc),

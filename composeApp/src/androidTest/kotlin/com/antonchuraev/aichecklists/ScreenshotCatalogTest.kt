@@ -327,12 +327,33 @@ class ScreenshotCatalogTest : BaseUiTest() {
             screenshotName = "analyze_result_preview"
         )
 
-        // 14. catalog_paywall
+        // 14. catalog_paywall (RC variant)
         // anchor: "Restore Purchase" is always present (paywall_restore)
         captureFromCatalog(
             tagName = "catalog_paywall",
             anchor = "Restore Purchase",
             screenshotName = "paywall"
+        )
+
+        // 14a. paywall_variant_timeline — force Timeline A/B variant
+        captureFromCatalog(
+            tagName = "paywall_variant_timeline",
+            anchor = "Restore Purchase",
+            screenshotName = "paywall_variant_timeline"
+        )
+
+        // 14b. paywall_variant_features — force Features A/B variant
+        captureFromCatalog(
+            tagName = "paywall_variant_features",
+            anchor = "Restore Purchase",
+            screenshotName = "paywall_variant_features"
+        )
+
+        // 14c. paywall_variant_compare — force Compare A/B variant
+        captureFromCatalog(
+            tagName = "paywall_variant_compare",
+            anchor = "Restore Purchase",
+            screenshotName = "paywall_variant_compare"
         )
 
         // 15. catalog_subscription_success
@@ -436,8 +457,8 @@ class ScreenshotCatalogTest : BaseUiTest() {
         // This catches cases where most navigation silently broke and only a few PNGs were saved.
         // If fewer than 20 screenshots were captured the test fails with an actionable message.
         val captured = screenshotIndex
-        check(captured >= 20) {
-            "Screenshot harness produced only $captured images (expected ≥ 20). " +
+        check(captured >= 23) {
+            "Screenshot harness produced only $captured images (expected ≥ 23). " +
                 "Check logcat for navigation failures above."
         }
     }

@@ -32,6 +32,7 @@ val paywallFeatureModule = module {
             purchaseProductUseCase = get(),
             restorePurchasesUseCase = get(),
             analyticsTracker = get(),
+            remoteConfigProvider = get(),
             sourceOverride = params.getOrNull<String>()
         )
     }

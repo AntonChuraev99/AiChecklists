@@ -16,6 +16,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
@@ -26,13 +27,14 @@ fun AppButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    icon: ImageVector? = null
+    icon: ImageVector? = null,
+    shape: Shape = MaterialTheme.shapes.small,
 ) {
     Button(
         onClick = onClick,
         modifier = modifier.height(AppDimens.ButtonHeight),
         enabled = enabled,
-        shape = MaterialTheme.shapes.small,
+        shape = shape,
         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
     ) {
         if (icon != null) {
@@ -61,13 +63,14 @@ fun AppButtonSecondary(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    icon: ImageVector? = null
+    icon: ImageVector? = null,
+    shape: Shape = MaterialTheme.shapes.small,
 ) {
     OutlinedButton(
         onClick = onClick,
         modifier = modifier.height(AppDimens.ButtonHeight),
         enabled = enabled,
-        shape = MaterialTheme.shapes.small,
+        shape = shape,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
     ) {
@@ -111,13 +114,14 @@ fun AppButtonDestructive(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    shape: Shape = MaterialTheme.shapes.small,
 ) {
     Button(
         onClick = onClick,
         modifier = modifier.height(AppDimens.ButtonHeight),
         enabled = enabled,
-        shape = MaterialTheme.shapes.small,
+        shape = shape,
         colors = ButtonDefaults.buttonColors(
             containerColor = MaterialTheme.colorScheme.error,
             contentColor = MaterialTheme.colorScheme.onError
