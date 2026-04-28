@@ -52,10 +52,23 @@ class PaywallViewModel(
         else -> PaywallVariant.Timeline  // safe default
     }
 
-    // Product IDs aligned with Google Play subscription_id:base_plan_id format.
-    private fun productIdForPlan(plan: PaywallPlan): String = when (plan) {
-        PaywallPlan.Yearly  -> "premium_yearly:main-20"
-        PaywallPlan.Monthly -> "premium_monthly:monthly"
+    // Match yearly/monthly by id substring + period fallback. Hardcoded full ids
+    // ("premium_yearly:main-20") are brittle — RC SDK strips basePlan suffix on
+    // Google Play and storeProduct.period was observed null for yearly on KZ.
+    // ID substring is the most reliable primary signal.
+    private fun selectProductForPlan(
+        plan: PaywallPlan,
+        products: List<com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallProduct>,
+    ) = when (plan) {
+        PaywallPlan.Yearly  -> products.find {
+            it.id.contains("year", ignoreCase = true) ||
+                it.id.contains("annual", ignoreCase = true) ||
+                it.periodString?.contains("year") == true
+        }
+        PaywallPlan.Monthly -> products.find {
+            it.id.contains("month", ignoreCase = true) ||
+                it.periodString?.contains("month") == true
+        }
     }
 
     init {
@@ -171,8 +184,7 @@ class PaywallViewModel(
 
     private fun purchase() {
         val currentState = _screenState.value
-        val targetProductId = productIdForPlan(currentState.selectedPlan)
-        val selectedProduct = currentState.products.find { it.id == targetProductId }
+        val selectedProduct = selectProductForPlan(currentState.selectedPlan, currentState.products)
         if (selectedProduct == null) {
             // Expected product missing from offering — show error instead of silently
             // buying a different product (compliance: user paid based on shown price).
@@ -181,8 +193,8 @@ class PaywallViewModel(
                 mapOf(
                     "source"                to source,
                     "selected_plan"         to currentState.selectedPlan.name,
-                    "expected_product_id"   to targetProductId,
                     "available_product_ids" to currentState.products.joinToString(",") { it.id },
+                    "available_periods"     to currentState.products.joinToString(",") { it.periodString.orEmpty() },
                 ),
             )
             viewModelScope.launch {

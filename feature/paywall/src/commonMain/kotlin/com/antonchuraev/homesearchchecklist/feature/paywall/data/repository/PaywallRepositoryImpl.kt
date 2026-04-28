@@ -1,5 +1,6 @@
 package com.antonchuraev.homesearchchecklist.feature.paywall.data.repository
 
+import com.antonchuraev.homesearchchecklist.feature.paywall.data.PaywallConfig
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.Entitlements
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.LoginResult
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallErrorCode
@@ -78,7 +79,12 @@ class PaywallRepositoryImpl : PaywallRepository {
                     continuation.resume(Result.failure(error.toPaywallException()))
                 },
                 onSuccess = { offerings ->
-                    val currentOffering = offerings.current
+                    // Prefer named offering (PaywallConfig.OFFERING_ID) so the active
+                    // offering is locked to this build version. Fall back to
+                    // offerings.current if the named one is missing so dashboard
+                    // changes can still propagate. Mirrors swapfaceandroid pattern.
+                    val currentOffering = offerings.all[PaywallConfig.OFFERING_ID]
+                        ?: offerings.current
                     if (currentOffering == null) {
                         continuation.resume(Result.success(null))
                         return@getOfferings
