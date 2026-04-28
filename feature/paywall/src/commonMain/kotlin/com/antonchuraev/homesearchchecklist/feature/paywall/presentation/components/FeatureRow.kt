@@ -59,10 +59,13 @@ internal fun FeatureRow(
                 modifier = Modifier.size(22.dp),
             )
         }
+        // Aligns the title's first-line visual center (~12dp from text top) with the
+        // 40dp icon tile's vertical center (20dp). 8dp top padding compensates for
+        // titleMedium's ascent so the icon and title read as a single visual unit.
         Column(
             modifier = Modifier
                 .weight(1f)
-                .padding(top = 2.dp),
+                .padding(top = 8.dp),
         ) {
             Text(title, style = MaterialTheme.typography.titleMedium, color = cs.onSurface)
             Spacer(Modifier.height(2.dp))
