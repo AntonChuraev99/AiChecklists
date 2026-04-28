@@ -2,6 +2,7 @@ package com.antonchuraev.homesearchchecklist.desingsystem.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Card
@@ -18,13 +19,14 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
 fun AppCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
+    contentPadding: PaddingValues = PaddingValues(AppDimens.CardPadding),
     content: @Composable () -> Unit
 ) {
     val isDark = LocalIsDarkTheme.current
     val shape = MaterialTheme.shapes.medium
     val containerModifier = modifier.fillMaxWidth()
     val contentBox: @Composable () -> Unit = {
-        Box(modifier = Modifier.padding(AppDimens.CardPadding)) {
+        Box(modifier = Modifier.padding(contentPadding)) {
             content()
         }
     }

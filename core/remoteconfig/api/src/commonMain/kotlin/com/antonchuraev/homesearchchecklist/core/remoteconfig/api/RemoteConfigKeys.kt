@@ -26,6 +26,9 @@ object RemoteConfigKeys {
 
     // Update Feed
     const val UPDATE_FEED_JSON = "update_feed_json"
+
+    // Paywall A/B variant: "timeline_v1" | "features_v1" | "compare_v1"
+    const val PAYWALL_VARIANT = "paywall_variant"
 }
 
 /**
@@ -51,6 +54,9 @@ object RemoteConfigDefaults {
 
     // Onboarding type: "interactive" or "default"
     const val ONBOARDING = "interactive"
+
+    // Paywall A/B variant default
+    const val PAYWALL_VARIANT = "timeline_v1"
 
     // Update Feed — 17 chronological feature posts (v1.6–v1.13, Jan–Apr 2026) + 4 de-duped Google
     // Play release notes (v1.6, v1.7, v1.10, v1.13). Posts use main-version format (X.Y). Grouped

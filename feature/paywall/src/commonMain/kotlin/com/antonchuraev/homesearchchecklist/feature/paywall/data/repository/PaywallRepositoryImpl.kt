@@ -120,6 +120,9 @@ class PaywallRepositoryImpl : PaywallRepository {
                             title = storeProduct.title,
                             description = storeProduct.title,
                             priceString = storeProduct.price.formatted,
+                            // amountMicros is in millionths of the currency unit (e.g. 20_000_000 = $20.00)
+                            priceAmount = storeProduct.price.amountMicros / 1_000_000.0,
+                            priceCurrencyCode = storeProduct.price.currencyCode,
                             periodString = storeProduct.period?.let { period ->
                                 "${period.value} ${period.unit.name.lowercase()}"
                             },

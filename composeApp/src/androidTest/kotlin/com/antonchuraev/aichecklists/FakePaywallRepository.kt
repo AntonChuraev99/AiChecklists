@@ -22,16 +22,31 @@ class FakePaywallRepository : PaywallRepository {
 
     private val freeUser = SubscriptionStatus.FREE
 
-    // Real product: only the monthly subscription exists in Play Console today.
-    // Annual is a TODO (see project memory) — don't show it in screenshots.
+    // Both products match the canonical IDs used in PaywallViewModel.productIdForPlan()
+    // so screenshot tests never fire the "purchase_product_not_found" diagnostic event.
     private val fakeOffering = PaywallOffering(
-        id = "default",
+        id = "monthAndYear",
         products = listOf(
             PaywallProduct(
-                id = "gisti_monthly",
+                id = "premium_yearly:main-20",
+                title = "Yearly",
+                description = "Yearly",
+                priceString = "$20.00",
+                priceAmount = 20.0,
+                priceCurrencyCode = "USD",
+                periodString = "1 year",
+                packageId = "annual",
+                isPopular = false,
+                hasFreeTrial = true,
+                freeTrialDays = 3
+            ),
+            PaywallProduct(
+                id = "premium_monthly:monthly",
                 title = "Monthly",
                 description = "Monthly",
-                priceString = "$1.99",
+                priceString = "$5.99",
+                priceAmount = 5.99,
+                priceCurrencyCode = "USD",
                 periodString = "1 month",
                 packageId = "monthly",
                 isPopular = true,

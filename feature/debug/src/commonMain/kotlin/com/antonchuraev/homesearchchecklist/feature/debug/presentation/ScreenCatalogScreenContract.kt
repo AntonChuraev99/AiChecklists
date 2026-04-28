@@ -44,6 +44,9 @@ sealed interface ScreenCatalogIntent : Intent {
 
     // Monetisation screens
     data object NavigatePaywall : ScreenCatalogIntent
+    data object NavigatePaywallTimeline : ScreenCatalogIntent
+    data object NavigatePaywallFeatures : ScreenCatalogIntent
+    data object NavigatePaywallCompare : ScreenCatalogIntent
     data object NavigateSubscriptionStatusSuccess : ScreenCatalogIntent
     data object NavigateSubscriptionStatusPending : ScreenCatalogIntent
 

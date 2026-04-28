@@ -87,6 +87,9 @@ class ScreenCatalogViewModel(
             ScreenCatalogIntent.NavigateAnalyzeResultPreview -> appNavigator.navigateToAnalyzeResultPreview()
 
             ScreenCatalogIntent.NavigatePaywall -> appNavigator.navigateToPaywall(source = "screen_catalog")
+            ScreenCatalogIntent.NavigatePaywallTimeline -> appNavigator.navigateToPaywallVariant(source = "debug", forceVariant = "timeline")
+            ScreenCatalogIntent.NavigatePaywallFeatures -> appNavigator.navigateToPaywallVariant(source = "debug", forceVariant = "features")
+            ScreenCatalogIntent.NavigatePaywallCompare  -> appNavigator.navigateToPaywallVariant(source = "debug", forceVariant = "compare")
             ScreenCatalogIntent.NavigateSubscriptionStatusSuccess -> appNavigator.navigateToSubscriptionStatus(showSuccessMessage = true)
             ScreenCatalogIntent.NavigateSubscriptionStatusPending -> appNavigator.navigateToSubscriptionStatus(showSuccessMessage = false)
 
