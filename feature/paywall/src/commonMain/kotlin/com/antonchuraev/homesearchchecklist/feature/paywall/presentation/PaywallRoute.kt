@@ -37,9 +37,20 @@ fun PaywallRoute(
     // would pop twice and escape the backstack past Main into blank.
     var closeConsumed by remember { mutableStateOf(false) }
 
-    // Build UI state from MVI state — sourcing prices from loaded RevenueCat products
-    val yearlyProduct  = state.products.find { it.id == "premium_yearly:main-20" }
-    val monthlyProduct = state.products.find { it.id == "premium_monthly:monthly" }
+    // Match yearly/monthly by id substring + period fallback. We had this hardcoded
+    // to "premium_yearly:main-20"/"premium_monthly:monthly" which broke on Google
+    // Play because RC SDK strips the basePlan suffix; periodString worked for
+    // monthly but not yearly on KZ region (period field was null in practice),
+    // so the substring match on id is the most reliable primary signal.
+    val yearlyProduct  = state.products.find {
+        it.id.contains("year", ignoreCase = true) ||
+            it.id.contains("annual", ignoreCase = true) ||
+            it.periodString?.contains("year") == true
+    }
+    val monthlyProduct = state.products.find {
+        it.id.contains("month", ignoreCase = true) ||
+            it.periodString?.contains("month") == true
+    }
 
     // Compute savings % from real numeric prices (both must be > 0 and same currency)
     val yearlySavings: String? = if (
