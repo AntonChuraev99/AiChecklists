@@ -73,6 +73,7 @@ import androidx.compose.material.icons.automirrored.filled.EventNote
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -230,7 +231,8 @@ fun TemplatesScreen(
             // Bottom action buttons
             BottomActionButtons(
                 onCreateManually = { viewModel.sendIntent(TemplatesScreenIntent.OnCreateManuallyClick) },
-                onCreateWithAi = { viewModel.sendIntent(TemplatesScreenIntent.OnCreateWithAiClick) }
+                onCreateWithAi = { viewModel.sendIntent(TemplatesScreenIntent.OnCreateWithAiClick) },
+                onCreateWeekly = { viewModel.sendIntent(TemplatesScreenIntent.OnCreateWeeklyClick) },
             )
         }
     }
@@ -239,7 +241,8 @@ fun TemplatesScreen(
 @Composable
 private fun BottomActionButtons(
     onCreateManually: () -> Unit,
-    onCreateWithAi: () -> Unit
+    onCreateWithAi: () -> Unit,
+    onCreateWeekly: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -263,6 +266,14 @@ private fun BottomActionButtons(
             text = stringResource(Res.string.templates_create_with_ai),
             onClick = onCreateWithAi,
             icon = Icons.Outlined.AutoAwesome,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        // My Week button
+        AppButtonSecondary(
+            text = stringResource(Res.string.templates_create_weekly),
+            onClick = onCreateWeekly,
+            icon = Icons.Outlined.CalendarMonth,
             modifier = Modifier.fillMaxWidth()
         )
     }

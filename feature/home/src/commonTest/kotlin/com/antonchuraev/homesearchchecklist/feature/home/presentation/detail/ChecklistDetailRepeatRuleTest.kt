@@ -28,6 +28,10 @@ import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.Entitle
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.SubscriptionStatus
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.repository.PaywallRepository
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetUserLimitsUseCase
+import com.antonchuraev.homesearchchecklist.feature.user.domain.model.RegistrationData
+import com.antonchuraev.homesearchchecklist.feature.user.domain.model.UserData
+import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -116,7 +120,8 @@ class ChecklistDetailRepeatRuleTest {
             getUserLimitsUseCase = GetUserLimitsUseCase(
                 FakeRemoteConfigProvider(),
                 repository,
-                paywallRepository
+                paywallRepository,
+                FakeUserDataRepository()
             ),
             analyticsTracker = analyticsTracker,
             reminderScheduler = scheduler,
@@ -791,6 +796,23 @@ class ChecklistDetailRepeatRuleTest {
         override suspend fun getActiveRepeatSchedules(): List<ChecklistRepeatInfo> = emptyList()
         override suspend fun getPastDueRepeatSchedules(nowMillis: Long): List<ChecklistRepeatInfo> = emptyList()
         override suspend fun getTotalAdditionalFillCount(): Int = 0
+        override suspend fun getWeeklyChecklistCount(): Int = 0
+    }
+
+    private class FakeUserDataRepository : UserDataRepository {
+        private val userData = UserData(userId = "test", isPremium = false)
+        private val flow = MutableStateFlow(userData)
+        override fun getUserDataFlow(): StateFlow<UserData> = flow
+        override suspend fun getUserData(): UserData = userData
+        override suspend fun update(userData: UserData) {}
+        override suspend fun ensureUserRegistered(): Result<RegistrationData> =
+            Result.success(RegistrationData(userData = userData, isNewUser = false))
+        override suspend fun syncWithServer(): Result<RegistrationData> =
+            Result.success(RegistrationData(userData = userData, isNewUser = false))
+        override suspend fun isPaywallLinked(): Boolean = false
+        override suspend fun setPaywallLinked(linked: Boolean) {}
+        override suspend fun restoreCreditsAfterPurchase(): Result<Int> = Result.success(0)
+        override suspend fun getFirstLaunchAtMillis(): Long = 0L
     }
 
     private class FakeAppNavigator : AppNavigator {

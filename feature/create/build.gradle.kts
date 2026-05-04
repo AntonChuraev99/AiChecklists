@@ -29,6 +29,7 @@ kotlin {
             implementation(projects.core.navigation.api)
 
             implementation(projects.feature.checklist)
+            implementation(projects.feature.paywall)
 
             implementation(compose.runtime)
             implementation(compose.foundation)

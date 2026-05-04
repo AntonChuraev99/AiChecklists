@@ -6,6 +6,7 @@ import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.Analyze
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeResult
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistViewMode
 import dev.shreyaspatil.ai.client.generativeai.GenerativeModel
 import dev.shreyaspatil.ai.client.generativeai.type.PlatformImage
 import dev.shreyaspatil.ai.client.generativeai.type.content
@@ -218,6 +219,17 @@ class GeminiAiAnalyzer(
             "Создай новый чек-лист."
         }
 
+        val weeklyPart = if (targetChecklist?.viewMode == ChecklistViewMode.Weekly) {
+            """
+
+            ВАЖНО: Это еженедельный чек-лист (Weekly mode). Распредели пункты по дням недели (Понедельник-Воскресенье).
+            После каждого пункта добавляй тег дня в формате [day:N], где N — номер дня (1=Понедельник, 7=Воскресенье).
+            Пример: - Сделать зарядку [day:1]
+            """.trimIndent()
+        } else {
+            ""
+        }
+
         return """
             Проанализируй $contentDescription и создай список пунктов для проверки (чек-лист).
 
@@ -225,6 +237,7 @@ class GeminiAiAnalyzer(
             $content
 
             $contextPart
+            $weeklyPart
 
             Требования:
             1. Каждый пункт должен быть конкретным и проверяемым
@@ -240,18 +253,28 @@ class GeminiAiAnalyzer(
         """.trimIndent()
     }
 
+    /**
+     * Parses the Gemini response into a list of ChecklistItems.
+     * Supports optional [day:N] suffix for weekly mode items (N=1..7, ISO weekday).
+     * If the AI omits the day tag, weekday defaults to null (item appears in "unassigned" state).
+     */
     private fun parseResponse(responseText: String, warnings: List<String> = emptyList()): AnalyzeResult {
+        val dayTagRegex = Regex("""\[day:([1-7])]""")
         val items = responseText
             .lines()
             .map { it.trim() }
             .filter { it.startsWith("-") || it.startsWith("•") || it.startsWith("*") }
             .map { line ->
-                val text = line
+                val rawText = line
                     .removePrefix("-")
                     .removePrefix("•")
                     .removePrefix("*")
                     .trim()
-                ChecklistItem(text = text, checked = false)
+                // Extract optional [day:N] tag
+                val dayMatch = dayTagRegex.find(rawText)
+                val weekday = dayMatch?.groupValues?.getOrNull(1)?.toIntOrNull()
+                val text = rawText.replace(dayTagRegex, "").trim()
+                ChecklistItem(text = text, checked = false, weekday = weekday)
             }
             .filter { it.text.isNotBlank() }
             .take(15) // Safety limit

@@ -29,17 +29,26 @@ class GetUserLimitsUseCase(
             RemoteConfigDefaults.MAX_FILLS_FREE
         ).toInt()
 
+        val maxWeeklyChecklistsFree = remoteConfigProvider.getLong(
+            RemoteConfigKeys.MAX_WEEKLY_CHECKLISTS_FREE,
+            RemoteConfigDefaults.MAX_WEEKLY_CHECKLISTS_FREE
+        ).toInt()
+
         return combine(
             checklistRepository.checklists.map { it.size },
             paywallRepository.subscriptionStatus,
             userDataRepository.getUserDataFlow().map { it.isPremium }
         ) { checklistCount, subscriptionStatus, firestorePremium ->
             val revenueCatPremium = subscriptionStatus.activeEntitlements.contains(Entitlements.PREMIUM)
+            val isPremium = revenueCatPremium || firestorePremium
+            val weeklyCount = checklistRepository.getWeeklyChecklistCount()
             UserLimits(
                 maxChecklists = maxChecklists,
                 maxFillsPerChecklist = maxFillsPerChecklist,
                 currentChecklistCount = checklistCount,
-                isPremium = revenueCatPremium || firestorePremium
+                isPremium = isPremium,
+                maxWeeklyChecklists = if (isPremium) Int.MAX_VALUE else maxWeeklyChecklistsFree,
+                currentWeeklyChecklistCount = weeklyCount
             )
         }
     }

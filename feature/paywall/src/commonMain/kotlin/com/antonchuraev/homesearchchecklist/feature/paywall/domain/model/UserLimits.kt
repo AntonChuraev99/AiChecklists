@@ -8,13 +8,20 @@ data class UserLimits(
     val maxChecklists: Int,
     val maxFillsPerChecklist: Int,
     val currentChecklistCount: Int,
-    val isPremium: Boolean
+    val isPremium: Boolean,
+    // Weekly mode limits (separate from standard checklist limit)
+    val maxWeeklyChecklists: Int = if (isPremium) Int.MAX_VALUE else 1,
+    val currentWeeklyChecklistCount: Int = 0
 ) {
     val canCreateChecklist: Boolean
         get() = isPremium || currentChecklistCount < maxChecklists
 
     val remainingChecklists: Int
         get() = if (isPremium) Int.MAX_VALUE else maxOf(0, maxChecklists - currentChecklistCount)
+
+    /** Whether the user can create a new weekly checklist. Free users: max 1, Premium: unlimited. */
+    val canCreateWeeklyChecklist: Boolean
+        get() = isPremium || currentWeeklyChecklistCount < maxWeeklyChecklists
 
     fun canCreateFill(currentFillCount: Int): Boolean =
         isPremium || currentFillCount < maxFillsPerChecklist

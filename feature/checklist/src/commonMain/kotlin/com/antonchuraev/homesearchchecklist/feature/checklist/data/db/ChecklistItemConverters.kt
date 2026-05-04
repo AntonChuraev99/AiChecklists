@@ -1,8 +1,9 @@
 package com.antonchuraev.homesearchchecklist.feature.checklist.data.db
 
 import androidx.room.TypeConverter
-import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistViewMode
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 
@@ -31,6 +32,19 @@ class ChecklistItemConverters {
     fun fillItemsToString(items: List<ChecklistFillItem>): String {
         if (items.isEmpty()) return ""
         return json.encodeToString(ListSerializer(ChecklistFillItem.serializer()), items)
+    }
+
+    @TypeConverter
+    fun viewModeFromString(value: String?): ChecklistViewMode {
+        return when (value) {
+            ChecklistViewMode.Weekly.name -> ChecklistViewMode.Weekly
+            else -> ChecklistViewMode.Standard
+        }
+    }
+
+    @TypeConverter
+    fun viewModeToString(mode: ChecklistViewMode): String {
+        return mode.name
     }
 }
 
