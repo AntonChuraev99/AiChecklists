@@ -277,6 +277,16 @@ class ChecklistDetailViewModel(
             ChecklistDetailIntent.OnSnackbarDismissed -> {
                 updateContentState { it.copy(snackbarMessage = null) }
             }
+
+            // Weekly mode
+            is ChecklistDetailIntent.OnAddItemToDay -> addItemToDay(intent.weekday, intent.text)
+            is ChecklistDetailIntent.OnItemLongPressForMove -> {
+                updateContentState { it.copy(moveToDayItemId = intent.itemId) }
+            }
+            is ChecklistDetailIntent.OnMoveItemToDay -> moveItemToDay(intent.itemId, intent.targetWeekday)
+            ChecklistDetailIntent.OnDismissMoveToDaySheet -> {
+                updateContentState { it.copy(moveToDayItemId = null) }
+            }
         }
     }
 
@@ -444,6 +454,64 @@ class ChecklistDetailViewModel(
             analyticsTracker.event("item_added_quick", mapOf(
                 "checklist_id" to checklistId.toString(),
                 "item_count" to updatedFill.items.size.toString()
+            ))
+        }
+    }
+
+    private fun addItemToDay(weekday: Int, text: String) {
+        val state = _screenState.value as? ChecklistDetailState.Content ?: return
+        val fill = state.defaultFill ?: return
+        val trimmed = text.trim()
+        if (trimmed.isEmpty()) return
+
+        val newFillItem = ChecklistFillItem(text = trimmed, checked = false, note = null, weekday = weekday)
+        val updatedFill = fill.copy(items = fill.items + newFillItem)
+
+        val newChecklistItem = ChecklistItem(text = trimmed, weekday = weekday)
+        val updatedChecklist = state.checklist.copy(items = state.checklist.items + newChecklistItem)
+        updateContentState { it.copy(checklist = updatedChecklist) }
+
+        viewModelScope.launch {
+            repository.updateFill(updatedFill)
+            repository.updateChecklistTemplate(updatedChecklist)
+            analyticsTracker.event("weekly_item_added", mapOf(
+                "checklist_id" to checklistId.toString(),
+                "weekday" to weekday.toString()
+            ))
+        }
+    }
+
+    private fun moveItemToDay(itemId: String, targetWeekday: Int) {
+        val state = _screenState.value as? ChecklistDetailState.Content ?: return
+        val fill = state.defaultFill ?: return
+
+        val updatedFillItems = fill.items.map { item ->
+            if (item.id == itemId) item.withWeekday(targetWeekday) else item
+        }
+        val updatedFill = fill.copy(items = updatedFillItems)
+
+        val movedFillItem = fill.items.firstOrNull { it.id == itemId }
+        val updatedChecklistItems = if (movedFillItem != null) {
+            state.checklist.items.map { templateItem ->
+                if (templateItem.text == movedFillItem.text && templateItem.weekday == movedFillItem.weekday) {
+                    templateItem.withWeekday(targetWeekday)
+                } else {
+                    templateItem
+                }
+            }
+        } else {
+            state.checklist.items
+        }
+        val updatedChecklist = state.checklist.copy(items = updatedChecklistItems)
+
+        updateContentState { it.copy(checklist = updatedChecklist, moveToDayItemId = null) }
+
+        viewModelScope.launch {
+            repository.updateFill(updatedFill)
+            repository.updateChecklistTemplate(updatedChecklist)
+            analyticsTracker.event("weekly_item_moved", mapOf(
+                "checklist_id" to checklistId.toString(),
+                "target_weekday" to targetWeekday.toString()
             ))
         }
     }

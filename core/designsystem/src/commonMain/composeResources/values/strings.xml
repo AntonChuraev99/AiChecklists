@@ -782,4 +782,25 @@
          restore "Auto-renews. " between %1$s/year. and Cancel. -->
     <string name="paywall_v1_cta_sub_yearly">Then %1$s/year. Cancel anytime.</string>
     <string name="paywall_v1_cta_sub_monthly">Then %1$s/month. Cancel anytime.</string>
+
+    <!-- Weekly mode ("My Week" checklist view) -->
+    <string name="templates_create_weekly">My Week</string>
+    <string name="weekly_mode_title">My Week</string>
+    <string name="weekday_today">Today</string>
+    <string name="weekday_tomorrow">Tomorrow</string>
+    <string name="weekday_monday">Monday</string>
+    <string name="weekday_tuesday">Tuesday</string>
+    <string name="weekday_wednesday">Wednesday</string>
+    <string name="weekday_thursday">Thursday</string>
+    <string name="weekday_friday">Friday</string>
+    <string name="weekday_saturday">Saturday</string>
+    <string name="weekday_sunday">Sunday</string>
+    <!-- %1$s = localized weekday name, e.g. "Add for Monday" -->
+    <string name="weekly_add_for_day">Add for %1$s</string>
+    <string name="weekly_move_to_day_title">Move to day</string>
+    <string name="weekly_move_to_day_action">Move to…</string>
+    <string name="weekly_paywall_locked_title">Premium feature</string>
+    <string name="weekly_paywall_locked_message">Free users can have 1 weekly checklist. Upgrade to Premium for unlimited weekly checklists.</string>
+    <!-- %1$d = item count badge, e.g. "· 3" -->
+    <string name="weekly_item_count_badge">· %1$d</string>
 </resources>

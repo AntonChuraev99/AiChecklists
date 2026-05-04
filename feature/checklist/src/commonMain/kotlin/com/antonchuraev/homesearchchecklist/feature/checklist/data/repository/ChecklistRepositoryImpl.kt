@@ -161,6 +161,11 @@ class ChecklistRepositoryImpl(
         return fillDao.getTotalAdditionalFillCount()
     }
 
+    // Weekly mode
+    override suspend fun getWeeklyChecklistCount(): Int {
+        return checklistDao.getWeeklyChecklistCount()
+    }
+
     // Fills (instances)
     override fun getFillsByChecklistId(checklistId: Long): Flow<List<ChecklistFill>> {
         return fillDao.observeFillsByChecklistId(checklistId).map { list ->

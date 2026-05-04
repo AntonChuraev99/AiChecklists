@@ -52,6 +52,8 @@ sealed interface ChecklistDetailState : State {
         val separateCompleted: Boolean = false,
         val autoDeleteCompleted: Boolean = false,
         val pendingUndoItem: UndoableDeleteItem? = null,
+        // Weekly mode: non-null while MoveToDayBottomSheet is open
+        val moveToDayItemId: String? = null,
         // Reminder sheet tab state
         val activeReminderTab: ReminderTab = ReminderTab.ONCE,
         // Repeat configuration (active while editing on the REPEAT tab)
@@ -153,4 +155,10 @@ sealed interface ChecklistDetailIntent : Intent {
     data object OnDismissExactAlarmSheet : ChecklistDetailIntent
     data object OnReturnedFromSettings : ChecklistDetailIntent
     data object OnSnackbarDismissed : ChecklistDetailIntent
+
+    // Weekly mode intents
+    data class OnAddItemToDay(val weekday: Int, val text: String) : ChecklistDetailIntent
+    data class OnItemLongPressForMove(val itemId: String) : ChecklistDetailIntent
+    data class OnMoveItemToDay(val itemId: String, val targetWeekday: Int) : ChecklistDetailIntent
+    data object OnDismissMoveToDaySheet : ChecklistDetailIntent
 }

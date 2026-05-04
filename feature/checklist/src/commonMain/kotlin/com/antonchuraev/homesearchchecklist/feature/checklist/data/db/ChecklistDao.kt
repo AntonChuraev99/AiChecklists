@@ -110,4 +110,9 @@ interface ChecklistDao {
           AND repeatNextAt <= :nowMillis
     """)
     suspend fun getPastDueRepeatSchedules(nowMillis: Long): List<ChecklistRepeatInfo>
+
+    // ─── Weekly mode ───
+
+    @Query("SELECT COUNT(*) FROM checklists WHERE viewMode = 'Weekly'")
+    suspend fun getWeeklyChecklistCount(): Int
 }

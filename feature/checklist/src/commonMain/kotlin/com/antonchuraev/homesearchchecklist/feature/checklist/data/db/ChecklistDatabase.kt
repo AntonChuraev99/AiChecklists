@@ -60,9 +60,16 @@ val MIGRATION_8_9 = object : Migration(8, 9) {
     }
 }
 
+val MIGRATION_9_10 = object : Migration(9, 10) {
+    override fun migrate(connection: SQLiteConnection) {
+        // Add viewMode column; existing rows default to 'Standard' (flat list behavior)
+        connection.execSQL("ALTER TABLE checklists ADD COLUMN viewMode TEXT NOT NULL DEFAULT 'Standard'")
+    }
+}
+
 @Database(
     entities = [ChecklistEntity::class, ChecklistFillEntity::class],
-    version = 9,
+    version = 10,
     exportSchema = false
 )
 @TypeConverters(ChecklistItemConverters::class, ReminderConverters::class)
@@ -76,7 +83,7 @@ abstract class ChecklistDatabase : RoomDatabase() {
             builder: Builder<ChecklistDatabase>
         ): ChecklistDatabase {
             return builder
-                .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+                .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
                 .fallbackToDestructiveMigration(dropAllTables = false)
                 .setQueryCoroutineContext(Dispatchers.IO)
                 .build()

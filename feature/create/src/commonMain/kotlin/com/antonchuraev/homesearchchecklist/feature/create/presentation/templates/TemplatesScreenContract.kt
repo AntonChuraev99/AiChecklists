@@ -29,4 +29,5 @@ sealed interface TemplatesScreenIntent : Intent {
     // Bottom action buttons
     data object OnCreateManuallyClick : TemplatesScreenIntent
     data object OnCreateWithAiClick : TemplatesScreenIntent
+    data object OnCreateWeeklyClick : TemplatesScreenIntent
 }

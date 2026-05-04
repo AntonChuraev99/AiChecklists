@@ -4,6 +4,7 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistViewMode
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
 
 @Entity(tableName = "checklists")
@@ -18,7 +19,8 @@ data class ChecklistEntity(
     val repeatOccurrenceCount: Int = 0,
     val separateCompleted: Boolean = false,
     val position: Int = 0,
-    val autoDeleteCompleted: Boolean = false
+    val autoDeleteCompleted: Boolean = false,
+    val viewMode: ChecklistViewMode = ChecklistViewMode.Standard
 )
 
 fun ChecklistEntity.toDomain() = Checklist(
@@ -32,7 +34,8 @@ fun ChecklistEntity.toDomain() = Checklist(
     repeatOccurrenceCount = repeatOccurrenceCount,
     separateCompleted = separateCompleted,
     position = position,
-    autoDeleteCompleted = autoDeleteCompleted
+    autoDeleteCompleted = autoDeleteCompleted,
+    viewMode = viewMode
 )
 
 fun Checklist.toEntity() = ChecklistEntity(
@@ -46,5 +49,6 @@ fun Checklist.toEntity() = ChecklistEntity(
     repeatOccurrenceCount = repeatOccurrenceCount,
     separateCompleted = separateCompleted,
     position = position,
-    autoDeleteCompleted = autoDeleteCompleted
+    autoDeleteCompleted = autoDeleteCompleted,
+    viewMode = viewMode
 )

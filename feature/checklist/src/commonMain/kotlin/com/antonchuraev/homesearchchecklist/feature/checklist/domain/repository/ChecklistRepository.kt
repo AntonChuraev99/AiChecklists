@@ -39,6 +39,9 @@ interface ChecklistRepository {
     // Analytics
     suspend fun getTotalAdditionalFillCount(): Int
 
+    // Weekly mode
+    suspend fun getWeeklyChecklistCount(): Int
+
     // Fills (instances)
     fun getFillsByChecklistId(checklistId: Long): Flow<List<ChecklistFill>>
     fun getDefaultFillByChecklistId(checklistId: Long): Flow<ChecklistFill?>

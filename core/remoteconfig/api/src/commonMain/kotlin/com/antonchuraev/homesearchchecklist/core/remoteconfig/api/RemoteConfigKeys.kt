@@ -17,6 +17,7 @@ object RemoteConfigKeys {
     const val MAX_CHECKLISTS_FREE = "max_checklists_free"
     const val MAX_FILLS_FREE = "max_fills_free"
     const val MAX_RECURRING_REMINDERS_FREE = "max_recurring_reminders_free"
+    const val MAX_WEEKLY_CHECKLISTS_FREE = "max_weekly_checklists_free"
 
     // Templates
     const val TEMPLATES_JSON = "templates_json"
@@ -48,6 +49,7 @@ object RemoteConfigDefaults {
     const val MAX_CHECKLISTS_FREE = 4L
     const val MAX_FILLS_FREE = 5L
     const val MAX_RECURRING_REMINDERS_FREE = 1L
+    const val MAX_WEEKLY_CHECKLISTS_FREE = 1L
 
     // Templates - default empty, populated from Remote Config
     const val TEMPLATES_JSON = ""

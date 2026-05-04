@@ -139,9 +139,12 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistViewMode
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatEndCondition
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatType
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.weekly.MoveToDayBottomSheet
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.weekly.WeeklyChecklistDetailContent
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderSheet
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderSheetCallbacks
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderSheetState
@@ -382,6 +385,33 @@ private fun ChecklistDetailContent(
                 CircularProgressIndicator()
             }
         } else {
+            when (state.checklist.viewMode) {
+                ChecklistViewMode.Weekly -> {
+                    val todayWeekday = remember {
+                        Clock.System.todayIn(TimeZone.currentSystemDefault()).dayOfWeek.isoDayNumber
+                    }
+                    WeeklyChecklistDetailContent(
+                        state = state,
+                        todayWeekday = todayWeekday,
+                        onIntent = onIntent,
+                        onAddItemToDay = { weekday, text -> onIntent(ChecklistDetailIntent.OnAddItemToDay(weekday, text)) },
+                        onItemCheckedChange = { itemId, checked -> onIntent(ChecklistDetailIntent.OnItemCheckedChange(itemId, checked)) },
+                        onItemLongPress = { itemId -> onIntent(ChecklistDetailIntent.OnItemLongPressForMove(itemId)) },
+                        onItemNoteClick = { itemId -> onIntent(ChecklistDetailIntent.OnAddNoteClick(itemId)) },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    // MoveToDayBottomSheet — sibling to WeeklyChecklistDetailContent, not inside it
+                    state.moveToDayItemId?.let { itemId ->
+                        val fillItem = state.defaultFill?.items?.firstOrNull { it.id == itemId }
+                        MoveToDayBottomSheet(
+                            currentWeekday = fillItem?.weekday,
+                            todayWeekday = todayWeekday,
+                            onDaySelected = { weekday -> onIntent(ChecklistDetailIntent.OnMoveItemToDay(itemId, weekday)) },
+                            onDismiss = { onIntent(ChecklistDetailIntent.OnDismissMoveToDaySheet) },
+                        )
+                    }
+                }
+                ChecklistViewMode.Standard -> {
             val sourceUnchecked = remember(defaultFill.items, state.separateCompleted) {
                 if (state.separateCompleted) defaultFill.items.filter { !it.checked }
                 else defaultFill.items
@@ -560,6 +590,8 @@ private fun ChecklistDetailContent(
                     Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
                 }
             }
+                } // end Standard ->
+            } // end when (state.checklist.viewMode)
         }
     }
 
@@ -873,7 +905,7 @@ private fun SwipeDeleteBackground() {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ChecklistItemCard(
+internal fun ChecklistItemCard(
     item: ChecklistFillItem,
     isDragging: Boolean,
     isEditMode: Boolean,
