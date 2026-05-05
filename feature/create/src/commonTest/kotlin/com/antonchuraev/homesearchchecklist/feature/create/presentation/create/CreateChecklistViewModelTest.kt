@@ -9,6 +9,7 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistR
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ItemReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import kotlinx.coroutines.Dispatchers
@@ -257,6 +258,8 @@ class CreateChecklistViewModelTest {
         override suspend fun getPastDueRepeatSchedules(nowMillis: Long): List<ChecklistRepeatInfo> = emptyList()
 
         override suspend fun getTotalAdditionalFillCount(): Int = 0
+        override suspend fun getWeeklyChecklistCount(): Int = 0
+        override suspend fun getAllItemRemindersForRescheduling(): List<ItemReminderInfo> = emptyList()
 
         override fun getFillsByChecklistId(checklistId: Long): Flow<List<ChecklistFill>> = emptyFlow()
         override fun getDefaultFillByChecklistId(checklistId: Long): Flow<ChecklistFill?> = emptyFlow()

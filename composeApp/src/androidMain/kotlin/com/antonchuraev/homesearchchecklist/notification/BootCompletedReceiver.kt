@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.usecase.RecoverRecurringRemindersUseCase
 import kotlinx.coroutines.CancellationException
@@ -39,7 +40,26 @@ class BootCompletedReceiver : BroadcastReceiver() {
 
                 // 3. Recover past-due repeat schedules (advance to next future occurrence)
                 val recoverUseCase: RecoverRecurringRemindersUseCase = koin.get()
-                recoverUseCase(nowMillis = System.currentTimeMillis())
+                val now = System.currentTimeMillis()
+                recoverUseCase(nowMillis = now)
+
+                // 4. Reschedule per-item reminders (one-shot + repeat) that are still in the future
+                val repository: ChecklistRepository = koin.get()
+                val itemReminders = repository.getAllItemRemindersForRescheduling()
+                for (info in itemReminders) {
+                    val reminderAt = info.reminderAt
+                    if (reminderAt != null && reminderAt > now) {
+                        scheduler.scheduleItemReminder(
+                            info.checklistId, info.fillId, info.itemId, reminderAt
+                        )
+                    }
+                    val repeatNextAt = info.repeatNextAt
+                    if (info.repeatRule != null && repeatNextAt != null && repeatNextAt > now) {
+                        scheduler.scheduleItemRepeat(
+                            info.checklistId, info.fillId, info.itemId, repeatNextAt
+                        )
+                    }
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

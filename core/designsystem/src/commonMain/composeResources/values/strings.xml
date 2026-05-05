@@ -282,6 +282,21 @@
     <string name="fill_edit_title">Edit Fill</string>
     <string name="fill_add_note">Add note</string>
     <string name="fill_note_dialog_title">Note</string>
+
+    <!-- Per-item action row (ChecklistItemCard bottom row — kept for formatItemReminderLabel fallback) -->
+    <string name="detail_item_action_note">Note</string>
+    <string name="detail_item_action_edit_note">Edit note</string>
+    <string name="detail_item_action_remind">Remind</string>
+    <string name="detail_item_reminder_missed">Missed (%1$s)</string>
+    <string name="detail_item_reminder_at">%1$s</string>
+
+    <!-- Item Details Sheet (Things-style) -->
+    <string name="detail_item_sheet_action_reminder">Reminder</string>
+    <string name="detail_item_sheet_action_note">Note</string>
+    <string name="detail_item_sheet_action_edit_note">Edit note</string>
+    <string name="detail_item_sheet_action_delete">Delete item</string>
+    <string name="detail_item_sheet_subtitle_no_reminder">Tap to set</string>
+    <string name="detail_item_sheet_subtitle_no_note">Tap to add</string>
     <string name="fill_note_placeholder">Add a note about this item...</string>
     <string name="fill_cover_change">Change Cover</string>
     <string name="fill_cover_remove">Remove Cover</string>

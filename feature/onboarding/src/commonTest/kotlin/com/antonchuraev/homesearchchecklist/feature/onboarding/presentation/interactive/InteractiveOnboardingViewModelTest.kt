@@ -8,9 +8,10 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistR
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistRepeatInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ItemReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
-import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
 import com.antonchuraev.homesearchchecklist.feature.create.domain.model.ChecklistTemplate
 import com.antonchuraev.homesearchchecklist.feature.sharing.domain.formatter.ChecklistFormatter
@@ -1123,6 +1124,10 @@ class InteractiveOnboardingViewModelTest {
         }
         override fun cancelRepeat(checklistId: Long) {}
         override suspend fun rescheduleAllActiveRepeats() {}
+        override fun scheduleItemReminder(checklistId: Long, fillId: Long, itemId: String, triggerAtMillis: Long) {}
+        override fun cancelItemReminder(checklistId: Long, fillId: Long, itemId: String) {}
+        override fun scheduleItemRepeat(checklistId: Long, fillId: Long, itemId: String, triggerAtMillis: Long) {}
+        override fun cancelItemRepeat(checklistId: Long, fillId: Long, itemId: String) {}
     }
 
     private class FakeChecklistRepository : ChecklistRepository {
@@ -1188,6 +1193,8 @@ class InteractiveOnboardingViewModelTest {
         override suspend fun getActiveRepeatSchedules(): List<ChecklistRepeatInfo> = emptyList()
         override suspend fun getPastDueRepeatSchedules(nowMillis: Long): List<ChecklistRepeatInfo> = emptyList()
         override suspend fun getTotalAdditionalFillCount(): Int = 0
+        override suspend fun getWeeklyChecklistCount(): Int = 0
+        override suspend fun getAllItemRemindersForRescheduling(): List<ItemReminderInfo> = emptyList()
     }
 
     private class FakeAppNavigator : AppNavigator {

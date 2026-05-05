@@ -5,6 +5,7 @@ import com.antonchuraev.homesearchchecklist.core.common.api.State
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatEndCondition
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatType
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.PendingRepeatConfig
@@ -60,6 +61,11 @@ sealed interface ChecklistDetailState : State {
         val pendingRepeatConfig: PendingRepeatConfig? = null,
         val showEndConditionPicker: Boolean = false,
         val repeatRuleSummary: String? = null,
+        // Per-item reminder sheet: null = closed; non-null = open for that itemId
+        val itemReminderSheetFor: String? = null,
+        val activeItemReminderTab: ReminderTab = ReminderTab.ONCE,
+        // Item details sheet: null = closed; non-null = open for that itemId
+        val itemDetailsSheetFor: String? = null,
     ) : ChecklistDetailState
 }
 
@@ -161,4 +167,21 @@ sealed interface ChecklistDetailIntent : Intent {
     data class OnItemLongPressForMove(val itemId: String) : ChecklistDetailIntent
     data class OnMoveItemToDay(val itemId: String, val targetWeekday: Int) : ChecklistDetailIntent
     data object OnDismissMoveToDaySheet : ChecklistDetailIntent
+
+    // Item details sheet
+    data class OnItemTapForDetails(val itemId: String) : ChecklistDetailIntent
+    data object OnDismissItemDetailsSheet : ChecklistDetailIntent
+    data class OnDeleteItemFromSheet(val itemId: String) : ChecklistDetailIntent
+
+    // Per-item reminder intents
+    data class OnItemReminderClick(val itemId: String) : ChecklistDetailIntent
+    data class OnSaveItemReminder(
+        val itemId: String,
+        val reminderAt: Long?,
+        val repeatRule: ReminderRepeatRule?,
+        val repeatTimeOfDayMinutes: Int?
+    ) : ChecklistDetailIntent
+    data class OnRemoveItemReminder(val itemId: String) : ChecklistDetailIntent
+    data object OnDismissItemReminderSheet : ChecklistDetailIntent
+    data class OnItemReminderTabSelected(val tab: ReminderTab) : ChecklistDetailIntent
 }

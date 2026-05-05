@@ -11,6 +11,7 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.toEntity
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ItemReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import kotlinx.coroutines.flow.Flow
@@ -97,7 +98,19 @@ class ChecklistRepositoryImpl(
     }
 
     override suspend fun countActiveReminders(): Int {
-        return checklistDao.countActiveReminders(currentTimeMillis())
+        val now = currentTimeMillis()
+        // Checklist-level one-shot reminders still in the future (original behavior preserved)
+        val checklistOneShot = checklistDao.countActiveReminders(now)
+        // Per-item reminders: scan all default fills in-memory.
+        // Items are serialized JSON — not SQL-queryable columns.
+        // Counts each item that has any active reminder (one-shot OR recurring).
+        // Note: checklist-level repeat schedules are NOT included here — they have a
+        // separate gate via countActiveRepeatSchedules() in ChecklistDetailViewModel.
+        val itemReminderCount = fillDao.getAllDefaultFills()
+            .sumOf { entity ->
+                entity.items.count { item -> item.hasActiveReminder }
+            }
+        return checklistOneShot + itemReminderCount
     }
 
     override suspend fun getActiveReminders(): List<ChecklistReminderInfo> {
@@ -159,6 +172,24 @@ class ChecklistRepositoryImpl(
     // Analytics
     override suspend fun getTotalAdditionalFillCount(): Int {
         return fillDao.getTotalAdditionalFillCount()
+    }
+
+    override suspend fun getAllItemRemindersForRescheduling(): List<ItemReminderInfo> {
+        return fillDao.getAllDefaultFills().flatMap { entity ->
+            entity.items
+                .filter { item -> item.hasActiveReminder }
+                .map { item ->
+                    ItemReminderInfo(
+                        checklistId = entity.checklistId,
+                        fillId = entity.id,
+                        itemId = item.id,
+                        reminderAt = item.reminderAt,
+                        repeatRule = item.repeatRule,
+                        repeatNextAt = item.repeatNextAt,
+                        repeatOccurrenceCount = item.repeatOccurrenceCount
+                    )
+                }
+        }
     }
 
     // Weekly mode

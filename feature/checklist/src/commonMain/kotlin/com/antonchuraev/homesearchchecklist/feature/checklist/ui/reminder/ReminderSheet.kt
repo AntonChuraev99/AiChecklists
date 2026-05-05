@@ -819,7 +819,7 @@ private fun EndConditionDialog(
 
 // ─── Utility functions ──────────────────────────────────────────
 
-internal fun formatReminderDateTime(dateTime: LocalDateTime): String {
+fun formatReminderDateTime(dateTime: LocalDateTime): String {
     val month = dateTime.month.name.take(3).lowercase()
         .replaceFirstChar { it.uppercase() }
     val day = dateTime.dayOfMonth

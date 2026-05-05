@@ -57,9 +57,8 @@ import org.jetbrains.compose.resources.stringResource
  * @param onAddItemToDay callback for adding a new item to a specific day
  * @param onItemCheckedChange callback for toggling an item's checked state
  * @param onItemLongPress callback when user long-presses an item (opens MoveToDayBottomSheet)
- * @param onItemNoteClick callback for opening note dialog for an item
+ * @param onItemTap callback when user taps the right 70% of an item card (opens ItemDetailsSheet)
  */
-@Suppress("UNUSED_PARAMETER")
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun WeeklyChecklistDetailContent(
@@ -69,7 +68,7 @@ internal fun WeeklyChecklistDetailContent(
     onAddItemToDay: (weekday: Int, text: String) -> Unit,
     onItemCheckedChange: (itemId: String, checked: Boolean) -> Unit,
     onItemLongPress: (itemId: String) -> Unit,
-    onItemNoteClick: (itemId: String) -> Unit,
+    onItemTap: (itemId: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val items = state.defaultFill?.items.orEmpty()
@@ -138,7 +137,7 @@ internal fun WeeklyChecklistDetailContent(
                     isEditMode = false,
                     wiggleAngle = 0f,
                     onCheckedChange = { checked: Boolean -> onItemCheckedChange(item.id, checked) },
-                    onNoteClick = { onItemNoteClick(item.id) },
+                    onItemTap = { onItemTap(item.id) },
                     onLongClick = { onItemLongPress(item.id) },
                     modifier = Modifier.padding(horizontal = AppDimens.ScreenPaddingHorizontal),
                 )
@@ -202,7 +201,7 @@ internal fun WeeklyChecklistDetailContent(
                         isEditMode = false,
                         wiggleAngle = 0f,
                         onCheckedChange = { checked: Boolean -> onItemCheckedChange(item.id, checked) },
-                        onNoteClick = { onItemNoteClick(item.id) },
+                        onItemTap = { onItemTap(item.id) },
                         onLongClick = { onItemLongPress(item.id) },
                         modifier = Modifier.padding(horizontal = AppDimens.ScreenPaddingHorizontal),
                     )

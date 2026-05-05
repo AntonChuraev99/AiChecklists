@@ -29,6 +29,10 @@ interface ChecklistFillDao {
     @Query("SELECT COUNT(*) FROM checklist_fills WHERE isDefault = 0")
     suspend fun getTotalAdditionalFillCount(): Int
 
+    /** Returns all default fills across all checklists (used for per-item reminder scanning). */
+    @Query("SELECT * FROM checklist_fills WHERE isDefault = 1")
+    suspend fun getAllDefaultFills(): List<ChecklistFillEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(fill: ChecklistFillEntity): Long
 

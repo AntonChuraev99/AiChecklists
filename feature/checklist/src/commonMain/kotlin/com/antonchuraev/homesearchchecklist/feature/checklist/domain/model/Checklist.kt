@@ -77,6 +77,13 @@ data class ChecklistFill(
  * Item state in a filled checklist
  * id is auto-generated for stable LazyColumn keys
  * weekday: ISO day-of-week (1=Mon..7=Sun), non-null only when checklist viewMode=Weekly
+ *
+ * Per-item reminder fields mirror the checklist-level fields in [Checklist]:
+ * - [reminderAt]: one-shot trigger epoch millis; null = no pending one-shot
+ * - [repeatRule]: recurring schedule; null = not recurring
+ * - [repeatTimeOfDayMinutes]: minutes-since-midnight for repeat trigger
+ * - [repeatNextAt]: next repeat epoch millis
+ * - [repeatOccurrenceCount]: how many times this item's repeat has fired
  */
 @ConsistentCopyVisibility
 @Serializable
@@ -85,7 +92,13 @@ data class ChecklistFillItem private constructor(
     val checked: Boolean,
     val note: String? = null,
     val id: String = generateId(),
-    val weekday: Int? = null
+    val weekday: Int? = null,
+    // ── Per-item reminder fields ──
+    val reminderAt: Long? = null,
+    val repeatRule: ReminderRepeatRule? = null,
+    val repeatTimeOfDayMinutes: Int? = null,
+    val repeatNextAt: Long? = null,
+    val repeatOccurrenceCount: Int = 0
 ) {
     constructor(
         text: String,
@@ -100,14 +113,59 @@ data class ChecklistFillItem private constructor(
         weekday = weekday
     )
 
-    /** Update checked state while preserving id and weekday */
-    fun withChecked(checked: Boolean) = ChecklistFillItem(text, checked, note, id, weekday)
+    /** Update checked state while preserving id, weekday, and reminder fields */
+    fun withChecked(checked: Boolean) = ChecklistFillItem(
+        text, checked, note, id, weekday,
+        reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount
+    )
 
-    /** Update note while preserving id and weekday */
-    fun withNote(note: String?) = ChecklistFillItem(text, checked, note, id, weekday)
+    /** Update note while preserving id, weekday, and reminder fields */
+    fun withNote(note: String?) = ChecklistFillItem(
+        text, checked, note, id, weekday,
+        reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount
+    )
 
-    /** Update weekday while preserving id, text, checked state, and note */
-    fun withWeekday(weekday: Int?) = ChecklistFillItem(text, checked, note, id, weekday)
+    /** Update weekday while preserving id, text, checked state, note, and reminder fields */
+    fun withWeekday(weekday: Int?) = ChecklistFillItem(
+        text, checked, note, id, weekday,
+        reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount
+    )
+
+    /** Set or clear the one-shot reminder timestamp; preserves all other fields */
+    fun withReminderAt(reminderAt: Long?) = ChecklistFillItem(
+        text, checked, note, id, weekday,
+        reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount
+    )
+
+    /** Set the recurring repeat schedule; preserves all other fields */
+    fun withRepeatRule(
+        rule: ReminderRepeatRule,
+        timeOfDayMinutes: Int,
+        nextAt: Long
+    ) = ChecklistFillItem(
+        text, checked, note, id, weekday,
+        reminderAt, rule, timeOfDayMinutes, nextAt, repeatOccurrenceCount
+    )
+
+    /** Advance the repeat schedule to the next trigger; preserves all other fields */
+    fun withRepeatAdvanced(nextAt: Long?, newCount: Int) = ChecklistFillItem(
+        text, checked, note, id, weekday,
+        reminderAt, repeatRule, repeatTimeOfDayMinutes, nextAt, newCount
+    )
+
+    /** Clear all reminder data (both one-shot and repeat) while preserving all other fields */
+    fun withReminderCleared() = ChecklistFillItem(
+        text, checked, note, id, weekday,
+        reminderAt = null,
+        repeatRule = null,
+        repeatTimeOfDayMinutes = null,
+        repeatNextAt = null,
+        repeatOccurrenceCount = 0
+    )
+
+    /** Returns true if this item has any active reminder (one-shot OR recurring) */
+    val hasActiveReminder: Boolean
+        get() = reminderAt != null || repeatRule != null
 
     companion object {
         private fun generateId() = "${currentTimeMillis()}_${Random.nextInt(0, 10000)}"

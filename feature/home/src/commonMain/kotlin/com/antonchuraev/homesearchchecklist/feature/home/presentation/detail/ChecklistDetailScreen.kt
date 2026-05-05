@@ -23,11 +23,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -62,6 +64,7 @@ import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material.icons.outlined.RemoveDone
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.filled.Note
 import androidx.compose.material.icons.outlined.NoteAdd
 import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.Notifications
@@ -125,6 +128,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -145,10 +150,12 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Repea
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatType
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.weekly.MoveToDayBottomSheet
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.weekly.WeeklyChecklistDetailContent
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.PendingRepeatConfig
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderSheet
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderSheetCallbacks
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderSheetState
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderDateTimePicker
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.formatReminderDateTime
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
 import org.jetbrains.compose.resources.getString
@@ -397,7 +404,7 @@ private fun ChecklistDetailContent(
                         onAddItemToDay = { weekday, text -> onIntent(ChecklistDetailIntent.OnAddItemToDay(weekday, text)) },
                         onItemCheckedChange = { itemId, checked -> onIntent(ChecklistDetailIntent.OnItemCheckedChange(itemId, checked)) },
                         onItemLongPress = { itemId -> onIntent(ChecklistDetailIntent.OnItemLongPressForMove(itemId)) },
-                        onItemNoteClick = { itemId -> onIntent(ChecklistDetailIntent.OnAddNoteClick(itemId)) },
+                        onItemTap = { itemId -> onIntent(ChecklistDetailIntent.OnItemTapForDetails(itemId)) },
                         modifier = Modifier.fillMaxSize(),
                     )
                     // MoveToDayBottomSheet — sibling to WeeklyChecklistDetailContent, not inside it
@@ -500,7 +507,7 @@ private fun ChecklistDetailContent(
                                 onCheckedChange = { checked ->
                                     onIntent(ChecklistDetailIntent.OnItemCheckedChange(item.id, checked))
                                 },
-                                onNoteClick = { onIntent(ChecklistDetailIntent.OnAddNoteClick(item.id)) },
+                                onItemTap = { onIntent(ChecklistDetailIntent.OnItemTapForDetails(item.id)) },
                                 onLongClick = {
                                     if (!isEditMode) {
                                         hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -572,7 +579,7 @@ private fun ChecklistDetailContent(
                                     onCheckedChange = { checked ->
                                         onIntent(ChecklistDetailIntent.OnItemCheckedChange(item.id, checked))
                                     },
-                                    onNoteClick = { onIntent(ChecklistDetailIntent.OnAddNoteClick(item.id)) },
+                                    onItemTap = { onIntent(ChecklistDetailIntent.OnItemTapForDetails(item.id)) },
                                     onLongClick = {
                                         if (!isEditMode) {
                                             hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -593,6 +600,20 @@ private fun ChecklistDetailContent(
                 } // end Standard ->
             } // end when (state.checklist.viewMode)
         }
+    }
+
+    // Item details sheet — opens when user taps the right 70% of a ChecklistItemCard
+    val detailsItem = state.itemDetailsSheetFor?.let { id ->
+        state.defaultFill?.items?.firstOrNull { it.id == id }
+    }
+    if (detailsItem != null) {
+        ItemDetailsSheet(
+            item = detailsItem,
+            onReminderClick = { onIntent(ChecklistDetailIntent.OnItemReminderClick(detailsItem.id)) },
+            onNoteClick = { onIntent(ChecklistDetailIntent.OnAddNoteClick(detailsItem.id)) },
+            onDelete = { onIntent(ChecklistDetailIntent.OnDeleteItemFromSheet(detailsItem.id)) },
+            onDismiss = { onIntent(ChecklistDetailIntent.OnDismissItemDetailsSheet) },
+        )
     }
 
     // Note dialog
@@ -684,6 +705,54 @@ private fun ChecklistDetailContent(
                 onSaveRepeat = { onIntent(ChecklistDetailIntent.OnSaveRepeatSchedule) },
                 onRemoveRepeat = { onIntent(ChecklistDetailIntent.OnRemoveRepeatSchedule) },
                 onDismiss = { onIntent(ChecklistDetailIntent.OnDismissReminderUI) }
+            )
+        )
+    }
+
+    // Per-item reminder sheet (reuses ReminderSheet with item-scoped callbacks)
+    val itemReminderItem = state.itemReminderSheetFor?.let { id ->
+        state.defaultFill?.items?.firstOrNull { it.id == id }
+    }
+    if (itemReminderItem != null) {
+        ReminderSheet(
+            state = ReminderSheetState(
+                activeTab = state.activeItemReminderTab,
+                currentReminder = itemReminderItem.reminderAt,
+                currentRepeatRule = itemReminderItem.repeatRule,
+                repeatRuleSummary = itemReminderItem.repeatRule?.type?.name,
+                pendingRepeatConfig = null,
+                showEndConditionPicker = false
+            ),
+            callbacks = ReminderSheetCallbacks(
+                onTabSelected = { onIntent(ChecklistDetailIntent.OnItemReminderTabSelected(it)) },
+                onPresetSelected = { triggerAt ->
+                    onIntent(ChecklistDetailIntent.OnSaveItemReminder(
+                        itemReminderItem.id, triggerAt, null, null
+                    ))
+                },
+                onCustomDateRequested = { onIntent(ChecklistDetailIntent.OnCustomDateRequested) },
+                onRemoveReminder = { onIntent(ChecklistDetailIntent.OnRemoveItemReminder(itemReminderItem.id)) },
+                onRepeatTypeSelected = { onIntent(ChecklistDetailIntent.OnRepeatTypeSelected(it)) },
+                onSmartPresetSelected = { onIntent(ChecklistDetailIntent.OnSmartPresetSelected(it)) },
+                onRepeatIntervalChanged = { onIntent(ChecklistDetailIntent.OnRepeatIntervalChanged(it)) },
+                onWeekDayToggled = { onIntent(ChecklistDetailIntent.OnWeekDayToggled(it)) },
+                onResetChecksToggled = { onIntent(ChecklistDetailIntent.OnResetChecksToggled(it)) },
+                onRepeatTimeChanged = { h, m -> onIntent(ChecklistDetailIntent.OnRepeatTimeChanged(h, m)) },
+                onEndConditionClick = { onIntent(ChecklistDetailIntent.OnEndConditionClick) },
+                onEndConditionSelected = { onIntent(ChecklistDetailIntent.OnEndConditionSelected(it)) },
+                onDismissEndCondition = { onIntent(ChecklistDetailIntent.OnDismissEndConditionPicker) },
+                onSaveRepeat = {
+                    val config = state.pendingRepeatConfig
+                    if (config != null) {
+                        val rule = config.toRule()
+                        val timeMinutes = config.timeHour * 60 + config.timeMinute
+                        onIntent(ChecklistDetailIntent.OnSaveItemReminder(
+                            itemReminderItem.id, null, rule, timeMinutes
+                        ))
+                    }
+                },
+                onRemoveRepeat = { onIntent(ChecklistDetailIntent.OnRemoveItemReminder(itemReminderItem.id)) },
+                onDismiss = { onIntent(ChecklistDetailIntent.OnDismissItemReminderSheet) }
             )
         )
     }
@@ -911,7 +980,7 @@ internal fun ChecklistItemCard(
     isEditMode: Boolean,
     wiggleAngle: Float,
     onCheckedChange: (Boolean) -> Unit,
-    onNoteClick: () -> Unit,
+    onItemTap: () -> Unit,
     onLongClick: () -> Unit,
     cardDragModifier: Modifier = Modifier,
     modifier: Modifier = Modifier
@@ -925,69 +994,114 @@ internal fun ChecklistItemCard(
                 rotationZ = wiggleAngle
             }
         }
-        .then(
-            if (isEditMode) {
-                cardDragModifier
-            } else {
-                Modifier.combinedClickable(
-                    onClick = { onCheckedChange(!item.checked) },
-                    onLongClick = onLongClick
-                )
-            }
-        )
+        .then(if (isEditMode) cardDragModifier else Modifier)
 
     val cardContent: @Composable () -> Unit = {
-        Column(modifier = Modifier.fillMaxWidth().padding(AppDimens.CardPadding)) {
+        Box(modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp)) {
+            // ── Visual layer: Checkbox + Text at original positions ──
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.Center)
+                    .padding(
+                        horizontal = AppDimens.SpacingMd,
+                        vertical = AppDimens.SpacingSm
+                    ),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (!isEditMode) {
                     Checkbox(
                         checked = item.checked,
-                        onCheckedChange = onCheckedChange
+                        onCheckedChange = null, // tap overlay handles it
+                        modifier = Modifier.padding(end = AppDimens.SpacingSm)
                     )
                 }
-
-                Text(
-                    text = item.text,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = if (item.checked) {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    },
-                    textDecoration = if (item.checked) TextDecoration.LineThrough else null,
-                    modifier = Modifier.weight(1f).padding(
-                        start = if (isEditMode) AppDimens.SpacingSm else 0.dp
-                    )
-                )
-
-                if (!isEditMode) {
-                    IconButton(onClick = onNoteClick) {
-                        Icon(
-                            Icons.Outlined.NoteAdd,
-                            contentDescription = stringResource(Res.string.fill_add_note),
-                            tint = if (item.note != null) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                            modifier = Modifier.size(20.dp)
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs)
+                ) {
+                    Text(
+                        text = item.text,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = if (item.checked) {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
+                        textDecoration = if (item.checked) TextDecoration.LineThrough else null,
+                        modifier = Modifier.fillMaxWidth().padding(
+                            start = if (isEditMode) AppDimens.SpacingSm else 0.dp
                         )
+                    )
+
+                    if (!isEditMode) {
+                        item.note?.let { note ->
+                            Text(
+                                text = note,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+
+                    if (!isEditMode && item.hasActiveReminder) {
+                        val reminderMissed = isReminderMissed(item)
+                        val reminderLabel = formatItemReminderLabel(item)
+                        val chipColor = if (reminderMissed)
+                            MaterialTheme.colorScheme.error
+                        else
+                            MaterialTheme.colorScheme.primary
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Notifications,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp),
+                                tint = chipColor
+                            )
+                            Text(
+                                text = reminderLabel,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = chipColor
+                            )
+                        }
                     }
                 }
             }
 
+            // ── Tap overlay: invisible 30/70 split (above visual layer) ──
+            // No ripple — clicks are silent; user feedback comes from state change
+            // (checkbox flip / sheet appearing).
             if (!isEditMode) {
-                item.note?.let { note ->
-                    Text(
-                        text = note,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(start = 48.dp, end = 48.dp, bottom = AppDimens.SpacingSm)
+                val checkInteractionSource = remember { MutableInteractionSource() }
+                val tapInteractionSource = remember { MutableInteractionSource() }
+                Row(modifier = Modifier.matchParentSize()) {
+                    Box(
+                        modifier = Modifier
+                            .weight(0.30f)
+                            .fillMaxHeight()
+                            .combinedClickable(
+                                interactionSource = checkInteractionSource,
+                                indication = null,
+                                onClick = { onCheckedChange(!item.checked) },
+                                onLongClick = onLongClick
+                            )
+                    )
+                    Box(
+                        modifier = Modifier
+                            .weight(0.70f)
+                            .fillMaxHeight()
+                            .clickable(
+                                interactionSource = tapInteractionSource,
+                                indication = null,
+                                onClick = onItemTap
+                            )
                     )
                 }
             }
@@ -1025,6 +1139,228 @@ internal fun ChecklistItemCard(
             ),
             elevation = CardDefaults.cardElevation(defaultElevation = elevation)
         ) { cardContent() }
+    }
+}
+
+/**
+ * Things-style detail sheet for a checklist item.
+ *
+ * Shows item name + three action rows: Reminder, Note, Delete.
+ * Wiring (close + open target) is handled in Phase B (android-expert).
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun ItemDetailsSheet(
+    item: ChecklistFillItem,
+    onReminderClick: () -> Unit,
+    onNoteClick: () -> Unit,
+    onDelete: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
+                .padding(bottom = AppDimens.SpacingXxl)
+        ) {
+            // Item name as sheet title
+            Text(
+                text = item.text,
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = AppDimens.SpacingMd)
+            )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+            // ── Reminder row ──
+            val hasReminder = item.hasActiveReminder
+            val reminderMissed = hasReminder && isReminderMissed(item)
+            val reminderTitle = stringResource(Res.string.detail_item_sheet_action_reminder)
+            val reminderSubtitle = when {
+                hasReminder -> formatItemReminderLabel(item)
+                else -> stringResource(Res.string.detail_item_sheet_subtitle_no_reminder)
+            }
+            val reminderIconTint = when {
+                reminderMissed -> MaterialTheme.colorScheme.error
+                hasReminder -> MaterialTheme.colorScheme.primary
+                else -> MaterialTheme.colorScheme.onSurfaceVariant
+            }
+
+            ItemDetailsSheetRow(
+                icon = if (hasReminder) Icons.Filled.Notifications else Icons.Outlined.Notifications,
+                iconTint = reminderIconTint,
+                title = reminderTitle,
+                subtitle = reminderSubtitle,
+                showChevron = true,
+                onClick = onReminderClick,
+            )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+            // ── Note row ──
+            val hasNote = item.note != null
+            val noteTitle = stringResource(
+                if (hasNote) Res.string.detail_item_sheet_action_edit_note
+                else Res.string.detail_item_sheet_action_note
+            )
+            val noteSubtitle = item.note
+                ?: stringResource(Res.string.detail_item_sheet_subtitle_no_note)
+            val noteIconTint = if (hasNote)
+                MaterialTheme.colorScheme.primary
+            else
+                MaterialTheme.colorScheme.onSurfaceVariant
+
+            ItemDetailsSheetRow(
+                icon = if (hasNote) Icons.Filled.Note else Icons.Outlined.NoteAdd,
+                iconTint = noteIconTint,
+                title = noteTitle,
+                subtitle = noteSubtitle,
+                showChevron = true,
+                onClick = onNoteClick,
+            )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+            Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
+
+            // ── Delete row ──
+            ItemDetailsSheetRow(
+                icon = Icons.Outlined.Delete,
+                iconTint = MaterialTheme.colorScheme.error,
+                title = stringResource(Res.string.detail_item_sheet_action_delete),
+                subtitle = null,
+                showChevron = false,
+                titleColor = MaterialTheme.colorScheme.error,
+                onClick = onDelete,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ItemDetailsSheetRow(
+    icon: ImageVector,
+    iconTint: Color,
+    title: String,
+    subtitle: String?,
+    showChevron: Boolean,
+    onClick: () -> Unit,
+    titleColor: Color = MaterialTheme.colorScheme.onSurface,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = AppDimens.MinTouchTarget)
+            .clickable(onClick = onClick)
+            .padding(vertical = AppDimens.SpacingMd),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = iconTint,
+            modifier = Modifier.size(24.dp)
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = titleColor,
+            )
+            if (subtitle != null) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        if (showChevron) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+
+/**
+ * Returns true if the item has a one-shot reminder that has already passed (missed).
+ * Recurring reminders never count as missed — they always show the next future trigger.
+ */
+private fun isReminderMissed(item: ChecklistFillItem): Boolean {
+    if (item.repeatRule != null) return false
+    val at = item.reminderAt ?: return false
+    return at < Clock.System.now().toEpochMilliseconds()
+}
+
+/**
+ * Formats the label shown on the Remind TextButton inside ChecklistItemCard.
+ *
+ * States:
+ * - No reminder   → "Remind"
+ * - One-shot, future → "May 5, 18:00"  (formatted via formatReminderDateTime)
+ * - One-shot, past   → "Missed (May 5)"
+ * - Recurring        → compact rule text, e.g. "Daily 09:00" / "Weekly Mon 18:00"
+ */
+@Composable
+internal fun formatItemReminderLabel(item: ChecklistFillItem): String {
+    if (!item.hasActiveReminder) return stringResource(Res.string.detail_item_action_remind)
+
+    val tz = TimeZone.currentSystemDefault()
+
+    // Recurring reminder — show rule + time from repeatTimeOfDayMinutes
+    val rule = item.repeatRule
+    if (rule != null) {
+        val minutes = item.repeatTimeOfDayMinutes ?: 0
+        val h = (minutes / 60).toString().padStart(2, '0')
+        val m = (minutes % 60).toString().padStart(2, '0')
+        val ruleText = when (rule.type) {
+            RepeatType.DAILY -> "Daily $h:$m"
+            RepeatType.WEEKLY -> {
+                val days = rule.weekDays
+                if (days.isNullOrEmpty()) "Weekly $h:$m"
+                else {
+                    val dayNames = days.sorted().joinToString(",") { iso ->
+                        when (iso) {
+                            1 -> "Mon"; 2 -> "Tue"; 3 -> "Wed"; 4 -> "Thu"
+                            5 -> "Fri"; 6 -> "Sat"; else -> "Sun"
+                        }
+                    }
+                    "Weekly $dayNames $h:$m"
+                }
+            }
+            RepeatType.MONTHLY -> "Monthly $h:$m"
+            RepeatType.YEARLY -> "Yearly $h:$m"
+        }
+        return ruleText
+    }
+
+    // One-shot reminder
+    val at = item.reminderAt ?: return stringResource(Res.string.detail_item_action_remind)
+    val localDt = Instant.fromEpochMilliseconds(at).toLocalDateTime(tz)
+    val formatted = formatReminderDateTime(localDt)
+
+    return if (isReminderMissed(item)) {
+        // Show date only for missed (no time clutter)
+        val month = localDt.month.name.take(3).lowercase().replaceFirstChar { it.uppercase() }
+        "Missed ($month ${localDt.dayOfMonth})"
+    } else {
+        formatted
     }
 }
 

@@ -30,6 +30,18 @@ class ReminderReceiver : BroadcastReceiver() {
         when (intent.action) {
             ACTION_REMINDER_FIRE -> handleOneShot(context, checklistId)
             ACTION_REPEAT_FIRE -> handleRepeat(context, checklistId)
+            ACTION_ITEM_REMINDER_FIRE -> {
+                val fillId = intent.getLongExtra(EXTRA_FILL_ID, -1L)
+                val itemId = intent.getStringExtra(EXTRA_ITEM_ID) ?: return
+                if (fillId == -1L) return
+                handleItemOneShot(context, checklistId, fillId, itemId)
+            }
+            ACTION_ITEM_REPEAT_FIRE -> {
+                val fillId = intent.getLongExtra(EXTRA_FILL_ID, -1L)
+                val itemId = intent.getStringExtra(EXTRA_ITEM_ID) ?: return
+                if (fillId == -1L) return
+                handleItemRepeat(context, checklistId, fillId, itemId)
+            }
         }
     }
 
@@ -123,6 +135,138 @@ class ReminderReceiver : BroadcastReceiver() {
         }
     }
 
+    private fun handleItemOneShot(context: Context, checklistId: Long, fillId: Long, itemId: String) {
+        val pendingResult = goAsync()
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val koin = GlobalContext.getOrNull() ?: return@launch
+                val repository: ChecklistRepository = koin.get()
+
+                val fill = repository.getFillById(fillId) ?: return@launch
+                val item = fill.items.find { it.id == itemId } ?: return@launch
+
+                // Guard: skip notification if item already completed
+                if (item.checked) return@launch
+
+                // Clear one-shot field so it doesn't re-fire after reboot rescheduling
+                val updatedItems = fill.items.map { if (it.id == itemId) it.withReminderAt(null) else it }
+                repository.updateFill(fill.copy(items = updatedItems))
+
+                val checklist = repository.getChecklistById(checklistId)
+                val checklistName = checklist?.name ?: context.getString(R.string.app_name)
+                showItemNotification(context, checklistId, fillId, itemId, checklistName, item.text)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e(TAG, "Error processing item one-shot reminder", e)
+            } finally {
+                pendingResult.finish()
+            }
+        }
+    }
+
+    private fun handleItemRepeat(context: Context, checklistId: Long, fillId: Long, itemId: String) {
+        val pendingResult = goAsync()
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val koin = GlobalContext.getOrNull() ?: return@launch
+                val repository: ChecklistRepository = koin.get()
+                val scheduler: ChecklistReminderScheduler = koin.get()
+
+                val fill = repository.getFillById(fillId) ?: return@launch
+                val item = fill.items.find { it.id == itemId } ?: return@launch
+
+                // Guard: skip notification if item already completed
+                if (item.checked) return@launch
+
+                val repeatRule = item.repeatRule ?: return@launch
+                val now = System.currentTimeMillis()
+                val nextOccurrence = repeatRule.computeNextOccurrence(
+                    currentTriggerMillis = item.repeatNextAt ?: now,
+                    currentCount = item.repeatOccurrenceCount,
+                    nowMillis = now
+                )
+
+                val updatedItem = if (nextOccurrence != null) {
+                    // Advance to next occurrence
+                    item.withRepeatAdvanced(
+                        nextAt = nextOccurrence,
+                        newCount = item.repeatOccurrenceCount + 1
+                    )
+                } else {
+                    // End condition reached — stop repeating, clear schedule
+                    item.withRepeatAdvanced(nextAt = null, newCount = item.repeatOccurrenceCount + 1)
+                        .withReminderAt(null)
+                }
+
+                val updatedItems = fill.items.map { if (it.id == itemId) updatedItem else it }
+                repository.updateFill(fill.copy(items = updatedItems))
+
+                // Reschedule next occurrence if schedule continues
+                if (nextOccurrence != null) {
+                    scheduler.scheduleItemRepeat(checklistId, fillId, itemId, nextOccurrence)
+                }
+
+                val checklist = repository.getChecklistById(checklistId)
+                val checklistName = checklist?.name ?: context.getString(R.string.app_name)
+                showItemNotification(context, checklistId, fillId, itemId, checklistName, item.text)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e(TAG, "Error processing item repeat reminder", e)
+            } finally {
+                pendingResult.finish()
+            }
+        }
+    }
+
+    private fun showItemNotification(
+        context: Context,
+        checklistId: Long,
+        fillId: Long,
+        itemId: String,
+        checklistName: String,
+        itemText: String
+    ) {
+        val deepLinkIntent = Intent(context, MainActivity::class.java).apply {
+            action = ACTION_OPEN_CHECKLIST
+            putExtra(EXTRA_NAVIGATE_CHECKLIST_ID, checklistId)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val pendingIntent = TaskStackBuilder.create(context).run {
+            addNextIntentWithParentStack(deepLinkIntent)
+            getPendingIntent(
+                ReminderScheduler.itemReminderRequestCode(fillId, itemId),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )!!
+        }
+
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_checkbox_checked)
+            .setContentTitle(checklistName.take(200))
+            .setContentText(itemText.take(200))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setPublicVersion(
+                NotificationCompat.Builder(context, CHANNEL_ID)
+                    .setSmallIcon(R.drawable.ic_checkbox_checked)
+                    .setContentTitle(context.getString(R.string.app_name))
+                    .setContentText(context.getString(R.string.reminder_notification_tap))
+                    .build()
+            )
+            .build()
+
+        val notificationManager = context.getSystemService(NotificationManager::class.java)
+        // Use a unique notification ID so item notifications don't overwrite checklist notifications
+        notificationManager.notify(
+            ReminderScheduler.itemReminderRequestCode(fillId, itemId),
+            notification
+        )
+    }
+
     private fun showNotification(
         context: Context,
         checklistId: Long,
@@ -181,7 +325,11 @@ class ReminderReceiver : BroadcastReceiver() {
         private const val TAG = "ReminderReceiver"
         const val ACTION_REMINDER_FIRE = "com.antonchuraev.aichecklists.ACTION_REMINDER_FIRE"
         const val ACTION_REPEAT_FIRE = "com.antonchuraev.aichecklists.ACTION_REPEAT_FIRE"
+        const val ACTION_ITEM_REMINDER_FIRE = "com.antonchuraev.aichecklists.ACTION_ITEM_REMINDER_FIRE"
+        const val ACTION_ITEM_REPEAT_FIRE = "com.antonchuraev.aichecklists.ACTION_ITEM_REPEAT_FIRE"
         const val EXTRA_CHECKLIST_ID = "checklist_id"
+        const val EXTRA_FILL_ID = "fill_id"
+        const val EXTRA_ITEM_ID = "item_id"
         const val ACTION_OPEN_CHECKLIST = "com.antonchuraev.aichecklists.action.OPEN_CHECKLIST"
         const val EXTRA_NAVIGATE_CHECKLIST_ID = "navigate_to_checklist"
         private const val CHANNEL_ID = "checklist_reminders"
