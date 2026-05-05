@@ -26,10 +26,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.UserLimits
 
 class ChecklistDetailViewModel(
     private val checklistId: Long,
@@ -43,6 +46,15 @@ class ChecklistDetailViewModel(
 
     private val _screenState = MutableStateFlow<ChecklistDetailState>(ChecklistDetailState.Loading)
     override val screenState: StateFlow<ChecklistDetailState> = _screenState.asStateFlow()
+
+    // userLimits is held in its own flow because the Loading → Content transition
+    // (driven by checklist load) races with the GetUserLimits flow's first emission.
+    // updateContentState{} is a no-op while state is still Loading, so writing
+    // userLimits straight into screenState would lose the first emission and leave
+    // every subsequent paywall gate seeing isPremium=false. Keeping it independent
+    // ensures awaitUserLimits() always sees the latest value regardless of when
+    // Content state was created.
+    private val _userLimits = MutableStateFlow<UserLimits?>(null)
 
     private var loadDataJob: Job? = null
 
@@ -80,6 +92,7 @@ class ChecklistDetailViewModel(
 
         viewModelScope.launch {
             getUserLimitsUseCase().collect { userLimits ->
+                _userLimits.value = userLimits
                 updateContentState { it.copy(userLimits = userLimits) }
             }
         }
@@ -97,11 +110,13 @@ class ChecklistDetailViewModel(
                 additionalFillsCount = additionalFillsCount
             )
         } else {
+            // Pull the latest userLimits from its independent flow — it may have
+            // already emitted while state was still Loading.
             ChecklistDetailState.Content(
                 checklist = checklist,
                 defaultFill = defaultFill,
                 additionalFillsCount = additionalFillsCount,
-                userLimits = null,
+                userLimits = _userLimits.value,
                 separateCompleted = checklist.separateCompleted,
                 autoDeleteCompleted = checklist.autoDeleteCompleted
             )
@@ -300,10 +315,21 @@ class ChecklistDetailViewModel(
             )
             is ChecklistDetailIntent.OnRemoveItemReminder -> removeItemReminder(intent.itemId)
             ChecklistDetailIntent.OnDismissItemReminderSheet -> {
-                updateContentState { it.copy(itemReminderSheetFor = null) }
+                updateContentState {
+                    it.copy(
+                        itemReminderSheetFor = null,
+                        pendingRepeatConfig = null,
+                        repeatRuleSummary = null,
+                        showEndConditionPicker = false
+                    )
+                }
             }
             is ChecklistDetailIntent.OnItemReminderTabSelected -> {
                 updateContentState { it.copy(activeItemReminderTab = intent.tab) }
+                if (intent.tab == ReminderTab.REPEAT) {
+                    val itemId = (_screenState.value as? ChecklistDetailState.Content)?.itemReminderSheetFor
+                    if (itemId != null) initItemRepeatTabIfNeeded(itemId)
+                }
             }
         }
     }
@@ -647,10 +673,23 @@ class ChecklistDetailViewModel(
         }
     }
 
+    /**
+     * Awaits the first non-null `userLimits` emission from the dedicated [_userLimits]
+     * flow. Use this in handlers that gate on premium — never
+     * `state.userLimits?.isPremium ?: false`, which silently flips to "not premium"
+     * during the Loading→Content transition and pushes the user into a paywall they
+     * shouldn't see. Returns null only on a 2-second timeout (DataStore / RC stall).
+     */
+    private suspend fun awaitUserLimits(): UserLimits? {
+        return _userLimits.value ?: withTimeoutOrNull(2_000L) {
+            _userLimits.filterNotNull().first()
+        }
+    }
+
     private fun handleReminderClick() {
         viewModelScope.launch {
             val state = _screenState.value as? ChecklistDetailState.Content ?: return@launch
-            val isPremium = state.userLimits?.isPremium ?: false
+            val isPremium = awaitUserLimits()?.isPremium ?: false
             val currentChecklistHasReminder = state.checklist.reminderAt != null
 
             if (!isPremium && !currentChecklistHasReminder) {
@@ -672,6 +711,9 @@ class ChecklistDetailViewModel(
                 updateContentState { it.copy(showNotificationPermissionSheet = true, activeReminderTab = defaultTab) }
             } else {
                 updateContentState { it.copy(showReminderSheet = true, activeReminderTab = defaultTab) }
+                if (defaultTab == ReminderTab.REPEAT) {
+                    initRepeatTabIfNeeded()
+                }
             }
         }
     }
@@ -685,39 +727,39 @@ class ChecklistDetailViewModel(
     }
 
     private fun initRepeatTabIfNeeded() {
-        val state = _screenState.value as? ChecklistDetailState.Content ?: return
+        viewModelScope.launch {
+            val state = _screenState.value as? ChecklistDetailState.Content ?: return@launch
 
-        // Already has pending config — just switch tab
-        if (state.pendingRepeatConfig != null) {
-            updateContentState { it.copy(activeReminderTab = ReminderTab.REPEAT) }
-            return
-        }
-
-        val existingRule = state.checklist.repeatRule
-        val isPremium = state.userLimits?.isPremium ?: false
-
-        if (existingRule != null) {
-            // Editing an existing repeat rule — no limit check needed
-            val existingTimeMinutes = state.checklist.repeatTimeOfDayMinutes ?: (9 * 60)
-            val config = PendingRepeatConfig(
-                type = existingRule.type,
-                interval = existingRule.interval,
-                weekDays = existingRule.weekDays ?: emptySet(),
-                endCondition = existingRule.endCondition,
-                resetChecks = existingRule.resetChecks,
-                isCustom = existingRule.interval > 1 || !existingRule.weekDays.isNullOrEmpty(),
-                timeHour = existingTimeMinutes / 60,
-                timeMinute = existingTimeMinutes % 60
-            )
-            updateContentState {
-                it.copy(activeReminderTab = ReminderTab.REPEAT, pendingRepeatConfig = config)
+            // Already has pending config — just switch tab
+            if (state.pendingRepeatConfig != null) {
+                updateContentState { it.copy(activeReminderTab = ReminderTab.REPEAT) }
+                return@launch
             }
-            return
-        }
 
-        // New repeat schedule — check free user limit
-        if (!isPremium) {
-            viewModelScope.launch {
+            val existingRule = state.checklist.repeatRule
+
+            if (existingRule != null) {
+                // Editing an existing repeat rule — no limit check needed
+                val existingTimeMinutes = state.checklist.repeatTimeOfDayMinutes ?: (9 * 60)
+                val config = PendingRepeatConfig(
+                    type = existingRule.type,
+                    interval = existingRule.interval,
+                    weekDays = existingRule.weekDays ?: emptySet(),
+                    endCondition = existingRule.endCondition,
+                    resetChecks = existingRule.resetChecks,
+                    isCustom = existingRule.interval > 1 || !existingRule.weekDays.isNullOrEmpty(),
+                    timeHour = existingTimeMinutes / 60,
+                    timeMinute = existingTimeMinutes % 60
+                )
+                updateContentState {
+                    it.copy(activeReminderTab = ReminderTab.REPEAT, pendingRepeatConfig = config)
+                }
+                return@launch
+            }
+
+            // New repeat schedule — check free user limit
+            val isPremium = awaitUserLimits()?.isPremium ?: false
+            if (!isPremium) {
                 val activeCount = repository.countActiveRepeatSchedules()
                 if (activeCount >= MAX_FREE_REPEAT_SCHEDULES) {
                     analyticsTracker.event("recurring_limit_hit")
@@ -727,10 +769,10 @@ class ChecklistDetailViewModel(
                         it.copy(activeReminderTab = ReminderTab.REPEAT, pendingRepeatConfig = PendingRepeatConfig())
                     }
                 }
-            }
-        } else {
-            updateContentState {
-                it.copy(activeReminderTab = ReminderTab.REPEAT, pendingRepeatConfig = PendingRepeatConfig())
+            } else {
+                updateContentState {
+                    it.copy(activeReminderTab = ReminderTab.REPEAT, pendingRepeatConfig = PendingRepeatConfig())
+                }
             }
         }
     }
@@ -739,11 +781,17 @@ class ChecklistDetailViewModel(
         updateContentState {
             it.copy(showNotificationPermissionSheet = false, showReminderSheet = true)
         }
+        if ((_screenState.value as? ChecklistDetailState.Content)?.activeReminderTab == ReminderTab.REPEAT) {
+            initRepeatTabIfNeeded()
+        }
     }
 
     private fun handleNotificationPermissionSkip() {
         updateContentState {
             it.copy(showNotificationPermissionSheet = false, showReminderSheet = true)
+        }
+        if ((_screenState.value as? ChecklistDetailState.Content)?.activeReminderTab == ReminderTab.REPEAT) {
+            initRepeatTabIfNeeded()
         }
     }
 
@@ -1106,7 +1154,7 @@ class ChecklistDetailViewModel(
         viewModelScope.launch {
             val state = _screenState.value as? ChecklistDetailState.Content ?: return@launch
             val item = state.defaultFill?.items?.firstOrNull { it.id == itemId } ?: return@launch
-            val isPremium = state.userLimits?.isPremium ?: false
+            val isPremium = awaitUserLimits()?.isPremium ?: false
 
             // Close item details sheet before opening reminder sheet (Approach A)
             updateContentState { it.copy(itemDetailsSheetFor = null) }
@@ -1139,7 +1187,34 @@ class ChecklistDetailViewModel(
                 updateContentState {
                     it.copy(itemReminderSheetFor = itemId, activeItemReminderTab = defaultTab)
                 }
+                if (defaultTab == ReminderTab.REPEAT) {
+                    initItemRepeatTabIfNeeded(itemId)
+                }
             }
+        }
+    }
+
+    private fun initItemRepeatTabIfNeeded(itemId: String) {
+        val state = _screenState.value as? ChecklistDetailState.Content ?: return
+        if (state.pendingRepeatConfig != null) return
+        val item = state.defaultFill?.items?.firstOrNull { it.id == itemId } ?: return
+        val existingRule = item.repeatRule ?: return
+        val existingTimeMinutes = item.repeatTimeOfDayMinutes ?: (9 * 60)
+        val config = PendingRepeatConfig(
+            type = existingRule.type,
+            interval = existingRule.interval,
+            weekDays = existingRule.weekDays ?: emptySet(),
+            endCondition = existingRule.endCondition,
+            resetChecks = existingRule.resetChecks,
+            isCustom = existingRule.interval > 1 || !existingRule.weekDays.isNullOrEmpty(),
+            timeHour = existingTimeMinutes / 60,
+            timeMinute = existingTimeMinutes % 60
+        )
+        updateContentState {
+            it.copy(
+                pendingRepeatConfig = config,
+                repeatRuleSummary = buildRepeatSummary(config)
+            )
         }
     }
 
@@ -1198,7 +1273,13 @@ class ChecklistDetailViewModel(
                 reminderScheduler.scheduleItemRepeat(checklistId, fill.id, itemId, nextAt)
             }
 
-            updateContentState { it.copy(itemReminderSheetFor = null) }
+            updateContentState {
+                it.copy(
+                    itemReminderSheetFor = null,
+                    pendingRepeatConfig = null,
+                    repeatRuleSummary = null
+                )
+            }
 
             analyticsTracker.event("item_reminder_set", mapOf(
                 "checklist_id" to checklistId.toString(),
@@ -1224,7 +1305,13 @@ class ChecklistDetailViewModel(
             val updatedFill = fill.copy(items = updatedItems)
             repository.updateFill(updatedFill)
 
-            updateContentState { it.copy(itemReminderSheetFor = null) }
+            updateContentState {
+                it.copy(
+                    itemReminderSheetFor = null,
+                    pendingRepeatConfig = null,
+                    repeatRuleSummary = null
+                )
+            }
 
             analyticsTracker.event("item_reminder_removed", mapOf(
                 "checklist_id" to checklistId.toString()

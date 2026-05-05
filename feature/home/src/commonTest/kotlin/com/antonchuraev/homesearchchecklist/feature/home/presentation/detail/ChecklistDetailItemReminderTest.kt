@@ -189,6 +189,47 @@ class ChecklistDetailItemReminderTest {
         assertEquals(ReminderTab.REPEAT, state.activeItemReminderTab)
     }
 
+    @Test
+    fun onItemReminderClick_withRepeatRule_populatesPendingConfigWithSavedTime() = runTest {
+        // Bug regression: opening per-item reminder sheet for an item with active
+        // repeat must populate pendingRepeatConfig from item.repeatRule and
+        // item.repeatTimeOfDayMinutes — otherwise CurrentRepeatCard / TimePicker
+        // show default 09:00 instead of the saved value.
+        val savedTimeMinutes = 12 * 60 // 12:00
+        val itemWithCustomTime = ChecklistFillItem(text = "Task D", checked = false)
+            .withRepeatRule(repeatRule, savedTimeMinutes, System.currentTimeMillis() + 86_400_000L)
+        repository.defaultFillFlow.value = testFill.copy(
+            items = testFill.items + itemWithCustomTime
+        )
+
+        val vm = createViewModel()
+        vm.onIntent(ChecklistDetailIntent.OnItemReminderClick(itemWithCustomTime.id))
+
+        val state = contentState(vm)
+        assertEquals(ReminderTab.REPEAT, state.activeItemReminderTab)
+        val config = state.pendingRepeatConfig
+        assertNotNull(config, "pendingRepeatConfig must be initialised from item.repeatRule")
+        assertEquals(12, config.timeHour)
+        assertEquals(0, config.timeMinute)
+        assertEquals(RepeatType.DAILY, config.type)
+    }
+
+    @Test
+    fun onItemReminderClick_thenDismiss_clearsPendingConfig() = runTest {
+        // Without clearing pendingRepeatConfig on dismiss, opening another item's
+        // sheet would show the previous item's time/type.
+        val vm = createViewModel()
+        vm.onIntent(ChecklistDetailIntent.OnItemReminderClick(itemWithRepeatReminder.id))
+        assertNotNull(contentState(vm).pendingRepeatConfig)
+
+        vm.onIntent(ChecklistDetailIntent.OnDismissItemReminderSheet)
+
+        val state = contentState(vm)
+        assertNull(state.itemReminderSheetFor)
+        assertNull(state.pendingRepeatConfig)
+        assertNull(state.repeatRuleSummary)
+    }
+
     // ── Free-tier gate ─────────────────────────────────────────────────────
 
     @Test

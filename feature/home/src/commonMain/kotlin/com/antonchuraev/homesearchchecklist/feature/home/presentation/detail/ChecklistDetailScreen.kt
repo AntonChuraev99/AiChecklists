@@ -719,9 +719,12 @@ private fun ChecklistDetailContent(
                 activeTab = state.activeItemReminderTab,
                 currentReminder = itemReminderItem.reminderAt,
                 currentRepeatRule = itemReminderItem.repeatRule,
-                repeatRuleSummary = itemReminderItem.repeatRule?.type?.name,
-                pendingRepeatConfig = null,
-                showEndConditionPicker = false
+                // Intentionally no fallback to raw enum name (e.g. "DAILY"):
+                // prefer hiding CurrentRepeatCard entirely over showing meaningless
+                // text. The card has a `summary != null` guard.
+                repeatRuleSummary = state.repeatRuleSummary,
+                pendingRepeatConfig = state.pendingRepeatConfig,
+                showEndConditionPicker = state.showEndConditionPicker
             ),
             callbacks = ReminderSheetCallbacks(
                 onTabSelected = { onIntent(ChecklistDetailIntent.OnItemReminderTabSelected(it)) },
