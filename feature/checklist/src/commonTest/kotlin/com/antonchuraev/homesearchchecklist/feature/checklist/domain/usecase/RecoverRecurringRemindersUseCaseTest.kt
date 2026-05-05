@@ -5,6 +5,7 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistR
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistRepeatInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ItemReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatEndCondition
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatType
@@ -33,6 +34,10 @@ class RecoverRecurringRemindersUseCaseTest {
         }
         override fun cancelRepeat(checklistId: Long) {}
         override suspend fun rescheduleAllActiveRepeats() {}
+        override fun scheduleItemReminder(checklistId: Long, fillId: Long, itemId: String, triggerAtMillis: Long) {}
+        override fun cancelItemReminder(checklistId: Long, fillId: Long, itemId: String) {}
+        override fun scheduleItemRepeat(checklistId: Long, fillId: Long, itemId: String, triggerAtMillis: Long) {}
+        override fun cancelItemRepeat(checklistId: Long, fillId: Long, itemId: String) {}
     }
 
     private class FakeRepository : ChecklistRepository {
@@ -75,8 +80,8 @@ class RecoverRecurringRemindersUseCaseTest {
         override suspend fun updateFill(fill: ChecklistFill) {}
         override suspend fun deleteFill(fill: ChecklistFill) {}
         override suspend fun getTotalAdditionalFillCount(): Int = 0
-
         override suspend fun getWeeklyChecklistCount(): Int = 0
+        override suspend fun getAllItemRemindersForRescheduling(): List<ItemReminderInfo> = emptyList()
     }
 
     // ─── Tests ────────────────────────────────────────────────────────

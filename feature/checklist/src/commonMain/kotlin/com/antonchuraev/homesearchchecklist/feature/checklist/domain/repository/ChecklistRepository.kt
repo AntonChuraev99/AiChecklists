@@ -4,6 +4,7 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistR
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistRepeatInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ItemReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
 import kotlinx.coroutines.flow.Flow
 
@@ -23,9 +24,33 @@ interface ChecklistRepository {
 
     // One-shot reminders (independent of repeat)
     suspend fun setReminder(checklistId: Long, reminderAt: Long?)
+    /**
+     * Counts active one-shot reminders across both checklist-level and per-item scopes.
+     *
+     * Used by the free-tier gate for one-shot reminders. Per-item recurring schedules
+     * are also included (each item with any active reminder counts as 1).
+     * Checklist-level repeat schedules are counted separately via [countActiveRepeatSchedules]
+     * (they have their own gate in ChecklistDetailViewModel).
+     *
+     * Active = checklist [reminderAt] in the future (one-shot)
+     *        + items where [reminderAt] != null OR [repeatRule] != null.
+     *
+     * Note: item-level counting is done in-memory by scanning default fills
+     * (items are serialized JSON, not queryable SQL columns).
+     */
     suspend fun countActiveReminders(): Int
     suspend fun getActiveReminders(): List<ChecklistReminderInfo>
     suspend fun getDefaultFillOneShot(checklistId: Long): ChecklistFill?
+
+    // Per-item reminder persistence
+    // Items are stored as JSON inside the fill row — no dedicated column.
+    // All mutations go through [updateFill]; these helpers are convenience wrappers.
+
+    /**
+     * Returns all default fills that contain at least one item with an active reminder.
+     * Used by [getAllItemRemindersForRescheduling] and the BootCompletedReceiver (Phase 2).
+     */
+    suspend fun getAllItemRemindersForRescheduling(): List<ItemReminderInfo>
 
     // Independent repeat schedule
     suspend fun setRepeatSchedule(checklistId: Long, rule: ReminderRepeatRule, timeOfDayMinutes: Int, firstTriggerAt: Long)

@@ -13,6 +13,7 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Check
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ItemReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatEndCondition
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatType
@@ -797,6 +798,7 @@ class ChecklistDetailRepeatRuleTest {
         override suspend fun getPastDueRepeatSchedules(nowMillis: Long): List<ChecklistRepeatInfo> = emptyList()
         override suspend fun getTotalAdditionalFillCount(): Int = 0
         override suspend fun getWeeklyChecklistCount(): Int = 0
+        override suspend fun getAllItemRemindersForRescheduling(): List<ItemReminderInfo> = emptyList()
     }
 
     private class FakeUserDataRepository : UserDataRepository {
@@ -874,5 +876,9 @@ class ChecklistDetailRepeatRuleTest {
         override fun scheduleRepeat(checklistId: Long, triggerAtMillis: Long) {}
         override fun cancelRepeat(checklistId: Long) {}
         override suspend fun rescheduleAllActiveRepeats() {}
+        override fun scheduleItemReminder(checklistId: Long, fillId: Long, itemId: String, triggerAtMillis: Long) {}
+        override fun cancelItemReminder(checklistId: Long, fillId: Long, itemId: String) {}
+        override fun scheduleItemRepeat(checklistId: Long, fillId: Long, itemId: String, triggerAtMillis: Long) {}
+        override fun cancelItemRepeat(checklistId: Long, fillId: Long, itemId: String) {}
     }
 }

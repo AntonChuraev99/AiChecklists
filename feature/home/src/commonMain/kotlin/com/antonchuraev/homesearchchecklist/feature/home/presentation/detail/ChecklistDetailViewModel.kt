@@ -287,6 +287,24 @@ class ChecklistDetailViewModel(
             ChecklistDetailIntent.OnDismissMoveToDaySheet -> {
                 updateContentState { it.copy(moveToDayItemId = null) }
             }
+
+            // Item details sheet
+            is ChecklistDetailIntent.OnItemTapForDetails -> updateContentState { it.copy(itemDetailsSheetFor = intent.itemId) }
+            ChecklistDetailIntent.OnDismissItemDetailsSheet -> updateContentState { it.copy(itemDetailsSheetFor = null) }
+            is ChecklistDetailIntent.OnDeleteItemFromSheet -> deleteItemFromSheet(intent.itemId)
+
+            // Per-item reminders
+            is ChecklistDetailIntent.OnItemReminderClick -> handleItemReminderClick(intent.itemId)
+            is ChecklistDetailIntent.OnSaveItemReminder -> saveItemReminder(
+                intent.itemId, intent.reminderAt, intent.repeatRule, intent.repeatTimeOfDayMinutes
+            )
+            is ChecklistDetailIntent.OnRemoveItemReminder -> removeItemReminder(intent.itemId)
+            ChecklistDetailIntent.OnDismissItemReminderSheet -> {
+                updateContentState { it.copy(itemReminderSheetFor = null) }
+            }
+            is ChecklistDetailIntent.OnItemReminderTabSelected -> {
+                updateContentState { it.copy(activeItemReminderTab = intent.tab) }
+            }
         }
     }
 
@@ -294,7 +312,7 @@ class ChecklistDetailViewModel(
         val state = _screenState.value
         if (state is ChecklistDetailState.Content && state.defaultFill != null) {
             val currentNote = state.defaultFill.items.firstOrNull { it.id == itemId }?.note.orEmpty()
-            updateContentState { it.copy(noteDialogItemId = itemId, editingNote = currentNote) }
+            updateContentState { it.copy(itemDetailsSheetFor = null, noteDialogItemId = itemId, editingNote = currentNote) }
         }
     }
 
@@ -313,6 +331,10 @@ class ChecklistDetailViewModel(
             updateContentState { it.copy(checklist = updatedChecklist) }
 
             viewModelScope.launch {
+                if (itemToDelete.hasActiveReminder) {
+                    reminderScheduler.cancelItemReminder(checklistId, state.defaultFill.id, itemId)
+                    reminderScheduler.cancelItemRepeat(checklistId, state.defaultFill.id, itemId)
+                }
                 repository.updateFill(updatedFill)
                 repository.updateChecklistTemplate(updatedChecklist)
                 analyticsTracker.event("item_auto_deleted", mapOf(
@@ -322,11 +344,28 @@ class ChecklistDetailViewModel(
             return
         }
 
+        val targetItem = state.defaultFill.items.firstOrNull { it.id == itemId }
+
         val updatedItems = state.defaultFill.items.map { item ->
-            if (item.id == itemId) item.withChecked(checked) else item
+            if (item.id == itemId) {
+                val base = item.withChecked(checked)
+                // Cancel item-level alarm when checking an item that has an active reminder
+                if (checked && item.hasActiveReminder) base.withReminderCleared() else base
+            } else {
+                item
+            }
         }
 
         val updatedFill = state.defaultFill.copy(items = updatedItems)
+
+        // Cancel the scheduled alarms when checking an item with active reminder
+        if (checked && targetItem != null && targetItem.hasActiveReminder) {
+            val fillId = state.defaultFill.id
+            viewModelScope.launch {
+                reminderScheduler.cancelItemReminder(checklistId, fillId, itemId)
+                reminderScheduler.cancelItemRepeat(checklistId, fillId, itemId)
+            }
+        }
 
         val eventName = if (checked) "item_checked" else "item_unchecked"
         val totalItems = updatedItems.size
@@ -970,6 +1009,11 @@ class ChecklistDetailViewModel(
         }
 
         viewModelScope.launch {
+            // Cancel any per-item alarms before persisting deletion
+            if (item.hasActiveReminder) {
+                reminderScheduler.cancelItemReminder(checklistId, fill.id, itemId)
+                reminderScheduler.cancelItemRepeat(checklistId, fill.id, itemId)
+            }
             repository.updateFill(updatedFill)
             repository.updateChecklistTemplate(updatedChecklist)
             analyticsTracker.event("item_deleted", mapOf(
@@ -1016,6 +1060,173 @@ class ChecklistDetailViewModel(
             repository.updateFill(restoredFill)
             repository.updateChecklistTemplate(restoredChecklist)
             analyticsTracker.event("item_undo_delete", mapOf(
+                "checklist_id" to checklistId.toString()
+            ))
+        }
+    }
+
+    // ─── Item details sheet delete ────────────────────────────────────────
+
+    private fun deleteItemFromSheet(itemId: String) {
+        val state = _screenState.value as? ChecklistDetailState.Content ?: return
+        val fill = state.defaultFill ?: return
+        val item = fill.items.firstOrNull { it.id == itemId } ?: return
+
+        val updatedFillItems = fill.items.filter { it.id != itemId }
+        val updatedFill = fill.copy(items = updatedFillItems)
+
+        val updatedChecklistItems = state.checklist.items.filter { it.text != item.text }
+        val updatedChecklist = state.checklist.copy(items = updatedChecklistItems)
+
+        updateContentState {
+            it.copy(
+                checklist = updatedChecklist,
+                itemDetailsSheetFor = null,
+            )
+        }
+
+        viewModelScope.launch {
+            if (item.hasActiveReminder) {
+                reminderScheduler.cancelItemReminder(checklistId, fill.id, itemId)
+                reminderScheduler.cancelItemRepeat(checklistId, fill.id, itemId)
+            }
+            repository.updateFill(updatedFill)
+            repository.updateChecklistTemplate(updatedChecklist)
+            analyticsTracker.event("item_deleted", mapOf(
+                "checklist_id" to checklistId.toString(),
+                "method" to "sheet",
+                "item_count" to updatedFillItems.size.toString()
+            ))
+        }
+    }
+
+    // ─── Per-item reminder handlers ───────────────────────────────────────
+
+    private fun handleItemReminderClick(itemId: String) {
+        viewModelScope.launch {
+            val state = _screenState.value as? ChecklistDetailState.Content ?: return@launch
+            val item = state.defaultFill?.items?.firstOrNull { it.id == itemId } ?: return@launch
+            val isPremium = state.userLimits?.isPremium ?: false
+
+            // Close item details sheet before opening reminder sheet (Approach A)
+            updateContentState { it.copy(itemDetailsSheetFor = null) }
+
+            // Free-tier gate: only for new reminders (item doesn't already have one)
+            if (!isPremium && !item.hasActiveReminder) {
+                val activeCount = repository.countActiveReminders()
+                if (activeCount >= 1) {
+                    navigator.navigateToPaywall(source = "detail_item_reminder_limit")
+                    return@launch
+                }
+            }
+
+            if (!reminderScheduler.hasNotificationPermission()) {
+                // Reuse notification permission sheet; after granting, we reopen the item sheet
+                // by storing the target itemId first so the user can retry
+                updateContentState {
+                    it.copy(
+                        itemReminderSheetFor = itemId,
+                        activeItemReminderTab = ReminderTab.ONCE,
+                        showNotificationPermissionSheet = true
+                    )
+                }
+            } else {
+                val defaultTab = if (item.repeatRule != null && item.reminderAt == null) {
+                    ReminderTab.REPEAT
+                } else {
+                    ReminderTab.ONCE
+                }
+                updateContentState {
+                    it.copy(itemReminderSheetFor = itemId, activeItemReminderTab = defaultTab)
+                }
+            }
+        }
+    }
+
+    private fun saveItemReminder(
+        itemId: String,
+        reminderAt: Long?,
+        repeatRule: ReminderRepeatRule?,
+        repeatTimeOfDayMinutes: Int?
+    ) {
+        viewModelScope.launch {
+            val state = _screenState.value as? ChecklistDetailState.Content ?: return@launch
+            val fill = state.defaultFill ?: return@launch
+            val item = fill.items.firstOrNull { it.id == itemId } ?: return@launch
+
+            // Cancel prior schedule(s) before applying new ones (switching between types)
+            if (item.hasActiveReminder) {
+                reminderScheduler.cancelItemReminder(checklistId, fill.id, itemId)
+                reminderScheduler.cancelItemRepeat(checklistId, fill.id, itemId)
+            }
+
+            val updatedItem: ChecklistFillItem = if (repeatRule != null && repeatTimeOfDayMinutes != null) {
+                // Compute first trigger time the same way saveRepeatSchedule does
+                val tz = TimeZone.currentSystemDefault()
+                val now = Clock.System.now()
+                val today = now.toLocalDateTime(tz).date
+                val timeHour = repeatTimeOfDayMinutes / 60
+                val timeMinute = repeatTimeOfDayMinutes % 60
+                val triggerTime = LocalTime(timeHour, timeMinute)
+                val todayTrigger = LocalDateTime(today, triggerTime).toInstant(tz).toEpochMilliseconds()
+                val firstTriggerAt = if (todayTrigger > now.toEpochMilliseconds()) {
+                    todayTrigger
+                } else {
+                    val tomorrow = today.plus(1, DateTimeUnit.DAY)
+                    LocalDateTime(tomorrow, triggerTime).toInstant(tz).toEpochMilliseconds()
+                }
+                // Apply repeat rule first, then set one-shot reminderAt (null clears it)
+                item.withRepeatRule(repeatRule, repeatTimeOfDayMinutes, firstTriggerAt)
+                    .withReminderAt(reminderAt)
+            } else {
+                // One-shot only: clear any prior repeat, set reminderAt
+                item.withReminderCleared().withReminderAt(reminderAt)
+            }
+
+            val updatedItems = fill.items.map { if (it.id == itemId) updatedItem else it }
+            val updatedFill = fill.copy(items = updatedItems)
+
+            // Persist — reminder fields live only on ChecklistFillItem, not template
+            repository.updateFill(updatedFill)
+
+            // Schedule alarms
+            if (reminderAt != null) {
+                reminderScheduler.scheduleItemReminder(checklistId, fill.id, itemId, reminderAt)
+            }
+            val nextAt = updatedItem.repeatNextAt
+            if (repeatRule != null && nextAt != null) {
+                reminderScheduler.scheduleItemRepeat(checklistId, fill.id, itemId, nextAt)
+            }
+
+            updateContentState { it.copy(itemReminderSheetFor = null) }
+
+            analyticsTracker.event("item_reminder_set", mapOf(
+                "checklist_id" to checklistId.toString(),
+                "has_repeat" to (repeatRule != null).toString()
+            ))
+
+            maybeShowExactAlarmInstruction()
+        }
+    }
+
+    private fun removeItemReminder(itemId: String) {
+        viewModelScope.launch {
+            val state = _screenState.value as? ChecklistDetailState.Content ?: return@launch
+            val fill = state.defaultFill ?: return@launch
+
+            // Defensive: cancel both regardless of which was active
+            reminderScheduler.cancelItemReminder(checklistId, fill.id, itemId)
+            reminderScheduler.cancelItemRepeat(checklistId, fill.id, itemId)
+
+            val updatedItems = fill.items.map { item ->
+                if (item.id == itemId) item.withReminderCleared() else item
+            }
+            val updatedFill = fill.copy(items = updatedItems)
+            repository.updateFill(updatedFill)
+
+            updateContentState { it.copy(itemReminderSheetFor = null) }
+
+            analyticsTracker.event("item_reminder_removed", mapOf(
                 "checklist_id" to checklistId.toString()
             ))
         }

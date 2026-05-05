@@ -24,6 +24,10 @@ private object StubReminderScheduler : ChecklistReminderScheduler {
     override fun scheduleRepeat(checklistId: Long, triggerAtMillis: Long) = Unit
     override fun cancelRepeat(checklistId: Long) = Unit
     override suspend fun rescheduleAllActiveRepeats() = Unit
+    override fun scheduleItemReminder(checklistId: Long, fillId: Long, itemId: String, triggerAtMillis: Long) = Unit
+    override fun cancelItemReminder(checklistId: Long, fillId: Long, itemId: String) = Unit
+    override fun scheduleItemRepeat(checklistId: Long, fillId: Long, itemId: String, triggerAtMillis: Long) = Unit
+    override fun cancelItemRepeat(checklistId: Long, fillId: Long, itemId: String) = Unit
 }
 
 actual fun platformModule(): Module = module {
