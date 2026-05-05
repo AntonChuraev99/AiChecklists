@@ -786,8 +786,6 @@
     <!-- Weekly mode ("My Week" checklist view) -->
     <string name="templates_create_weekly">My Week</string>
     <string name="weekly_mode_title">My Week</string>
-    <string name="weekday_today">Today</string>
-    <string name="weekday_tomorrow">Tomorrow</string>
     <string name="weekday_monday">Monday</string>
     <string name="weekday_tuesday">Tuesday</string>
     <string name="weekday_wednesday">Wednesday</string>
@@ -801,6 +799,5 @@
     <string name="weekly_move_to_day_action">Move to…</string>
     <string name="weekly_paywall_locked_title">Premium feature</string>
     <string name="weekly_paywall_locked_message">Free users can have 1 weekly checklist. Upgrade to Premium for unlimited weekly checklists.</string>
-    <!-- %1$d = item count badge, e.g. "· 3" -->
-    <string name="weekly_item_count_badge">· %1$d</string>
+    <string name="weekly_overdue_section_title">Overdue</string>
 </resources>

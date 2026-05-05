@@ -29,7 +29,6 @@ import androidx.compose.ui.text.font.FontWeight
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.cancel
 import aichecklists.core.designsystem.generated.resources.selected
-import aichecklists.core.designsystem.generated.resources.weekday_today
 import aichecklists.core.designsystem.generated.resources.weekly_move_to_day_title
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonText
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
@@ -88,9 +87,8 @@ internal fun MoveToDayBottomSheet(
             // All 7 days in ISO order (Mon=1 .. Sun=7)
             (1..7).forEach { weekday ->
                 val isToday = weekday == todayWeekday
-                val isTomorrow = ((todayWeekday % 7) + 1) == weekday
                 val isSelected = weekday == currentWeekday
-                val dayLabel = stringResource(weekdayLabelKey(weekday, isToday, isTomorrow))
+                val dayLabel = stringResource(weekdayNameKey(weekday))
                 val selectedLabel = stringResource(Res.string.selected)
 
                 val interactionSource = remember { MutableInteractionSource() }
