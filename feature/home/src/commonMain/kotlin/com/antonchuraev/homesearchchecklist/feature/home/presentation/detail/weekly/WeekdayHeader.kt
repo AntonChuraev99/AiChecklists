@@ -15,58 +15,38 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontWeight
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.add_item
-import aichecklists.core.designsystem.generated.resources.weekly_item_count_badge
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import org.jetbrains.compose.resources.stringResource
 
 /**
  * Sticky section header for a weekly checklist day.
  *
- * Visual hierarchy:
- * - Today: titleMedium + bold + primary color
- * - Tomorrow: titleSmall + bold + onSurface
- * - Other days: titleSmall + medium weight + onSurfaceVariant
- * - Empty days: alpha 0.6 applied to entire header
- *
- * Shows item count badge inline (e.g. "Wednesday · 3") when count > 0.
- * "+" button on the trailing edge triggers per-day inline add.
+ * Always shows the plain weekday name (Monday, Tuesday, ...). Today's section is
+ * marked only by visual weight — bold + primary color. All other days share the
+ * same neutral styling regardless of whether they have items, to keep the only
+ * meaningful hierarchy "today vs the rest" — without competing emphasis from
+ * non-empty days.
  *
  * @param weekday ISO weekday 1=Monday..7=Sunday
- * @param isToday whether this slot represents today
- * @param isTomorrow whether this slot represents tomorrow
- * @param itemCount number of items in this day section
+ * @param isToday whether this slot represents today (drives bold + primary styling)
  * @param onAddClick callback when the "+" button is tapped
  */
 @Composable
 internal fun WeekdayHeader(
     weekday: Int,
     isToday: Boolean,
-    isTomorrow: Boolean,
-    itemCount: Int,
     onAddClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val isEmpty = itemCount == 0
-
-    val labelKey = weekdayLabelKey(weekday, isToday, isTomorrow)
-    val dayLabel = stringResource(labelKey)
-
-    // Build display text: "Monday · 3" or just "Monday"
-    val displayText = if (itemCount > 0) {
-        "$dayLabel ${stringResource(Res.string.weekly_item_count_badge, itemCount)}"
-    } else {
-        dayLabel
-    }
+    val dayLabel = stringResource(weekdayNameKey(weekday))
 
     Row(
         modifier = modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background)
-            .alpha(if (isEmpty) 0.6f else 1f)
             .padding(
                 start = AppDimens.ScreenPaddingHorizontal,
                 end = AppDimens.SpacingXs,
@@ -77,22 +57,16 @@ internal fun WeekdayHeader(
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(
-            text = displayText,
-            style = when {
-                isToday -> MaterialTheme.typography.titleMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                )
-                isTomorrow -> MaterialTheme.typography.titleSmall.copy(
-                    fontWeight = FontWeight.Bold,
-                )
-                else -> MaterialTheme.typography.titleSmall.copy(
-                    fontWeight = FontWeight.Medium,
-                )
+            text = dayLabel,
+            style = if (isToday) {
+                MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+            } else {
+                MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Medium)
             },
-            color = when {
-                isToday -> MaterialTheme.colorScheme.primary
-                isTomorrow -> MaterialTheme.colorScheme.onSurface
-                else -> MaterialTheme.colorScheme.onSurfaceVariant
+            color = if (isToday) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
             },
             modifier = Modifier.weight(1f),
         )
