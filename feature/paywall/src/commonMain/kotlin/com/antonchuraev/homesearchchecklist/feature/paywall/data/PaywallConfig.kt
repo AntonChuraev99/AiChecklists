@@ -11,8 +11,8 @@ object PaywallConfig {
     // OFFERING_ID value. Bump this when introducing a new offering version.
     const val OFFERING_ID = "monthAndYear"
 
-    // Entitlement identifier (configure in RevenueCat dashboard)
-    const val PREMIUM_ENTITLEMENT_ID = "AiChecklists Pro"
+    // Entitlement identifier lives in feature/paywall/.../domain/model/SubscriptionStatus.kt
+    // as Entitlements.PREMIUM (single source of truth). Do not duplicate here.
 
     // Legal pages URLs (Firebase Hosting)
     const val TERMS_OF_USE_URL = "https://gisti-app.web.app/terms"

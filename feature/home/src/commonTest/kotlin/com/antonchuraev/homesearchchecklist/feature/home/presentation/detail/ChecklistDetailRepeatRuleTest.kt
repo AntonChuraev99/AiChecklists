@@ -186,6 +186,36 @@ class ChecklistDetailRepeatRuleTest {
         assertTrue(config.resetChecks)
     }
 
+    @Test
+    fun onReminderClick_withActiveRepeat_opensRepeatTabWithSavedTime() = runTest {
+        // Bug regression: opening reminder sheet when repeat is active must populate
+        // pendingRepeatConfig from existing rule, not default 09:00. Otherwise the
+        // CurrentRepeatCard and Time-of-day picker show 09:00 even though the saved
+        // time is different.
+        val rule = ReminderRepeatRule(
+            type = RepeatType.DAILY,
+            interval = 1
+        )
+        val savedTimeMinutes = 12 * 60 // 12:00
+        repository.storedChecklist = testChecklist.copy(
+            repeatRule = rule,
+            repeatTimeOfDayMinutes = savedTimeMinutes,
+            repeatNextAt = 9_999_999_999L // active repeat → defaultTab = REPEAT
+        )
+
+        val vm = createViewModel()
+        // Single intent — no manual tab switch. Sheet opens directly on REPEAT tab.
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
+
+        val state = contentState(vm)
+        assertEquals(ReminderTab.REPEAT, state.activeReminderTab)
+        val config = state.pendingRepeatConfig
+        assertNotNull(config, "pendingRepeatConfig must be initialised when sheet opens on REPEAT tab")
+        assertEquals(12, config.timeHour)
+        assertEquals(0, config.timeMinute)
+        assertEquals(RepeatType.DAILY, config.type)
+    }
+
     // --- Type selection ---
 
     @Test
