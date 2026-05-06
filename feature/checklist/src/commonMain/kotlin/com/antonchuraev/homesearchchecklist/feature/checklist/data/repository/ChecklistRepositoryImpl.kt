@@ -13,8 +13,12 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Check
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ItemReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 
 class ChecklistRepositoryImpl(
@@ -249,5 +253,106 @@ class ChecklistRepositoryImpl(
                 checklistDao.updatePosition(entity.id, index)
             }
         }
+    }
+
+    // ─── Today reminders ───
+
+    override fun observeRemindersInRange(fromMs: Long, toMs: Long): Flow<List<TodayReminderInfo>> {
+        // Combine the checklists flow with all default fills flow to react to any change.
+        // We cannot do a simple SQL query for per-item reminders because items are stored
+        // as JSON (not individual columns), so we scan in-memory.
+        return combine(
+            checklistDao.observeChecklists(),
+            flow { emit(fillDao.getAllDefaultFills()) }
+        ) { checklistEntities, fillEntities ->
+            buildRemindersInRange(checklistEntities, fillEntities, fromMs, toMs)
+        }
+    }
+
+    override suspend fun getRemindersInRange(fromMs: Long, toMs: Long): List<TodayReminderInfo> {
+        val checklistEntities = checklistDao.observeChecklists().first()
+        val fillEntities = fillDao.getAllDefaultFills()
+        return buildRemindersInRange(checklistEntities, fillEntities, fromMs, toMs)
+    }
+
+    /**
+     * Scans checklists and default fills to collect all reminders in [fromMs]..[toMs].
+     *
+     * Checklist-level: [ChecklistEntity.reminderAt] (one-shot) or [ChecklistEntity.repeatNextAt] (recurring).
+     * Item-level: [ChecklistFillItem.reminderAt] (one-shot) or [ChecklistFillItem.repeatNextAt] (recurring).
+     *
+     * A fill entity is keyed by checklistId — we resolve the checklist name via the entities list
+     * rather than a separate DB query.
+     */
+    private fun buildRemindersInRange(
+        checklistEntities: List<com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistEntity>,
+        fillEntities: List<com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistFillEntity>,
+        fromMs: Long,
+        toMs: Long,
+    ): List<TodayReminderInfo> {
+        val result = mutableListOf<TodayReminderInfo>()
+
+        // Build name-lookup map once
+        val nameById = checklistEntities.associate { it.id to it.name }
+
+        // ── Checklist-level reminders ──
+        for (entity in checklistEntities) {
+            // One-shot reminder
+            val reminderAt = entity.reminderAt
+            if (reminderAt != null && reminderAt in fromMs..toMs) {
+                result += TodayReminderInfo.ChecklistLevel(
+                    checklistId = entity.id,
+                    checklistName = entity.name,
+                    reminderAt = reminderAt,
+                    isRecurring = false,
+                )
+            }
+            // Recurring next occurrence (independent of one-shot)
+            val repeatNextAt = entity.repeatNextAt
+            if (repeatNextAt != null && repeatNextAt in fromMs..toMs) {
+                result += TodayReminderInfo.ChecklistLevel(
+                    checklistId = entity.id,
+                    checklistName = entity.name,
+                    reminderAt = repeatNextAt,
+                    isRecurring = true,
+                )
+            }
+        }
+
+        // ── Per-item reminders (from default fills) ──
+        val fillByChecklistId = fillEntities.associateBy { it.checklistId }
+        for (fillEntity in fillEntities) {
+            val checklistName = nameById[fillEntity.checklistId] ?: continue
+            for (item in fillEntity.items) {
+                // One-shot
+                val reminderAt = item.reminderAt
+                if (reminderAt != null && reminderAt in fromMs..toMs) {
+                    result += TodayReminderInfo.ItemLevel(
+                        checklistId = fillEntity.checklistId,
+                        checklistName = checklistName,
+                        fillId = fillEntity.id,
+                        itemId = item.id,
+                        itemText = item.text,
+                        reminderAt = reminderAt,
+                        isRecurring = false,
+                    )
+                }
+                // Recurring
+                val repeatNextAt = item.repeatNextAt
+                if (repeatNextAt != null && repeatNextAt in fromMs..toMs) {
+                    result += TodayReminderInfo.ItemLevel(
+                        checklistId = fillEntity.checklistId,
+                        checklistName = checklistName,
+                        fillId = fillEntity.id,
+                        itemId = item.id,
+                        itemText = item.text,
+                        reminderAt = repeatNextAt,
+                        isRecurring = true,
+                    )
+                }
+            }
+        }
+
+        return result
     }
 }

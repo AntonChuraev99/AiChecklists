@@ -68,5 +68,8 @@ sealed interface AppNavRoute {
     data object Settings : AppNavRoute
 
     @Serializable
+    data object Today : AppNavRoute
+
+    @Serializable
     data object ScreenCatalog : AppNavRoute
 }

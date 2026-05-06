@@ -83,5 +83,7 @@ interface AppNavigator {
 
     fun navigateToSettings()
 
+    fun navigateToToday()
+
     fun navigateToScreenCatalog()
 }

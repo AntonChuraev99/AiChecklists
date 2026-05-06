@@ -820,4 +820,18 @@
     <string name="reminder_paywall_locked_title">Premium feature</string>
     <string name="reminder_paywall_locked_message">Free users can have 1 active reminder. Upgrade to Premium for unlimited reminders on checklists and items.</string>
     <string name="reminder_paywall_locked_cta">Become Pro</string>
+
+    <!-- Today Screen -->
+    <string name="today_title">Today</string>
+    <string name="today_empty_state_title">Nothing for today</string>
+    <string name="today_empty_state_description">Enjoy your day or create a new task</string>
+    <string name="today_all_done_title">All done for today</string>
+    <string name="today_all_done_description">Great job! You\'ve completed everything scheduled for today.</string>
+    <string name="today_section_past_due">Past due</string>
+    <string name="today_section_today">Today</string>
+    <string name="today_open_menu">Open menu</string>
+
+    <!-- Navigation Bar tabs -->
+    <string name="today_tab_today">Today</string>
+    <string name="today_tab_lists">Lists</string>
 </resources>

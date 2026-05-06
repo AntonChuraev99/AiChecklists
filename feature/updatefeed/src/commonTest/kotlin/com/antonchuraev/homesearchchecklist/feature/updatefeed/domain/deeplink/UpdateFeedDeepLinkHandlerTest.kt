@@ -51,6 +51,7 @@ class UpdateFeedDeepLinkHandlerTest {
         override fun navigateToShareChecklist(checklistId: Long) {}
         override fun navigateToUpdateFeed() { updateFeedCallCount++ }
         override fun navigateToSettings() {}
+        override fun navigateToToday() {}
         override fun navigateToScreenCatalog() {}
         override fun showWidgetInstruction() { widgetInstructionCallCount++ }
         override fun requestCreateWeeklyChecklist() { requestCreateWeeklyChecklistCount++ }

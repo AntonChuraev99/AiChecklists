@@ -22,6 +22,7 @@ import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.MailOutline
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -38,6 +39,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.feature.paywall.data.PaywallConfig
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.drawer_item_home
+import aichecklists.core.designsystem.generated.resources.today_title
 import aichecklists.core.designsystem.generated.resources.drawer_logo_content_description
 import aichecklists.core.designsystem.generated.resources.drawer_section_about
 import aichecklists.core.designsystem.generated.resources.drawer_section_help
@@ -67,6 +69,7 @@ object DrawerDestination {
     const val Main = "main"
     const val UpdateFeed = "update_feed"
     const val Settings = "settings"
+    const val Today = "today"
 }
 
 @Composable
@@ -74,6 +77,7 @@ fun AppNavigationDrawerContent(
     selectedItemId: String,
     onCloseDrawer: () -> Unit,
     onHomeClick: () -> Unit,
+    onTodayClick: () -> Unit = {},
     onUpdateFeedClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onRateAppClick: () -> Unit,
@@ -102,6 +106,17 @@ fun AppNavigationDrawerContent(
             onClick = {
                 onCloseDrawer()
                 onHomeClick()
+            },
+            colors = drawerItemColors,
+            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+        )
+        NavigationDrawerItem(
+            label = { Text(stringResource(Res.string.today_title)) },
+            icon = { Icon(Icons.Outlined.WbSunny, contentDescription = null) },
+            selected = selectedItemId == DrawerDestination.Today,
+            onClick = {
+                onCloseDrawer()
+                onTodayClick()
             },
             colors = drawerItemColors,
             modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)

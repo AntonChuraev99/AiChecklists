@@ -183,6 +183,7 @@ class TemplatesViewModelTest {
         override fun navigateToShareChecklist(checklistId: Long) {}
         override fun navigateToUpdateFeed() {}
         override fun navigateToSettings() {}
+        override fun navigateToToday() {}
         override fun navigateToScreenCatalog() {}
         override fun showWidgetInstruction() {}
         override fun requestCreateWeeklyChecklist() {}

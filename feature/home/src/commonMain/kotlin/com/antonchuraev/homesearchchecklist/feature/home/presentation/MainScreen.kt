@@ -63,6 +63,9 @@ fun MainScreen(
     isEditMode: Boolean,
     onEditModeChange: (Boolean) -> Unit,
     viewModel: MainScreenViewModel = koinViewModel(),
+    /** When true, the bottom "Create Checklist" bar is suppressed.
+     *  Set to true when the caller (App.kt) provides a FAB instead. */
+    hideBottomBar: Boolean = false,
 ) {
     val analyticsTracker: AnalyticsTracker = koinInject()
     LaunchedEffect(Unit) { analyticsTracker.screenView("main") }
@@ -104,7 +107,9 @@ fun MainScreen(
             }
         },
         bottomBar = {
-            if (!isEditMode && screenState is MainScreenState.Success) {
+            // When the caller provides a FAB (hideBottomBar = true), suppress this bar
+            // to avoid double bottom UI on the Lists tab.
+            if (!hideBottomBar && !isEditMode && screenState is MainScreenState.Success) {
                 val state = screenState as MainScreenState.Success
                 val canCreateChecklist = state.userLimits?.canCreateChecklist ?: true
 

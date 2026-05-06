@@ -6,6 +6,7 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Check
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ItemReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo
 import kotlinx.coroutines.flow.Flow
 
 interface ChecklistRepository {
@@ -67,6 +68,22 @@ interface ChecklistRepository {
     // Weekly mode
     suspend fun getWeeklyChecklistCount(): Int
     val weeklyChecklistCount: Flow<Int>
+
+    /**
+     * Observes all reminders (checklist-level + per-item) that fall within [fromMs]..[toMs].
+     *
+     * Checklist-level: [Checklist.reminderAt] or [Checklist.repeatNextAt] in range.
+     * Per-item: [ChecklistFillItem.reminderAt] or [ChecklistFillItem.repeatNextAt] in range.
+     *
+     * Emits a new list whenever the underlying checklists or fills change.
+     * Consumers use this to drive the Today screen.
+     */
+    fun observeRemindersInRange(fromMs: Long, toMs: Long): Flow<List<TodayReminderInfo>>
+
+    /**
+     * One-shot version of [observeRemindersInRange] for use in suspend contexts.
+     */
+    suspend fun getRemindersInRange(fromMs: Long, toMs: Long): List<TodayReminderInfo>
 
     // Fills (instances)
     fun getFillsByChecklistId(checklistId: Long): Flow<List<ChecklistFill>>
