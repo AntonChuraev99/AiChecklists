@@ -57,6 +57,7 @@ import com.antonchuraev.homesearchchecklist.feature.debug.presentation.DebugScre
 import com.antonchuraev.homesearchchecklist.feature.debug.presentation.ScreenCatalogScreen
 import com.antonchuraev.homesearchchecklist.feature.debug.presentation.StoreScreenshotScreen
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.MainScreen
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.today.TodayRoute
 import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.OnboardingScreen
 import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive.InteractiveOnboardingScreen
 import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.AnalyzeScreen
@@ -191,6 +192,7 @@ fun App() {
 
                     ModalNavigationDrawer(
                         drawerState = drawerState,
+                        // Disable swipe-to-open while in edit mode (drag-reorder conflict)
                         gesturesEnabled = !isEditMode,
                         drawerContent = {
                             ModalDrawerSheet(
@@ -200,6 +202,13 @@ fun App() {
                                     selectedItemId = DrawerDestination.Main,
                                     onCloseDrawer = { scope.launch { drawerState.close() } },
                                     onHomeClick = { /* already on Main; drawer close is enough */ },
+                                    onTodayClick = {
+                                        if (navConsumed) return@AppNavigationDrawerContent
+                                        navConsumed = true
+                                        navController.navigate(AppNavRoute.Today) {
+                                            launchSingleTop = true
+                                        }
+                                    },
                                     onUpdateFeedClick = {
                                         if (navConsumed) return@AppNavigationDrawerContent
                                         navConsumed = true
@@ -327,6 +336,13 @@ fun App() {
                                         navConsumed = true
                                         navController.popBackStack(AppNavRoute.Main, inclusive = false)
                                     },
+                                    onTodayClick = {
+                                        if (navConsumed) return@AppNavigationDrawerContent
+                                        navConsumed = true
+                                        navController.navigate(AppNavRoute.Today) {
+                                            launchSingleTop = true
+                                        }
+                                    },
                                     onUpdateFeedClick = {
                                         if (navConsumed) return@AppNavigationDrawerContent
                                         navConsumed = true
@@ -379,6 +395,13 @@ fun App() {
                                         navConsumed = true
                                         navController.popBackStack()
                                     },
+                                    onTodayClick = {
+                                        if (navConsumed) return@AppNavigationDrawerContent
+                                        navConsumed = true
+                                        navController.navigate(AppNavRoute.Today) {
+                                            launchSingleTop = true
+                                        }
+                                    },
                                     onUpdateFeedClick = { /* already here */ },
                                     onSettingsClick = {
                                         if (navConsumed) return@AppNavigationDrawerContent
@@ -401,6 +424,67 @@ fun App() {
                         UpdateFeedScreen(
                             onBackClick = { navController.popBackStack() },
                             drawerState = drawerState,
+                        )
+                    }
+                }
+
+                composable<AppNavRoute.Today> {
+                    // Fresh Closed DrawerState per entry — same rationale as Main route.
+                    val drawerState = remember { DrawerState(initialValue = DrawerValue.Closed) }
+                    val scope = rememberCoroutineScope()
+                    var navConsumed by remember { mutableStateOf(false) }
+                    LaunchedEffect(navConsumed) {
+                        if (navConsumed) {
+                            delay(500)
+                            navConsumed = false
+                        }
+                    }
+
+                    ModalNavigationDrawer(
+                        drawerState = drawerState,
+                        drawerContent = {
+                            ModalDrawerSheet(
+                                drawerContainerColor = MaterialTheme.colorScheme.surface
+                            ) {
+                                AppNavigationDrawerContent(
+                                    selectedItemId = DrawerDestination.Today,
+                                    onCloseDrawer = { scope.launch { drawerState.close() } },
+                                    onHomeClick = {
+                                        if (navConsumed) return@AppNavigationDrawerContent
+                                        navConsumed = true
+                                        navController.popBackStack(AppNavRoute.Main, inclusive = false)
+                                    },
+                                    onTodayClick = { /* already here */ },
+                                    onUpdateFeedClick = {
+                                        if (navConsumed) return@AppNavigationDrawerContent
+                                        navConsumed = true
+                                        navController.navigate(AppNavRoute.UpdateFeed) {
+                                            launchSingleTop = true
+                                        }
+                                    },
+                                    onSettingsClick = {
+                                        if (navConsumed) return@AppNavigationDrawerContent
+                                        navConsumed = true
+                                        navController.navigate(AppNavRoute.Settings) {
+                                            launchSingleTop = true
+                                        }
+                                    },
+                                    onRateAppClick = {
+                                        csatViewModel.sendIntent(CsatIntent.ForceShow)
+                                    },
+                                    onLeaveFeedbackClick = {
+                                        csatViewModel.sendIntent(CsatIntent.ForceShowFeedback)
+                                    },
+                                    versionName = AppBuildConfig.versionName,
+                                )
+                            }
+                        }
+                    ) {
+                        TodayRoute(
+                            drawerState = drawerState,
+                            onCreateChecklistClick = {
+                                navigator.navigateToTemplatesScreen()
+                            },
                         )
                     }
                 }
@@ -532,6 +616,10 @@ private fun NavController.handle(command: NavCommand) {
         }
 
         is NavCommand.ToSettings -> navigate(AppNavRoute.Settings) {
+            launchSingleTop = true
+        }
+
+        is NavCommand.ToToday -> navigate(AppNavRoute.Today) {
             launchSingleTop = true
         }
 

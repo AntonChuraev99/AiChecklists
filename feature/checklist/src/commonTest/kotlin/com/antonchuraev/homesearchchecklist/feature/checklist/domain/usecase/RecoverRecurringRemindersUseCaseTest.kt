@@ -83,6 +83,8 @@ class RecoverRecurringRemindersUseCaseTest {
         override suspend fun getWeeklyChecklistCount(): Int = 0
         override val weeklyChecklistCount: Flow<Int> = flowOf(0)
         override suspend fun getAllItemRemindersForRescheduling(): List<ItemReminderInfo> = emptyList()
+        override fun observeRemindersInRange(fromMs: Long, toMs: Long): Flow<List<com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo>> = flowOf(emptyList())
+        override suspend fun getRemindersInRange(fromMs: Long, toMs: Long): List<com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo> = emptyList()
     }
 
     // ─── Tests ────────────────────────────────────────────────────────
