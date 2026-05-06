@@ -242,7 +242,8 @@ class ChecklistDetailViewModel(
                         showCustomPicker = false,
                         customPickerDateMillis = null,
                         pendingRepeatConfig = null,
-                        showEndConditionPicker = false
+                        showEndConditionPicker = false,
+                        reminderSheetLocked = false,
                     )
                 }
             }
@@ -308,6 +309,16 @@ class ChecklistDetailViewModel(
             ChecklistDetailIntent.OnDismissItemDetailsSheet -> updateContentState { it.copy(itemDetailsSheetFor = null) }
             is ChecklistDetailIntent.OnDeleteItemFromSheet -> deleteItemFromSheet(intent.itemId)
 
+            // Reminder paywall upgrade from locked banner
+            ChecklistDetailIntent.OnReminderUpgradeClick -> {
+                updateContentState { it.copy(showReminderSheet = false, reminderSheetLocked = false) }
+                navigator.navigateToPaywall(source = "detail_reminder_limit")
+            }
+            ChecklistDetailIntent.OnItemReminderUpgradeClick -> {
+                updateContentState { it.copy(itemReminderSheetFor = null, itemReminderSheetLocked = false) }
+                navigator.navigateToPaywall(source = "detail_item_reminder_limit")
+            }
+
             // Per-item reminders
             is ChecklistDetailIntent.OnItemReminderClick -> handleItemReminderClick(intent.itemId)
             is ChecklistDetailIntent.OnSaveItemReminder -> saveItemReminder(
@@ -318,6 +329,7 @@ class ChecklistDetailViewModel(
                 updateContentState {
                     it.copy(
                         itemReminderSheetFor = null,
+                        itemReminderSheetLocked = false,
                         pendingRepeatConfig = null,
                         repeatRuleSummary = null,
                         showEndConditionPicker = false
@@ -692,14 +704,6 @@ class ChecklistDetailViewModel(
             val isPremium = awaitUserLimits()?.isPremium ?: false
             val currentChecklistHasReminder = state.checklist.reminderAt != null
 
-            if (!isPremium && !currentChecklistHasReminder) {
-                val activeCount = repository.countActiveReminders()
-                if (activeCount >= 1) {
-                    navigator.navigateToPaywall(source = "detail_reminder_limit")
-                    return@launch
-                }
-            }
-
             // Determine default tab: if repeat is active and no one-shot reminder, open on REPEAT tab
             val defaultTab = if (state.checklist.repeatNextAt != null && state.checklist.reminderAt == null) {
                 ReminderTab.REPEAT
@@ -707,10 +711,30 @@ class ChecklistDetailViewModel(
                 ReminderTab.ONCE
             }
 
+            val isAtLimit = !isPremium && !currentChecklistHasReminder &&
+                    repository.countActiveReminders() >= 1
+
+            if (isAtLimit) {
+                // Show locked banner inside the sheet — skip notification permission check
+                // since the user cannot create a reminder until they upgrade.
+                updateContentState {
+                    it.copy(
+                        showReminderSheet = true,
+                        activeReminderTab = defaultTab,
+                        reminderSheetLocked = true,
+                    )
+                }
+                return@launch
+            }
+
             if (!reminderScheduler.hasNotificationPermission()) {
-                updateContentState { it.copy(showNotificationPermissionSheet = true, activeReminderTab = defaultTab) }
+                updateContentState {
+                    it.copy(showNotificationPermissionSheet = true, activeReminderTab = defaultTab, reminderSheetLocked = false)
+                }
             } else {
-                updateContentState { it.copy(showReminderSheet = true, activeReminderTab = defaultTab) }
+                updateContentState {
+                    it.copy(showReminderSheet = true, activeReminderTab = defaultTab, reminderSheetLocked = false)
+                }
                 if (defaultTab == ReminderTab.REPEAT) {
                     initRepeatTabIfNeeded()
                 }
@@ -1160,12 +1184,20 @@ class ChecklistDetailViewModel(
             updateContentState { it.copy(itemDetailsSheetFor = null) }
 
             // Free-tier gate: only for new reminders (item doesn't already have one)
-            if (!isPremium && !item.hasActiveReminder) {
-                val activeCount = repository.countActiveReminders()
-                if (activeCount >= 1) {
-                    navigator.navigateToPaywall(source = "detail_item_reminder_limit")
-                    return@launch
+            val isAtLimit = !isPremium && !item.hasActiveReminder &&
+                    repository.countActiveReminders() >= 1
+
+            if (isAtLimit) {
+                // Show locked banner inside the sheet — skip notification permission check
+                // since the user cannot create a reminder until they upgrade.
+                updateContentState {
+                    it.copy(
+                        itemReminderSheetFor = itemId,
+                        activeItemReminderTab = ReminderTab.ONCE,
+                        itemReminderSheetLocked = true,
+                    )
                 }
+                return@launch
             }
 
             if (!reminderScheduler.hasNotificationPermission()) {
@@ -1175,6 +1207,7 @@ class ChecklistDetailViewModel(
                     it.copy(
                         itemReminderSheetFor = itemId,
                         activeItemReminderTab = ReminderTab.ONCE,
+                        itemReminderSheetLocked = false,
                         showNotificationPermissionSheet = true
                     )
                 }
@@ -1185,7 +1218,11 @@ class ChecklistDetailViewModel(
                     ReminderTab.ONCE
                 }
                 updateContentState {
-                    it.copy(itemReminderSheetFor = itemId, activeItemReminderTab = defaultTab)
+                    it.copy(
+                        itemReminderSheetFor = itemId,
+                        activeItemReminderTab = defaultTab,
+                        itemReminderSheetLocked = false,
+                    )
                 }
                 if (defaultTab == ReminderTab.REPEAT) {
                     initItemRepeatTabIfNeeded(itemId)

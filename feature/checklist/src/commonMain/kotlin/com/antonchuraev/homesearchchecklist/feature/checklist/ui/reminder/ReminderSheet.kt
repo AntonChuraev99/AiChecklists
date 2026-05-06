@@ -24,6 +24,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.CheckCircle
@@ -59,6 +60,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonText
@@ -100,56 +102,105 @@ fun ReminderSheet(
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surface
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-        ) {
-            // Tab row
-            PrimaryTabRow(
-                selectedTabIndex = if (state.activeTab == ReminderTab.ONCE) 0 else 1,
-                containerColor = MaterialTheme.colorScheme.surface,
-                contentColor = MaterialTheme.colorScheme.primary
+        if (state.isLocked) {
+            LockedReminderContent(
+                onUpgradeClick = callbacks.onUpgradeClick
+            )
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
             ) {
-                Tab(
-                    selected = state.activeTab == ReminderTab.ONCE,
-                    onClick = { callbacks.onTabSelected(ReminderTab.ONCE) },
-                    text = { Text(stringResource(Res.string.reminder_tab_once)) }
-                )
-                Tab(
-                    selected = state.activeTab == ReminderTab.REPEAT,
-                    onClick = { callbacks.onTabSelected(ReminderTab.REPEAT) },
-                    text = { Text(stringResource(Res.string.reminder_tab_repeat)) }
-                )
-            }
+                // Tab row
+                PrimaryTabRow(
+                    selectedTabIndex = if (state.activeTab == ReminderTab.ONCE) 0 else 1,
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.primary
+                ) {
+                    Tab(
+                        selected = state.activeTab == ReminderTab.ONCE,
+                        onClick = { callbacks.onTabSelected(ReminderTab.ONCE) },
+                        text = { Text(stringResource(Res.string.reminder_tab_once)) }
+                    )
+                    Tab(
+                        selected = state.activeTab == ReminderTab.REPEAT,
+                        onClick = { callbacks.onTabSelected(ReminderTab.REPEAT) },
+                        text = { Text(stringResource(Res.string.reminder_tab_repeat)) }
+                    )
+                }
 
-            // Tab content
-            when (state.activeTab) {
-                ReminderTab.ONCE -> OnceTabContent(
-                    currentReminder = state.currentReminder,
-                    onPresetSelected = callbacks.onPresetSelected,
-                    onCustomDateRequested = callbacks.onCustomDateRequested,
-                    onRemoveReminder = callbacks.onRemoveReminder
-                )
-                ReminderTab.REPEAT -> RepeatTabContent(
-                    config = state.pendingRepeatConfig ?: PendingRepeatConfig(),
-                    currentRepeatRule = state.currentRepeatRule,
-                    repeatRuleSummary = state.repeatRuleSummary,
-                    showEndConditionPicker = state.showEndConditionPicker,
-                    onTypeSelected = callbacks.onRepeatTypeSelected,
-                    onSmartPresetSelected = callbacks.onSmartPresetSelected,
-                    onIntervalChanged = callbacks.onRepeatIntervalChanged,
-                    onWeekDayToggled = callbacks.onWeekDayToggled,
-                    onResetChecksToggled = callbacks.onResetChecksToggled,
-                    onTimeChanged = callbacks.onRepeatTimeChanged,
-                    onEndConditionClick = callbacks.onEndConditionClick,
-                    onEndConditionSelected = callbacks.onEndConditionSelected,
-                    onDismissEndCondition = callbacks.onDismissEndCondition,
-                    onSave = callbacks.onSaveRepeat,
-                    onRemove = callbacks.onRemoveRepeat
-                )
+                // Tab content
+                when (state.activeTab) {
+                    ReminderTab.ONCE -> OnceTabContent(
+                        currentReminder = state.currentReminder,
+                        onPresetSelected = callbacks.onPresetSelected,
+                        onCustomDateRequested = callbacks.onCustomDateRequested,
+                        onRemoveReminder = callbacks.onRemoveReminder
+                    )
+                    ReminderTab.REPEAT -> RepeatTabContent(
+                        config = state.pendingRepeatConfig ?: PendingRepeatConfig(),
+                        currentRepeatRule = state.currentRepeatRule,
+                        repeatRuleSummary = state.repeatRuleSummary,
+                        showEndConditionPicker = state.showEndConditionPicker,
+                        onTypeSelected = callbacks.onRepeatTypeSelected,
+                        onSmartPresetSelected = callbacks.onSmartPresetSelected,
+                        onIntervalChanged = callbacks.onRepeatIntervalChanged,
+                        onWeekDayToggled = callbacks.onWeekDayToggled,
+                        onResetChecksToggled = callbacks.onResetChecksToggled,
+                        onTimeChanged = callbacks.onRepeatTimeChanged,
+                        onEndConditionClick = callbacks.onEndConditionClick,
+                        onEndConditionSelected = callbacks.onEndConditionSelected,
+                        onDismissEndCondition = callbacks.onDismissEndCondition,
+                        onSave = callbacks.onSaveRepeat,
+                        onRemove = callbacks.onRemoveRepeat
+                    )
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun LockedReminderContent(
+    onUpgradeClick: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
+            .padding(top = AppDimens.SpacingXl, bottom = AppDimens.SpacingXxl),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Lock,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(32.dp)
+        )
+        Spacer(modifier = Modifier.height(AppDimens.SpacingLg))
+        Text(
+            text = stringResource(Res.string.reminder_paywall_locked_title),
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
+        Text(
+            text = stringResource(Res.string.reminder_paywall_locked_message),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(modifier = Modifier.height(AppDimens.SpacingLg))
+        AppButton(
+            text = stringResource(Res.string.reminder_paywall_locked_cta),
+            onClick = onUpgradeClick,
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }
 

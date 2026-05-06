@@ -686,7 +686,8 @@ private fun ChecklistDetailContent(
                 currentRepeatRule = state.checklist.repeatRule,
                 repeatRuleSummary = state.repeatRuleSummary,
                 pendingRepeatConfig = state.pendingRepeatConfig,
-                showEndConditionPicker = state.showEndConditionPicker
+                showEndConditionPicker = state.showEndConditionPicker,
+                isLocked = state.reminderSheetLocked,
             ),
             callbacks = ReminderSheetCallbacks(
                 onTabSelected = { onIntent(ChecklistDetailIntent.OnReminderTabSelected(it)) },
@@ -704,7 +705,8 @@ private fun ChecklistDetailContent(
                 onDismissEndCondition = { onIntent(ChecklistDetailIntent.OnDismissEndConditionPicker) },
                 onSaveRepeat = { onIntent(ChecklistDetailIntent.OnSaveRepeatSchedule) },
                 onRemoveRepeat = { onIntent(ChecklistDetailIntent.OnRemoveRepeatSchedule) },
-                onDismiss = { onIntent(ChecklistDetailIntent.OnDismissReminderUI) }
+                onDismiss = { onIntent(ChecklistDetailIntent.OnDismissReminderUI) },
+                onUpgradeClick = { onIntent(ChecklistDetailIntent.OnReminderUpgradeClick) },
             )
         )
     }
@@ -713,28 +715,35 @@ private fun ChecklistDetailContent(
     val itemReminderItem = state.itemReminderSheetFor?.let { id ->
         state.defaultFill?.items?.firstOrNull { it.id == id }
     }
-    if (itemReminderItem != null) {
+    if (state.itemReminderSheetFor != null) {
         ReminderSheet(
             state = ReminderSheetState(
                 activeTab = state.activeItemReminderTab,
-                currentReminder = itemReminderItem.reminderAt,
-                currentRepeatRule = itemReminderItem.repeatRule,
+                currentReminder = itemReminderItem?.reminderAt,
+                currentRepeatRule = itemReminderItem?.repeatRule,
                 // Intentionally no fallback to raw enum name (e.g. "DAILY"):
                 // prefer hiding CurrentRepeatCard entirely over showing meaningless
                 // text. The card has a `summary != null` guard.
                 repeatRuleSummary = state.repeatRuleSummary,
                 pendingRepeatConfig = state.pendingRepeatConfig,
-                showEndConditionPicker = state.showEndConditionPicker
+                showEndConditionPicker = state.showEndConditionPicker,
+                isLocked = state.itemReminderSheetLocked,
             ),
             callbacks = ReminderSheetCallbacks(
                 onTabSelected = { onIntent(ChecklistDetailIntent.OnItemReminderTabSelected(it)) },
                 onPresetSelected = { triggerAt ->
-                    onIntent(ChecklistDetailIntent.OnSaveItemReminder(
-                        itemReminderItem.id, triggerAt, null, null
-                    ))
+                    if (itemReminderItem != null) {
+                        onIntent(ChecklistDetailIntent.OnSaveItemReminder(
+                            itemReminderItem.id, triggerAt, null, null
+                        ))
+                    }
                 },
                 onCustomDateRequested = { onIntent(ChecklistDetailIntent.OnCustomDateRequested) },
-                onRemoveReminder = { onIntent(ChecklistDetailIntent.OnRemoveItemReminder(itemReminderItem.id)) },
+                onRemoveReminder = {
+                    if (itemReminderItem != null) {
+                        onIntent(ChecklistDetailIntent.OnRemoveItemReminder(itemReminderItem.id))
+                    }
+                },
                 onRepeatTypeSelected = { onIntent(ChecklistDetailIntent.OnRepeatTypeSelected(it)) },
                 onSmartPresetSelected = { onIntent(ChecklistDetailIntent.OnSmartPresetSelected(it)) },
                 onRepeatIntervalChanged = { onIntent(ChecklistDetailIntent.OnRepeatIntervalChanged(it)) },
@@ -746,7 +755,7 @@ private fun ChecklistDetailContent(
                 onDismissEndCondition = { onIntent(ChecklistDetailIntent.OnDismissEndConditionPicker) },
                 onSaveRepeat = {
                     val config = state.pendingRepeatConfig
-                    if (config != null) {
+                    if (config != null && itemReminderItem != null) {
                         val rule = config.toRule()
                         val timeMinutes = config.timeHour * 60 + config.timeMinute
                         onIntent(ChecklistDetailIntent.OnSaveItemReminder(
@@ -754,8 +763,13 @@ private fun ChecklistDetailContent(
                         ))
                     }
                 },
-                onRemoveRepeat = { onIntent(ChecklistDetailIntent.OnRemoveItemReminder(itemReminderItem.id)) },
-                onDismiss = { onIntent(ChecklistDetailIntent.OnDismissItemReminderSheet) }
+                onRemoveRepeat = {
+                    if (itemReminderItem != null) {
+                        onIntent(ChecklistDetailIntent.OnRemoveItemReminder(itemReminderItem.id))
+                    }
+                },
+                onDismiss = { onIntent(ChecklistDetailIntent.OnDismissItemReminderSheet) },
+                onUpgradeClick = { onIntent(ChecklistDetailIntent.OnItemReminderUpgradeClick) },
             )
         )
     }

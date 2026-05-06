@@ -233,15 +233,16 @@ class ChecklistDetailItemReminderTest {
     // ── Free-tier gate ─────────────────────────────────────────────────────
 
     @Test
-    fun onItemReminderClick_freeUserAtLimit_navigatesPaywall_doesNotOpenSheet() = runTest {
+    fun onItemReminderClick_freeUserAtLimit_opensLockedSheet_doesNotNavigatePaywall() = runTest {
         // Free user, 1 active reminder already exists, item has no reminder
         repository.activeRemindersCount = 1
         val vm = createViewModel(paywallRepository = FakePaywallRepository(SubscriptionStatus.FREE))
 
         vm.onIntent(ChecklistDetailIntent.OnItemReminderClick(itemNoReminder.id))
 
-        assertEquals("detail_item_reminder_limit", navigator.lastPaywallSource)
-        assertNull(contentState(vm).itemReminderSheetFor)
+        assertNull(navigator.lastPaywallSource)
+        assertEquals(itemNoReminder.id, contentState(vm).itemReminderSheetFor)
+        assertTrue(contentState(vm).itemReminderSheetLocked)
     }
 
     @Test
@@ -473,6 +474,38 @@ class ChecklistDetailItemReminderTest {
 
         assertTrue(scheduler.cancelledItemReminders.isEmpty())
         assertTrue(scheduler.cancelledItemRepeats.isEmpty())
+    }
+
+    // ── OnItemReminderUpgradeClick ────────────────────────────────────────
+
+    @Test
+    fun onItemReminderUpgradeClick_navigatesPaywall_andClosesLockedSheet() = runTest {
+        repository.activeRemindersCount = 1
+        val vm = createViewModel(paywallRepository = FakePaywallRepository(SubscriptionStatus.FREE))
+        vm.onIntent(ChecklistDetailIntent.OnItemReminderClick(itemNoReminder.id))
+        // Verify locked sheet is open
+        assertTrue(contentState(vm).itemReminderSheetLocked)
+
+        vm.onIntent(ChecklistDetailIntent.OnItemReminderUpgradeClick)
+
+        assertEquals("detail_item_reminder_limit", navigator.lastPaywallSource)
+        assertNull(contentState(vm).itemReminderSheetFor)
+        assertFalse(contentState(vm).itemReminderSheetLocked)
+    }
+
+    @Test
+    fun onDismissItemReminderSheet_whenLocked_clearsLockFlag() = runTest {
+        repository.activeRemindersCount = 1
+        val vm = createViewModel(paywallRepository = FakePaywallRepository(SubscriptionStatus.FREE))
+        vm.onIntent(ChecklistDetailIntent.OnItemReminderClick(itemNoReminder.id))
+        assertTrue(contentState(vm).itemReminderSheetLocked)
+
+        vm.onIntent(ChecklistDetailIntent.OnDismissItemReminderSheet)
+
+        assertNull(contentState(vm).itemReminderSheetFor)
+        assertFalse(contentState(vm).itemReminderSheetLocked)
+        // dismiss WITHOUT upgrade does NOT navigate to paywall
+        assertNull(navigator.lastPaywallSource)
     }
 
     // ─── Test doubles ─────────────────────────────────────────────────────
