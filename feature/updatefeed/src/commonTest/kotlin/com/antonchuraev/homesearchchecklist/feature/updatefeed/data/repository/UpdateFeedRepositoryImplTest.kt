@@ -29,7 +29,7 @@ class UpdateFeedRepositoryImplTest {
 
         val releases = repository.getReleases()
 
-        // 19 posts across 9 main-versions (v1.6–v1.14)
+        // 20 posts across 9 main-versions (v1.6–v1.14)
         assertEquals(9, releases.size)
     }
 
@@ -250,13 +250,13 @@ class UpdateFeedRepositoryImplTest {
     }
 
     @Test
-    fun `getReleases_withDefaultJson_totalPostCountIsNineteen`() = runTest {
+    fun `getReleases_withDefaultJson_totalPostCountIsTwenty`() = runTest {
         val repository = buildRepository(UpdateFeedContent.JSON)
 
         val releases = repository.getReleases()
         val totalPosts = releases.sumOf { it.posts.size }
 
-        assertEquals(19, totalPosts)
+        assertEquals(20, totalPosts)
     }
 
     @Test
