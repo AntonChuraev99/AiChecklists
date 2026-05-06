@@ -15,11 +15,8 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Check
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ItemReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
-import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatEndCondition
-import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatType
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
-import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderTab
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.Entitlements
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.LoginResult
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallOffering
@@ -50,64 +47,39 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
 
 /**
- * TDD tests for ItemDetailsSheet intents in ChecklistDetailViewModel (Phase B).
- *
- * Covers:
- * - OnItemTapForDetails: opens sheet (itemDetailsSheetFor set)
- * - OnDismissItemDetailsSheet: closes sheet (itemDetailsSheetFor null)
- * - OnItemReminderClick while sheet open: closes details sheet, opens reminder sheet
- * - OnAddNoteClick while sheet open: closes details sheet, opens note dialog
- * - OnDeleteItemFromSheet: cancels reminders if active, removes from fill+template, closes sheet
- * - Free-tier paywall gate still triggers when reminder click comes via sheet
+ * Tests for the checklist-level reminder free-tier gate:
+ * When a free user at the limit taps the reminder bell, we now open a locked
+ * ReminderSheet instead of navigating directly to the paywall.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
-class ChecklistDetailItemDetailsSheetTest {
+class ChecklistDetailReminderGateTest {
 
     private val testDispatcher = UnconfinedTestDispatcher()
     private lateinit var repository: FakeChecklistRepository
-    private lateinit var scheduler: FakeReminderScheduler
     private lateinit var navigator: FakeAppNavigator
 
-    private val itemNoReminder = ChecklistFillItem("Task A", checked = false)
-
-    private val repeatRule = ReminderRepeatRule(
-        type = RepeatType.DAILY,
-        interval = 1,
-        weekDays = null,
-        endCondition = RepeatEndCondition.Never,
-        resetChecks = false
-    )
-    private val itemWithReminder = ChecklistFillItem(
-        text = "Task B",
-        checked = false,
-    ).withReminderAt(System.currentTimeMillis() + 3_600_000L)
-
-    private val itemWithRepeat = ChecklistFillItem(
-        text = "Task C",
-        checked = false,
-    ).withRepeatRule(repeatRule, 9 * 60, System.currentTimeMillis() + 86_400_000L)
-
-    private val testChecklist = Checklist(
+    // Checklist without any existing reminder
+    private val checklistNoReminder = Checklist(
         id = 1L,
         name = "Test",
-        items = listOf(
-            ChecklistItem("Task A"),
-            ChecklistItem("Task B"),
-            ChecklistItem("Task C"),
-        )
+        items = listOf(ChecklistItem("Item 1"))
+    )
+
+    // Checklist that already has an active reminder
+    private val checklistWithReminder = checklistNoReminder.copy(
+        reminderAt = System.currentTimeMillis() + 3_600_000L
     )
 
     private val testFill = ChecklistFill(
         id = 10L,
         checklistId = 1L,
         name = "",
-        items = listOf(itemNoReminder, itemWithReminder, itemWithRepeat),
+        items = listOf(ChecklistFillItem("Item 1", checked = false)),
         createdAt = 0L,
         isDefault = true
     )
@@ -116,10 +88,9 @@ class ChecklistDetailItemDetailsSheetTest {
     fun setup() {
         Dispatchers.setMain(testDispatcher)
         repository = FakeChecklistRepository().apply {
-            storedChecklist = testChecklist
+            storedChecklist = checklistNoReminder
             defaultFillFlow.value = testFill
         }
-        scheduler = FakeReminderScheduler()
         navigator = FakeAppNavigator()
     }
 
@@ -129,11 +100,11 @@ class ChecklistDetailItemDetailsSheetTest {
     }
 
     private fun createViewModel(
-        paywallRepository: FakePaywallRepository = FakePaywallRepository()
+        paywallRepository: PaywallRepository = FakePaywallRepository()
     ): ChecklistDetailViewModel {
         val datastore = AppDatastore(
             PreferenceDataStoreFactory.createWithPath {
-                "build/test_prefs_details_sheet_${Random.nextLong()}.preferences_pb".toPath()
+                "build/test_prefs_reminder_gate_${Random.nextLong()}.preferences_pb".toPath()
             },
             testDispatcher
         )
@@ -148,7 +119,7 @@ class ChecklistDetailItemDetailsSheetTest {
                 FakeUserDataRepository()
             ),
             analyticsTracker = FakeAnalyticsTracker(),
-            reminderScheduler = scheduler,
+            reminderScheduler = FakeReminderScheduler(),
             datastore = datastore
         )
     }
@@ -156,209 +127,102 @@ class ChecklistDetailItemDetailsSheetTest {
     private fun contentState(vm: ChecklistDetailViewModel): ChecklistDetailState.Content =
         vm.screenState.value as ChecklistDetailState.Content
 
-    // ── OnItemTapForDetails ───────────────────────────────────────────────
+    // ── handleReminderClick — locked sheet gate ───────────────────────────
 
     @Test
-    fun onItemTapForDetails_setsItemDetailsSheetFor() = runTest {
-        val vm = createViewModel()
-        assertNull(contentState(vm).itemDetailsSheetFor)
-
-        vm.onIntent(ChecklistDetailIntent.OnItemTapForDetails(itemNoReminder.id))
-
-        assertEquals(itemNoReminder.id, contentState(vm).itemDetailsSheetFor)
-    }
-
-    @Test
-    fun onItemTapForDetails_differentItem_updatesSheetTarget() = runTest {
-        val vm = createViewModel()
-        vm.onIntent(ChecklistDetailIntent.OnItemTapForDetails(itemNoReminder.id))
-        assertEquals(itemNoReminder.id, contentState(vm).itemDetailsSheetFor)
-
-        vm.onIntent(ChecklistDetailIntent.OnItemTapForDetails(itemWithReminder.id))
-        assertEquals(itemWithReminder.id, contentState(vm).itemDetailsSheetFor)
-    }
-
-    // ── OnDismissItemDetailsSheet ─────────────────────────────────────────
-
-    @Test
-    fun onDismissItemDetailsSheet_clearsItemDetailsSheetFor() = runTest {
-        val vm = createViewModel()
-        vm.onIntent(ChecklistDetailIntent.OnItemTapForDetails(itemNoReminder.id))
-        assertEquals(itemNoReminder.id, contentState(vm).itemDetailsSheetFor)
-
-        vm.onIntent(ChecklistDetailIntent.OnDismissItemDetailsSheet)
-
-        assertNull(contentState(vm).itemDetailsSheetFor)
-    }
-
-    @Test
-    fun onDismissItemDetailsSheet_doesNotPersistAnything() = runTest {
-        val vm = createViewModel()
-        vm.onIntent(ChecklistDetailIntent.OnItemTapForDetails(itemNoReminder.id))
-        vm.onIntent(ChecklistDetailIntent.OnDismissItemDetailsSheet)
-
-        assertNull(repository.lastUpdatedFill)
-        assertTrue(scheduler.cancelledItemReminders.isEmpty())
-        assertTrue(scheduler.cancelledItemRepeats.isEmpty())
-    }
-
-    // ── OnItemReminderClick while details sheet open ──────────────────────
-
-    @Test
-    fun onItemReminderClick_whileDetailsSheetOpen_closesDetailsSheetThenOpensReminderSheet() = runTest {
-        val vm = createViewModel()
-        // Open details sheet first
-        vm.onIntent(ChecklistDetailIntent.OnItemTapForDetails(itemNoReminder.id))
-        assertEquals(itemNoReminder.id, contentState(vm).itemDetailsSheetFor)
-
-        // Now trigger reminder click for the same item
-        vm.onIntent(ChecklistDetailIntent.OnItemReminderClick(itemNoReminder.id))
-
-        val state = contentState(vm)
-        // Details sheet closed
-        assertNull(state.itemDetailsSheetFor)
-        // Reminder sheet opened
-        assertEquals(itemNoReminder.id, state.itemReminderSheetFor)
-    }
-
-    // ── OnAddNoteClick while details sheet open ───────────────────────────
-
-    @Test
-    fun onAddNoteClick_whileDetailsSheetOpen_closesDetailsSheetThenOpensNoteDialog() = runTest {
-        val vm = createViewModel()
-        vm.onIntent(ChecklistDetailIntent.OnItemTapForDetails(itemNoReminder.id))
-        assertEquals(itemNoReminder.id, contentState(vm).itemDetailsSheetFor)
-
-        vm.onIntent(ChecklistDetailIntent.OnAddNoteClick(itemNoReminder.id))
-
-        val state = contentState(vm)
-        // Details sheet closed
-        assertNull(state.itemDetailsSheetFor)
-        // Note dialog opened
-        assertEquals(itemNoReminder.id, state.noteDialogItemId)
-    }
-
-    // ── OnDeleteItemFromSheet without reminder ────────────────────────────
-
-    @Test
-    fun onDeleteItemFromSheet_withoutReminder_justDeletes() = runTest {
-        val vm = createViewModel()
-        vm.onIntent(ChecklistDetailIntent.OnItemTapForDetails(itemNoReminder.id))
-
-        vm.onIntent(ChecklistDetailIntent.OnDeleteItemFromSheet(itemNoReminder.id))
-
-        // No scheduler calls
-        assertTrue(scheduler.cancelledItemReminders.isEmpty())
-        assertTrue(scheduler.cancelledItemRepeats.isEmpty())
-
-        // Fill persisted without the item
-        val savedFill = repository.lastUpdatedFill
-        assertNotNull(savedFill)
-        assertFalse(savedFill.items.any { it.id == itemNoReminder.id })
-
-        // Template also updated
-        val savedChecklist = repository.lastUpdatedChecklist
-        assertNotNull(savedChecklist)
-        assertFalse(savedChecklist.items.any { it.text == itemNoReminder.text })
-
-        // Sheet closed
-        assertNull(contentState(vm).itemDetailsSheetFor)
-    }
-
-    // ── OnDeleteItemFromSheet with one-shot reminder ──────────────────────
-
-    @Test
-    fun onDeleteItemFromSheet_withActiveReminder_cancelsReminderAndDeletes() = runTest {
-        val vm = createViewModel()
-        vm.onIntent(ChecklistDetailIntent.OnItemTapForDetails(itemWithReminder.id))
-
-        vm.onIntent(ChecklistDetailIntent.OnDeleteItemFromSheet(itemWithReminder.id))
-
-        // Both cancel methods called
-        assertTrue(scheduler.cancelledItemReminders.any { it == itemWithReminder.id })
-        assertTrue(scheduler.cancelledItemRepeats.any { it == itemWithReminder.id })
-
-        // Item removed from fill
-        val savedFill = repository.lastUpdatedFill
-        assertNotNull(savedFill)
-        assertFalse(savedFill.items.any { it.id == itemWithReminder.id })
-
-        // Sheet closed
-        assertNull(contentState(vm).itemDetailsSheetFor)
-    }
-
-    // ── OnDeleteItemFromSheet with repeat reminder ────────────────────────
-
-    @Test
-    fun onDeleteItemFromSheet_withRepeatReminder_cancelsRepeatAndDeletes() = runTest {
-        val vm = createViewModel()
-        vm.onIntent(ChecklistDetailIntent.OnItemTapForDetails(itemWithRepeat.id))
-
-        vm.onIntent(ChecklistDetailIntent.OnDeleteItemFromSheet(itemWithRepeat.id))
-
-        assertTrue(scheduler.cancelledItemReminders.any { it == itemWithRepeat.id })
-        assertTrue(scheduler.cancelledItemRepeats.any { it == itemWithRepeat.id })
-
-        val savedFill = repository.lastUpdatedFill
-        assertNotNull(savedFill)
-        assertFalse(savedFill.items.any { it.id == itemWithRepeat.id })
-
-        assertNull(contentState(vm).itemDetailsSheetFor)
-    }
-
-    // ── Free-tier paywall gate still works when coming from details sheet ─
-
-    @Test
-    fun onItemReminderClick_freeTierGate_opensLockedSheetWhenComingFromDetails() = runTest {
+    fun onReminderClick_freeUserAtLimit_opensLockedSheet_doesNotNavigatePaywall() = runTest {
         repository.activeRemindersCount = 1
         val vm = createViewModel(paywallRepository = FakePaywallRepository(SubscriptionStatus.FREE))
 
-        // Open details sheet, then tap reminder from it
-        vm.onIntent(ChecklistDetailIntent.OnItemTapForDetails(itemNoReminder.id))
-        vm.onIntent(ChecklistDetailIntent.OnItemReminderClick(itemNoReminder.id))
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
 
-        // Details sheet cleared (closed before reminder sheet opens — Approach A)
-        assertNull(contentState(vm).itemDetailsSheetFor)
-        // Reminder sheet opened in locked mode
-        assertEquals(itemNoReminder.id, contentState(vm).itemReminderSheetFor)
-        assertTrue(contentState(vm).itemReminderSheetLocked)
-        // No paywall navigation
+        assertNull(navigator.lastPaywallSource)
+        assertTrue(contentState(vm).showReminderSheet)
+        assertTrue(contentState(vm).reminderSheetLocked)
+    }
+
+    @Test
+    fun onReminderClick_freeUserAtLimit_butChecklistAlreadyHasReminder_opensSheetUnlocked() = runTest {
+        // Free user is at limit, but this specific checklist already has a reminder —
+        // editing an existing reminder must be allowed without locked banner.
+        repository.activeRemindersCount = 1
+        repository.storedChecklist = checklistWithReminder
+        val vm = createViewModel(paywallRepository = FakePaywallRepository(SubscriptionStatus.FREE))
+
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
+
+        assertNull(navigator.lastPaywallSource)
+        assertTrue(contentState(vm).showReminderSheet)
+        assertFalse(contentState(vm).reminderSheetLocked)
+    }
+
+    @Test
+    fun onReminderClick_premiumUser_atLimit_opensSheetUnlocked() = runTest {
+        repository.activeRemindersCount = 5
+        val premiumStatus = SubscriptionStatus(isActive = true, activeEntitlements = setOf(Entitlements.PREMIUM))
+        val vm = createViewModel(paywallRepository = FakePaywallRepository(premiumStatus))
+
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
+
+        assertNull(navigator.lastPaywallSource)
+        assertFalse(contentState(vm).reminderSheetLocked)
+    }
+
+    @Test
+    fun onReminderClick_freeUser_belowLimit_opensSheetUnlocked() = runTest {
+        repository.activeRemindersCount = 0
+        val vm = createViewModel(paywallRepository = FakePaywallRepository(SubscriptionStatus.FREE))
+
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
+
+        assertNull(navigator.lastPaywallSource)
+        assertFalse(contentState(vm).reminderSheetLocked)
+    }
+
+    // ── OnReminderUpgradeClick ────────────────────────────────────────────
+
+    @Test
+    fun onReminderUpgradeClick_navigatesPaywall_andClosesLockedSheet() = runTest {
+        repository.activeRemindersCount = 1
+        val vm = createViewModel(paywallRepository = FakePaywallRepository(SubscriptionStatus.FREE))
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
+        assertTrue(contentState(vm).reminderSheetLocked)
+
+        vm.onIntent(ChecklistDetailIntent.OnReminderUpgradeClick)
+
+        assertEquals("detail_reminder_limit", navigator.lastPaywallSource)
+        assertFalse(contentState(vm).showReminderSheet)
+        assertFalse(contentState(vm).reminderSheetLocked)
+    }
+
+    // ── OnDismissReminderUI — clears lock on dismiss ──────────────────────
+
+    @Test
+    fun onDismissReminderUI_whenLocked_clearsLockFlag() = runTest {
+        repository.activeRemindersCount = 1
+        val vm = createViewModel(paywallRepository = FakePaywallRepository(SubscriptionStatus.FREE))
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
+        assertTrue(contentState(vm).reminderSheetLocked)
+
+        vm.onIntent(ChecklistDetailIntent.OnDismissReminderUI)
+
+        assertFalse(contentState(vm).showReminderSheet)
+        assertFalse(contentState(vm).reminderSheetLocked)
+        // dismiss WITHOUT upgrade does NOT navigate to paywall
         assertNull(navigator.lastPaywallSource)
     }
 
     // ─── Test doubles ─────────────────────────────────────────────────────
 
-    private class FakeReminderScheduler : ChecklistReminderScheduler {
-        val cancelledItemReminders = mutableListOf<String>()
-        val cancelledItemRepeats = mutableListOf<String>()
-
-        override fun scheduleReminder(checklistId: Long, triggerAtMillis: Long) {}
-        override fun cancelReminder(checklistId: Long) {}
-        override suspend fun rescheduleAllActiveReminders() {}
-        override fun scheduleRepeat(checklistId: Long, triggerAtMillis: Long) {}
-        override fun cancelRepeat(checklistId: Long) {}
-        override suspend fun rescheduleAllActiveRepeats() {}
-        override fun scheduleItemReminder(checklistId: Long, fillId: Long, itemId: String, triggerAtMillis: Long) {}
-        override fun cancelItemReminder(checklistId: Long, fillId: Long, itemId: String) {
-            cancelledItemReminders.add(itemId)
-        }
-        override fun scheduleItemRepeat(checklistId: Long, fillId: Long, itemId: String, triggerAtMillis: Long) {}
-        override fun cancelItemRepeat(checklistId: Long, fillId: Long, itemId: String) {
-            cancelledItemRepeats.add(itemId)
-        }
-    }
-
     private class FakeChecklistRepository : ChecklistRepository {
         var storedChecklist: Checklist? = null
         val defaultFillFlow = MutableStateFlow<ChecklistFill?>(null)
-        var lastUpdatedFill: ChecklistFill? = null
-        var lastUpdatedChecklist: Checklist? = null
         var activeRemindersCount: Int = 0
 
         override val checklists: Flow<List<Checklist>> = flowOf(emptyList())
         override suspend fun addChecklist(checklist: Checklist): Long = 1L
         override suspend fun updateChecklist(checklist: Checklist) {}
-        override suspend fun updateChecklistTemplate(checklist: Checklist) { lastUpdatedChecklist = checklist }
+        override suspend fun updateChecklistTemplate(checklist: Checklist) {}
         override suspend fun deleteChecklist(checklist: Checklist) {}
         override suspend fun getChecklistById(id: Long): Checklist? = storedChecklist
         override suspend fun setSeparateCompleted(checklistId: Long, value: Boolean) {}
@@ -373,7 +237,7 @@ class ChecklistDetailItemDetailsSheetTest {
         override suspend fun getFillById(id: Long): ChecklistFill? = null
         override suspend fun getFillCountByChecklistId(checklistId: Long): Int = 0
         override suspend fun addFill(fill: ChecklistFill): Long = 1L
-        override suspend fun updateFill(fill: ChecklistFill) { lastUpdatedFill = fill }
+        override suspend fun updateFill(fill: ChecklistFill) {}
         override suspend fun deleteFill(fill: ChecklistFill) {}
         override suspend fun reorderChecklists(orderedIds: List<Long>) {}
         override suspend fun setRepeatSchedule(checklistId: Long, rule: ReminderRepeatRule, timeOfDayMinutes: Int, firstTriggerAt: Long) {}
@@ -451,6 +315,19 @@ class ChecklistDetailItemDetailsSheetTest {
         override fun isConfigured(): Boolean = true
         override suspend fun logIn(appUserId: String): Result<LoginResult> = Result.failure(NotImplementedError())
         override suspend fun logOut(): Result<SubscriptionStatus> = Result.failure(NotImplementedError())
+    }
+
+    private class FakeReminderScheduler : ChecklistReminderScheduler {
+        override fun scheduleReminder(checklistId: Long, triggerAtMillis: Long) {}
+        override fun cancelReminder(checklistId: Long) {}
+        override suspend fun rescheduleAllActiveReminders() {}
+        override fun scheduleRepeat(checklistId: Long, triggerAtMillis: Long) {}
+        override fun cancelRepeat(checklistId: Long) {}
+        override suspend fun rescheduleAllActiveRepeats() {}
+        override fun scheduleItemReminder(checklistId: Long, fillId: Long, itemId: String, triggerAtMillis: Long) {}
+        override fun cancelItemReminder(checklistId: Long, fillId: Long, itemId: String) {}
+        override fun scheduleItemRepeat(checklistId: Long, fillId: Long, itemId: String, triggerAtMillis: Long) {}
+        override fun cancelItemRepeat(checklistId: Long, fillId: Long, itemId: String) {}
     }
 
     private class FakeAnalyticsTracker : AnalyticsTracker {

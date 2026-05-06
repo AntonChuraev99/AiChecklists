@@ -31,6 +31,11 @@ data class PendingRepeatConfig(
 
 /**
  * State for the shared [ReminderSheet] composable.
+ *
+ * When [isLocked] is true the sheet renders a locked-paywall banner instead of the normal
+ * tab content. The caller is responsible for setting this flag; the sheet itself only
+ * displays UI and calls back through [ReminderSheetCallbacks.onUpgradeClick] /
+ * [ReminderSheetCallbacks.onDismiss].
  */
 data class ReminderSheetState(
     val activeTab: ReminderTab = ReminderTab.ONCE,
@@ -38,11 +43,16 @@ data class ReminderSheetState(
     val currentRepeatRule: ReminderRepeatRule? = null,
     val repeatRuleSummary: String? = null,
     val pendingRepeatConfig: PendingRepeatConfig? = null,
-    val showEndConditionPicker: Boolean = false
+    val showEndConditionPicker: Boolean = false,
+    /** When true, hides tab content and shows the premium-upgrade locked banner. */
+    val isLocked: Boolean = false,
 )
 
 /**
  * Callbacks for the shared [ReminderSheet] composable.
+ *
+ * [onUpgradeClick] is called when the user taps "Become Pro" inside the locked banner.
+ * Defaults to no-op so existing call-sites (e.g. onboarding) don't need to change.
  */
 data class ReminderSheetCallbacks(
     // Tab
@@ -64,5 +74,7 @@ data class ReminderSheetCallbacks(
     val onSaveRepeat: () -> Unit,
     val onRemoveRepeat: () -> Unit,
     // Sheet
-    val onDismiss: () -> Unit
+    val onDismiss: () -> Unit,
+    // Locked paywall banner
+    val onUpgradeClick: () -> Unit = {},
 )

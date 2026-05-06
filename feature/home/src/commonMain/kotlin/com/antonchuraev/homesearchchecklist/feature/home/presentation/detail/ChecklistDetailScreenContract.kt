@@ -66,6 +66,9 @@ sealed interface ChecklistDetailState : State {
         val activeItemReminderTab: ReminderTab = ReminderTab.ONCE,
         // Item details sheet: null = closed; non-null = open for that itemId
         val itemDetailsSheetFor: String? = null,
+        // Paywall locked banners: shown instead of normal tab content when free user is at limit
+        val reminderSheetLocked: Boolean = false,
+        val itemReminderSheetLocked: Boolean = false,
     ) : ChecklistDetailState
 }
 
@@ -172,6 +175,10 @@ sealed interface ChecklistDetailIntent : Intent {
     data class OnItemTapForDetails(val itemId: String) : ChecklistDetailIntent
     data object OnDismissItemDetailsSheet : ChecklistDetailIntent
     data class OnDeleteItemFromSheet(val itemId: String) : ChecklistDetailIntent
+
+    // Reminder paywall upgrade (called from locked banner inside ReminderSheet)
+    data object OnReminderUpgradeClick : ChecklistDetailIntent
+    data object OnItemReminderUpgradeClick : ChecklistDetailIntent
 
     // Per-item reminder intents
     data class OnItemReminderClick(val itemId: String) : ChecklistDetailIntent
