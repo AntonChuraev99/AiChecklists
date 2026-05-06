@@ -5,6 +5,14 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.core.navigation.api.NavCommand
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistReminderInfo
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistRepeatInfo
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ItemReminderInfo
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.LoginResult
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallOffering
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PurchaseResult
@@ -12,14 +20,23 @@ import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.Restore
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.SubscriptionStatus
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.repository.PaywallRepository
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetSubscriptionStatusUseCase
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetUserLimitsUseCase
 import com.antonchuraev.homesearchchecklist.feature.updatefeed.domain.deeplink.UpdateFeedDeepLinkHandler
+import com.antonchuraev.homesearchchecklist.feature.updatefeed.domain.deeplink.UpdateFeedDeepLinks
 import com.antonchuraev.homesearchchecklist.feature.updatefeed.domain.model.UpdatePost
+import com.antonchuraev.homesearchchecklist.feature.updatefeed.domain.model.UpdatePostAction
 import com.antonchuraev.homesearchchecklist.feature.updatefeed.domain.model.VersionReleaseGroup
 import com.antonchuraev.homesearchchecklist.feature.updatefeed.domain.repository.UpdateFeedRepository
+import com.antonchuraev.homesearchchecklist.feature.user.domain.model.RegistrationData
+import com.antonchuraev.homesearchchecklist.feature.user.domain.model.UserData
+import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -36,6 +53,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class UpdateFeedViewModelTest {
 
     // UnconfinedTestDispatcher executes coroutines eagerly — no advanceUntilIdle needed
@@ -89,6 +107,7 @@ class UpdateFeedViewModelTest {
         override fun navigateToSettings() {}
         override fun navigateToScreenCatalog() {}
         override fun showWidgetInstruction() {}
+        override fun requestCreateWeeklyChecklist() {}
     }
 
     private class FakePaywallRepository(
@@ -107,10 +126,11 @@ class UpdateFeedViewModelTest {
     }
 
     private class FakeAnalyticsTracker : AnalyticsTracker {
+        val events = mutableListOf<Pair<String, Map<String, Any>>>()
         override fun setUserId(userId: String) {}
         override fun setUserProperties(properties: Map<String, Any>) {}
         override fun screenView(name: String) {}
-        override fun event(name: String, params: Map<String, Any>) {}
+        override fun event(name: String, params: Map<String, Any>) { events.add(name to params) }
     }
 
     private class FakeLogger : AppLogger {
@@ -118,6 +138,66 @@ class UpdateFeedViewModelTest {
         override fun info(tag: String, message: String) {}
         override fun warning(tag: String, message: String) {}
         override fun error(tag: String, message: String, throwable: Throwable?) {}
+    }
+
+    private class FakeRemoteConfigProvider : RemoteConfigProvider {
+        override suspend fun fetchAndActivate(): Boolean = true
+        override fun getBoolean(key: String, defaultValue: Boolean): Boolean = defaultValue
+        override fun getString(key: String, defaultValue: String): String = defaultValue
+        override fun getLong(key: String, defaultValue: Long): Long = defaultValue
+    }
+
+    private class FakeChecklistRepository(
+        private val weeklyCount: Int = 0
+    ) : ChecklistRepository {
+        override val checklists: Flow<List<Checklist>> = flowOf(emptyList())
+        override val weeklyChecklistCount: Flow<Int> = flowOf(weeklyCount)
+        override suspend fun addChecklist(checklist: Checklist): Long = 1L
+        override suspend fun updateChecklist(checklist: Checklist) {}
+        override suspend fun updateChecklistTemplate(checklist: Checklist) {}
+        override suspend fun deleteChecklist(checklist: Checklist) {}
+        override suspend fun getChecklistById(id: Long): Checklist? = null
+        override suspend fun reorderChecklists(orderedIds: List<Long>) {}
+        override suspend fun setSeparateCompleted(checklistId: Long, value: Boolean) {}
+        override suspend fun setAutoDeleteCompleted(checklistId: Long, value: Boolean) {}
+        override suspend fun setReminder(checklistId: Long, reminderAt: Long?) {}
+        override suspend fun countActiveReminders(): Int = 0
+        override suspend fun getActiveReminders(): List<ChecklistReminderInfo> = emptyList()
+        override suspend fun getDefaultFillOneShot(checklistId: Long): ChecklistFill? = null
+        override fun getFillsByChecklistId(checklistId: Long): Flow<List<ChecklistFill>> = flowOf(emptyList())
+        override fun getDefaultFillByChecklistId(checklistId: Long): Flow<ChecklistFill?> = flowOf(null)
+        override fun getAdditionalFillsByChecklistId(checklistId: Long): Flow<List<ChecklistFill>> = flowOf(emptyList())
+        override suspend fun getFillById(id: Long): ChecklistFill? = null
+        override suspend fun getFillCountByChecklistId(checklistId: Long): Int = 0
+        override suspend fun addFill(fill: ChecklistFill): Long = 1L
+        override suspend fun updateFill(fill: ChecklistFill) {}
+        override suspend fun deleteFill(fill: ChecklistFill) {}
+        override suspend fun setRepeatSchedule(checklistId: Long, rule: ReminderRepeatRule, timeOfDayMinutes: Int, firstTriggerAt: Long) {}
+        override suspend fun advanceRepeatSchedule(checklistId: Long, nextAt: Long?, newCount: Int) {}
+        override suspend fun clearRepeatSchedule(checklistId: Long) {}
+        override suspend fun resetDefaultFillChecks(checklistId: Long) {}
+        override suspend fun countActiveRepeatSchedules(): Int = 0
+        override suspend fun getActiveRepeatSchedules(): List<ChecklistRepeatInfo> = emptyList()
+        override suspend fun getPastDueRepeatSchedules(nowMillis: Long): List<ChecklistRepeatInfo> = emptyList()
+        override suspend fun getTotalAdditionalFillCount(): Int = 0
+        override suspend fun getWeeklyChecklistCount(): Int = weeklyCount
+        override suspend fun getAllItemRemindersForRescheduling(): List<ItemReminderInfo> = emptyList()
+    }
+
+    private class FakeUserDataRepository : UserDataRepository {
+        private val userData = UserData(userId = "test", isPremium = false)
+        private val flow = MutableStateFlow(userData)
+        override fun getUserDataFlow(): StateFlow<UserData> = flow
+        override suspend fun getUserData(): UserData = userData
+        override suspend fun update(userData: UserData) {}
+        override suspend fun ensureUserRegistered(): Result<RegistrationData> =
+            Result.success(RegistrationData(userData = userData, isNewUser = false))
+        override suspend fun syncWithServer(): Result<RegistrationData> =
+            Result.success(RegistrationData(userData = userData, isNewUser = false))
+        override suspend fun isPaywallLinked(): Boolean = false
+        override suspend fun setPaywallLinked(linked: Boolean) {}
+        override suspend fun restoreCreditsAfterPurchase(): Result<Int> = Result.success(0)
+        override suspend fun getFirstLaunchAtMillis(): Long = 0L
     }
 
     private val samplePost = UpdatePost(
@@ -130,6 +210,21 @@ class UpdateFeedViewModelTest {
         actions = emptyList()
     )
 
+    private val weeklyPost = UpdatePost(
+        id = "weekly_mode_v1",
+        version = "1.14",
+        title = "Weekly Mode",
+        description = "Plan your week visually.",
+        publishedAtMillis = 1769644800000L,
+        iconName = "Bolt",
+        actions = listOf(
+            UpdatePostAction(
+                label = "Create weekly checklist",
+                deepLink = UpdateFeedDeepLinks.CREATE_WEEKLY
+            )
+        )
+    )
+
     private val sampleReleases = listOf(
         VersionReleaseGroup(
             version = "1.6",
@@ -139,22 +234,43 @@ class UpdateFeedViewModelTest {
         )
     )
 
+    private val weeklyReleases = listOf(
+        VersionReleaseGroup(
+            version = "1.14",
+            publishedAtMillis = 1769644800000L,
+            storeDescription = "🆕 Weekly mode!",
+            posts = listOf(weeklyPost)
+        )
+    )
+
     private fun buildViewModel(
         releases: List<VersionReleaseGroup> = sampleReleases,
-        subscriptionStatus: SubscriptionStatus = SubscriptionStatus.FREE
-    ): Pair<UpdateFeedViewModel, FakeNavigator> {
+        subscriptionStatus: SubscriptionStatus = SubscriptionStatus.FREE,
+        weeklyCount: Int = 0
+    ): Triple<UpdateFeedViewModel, FakeNavigator, FakeAnalyticsTracker> {
         val navigator = FakeNavigator()
-        val useCase = GetSubscriptionStatusUseCase(FakePaywallRepository(subscriptionStatus))
+        val tracker = FakeAnalyticsTracker()
+        val paywallRepository = FakePaywallRepository(subscriptionStatus)
+        val subscriptionUseCase = GetSubscriptionStatusUseCase(paywallRepository)
+        val userLimitsUseCase = GetUserLimitsUseCase(
+            remoteConfigProvider = FakeRemoteConfigProvider(),
+            checklistRepository = FakeChecklistRepository(weeklyCount),
+            paywallRepository = paywallRepository,
+            userDataRepository = FakeUserDataRepository()
+        )
         val viewModel = UpdateFeedViewModel(
             repository = FakeRepository(releases),
             navigator = navigator,
             deepLinkHandler = UpdateFeedDeepLinkHandler(navigator),
-            getSubscriptionStatusUseCase = useCase,
-            analyticsTracker = FakeAnalyticsTracker(),
+            getSubscriptionStatusUseCase = subscriptionUseCase,
+            getUserLimitsUseCase = userLimitsUseCase,
+            analyticsTracker = tracker,
             logger = FakeLogger()
         )
-        return viewModel to navigator
+        return Triple(viewModel, navigator, tracker)
     }
+
+    // ── Existing tests (preserved) ──────────────────────────────────────────
 
     @Test
     fun `loadReleases_withReleasesAndInactivePremium_emitsSuccessWithIsPremiumFalse`() = runTest {
@@ -281,5 +397,145 @@ class UpdateFeedViewModelTest {
         viewModel.sendIntent(UpdateFeedScreenIntent.OnPremiumBannerClick)
         advanceUntilIdle()
         assertTrue(navigator.navigatedToSubscriptionStatus)
+    }
+
+    // ── Locked CTA tests ────────────────────────────────────────────────────
+
+    @Test
+    fun `loadReleases_whenFreeUserHitsWeeklyLimit_putsCreateWeeklyDeeplinkInLockedSet`() = runTest {
+        // Free user has 1 weekly checklist, max is 1 → canCreateWeeklyChecklist = false
+        val (viewModel, _) = buildViewModel(
+            releases = weeklyReleases,
+            subscriptionStatus = SubscriptionStatus.FREE,
+            weeklyCount = 1
+        )
+        advanceUntilIdle()
+
+        val state = viewModel.screenState.value
+        assertIs<UpdateFeedScreenState.Success>(state)
+        assertTrue(
+            UpdateFeedDeepLinks.CREATE_WEEKLY in state.lockedActionDeepLinks,
+            "Expected CREATE_WEEKLY deeplink in lockedActionDeepLinks when free user hits limit"
+        )
+    }
+
+    @Test
+    fun `loadReleases_whenFreeUserBelowWeeklyLimit_lockedSetEmpty`() = runTest {
+        // Free user has 0 weekly checklists, max is 1 → canCreateWeeklyChecklist = true
+        val (viewModel, _) = buildViewModel(
+            releases = weeklyReleases,
+            subscriptionStatus = SubscriptionStatus.FREE,
+            weeklyCount = 0
+        )
+        advanceUntilIdle()
+
+        val state = viewModel.screenState.value
+        assertIs<UpdateFeedScreenState.Success>(state)
+        assertTrue(
+            state.lockedActionDeepLinks.isEmpty(),
+            "Expected empty lockedActionDeepLinks when free user is below the weekly limit"
+        )
+    }
+
+    @Test
+    fun `loadReleases_whenPremium_lockedSetEmpty`() = runTest {
+        // Premium user — canCreateWeeklyChecklist is always true regardless of count
+        val premiumStatus = SubscriptionStatus(
+            isActive = true,
+            activeEntitlements = setOf("AiChecklists Pro"),
+            expirationDate = null
+        )
+        val (viewModel, _) = buildViewModel(
+            releases = weeklyReleases,
+            subscriptionStatus = premiumStatus,
+            weeklyCount = 5
+        )
+        advanceUntilIdle()
+
+        val state = viewModel.screenState.value
+        assertIs<UpdateFeedScreenState.Success>(state)
+        assertTrue(
+            state.lockedActionDeepLinks.isEmpty(),
+            "Expected empty lockedActionDeepLinks for premium user"
+        )
+    }
+
+    @Test
+    fun `handleActionClick_whenWeeklyDeeplinkLocked_navigatesToPaywall_skipsDeepLinkHandler`() = runTest {
+        // Free user at limit → CREATE_WEEKLY action is locked
+        val (viewModel, navigator) = buildViewModel(
+            releases = weeklyReleases,
+            subscriptionStatus = SubscriptionStatus.FREE,
+            weeklyCount = 1
+        )
+        advanceUntilIdle()
+
+        viewModel.sendIntent(
+            UpdateFeedScreenIntent.OnActionClick(
+                postId = "weekly_mode_v1",
+                action = UpdatePostAction(
+                    label = "Create weekly checklist",
+                    deepLink = UpdateFeedDeepLinks.CREATE_WEEKLY
+                )
+            )
+        )
+        advanceUntilIdle()
+
+        assertEquals("weekly_mode_limit", navigator.paywallSource,
+            "Expected navigation to paywall with source='weekly_mode_limit'")
+    }
+
+    @Test
+    fun `handleActionClick_whenWeeklyDeeplinkLocked_analyticsEventIncludesLockedTrue`() = runTest {
+        val (viewModel, _, tracker) = buildViewModel(
+            releases = weeklyReleases,
+            subscriptionStatus = SubscriptionStatus.FREE,
+            weeklyCount = 1
+        )
+        advanceUntilIdle()
+
+        viewModel.sendIntent(
+            UpdateFeedScreenIntent.OnActionClick(
+                postId = "weekly_mode_v1",
+                action = UpdatePostAction(
+                    label = "Create weekly checklist",
+                    deepLink = UpdateFeedDeepLinks.CREATE_WEEKLY
+                )
+            )
+        )
+        advanceUntilIdle()
+
+        val event = tracker.events.firstOrNull { it.first == "update_feed_action_click" }
+        assertNotNull(event, "Expected analytics event 'update_feed_action_click'")
+        assertEquals(true, event.second["locked"], "Expected locked=true in analytics params")
+    }
+
+    @Test
+    fun `handleActionClick_whenWeeklyDeeplinkUnlocked_callsDeepLinkHandler_noPaywallNavigation`() = runTest {
+        // Free user with 0 weekly checklists → not locked, handler should fire
+        val (viewModel, navigator) = buildViewModel(
+            releases = weeklyReleases,
+            subscriptionStatus = SubscriptionStatus.FREE,
+            weeklyCount = 0
+        )
+        advanceUntilIdle()
+
+        viewModel.sendIntent(
+            UpdateFeedScreenIntent.OnActionClick(
+                postId = "weekly_mode_v1",
+                action = UpdatePostAction(
+                    label = "Create weekly checklist",
+                    deepLink = UpdateFeedDeepLinks.CREATE_WEEKLY
+                )
+            )
+        )
+        advanceUntilIdle()
+
+        // DeepLinkHandler routes gisti://create?viewMode=weekly to requestCreateWeeklyChecklist()
+        // which on FakeNavigator is a no-op — but crucially paywallSource must remain null
+        assertNull(
+            navigator.paywallSource,
+            "Expected no paywall navigation when weekly CTA is not locked"
+        )
     }
 }

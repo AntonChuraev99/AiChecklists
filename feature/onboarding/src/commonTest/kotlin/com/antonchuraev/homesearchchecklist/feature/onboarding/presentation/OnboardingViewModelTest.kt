@@ -141,6 +141,7 @@ class OnboardingViewModelTest {
         override val commands: Flow<NavCommand> = emptyFlow()
         override val events: SharedFlow<AppNavEvent> = MutableSharedFlow()
         override fun showWidgetInstruction() {}
+        override fun requestCreateWeeklyChecklist() {}
         override fun onBack() {}
         override fun navigateToOnboarding() {}
         override fun navigateToInteractiveOnboarding() {}

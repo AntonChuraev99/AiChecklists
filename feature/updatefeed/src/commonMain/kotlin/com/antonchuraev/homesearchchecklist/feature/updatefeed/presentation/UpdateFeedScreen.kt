@@ -141,6 +141,7 @@ private fun UpdateFeedScreenContent(
                     ) { release ->
                         ReleaseCard(
                             release = release,
+                            lockedActionDeepLinks = currentState.lockedActionDeepLinks,
                             onActionClick = { postId, action ->
                                 viewModel.sendIntent(
                                     UpdateFeedScreenIntent.OnActionClick(

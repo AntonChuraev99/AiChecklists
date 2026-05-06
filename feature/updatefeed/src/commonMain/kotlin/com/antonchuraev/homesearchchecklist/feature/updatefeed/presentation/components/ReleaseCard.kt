@@ -57,7 +57,8 @@ import com.antonchuraev.homesearchchecklist.feature.updatefeed.domain.model.Vers
 internal fun ReleaseCard(
     release: VersionReleaseGroup,
     onActionClick: (postId: String, action: UpdatePostAction) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    lockedActionDeepLinks: Set<String> = emptySet()
 ) {
     var expanded by rememberSaveable { mutableStateOf(true) }
     val headerContentDescription = "Version ${release.version} release notes, " +
@@ -135,6 +136,7 @@ internal fun ReleaseCard(
                         }
                         FeatureItem(
                             post = post,
+                            lockedActionDeepLinks = lockedActionDeepLinks,
                             onActionClick = { action -> onActionClick(post.id, action) },
                             modifier = Modifier.fillMaxWidth()
                         )

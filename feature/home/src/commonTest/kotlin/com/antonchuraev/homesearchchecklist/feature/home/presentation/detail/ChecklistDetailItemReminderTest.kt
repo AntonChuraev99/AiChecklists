@@ -579,6 +579,7 @@ class ChecklistDetailItemReminderTest {
         override suspend fun getPastDueRepeatSchedules(nowMillis: Long): List<ChecklistRepeatInfo> = emptyList()
         override suspend fun getTotalAdditionalFillCount(): Int = 0
         override suspend fun getWeeklyChecklistCount(): Int = 0
+        override val weeklyChecklistCount: Flow<Int> = flowOf(0)
         override suspend fun getAllItemRemindersForRescheduling(): List<ItemReminderInfo> = emptyList()
     }
 
@@ -602,6 +603,7 @@ class ChecklistDetailItemReminderTest {
         override val commands: Flow<NavCommand> = emptyFlow()
         override val events: SharedFlow<AppNavEvent> = MutableSharedFlow()
         override fun showWidgetInstruction() {}
+        override fun requestCreateWeeklyChecklist() {}
         override fun onBack() {}
         override fun navigateToOnboarding() {}
         override fun navigateToInteractiveOnboarding() {}

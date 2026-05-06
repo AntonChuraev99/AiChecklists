@@ -37,11 +37,11 @@ class GetUserLimitsUseCase(
         return combine(
             checklistRepository.checklists.map { it.size },
             paywallRepository.subscriptionStatus,
-            userDataRepository.getUserDataFlow().map { it.isPremium }
-        ) { checklistCount, subscriptionStatus, firestorePremium ->
+            userDataRepository.getUserDataFlow().map { it.isPremium },
+            checklistRepository.weeklyChecklistCount
+        ) { checklistCount, subscriptionStatus, firestorePremium, weeklyCount ->
             val revenueCatPremium = subscriptionStatus.activeEntitlements.contains(Entitlements.PREMIUM)
             val isPremium = revenueCatPremium || firestorePremium
-            val weeklyCount = checklistRepository.getWeeklyChecklistCount()
             UserLimits(
                 maxChecklists = maxChecklists,
                 maxFillsPerChecklist = maxFillsPerChecklist,

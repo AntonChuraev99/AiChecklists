@@ -15,6 +15,7 @@ import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.Campaign
 import androidx.compose.material.icons.outlined.Celebration
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Replay
 import androidx.compose.material.icons.outlined.Star
@@ -28,21 +29,30 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.unlock_more_with_premium
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonText
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.feature.updatefeed.domain.model.UpdatePost
 import com.antonchuraev.homesearchchecklist.feature.updatefeed.domain.model.UpdatePostAction
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * A single feature row inside a [ReleaseCard].
  * No outer card — just icon + title + description + optional action buttons.
+ *
+ * When [lockedActionDeepLinks] contains an action's deepLink, that action
+ * renders as "Unlock with Premium" CTA (with a lock icon) instead of its
+ * original label. The onClick still fires [onActionClick] — the ViewModel
+ * intercepts locked actions and routes to the paywall instead.
  */
 @Composable
 internal fun FeatureItem(
     post: UpdatePost,
     onActionClick: (UpdatePostAction) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    lockedActionDeepLinks: Set<String> = emptySet()
 ) {
     Column(
         modifier = modifier,
@@ -79,16 +89,30 @@ internal fun FeatureItem(
             Column(
                 verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs)
             ) {
-                // First action — primary button
+                val primaryAction = post.actions[0]
+                val isPrimaryLocked = primaryAction.deepLink in lockedActionDeepLinks
+
+                // First action — primary button (locked variant shows lock icon + "Unlock with Premium")
                 AppButton(
-                    text = post.actions[0].label,
-                    onClick = { onActionClick(post.actions[0]) },
+                    text = if (isPrimaryLocked) {
+                        stringResource(Res.string.unlock_more_with_premium)
+                    } else {
+                        primaryAction.label
+                    },
+                    icon = if (isPrimaryLocked) Icons.Outlined.Lock else null,
+                    onClick = { onActionClick(primaryAction) },
                     modifier = Modifier.fillMaxWidth()
                 )
-                // Remaining actions — text buttons
+
+                // Remaining actions — text buttons (lock state applies to each individually)
                 post.actions.drop(1).forEach { action ->
+                    val isLocked = action.deepLink in lockedActionDeepLinks
                     AppButtonText(
-                        text = action.label,
+                        text = if (isLocked) {
+                            stringResource(Res.string.unlock_more_with_premium)
+                        } else {
+                            action.label
+                        },
                         onClick = { onActionClick(action) },
                         modifier = Modifier.fillMaxWidth()
                     )

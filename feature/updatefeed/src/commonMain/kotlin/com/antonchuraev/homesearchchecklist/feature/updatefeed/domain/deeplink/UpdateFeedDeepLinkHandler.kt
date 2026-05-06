@@ -26,7 +26,12 @@ class UpdateFeedDeepLinkHandler(private val navigator: AppNavigator) {
                 true
             }
             "create" -> {
-                navigator.navigateToCreateChecklistScreen(templateId = null)
+                val viewMode = uri.queryParam("viewMode")
+                if (viewMode == "weekly") {
+                    navigator.requestCreateWeeklyChecklist()
+                } else {
+                    navigator.navigateToCreateChecklistScreen(templateId = null)
+                }
                 true
             }
             "subscription_status" -> {

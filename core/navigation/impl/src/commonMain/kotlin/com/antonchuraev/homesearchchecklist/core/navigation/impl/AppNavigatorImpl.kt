@@ -33,6 +33,10 @@ class AppNavigatorImpl : AppNavigator {
         _events.tryEmit(AppNavEvent.ShowWidgetInstruction)
     }
 
+    override fun requestCreateWeeklyChecklist() {
+        _events.tryEmit(AppNavEvent.CreateWeeklyChecklistRequested)
+    }
+
     private fun emit(command: NavCommand) {
         _commands.trySend(command)
     }

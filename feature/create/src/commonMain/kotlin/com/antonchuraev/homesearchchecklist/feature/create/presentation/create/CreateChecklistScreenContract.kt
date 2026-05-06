@@ -13,7 +13,9 @@ data class CreateChecklistState(
     val newItemText: String = "",
     // Inline item editing
     val editingItemId: String? = null,
-    val editingItemText: String = ""
+    val editingItemText: String = "",
+    // Gate: false when free user is at the checklist limit (edit mode always passes)
+    val canCreateChecklist: Boolean = true
 ) : State
 
 sealed interface CreateChecklistIntent : Intent {

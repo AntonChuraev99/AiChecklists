@@ -117,6 +117,8 @@
     <string name="update_feed_menu_item">Updates</string>
     <string name="update_feed_empty_title">No updates yet</string>
     <string name="update_feed_empty_description">Check back later for news and tips</string>
+    <string name="update_feed_unlock_with_premium">Become Pro to Unlock More</string>
+    <string name="unlock_more_with_premium">Become Pro to Unlock More</string>
 
     <!-- Create Screen -->
     <string name="create_title">New Checklist</string>

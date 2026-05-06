@@ -52,6 +52,9 @@ kotlin {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
             implementation(libs.androidx.navigation.compose)
+            implementation(projects.core.remoteconfig.api)
+            implementation(projects.feature.user)
+            implementation(projects.feature.paywall)
         }
     }
 }

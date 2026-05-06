@@ -1,17 +1,15 @@
 package com.antonchuraev.homesearchchecklist.feature.updatefeed.data.repository
 
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
-import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDefaults
-import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigKeys
-import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
+import com.antonchuraev.homesearchchecklist.feature.updatefeed.data.UpdateFeedContent
 import com.antonchuraev.homesearchchecklist.feature.updatefeed.domain.model.UpdateFeedConfig
 import com.antonchuraev.homesearchchecklist.feature.updatefeed.domain.model.VersionReleaseGroup
 import com.antonchuraev.homesearchchecklist.feature.updatefeed.domain.repository.UpdateFeedRepository
 import kotlinx.serialization.json.Json
 
 class UpdateFeedRepositoryImpl(
-    private val remoteConfigProvider: RemoteConfigProvider,
-    private val logger: AppLogger
+    private val logger: AppLogger,
+    private val jsonSource: String = UpdateFeedContent.JSON
 ) : UpdateFeedRepository {
 
     private val json = Json {
@@ -21,11 +19,7 @@ class UpdateFeedRepositoryImpl(
 
     override suspend fun getReleases(): List<VersionReleaseGroup> {
         return try {
-            val jsonString = remoteConfigProvider.getString(
-                key = RemoteConfigKeys.UPDATE_FEED_JSON,
-                defaultValue = RemoteConfigDefaults.UPDATE_FEED_JSON
-            )
-            val config = json.decodeFromString<UpdateFeedConfig>(jsonString)
+            val config = json.decodeFromString<UpdateFeedConfig>(jsonSource)
 
             // Build the union of all known versions from posts + releaseNotes.
             val allVersions: Set<String> =

@@ -75,6 +75,7 @@ import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -230,6 +231,8 @@ fun TemplatesScreen(
 
             // Bottom action buttons
             BottomActionButtons(
+                canCreateChecklist = state.canCreateChecklist,
+                canCreateWeeklyChecklist = state.canCreateWeeklyChecklist,
                 onCreateManually = { viewModel.sendIntent(TemplatesScreenIntent.OnCreateManuallyClick) },
                 onCreateWithAi = { viewModel.sendIntent(TemplatesScreenIntent.OnCreateWithAiClick) },
                 onCreateWeekly = { viewModel.sendIntent(TemplatesScreenIntent.OnCreateWeeklyClick) },
@@ -240,6 +243,8 @@ fun TemplatesScreen(
 
 @Composable
 private fun BottomActionButtons(
+    canCreateChecklist: Boolean,
+    canCreateWeeklyChecklist: Boolean,
     onCreateManually: () -> Unit,
     onCreateWithAi: () -> Unit,
     onCreateWeekly: () -> Unit,
@@ -253,11 +258,15 @@ private fun BottomActionButtons(
             .padding(top = AppDimens.SpacingLg, bottom = AppDimens.SpacingLg),
         verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
     ) {
-        // Create manually button
+        // Create manually button — shows lock CTA when free user is at checklist limit
         AppButton(
-            text = stringResource(Res.string.templates_create_manually),
+            text = if (canCreateChecklist) {
+                stringResource(Res.string.templates_create_manually)
+            } else {
+                stringResource(Res.string.unlock_more_with_premium)
+            },
             onClick = onCreateManually,
-            icon = Icons.Default.Edit,
+            icon = if (canCreateChecklist) Icons.Default.Edit else Icons.Outlined.Lock,
             modifier = Modifier.fillMaxWidth()
         )
 
@@ -269,11 +278,15 @@ private fun BottomActionButtons(
             modifier = Modifier.fillMaxWidth()
         )
 
-        // My Week button
+        // My Week button — shows lock CTA when free user is at the weekly limit
         AppButtonSecondary(
-            text = stringResource(Res.string.templates_create_weekly),
+            text = if (canCreateWeeklyChecklist) {
+                stringResource(Res.string.templates_create_weekly)
+            } else {
+                stringResource(Res.string.unlock_more_with_premium)
+            },
             onClick = onCreateWeekly,
-            icon = Icons.Outlined.CalendarMonth,
+            icon = if (canCreateWeeklyChecklist) Icons.Outlined.CalendarMonth else Icons.Outlined.Lock,
             modifier = Modifier.fillMaxWidth()
         )
     }

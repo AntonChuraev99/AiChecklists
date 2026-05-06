@@ -25,6 +25,9 @@ interface AppNavigator {
     /** Publish ShowWidgetInstruction event so App.kt opens the overlay. */
     fun showWidgetInstruction()
 
+    /** Request creation of a new weekly checklist. App.kt handles premium gate and navigation. */
+    fun requestCreateWeeklyChecklist()
+
     fun onBack()
 
     fun navigateToOnboarding()

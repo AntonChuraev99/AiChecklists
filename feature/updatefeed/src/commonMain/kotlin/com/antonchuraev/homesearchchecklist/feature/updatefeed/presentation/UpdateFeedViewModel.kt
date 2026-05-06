@@ -7,7 +7,9 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.common.api.formatExpirationDate
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetSubscriptionStatusUseCase
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetUserLimitsUseCase
 import com.antonchuraev.homesearchchecklist.feature.updatefeed.domain.deeplink.UpdateFeedDeepLinkHandler
+import com.antonchuraev.homesearchchecklist.feature.updatefeed.domain.deeplink.UpdateFeedDeepLinks
 import com.antonchuraev.homesearchchecklist.feature.updatefeed.domain.repository.UpdateFeedRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,6 +22,7 @@ class UpdateFeedViewModel(
     private val navigator: AppNavigator,
     private val deepLinkHandler: UpdateFeedDeepLinkHandler,
     private val getSubscriptionStatusUseCase: GetSubscriptionStatusUseCase,
+    private val getUserLimitsUseCase: GetUserLimitsUseCase,
     private val analyticsTracker: AnalyticsTracker,
     private val logger: AppLogger
 ) : AppViewModel<UpdateFeedScreenState, UpdateFeedScreenIntent, Nothing>() {
@@ -44,17 +47,24 @@ class UpdateFeedViewModel(
         viewModelScope.launch {
             combine(
                 flow { emit(repository.getReleases()) },
-                getSubscriptionStatusUseCase()
-            ) { releases, subscriptionStatus ->
+                getSubscriptionStatusUseCase(),
+                getUserLimitsUseCase()
+            ) { releases, subscriptionStatus, userLimits ->
                 if (releases.isEmpty()) {
                     UpdateFeedScreenState.Empty
                 } else {
+                    val locked = if (!userLimits.canCreateWeeklyChecklist) {
+                        setOf(UpdateFeedDeepLinks.CREATE_WEEKLY)
+                    } else {
+                        emptySet()
+                    }
                     UpdateFeedScreenState.Success(
                         releases = releases,
                         isPremium = subscriptionStatus.isActive,
                         formattedExpirationDate = subscriptionStatus.expirationDate?.let {
                             formatExpirationDate(it)
-                        }
+                        },
+                        lockedActionDeepLinks = locked
                     )
                 }
             }.collect { state ->
@@ -64,14 +74,24 @@ class UpdateFeedViewModel(
     }
 
     private fun handleActionClick(intent: UpdateFeedScreenIntent.OnActionClick) {
+        val state = _screenState.value as? UpdateFeedScreenState.Success
+        val isLocked = state?.lockedActionDeepLinks?.contains(intent.action.deepLink) == true
+
         analyticsTracker.event(
             name = "update_feed_action_click",
             params = mapOf(
                 "post_id" to intent.postId,
                 "label" to intent.action.label,
-                "deep_link" to intent.action.deepLink
+                "deep_link" to intent.action.deepLink,
+                "locked" to isLocked
             )
         )
+
+        if (isLocked && intent.action.deepLink == UpdateFeedDeepLinks.CREATE_WEEKLY) {
+            navigator.navigateToPaywall(source = "weekly_mode_limit")
+            return
+        }
+
         val handled = deepLinkHandler.handle(intent.action.deepLink)
         if (!handled) {
             logger.debug("UpdateFeedViewModel", "Unhandled deeplink: ${intent.action.deepLink}")

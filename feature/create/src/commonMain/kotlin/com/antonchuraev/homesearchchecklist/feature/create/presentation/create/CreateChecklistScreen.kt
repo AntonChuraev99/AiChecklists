@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -77,8 +78,14 @@ fun CreateChecklistScreen(
                     .padding(bottom = AppDimens.SpacingLg)
                     .navigationBarsPadding()
             ) {
+                val isLocked = !screenState.isEditMode && !screenState.canCreateChecklist
                 AppButton(
-                    text = stringResource(Res.string.save),
+                    text = if (isLocked) {
+                        stringResource(Res.string.unlock_more_with_premium)
+                    } else {
+                        stringResource(Res.string.save)
+                    },
+                    icon = if (isLocked) Icons.Outlined.Lock else null,
                     onClick = { viewModel.sendIntent(CreateChecklistIntent.OnSaveClick) },
                     modifier = Modifier.fillMaxWidth()
                 )

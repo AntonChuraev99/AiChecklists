@@ -28,6 +28,8 @@ class UpdateFeedDeepLinkHandlerTest {
         override val commands: Flow<NavCommand> = emptyFlow()
         override val events: SharedFlow<AppNavEvent> = MutableSharedFlow()
 
+        var requestCreateWeeklyChecklistCount = 0
+
         override fun onBack() { backCallCount++ }
         override fun navigateToOnboarding() {}
         override fun navigateToInteractiveOnboarding() {}
@@ -51,6 +53,7 @@ class UpdateFeedDeepLinkHandlerTest {
         override fun navigateToSettings() {}
         override fun navigateToScreenCatalog() {}
         override fun showWidgetInstruction() { widgetInstructionCallCount++ }
+        override fun requestCreateWeeklyChecklist() { requestCreateWeeklyChecklistCount++ }
     }
 
     private fun createHandler(): Pair<UpdateFeedDeepLinkHandler, FakeNavigator> {
@@ -191,5 +194,33 @@ class UpdateFeedDeepLinkHandlerTest {
         assertFalse(result)
         assertEquals(0, nav.mainScreenCallCount)
         assertEquals(0, nav.widgetInstructionCallCount)
+    }
+
+    @Test
+    fun `handle_createUriWithViewModeWeekly_callsRequestCreateWeeklyChecklist`() {
+        val (handler, nav) = createHandler()
+        val result = handler.handle("gisti://create?viewMode=weekly")
+        assertTrue(result)
+        assertEquals(1, nav.requestCreateWeeklyChecklistCount)
+        // Must NOT call regular create screen
+        assertEquals(0, nav.createCallCount)
+    }
+
+    @Test
+    fun `handle_createUriWithViewModeOther_fallsBackToRegularCreate`() {
+        val (handler, nav) = createHandler()
+        val result = handler.handle("gisti://create?viewMode=other")
+        assertTrue(result)
+        assertEquals(1, nav.createCallCount)
+        assertEquals(0, nav.requestCreateWeeklyChecklistCount)
+    }
+
+    @Test
+    fun `handle_createUriWithoutViewMode_fallsBackToRegularCreate`() {
+        val (handler, nav) = createHandler()
+        val result = handler.handle("gisti://create")
+        assertTrue(result)
+        assertEquals(1, nav.createCallCount)
+        assertEquals(0, nav.requestCreateWeeklyChecklistCount)
     }
 }

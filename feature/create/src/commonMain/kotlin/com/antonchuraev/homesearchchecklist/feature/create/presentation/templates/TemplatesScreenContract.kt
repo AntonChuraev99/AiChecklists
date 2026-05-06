@@ -14,7 +14,12 @@ data class TemplatesScreenState(
     val selectedTemplate: ChecklistTemplate? = null,
     val showPreviewDialog: Boolean = false,
     val isCreating: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    // Gate: false when free user has hit the checklist creation limit
+    val canCreateChecklist: Boolean = true,
+    // Gate: false when free user has hit the weekly checklist limit (separate from the
+    // overall limit — see UserLimits.canCreateWeeklyChecklist)
+    val canCreateWeeklyChecklist: Boolean = true
 ) : State
 
 sealed interface TemplatesScreenIntent : Intent {
