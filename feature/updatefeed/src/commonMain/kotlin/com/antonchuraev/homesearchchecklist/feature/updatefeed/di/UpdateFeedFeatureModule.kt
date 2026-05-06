@@ -8,8 +8,9 @@ import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
 
 val updateFeedFeatureModule = module {
-    single<UpdateFeedRepository> { UpdateFeedRepositoryImpl(get(), get()) }
+    single<UpdateFeedRepository> { UpdateFeedRepositoryImpl(get()) }
     single { UpdateFeedDeepLinkHandler(get()) }
-    // get() order: repository, navigator, deepLinkHandler, getSubscriptionStatusUseCase, analyticsTracker, logger
-    viewModel { UpdateFeedViewModel(get(), get(), get(), get(), get(), get()) }
+    // get() order: repository, navigator, deepLinkHandler, getSubscriptionStatusUseCase,
+    //              getUserLimitsUseCase, analyticsTracker, logger
+    viewModel { UpdateFeedViewModel(get(), get(), get(), get(), get(), get(), get()) }
 }

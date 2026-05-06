@@ -81,6 +81,7 @@ class RecoverRecurringRemindersUseCaseTest {
         override suspend fun deleteFill(fill: ChecklistFill) {}
         override suspend fun getTotalAdditionalFillCount(): Int = 0
         override suspend fun getWeeklyChecklistCount(): Int = 0
+        override val weeklyChecklistCount: Flow<Int> = flowOf(0)
         override suspend fun getAllItemRemindersForRescheduling(): List<ItemReminderInfo> = emptyList()
     }
 

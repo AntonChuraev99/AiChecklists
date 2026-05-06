@@ -27,7 +27,6 @@ kotlin {
             implementation(projects.core.common.api)
             implementation(projects.core.designsystem)
             implementation(projects.core.navigation.api)
-            implementation(projects.core.remoteconfig.api)
             implementation(projects.feature.paywall)
 
             implementation(compose.runtime)
@@ -53,6 +52,9 @@ kotlin {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
             implementation(libs.androidx.navigation.compose)
+            implementation(projects.feature.checklist)
+            implementation(projects.feature.user)
+            implementation(projects.core.remoteconfig.api)
         }
 
         val iosMain by creating {

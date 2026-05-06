@@ -4,6 +4,9 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.core.navigation.api.NavCommand
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDefaults
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigKeys
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistRepeatInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
@@ -12,15 +15,29 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Check
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ItemReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.LoginResult
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallOffering
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PurchaseResult
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.RestoreResult
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.SubscriptionStatus
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.repository.PaywallRepository
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetUserLimitsUseCase
+import com.antonchuraev.homesearchchecklist.feature.user.domain.model.RegistrationData
+import com.antonchuraev.homesearchchecklist.feature.user.domain.model.UserData
+import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -29,6 +46,7 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -54,8 +72,38 @@ class CreateChecklistViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun createViewModel(editChecklistId: Long? = null): CreateChecklistViewModel =
-        CreateChecklistViewModel(editChecklistId, fakeRepo, fakeNavigator, fakeAnalytics)
+    private fun createViewModel(
+        editChecklistId: Long? = null,
+        checklistCount: Int = 0,
+        isPremium: Boolean = false
+    ): CreateChecklistViewModel {
+        val checklistRepoWithCount = if (checklistCount > 0) {
+            FakeChecklistRepositoryWithCount(fakeRepo, checklistCount)
+        } else {
+            fakeRepo
+        }
+        val getUserLimitsUseCase = buildGetUserLimitsUseCase(
+            checklistRepo = checklistRepoWithCount,
+            isPremium = isPremium
+        )
+        return CreateChecklistViewModel(
+            editChecklistId,
+            fakeRepo,
+            fakeNavigator,
+            fakeAnalytics,
+            getUserLimitsUseCase
+        )
+    }
+
+    private fun buildGetUserLimitsUseCase(
+        checklistRepo: ChecklistRepository = fakeRepo,
+        isPremium: Boolean = false
+    ): GetUserLimitsUseCase = GetUserLimitsUseCase(
+        remoteConfigProvider = FakeRemoteConfigProvider(),
+        checklistRepository = checklistRepo,
+        paywallRepository = FakePaywallRepository(isPremium),
+        userDataRepository = FakeUserDataRepository(isPremium)
+    )
 
     // ── State shape ──────────────────────────────────────────────────
 
@@ -209,6 +257,60 @@ class CreateChecklistViewModelTest {
         assertTrue(fakeNavigator.backInvoked, "Edit flow must navigate back after save")
     }
 
+    // ── Checklist limit gate ────────────────────────────────────────
+
+    @Test
+    fun onSaveClick_whenLocked_navigatesToPaywall_skipsAddChecklist() = testScope.runTest {
+        val maxFree = RemoteConfigDefaults.MAX_CHECKLISTS_FREE.toInt()
+        // Use UnconfinedTestDispatcher for the limits-observing coroutine to settle first
+        val unconfinedDispatcher = UnconfinedTestDispatcher(testScheduler)
+        Dispatchers.setMain(unconfinedDispatcher)
+
+        val vm = createViewModel(editChecklistId = null, checklistCount = maxFree, isPremium = false)
+        advanceUntilIdle()
+
+        vm.onIntent(CreateChecklistIntent.OnNameChange("My List"))
+        vm.onIntent(CreateChecklistIntent.OnSaveClick)
+        advanceUntilIdle()
+
+        assertEquals("checklist_limit", fakeNavigator.paywallSource,
+            "Expected paywall navigation with source='checklist_limit'")
+        assertNull(fakeRepo.lastAddedChecklist,
+            "Expected no checklist added when at free limit")
+    }
+
+    @Test
+    fun onSaveClick_whenInEditMode_doesNotGate() = testScope.runTest {
+        val maxFree = RemoteConfigDefaults.MAX_CHECKLISTS_FREE.toInt()
+        fakeRepo.loadResult = Checklist(
+            id = 1L,
+            name = "Existing",
+            items = listOf(ChecklistItem("task"))
+        )
+        // Edit mode: checklistCount at max, but edit should bypass gate
+        val vm = createViewModel(editChecklistId = 1L, checklistCount = maxFree, isPremium = false)
+        advanceUntilIdle()
+
+        vm.onIntent(CreateChecklistIntent.OnSaveClick)
+        advanceUntilIdle()
+
+        assertNull(fakeNavigator.paywallSource, "Edit mode must not route to paywall")
+        assertTrue(fakeNavigator.backInvoked, "Edit mode save must navigate back")
+    }
+
+    @Test
+    fun onSaveClick_whenFreeBelowLimit_addsChecklist() = testScope.runTest {
+        val vm = createViewModel(editChecklistId = null, checklistCount = 0, isPremium = false)
+        advanceUntilIdle()
+
+        vm.onIntent(CreateChecklistIntent.OnNameChange("My List"))
+        vm.onIntent(CreateChecklistIntent.OnSaveClick)
+        advanceUntilIdle()
+
+        assertNull(fakeNavigator.paywallSource, "No paywall when below limit")
+        assertTrue(fakeNavigator.navigatedToMainScreen, "Expected navigation to main after save")
+    }
+
     // ── Fakes ───────────────────────────────────────────────────────
 
     private class FakeChecklistRepository : ChecklistRepository {
@@ -259,6 +361,7 @@ class CreateChecklistViewModelTest {
 
         override suspend fun getTotalAdditionalFillCount(): Int = 0
         override suspend fun getWeeklyChecklistCount(): Int = 0
+        override val weeklyChecklistCount: Flow<Int> = flowOf(0)
         override suspend fun getAllItemRemindersForRescheduling(): List<ItemReminderInfo> = emptyList()
 
         override fun getFillsByChecklistId(checklistId: Long): Flow<List<ChecklistFill>> = emptyFlow()
@@ -276,6 +379,7 @@ class CreateChecklistViewModelTest {
     private class FakeAppNavigator : AppNavigator {
         var backInvoked = false
         var navigatedToMainScreen = false
+        var paywallSource: String? = null
 
         override val commands: Flow<NavCommand> = emptyFlow()
 
@@ -283,6 +387,7 @@ class CreateChecklistViewModelTest {
         override val events: SharedFlow<AppNavEvent> = _events.asSharedFlow()
 
         override fun showWidgetInstruction() {}
+        override fun requestCreateWeeklyChecklist() {}
         override fun onBack() { backInvoked = true }
         override fun navigateToOnboarding() {}
         override fun navigateToInteractiveOnboarding() {}
@@ -298,7 +403,7 @@ class CreateChecklistViewModelTest {
         override fun navigateToChecklistDetail(checklistId: Long, clearBackStack: Boolean) {}
         override fun navigateToFillDetail(fillId: Long, clearBackStack: Boolean) {}
         override fun navigateToFillsList(checklistId: Long) {}
-        override fun navigateToPaywall(source: String) {}
+        override fun navigateToPaywall(source: String) { paywallSource = source }
         override fun navigateToPaywallVariant(source: String, forceVariant: String) {}
         override fun navigateToSubscriptionStatus(showSuccessMessage: Boolean) {}
         override fun navigateToShareChecklist(checklistId: Long) {}
@@ -314,5 +419,56 @@ class CreateChecklistViewModelTest {
         override fun setUserProperties(properties: Map<String, Any>) {}
         override fun screenView(name: String) {}
         override fun event(name: String, params: Map<String, Any>) { events.add(name to params) }
+    }
+
+    /** Wraps FakeChecklistRepository to report a specific checklist count via [checklists] flow. */
+    private class FakeChecklistRepositoryWithCount(
+        private val delegate: FakeChecklistRepository,
+        private val count: Int
+    ) : ChecklistRepository by delegate {
+        override val checklists: Flow<List<Checklist>> = flowOf(
+            List(count) { Checklist(id = it.toLong(), name = "C$it", items = emptyList()) }
+        )
+    }
+
+    private class FakePaywallRepository(
+        private val isPremium: Boolean = false
+    ) : PaywallRepository {
+        override val subscriptionStatus: Flow<SubscriptionStatus> = flowOf(
+            if (isPremium) SubscriptionStatus(isActive = true, activeEntitlements = setOf("AiChecklists Pro"))
+            else SubscriptionStatus.FREE
+        )
+        override suspend fun getOfferings(): Result<PaywallOffering?> = Result.success(null)
+        override suspend fun purchase(packageId: String): PurchaseResult = PurchaseResult.Error("stub")
+        override suspend fun restorePurchases(): RestoreResult = RestoreResult.Error("stub")
+        override suspend fun refreshSubscriptionStatus() {}
+        override fun isConfigured(): Boolean = false
+        override suspend fun logIn(appUserId: String): Result<LoginResult> = Result.failure(NotImplementedError())
+        override suspend fun logOut(): Result<SubscriptionStatus> = Result.failure(NotImplementedError())
+    }
+
+    private class FakeUserDataRepository(private val isPremium: Boolean = false) : UserDataRepository {
+        private val data = UserData(userId = "test", isPremium = isPremium)
+        override fun getUserDataFlow(): StateFlow<UserData> = MutableStateFlow(data)
+        override suspend fun getUserData(): UserData = data
+        override suspend fun update(userData: UserData) {}
+        override suspend fun ensureUserRegistered(): Result<RegistrationData> =
+            Result.success(RegistrationData(userData = data, isNewUser = false))
+        override suspend fun syncWithServer(): Result<RegistrationData> =
+            Result.success(RegistrationData(userData = data, isNewUser = false))
+        override suspend fun isPaywallLinked(): Boolean = false
+        override suspend fun setPaywallLinked(linked: Boolean) {}
+        override suspend fun restoreCreditsAfterPurchase(): Result<Int> = Result.success(0)
+        override suspend fun getFirstLaunchAtMillis(): Long = 0L
+    }
+
+    private class FakeRemoteConfigProvider : RemoteConfigProvider {
+        override suspend fun fetchAndActivate(): Boolean = true
+        override fun getBoolean(key: String, defaultValue: Boolean): Boolean = defaultValue
+        override fun getString(key: String, defaultValue: String): String = defaultValue
+        override fun getLong(key: String, defaultValue: Long): Long = when (key) {
+            RemoteConfigKeys.MAX_CHECKLISTS_FREE -> RemoteConfigDefaults.MAX_CHECKLISTS_FREE
+            else -> defaultValue
+        }
     }
 }

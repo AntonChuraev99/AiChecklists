@@ -115,4 +115,7 @@ interface ChecklistDao {
 
     @Query("SELECT COUNT(*) FROM checklists WHERE viewMode = 'Weekly'")
     suspend fun getWeeklyChecklistCount(): Int
+
+    @Query("SELECT COUNT(*) FROM checklists WHERE viewMode = 'Weekly'")
+    fun observeWeeklyChecklistCount(): Flow<Int>
 }

@@ -197,6 +197,8 @@ class ChecklistRepositoryImpl(
         return checklistDao.getWeeklyChecklistCount()
     }
 
+    override val weeklyChecklistCount: Flow<Int> = checklistDao.observeWeeklyChecklistCount()
+
     // Fills (instances)
     override fun getFillsByChecklistId(checklistId: Long): Flow<List<ChecklistFill>> {
         return fillDao.observeFillsByChecklistId(checklistId).map { list ->

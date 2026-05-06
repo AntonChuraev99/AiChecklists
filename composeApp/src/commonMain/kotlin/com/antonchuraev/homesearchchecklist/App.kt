@@ -2,6 +2,7 @@ package com.antonchuraev.homesearchchecklist
 
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
 import com.antonchuraev.homesearchchecklist.core.navigation.api.NavCommand
+import com.antonchuraev.homesearchchecklist.feature.create.domain.usecase.CreateWeeklyChecklistUseCase
 import com.antonchuraev.homesearchchecklist.csat.CsatBottomSheet
 import com.antonchuraev.homesearchchecklist.csat.CsatIntent
 import com.antonchuraev.homesearchchecklist.csat.CsatViewModel
@@ -122,12 +123,21 @@ fun App() {
         val csatState by csatViewModel.screenState.collectAsState()
 
         var showWidgetInstruction by remember { mutableStateOf(false) }
+        val createWeeklyChecklistUseCase: CreateWeeklyChecklistUseCase = koinInject()
         LaunchedEffect(Unit) {
             navigator.events.collect { event ->
                 when (event) {
                     AppNavEvent.ShowWidgetInstruction -> {
                         if (!showWidgetInstruction) {
                             showWidgetInstruction = true
+                        }
+                    }
+                    AppNavEvent.CreateWeeklyChecklistRequested -> {
+                        when (val result = createWeeklyChecklistUseCase()) {
+                            is CreateWeeklyChecklistUseCase.Result.Created ->
+                                navigator.navigateToChecklistDetail(result.checklistId, clearBackStack = true)
+                            CreateWeeklyChecklistUseCase.Result.RequiresUpgrade ->
+                                navigator.navigateToPaywall(source = "weekly_mode_limit")
                         }
                     }
                 }

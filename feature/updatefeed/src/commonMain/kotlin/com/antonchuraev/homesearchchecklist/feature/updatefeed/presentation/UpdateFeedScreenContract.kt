@@ -10,7 +10,8 @@ sealed interface UpdateFeedScreenState : State {
     data class Success(
         val releases: List<VersionReleaseGroup>,
         val isPremium: Boolean,
-        val formattedExpirationDate: String?
+        val formattedExpirationDate: String?,
+        val lockedActionDeepLinks: Set<String> = emptySet()
     ) : UpdateFeedScreenState
     data object Empty : UpdateFeedScreenState
 }

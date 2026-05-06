@@ -1,8 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.updatefeed.data.repository
 
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
-import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDefaults
-import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
+import com.antonchuraev.homesearchchecklist.feature.updatefeed.data.UpdateFeedContent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -11,15 +10,6 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class UpdateFeedRepositoryImplTest {
-
-    private class FakeRemoteConfigProvider(
-        private val jsonValue: String
-    ) : RemoteConfigProvider {
-        override suspend fun fetchAndActivate(): Boolean = true
-        override fun getBoolean(key: String, defaultValue: Boolean): Boolean = defaultValue
-        override fun getString(key: String, defaultValue: String): String = jsonValue
-        override fun getLong(key: String, defaultValue: Long): Long = defaultValue
-    }
 
     private class FakeLogger : AppLogger {
         val errors = mutableListOf<String>()
@@ -34,42 +24,42 @@ class UpdateFeedRepositoryImplTest {
     // ---- getReleases() — default JSON ----
 
     @Test
-    fun `getReleases_withDefaultJson_returnsEightReleaseGroups`() = runTest {
-        val repository = buildRepository(RemoteConfigDefaults.UPDATE_FEED_JSON)
+    fun `getReleases_withDefaultJson_returnsNineReleaseGroups`() = runTest {
+        val repository = buildRepository(UpdateFeedContent.JSON)
 
         val releases = repository.getReleases()
 
-        // 17 posts across 8 main-versions (v1.6–v1.13)
-        assertEquals(8, releases.size)
+        // 19 posts across 9 main-versions (v1.6–v1.14)
+        assertEquals(9, releases.size)
     }
 
     @Test
     fun `getReleases_withDefaultJson_groupsSortedDescByPublishedAtMillis`() = runTest {
-        val repository = buildRepository(RemoteConfigDefaults.UPDATE_FEED_JSON)
+        val repository = buildRepository(UpdateFeedContent.JSON)
 
         val releases = repository.getReleases()
 
-        // Newest release first (v1.13 has the highest post timestamp)
-        assertEquals("1.13", releases.first().version)
+        // Newest release first (v1.14 has the highest post timestamp)
+        assertEquals("1.14", releases.first().version)
         // Oldest release last (v1.6)
         assertEquals("1.6", releases.last().version)
     }
 
     @Test
     fun `getReleases_withDefaultJson_sortOrderIsDescending`() = runTest {
-        val repository = buildRepository(RemoteConfigDefaults.UPDATE_FEED_JSON)
+        val repository = buildRepository(UpdateFeedContent.JSON)
 
         val releases = repository.getReleases()
 
         assertEquals(
-            listOf("1.13", "1.12", "1.11", "1.10", "1.9", "1.8", "1.7", "1.6"),
+            listOf("1.14", "1.13", "1.12", "1.11", "1.10", "1.9", "1.8", "1.7", "1.6"),
             releases.map { it.version }
         )
     }
 
     @Test
     fun `getReleases_withDefaultJson_v1_12HasTwoPosts`() = runTest {
-        val repository = buildRepository(RemoteConfigDefaults.UPDATE_FEED_JSON)
+        val repository = buildRepository(UpdateFeedContent.JSON)
 
         val releases = repository.getReleases()
         val v112 = releases.first { it.version == "1.12" }
@@ -81,7 +71,7 @@ class UpdateFeedRepositoryImplTest {
 
     @Test
     fun `getReleases_withDefaultJson_v1_11HasFivePostsAndNoStoreDescription`() = runTest {
-        val repository = buildRepository(RemoteConfigDefaults.UPDATE_FEED_JSON)
+        val repository = buildRepository(UpdateFeedContent.JSON)
 
         val releases = repository.getReleases()
         val v111 = releases.first { it.version == "1.11" }
@@ -99,7 +89,7 @@ class UpdateFeedRepositoryImplTest {
 
     @Test
     fun `getReleases_withDefaultJson_v1_11_publishedAtMillisIsMaxOfPosts`() = runTest {
-        val repository = buildRepository(RemoteConfigDefaults.UPDATE_FEED_JSON)
+        val repository = buildRepository(UpdateFeedContent.JSON)
 
         val releases = repository.getReleases()
         val v111 = releases.first { it.version == "1.11" }
@@ -110,7 +100,7 @@ class UpdateFeedRepositoryImplTest {
 
     @Test
     fun `getReleases_withDefaultJson_v1_8HasThreePostsAndNoStoreDescription`() = runTest {
-        val repository = buildRepository(RemoteConfigDefaults.UPDATE_FEED_JSON)
+        val repository = buildRepository(UpdateFeedContent.JSON)
 
         val releases = repository.getReleases()
         val v18 = releases.first { it.version == "1.8" }
@@ -126,7 +116,7 @@ class UpdateFeedRepositoryImplTest {
 
     @Test
     fun `getReleases_withDefaultJson_v1_9HasTwoPostsAndNoStoreDescription`() = runTest {
-        val repository = buildRepository(RemoteConfigDefaults.UPDATE_FEED_JSON)
+        val repository = buildRepository(UpdateFeedContent.JSON)
 
         val releases = repository.getReleases()
         val v19 = releases.first { it.version == "1.9" }
@@ -141,7 +131,7 @@ class UpdateFeedRepositoryImplTest {
 
     @Test
     fun `getReleases_withDefaultJson_singlePostVersionsHaveOnePost`() = runTest {
-        val repository = buildRepository(RemoteConfigDefaults.UPDATE_FEED_JSON)
+        val repository = buildRepository(UpdateFeedContent.JSON)
 
         val releases = repository.getReleases()
         val singlePostVersions = listOf("1.6", "1.7", "1.10")
@@ -154,7 +144,7 @@ class UpdateFeedRepositoryImplTest {
 
     @Test
     fun `getReleases_withDefaultJson_v1_6HasDedupedStoreDescription`() = runTest {
-        val repository = buildRepository(RemoteConfigDefaults.UPDATE_FEED_JSON)
+        val repository = buildRepository(UpdateFeedContent.JSON)
 
         val releases = repository.getReleases()
         val v16 = releases.first { it.version == "1.6" }
@@ -169,7 +159,7 @@ class UpdateFeedRepositoryImplTest {
 
     @Test
     fun `getReleases_withDefaultJson_v1_7HasDedupedStoreDescription`() = runTest {
-        val repository = buildRepository(RemoteConfigDefaults.UPDATE_FEED_JSON)
+        val repository = buildRepository(UpdateFeedContent.JSON)
 
         val releases = repository.getReleases()
         val v17 = releases.first { it.version == "1.7" }
@@ -184,7 +174,7 @@ class UpdateFeedRepositoryImplTest {
 
     @Test
     fun `getReleases_withDefaultJson_v1_10HasDedupedStoreDescription`() = runTest {
-        val repository = buildRepository(RemoteConfigDefaults.UPDATE_FEED_JSON)
+        val repository = buildRepository(UpdateFeedContent.JSON)
 
         val releases = repository.getReleases()
         val v110 = releases.first { it.version == "1.10" }
@@ -198,7 +188,7 @@ class UpdateFeedRepositoryImplTest {
 
     @Test
     fun `getReleases_withDefaultJson_versionsWithNullStoreDescriptionHavePosts`() = runTest {
-        val repository = buildRepository(RemoteConfigDefaults.UPDATE_FEED_JSON)
+        val repository = buildRepository(UpdateFeedContent.JSON)
 
         val releases = repository.getReleases()
 
@@ -213,7 +203,7 @@ class UpdateFeedRepositoryImplTest {
 
     @Test
     fun `getReleases_withDefaultJson_groupPublishedAtMillisIsMaxOfPostsWhenPostsExist`() = runTest {
-        val repository = buildRepository(RemoteConfigDefaults.UPDATE_FEED_JSON)
+        val repository = buildRepository(UpdateFeedContent.JSON)
 
         val releases = repository.getReleases()
 
@@ -229,7 +219,7 @@ class UpdateFeedRepositoryImplTest {
 
     @Test
     fun `getReleases_withDefaultJson_postsWithinGroupSortedDescByPublishedAtMillis`() = runTest {
-        val repository = buildRepository(RemoteConfigDefaults.UPDATE_FEED_JSON)
+        val repository = buildRepository(UpdateFeedContent.JSON)
 
         val releases = repository.getReleases()
 
@@ -245,7 +235,7 @@ class UpdateFeedRepositoryImplTest {
 
     @Test
     fun `getReleases_withDefaultJson_widgetPostHasCorrectFields`() = runTest {
-        val repository = buildRepository(RemoteConfigDefaults.UPDATE_FEED_JSON)
+        val repository = buildRepository(UpdateFeedContent.JSON)
 
         val releases = repository.getReleases()
         val widgetGroup = releases.first { it.version == "1.6" }
@@ -260,18 +250,18 @@ class UpdateFeedRepositoryImplTest {
     }
 
     @Test
-    fun `getReleases_withDefaultJson_totalPostCountIsSeventeen`() = runTest {
-        val repository = buildRepository(RemoteConfigDefaults.UPDATE_FEED_JSON)
+    fun `getReleases_withDefaultJson_totalPostCountIsNineteen`() = runTest {
+        val repository = buildRepository(UpdateFeedContent.JSON)
 
         val releases = repository.getReleases()
         val totalPosts = releases.sumOf { it.posts.size }
 
-        assertEquals(17, totalPosts)
+        assertEquals(19, totalPosts)
     }
 
     @Test
     fun `getReleases_withDefaultJson_mainVersionGroupingFoldsPatchVersions`() = runTest {
-        val repository = buildRepository(RemoteConfigDefaults.UPDATE_FEED_JSON)
+        val repository = buildRepository(UpdateFeedContent.JSON)
 
         val releases = repository.getReleases()
         val v111 = releases.first { it.version == "1.11" }
@@ -292,7 +282,7 @@ class UpdateFeedRepositoryImplTest {
     @Test
     fun `getReleases_withDefaultJson_v1_11HasPostsButNoReleaseNotesEntry`() = runTest {
         // Verifies that a group with posts but no releaseNotes key parses correctly (storeDescription is null)
-        val repository = buildRepository(RemoteConfigDefaults.UPDATE_FEED_JSON)
+        val repository = buildRepository(UpdateFeedContent.JSON)
 
         val releases = repository.getReleases()
         val v111 = releases.first { it.version == "1.11" }
@@ -446,8 +436,8 @@ class UpdateFeedRepositoryImplTest {
     fun `getReleases_withInvalidJson_returnsEmptyListAndLogsError`() = runTest {
         val logger = FakeLogger()
         val repository = UpdateFeedRepositoryImpl(
-            FakeRemoteConfigProvider("not valid json {{{{"),
-            logger
+            logger,
+            "not valid json {{{{"
         )
 
         val releases = repository.getReleases()
@@ -509,6 +499,6 @@ class UpdateFeedRepositoryImplTest {
     // ---- Helper ----
 
     private fun buildRepository(json: String): UpdateFeedRepositoryImpl {
-        return UpdateFeedRepositoryImpl(FakeRemoteConfigProvider(json), FakeLogger())
+        return UpdateFeedRepositoryImpl(FakeLogger(), json)
     }
 }

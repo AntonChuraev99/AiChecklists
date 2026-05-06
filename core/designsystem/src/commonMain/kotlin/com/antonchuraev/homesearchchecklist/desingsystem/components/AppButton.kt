@@ -41,19 +41,19 @@ fun AppButton(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(ButtonDefaults.IconSize)
             )
-            Spacer(modifier = Modifier.width(AppDimens.SpacingSm))
+            Spacer(modifier = Modifier.width(ButtonDefaults.IconSpacing))
         }
         Text(
             text = text,
             style = MaterialTheme.typography.labelLarge,
             maxLines = 1,
-            autoSize = TextAutoSize.StepBased(MaterialTheme.typography.labelLarge.fontSize / 2 , MaterialTheme.typography.labelLarge.fontSize)
+            autoSize = TextAutoSize.StepBased(
+                MaterialTheme.typography.labelLarge.fontSize / 2,
+                MaterialTheme.typography.labelLarge.fontSize
+            )
         )
-        if (icon != null) {
-            Spacer(modifier = Modifier.width(18.dp + AppDimens.SpacingSm))
-        }
     }
 }
 
@@ -78,9 +78,9 @@ fun AppButtonSecondary(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(ButtonDefaults.IconSize)
             )
-            Spacer(modifier = Modifier.width(AppDimens.SpacingSm))
+            Spacer(modifier = Modifier.width(ButtonDefaults.IconSpacing))
         }
         Text(
             text = text,

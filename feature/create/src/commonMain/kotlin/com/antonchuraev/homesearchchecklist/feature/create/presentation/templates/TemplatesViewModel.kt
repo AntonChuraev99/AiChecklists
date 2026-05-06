@@ -5,15 +5,14 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
-import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistViewMode
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.create.domain.model.ChecklistTemplate
 import com.antonchuraev.homesearchchecklist.feature.create.domain.repository.TemplatesRepository
+import com.antonchuraev.homesearchchecklist.feature.create.domain.usecase.CreateWeeklyChecklistUseCase
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetUserLimitsUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -21,6 +20,7 @@ class TemplatesViewModel(
     private val appNavigator: AppNavigator,
     private val templatesRepository: TemplatesRepository,
     private val checklistRepository: ChecklistRepository,
+    private val createWeeklyChecklistUseCase: CreateWeeklyChecklistUseCase,
     private val getUserLimitsUseCase: GetUserLimitsUseCase,
 ) : AppViewModel<TemplatesScreenState, TemplatesScreenIntent, Nothing>() {
 
@@ -29,6 +29,20 @@ class TemplatesViewModel(
 
     init {
         loadTemplates()
+        observeUserLimits()
+    }
+
+    private fun observeUserLimits() {
+        viewModelScope.launch {
+            getUserLimitsUseCase().collect { limits ->
+                _screenState.update {
+                    it.copy(
+                        canCreateChecklist = limits.canCreateChecklist,
+                        canCreateWeeklyChecklist = limits.canCreateWeeklyChecklist
+                    )
+                }
+            }
+        }
     }
 
     override fun onIntent(intent: TemplatesScreenIntent) {
@@ -40,7 +54,7 @@ class TemplatesViewModel(
             TemplatesScreenIntent.OnDismissError -> dismissError()
             is TemplatesScreenIntent.OnSearchQueryChange -> onSearchQueryChange(intent.query)
             TemplatesScreenIntent.OnToggleSearch -> toggleSearch()
-            TemplatesScreenIntent.OnCreateManuallyClick -> appNavigator.navigateToCreateChecklistScreen(null)
+            TemplatesScreenIntent.OnCreateManuallyClick -> handleCreateManuallyClick()
             TemplatesScreenIntent.OnCreateWithAiClick -> appNavigator.navigateToAnalyzeScreen()
             TemplatesScreenIntent.OnCreateWeeklyClick -> handleCreateWeeklyClick()
         }
@@ -139,20 +153,22 @@ class TemplatesViewModel(
         }
     }
 
+    private fun handleCreateManuallyClick() {
+        if (!_screenState.value.canCreateChecklist) {
+            appNavigator.navigateToPaywall(source = "checklist_limit")
+        } else {
+            appNavigator.navigateToCreateChecklistScreen(null)
+        }
+    }
+
     private fun handleCreateWeeklyClick() {
         viewModelScope.launch {
-            val limits = getUserLimitsUseCase().first()
-            if (!limits.canCreateWeeklyChecklist) {
-                appNavigator.navigateToPaywall(source = "weekly_mode_limit")
-                return@launch
+            when (val result = createWeeklyChecklistUseCase()) {
+                is CreateWeeklyChecklistUseCase.Result.Created ->
+                    appNavigator.navigateToChecklistDetail(result.checklistId, clearBackStack = true)
+                CreateWeeklyChecklistUseCase.Result.RequiresUpgrade ->
+                    appNavigator.navigateToPaywall(source = "weekly_mode_limit")
             }
-            val checklist = Checklist(
-                name = "Моя неделя",
-                items = emptyList(),
-                viewMode = ChecklistViewMode.Weekly,
-            )
-            val checklistId = checklistRepository.addChecklist(checklist)
-            appNavigator.navigateToChecklistDetail(checklistId, clearBackStack = true)
         }
     }
 

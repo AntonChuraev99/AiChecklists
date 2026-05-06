@@ -7,6 +7,7 @@ import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetUserLimitsUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,7 +18,8 @@ class CreateChecklistViewModel(
     private val editChecklistId: Long?,
     private val checklistRepository: ChecklistRepository,
     private val appNavigator: AppNavigator,
-    private val analyticsTracker: AnalyticsTracker
+    private val analyticsTracker: AnalyticsTracker,
+    private val getUserLimitsUseCase: GetUserLimitsUseCase
 ) : AppViewModel<CreateChecklistState, CreateChecklistIntent, Nothing>() {
 
     private val _screenState = MutableStateFlow(CreateChecklistState(
@@ -29,6 +31,17 @@ class CreateChecklistViewModel(
     init {
         if (editChecklistId != null) {
             loadChecklist(editChecklistId)
+        } else {
+            // Only observe limits in create mode — edit mode is never gated
+            observeUserLimits()
+        }
+    }
+
+    private fun observeUserLimits() {
+        viewModelScope.launch {
+            getUserLimitsUseCase().collect { limits ->
+                _screenState.update { it.copy(canCreateChecklist = limits.canCreateChecklist) }
+            }
         }
     }
 
@@ -111,6 +124,14 @@ class CreateChecklistViewModel(
     }
 
     private fun onSaveClick() {
+        val currentState = _screenState.value
+
+        // Gate: redirect free users at the checklist limit to paywall (create mode only)
+        if (!currentState.isEditMode && !currentState.canCreateChecklist) {
+            appNavigator.navigateToPaywall(source = "checklist_limit")
+            return
+        }
+
         commitPendingEdit()
 
         // Auto-add unsaved text from input field before saving
@@ -119,30 +140,30 @@ class CreateChecklistViewModel(
             addItemFromInput()
         }
 
-        val currentState = _screenState.value
+        val latestState = _screenState.value
 
-        if (currentState.name.isBlank()) {
+        if (latestState.name.isBlank()) {
             _screenState.update { it.copy(nameError = "Введите название чек-листа") }
             return
         }
 
         viewModelScope.launch {
-            if (currentState.isEditMode && currentState.editChecklistId != null) {
+            if (latestState.isEditMode && latestState.editChecklistId != null) {
                 checklistRepository.updateChecklist(
                     Checklist(
-                        id = currentState.editChecklistId,
-                        name = currentState.name.trim(),
-                        items = currentState.items
+                        id = latestState.editChecklistId,
+                        name = latestState.name.trim(),
+                        items = latestState.items
                     )
                 )
                 appNavigator.onBack()
             } else {
                 checklistRepository.addChecklist(
-                    Checklist(name = currentState.name.trim(), items = currentState.items)
+                    Checklist(name = latestState.name.trim(), items = latestState.items)
                 )
                 analyticsTracker.event("checklist_created", mapOf(
                     "source" to "manual",
-                    "item_count" to currentState.items.size
+                    "item_count" to latestState.items.size
                 ))
                 appNavigator.navigateToMainScreen(clearBackStack = true)
             }

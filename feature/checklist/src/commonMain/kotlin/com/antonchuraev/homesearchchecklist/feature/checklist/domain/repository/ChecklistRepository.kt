@@ -66,6 +66,7 @@ interface ChecklistRepository {
 
     // Weekly mode
     suspend fun getWeeklyChecklistCount(): Int
+    val weeklyChecklistCount: Flow<Int>
 
     // Fills (instances)
     fun getFillsByChecklistId(checklistId: Long): Flow<List<ChecklistFill>>
