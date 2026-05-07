@@ -94,6 +94,157 @@ globalThis.__functionsCall = async (name, dataJson) => {
     }
 };
 
+// === File Picker bridge ===
+// Staging map: key = "wasm-blob://<uuid>", value = ArrayBuffer
+globalThis.__filePickerStaging = new Map();
+
+globalThis.__pickFile = (accept) => new Promise((resolve) => {
+    try {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = accept || '*/*';
+        input.style.display = 'none';
+        document.body.appendChild(input);
+
+        const cleanup = () => {
+            try { document.body.removeChild(input); } catch (_) {}
+        };
+
+        input.onchange = (e) => {
+            const file = e.target.files && e.target.files[0];
+            cleanup();
+            if (!file) { resolve(null); return; }
+
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const key = 'wasm-blob://' + crypto.randomUUID();
+                globalThis.__filePickerStaging.set(key, ev.target.result);
+                resolve({ path: key, name: file.name, mimeType: file.type || null, size: file.size });
+            };
+            reader.onerror = () => { resolve(null); };
+            reader.readAsArrayBuffer(file);
+        };
+
+        // User may close the dialog without selecting — fire a resolve after focus returns
+        const onFocus = () => {
+            window.removeEventListener('focus', onFocus);
+            // Give onchange a chance to fire first
+            setTimeout(() => {
+                if (!input.files || input.files.length === 0) {
+                    cleanup();
+                    resolve(null);
+                }
+            }, 500);
+        };
+        window.addEventListener('focus', onFocus);
+        input.click();
+    } catch (err) {
+        console.error('[FilePicker] __pickFile error:', err);
+        resolve(null);
+    }
+});
+
+globalThis.__readStagedBytes = (path) => {
+    try {
+        const buf = globalThis.__filePickerStaging.get(path);
+        if (!buf) return null;
+        return new Uint8Array(buf);
+    } catch (e) {
+        return null;
+    }
+};
+
+// === Web Share / Clipboard bridge ===
+globalThis.__shareText = (title, text) => {
+    return new Promise((resolve) => {
+        try {
+            if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+                navigator.share({ title: title || '', text: text || '' })
+                    .then(() => resolve(true))
+                    .catch((e) => {
+                        // AbortError = user cancelled, still counts as native share initiated
+                        if (e && e.name === 'AbortError') { resolve(true); return; }
+                        // Fallback to clipboard on share failure
+                        globalThis.__copyToClipboard(text).then(() => resolve(false));
+                    });
+            } else {
+                globalThis.__copyToClipboard(text).then(() => resolve(false));
+            }
+        } catch (e) {
+            console.warn('[Share] __shareText error:', e);
+            globalThis.__copyToClipboard(text).then(() => resolve(false));
+        }
+    });
+};
+
+globalThis.__copyToClipboard = (text) => {
+    try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            return navigator.clipboard.writeText(text).catch((e) => {
+                console.warn('[Clipboard] writeText failed:', e);
+            });
+        }
+    } catch (e) {
+        console.warn('[Clipboard] __copyToClipboard error:', e);
+    }
+    return Promise.resolve();
+};
+
+// === Print / PDF bridge ===
+globalThis.__printHtml = (html) => {
+    try {
+        // Use a hidden iframe so we don't navigate away or lose COOP context.
+        // The iframe gets COEP-inherited and can call contentWindow.print().
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.top = '-9999px';
+        iframe.style.left = '-9999px';
+        iframe.style.width = '210mm';  // A4
+        iframe.style.height = '297mm';
+        iframe.style.border = 'none';
+        document.body.appendChild(iframe);
+
+        const cleanup = () => {
+            try { document.body.removeChild(iframe); } catch (_) {}
+        };
+
+        iframe.onload = () => {
+            try {
+                iframe.contentWindow.focus();
+                iframe.contentWindow.print();
+                // Wait for print dialog to close
+                iframe.contentWindow.addEventListener('afterprint', () => {
+                    setTimeout(cleanup, 300);
+                });
+                // Fallback cleanup in case afterprint doesn't fire (some browsers)
+                setTimeout(cleanup, 60000);
+            } catch (e) {
+                console.warn('[Print] print() failed, falling back to window.open:', e);
+                cleanup();
+                // Fallback: open Blob URL in new tab
+                try {
+                    const blob = new Blob([html], { type: 'text/html' });
+                    const url = URL.createObjectURL(blob);
+                    const w = window.open(url, '_blank');
+                    if (w) {
+                        w.onload = () => {
+                            w.print();
+                            setTimeout(() => URL.revokeObjectURL(url), 60000);
+                        };
+                    }
+                } catch (e2) {
+                    console.error('[Print] fallback also failed:', e2);
+                }
+            }
+        };
+
+        // Set srcdoc AFTER appending to DOM to ensure load event fires
+        iframe.srcdoc = html;
+    } catch (err) {
+        console.error('[Print] __printHtml error:', err);
+    }
+};
+
 // Load composeApp.js AFTER all globalThis.__* are set
 // so Kotlin starts with the full bridge already in place.
 const script = document.createElement('script');
