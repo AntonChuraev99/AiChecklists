@@ -1,7 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository
 
-import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistReminderInfo
-import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistRepeatInfo
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistReminderInfo
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistRepeatInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ItemReminderInfo

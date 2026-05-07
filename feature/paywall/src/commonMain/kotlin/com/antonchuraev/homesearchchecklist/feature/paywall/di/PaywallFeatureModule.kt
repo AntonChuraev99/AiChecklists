@@ -1,6 +1,5 @@
 package com.antonchuraev.homesearchchecklist.feature.paywall.di
 
-import com.antonchuraev.homesearchchecklist.feature.paywall.data.repository.PaywallRepositoryImpl
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.repository.PaywallRepository
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetOfferingsUseCase
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetSubscriptionStatusUseCase
@@ -9,12 +8,17 @@ import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.Purch
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.RestorePurchasesUseCase
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.PaywallViewModel
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.SubscriptionStatusViewModel
+import org.koin.core.Koin
 import org.koin.core.module.dsl.viewModel
 import org.koin.core.module.dsl.viewModelOf
+import org.koin.core.scope.Scope
 import org.koin.dsl.module
 
+/** Platform-specific factory — returns the correct PaywallRepository implementation. */
+expect fun createPaywallRepository(): PaywallRepository
+
 val paywallFeatureModule = module {
-    single<PaywallRepository> { PaywallRepositoryImpl() }
+    single<PaywallRepository> { createPaywallRepository() }
 
     // Use cases
     factory { GetSubscriptionStatusUseCase(get()) }

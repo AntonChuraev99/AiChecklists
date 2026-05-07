@@ -1,0 +1,103 @@
+// init.js — Gisti Firebase + RC bridge for KMP wasmJs
+// Generated from init.js.template by Gradle task generateWasmInitJs.
+// DO NOT edit init.js directly — edit init.js.template instead.
+// DO NOT commit init.js — it contains API keys (listed in .gitignore).
+//
+// Add these keys to local.properties to enable Firebase RC:
+//   FIREBASE_WEB_API_KEY=<from Firebase Console → Project Settings → Web app>
+//   FIREBASE_WEB_AUTH_DOMAIN=aichecklists-40230.firebaseapp.com
+//   FIREBASE_WEB_PROJECT_ID=aichecklists-40230
+//   FIREBASE_WEB_STORAGE_BUCKET=aichecklists-40230.firebasestorage.app
+//   FIREBASE_WEB_MESSAGING_SENDER_ID=27698629989
+//   FIREBASE_WEB_APP_ID=<from Firebase Console → Project Settings → Web app>
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js';
+import {
+    getRemoteConfig,
+    fetchAndActivate,
+    getValue,
+} from 'https://www.gstatic.com/firebasejs/12.11.0/firebase-remote-config.js';
+import { getFunctions, httpsCallable }
+    from 'https://www.gstatic.com/firebasejs/12.11.0/firebase-functions.js';
+
+const firebaseConfig = {
+    apiKey: "__FIREBASE_API_KEY__",
+    authDomain: "__FIREBASE_AUTH_DOMAIN__",
+    projectId: "__FIREBASE_PROJECT_ID__",
+    storageBucket: "__FIREBASE_STORAGE_BUCKET__",
+    messagingSenderId: "__FIREBASE_MESSAGING_SENDER_ID__",
+    appId: "__FIREBASE_APP_ID__",
+};
+
+const app = initializeApp(firebaseConfig);
+
+// === Firebase Remote Config ===
+const rc = getRemoteConfig(app);
+rc.settings.minimumFetchIntervalMillis = 43_200_000; // 12 hours — matches Android
+
+// Default values for graceful degradation when fetch fails
+rc.defaultConfig = {
+    feature_ai_analysis_enabled: true,
+    max_checklist_items: 100,
+    ai_analysis_max_input_length: 10000,
+    min_app_version: "1.0.0",
+    maintenance_mode: false,
+    ai_functions_base_url: "https://us-central1-aichecklists-40230.cloudfunctions.net",
+    ai_daily_limit_free: 10,
+    ai_daily_limit_premium: 300,
+    max_checklists_free: 4,
+    max_fills_free: 5,
+    max_recurring_reminders_free: 1,
+    max_weekly_checklists_free: 1,
+    templates_json: "[]",
+    onboarding: "interactive",
+    paywall_variant: "features_v1",
+};
+
+// Synchronous helpers — safe to call after __rcFetchPromise resolves (or immediately for defaults)
+globalThis.__rcGetString  = (key) => { try { return getValue(rc, key).asString();  } catch (e) { return ""; }  };
+globalThis.__rcGetBoolean = (key) => { try { return getValue(rc, key).asBoolean(); } catch (e) { return false; } };
+globalThis.__rcGetNumber  = (key) => { try { return getValue(rc, key).asNumber();  } catch (e) { return 0; }    };
+
+// Promise starts immediately, Kotlin awaits via awaitRcReady()
+// Always resolves (never rejects) — graceful degradation to defaultConfig
+globalThis.__rcFetchPromise = (async () => {
+    try {
+        await fetchAndActivate(rc);
+        console.log('[RC] fetchAndActivate: OK');
+        return true;
+    } catch (err) {
+        console.warn('[RC] fetchAndActivate failed (using defaults):', err?.code ?? err);
+        return false;
+    }
+})();
+
+// === Firebase Functions bridge ===
+// NOTE: register_user and restore_credits_after_purchase are @functions_framework.http
+// (HTTP functions, not callable). httpsCallable only works with 2nd-gen onCall functions.
+// These functions require server-side CORS headers to be called from the browser.
+// The bridge below is wired for any future onCall functions added to the project.
+// For register_user / restore_credits_after_purchase, CORS headers must be added server-side.
+const functions = getFunctions(app, 'us-central1');
+
+globalThis.__functionsCall = async (name, dataJson) => {
+    try {
+        const fn = httpsCallable(functions, name);
+        const data = (dataJson && dataJson !== '{}') ? JSON.parse(dataJson) : undefined;
+        const result = await fn(data);
+        return JSON.stringify({ ok: true, data: result.data });
+    } catch (err) {
+        return JSON.stringify({
+            ok: false,
+            code: err?.code ?? 'unknown',
+            message: err?.message ?? String(err),
+        });
+    }
+};
+
+// Load composeApp.js AFTER all globalThis.__* are set
+// so Kotlin starts with the full bridge already in place.
+const script = document.createElement('script');
+script.src = './composeApp.js';
+script.onload = () => console.log('[Gisti] composeApp.js loaded');
+script.onerror = (e) => console.error('[Gisti] composeApp.js failed to load', e);
+document.head.appendChild(script);

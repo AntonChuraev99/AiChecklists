@@ -20,6 +20,11 @@ kotlin {
         }
     }
 
+    @OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
+    wasmJs {
+        browser()
+    }
+
     sourceSets {
         commonMain.dependencies {
             implementation(projects.core.common.api)
@@ -58,6 +63,9 @@ kotlin {
         }
         iosSimulatorArm64Main {
             dependsOn(iosMain)
+        }
+        wasmJsMain.dependencies {
+            implementation(libs.ktor.client.js)
         }
     }
 }

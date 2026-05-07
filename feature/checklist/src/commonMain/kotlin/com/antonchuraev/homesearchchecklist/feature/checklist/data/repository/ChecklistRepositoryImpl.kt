@@ -2,15 +2,17 @@ package com.antonchuraev.homesearchchecklist.feature.checklist.data.repository
 
 import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistDao
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistEntity
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistFillDao
-import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistReminderInfo
-import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistRepeatInfo
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistFillEntity
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ReminderConverters
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.toDomain
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.toEntity
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistReminderInfo
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistRepeatInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ItemReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo
@@ -285,8 +287,8 @@ class ChecklistRepositoryImpl(
      * rather than a separate DB query.
      */
     private fun buildRemindersInRange(
-        checklistEntities: List<com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistEntity>,
-        fillEntities: List<com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistFillEntity>,
+        checklistEntities: List<ChecklistEntity>,
+        fillEntities: List<ChecklistFillEntity>,
         fromMs: Long,
         toMs: Long,
     ): List<TodayReminderInfo> {
@@ -320,7 +322,6 @@ class ChecklistRepositoryImpl(
         }
 
         // ── Per-item reminders (from default fills) ──
-        val fillByChecklistId = fillEntities.associateBy { it.checklistId }
         for (fillEntity in fillEntities) {
             val checklistName = nameById[fillEntity.checklistId] ?: continue
             for (item in fillEntity.items) {

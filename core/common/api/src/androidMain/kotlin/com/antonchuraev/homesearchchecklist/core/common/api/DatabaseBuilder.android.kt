@@ -1,7 +1,8 @@
 package com.antonchuraev.homesearchchecklist.core.common.api
 
-import androidx.room.Room
-import androidx.room.RoomDatabase
+import androidx.room3.Room
+import androidx.room3.RoomDatabase
+import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 
 actual inline fun <reified T : RoomDatabase> getDatabaseBuilder(databaseName: String): RoomDatabase.Builder<T> {
     val appContext = AppContextHolder.context
@@ -9,5 +10,5 @@ actual inline fun <reified T : RoomDatabase> getDatabaseBuilder(databaseName: St
     return Room.databaseBuilder<T>(
         context = appContext,
         name = dbFile.absolutePath
-    )
+    ).setDriver(BundledSQLiteDriver())
 }

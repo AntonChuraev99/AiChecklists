@@ -5,12 +5,8 @@ import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigKe
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
 
 /**
- * iOS stub implementation. Returns default values.
- *
- * To implement Firebase for iOS:
- * 1. Add Firebase iOS SDK via CocoaPods
- * 2. Initialize Firebase in AppDelegate.swift
- * 3. Replace this stub with real implementation
+ * Stub implementation that returns default values.
+ * Used on platforms without Firebase Remote Config support (iOS, web).
  */
 class StubRemoteConfigProvider : RemoteConfigProvider {
 

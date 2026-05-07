@@ -21,6 +21,11 @@ kotlin {
         }
     }
 
+    @OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
+    wasmJs {
+        browser()
+    }
+
     sourceSets {
         commonMain.dependencies {
             implementation(projects.core.navigation.api)
@@ -41,18 +46,36 @@ kotlin {
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.bundles.koin.feature)
             implementation(libs.kotlinx.coroutines.core)
-
-            // RevenueCat
-            implementation(libs.revenuecat.purchases.core)
-            implementation(libs.revenuecat.purchases.result)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
         }
-        androidMain.dependencies {
-            implementation(libs.androidx.activity.compose)
+
+        // mobileMain: shared by Android + iOS — where RevenueCat lives
+        val mobileMain by creating {
+            dependsOn(commonMain.get())
+            dependencies {
+                implementation(libs.revenuecat.purchases.core)
+                implementation(libs.revenuecat.purchases.result)
+            }
         }
+        androidMain {
+            dependsOn(mobileMain)
+            dependencies {
+                implementation(libs.androidx.activity.compose)
+            }
+        }
+        val iosMain by creating {
+            dependsOn(mobileMain)
+        }
+        iosArm64Main {
+            dependsOn(iosMain)
+        }
+        iosSimulatorArm64Main {
+            dependsOn(iosMain)
+        }
+        // wasmJs: no RevenueCat — stub PaywallRepository provided
     }
 }
 

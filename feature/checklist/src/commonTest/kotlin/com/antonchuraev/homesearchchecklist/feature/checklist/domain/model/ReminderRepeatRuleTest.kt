@@ -1,7 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.checklist.domain.model
 
+import kotlin.time.Instant
 import kotlinx.datetime.DateTimeUnit
-import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.LocalTime
