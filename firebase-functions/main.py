@@ -23,7 +23,7 @@ from typing import Any
 
 import firebase_admin
 from firebase_admin import credentials, firestore
-from flask import Request, jsonify
+from flask import Request, jsonify, make_response
 import google.generativeai as genai
 import functions_framework
 from firebase_functions import firestore_fn  # 2nd gen Firestore trigger
@@ -139,6 +139,26 @@ def create_error_response(message: str, status_code: int = 400):
 def create_success_response(data: dict):
     """Create standardized success response."""
     return jsonify({"success": True, **data})
+
+
+_CORS_HEADERS = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Max-Age": "3600",
+}
+
+
+def add_cors_headers(response):
+    """Add CORS headers to a Flask response so browsers can call the function from any origin."""
+    for key, value in _CORS_HEADERS.items():
+        response.headers[key] = value
+    return response
+
+
+def cors_preflight_ok():
+    """Return 204 No Content for CORS preflight OPTIONS requests."""
+    return add_cors_headers(make_response("", 204))
 
 
 # ============================================================================
@@ -422,20 +442,32 @@ def register_user(request: Request):
         "created_at": "ISO datetime string"
     }
     """
+    # CORS preflight — browsers send OPTIONS before cross-origin POST
+    if request.method == "OPTIONS":
+        return cors_preflight_ok()
+
     if request.method != "POST":
-        return create_error_response("Only POST method is allowed")
+        return add_cors_headers(make_response(
+            jsonify({"success": False, "error": "Only POST method is allowed"}), 405
+        ))
 
     try:
         data = request.get_json()
     except Exception:
-        return create_error_response("Invalid JSON body")
+        return add_cors_headers(make_response(
+            jsonify({"success": False, "error": "Invalid JSON body"}), 400
+        ))
 
     if not data:
-        return create_error_response("Request body is required")
+        return add_cors_headers(make_response(
+            jsonify({"success": False, "error": "Request body is required"}), 400
+        ))
 
     device_id = data.get("device_id")
     if not device_id or not isinstance(device_id, str) or len(device_id) < 10:
-        return create_error_response("Valid device_id is required (min 10 characters)")
+        return add_cors_headers(make_response(
+            jsonify({"success": False, "error": "Valid device_id is required (min 10 characters)"}), 400
+        ))
 
     # Normalize device_id (trim, lowercase for consistency)
     device_id = device_id.strip().lower()
@@ -452,13 +484,13 @@ def register_user(request: Request):
         for user_doc in existing_users:
             # User exists - return existing data
             user_data = user_doc.to_dict()
-            return create_success_response({
+            return add_cors_headers(make_response(jsonify({"success": True,
                 "user_id": user_doc.id,
                 "is_new_user": False,
                 "is_premium": user_data.get("is_premium", False),
                 "ai_credits": user_data.get("ai_credits", 0),
                 "created_at": user_data.get("created_at", "")
-            })
+            })))
 
         # User doesn't exist - create new user
         new_user_id = str(uuid.uuid4())
@@ -477,16 +509,18 @@ def register_user(request: Request):
         # Save to Firestore with user_id as document ID
         users_ref.document(new_user_id).set(user_data)
 
-        return create_success_response({
+        return add_cors_headers(make_response(jsonify({"success": True,
             "user_id": new_user_id,
             "is_new_user": True,
             "is_premium": False,
             "ai_credits": initial_credits,
             "created_at": now
-        })
+        })))
 
     except Exception as e:
-        return create_error_response(f"Failed to register user: {str(e)}", 500)
+        return add_cors_headers(make_response(
+            jsonify({"success": False, "error": f"Failed to register user: {str(e)}"}), 500
+        ))
 
 
 # ============================================================================
@@ -940,9 +974,15 @@ def restore_credits_after_purchase(request: Request):
         "message": "Credits restored"
     }
     """
+    # CORS preflight — browsers send OPTIONS before cross-origin POST
+    if request.method == "OPTIONS":
+        return cors_preflight_ok()
+
     data, error = validate_request(request)
     if error:
-        return create_error_response(error)
+        return add_cors_headers(make_response(
+            jsonify({"success": False, "error": error}), 400
+        ))
 
     user_id = data["user_id"]
 
@@ -952,7 +992,9 @@ def restore_credits_after_purchase(request: Request):
         user_doc = user_ref.get()
 
         if not user_doc.exists:
-            return create_error_response("User not found", 404)
+            return add_cors_headers(make_response(
+                jsonify({"success": False, "error": "User not found"}), 404
+            ))
 
         prev = user_doc.to_dict() or {}
         prev_state = {
@@ -963,11 +1005,13 @@ def restore_credits_after_purchase(request: Request):
         # Verify via Firestore (RC Extension) with REST fallback
         status = verify_premium(user_id)
         if status == UNAVAILABLE:
-            return create_error_response(
-                "Verification service temporarily unavailable. Please try again.", 503
-            )
+            return add_cors_headers(make_response(
+                jsonify({"success": False, "error": "Verification service temporarily unavailable. Please try again."}), 503
+            ))
         if status == NOT_VERIFIED:
-            return create_error_response("No active subscription found", 403)
+            return add_cors_headers(make_response(
+                jsonify({"success": False, "error": "No active subscription found"}), 403
+            ))
 
         # Get credits config
         config = get_credits_config()
@@ -999,14 +1043,16 @@ def restore_credits_after_purchase(request: Request):
             "revenuecat_verification_result": status,
         })
 
-        return create_success_response({
+        return add_cors_headers(make_response(jsonify({"success": True,
             "ai_credits": credits_cap,
             "is_premium": True,
             "message": "Credits restored successfully"
-        })
+        })))
 
     except Exception as e:
-        return create_error_response("Failed to restore credits. Please try again.", 500)
+        return add_cors_headers(make_response(
+            jsonify({"success": False, "error": "Failed to restore credits. Please try again."}), 500
+        ))
 
 
 # ============================================================================

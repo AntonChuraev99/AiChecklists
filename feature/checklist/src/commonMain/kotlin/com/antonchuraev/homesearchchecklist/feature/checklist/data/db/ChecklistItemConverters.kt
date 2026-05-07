@@ -1,6 +1,6 @@
 package com.antonchuraev.homesearchchecklist.feature.checklist.data.db
 
-import androidx.room.TypeConverter
+import androidx.room3.TypeConverter
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistViewMode
@@ -47,4 +47,3 @@ class ChecklistItemConverters {
         return mode.name
     }
 }
-

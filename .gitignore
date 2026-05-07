@@ -36,6 +36,9 @@ release.keystore
 google-services.json
 GoogleService-Info.plist
 
+# Generated wasmJs init.js (contains Firebase web API key — built from init.js.template)
+composeApp/src/wasmJsMain/resources/init.js
+
 # Google Service Account keys (NEVER commit!)
 *-service-account*.json
 *serviceaccount*.json
@@ -70,3 +73,4 @@ SECURITY_DELIVERY_SUMMARY.txt
 !iosApp/**/*.png
 !core/**/*.png
 !feature/**/*.png
+*.stackdump

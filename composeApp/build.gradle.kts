@@ -29,12 +29,30 @@ kotlin {
             isStatic = true
         }
     }
-    
+
+    @OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
+    wasmJs {
+        // Capture path at config time so KotlinWebpack task doesn't drag a Project reference.
+        val staticServePath = layout.projectDirectory.dir("src/wasmJsMain/resources").asFile.absolutePath
+        browser {
+            commonWebpackConfig {
+                outputFileName = "composeApp.js"
+                devServer = (devServer ?: org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackConfig.DevServer()).apply {
+                    port = 9090
+                    open = false
+                    static = (static ?: mutableListOf()).apply {
+                        add(staticServePath)
+                    }
+                }
+            }
+        }
+        binaries.executable()
+    }
+
     sourceSets {
         androidMain.dependencies {
             implementation(compose.preview)
             implementation(libs.androidx.activity.compose)
-            implementation(libs.room.ktx)
 
             // Glance for App Widgets
             implementation(libs.glance)
@@ -90,8 +108,6 @@ kotlin {
             implementation(libs.koin.compose)
             implementation(libs.koin.compose.viewmodel)
 
-            implementation(libs.room.runtime)
-            implementation(libs.sqlite.bundled)
             implementation(libs.kotlinx.datetime)
         }
         commonTest.dependencies {
@@ -201,12 +217,59 @@ android {
     }
 }
 
+// ============================================================
+// Task: generateWasmInitJs
+// Reads Firebase web config from local.properties and substitutes
+// placeholders in init.js.template → composeApp/src/wasmJsMain/resources/init.js.
+// init.js is gitignored (contains API keys).
+// init.js.template is committed (safe — contains only placeholders).
+// ============================================================
+// Read local.properties at configuration time (config-cache-friendly).
+// Values get captured into the registered task as inputs, so the generated
+// init.js is invalidated when local.properties changes.
+val firebaseWebProps: Map<String, String> = run {
+    val localPropertiesFile = rootProject.file("local.properties")
+    val props = Properties()
+    if (localPropertiesFile.exists()) {
+        localPropertiesFile.inputStream().use { props.load(it) }
+    }
+    mapOf(
+        "FIREBASE_API_KEY" to props.getProperty("FIREBASE_WEB_API_KEY", "MISSING_FIREBASE_WEB_API_KEY"),
+        "FIREBASE_AUTH_DOMAIN" to props.getProperty("FIREBASE_WEB_AUTH_DOMAIN", "aichecklists-40230.firebaseapp.com"),
+        "FIREBASE_PROJECT_ID" to props.getProperty("FIREBASE_WEB_PROJECT_ID", "aichecklists-40230"),
+        "FIREBASE_STORAGE_BUCKET" to props.getProperty("FIREBASE_WEB_STORAGE_BUCKET", "aichecklists-40230.firebasestorage.app"),
+        "FIREBASE_MESSAGING_SENDER_ID" to props.getProperty("FIREBASE_WEB_MESSAGING_SENDER_ID", "27698629989"),
+        "FIREBASE_APP_ID" to props.getProperty("FIREBASE_WEB_APP_ID", "MISSING_FIREBASE_WEB_APP_ID"),
+    )
+}
+
+val generateWasmInitJs by tasks.registering {
+    group = "wasm"
+    description = "Generate init.js from init.js.template using Firebase web config from local.properties"
+
+    val templateFile = project.file("src/wasmJsMain/resources/init.js.template")
+    val outputFile = project.file("src/wasmJsMain/resources/init.js")
+    val captured = firebaseWebProps  // capture map for config-cache safety
+    val apiKeyMissing = captured["FIREBASE_API_KEY"] == "MISSING_FIREBASE_WEB_API_KEY"
+
+    inputs.file(templateFile)
+    inputs.property("firebaseWebProps", captured.toString())
+    outputs.file(outputFile)
+
+    doLast {
+        var content = templateFile.readText()
+        for ((key, value) in captured) {
+            content = content.replace("__${key}__", value)
+        }
+        outputFile.writeText(content)
+        if (apiKeyMissing) {
+            println("[generateWasmInitJs] WARNING: FIREBASE_WEB_API_KEY not set in local.properties — RC fetch will fail, defaultConfig used")
+        }
+    }
+}
+
 dependencies {
     debugImplementation(compose.uiTooling)
-    // KSP для Room под каждую целевую платформу
-    add("kspAndroid", libs.room.compiler)
-    add("kspIosSimulatorArm64", libs.room.compiler)
-    add("kspIosArm64", libs.room.compiler)
 
     // Firebase (Android only)
     implementation(platform(libs.firebase.bom))
@@ -227,5 +290,20 @@ dependencies {
     // MockK - mocking library for Kotlin
     androidTestImplementation("io.mockk:mockk-android:1.13.8")
     androidTestImplementation("io.mockk:mockk-agent:1.13.8")
+}
+
+// Wire generateWasmInitJs to run before every wasmJs task that touches resources or
+// compiles wasmJs code. wasmJsProcessResources is critical — it reads from
+// src/wasmJsMain/resources where init.js is generated.
+afterEvaluate {
+    tasks.matching {
+        it.name == "wasmJsProcessResources" ||
+        it.name.startsWith("compileKotlinWasmJs") ||
+        it.name.startsWith("wasmJsBrowser") ||
+        it.name.startsWith("compileDevelopmentExecutableKotlinWasmJs") ||
+        it.name.startsWith("compileProductionExecutableKotlinWasmJs")
+    }.configureEach {
+        dependsOn(generateWasmInitJs)
+    }
 }
 

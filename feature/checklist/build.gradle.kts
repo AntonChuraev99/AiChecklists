@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.jetbrains.kotlin.serialization)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.room3)
 }
 
 kotlin {
@@ -23,6 +24,11 @@ kotlin {
         }
     }
 
+    @OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
+    wasmJs {
+        browser()
+    }
+
     sourceSets {
         commonMain.dependencies {
             implementation(projects.core.common.api)
@@ -33,22 +39,40 @@ kotlin {
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.kotlinx.datetime)
 
-            implementation(libs.room.runtime)
-            implementation(libs.sqlite.bundled)
-
             implementation(compose.runtime)
             implementation(compose.foundation)
             implementation(compose.material3)
             implementation(compose.materialIconsExtended)
             implementation(compose.ui)
             implementation(compose.components.resources)
+
+            // Room 3.0 runtime — supports all KMP targets (Android, iOS, wasmJs)
+            implementation(libs.room3.runtime)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
         }
+
         androidMain.dependencies {
-            implementation(libs.room.ktx)
+            implementation(libs.sqlite3.bundled)
+        }
+        val iosMain by creating {
+            dependsOn(commonMain.get())
+            dependencies {
+                implementation(libs.sqlite3.bundled)
+            }
+        }
+        iosArm64Main {
+            dependsOn(iosMain)
+        }
+        iosSimulatorArm64Main {
+            dependsOn(iosMain)
+        }
+        wasmJsMain.dependencies {
+            // WebWorkerSQLiteDriver for OPFS persistence on web
+            implementation(libs.sqlite3.web)
+            implementation(npm("sqlite-wasm-worker", rootProject.layout.projectDirectory.dir("sqlite-wasm-worker").asFile))
         }
     }
 }
@@ -65,9 +89,14 @@ android {
     }
 }
 dependencies {
-    // KSP для Room под каждую целевую платформу
-    add("kspAndroid", libs.room.compiler)
-    add("kspIosArm64", libs.room.compiler)
-    add("kspIosSimulatorArm64", libs.room.compiler)
+    // KSP for Room 3.0 — all targets including wasmJs
+    add("kspAndroid", libs.room3.compiler)
+    add("kspIosArm64", libs.room3.compiler)
+    add("kspIosSimulatorArm64", libs.room3.compiler)
+    add("kspWasmJs", libs.room3.compiler)
+}
+
+room3 {
+    schemaDirectory(layout.projectDirectory.dir("schemas"))
 }
 

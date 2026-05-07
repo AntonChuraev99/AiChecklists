@@ -1,16 +1,19 @@
 package com.antonchuraev.homesearchchecklist.feature.checklist.di
 
 import com.antonchuraev.homesearchchecklist.core.common.api.getDatabaseBuilder
-import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistDao
-import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistFillDao
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistDatabase
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.repository.ChecklistRepositoryImpl
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 
+/** Room 3.0-backed ChecklistRepository — works on Android, iOS, and wasmJs (OPFS). */
+private val database: ChecklistDatabase by lazy {
+    ChecklistDatabase.getRoomDatabase(
+        getDatabaseBuilder<ChecklistDatabase>("ChecklistDatabase")
+    )
+}
 
-internal val database: ChecklistDatabase = ChecklistDatabase.getRoomDatabase(
-    getDatabaseBuilder<ChecklistDatabase>("ChecklistDatabase")
-)
-
-internal val checklistDao: ChecklistDao by lazy { database.checklistDao() }
-internal val checklistFillDao: ChecklistFillDao by lazy { database.checklistFillDao() }
-
-
+internal fun createChecklistRepository(): ChecklistRepository =
+    ChecklistRepositoryImpl(
+        checklistDao = database.checklistDao(),
+        fillDao = database.checklistFillDao()
+    )

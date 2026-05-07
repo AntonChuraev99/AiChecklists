@@ -9,7 +9,6 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
@@ -33,7 +32,7 @@ fun createDataStore(producePath: () -> String): DataStore<Preferences> =
  */
 class AppDatastore(
     private val dataStore: DataStore<Preferences>,
-    private val dispatcher: CoroutineDispatcher = Dispatchers.IO
+    private val dispatcher: CoroutineDispatcher = Dispatchers.Default
 ) {
 
     suspend fun saveBoolean(key: String, value: Boolean) {

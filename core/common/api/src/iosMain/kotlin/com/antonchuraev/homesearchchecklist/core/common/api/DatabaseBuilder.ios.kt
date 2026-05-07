@@ -1,9 +1,9 @@
 package com.antonchuraev.homesearchchecklist.core.common.api
 
-import androidx.room.Room
-import androidx.room.RoomDatabase
+import androidx.room3.Room
+import androidx.room3.RoomDatabase
+import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import kotlinx.cinterop.ExperimentalForeignApi
-import platform.Foundation.NSApplicationSupportDirectory
 import platform.Foundation.NSDocumentDirectory
 import platform.Foundation.NSFileManager
 import platform.Foundation.NSUserDomainMask
@@ -26,5 +26,5 @@ actual inline fun <reified T : RoomDatabase> getDatabaseBuilder(databaseName: St
     val dbFilePath = documentDirectory() + "/${databaseName}.db"
     return Room.databaseBuilder<T>(
         name = dbFilePath,
-    )
+    ).setDriver(BundledSQLiteDriver())
 }

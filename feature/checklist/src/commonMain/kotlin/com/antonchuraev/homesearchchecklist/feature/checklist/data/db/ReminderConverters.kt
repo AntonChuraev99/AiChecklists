@@ -1,6 +1,6 @@
 package com.antonchuraev.homesearchchecklist.feature.checklist.data.db
 
-import androidx.room.TypeConverter
+import androidx.room3.TypeConverter
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json

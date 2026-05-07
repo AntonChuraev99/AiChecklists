@@ -1,22 +1,14 @@
 package com.antonchuraev.homesearchchecklist.feature.checklist.data.db
 
-import androidx.room.Dao
-import androidx.room.Insert
-import androidx.room.OnConflictStrategy
-import androidx.room.Query
-import androidx.room.Update
+import androidx.room3.Dao
+import androidx.room3.Insert
+import androidx.room3.OnConflictStrategy
+import androidx.room3.Query
+import androidx.room3.Update
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistReminderInfo
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistRepeatInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
 import kotlinx.coroutines.flow.Flow
-
-data class ChecklistReminderInfo(val id: Long, val name: String, val reminderAt: Long)
-
-data class ChecklistRepeatInfo(
-    val id: Long,
-    val name: String,
-    val repeatNextAt: Long,
-    val repeatRule: ReminderRepeatRule?,
-    val repeatOccurrenceCount: Int
-)
 
 @Dao
 interface ChecklistDao {

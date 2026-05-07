@@ -8,6 +8,7 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Today
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
+import kotlin.time.Instant
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
@@ -126,7 +127,7 @@ class TodayViewModel(
          */
         internal fun computeTodayRange(nowMs: Long): Pair<Long, Long> {
             val tz = TimeZone.currentSystemDefault()
-            val now = kotlinx.datetime.Instant.fromEpochMilliseconds(nowMs).toLocalDateTime(tz)
+            val now = Instant.fromEpochMilliseconds(nowMs).toLocalDateTime(tz)
 
             val startOfDay = LocalDateTime(
                 year = now.year,
@@ -158,7 +159,7 @@ class TodayViewModel(
          */
         internal fun buildDateLabel(nowMs: Long): String {
             val tz = TimeZone.currentSystemDefault()
-            val dt = kotlinx.datetime.Instant.fromEpochMilliseconds(nowMs).toLocalDateTime(tz)
+            val dt = Instant.fromEpochMilliseconds(nowMs).toLocalDateTime(tz)
             val dayName = dt.dayOfWeek.name.lowercase().replaceFirstChar { it.uppercase() }
             val monthName = dt.month.name.lowercase().replaceFirstChar { it.uppercase() }
             return "$dayName, $monthName ${dt.dayOfMonth}"
@@ -169,7 +170,7 @@ class TodayViewModel(
          */
         internal fun formatTime(epochMs: Long): String {
             val tz = TimeZone.currentSystemDefault()
-            val dt = kotlinx.datetime.Instant.fromEpochMilliseconds(epochMs).toLocalDateTime(tz)
+            val dt = Instant.fromEpochMilliseconds(epochMs).toLocalDateTime(tz)
             val h = dt.hour.toString().padStart(2, '0')
             val m = dt.minute.toString().padStart(2, '0')
             return "$h:$m"

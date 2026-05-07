@@ -5,7 +5,7 @@ import com.antonchuraev.homesearchchecklist.core.datastore.api.AppDatastore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.todayIn
 
@@ -44,7 +44,7 @@ class CsatManager(private val datastore: AppDatastore) {
     )
 
     private fun todayEpochDays(): Int =
-        Clock.System.todayIn(TimeZone.currentSystemDefault()).toEpochDays()
+        Clock.System.todayIn(TimeZone.currentSystemDefault()).toEpochDays().toInt()
 
     suspend fun onUserAction() {
         val count = datastore.observeInt(KEY_ACTION_COUNT, 0).first()
