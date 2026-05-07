@@ -2,9 +2,117 @@
 
 **Branch:** `add-web-wasmjs-target`
 **Created:** 2026-05-07
-**Status:** Phase 1–3, 5, 5b, 6, 7, 7b complete. Phase 4 + Phase 8 + manual deploy remaining.
+**Last session ended:** 2026-05-07 evening (Phase 4 + Phase 8 done — code complete, doc complete; не закоммичено)
+**Status:** Phase 1–8 complete. **Phase 9 + manual verification pending.** Working copy has 6 modified files (not yet committed).
 
 This file picks up exactly where the prior session left off. Hand it to the next agent verbatim.
+
+---
+
+## ✅ Завтрашняя сессия — точка входа
+
+**Если ты — следующий агент или пользователь утром:** все изменения уже на диске, но **не закоммичены**. Сначала проверь `git status`, потом следуй TODO ниже строго по порядку.
+
+### Что сделано (закрыто на 2026-05-07)
+
+- Phase 4.0: CORS на 4 AI Cloud Functions (через рефакторинг общих helpers `create_error_response`/`create_success_response` + OPTIONS preflight на 4 функциях)
+- Phase 4.1: `FilePicker.wasmJs.kt` — реальный picker через скрытый `<input type="file">`
+- Phase 4.1: `FileReader.wasmJs.kt` — синхронное чтение из in-memory staging Map (`wasm-blob://uuid`)
+- Phase 4.2: `ShareLauncher.wasmJs.kt` — Web Share API + clipboard fallback (transient activation сохранена)
+- Phase 4.2: `PdfGenerator.wasmJs.kt` — A4 HTML + iframe `window.print()` (наследует COEP-контекст)
+- 5 helpers в `init.js.template`: `__pickFile`, `__readStagedBytes`, `__shareText`, `__copyToClipboard`, `__printHtml`
+- Build verification: `./gradlew composeApp:compileKotlinWasmJs` BUILD SUCCESSFUL
+- Phase 8: persistent doc в `docs/solutions/features/wasmjs-phase4-web-io-2026-05-07.md`, INDEX обновлён, project memory обновлён, stats обновлены
+
+### TODO для завтра (строго по порядку)
+
+1. **Закоммитить работу.** `git status` покажет 6 изменённых файлов (`firebase-functions/main.py`, `composeApp/src/wasmJsMain/resources/init.js.template`, 4 wasmJs Kotlin actuals) + изменения в `docs/`. Используй skill `/commit` (никогда `git commit` напрямую). Предложенный subject: `feat(wasm): finish AI + Sharing on web target`.
+
+2. **Задеплоить Cloud Functions** с CORS-aware версиями:
+   ```bash
+   cd firebase-functions
+   firebase deploy --only functions:analyze_and_fill_checklist,functions:generate_checklist,functions:register_user,functions:restore_credits_after_purchase,functions:get_usage_stats,functions:get_credits_info
+   ```
+   Без этого web получит CORS errors на AI-flow в браузере.
+
+3. **Smoke test в реальном Chrome:**
+   ```bash
+   ./gradlew composeApp:wasmJsBrowserDevelopmentRun --continuous
+   ```
+   Открыть `http://localhost:9090/` и вручную проверить:
+   - **AI flow:** Create checklist → Photo → выбрать image → AI возвращает items без CORS ошибок (проверить DevTools → Network вкладку — POST на `analyze_and_fill_checklist` или `generate_checklist` должен быть 200 OK с CORS headers).
+   - **Sharing — Plain Text:** открыть чеклист → Share → Plain Text. На desktop Chrome должен сработать clipboard fallback с toast'ом ("copied"). На mobile (если открыть с телефона по `http://<lan-ip>:9090/`) — нативный share sheet.
+   - **Sharing — PDF:** открыть чеклист → Share → PDF Document. Должен открыться browser print dialog с правильно отформатированной A4-страницей (без UI app shell, monochrome checkboxes ☑/☐).
+
+4. **Если smoke OK → Phase 9** (production deploy на Firebase Hosting):
+   ```bash
+   ./gradlew composeApp:wasmJsBrowserDistribution
+   firebase init hosting   # one-time, target = composeApp/build/dist/wasmJs/productionExecutable
+   firebase deploy --only hosting
+   ```
+   Проверить `firebase.json` имеет COOP/COEP/CORP headers (см. секцию Phase 9 ниже в этом файле).
+
+5. **Если smoke FAIL** — частые причины:
+   - **CORS error в Network tab** → Cloud Functions не задеплоены (шаг 2). Перепроверь `firebase deploy` output.
+   - **FilePicker не открывает диалог** → проверь DevTools console на ошибки `__pickFile`. Возможно `init.js` не сгенерирован — посмотри `composeApp/build/processedResources/wasmJs/main/init.js`. Если там `__FIREBASE_API_KEY__` не подменён — `local.properties` без ключей или `generateWasmInitJs` task не запустился.
+   - **PDF iframe не печатает** → попробуй fallback path в `__printHtml` (он автоматически срабатывает на `iframe.contentWindow.print` exception → `window.open(blob:)`). Если и fallback не работает — потенциально COEP блокирует iframe (но мы тестировали — должно работать в `same-origin` + `require-corp` режиме).
+
+### Не делать в следующей сессии (вне scope)
+
+- Audio recording / playback на web — оставлены stubs (`feature/analyze/src/wasmJsMain/.../recorder/`). Это требует `MediaRecorder` API и отдельной задачи.
+- Чистка `GeminiAiAnalyzer.kt` / `StubAiAnalyzer.kt` в commonMain — мёртвый код но не блокирует web. Отдельная low-risk задача.
+- `__functionsCall` httpsCallable bridge в `init.js` — не используется, но оставлен для будущих 2nd-gen onCall функций.
+
+### Известные limitations
+
+- Firefox desktop не поддерживает file sharing в Web Share API (только URL). `__shareText` корректно фолбэчит на clipboard.
+- Wasm bundle Compose 1.9.3 ~26 MB — Playwright бьётся с wasm streaming truncation. Для e2e-тестов render — только manual Chrome verification.
+- Onboarding persistence (custom DataStore localStorage) — был починен в прошлой сессии, надо переподтвердить юзером после `git pull` + dev-server restart.
+
+---
+
+## Phase 4 — DONE on 2026-05-07 (this session)
+
+### Deviations from original plan
+
+- **Did NOT create `proxy_gemini` Cloud Function.** Existing `analyze_and_fill_checklist` and `generate_checklist` already work as proxies (server-side `call_gemini` helper). Adding a third one would duplicate behaviour and split usage stats.
+- **CORS scope expanded from 2 → 4 functions.** Original plan only called out `register_user` + `restore_credits_after_purchase`. Web-side AI flow also needs CORS on `analyze_and_fill_checklist`, `generate_checklist`, `get_usage_stats`, `get_credits_info` — without which `FirebaseAiServiceImpl` (Ktor) hits preflight failures from `localhost:9090` / Firebase Hosting domain.
+- **Did NOT create `GeminiAiAnalyzer.wasmJs.kt`.** `GeminiAiAnalyzer` is dead code in production — Koin DI in `analyzeFeatureModule` only wires `FirebaseAiService`. Ktor HTTP client is already cross-platform; CORS fix was the only blocker for web AI.
+
+### Files touched
+
+Server (`firebase-functions/main.py`):
+- `create_error_response` / `create_success_response` rewritten to wrap responses with `add_cors_headers(make_response(...))`. This single change wires CORS to every endpoint that uses these helpers (4 AI functions + future).
+- Added `if request.method == "OPTIONS": return cors_preflight_ok()` to the entry of `analyze_and_fill_checklist`, `generate_checklist`, `get_usage_stats`, `get_credits_info`.
+
+Client (wasmJs actuals):
+- `composeApp/src/wasmJsMain/resources/init.js.template`: added 5 globalThis bridges — `__filePickerStaging` (Map<key, ArrayBuffer>), `__pickFile(accept)`, `__readStagedBytes(path)`, `__shareText(title, text)`, `__copyToClipboard(text)`, `__printHtml(html)`.
+- `feature/analyze/src/wasmJsMain/.../picker/FilePicker.wasmJs.kt`: real picker via hidden `<input type="file">`, `rememberCoroutineScope` for launch from onClick frame.
+- `feature/analyze/src/wasmJsMain/.../util/FileReader.wasmJs.kt`: synchronous reads from `__filePickerStaging` Map by `wasm-blob://<uuid>` key. Matches Android contract (sync disk read ↔ sync memory read).
+- `feature/sharing/src/wasmJsMain/.../share/ShareLauncher.wasmJs.kt`: `LaunchedEffect` two branches — `pdfFilePath != null` → just `onShareComplete` (print already triggered), `textContent != null` → `__shareText` (Web Share API or clipboard fallback). Transient activation preserved (LaunchedEffect runs in same Compose frame as onClick).
+- `feature/sharing/src/wasmJsMain/.../pdf/PdfGenerator.wasmJs.kt`: builds A4 HTML with inline CSS (`@media print`, monochrome ☑/☐ checkboxes, `print-color-adjust: exact`), opens hidden iframe with `srcdoc` and calls `iframe.contentWindow.print()`. Returns marker `"web-print://done"` (NOT null — null means error in callers).
+
+### Architecture notes
+
+- **iframe vs window.open for print:** iframe inherits parent COEP/COOP context (required for SQLite OPFS Web Worker to keep working). `window.open` would create a new browsing context without our COOP headers and can be blocked by popup blockers. Fallback to `window.open(blob:)` left in `__printHtml` for browsers that fail iframe printing.
+- **`wasm-blob://` staging key:** lets `FileReader.readBytes` stay synchronous, matching the Android disk-read contract. JVM/iOS read sync from disk; web reads sync from memory map populated during `__pickFile`.
+- **`unsafeCast<Promise<JsAny?>>().await<JsAny?>()`:** required by Kotlin/Wasm — type parameter on `await<T>()` is not inferred when source is `JsAny?`.
+- **`console` is not in scope in Kotlin/Wasm:** wrapped in `@JsFun("(msg) => { console.log(msg); }")` helpers.
+
+### Verification
+
+- `./gradlew composeApp:compileKotlinWasmJs` — BUILD SUCCESSFUL (724ms incremental, all wasmJs modules).
+- `python -c "import ast; ast.parse(open('main.py').read())"` — main.py syntax OK after CORS edits.
+- Existing `firebase-functions/test_main.py` tests not affected (mock `request.method = "POST"`; OPTIONS branches are net-new).
+
+### Manual steps STILL required before user can verify on web
+
+1. `firebase deploy --only functions:analyze_and_fill_checklist,functions:generate_checklist,functions:register_user,functions:restore_credits_after_purchase,functions:get_usage_stats,functions:get_credits_info` — push the CORS-aware handlers to prod.
+2. `local.properties` already has Firebase web keys per prior session — only re-verify if new install.
+3. Open `http://localhost:9090/` after `./gradlew composeApp:wasmJsBrowserDevelopmentRun --continuous` and exercise:
+   - Create via AI → Photo upload → AI returns items
+   - Share → Plain Text → clipboard toast (desktop) or system share sheet (mobile)
+   - Share → PDF → browser print dialog with cleanly-formatted A4
 
 ---
 

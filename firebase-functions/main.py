@@ -132,13 +132,17 @@ def validate_request(request: Request) -> tuple[dict | None, str | None]:
 
 
 def create_error_response(message: str, status_code: int = 400):
-    """Create standardized error response."""
-    return jsonify({"success": False, "error": message}), status_code
+    """Create standardized error response with CORS headers so the web client
+    can read the body even on non-2xx status."""
+    return add_cors_headers(make_response(
+        jsonify({"success": False, "error": message}), status_code
+    ))
 
 
 def create_success_response(data: dict):
-    """Create standardized success response."""
-    return jsonify({"success": True, **data})
+    """Create standardized success response with CORS headers so any
+    @functions_framework.http endpoint becomes browser-callable."""
+    return add_cors_headers(make_response(jsonify({"success": True, **data})))
 
 
 _CORS_HEADERS = {
@@ -587,6 +591,10 @@ def analyze_and_fill_checklist(request: Request):
         "usage": {"count": number, "limit": number}
     }
     """
+    # CORS preflight — browsers send OPTIONS before cross-origin POST
+    if request.method == "OPTIONS":
+        return cors_preflight_ok()
+
     # Validate request
     data, error = validate_request(request)
     if error:
@@ -721,6 +729,10 @@ def generate_checklist(request: Request):
         "usage": {"count": number, "limit": number}
     }
     """
+    # CORS preflight — browsers send OPTIONS before cross-origin POST
+    if request.method == "OPTIONS":
+        return cors_preflight_ok()
+
     # Validate request
     data, error = validate_request(request)
     if error:
@@ -822,6 +834,10 @@ def get_usage_stats(request: Request):
         }
     }
     """
+    # CORS preflight — browsers send OPTIONS before cross-origin POST
+    if request.method == "OPTIONS":
+        return cors_preflight_ok()
+
     data, error = validate_request(request)
     if error:
         return create_error_response(error)
@@ -1082,6 +1098,10 @@ def get_credits_info(request: Request):
         "user_credits": number
     }
     """
+    # CORS preflight — browsers send OPTIONS before cross-origin POST
+    if request.method == "OPTIONS":
+        return cors_preflight_ok()
+
     data, error = validate_request(request)
     if error:
         return create_error_response(error)
