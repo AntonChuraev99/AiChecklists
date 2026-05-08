@@ -699,6 +699,16 @@
     <string name="paywall_v1_close_cd">Close</string>
     <string name="paywall_v1_restore_action">Restore</string>
 
+    <!-- Web target: replaces paywall with an "install the mobile app" CTA -->
+    <string name="paywall_web_install_title">Get the full Gisti experience</string>
+    <string name="paywall_web_install_description">Subscriptions and full features live in the mobile app. Install Gisti on your phone for unlimited checklists, AI fills, exports, and reminders.</string>
+    <string name="paywall_web_install_android_label">Android</string>
+    <string name="paywall_web_install_android_status">Available now on Google Play</string>
+    <string name="paywall_web_install_android_cta">Get on Google Play</string>
+    <string name="paywall_web_install_ios_label">iOS</string>
+    <string name="paywall_web_install_ios_status">Coming soon</string>
+    <string name="paywall_web_install_ios_hint">We are cooking it. Stay tuned.</string>
+
     <!-- Trial pill (Variant A) -->
     <string name="paywall_v1_timeline_days_free">%1$d DAYS FREE</string>
 

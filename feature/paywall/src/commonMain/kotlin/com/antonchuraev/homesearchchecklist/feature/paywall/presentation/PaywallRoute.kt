@@ -9,6 +9,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.paywall.data.PaywallConfig
 import kotlin.math.round
 import org.koin.compose.koinInject
@@ -54,14 +55,42 @@ private fun monthlyEquivalent(yearlyPriceString: String, yearlyPriceAmount: Doub
  */
 @Composable
 fun PaywallRoute(
-    viewModel: PaywallViewModel = koinViewModel(),
     onPurchaseSuccess: () -> Unit = {},
 ) {
     val analyticsTracker: AnalyticsTracker = koinInject()
+    val uriHandler = LocalUriHandler.current
+
+    // Web target replaces the paywall with an "install the mobile app" CTA:
+    // RevenueCat IAP isn't available in the browser. Done before VM injection
+    // so we don't spin up a PaywallViewModel + offerings flow we won't use.
+    if (isWebPaywallTarget) {
+        val navigator: AppNavigator = koinInject()
+        LaunchedEffect(Unit) {
+            analyticsTracker.screenView("paywall_web_install")
+        }
+        WebInstallAppScreen(
+            onClose = {
+                analyticsTracker.event(
+                    "paywall_web_install_closed",
+                    emptyMap(),
+                )
+                navigator.onBack()
+            },
+            onInstallAndroidClick = {
+                analyticsTracker.event(
+                    "paywall_web_install_android_clicked",
+                    mapOf("destination" to "google_play"),
+                )
+                uriHandler.openUri(GISTI_GOOGLE_PLAY_URL)
+            },
+        )
+        return
+    }
+
     LaunchedEffect(Unit) { analyticsTracker.screenView("paywall") }
 
+    val viewModel: PaywallViewModel = koinViewModel()
     val state by viewModel.screenState.collectAsStateWithLifecycle()
-    val uriHandler = LocalUriHandler.current
 
     // Navigate away on purchase success (handled by ViewModel in Phase 2)
     LaunchedEffect(state.purchaseSuccess) {
