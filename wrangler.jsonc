@@ -1,6 +1,6 @@
 // Cloudflare Worker configuration for the Gisti AI Checklists wasmJs build.
 //
-// Production URL: https://checklists.churaevanton.workers.dev/
+// Production URL: https://checklists.gisti.workers.dev/
 //
 // Worker type: Static Assets only — no `main` script, no Worker code at runtime.
 // Cloudflare serves files from `assets.directory` and falls back to `index.html`
@@ -8,7 +8,7 @@
 //
 // Deploy strategy (Cloudflare Workers Builds):
 //   - Push to `master` triggers `npx wrangler deploy` → production
-//     (https://checklists.churaevanton.workers.dev/).
+//     (https://checklists.gisti.workers.dev/).
 //   - Push to other branches triggers `npx wrangler versions upload` → preview URL.
 //     See: https://developers.cloudflare.com/workers/ci-cd/builds/build-branches/
 //

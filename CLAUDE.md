@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | Target | Status | Where |
 |--------|--------|-------|
 | Android | Production | Google Play |
-| Web (wasmJs) | Production | <https://checklists.churaevanton.workers.dev/> (Cloudflare Workers Static Assets) |
+| Web (wasmJs) | Production | <https://checklists.gisti.workers.dev/> (Cloudflare Workers Static Assets) |
 | iOS | Code-only, not released | — |
 
 > **iOS release strategy**: iOS version will be published after Android revenue covers the Apple Developer Program fee ($99/year). Until then, iOS target exists in code but is not actively released.
@@ -87,7 +87,7 @@ Available emulators: `Pixel_9`, `Medium_Phone_API_36.1`
 
 ### Deploying Web (Cloudflare Workers)
 
-Production site: <https://checklists.churaevanton.workers.dev/>
+Production site: <https://checklists.gisti.workers.dev/>
 
 ```bash
 ./gradlew composeApp:wasmJsBrowserDistribution        # Build production wasm bundle (~26 MB)
