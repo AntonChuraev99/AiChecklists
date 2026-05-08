@@ -19,6 +19,10 @@ captures
 node_modules/
 claude.bat
 
+# Cloudflare Workers (Static Assets) deploy
+.wrangler/
+.ci-cache/
+
 # Temp files
 tmpclaude-*
 nul

@@ -1,0 +1,26 @@
+// Cloudflare Worker configuration for the Gisti AI Checklists wasmJs build.
+//
+// Worker type: Static Assets only — no `main` script, no Worker code at runtime.
+// Cloudflare serves files from `assets.directory` and falls back to `index.html`
+// for unknown paths (SPA routing via `not_found_handling`).
+//
+// Deploy strategy (Cloudflare Workers Builds):
+//   - Push to `master` triggers `npx wrangler deploy` → production
+//     (https://gisti-app-web.<account>.workers.dev or custom domain).
+//   - Push to other branches triggers `npx wrangler versions upload` → preview URL.
+//     See: https://developers.cloudflare.com/workers/ci-cd/builds/build-branches/
+//
+// Local deploy: `./gradlew composeApp:wasmJsBrowserDistribution && npx wrangler@4 deploy`.
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "gisti-app-web",
+	"compatibility_date": "2026-05-08",
+	"preview_urls": true,
+	"assets": {
+		"directory": "./composeApp/build/dist/wasmJs/productionExecutable",
+		"not_found_handling": "single-page-application"
+	},
+	"observability": {
+		"enabled": true
+	}
+}
