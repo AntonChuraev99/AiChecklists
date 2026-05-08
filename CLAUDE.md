@@ -4,9 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Gisti - AI Checklists** is a Kotlin Multiplatform (KMP) application for Android and iOS. Built with Jetpack Compose Multiplatform.
+**Gisti - AI Checklists** is a Kotlin Multiplatform (KMP) application for Android, iOS, and Web. Built with Jetpack Compose Multiplatform.
+
+| Target | Status | Where |
+|--------|--------|-------|
+| Android | Production | Google Play |
+| Web (wasmJs) | Production | <https://checklists.churaevanton.workers.dev/> (Cloudflare Workers Static Assets) |
+| iOS | Code-only, not released | — |
 
 > **iOS release strategy**: iOS version will be published after Android revenue covers the Apple Developer Program fee ($99/year). Until then, iOS target exists in code but is not actively released.
+
+> **Web release strategy**: web target uses Compose Multiplatform's wasmJs renderer (Skiko canvas), Room 3.0 with the SQLite OPFS Web Worker driver for persistence, and the Firebase JS SDK (loaded as ESM modules) for Auth/Remote Config/Analytics. AI flow goes through CORS-enabled Cloud Functions; direct Gemini calls from the browser are not allowed.
 
 ### Public Repository
 
@@ -56,10 +64,12 @@ Gisti transforms any content into actionable checklists using AI:
 ## Build Commands
 
 ```bash
-./gradlew build                           # Full build for all targets
-./gradlew composeApp:assembleDebug        # Android debug APK
-./gradlew composeApp:bundleRelease        # Android release bundle
-./gradlew composeApp:connectedAndroidTest # Run Android instrumented tests
+./gradlew build                                       # Full build for all targets
+./gradlew composeApp:assembleDebug                    # Android debug APK
+./gradlew composeApp:bundleRelease                    # Android release bundle
+./gradlew composeApp:connectedAndroidTest             # Run Android instrumented tests
+./gradlew composeApp:wasmJsBrowserDevelopmentRun --continuous  # Web dev server on http://localhost:9090/
+./gradlew composeApp:wasmJsBrowserDistribution        # Web production bundle (Cloudflare Workers asset dir)
 ```
 
 For iOS, open `iosApp/iosApp.xcodeproj` in Xcode.
@@ -75,13 +85,31 @@ adb shell am start -n com.antonchuraev.aichecklists/com.antonchuraev.homesearchc
 
 Available emulators: `Pixel_9`, `Medium_Phone_API_36.1`
 
+### Deploying Web (Cloudflare Workers)
+
+Production site: <https://checklists.churaevanton.workers.dev/>
+
+```bash
+./gradlew composeApp:wasmJsBrowserDistribution        # Build production wasm bundle (~26 MB)
+npx wrangler@4 deploy                                 # Push to Cloudflare Workers (Static Assets only)
+```
+
+CI/CD: pushes to `master` trigger `npx wrangler deploy` → production; pushes to other branches trigger `npx wrangler versions upload` → preview URL. Configuration lives in `wrangler.jsonc` (Worker name `checklists`, asset directory `composeApp/build/dist/wasmJs/productionExecutable`, SPA fallback via `not_found_handling: single-page-application`).
+
+Before deploying: ensure `local.properties` has `FIREBASE_WEB_API_KEY` + `FIREBASE_WEB_APP_ID` so the build-time `generateWasmInitJs` Gradle task can substitute them into `init.js`. Cloud Functions must be deployed with CORS-aware handlers (`firebase deploy --only functions:analyze_and_fill_checklist,functions:generate_checklist,functions:register_user,functions:restore_credits_after_purchase,functions:get_usage_stats,functions:get_credits_info`).
+
 ## Architecture
 
 ### Module Structure
 
 ```
-composeApp/              # Main application entry points (Android/iOS)
-  widget/                # Glance home screen widget
+composeApp/              # Main application entry points (Android/iOS/wasmJs)
+  androidMain/           # Android-specific (widget, notifications, AlarmManager, in-app review)
+  iosMain/               # iOS-specific (UIKit bridges, native sharing)
+  wasmJsMain/            # Web-specific (Firebase JS SDK init, OPFS Room driver, browser pickers)
+    resources/
+      init.js.template   # Firebase JS SDK ESM init + globalThis bridges (file picker, share, print)
+  widget/                # Glance home screen widget (Android only)
   csat/                  # Customer satisfaction survey + in-app review
   notification/          # Reminder scheduling
 
@@ -141,7 +169,7 @@ ShareChecklist(checklistId)
 
 ### Database
 
-Room 2.8 with KSP. Database classes in `feature:checklist`. Platform-specific `DatabaseBuilder` uses `expect/actual`.
+Room 3.0 with KSP across all targets (Android, iOS, wasmJs). Database classes in `feature:checklist`. Platform-specific `DatabaseBuilder` uses `expect/actual`. Web target uses `WebWorkerSQLiteDriver` over OPFS for persistence (survives page reload). Android/iOS use the standard bundled SQLite driver.
 
 ## Design System
 
