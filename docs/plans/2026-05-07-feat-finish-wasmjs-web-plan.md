@@ -1,9 +1,45 @@
 # Plan — Finish wasmJs Web Target
 
-**Branch:** `add-web-wasmjs-target`
+**Branch:** `add-web-wasmjs-target` (merged to `master`)
 **Created:** 2026-05-07
+**Closed:** 2026-05-08
+**Status:** ✅ **COMPLETED — production live at <https://checklists.churaevanton.workers.dev/>**
+
+---
+
+## ✅ Final outcome (2026-05-08)
+
+Production deploy ended up on **Cloudflare Workers Static Assets**, not on Firebase Hosting (the original Phase 9 target). Cloudflare turned out simpler for this project — no `firebase init hosting` ceremony, single `wrangler.jsonc` config, automatic CI/CD on push to `master` via Cloudflare Workers Builds.
+
+What actually shipped:
+
+1. **Cloud Functions (CORS-aware) deployed.** `analyze_and_fill_checklist`, `generate_checklist`, `register_user`, `restore_credits_after_purchase`, `get_usage_stats`, `get_credits_info` all return CORS headers via the shared `create_error_response` / `create_success_response` helpers (commit `c3761e53`).
+2. **Web AI + Sharing flows verified manually in Chrome.** AI photo/text/PDF analyze works; Plain Text share falls back to clipboard on desktop / native share sheet on mobile; PDF print opens the browser print dialog with cleanly-formatted A4.
+3. **Cloudflare Workers config committed** as `wrangler.jsonc` (commits `5fe09493`, `bc3ca480`). Worker name `checklists`, asset directory `composeApp/build/dist/wasmJs/productionExecutable`, SPA routing via `not_found_handling: single-page-application`, observability enabled.
+4. **CI/CD wired through Cloudflare Workers Builds.** Push to `master` → `npx wrangler deploy` → production. Push to any other branch → `npx wrangler versions upload` → preview URL.
+5. **All Phase 1–9 work merged to `master`** (PR #7).
+
+### What changed vs the original plan
+
+| Original Phase 9 (Firebase Hosting) | Actual Phase 9 (Cloudflare Workers) |
+|---|---|
+| `firebase init hosting` + `firebase.json` with COOP/COEP/CORP headers | `wrangler.jsonc` with assets + SPA fallback; CF provides cross-origin headers by default |
+| `firebase deploy --only hosting` | `npx wrangler@4 deploy` |
+| Domain: `aichecklists-40230.web.app` | Domain: `checklists.churaevanton.workers.dev` |
+| No native CI/CD | Cloudflare Workers Builds — push-to-deploy on `master`, preview URLs on branches |
+
+Firebase Hosting was not blocked technically — Cloudflare was just a faster path to a public URL with build automation included. Firebase Hosting can still be added later if a custom domain on the Firebase project becomes the preference.
+
+### Permanent solution doc
+
+See `docs/solutions/features/wasmjs-web-target-cloudflare-2026-05-08.md` for the deploy playbook, wrangler config notes, and gotchas (wasm bundle size, COOP/COEP behavior on Workers, build-time secrets injection).
+
+---
+
+## Historical record (this file picks up exactly where the prior session left off — kept for archaeology)
+
 **Last session ended:** 2026-05-07 evening (Phase 4 + Phase 8 done — code complete, doc complete; не закоммичено)
-**Status:** Phase 1–8 complete. **Phase 9 + manual verification pending.** Working copy has 6 modified files (not yet committed).
+**Working copy at end of 2026-05-07 session:** Phase 1–8 complete; Phase 9 + manual verification pending; 6 modified files not yet committed.
 
 This file picks up exactly where the prior session left off. Hand it to the next agent verbatim.
 
