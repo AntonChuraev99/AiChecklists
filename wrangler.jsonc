@@ -13,7 +13,7 @@
 // Local deploy: `./gradlew composeApp:wasmJsBrowserDistribution && npx wrangler@4 deploy`.
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "gisti-app-web",
+	"name": "checklists",
 	"compatibility_date": "2026-05-08",
 	"preview_urls": true,
 	"assets": {
