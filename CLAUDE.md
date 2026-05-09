@@ -279,6 +279,46 @@ Column(modifier = Modifier.padding(horizontal = AppDimens.ScreenPaddingHorizonta
 }
 ```
 
+### Per-Item Actions Belong in `ItemDetailsSheet`
+
+**RULE**: Any new per-item action, toggle, or setting (priority/star, due date, tags, color, archive, etc.) MUST be added as a row in `ItemDetailsSheet` — NOT as a button on `ChecklistItemCard`.
+
+**Why**: `ChecklistItemCard` uses a 30/70 hit-zone split (left 30% toggles checkbox, right 70% opens `ItemDetailsSheet`). Adding new clickable elements to the card breaks this pattern, eats touch targets, and turns the card into Frankenstein UI as features accumulate. See `docs/solutions/ui-improvements/checklist-item-card-sheet-redesign-2026-05-05.md`.
+
+**On the card itself, only lightweight visual indicators are allowed:**
+- Reminder chip (existing)
+- Priority/star icon (read-only — tap opens sheet to toggle)
+- Tag color stripe (future)
+
+**These indicators MUST NOT have their own `clickable` modifier or hit-zone.** They are read-only signals; toggling happens inside the sheet.
+
+```kotlin
+// CORRECT: indicator is visual only, sheet handles toggle
+Row {
+    Text(item.text)
+    if (item.priority > 0) Icon(Icons.Filled.Star, null)  // no clickable
+}
+
+// WRONG: button on card, breaks 30/70 hit-zone
+Row {
+    Text(item.text)
+    IconButton(onClick = onToggleStar) { Icon(Icons.Filled.Star, null) }
+}
+```
+
+**For the action itself — add a row in `ItemDetailsSheet`:**
+```kotlin
+ItemDetailsSheet(...) {
+    Row(...)  // Reminder
+    Row(...)  // Note
+    Row(onClick = onTogglePriority) {  // ← new actions go HERE
+        Icon(Icons.Filled.Star, null)
+        Text(if (item.priority > 0) "Remove importance" else "Mark as important")
+    }
+    Row(...)  // Delete
+}
+```
+
 ## Features
 
 ### AI Analyze (`feature/analyze/`)

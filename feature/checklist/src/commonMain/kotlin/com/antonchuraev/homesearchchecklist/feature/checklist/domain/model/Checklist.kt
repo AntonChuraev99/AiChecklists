@@ -30,6 +30,7 @@ data class Checklist(
  * Single item in a checklist template
  * id is auto-generated for stable LazyColumn keys
  * weekday: ISO day-of-week (1=Mon..7=Sun), non-null only when checklist viewMode=Weekly
+ * priority: 0=normal, 1=starred (important). Higher values reserved for future use.
  */
 @ConsistentCopyVisibility
 @Serializable
@@ -37,20 +38,25 @@ data class ChecklistItem private constructor(
     val text: String,
     val checked: Boolean = false,
     val id: String = generateId(),
-    val weekday: Int? = null
+    val weekday: Int? = null,
+    val priority: Int = 0
 ) {
-    constructor(text: String, checked: Boolean = false, weekday: Int? = null) : this(
+    constructor(text: String, checked: Boolean = false, weekday: Int? = null, priority: Int = 0) : this(
         text = text,
         checked = checked,
         id = generateId(),
-        weekday = weekday
+        weekday = weekday,
+        priority = priority
     )
 
-    /** Update text while preserving id, checked state, and weekday */
-    fun withText(text: String) = ChecklistItem(text, checked, id, weekday)
+    /** Update text while preserving id, checked state, weekday, and priority */
+    fun withText(text: String) = ChecklistItem(text, checked, id, weekday, priority)
 
-    /** Update weekday while preserving id, text, and checked state */
-    fun withWeekday(weekday: Int?) = ChecklistItem(text, checked, id, weekday)
+    /** Update weekday while preserving id, text, checked state, and priority */
+    fun withWeekday(weekday: Int?) = ChecklistItem(text, checked, id, weekday, priority)
+
+    /** Toggle priority between 0 (normal) and 1 (starred), preserving all other fields */
+    fun withPriority(priority: Int) = ChecklistItem(text, checked, id, weekday, priority)
 
     companion object {
         private fun generateId() = "${currentTimeMillis()}_${Random.nextInt(0, 10000)}"
@@ -77,6 +83,7 @@ data class ChecklistFill(
  * Item state in a filled checklist
  * id is auto-generated for stable LazyColumn keys
  * weekday: ISO day-of-week (1=Mon..7=Sun), non-null only when checklist viewMode=Weekly
+ * priority: 0=normal, 1=starred (important). Higher values reserved for future use.
  *
  * Per-item reminder fields mirror the checklist-level fields in [Checklist]:
  * - [reminderAt]: one-shot trigger epoch millis; null = no pending one-shot
@@ -93,6 +100,7 @@ data class ChecklistFillItem private constructor(
     val note: String? = null,
     val id: String = generateId(),
     val weekday: Int? = null,
+    val priority: Int = 0,
     // ── Per-item reminder fields ──
     val reminderAt: Long? = null,
     val repeatRule: ReminderRepeatRule? = null,
@@ -104,36 +112,44 @@ data class ChecklistFillItem private constructor(
         text: String,
         checked: Boolean,
         note: String? = null,
-        weekday: Int? = null
+        weekday: Int? = null,
+        priority: Int = 0
     ) : this(
         text = text,
         checked = checked,
         note = note,
         id = generateId(),
-        weekday = weekday
+        weekday = weekday,
+        priority = priority
     )
 
-    /** Update checked state while preserving id, weekday, and reminder fields */
+    /** Update checked state while preserving id, weekday, priority, and reminder fields */
     fun withChecked(checked: Boolean) = ChecklistFillItem(
-        text, checked, note, id, weekday,
+        text, checked, note, id, weekday, priority,
         reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount
     )
 
-    /** Update note while preserving id, weekday, and reminder fields */
+    /** Update note while preserving id, weekday, priority, and reminder fields */
     fun withNote(note: String?) = ChecklistFillItem(
-        text, checked, note, id, weekday,
+        text, checked, note, id, weekday, priority,
         reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount
     )
 
-    /** Update weekday while preserving id, text, checked state, note, and reminder fields */
+    /** Update weekday while preserving id, text, checked state, note, priority, and reminder fields */
     fun withWeekday(weekday: Int?) = ChecklistFillItem(
-        text, checked, note, id, weekday,
+        text, checked, note, id, weekday, priority,
+        reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount
+    )
+
+    /** Toggle priority between 0 (normal) and 1 (starred); preserves all other fields */
+    fun withPriority(priority: Int) = ChecklistFillItem(
+        text, checked, note, id, weekday, priority,
         reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount
     )
 
     /** Set or clear the one-shot reminder timestamp; preserves all other fields */
     fun withReminderAt(reminderAt: Long?) = ChecklistFillItem(
-        text, checked, note, id, weekday,
+        text, checked, note, id, weekday, priority,
         reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount
     )
 
@@ -143,19 +159,19 @@ data class ChecklistFillItem private constructor(
         timeOfDayMinutes: Int,
         nextAt: Long
     ) = ChecklistFillItem(
-        text, checked, note, id, weekday,
+        text, checked, note, id, weekday, priority,
         reminderAt, rule, timeOfDayMinutes, nextAt, repeatOccurrenceCount
     )
 
     /** Advance the repeat schedule to the next trigger; preserves all other fields */
     fun withRepeatAdvanced(nextAt: Long?, newCount: Int) = ChecklistFillItem(
-        text, checked, note, id, weekday,
+        text, checked, note, id, weekday, priority,
         reminderAt, repeatRule, repeatTimeOfDayMinutes, nextAt, newCount
     )
 
     /** Clear all reminder data (both one-shot and repeat) while preserving all other fields */
     fun withReminderCleared() = ChecklistFillItem(
-        text, checked, note, id, weekday,
+        text, checked, note, id, weekday, priority,
         reminderAt = null,
         repeatRule = null,
         repeatTimeOfDayMinutes = null,

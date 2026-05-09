@@ -67,26 +67,32 @@ class TodayViewModel(
     private fun mapToState(infos: List<TodayReminderInfo>): TodayScreenState {
         if (infos.isEmpty()) return TodayScreenState.Empty
 
-        // Build display items, keeping reminderAt for sorting via a parallel list.
-        // We cannot add a field to TodayReminderItem (defined by mobile-design), so we
-        // carry reminderAt alongside in a Pair and strip it after sorting.
-        val pastDuePairs = mutableListOf<Pair<TodayReminderItem, Long>>()
-        val todayFuturePairs = mutableListOf<Pair<TodayReminderItem, Long>>()
+        // Build display items, carrying reminderAt and priority for sorting alongside.
+        // TodayReminderItem (defined by mobile-design) does not expose these fields,
+        // so we use a Triple<TodayReminderItem, reminderAt, priority> and strip the
+        // sort keys after ordering each bucket.
+        // Sort contract (per spec):
+        //   1. Within group: priority DESC (starred first).
+        //   2. Then: reminderAt ASC (earliest first within the same priority tier).
+        val pastDueTriples  = mutableListOf<Triple<TodayReminderItem, Long, Int>>()
+        val todayFutureTriples = mutableListOf<Triple<TodayReminderItem, Long, Int>>()
 
         for (info in infos) {
             val item = info.toDisplayItem()
-            val pair = item to info.reminderAt
-            if (item.isPastDue) pastDuePairs.add(pair) else todayFuturePairs.add(pair)
+            val triple = Triple(item, info.reminderAt, info.priority)
+            if (item.isPastDue) pastDueTriples.add(triple) else todayFutureTriples.add(triple)
         }
 
-        // Sort each bucket ascending by reminderAt (earliest first)
-        pastDuePairs.sortBy { it.second }
-        todayFuturePairs.sortBy { it.second }
+        val comparator = compareByDescending<Triple<TodayReminderItem, Long, Int>> { it.third }
+            .thenBy { it.second }
+
+        pastDueTriples.sortWith(comparator)
+        todayFutureTriples.sortWith(comparator)
 
         return TodayScreenState.Success(
             dateLabel = buildDateLabel(nowMs),
-            pastDue = pastDuePairs.map { it.first },
-            today = todayFuturePairs.map { it.first },
+            pastDue = pastDueTriples.map { it.first },
+            today = todayFutureTriples.map { it.first },
         )
     }
 

@@ -1,8 +1,8 @@
 package com.antonchuraev.homesearchchecklist.feature.checklist.domain.usecase
 
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
-import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistReminderInfo
-import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistRepeatInfo
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistReminderInfo
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistRepeatInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ItemReminderInfo
@@ -85,6 +85,7 @@ class RecoverRecurringRemindersUseCaseTest {
         override suspend fun getAllItemRemindersForRescheduling(): List<ItemReminderInfo> = emptyList()
         override fun observeRemindersInRange(fromMs: Long, toMs: Long): Flow<List<com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo>> = flowOf(emptyList())
         override suspend fun getRemindersInRange(fromMs: Long, toMs: Long): List<com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo> = emptyList()
+        override suspend fun togglePriority(fillId: Long, itemId: String): Result<Unit> = Result.success(Unit)
     }
 
     // ─── Tests ────────────────────────────────────────────────────────

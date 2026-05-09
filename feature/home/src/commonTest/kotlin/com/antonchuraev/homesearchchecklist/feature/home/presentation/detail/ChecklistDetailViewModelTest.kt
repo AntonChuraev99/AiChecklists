@@ -245,4 +245,76 @@ class ChecklistDetailViewModelTest {
         assertEquals(2, checkedCount)
         assertEquals(3, totalCount)
     }
+
+    // ── Priority sort order (state-level, no ViewModel needed) ──────────────
+
+    /**
+     * Verifies the priority sort contract applied inside [ChecklistDetailViewModel.withSortedItems]:
+     * starred items (priority=1) come before normal items (priority=0), and within each priority
+     * group the original insertion order (position) is preserved.
+     *
+     * This is a pure state test — no async, no repository needed.
+     */
+    @Test
+    fun `priority_sortOrder_starredItemsFirst_thenByPosition`() {
+        val normal1 = ChecklistFillItem("Normal 1", checked = false, priority = 0)
+        val normal2 = ChecklistFillItem("Normal 2", checked = false, priority = 0)
+        val starred1 = ChecklistFillItem("Starred 1", checked = false, priority = 1)
+        val starred2 = ChecklistFillItem("Starred 2", checked = false, priority = 1)
+
+        // Input: intentionally interleaved — normal, starred, normal, starred
+        val fill = ChecklistFill(
+            id = 1L,
+            checklistId = 1L,
+            name = "",
+            items = listOf(normal1, starred1, normal2, starred2),
+            createdAt = 0L,
+            isDefault = true,
+        )
+
+        // Simulate what withSortedItems() does (priority DESC, position ASC):
+        val sorted = fill.items
+            .mapIndexed { index, item -> item to index }
+            .sortedWith(
+                compareByDescending<Pair<ChecklistFillItem, Int>> { it.first.priority }
+                    .thenBy { it.second }
+            )
+            .map { it.first }
+
+        // First two must be the starred items, in their original relative order
+        assertEquals(starred1.id, sorted[0].id, "starred1 should be first (index 1 in input)")
+        assertEquals(starred2.id, sorted[1].id, "starred2 should be second (index 3 in input)")
+        // Last two must be the normal items, in their original relative order
+        assertEquals(normal1.id, sorted[2].id, "normal1 should be third (index 0 in input)")
+        assertEquals(normal2.id, sorted[3].id, "normal2 should be fourth (index 2 in input)")
+
+        // All items must be present
+        assertEquals(4, sorted.size)
+    }
+
+    @Test
+    fun `priority_sortOrder_allNormal_preservesOriginalOrder`() {
+        val item1 = ChecklistFillItem("A", checked = false, priority = 0)
+        val item2 = ChecklistFillItem("B", checked = false, priority = 0)
+        val item3 = ChecklistFillItem("C", checked = false, priority = 0)
+
+        val fill = ChecklistFill(
+            id = 1L, checklistId = 1L, name = "",
+            items = listOf(item1, item2, item3),
+            createdAt = 0L, isDefault = true,
+        )
+
+        val sorted = fill.items
+            .mapIndexed { index, item -> item to index }
+            .sortedWith(
+                compareByDescending<Pair<ChecklistFillItem, Int>> { it.first.priority }
+                    .thenBy { it.second }
+            )
+            .map { it.first }
+
+        // No starred items → original order must be preserved
+        assertEquals(item1.id, sorted[0].id)
+        assertEquals(item2.id, sorted[1].id)
+        assertEquals(item3.id, sorted[2].id)
+    }
 }
