@@ -6,8 +6,8 @@ import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.core.navigation.api.NavCommand
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
-import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistReminderInfo
-import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistRepeatInfo
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistReminderInfo
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistRepeatInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ItemReminderInfo
@@ -185,6 +185,7 @@ class UpdateFeedViewModelTest {
         override suspend fun getWeeklyChecklistCount(): Int = weeklyCount
         override suspend fun getAllItemRemindersForRescheduling(): List<ItemReminderInfo> = emptyList()
         override suspend fun getRemindersInRange(fromMs: Long, toMs: Long): List<TodayReminderInfo> = emptyList()
+        override suspend fun togglePriority(fillId: Long, itemId: String): Result<Unit> = Result.success(Unit)
         override fun observeRemindersInRange(fromMs: Long, toMs: Long): Flow<List<TodayReminderInfo>> = flowOf(emptyList())
     }
 

@@ -7,8 +7,8 @@ import com.antonchuraev.homesearchchecklist.core.navigation.api.NavCommand
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDefaults
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigKeys
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
-import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistReminderInfo
-import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistRepeatInfo
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistReminderInfo
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistRepeatInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
@@ -357,6 +357,9 @@ class CreateChecklistViewModelTest {
         override suspend fun resetDefaultFillChecks(checklistId: Long) = notUsed()
         override suspend fun countActiveRepeatSchedules(): Int = 0
         override suspend fun getActiveRepeatSchedules(): List<ChecklistRepeatInfo> = emptyList()
+        override fun observeRemindersInRange(fromMs: Long, toMs: Long): Flow<List<com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo>> = kotlinx.coroutines.flow.flowOf(emptyList())
+        override suspend fun getRemindersInRange(fromMs: Long, toMs: Long): List<com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo> = emptyList()
+        override suspend fun togglePriority(fillId: Long, itemId: String): Result<Unit> = Result.success(Unit)
         override suspend fun getPastDueRepeatSchedules(nowMillis: Long): List<ChecklistRepeatInfo> = emptyList()
 
         override suspend fun getTotalAdditionalFillCount(): Int = 0

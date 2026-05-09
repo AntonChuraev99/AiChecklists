@@ -299,6 +299,11 @@
     <string name="detail_item_sheet_action_delete">Delete item</string>
     <string name="detail_item_sheet_subtitle_no_reminder">Tap to set</string>
     <string name="detail_item_sheet_subtitle_no_note">Tap to add</string>
+
+    <!-- Item priority (star) -->
+    <string name="item_priority_mark">Mark as important</string>
+    <string name="item_priority_unmark">Remove importance</string>
+    <string name="item_priority_action">Important</string>
     <string name="fill_note_placeholder">Add a note about this item...</string>
     <string name="fill_cover_change">Change Cover</string>
     <string name="fill_cover_remove">Remove Cover</string>
@@ -321,7 +326,7 @@
 
     <!-- AI Credits -->
     <string name="credits_display">%1$d credits</string>
-    <string name="credits_get_more">Get More</string>
+    <string name="credits_get_more">Get More Credits</string>
     <string name="credits_your_credits">Your AI Credits</string>
     <string name="credits_refill_info">Refills daily at 12:00 CET</string>
     <string name="credits_refill_to">up to %1$d</string>

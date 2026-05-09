@@ -3,8 +3,8 @@ package com.antonchuraev.homesearchchecklist.feature.home.presentation.today
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.core.navigation.api.NavCommand
-import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistReminderInfo
-import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistRepeatInfo
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistReminderInfo
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistRepeatInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ItemReminderInfo
@@ -127,6 +127,7 @@ private class FakeRepository(
         flowOf(remindersInRange)
     override suspend fun getRemindersInRange(fromMs: Long, toMs: Long): List<TodayReminderInfo> =
         remindersInRange
+    override suspend fun togglePriority(fillId: Long, itemId: String): Result<Unit> = Result.success(Unit)
 }
 
 // ─── Helpers for building test data ─────────────────────────────────────────
@@ -376,5 +377,90 @@ class TodayViewModelTest {
 
         assertTrue(navigator.navigatedFillIds.isEmpty())
         assertTrue(navigator.navigatedChecklistIds.isEmpty())
+    }
+
+    // ── 12. Priority sort: starred items float to top within same group ──────
+
+    /**
+     * Verifies that within the past-due group (or future-today group), item-level reminders
+     * with priority=1 appear before those with priority=0.
+     *
+     * Both reminders are past-due (before TEST_NOW_MS = 12:00 UTC):
+     *   - starredReminder at 08:00 UTC  (priority=1)
+     *   - normalReminder  at 09:00 UTC  (priority=0)
+     *
+     * Without priority sort the output order would be [08:00, 09:00] (both ascending).
+     * With priority sort: starred (priority=1) floats first regardless of reminderAt.
+     * We deliberately give starred an EARLIER reminderAt to confirm priority beats time:
+     * both would appear in the same order either way. So we use:
+     *   - normalReminder  at 07:00 UTC  (priority=0, earlier time)
+     *   - starredReminder at 09:00 UTC  (priority=1, later time)
+     * Expected output: [starredReminder, normalReminder] — priority DESC wins over reminderAt.
+     */
+    @Test
+    fun priority_sortOrder_starredAboveNonStarred_withinSameGroup() = runTest {
+        // 07:00 UTC — earlier than 09:00, but this item is normal priority
+        val earlierTimeMs = 1_746_504_000_000L  // 2026-05-06 07:00 UTC (< TEST_NOW_MS → past-due)
+        // 09:00 UTC — later, but this item is starred
+        val laterTimeMs = PAST_DUE_MS            // 2026-05-06 09:00 UTC (< TEST_NOW_MS → past-due)
+
+        val repo = FakeRepository(
+            remindersInRange = listOf(
+                // normal item with earlier reminderAt (would appear first without priority sort)
+                // priority=0 by default in itemLevelReminder helper
+                itemLevelReminder(
+                    checklistId = 1L, fillId = 10L, itemId = "item_normal",
+                    itemText = "Normal task", reminderAt = earlierTimeMs, isRecurring = false,
+                ),
+                // starred item with later reminderAt
+                TodayReminderInfo.ItemLevel(
+                    checklistId = 2L,
+                    checklistName = "Work",
+                    fillId = 20L,
+                    itemId = "item_starred",
+                    itemText = "Starred task",
+                    reminderAt = laterTimeMs,
+                    isRecurring = false,
+                    priority = 1,
+                ),
+            )
+        )
+
+        val vm = TodayViewModel(repo, FakeNavigator())
+        val state = vm.awaitState()
+
+        assertIs<TodayScreenState.Success>(state)
+
+        // Both must be past-due (both before TEST_NOW_MS / current time at test run)
+        // Because TodayViewModel uses currentTimeMillis() for nowMs (live clock), we cannot
+        // guarantee which bucket they fall into — but the priority order must hold within
+        // whichever bucket they land in.
+        val allItems = state.pastDue + state.today
+        assertEquals(2, allItems.size, "Both reminders must appear in state")
+
+        // Find their positions
+        val starredIdx = allItems.indexOfFirst { it.id.contains("item_starred") }
+        val normalIdx  = allItems.indexOfFirst { it.id.contains("item_normal") }
+
+        assertTrue(starredIdx >= 0, "Starred item must be present")
+        assertTrue(normalIdx  >= 0, "Normal item must be present")
+
+        // If they are in the same bucket, starred must come before normal
+        val starredInPastDue = state.pastDue.any { it.id.contains("item_starred") }
+        val normalInPastDue  = state.pastDue.any { it.id.contains("item_normal") }
+        if (starredInPastDue && normalInPastDue) {
+            assertTrue(
+                starredIdx < normalIdx,
+                "Within past-due: starred (priority=1, later time) must precede normal (priority=0, earlier time)"
+            )
+        }
+        val starredInFuture = state.today.any { it.id.contains("item_starred") }
+        val normalInFuture  = state.today.any { it.id.contains("item_normal") }
+        if (starredInFuture && normalInFuture) {
+            assertTrue(
+                starredIdx < normalIdx,
+                "Within today-future: starred must precede normal"
+            )
+        }
     }
 }

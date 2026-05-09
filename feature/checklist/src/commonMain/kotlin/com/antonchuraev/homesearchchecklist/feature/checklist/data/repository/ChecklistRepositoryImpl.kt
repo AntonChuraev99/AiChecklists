@@ -198,6 +198,45 @@ class ChecklistRepositoryImpl(
         }
     }
 
+    // Priority
+
+    override suspend fun togglePriority(fillId: Long, itemId: String): Result<Unit> {
+        // 1. Load fill
+        val fillEntity = fillDao.getById(fillId)
+            ?: return Result.failure(IllegalStateException("Fill $fillId not found"))
+
+        // 2. Find and toggle the item in the fill
+        val itemIndex = fillEntity.items.indexOfFirst { it.id == itemId }
+        if (itemIndex == -1) {
+            return Result.failure(IllegalStateException("Item $itemId not found in fill $fillId"))
+        }
+
+        return runCatching {
+            val item = fillEntity.items[itemIndex]
+            val newPriority = if (item.priority == 0) 1 else 0
+            val updatedFillItems = fillEntity.items.toMutableList().also {
+                it[itemIndex] = item.withPriority(newPriority)
+            }
+
+            // 3. Persist updated fill
+            fillDao.insert(fillEntity.copy(items = updatedFillItems))
+
+            // 4. Dual update: sync priority to template items (matched by text)
+            // Template items use text as the stable key (same pattern as updateChecklist sync)
+            val checklistEntity = checklistDao.getById(fillEntity.checklistId)
+            if (checklistEntity != null) {
+                val updatedTemplateItems = checklistEntity.items.map { templateItem ->
+                    if (templateItem.text == item.text) {
+                        templateItem.withPriority(newPriority)
+                    } else {
+                        templateItem
+                    }
+                }
+                checklistDao.update(checklistEntity.copy(items = updatedTemplateItems))
+            }
+        }
+    }
+
     // Weekly mode
     override suspend fun getWeeklyChecklistCount(): Int {
         return checklistDao.getWeeklyChecklistCount()
@@ -336,6 +375,7 @@ class ChecklistRepositoryImpl(
                         itemText = item.text,
                         reminderAt = reminderAt,
                         isRecurring = false,
+                        priority = item.priority,
                     )
                 }
                 // Recurring
@@ -349,6 +389,7 @@ class ChecklistRepositoryImpl(
                         itemText = item.text,
                         reminderAt = repeatNextAt,
                         isRecurring = true,
+                        priority = item.priority,
                     )
                 }
             }

@@ -105,10 +105,11 @@ class ChecklistDetailViewModel(
         defaultFill: ChecklistFill?,
         additionalFillsCount: Int
     ) {
+        val sortedFill = defaultFill?.withSortedItems()
         val currentState = _screenState.value
         _screenState.value = if (currentState is ChecklistDetailState.Content) {
             currentState.copy(
-                defaultFill = defaultFill,
+                defaultFill = sortedFill,
                 additionalFillsCount = additionalFillsCount
             )
         } else {
@@ -116,13 +117,32 @@ class ChecklistDetailViewModel(
             // already emitted while state was still Loading.
             ChecklistDetailState.Content(
                 checklist = checklist,
-                defaultFill = defaultFill,
+                defaultFill = sortedFill,
                 additionalFillsCount = additionalFillsCount,
                 userLimits = _userLimits.value,
                 separateCompleted = checklist.separateCompleted,
                 autoDeleteCompleted = checklist.autoDeleteCompleted
             )
         }
+    }
+
+    /**
+     * Returns a copy of this fill with items sorted by priority DESC then by
+     * their original list position ASC (index in the list = position proxy).
+     *
+     * Starred items (priority = 1) float to the top; within each priority group
+     * the original insertion order is preserved. This sort is applied at the
+     * state-mapping layer only — the persisted fill order is not changed, so
+     * drag-to-reorder still works correctly (reorder writes orderedItemIds back
+     * to persistence and the next Room emission re-sorts for display).
+     */
+    private fun ChecklistFill.withSortedItems(): ChecklistFill {
+        val sorted = items
+            .mapIndexed { index, item -> item to index }
+            .sortedWith(compareByDescending<Pair<ChecklistFillItem, Int>> { it.first.priority }
+                .thenBy { it.second })
+            .map { it.first }
+        return if (sorted == items) this else copy(items = sorted)
     }
 
     override fun onIntent(intent: ChecklistDetailIntent) {
@@ -320,6 +340,9 @@ class ChecklistDetailViewModel(
                 updateContentState { it.copy(itemReminderSheetFor = null, itemReminderSheetLocked = false) }
                 navigator.navigateToPaywall(source = "detail_item_reminder_limit")
             }
+
+            // Priority
+            is ChecklistDetailIntent.OnToggleItemPriority -> toggleItemPriority(intent.itemId)
 
             // Per-item reminders
             is ChecklistDetailIntent.OnItemReminderClick -> handleItemReminderClick(intent.itemId)
@@ -1355,6 +1378,34 @@ class ChecklistDetailViewModel(
             analyticsTracker.event("item_reminder_removed", mapOf(
                 "checklist_id" to checklistId.toString()
             ))
+        }
+    }
+
+    // ─── Priority handler ──────────────────────────────────────────────────
+
+    /**
+     * Toggles the priority of a fill item between 0 (normal) and 1 (starred).
+     *
+     * Delegates to [ChecklistRepository.togglePriority] which performs the dual
+     * update (fill + template) atomically. On failure the error is logged and the
+     * UI is left unchanged — no destructive state change on error (same pattern
+     * as per-item reminders).
+     *
+     * The sheet is kept open so the user sees the icon update immediately via
+     * the Flow-driven state refresh from Room.
+     */
+    private fun toggleItemPriority(itemId: String) {
+        val state = _screenState.value as? ChecklistDetailState.Content ?: return
+        val fill = state.defaultFill ?: return
+
+        viewModelScope.launch {
+            val result = repository.togglePriority(fill.id, itemId)
+            result.onFailure { e ->
+                analyticsTracker.event(
+                    "item_priority_toggle_error",
+                    mapOf("item_id" to itemId, "error" to (e.message ?: "unknown"))
+                )
+            }
         }
     }
 

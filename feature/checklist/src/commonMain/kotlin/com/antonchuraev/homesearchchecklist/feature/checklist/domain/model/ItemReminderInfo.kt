@@ -4,7 +4,7 @@ package com.antonchuraev.homesearchchecklist.feature.checklist.domain.model
  * Lightweight projection used by [com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository.getAllItemRemindersForRescheduling]
  * and the Phase-2 BootCompletedReceiver to reschedule all per-item alarms after device reboot.
  *
- * Mirrors the structure of [com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistRepeatInfo]
+ * Mirrors the structure of [com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistRepeatInfo]
  * at the checklist level, but scoped to a specific fill item.
  *
  * @param checklistId  Parent checklist id — used for deep-link in the notification tap target.

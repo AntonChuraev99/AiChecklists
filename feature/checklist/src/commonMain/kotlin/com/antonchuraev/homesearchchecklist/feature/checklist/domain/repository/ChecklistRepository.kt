@@ -85,6 +85,17 @@ interface ChecklistRepository {
      */
     suspend fun getRemindersInRange(fromMs: Long, toMs: Long): List<TodayReminderInfo>
 
+    // Priority
+    /**
+     * Toggles the priority of a single fill item between 0 (normal) and 1 (starred).
+     *
+     * Performs a dual update: both the fill (for the detail screen) and the checklist template
+     * (for the edit screen) are updated atomically to keep them in sync.
+     *
+     * Returns [Result.failure] if the fill or item is not found.
+     */
+    suspend fun togglePriority(fillId: Long, itemId: String): Result<Unit>
+
     // Fills (instances)
     fun getFillsByChecklistId(checklistId: Long): Flow<List<ChecklistFill>>
     fun getDefaultFillByChecklistId(checklistId: Long): Flow<ChecklistFill?>

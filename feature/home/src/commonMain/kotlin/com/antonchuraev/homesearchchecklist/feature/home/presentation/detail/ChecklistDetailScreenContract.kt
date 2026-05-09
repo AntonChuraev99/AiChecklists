@@ -180,6 +180,9 @@ sealed interface ChecklistDetailIntent : Intent {
     data object OnReminderUpgradeClick : ChecklistDetailIntent
     data object OnItemReminderUpgradeClick : ChecklistDetailIntent
 
+    // Priority
+    data class OnToggleItemPriority(val itemId: String) : ChecklistDetailIntent
+
     // Per-item reminder intents
     data class OnItemReminderClick(val itemId: String) : ChecklistDetailIntent
     data class OnSaveItemReminder(

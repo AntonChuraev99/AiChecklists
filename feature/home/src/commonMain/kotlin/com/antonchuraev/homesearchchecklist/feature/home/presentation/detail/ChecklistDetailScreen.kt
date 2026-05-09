@@ -48,6 +48,8 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.CheckCircle
@@ -613,6 +615,7 @@ private fun ChecklistDetailContent(
             item = detailsItem,
             onReminderClick = { onIntent(ChecklistDetailIntent.OnItemReminderClick(detailsItem.id)) },
             onNoteClick = { onIntent(ChecklistDetailIntent.OnAddNoteClick(detailsItem.id)) },
+            onTogglePriority = { onIntent(ChecklistDetailIntent.OnToggleItemPriority(detailsItem.id)) },
             onDelete = { onIntent(ChecklistDetailIntent.OnDeleteItemFromSheet(detailsItem.id)) },
             onDismiss = { onIntent(ChecklistDetailIntent.OnDismissItemDetailsSheet) },
         )
@@ -1092,6 +1095,18 @@ internal fun ChecklistItemCard(
                         }
                     }
                 }
+                // Priority star — read-only indicator, vertically centered relative to whole card.
+                // No clickable modifier — toggling happens inside ItemDetailsSheet (30/70 hit-zone preserved).
+                if (!isEditMode && item.priority > 0) {
+                    Icon(
+                        imageVector = Icons.Filled.Star,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .padding(start = AppDimens.SpacingSm)
+                            .size(20.dp)
+                    )
+                }
             }
 
             // ── Tap overlay: invisible 30/70 split (above visual layer) ──
@@ -1173,6 +1188,7 @@ internal fun ItemDetailsSheet(
     item: ChecklistFillItem,
     onReminderClick: () -> Unit,
     onNoteClick: () -> Unit,
+    onTogglePriority: () -> Unit,
     onDelete: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -1245,6 +1261,28 @@ internal fun ItemDetailsSheet(
                 subtitle = noteSubtitle,
                 showChevron = true,
                 onClick = onNoteClick,
+            )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+            // ── Priority row ──
+            val isImportant = item.priority > 0
+            val priorityTitle = stringResource(
+                if (isImportant) Res.string.item_priority_unmark
+                else Res.string.item_priority_mark
+            )
+            val priorityIconTint = if (isImportant)
+                MaterialTheme.colorScheme.primary
+            else
+                MaterialTheme.colorScheme.onSurfaceVariant
+
+            ItemDetailsSheetRow(
+                icon = if (isImportant) Icons.Filled.Star else Icons.Outlined.Star,
+                iconTint = priorityIconTint,
+                title = priorityTitle,
+                subtitle = null,
+                showChevron = false,
+                onClick = onTogglePriority,
             )
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
