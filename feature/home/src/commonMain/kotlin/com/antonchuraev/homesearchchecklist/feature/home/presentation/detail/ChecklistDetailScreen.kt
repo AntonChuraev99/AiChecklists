@@ -1131,10 +1131,11 @@ internal fun ChecklistItemCard(
                         modifier = Modifier
                             .weight(0.70f)
                             .fillMaxHeight()
-                            .clickable(
+                            .combinedClickable(
                                 interactionSource = tapInteractionSource,
                                 indication = null,
-                                onClick = onItemTap
+                                onClick = onItemTap,
+                                onLongClick = onLongClick
                             )
                     )
                 }
