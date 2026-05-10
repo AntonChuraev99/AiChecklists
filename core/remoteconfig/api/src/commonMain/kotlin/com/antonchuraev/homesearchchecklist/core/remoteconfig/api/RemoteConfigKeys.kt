@@ -22,7 +22,7 @@ object RemoteConfigKeys {
     // Templates
     const val TEMPLATES_JSON = "templates_json"
 
-    // Onboarding type: "interactive" or "default"
+    // Onboarding type: "interactive" | "default" | "none" (none = skip to main)
     const val ONBOARDING = "onboarding"
 
     // Paywall A/B variant: "timeline_v1" | "features_v1" | "compare_v1"
@@ -56,7 +56,7 @@ object RemoteConfigDefaults {
     // Templates - default empty, populated from Remote Config
     const val TEMPLATES_JSON = ""
 
-    // Onboarding type: "interactive" or "default"
+    // Onboarding type: "interactive" | "default" | "none" (none = skip to main)
     const val ONBOARDING = "interactive"
 
     // Paywall A/B variant default

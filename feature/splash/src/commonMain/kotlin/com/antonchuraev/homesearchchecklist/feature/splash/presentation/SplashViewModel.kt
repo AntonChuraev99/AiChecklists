@@ -9,6 +9,7 @@ import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.Resto
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
+import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.CompleteOnboardingUseCase
 import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.GetOnboardingVariantUseCase
 import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.GetOnboardingVariantUseCase.OnboardingVariant
 import kotlinx.coroutines.CoroutineScope
@@ -27,6 +28,7 @@ class SplashViewModel(
     private val logger: AppLogger,
     private val analyticsTracker: AnalyticsTracker,
     private val getOnboardingVariant: GetOnboardingVariantUseCase,
+    private val completeOnboardingUseCase: CompleteOnboardingUseCase,
     private val remoteConfigProvider: RemoteConfigProvider
 ) : ViewModel() {
 
@@ -100,11 +102,18 @@ class SplashViewModel(
                     val variantName = when (variant) {
                         OnboardingVariant.INTERACTIVE -> "interactive"
                         OnboardingVariant.DEFAULT -> "slides"
+                        OnboardingVariant.NONE -> "none"
                     }
                     analyticsTracker.setUserProperties(mapOf("onboarding_type" to variantName))
                     when (variant) {
                         OnboardingVariant.INTERACTIVE -> navigateToInteractiveOnboarding()
                         OnboardingVariant.DEFAULT -> navigateToOnboarding()
+                        OnboardingVariant.NONE -> {
+                            // Skip onboarding entirely; persist as passed so future launches
+                            // bypass the variant check even if RC flips back to interactive/default.
+                            appScope.launch { runCatching { completeOnboardingUseCase() } }
+                            navigateToMainScreen(clearBackStack = true)
+                        }
                     }
                 }
             }

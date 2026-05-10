@@ -7,7 +7,7 @@ import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigPr
 class GetOnboardingVariantUseCase(
     private val remoteConfigProvider: RemoteConfigProvider
 ) {
-    enum class OnboardingVariant { DEFAULT, INTERACTIVE }
+    enum class OnboardingVariant { DEFAULT, INTERACTIVE, NONE }
 
     operator fun invoke(): OnboardingVariant {
         val type = remoteConfigProvider.getString(
@@ -16,11 +16,13 @@ class GetOnboardingVariantUseCase(
         )
         return when (type) {
             TYPE_INTERACTIVE -> OnboardingVariant.INTERACTIVE
+            TYPE_NONE -> OnboardingVariant.NONE
             else -> OnboardingVariant.DEFAULT
         }
     }
 
     companion object {
         private const val TYPE_INTERACTIVE = "interactive"
+        private const val TYPE_NONE = "none"
     }
 }

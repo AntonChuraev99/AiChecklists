@@ -14,6 +14,7 @@ import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.Resto
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.RegistrationData
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.UserData
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
+import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.CompleteOnboardingUseCase
 import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.GetOnboardingVariantUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -96,6 +97,7 @@ class SplashViewModelTest {
             logger = NoOpLogger(),
             analyticsTracker = NoOpAnalyticsTracker(),
             getOnboardingVariant = GetOnboardingVariantUseCase(noOpRemoteConfig),
+            completeOnboardingUseCase = CompleteOnboardingUseCase(fakeUserData),
             remoteConfigProvider = noOpRemoteConfig,
         )
     }
