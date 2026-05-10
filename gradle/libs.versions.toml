@@ -39,7 +39,7 @@ playReview = "2.0.2"
 kotlinxDatetime = "0.8.0"
 kotlinxDatetimeWasm = "0.8.0"
 amplitude = "1.22.4"
-reorderable = "2.4.3"
+reorderable = "3.1.0"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
