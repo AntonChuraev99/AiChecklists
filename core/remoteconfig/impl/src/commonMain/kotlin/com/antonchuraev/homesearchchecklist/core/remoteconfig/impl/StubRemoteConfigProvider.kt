@@ -16,6 +16,8 @@ class StubRemoteConfigProvider : RemoteConfigProvider {
         RemoteConfigKeys.AI_ANALYSIS_MAX_INPUT_LENGTH to RemoteConfigDefaults.AI_ANALYSIS_MAX_INPUT_LENGTH,
         RemoteConfigKeys.MIN_APP_VERSION to RemoteConfigDefaults.MIN_APP_VERSION,
         RemoteConfigKeys.MAINTENANCE_MODE to RemoteConfigDefaults.MAINTENANCE_MODE,
+        RemoteConfigKeys.PAYWALL_VARIANT to RemoteConfigDefaults.PAYWALL_VARIANT,
+        RemoteConfigKeys.PAYWALL_DEFAULT_PLAN to RemoteConfigDefaults.PAYWALL_DEFAULT_PLAN,
     )
 
     override suspend fun fetchAndActivate(): Boolean = true

@@ -45,7 +45,7 @@ class PaywallErrorTest {
     @Test
     fun paywallErrorCode_has_all_expected_values() {
         val codes = PaywallErrorCode.entries
-        assertEquals(9, codes.size)
+        assertEquals(10, codes.size)
         assertTrue(codes.contains(PaywallErrorCode.NETWORK_ERROR))
         assertTrue(codes.contains(PaywallErrorCode.OFFLINE))
         assertTrue(codes.contains(PaywallErrorCode.STORE_PROBLEM))
@@ -54,6 +54,26 @@ class PaywallErrorTest {
         assertTrue(codes.contains(PaywallErrorCode.INVALID_CREDENTIALS))
         assertTrue(codes.contains(PaywallErrorCode.PRODUCT_NOT_AVAILABLE))
         assertTrue(codes.contains(PaywallErrorCode.NOT_CONFIGURED))
+        assertTrue(codes.contains(PaywallErrorCode.BILLING_NOT_INITIALIZED))
         assertTrue(codes.contains(PaywallErrorCode.UNKNOWN))
+    }
+
+    @Test
+    fun paywallException_billingWasReady_defaults_to_false() {
+        val exception = PaywallException(
+            errorCode = PaywallErrorCode.BILLING_NOT_INITIALIZED,
+            message = "Not initialized"
+        )
+        assertEquals(false, exception.billingWasReady)
+    }
+
+    @Test
+    fun paywallException_billingWasReady_can_be_true() {
+        val exception = PaywallException(
+            errorCode = PaywallErrorCode.NETWORK_ERROR,
+            billingWasReady = true,
+            message = "Network error"
+        )
+        assertEquals(true, exception.billingWasReady)
     }
 }

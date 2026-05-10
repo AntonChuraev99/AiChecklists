@@ -9,13 +9,10 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Check
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
-import javax.inject.Singleton
-
 /**
  * Repository for widget data access.
  * CRITICAL: Always read progress from ChecklistFill, NOT from Checklist template!
  */
-@Singleton
 class WidgetRepository(
     private val checklistDao: ChecklistDao,
     private val fillDao: ChecklistFillDao

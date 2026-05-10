@@ -27,6 +27,11 @@ object RemoteConfigKeys {
 
     // Paywall A/B variant: "timeline_v1" | "features_v1" | "compare_v1"
     const val PAYWALL_VARIANT = "paywall_variant"
+
+    // Paywall default plan: "monthly" | "yearly" — controls which plan is pre-selected on open.
+    // Default is "monthly" so users in low-tier countries see $1.99 instead of $20/yr.
+    // Remotely switchable to "yearly" via Firebase RC for markets where yearly converts better.
+    const val PAYWALL_DEFAULT_PLAN = "paywall_default_plan"
 }
 
 /**
@@ -56,4 +61,7 @@ object RemoteConfigDefaults {
 
     // Paywall A/B variant default
     const val PAYWALL_VARIANT = "features_v1"
+
+    // Paywall default plan — "monthly" so low-tier markets see affordable price first.
+    const val PAYWALL_DEFAULT_PLAN = "monthly"
 }

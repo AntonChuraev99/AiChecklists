@@ -1,5 +1,6 @@
 package com.antonchuraev.homesearchchecklist.feature.paywall.data.repository
 
+import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.feature.paywall.data.PaywallConfig
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.Entitlements
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.LoginResult
@@ -19,6 +20,7 @@ import com.revenuecat.purchases.kmp.models.PurchasesError
 import com.revenuecat.purchases.kmp.models.PurchasesErrorCode
 import com.revenuecat.purchases.kmp.models.StoreProduct
 import com.revenuecat.purchases.kmp.models.StoreTransaction
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,7 +29,11 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.coroutines.resume
 
-class PaywallRepositoryImpl : PaywallRepository {
+private const val TAG = "PaywallRepository"
+
+class PaywallRepositoryImpl(
+    private val logger: AppLogger? = null,
+) : PaywallRepository {
 
     private val _subscriptionStatus = MutableStateFlow(SubscriptionStatus.FREE)
     override val subscriptionStatus: Flow<SubscriptionStatus> = _subscriptionStatus.asStateFlow()
@@ -60,12 +66,30 @@ class PaywallRepositoryImpl : PaywallRepository {
         listenerRegistered = true
     }
 
+    /**
+     * Waits for RevenueCat (and Play Billing underneath) to be fully initialized.
+     * Addresses the race condition where getOfferings() is called before Play Billing
+     * has established its service connection (BILLING_UNAVAILABLE in analytics).
+     * Exponential-ish backoff: 500ms, 1000ms, 1500ms.
+     */
+    private suspend fun awaitPurchasesReady(maxRetries: Int = 3): Boolean {
+        repeat(maxRetries) { attempt ->
+            if (isConfigured()) return true
+            val delayMs = 500L * (attempt + 1)
+            logger?.info(TAG, "[PAYWALL] Purchases not configured yet, attempt ${attempt + 1}/$maxRetries — waiting ${delayMs}ms")
+            delay(delayMs)
+        }
+        return isConfigured()
+    }
+
     override suspend fun getOfferings(): Result<PaywallOffering?> {
-        if (!isConfigured()) {
+        if (!awaitPurchasesReady()) {
+            logger?.warning(TAG, "[PAYWALL] getOfferings() aborted — Purchases not initialized after retries")
             return Result.failure(
                 PaywallException(
-                    errorCode = PaywallErrorCode.NOT_CONFIGURED,
-                    message = "RevenueCat not configured"
+                    errorCode = PaywallErrorCode.BILLING_NOT_INITIALIZED,
+                    billingWasReady = false,
+                    message = "RevenueCat not initialized after retries — Play Billing service may not be connected"
                 )
             )
         }
@@ -73,10 +97,14 @@ class PaywallRepositoryImpl : PaywallRepository {
         // Ensure listener is set up for pending purchase updates
         setupCustomerInfoListener()
 
+        logger?.info(TAG, "[PAYWALL] getOfferings() start")
+
         return suspendCancellableCoroutine { continuation ->
             Purchases.sharedInstance.getOfferings(
                 onError = { error ->
-                    continuation.resume(Result.failure(error.toPaywallException()))
+                    logger?.warning(TAG, "[PAYWALL] getOfferings() failed: ${error.code.name} / ${error.underlyingErrorMessage}")
+                    // billingWasReady=true here — awaitPurchasesReady() passed, error came from network/backend
+                    continuation.resume(Result.failure(error.toPaywallException(billingWasReady = true)))
                 },
                 onSuccess = { offerings ->
                     // Prefer named offering (PaywallConfig.OFFERING_ID) so the active
@@ -139,6 +167,9 @@ class PaywallRepositoryImpl : PaywallRepository {
                         )
                     }
 
+                    val skuIds = products.joinToString(",") { it.id }
+                    logger?.info(TAG, "[PAYWALL] getOfferings() success: offering=${currentOffering.identifier}, packages=${products.size}, skus=$skuIds")
+
                     continuation.resume(
                         Result.success(
                             PaywallOffering(
@@ -154,19 +185,27 @@ class PaywallRepositoryImpl : PaywallRepository {
 
     override suspend fun purchase(packageId: String): PurchaseResult {
         if (!isConfigured()) {
+            logger?.warning(TAG, "[PAYWALL] purchase() aborted — RevenueCat not configured")
             return PurchaseResult.Error("RevenueCat not configured")
         }
 
         val packageToPurchase = packagesMutex.withLock { cachedPackages[packageId] }
-            ?: return PurchaseResult.Error("Package not found: $packageId")
+            ?: run {
+                logger?.warning(TAG, "[PAYWALL] purchase() failed — package not found in cache: $packageId")
+                return PurchaseResult.Error("Package not found: $packageId")
+            }
+
+        logger?.info(TAG, "[PAYWALL] purchase() start: packageId=$packageId, sku=${packageToPurchase.storeProduct.id}")
 
         return suspendCancellableCoroutine { continuation ->
             Purchases.sharedInstance.purchase(
                 packageToPurchase = packageToPurchase,
                 onError = { error, userCancelled ->
                     if (userCancelled) {
+                        logger?.info(TAG, "[PAYWALL] purchase() cancelled by user: packageId=$packageId")
                         continuation.resume(PurchaseResult.Cancelled)
                     } else {
+                        logger?.warning(TAG, "[PAYWALL] purchase() failed: ${error.code.name} / ${error.underlyingErrorMessage}")
                         continuation.resume(
                             PurchaseResult.Error(
                                 message = error.message,
@@ -187,6 +226,8 @@ class PaywallRepositoryImpl : PaywallRepository {
                         introPrice.price.amountMicros == 0L ||
                         introPrice.subscriptionPeriod.value > 0
                     )
+
+                    logger?.info(TAG, "[PAYWALL] purchase() success: txId=${storeTransaction.transactionId}, isPremium=${status.isActive}, hasFreeTrial=$hasFreeTrial")
 
                     continuation.resume(
                         PurchaseResult.Success(
@@ -325,7 +366,7 @@ class PaywallRepositoryImpl : PaywallRepository {
         }
     }
 
-    private fun PurchasesError.toPaywallException(): PaywallException {
+    private fun PurchasesError.toPaywallException(billingWasReady: Boolean = false): PaywallException {
         val errorCode = when (code) {
             PurchasesErrorCode.NetworkError -> PaywallErrorCode.NETWORK_ERROR
             PurchasesErrorCode.OfflineConnectionError -> PaywallErrorCode.OFFLINE
@@ -339,6 +380,7 @@ class PaywallRepositoryImpl : PaywallRepository {
         return PaywallException(
             errorCode = errorCode,
             underlyingError = underlyingErrorMessage,
+            billingWasReady = billingWasReady,
             message = message
         )
     }

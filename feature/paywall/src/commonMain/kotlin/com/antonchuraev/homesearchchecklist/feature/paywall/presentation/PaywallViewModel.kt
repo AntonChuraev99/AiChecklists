@@ -3,6 +3,7 @@ package com.antonchuraev.homesearchchecklist.feature.paywall.presentation
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavRoute
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
@@ -11,7 +12,10 @@ import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigKe
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
 import com.antonchuraev.homesearchchecklist.feature.paywall.data.PaywallConfig
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.ConversionEventHelper
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.getDeviceCountry
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.getPlayStoreVersion
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallException
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PurchaseAnalyticsContext
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PurchaseResult
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.RestoreResult
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetOfferingsUseCase
@@ -26,6 +30,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+private const val TAG = "PaywallViewModel"
+
 class PaywallViewModel(
     savedStateHandle: SavedStateHandle,
     private val navigator: AppNavigator,
@@ -34,6 +40,7 @@ class PaywallViewModel(
     private val restorePurchasesUseCase: RestorePurchasesUseCase,
     private val analyticsTracker: AnalyticsTracker,
     private val remoteConfigProvider: RemoteConfigProvider,
+    private val logger: AppLogger? = null,
     sourceOverride: String? = null
 ) : AppViewModel<PaywallState, PaywallIntent, Nothing>() {
 
@@ -43,6 +50,11 @@ class PaywallViewModel(
 
     private val _screenState = MutableStateFlow(PaywallState(source = source))
     override val screenState: StateFlow<PaywallState> = _screenState.asStateFlow()
+
+    // Lazily populated after getOfferings() completes.
+    // Attached to all purchase-related events for diagnostics.
+    // Updated and read on the same viewModelScope coroutine — single-threaded access.
+    private var analyticsContext: PurchaseAnalyticsContext? = null
 
     // Maps raw string to PaywallVariant enum; forceVariant (from debug/nav arg) overrides RC.
     private fun parseVariant(raw: String?): PaywallVariant = when (raw) {
@@ -79,14 +91,37 @@ class PaywallViewModel(
             defaultValue = RemoteConfigDefaults.PAYWALL_VARIANT,
         )
         val resolvedVariant = parseVariant(forceVariant ?: rcVariant)
-        _screenState.update { it.copy(variant = resolvedVariant) }
+
+        // Resolve default plan from Remote Config.
+        // "monthly" is the safe default — lower price shown first increases conversion
+        // in price-sensitive markets (Ethiopia, LATAM, SEA). Can be remotely switched
+        // to "yearly" for markets where annual converts better.
+        val rcDefaultPlan = remoteConfigProvider.getString(
+            key = RemoteConfigKeys.PAYWALL_DEFAULT_PLAN,
+            defaultValue = RemoteConfigDefaults.PAYWALL_DEFAULT_PLAN,
+        )
+        val resolvedPlan = when (rcDefaultPlan.lowercase()) {
+            "yearly" -> PaywallPlan.Yearly
+            else -> PaywallPlan.Monthly // safe default for all other values
+        }
+
+        _screenState.update { it.copy(variant = resolvedVariant, selectedPlan = resolvedPlan) }
 
         analyticsTracker.setUserProperties(
-            mapOf("paywall_variant" to resolvedVariant.name),
+            mapOf(
+                "paywall_variant" to resolvedVariant.name,
+                "paywall_default_plan" to resolvedPlan.name.lowercase(),
+            ),
         )
         analyticsTracker.event(
             "paywall_opened",
-            mapOf("source" to source, "variant" to resolvedVariant.name),
+            buildMap {
+                put("source", source)
+                put("variant", resolvedVariant.name)
+                put("default_plan", resolvedPlan.name.lowercase())
+                getDeviceCountry()?.let { put("country", it) }
+                getPlayStoreVersion()?.let { put("play_store_version", it) }
+            },
         )
         loadProducts()
     }
@@ -118,16 +153,29 @@ class PaywallViewModel(
     private fun loadProducts() {
         viewModelScope.launch {
             _screenState.update { it.copy(isLoading = true, error = null) }
+            logger?.info(TAG, "[PAYWALL] loadProducts() start — source=$source")
 
             getOfferingsUseCase()
                 .onSuccess { offering ->
                     var products = offering?.products ?: emptyList()
 
+                    // Capture analytics context from successful offering load.
+                    analyticsContext = PurchaseAnalyticsContext(
+                        country = getDeviceCountry(),
+                        appVersion = "",  // Amplitude SDK auto-attaches app_version from manifest
+                        playStoreVersion = getPlayStoreVersion(),
+                        billingClientReady = true,
+                        offeringId = offering?.id,
+                        packageCount = products.size,
+                        availableSkuIds = products.map { it.id },
+                    )
+
                     if (products.isEmpty()) {
-                        analyticsTracker.event("products_load_empty", mapOf(
-                            "source" to source,
-                            "reason" to if (offering == null) "no_current_offering" else "empty_packages"
-                        ))
+                        analyticsTracker.event("products_load_empty", buildMap {
+                            put("source", source)
+                            put("reason", if (offering == null) "no_current_offering" else "empty_packages")
+                            analyticsContext?.toEventParams()?.let { putAll(it) }
+                        })
                         handleEmptyProducts()
                         return@launch
                     }
@@ -147,6 +195,14 @@ class PaywallViewModel(
                     val defaultSelected = products.find { it.isPopular }?.id
                         ?: products.firstOrNull()?.id
 
+                    logger?.info(TAG, "[PAYWALL] loadProducts() success — ${products.size} products loaded: ${products.joinToString { it.id }}")
+
+                    // Fire products_load_success for conversion funnel tracking.
+                    analyticsTracker.event("products_load_success", buildMap {
+                        put("source", source)
+                        analyticsContext?.toEventParams()?.let { putAll(it) }
+                    })
+
                     _screenState.update {
                         it.copy(
                             isLoading = false,
@@ -156,13 +212,29 @@ class PaywallViewModel(
                     }
                 }
                 .onFailure { error ->
-                    val params = mutableMapOf(
-                        "source" to source,
-                        "error" to (error.message ?: "unknown").take(100)
+                    logger?.warning(TAG, "[PAYWALL] loadProducts() failed — ${error.message}")
+
+                    // Capture context even on failure — critical for BILLING_UNAVAILABLE diagnosis.
+                    // billingWasReady from PaywallException tells us whether Play Billing was
+                    // connected before the call (false = race condition, true = network/backend error).
+                    val billingWasReady = (error as? PaywallException)?.billingWasReady ?: false
+                    analyticsContext = PurchaseAnalyticsContext(
+                        country = getDeviceCountry(),
+                        appVersion = "",
+                        playStoreVersion = getPlayStoreVersion(),
+                        billingClientReady = billingWasReady,
+                        offeringId = null,
+                        packageCount = 0,
+                        availableSkuIds = emptyList(),
                     )
-                    if (error is PaywallException) {
-                        params["error_code"] = error.errorCode.name
-                        params["underlying_error"] = (error.underlyingError ?: "none").take(100)
+                    val params = buildMap<String, Any> {
+                        put("source", source)
+                        put("error", (error.message ?: "unknown").take(100))
+                        if (error is PaywallException) {
+                            put("error_code", error.errorCode.name)
+                            put("underlying_error", (error.underlyingError ?: "none").take(100))
+                        }
+                        analyticsContext?.toEventParams()?.let { putAll(it) }
                     }
                     analyticsTracker.event("products_load_failed", params)
                     handleEmptyProducts()
@@ -193,12 +265,13 @@ class PaywallViewModel(
             // buying a different product (compliance: user paid based on shown price).
             analyticsTracker.event(
                 "purchase_product_not_found",
-                mapOf(
-                    "source"                to source,
-                    "selected_plan"         to currentState.selectedPlan.name,
-                    "available_product_ids" to currentState.products.joinToString(",") { it.id },
-                    "available_periods"     to currentState.products.joinToString(",") { it.periodString.orEmpty() },
-                ),
+                buildMap {
+                    put("source", source)
+                    put("selected_plan", currentState.selectedPlan.name)
+                    put("available_product_ids", currentState.products.joinToString(",") { it.id }.take(100))
+                    put("available_periods", currentState.products.joinToString(",") { it.periodString.orEmpty() }.take(100))
+                    analyticsContext?.toEventParams()?.let { putAll(it) }
+                },
             )
             viewModelScope.launch {
                 val errorMessage = getString(Res.string.paywall_load_error)
@@ -209,14 +282,19 @@ class PaywallViewModel(
             return
         }
 
+        logger?.info(TAG, "[PAYWALL] purchase() initiated: plan=${currentState.selectedPlan.name}, sku=${selectedProduct.id}, pkg=${selectedProduct.packageId}")
+
         analyticsTracker.event(
             "purchase_button_clicked",
-            mapOf(
-                "source"        to source,
-                "product_id"    to selectedProduct.id,
-                "variant"       to currentState.variant.name,
-                "selected_plan" to currentState.selectedPlan.name,
-            ),
+            buildMap {
+                put("source", source)
+                put("product_id", selectedProduct.id)
+                put("sku_id", selectedProduct.id)
+                put("variant", currentState.variant.name)
+                put("selected_plan", currentState.selectedPlan.name)
+                put("plan_type", currentState.selectedPlan.name.lowercase())
+                analyticsContext?.toEventParams()?.let { putAll(it) }
+            },
         )
 
         viewModelScope.launch {
@@ -224,10 +302,14 @@ class PaywallViewModel(
 
             when (val result = purchaseProductUseCase(selectedProduct.packageId)) {
                 is PurchaseResult.Success -> {
-                    analyticsTracker.event("purchase_completed", mapOf(
-                        "source" to source,
-                        "product_id" to selectedProduct.id
-                    ))
+                    analyticsTracker.event("purchase_completed", buildMap {
+                        put("source", source)
+                        put("product_id", selectedProduct.id)
+                        put("sku_id", selectedProduct.id)
+                        put("plan_type", currentState.selectedPlan.name.lowercase())
+                        put("price_str", selectedProduct.priceString.take(100))
+                        analyticsContext?.toEventParams()?.let { putAll(it) }
+                    })
                     conversionEventHelper.logConversionEvent(result, selectedProduct)
                     _screenState.update {
                         it.copy(isPurchasing = false, purchaseSuccess = true)
@@ -236,20 +318,26 @@ class PaywallViewModel(
                     navigator.navigateToSubscriptionStatus(showSuccessMessage = true)
                 }
                 is PurchaseResult.Cancelled -> {
-                    analyticsTracker.event("purchase_cancelled", mapOf(
-                        "source" to source,
-                        "product_id" to selectedProduct.id
-                    ))
+                    analyticsTracker.event("purchase_cancelled", buildMap {
+                        put("source", source)
+                        put("product_id", selectedProduct.id)
+                        put("sku_id", selectedProduct.id)
+                        put("plan_type", currentState.selectedPlan.name.lowercase())
+                        analyticsContext?.toEventParams()?.let { putAll(it) }
+                    })
                     _screenState.update { it.copy(isPurchasing = false) }
                 }
                 is PurchaseResult.Error -> {
-                    analyticsTracker.event("purchase_failed", mapOf(
-                        "source" to source,
-                        "product_id" to selectedProduct.id,
-                        "error" to (result.message).take(100),
-                        "error_code" to (result.errorCode ?: "unknown"),
-                        "underlying_error" to (result.underlyingError ?: "none").take(100)
-                    ))
+                    analyticsTracker.event("purchase_failed", buildMap {
+                        put("source", source)
+                        put("product_id", selectedProduct.id)
+                        put("sku_id", selectedProduct.id)
+                        put("plan_type", currentState.selectedPlan.name.lowercase())
+                        put("error", result.message.take(100))
+                        put("error_code", result.errorCode ?: "unknown")
+                        put("underlying_error", (result.underlyingError ?: "none").take(100))
+                        analyticsContext?.toEventParams()?.let { putAll(it) }
+                    })
                     _screenState.update {
                         it.copy(isPurchasing = false, error = result.message)
                     }

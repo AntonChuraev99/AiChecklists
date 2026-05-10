@@ -9,13 +9,10 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import javax.inject.Singleton
-
 /**
  * Manages widget configuration state using DataStore.
  * Stores the selected checklist ID for each widget instance (by appWidgetId).
  */
-@Singleton
 class WidgetStateManager(private val context: Context) {
 
     private val Context.widgetDataStore: DataStore<Preferences> by preferencesDataStore(
