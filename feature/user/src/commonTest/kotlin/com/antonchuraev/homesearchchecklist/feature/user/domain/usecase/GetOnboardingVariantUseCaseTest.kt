@@ -51,6 +51,15 @@ class GetOnboardingVariantUseCaseTest {
         assertEquals(GetOnboardingVariantUseCase.OnboardingVariant.DEFAULT, result)
     }
 
+    @Test
+    fun invoke_none_returnsNone() {
+        val useCase = createUseCase("none")
+
+        val result = useCase()
+
+        assertEquals(GetOnboardingVariantUseCase.OnboardingVariant.NONE, result)
+    }
+
     // --- Test doubles ---
 
     private class FakeRemoteConfigProvider(
