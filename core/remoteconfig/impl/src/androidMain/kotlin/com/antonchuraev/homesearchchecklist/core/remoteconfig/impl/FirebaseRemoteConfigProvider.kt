@@ -35,6 +35,8 @@ class FirebaseRemoteConfigProvider : RemoteConfigProvider {
         RemoteConfigKeys.MAX_FILLS_FREE to RemoteConfigDefaults.MAX_FILLS_FREE,
         RemoteConfigKeys.MAX_RECURRING_REMINDERS_FREE to RemoteConfigDefaults.MAX_RECURRING_REMINDERS_FREE,
         RemoteConfigKeys.ONBOARDING to RemoteConfigDefaults.ONBOARDING,
+        RemoteConfigKeys.PAYWALL_VARIANT to RemoteConfigDefaults.PAYWALL_VARIANT,
+        RemoteConfigKeys.PAYWALL_DEFAULT_PLAN to RemoteConfigDefaults.PAYWALL_DEFAULT_PLAN,
     )
 
     override suspend fun fetchAndActivate(): Boolean {

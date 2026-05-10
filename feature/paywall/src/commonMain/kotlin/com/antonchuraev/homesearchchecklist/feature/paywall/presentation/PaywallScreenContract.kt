@@ -39,7 +39,7 @@ data class PaywallUiState(
     val monthlyPrice: String       = "$1.99",
     val trialDays: Int             = 3,
     val ctaSubtext: String         = "Then $20/year. Cancel anytime.",
-    val selectedPlan: PaywallPlan  = PaywallPlan.Yearly,
+    val selectedPlan: PaywallPlan  = PaywallPlan.Monthly,
     val variant: PaywallVariant    = PaywallVariant.Timeline,
 )
 
@@ -53,8 +53,8 @@ data class PaywallState(
     val error: String? = null,
     val purchaseSuccess: Boolean = false,
     val source: String = "unknown",
-    // A/B test fields — populated in Phase 2 from Remote Config
-    val selectedPlan: PaywallPlan = PaywallPlan.Yearly,
+    // A/B test fields — populated from Remote Config
+    val selectedPlan: PaywallPlan = PaywallPlan.Monthly,
     val variant: PaywallVariant   = PaywallVariant.Timeline,
 ) : State
 
