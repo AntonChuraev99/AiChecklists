@@ -147,7 +147,7 @@ internal fun PaywallScreen(
                         )
                     }
                 },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                     // Disable M3 tonal-elevation overlay — keep flat surface across scroll states
                     // so the toolbar reads as a direct continuation of the body, not a separate band.
