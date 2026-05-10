@@ -9,9 +9,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Article
 import androidx.compose.material.icons.outlined.AutoAwesome
@@ -90,7 +91,16 @@ fun AppNavigationDrawerContent(
         unselectedIconColor = MaterialTheme.colorScheme.onSurface,
     )
 
-    Column(modifier = Modifier.fillMaxHeight()) {
+    // Whole drawer (header + sections + footer) scrolls as one region.
+    // Adapts to small viewports (landscape, foldables, large font scales).
+    // ModalDrawerSheet already applies DrawerDefaults.windowInsets, so we
+    // must NOT add statusBarsPadding/navigationBarsPadding here — it would
+    // double-pad.
+    Column(
+        modifier = Modifier
+            .fillMaxHeight()
+            .verticalScroll(rememberScrollState())
+    ) {
         DrawerBrandHeader()
 
         HorizontalDivider(
@@ -205,7 +215,7 @@ fun AppNavigationDrawerContent(
             modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
         )
 
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
         DrawerFooter(versionName)
     }
 }
@@ -269,13 +279,14 @@ private fun DrawerSectionLabel(text: String) {
 @Composable
 private fun DrawerFooter(versionName: String) {
     if (versionName.isNotBlank()) {
+        // No navigationBarsPadding here: ModalDrawerSheet already applies
+        // DrawerDefaults.windowInsets (= WindowInsets.systemBars) to its Surface.
         Text(
             text = stringResource(Res.string.drawer_version_label, versionName),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier
                 .padding(horizontal = AppDimens.SpacingLg, vertical = AppDimens.SpacingMd)
-                .navigationBarsPadding()
         )
     }
 }
