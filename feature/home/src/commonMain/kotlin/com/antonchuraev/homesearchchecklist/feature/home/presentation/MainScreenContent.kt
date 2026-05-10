@@ -154,7 +154,7 @@ fun MainScreenContent(
                         }
                         .then(
                             if (isEditMode) {
-                                Modifier.draggableHandle(
+                                Modifier.longPressDraggableHandle(
                                     onDragStarted = {
                                         hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                                     },

@@ -518,7 +518,7 @@ private fun ChecklistDetailContent(
                                         isEditMode = true
                                     }
                                 },
-                                cardDragModifier = Modifier.draggableHandle(
+                                cardDragModifier = Modifier.longPressDraggableHandle(
                                     onDragStarted = {
                                         hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                                     },
