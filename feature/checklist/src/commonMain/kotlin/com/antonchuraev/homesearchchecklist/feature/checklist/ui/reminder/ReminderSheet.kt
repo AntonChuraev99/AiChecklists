@@ -873,7 +873,7 @@ private fun EndConditionDialog(
 fun formatReminderDateTime(dateTime: LocalDateTime): String {
     val month = dateTime.month.name.take(3).lowercase()
         .replaceFirstChar { it.uppercase() }
-    val day = dateTime.dayOfMonth
+    val day = dateTime.day
     val hour = dateTime.hour.toString().padStart(2, '0')
     val minute = dateTime.minute.toString().padStart(2, '0')
     return "$month $day, $hour:$minute"

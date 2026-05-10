@@ -138,7 +138,7 @@ class TodayViewModel(
             val startOfDay = LocalDateTime(
                 year = now.year,
                 month = now.month,
-                dayOfMonth = now.dayOfMonth,
+                day = now.day,
                 hour = 0,
                 minute = 0,
                 second = 0,
@@ -147,7 +147,7 @@ class TodayViewModel(
             val endOfDay = LocalDateTime(
                 year = now.year,
                 month = now.month,
-                dayOfMonth = now.dayOfMonth,
+                day = now.day,
                 hour = 23,
                 minute = 59,
                 second = 59,
@@ -168,7 +168,7 @@ class TodayViewModel(
             val dt = Instant.fromEpochMilliseconds(nowMs).toLocalDateTime(tz)
             val dayName = dt.dayOfWeek.name.lowercase().replaceFirstChar { it.uppercase() }
             val monthName = dt.month.name.lowercase().replaceFirstChar { it.uppercase() }
-            return "$dayName, $monthName ${dt.dayOfMonth}"
+            return "$dayName, $monthName ${dt.day}"
         }
 
         /**

@@ -1415,7 +1415,7 @@ internal fun formatItemReminderLabel(item: ChecklistFillItem): String {
     return if (isReminderMissed(item)) {
         // Show date only for missed (no time clutter)
         val month = localDt.month.name.take(3).lowercase().replaceFirstChar { it.uppercase() }
-        "Missed ($month ${localDt.dayOfMonth})"
+        "Missed ($month ${localDt.day})"
     } else {
         formatted
     }
