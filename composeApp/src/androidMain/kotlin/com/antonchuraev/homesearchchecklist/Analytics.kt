@@ -4,12 +4,21 @@ import com.amplitude.android.Amplitude
 import com.amplitude.android.Configuration
 import com.amplitude.core.events.Identify
 
-import com.antonchuraev.aichecklists.BuildConfig
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppContextHolder
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.analytics.logEvent
 
+/**
+ * Analytics singleton.
+ *
+ * NOTE: The Amplitude API key is NOT available here from BuildConfig (which
+ * only exists in :androidApp). The key is injected at runtime by calling
+ * [Analytics.initialize] from GistiAndroidApplication after Koin starts.
+ *
+ * Firebase is lazy-initialized from AppContextHolder.context.
+ * Amplitude is null until [initialize] is called with a non-blank key.
+ */
 object Analytics : AnalyticsTracker {
 
     private val firebase by lazy {
@@ -18,16 +27,22 @@ object Analytics : AnalyticsTracker {
         }
     }
 
-    // Nullable Amplitude - handles empty API key gracefully
-    // Debug builds use a separate Amplitude project (AMPLITUDE_KEY_DEBUG)
-    // so debug events go to sandbox, not production
-    private val amplitude: Amplitude? by lazy {
-        val key = BuildConfig.AMPLITUDE_KEY
-        if (key.isBlank()) return@lazy null
+    // Nullable Amplitude — initialized lazily after key is injected
+    private var _amplitude: Amplitude? = null
+    private val amplitude: Amplitude?
+        get() = _amplitude
 
-        Amplitude(
+    /**
+     * Initialize Amplitude with the API key.
+     * Must be called after AppContextHolder.init() in GistiAndroidApplication.
+     * Safe to call multiple times (no-op if already initialized with same key).
+     */
+    fun initialize(amplitudeKey: String) {
+        if (amplitudeKey.isBlank()) return
+        if (_amplitude != null) return  // already initialized
+        _amplitude = Amplitude(
             Configuration(
-                apiKey = key,
+                apiKey = amplitudeKey,
                 context = AppContextHolder.context,
                 trackingSessionEvents = true
             )

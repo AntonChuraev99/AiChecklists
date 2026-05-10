@@ -1,0 +1,10 @@
+<resources>
+    <!--
+      App-level strings for androidApp module.
+      Note: Widget strings, reminder notification strings, and other strings
+      used by composeApp/androidMain code are defined in composeApp's
+      src/androidMain/res/values/strings.xml (namespace: com.antonchuraev.aichecklists).
+      They are available at runtime via resource merging in the final APK.
+    -->
+    <string name="app_name">Gisti - AI Checklists</string>
+</resources>

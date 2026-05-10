@@ -1,6 +1,6 @@
 package com.antonchuraev.aichecklists
 
-import com.antonchuraev.homesearchchecklist.GistiApplication
+import com.antonchuraev.homesearchchecklist.GistiAndroidApplication
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.repository.PaywallRepository
 import org.koin.core.context.loadKoinModules
 import org.koin.dsl.module
@@ -14,8 +14,11 @@ import org.koin.dsl.module
  *
  * Also swaps [PaywallRepository] for [FakePaywallRepository] so screenshot
  * tests see a fully-loaded paywall instead of an "Unable to load" error dialog.
+ *
+ * Extends GistiAndroidApplication (not GistiApplication directly) so that
+ * androidAppModule (GeminiConfig, widget, reminder bindings) is also loaded.
  */
-class TestApplication : GistiApplication() {
+class TestApplication : GistiAndroidApplication() {
 
     override fun onCreate() {
         super.onCreate()

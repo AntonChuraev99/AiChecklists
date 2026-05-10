@@ -22,6 +22,7 @@ dependencyResolutionManagement {
     }
 }
 
+include(":androidApp")
 include(":composeApp")
 include(":core:common:api")
 include(":core:common:impl")
