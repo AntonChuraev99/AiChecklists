@@ -32,7 +32,30 @@ open class GistiApplication : Application() {
         // but Analytics events are buffered until setConsent is called.
         initConsent()
 
-        // Initialize Koin if not already started (for widget support)
+        // Initialize Koin — subclasses (GistiAndroidApplication in :androidApp) can
+        // override startKoinIfNeeded() to add androidApp-specific modules.
+        startKoinIfNeeded()
+
+        initRevenueCat()
+
+        // Create notification channel for reminders (required on Android 8+)
+        ReminderReceiver.createNotificationChannel(this)
+
+        // Re-schedule active reminders (survives app updates and process death)
+        rescheduleReminders()
+    }
+
+    /**
+     * Initialize and start Koin with the base appModule.
+     *
+     * Override in subclasses (e.g. GistiAndroidApplication in :androidApp) to
+     * provide additional modules that depend on androidApp-specific BuildConfig
+     * values (GeminiConfig, widgetModule, etc.) or to change startKoin parameters.
+     *
+     * Default implementation loads only appModule — suitable for widget process,
+     * test overrides, or standalone library usage.
+     */
+    protected open fun startKoinIfNeeded() {
         val koinAlreadyStarted = GlobalContext.getOrNull() != null
         if (!koinAlreadyStarted) {
             startKoin {
@@ -48,14 +71,6 @@ open class GistiApplication : Application() {
         } else {
             android.util.Log.d("Koin", "startKoin skipped — already started (probably by widget)")
         }
-
-        initRevenueCat()
-
-        // Create notification channel for reminders (required on Android 8+)
-        ReminderReceiver.createNotificationChannel(this)
-
-        // Re-schedule active reminders (survives app updates and process death)
-        rescheduleReminders()
     }
 
     private fun rescheduleReminders() {

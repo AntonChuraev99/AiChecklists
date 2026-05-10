@@ -1,24 +1,26 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+@file:Suppress("DEPRECATION", "OPT_IN_USAGE")
+
 import java.util.Properties
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
-    alias(libs.plugins.androidApplication)
+    alias(libs.plugins.androidLibrary)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.jetbrains.kotlin.serialization)
-    alias(libs.plugins.ksp)
-    alias(libs.plugins.googleServices)
-    alias(libs.plugins.firebaseCrashlytics)
 }
 
 kotlin {
-    androidTarget {
-        compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_11)
+    android {
+        namespace = "com.antonchuraev.aichecklists"
+        compileSdk = libs.versions.android.compileSdk.get().toInt()
+        minSdk = libs.versions.android.minSdk.get().toInt()
+        withHostTest {}
+        androidResources {
+            enable = true
         }
     }
-    
+
     listOf(
         iosArm64(),
         iosSimulatorArm64()
@@ -54,19 +56,29 @@ kotlin {
             implementation(compose.preview)
             implementation(libs.androidx.activity.compose)
 
-            // Glance for App Widgets
+            // Koin Android — required for androidContext() / androidLogger() in GistiApplication
+            implementation(libs.koin.android)
+
+            // Glance for App Widgets — needed for InAppReviewLauncher.android.kt and widget actuals
             implementation(libs.glance)
             implementation(libs.glance.appwidget)
 
             // WorkManager for widget sync
             implementation(libs.workmanager)
 
-            // Google Play In-App Review
+            // Google Play In-App Review — needed for InAppReviewLauncher.android.kt actual
             implementation(libs.play.review.ktx)
 
-            // Amplitude Analytics
+            // Amplitude Analytics — needed for Analytics.kt (actual platform code)
             implementation(libs.amplitude.analytics)
             implementation(libs.play.services.appset)
+
+            // Firebase — Analytics, Crashlytics, ConsentManager actuals stay in composeApp/androidMain
+            // (runtime init via google-services plugin happens in androidApp)
+            // BOM is added via dependencies { add(...) } below — KMP DSL deprecates platform() in sourceSet blocks
+            implementation(libs.firebase.analytics)
+            implementation(libs.firebase.crashlytics)
+            implementation(libs.firebase.config)
         }
         commonMain.dependencies {
             implementation(projects.core.common.api)
@@ -115,106 +127,21 @@ kotlin {
             implementation(libs.kotlinx.coroutines.test)
             @OptIn(org.jetbrains.compose.ExperimentalComposeLibrary::class)
             implementation(compose.uiTest)
+            // Okio FakeFileSystem is used by CsatViewModelTest. datastore-core-okio
+            // re-exports okio so we pull it transitively without adding a new version pin.
+            implementation(libs.datastore.core.okio)
         }
     }
 }
 
-android {
-    namespace = "com.antonchuraev.aichecklists"
-    compileSdk = libs.versions.android.compileSdk.get().toInt()
+// Compose UI tooling for Android debug builds — androidRuntimeClasspath is the AGP9 replacement
+// for debugImplementation(compose.uiTooling) in KMP library modules
+dependencies {
+    add("androidRuntimeClasspath", compose.uiTooling)
 
-    defaultConfig {
-        applicationId = "com.antonchuraev.aichecklists"
-        minSdk = libs.versions.android.minSdk.get().toInt()
-        targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 40
-        versionName = "1.14.5"
-
-        testInstrumentationRunner = "com.antonchuraev.aichecklists.TestRunner"
-
-        // Test Orchestrator - isolate tests with clearPackageData
-        testInstrumentationRunnerArguments["clearPackageData"] = "true"
-
-        // Read Gemini API key from local.properties
-        val localProperties = project.rootProject.file("local.properties")
-        val properties = Properties()
-        if (localProperties.exists()) {
-            properties.load(localProperties.inputStream())
-        }
-        buildConfigField("String", "GEMINI_API_KEY", "\"${properties.getProperty("GEMINI_API_KEY", "")}\"")
-        // Amplitude keys set per build type below
-    }
-
-    testOptions {
-        // Enable Test Orchestrator for test isolation
-        execution = "ANDROIDX_TEST_ORCHESTRATOR"
-
-        // Disable animations to prevent flaky tests
-        animationsDisabled = true
-
-        unitTests {
-            isIncludeAndroidResources = true
-            isReturnDefaultValues = true
-        }
-    }
-
-    buildFeatures {
-        buildConfig = true
-    }
-    packaging {
-        resources {
-            excludes += "/META-INF/{AL2.0,LGPL2.1}"
-            excludes += "/META-INF/LICENSE.md"
-            excludes += "/META-INF/LICENSE-notice.md"
-        }
-    }
-    signingConfigs {
-        create("release") {
-            val localProperties = project.rootProject.file("local.properties")
-            val properties = Properties()
-            if (localProperties.exists()) {
-                properties.load(localProperties.inputStream())
-            }
-
-            val keystorePath = properties.getProperty("KEYSTORE_FILE", "")
-            if (keystorePath.isNotEmpty()) {
-                storeFile = file(keystorePath)
-                storePassword = properties.getProperty("KEYSTORE_PASSWORD", "")
-                keyAlias = properties.getProperty("KEY_ALIAS", "gisti")
-                keyPassword = properties.getProperty("KEY_PASSWORD", "")
-            }
-        }
-    }
-    buildTypes {
-        getByName("debug") {
-            val localProperties = project.rootProject.file("local.properties")
-            val properties = Properties()
-            if (localProperties.exists()) {
-                properties.load(localProperties.inputStream())
-            }
-            buildConfigField("String", "AMPLITUDE_KEY", "\"${properties.getProperty("AMPLITUDE_DEBUG_KEY", "")}\"")
-        }
-        getByName("release") {
-            isMinifyEnabled = true
-            isShrinkResources = true
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
-            signingConfig = signingConfigs.getByName("release")
-
-            val localProperties = project.rootProject.file("local.properties")
-            val properties = Properties()
-            if (localProperties.exists()) {
-                properties.load(localProperties.inputStream())
-            }
-            buildConfigField("String", "AMPLITUDE_KEY", "\"${properties.getProperty("AMPLITUDE_KEY", "")}\"")
-        }
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-    }
+    // Firebase BOM — pins versions of firebase-analytics/crashlytics/config in androidMain.
+    // platform() is deprecated in KMP source-set blocks (KT-58759), so we pin via dependencies{}.
+    add("androidMainImplementation", platform(libs.firebase.bom))
 }
 
 // ============================================================
@@ -268,30 +195,6 @@ val generateWasmInitJs by tasks.registering {
     }
 }
 
-dependencies {
-    debugImplementation(compose.uiTooling)
-
-    // Firebase (Android only)
-    implementation(platform(libs.firebase.bom))
-    implementation(libs.firebase.analytics)
-    implementation(libs.firebase.crashlytics)
-    implementation(libs.firebase.config)
-
-    // Android UI Tests
-    androidTestImplementation(libs.androidx.testExt.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation("androidx.compose.ui:ui-test-junit4:1.7.8")
-    androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
-    debugImplementation("androidx.compose.ui:ui-test-manifest:1.7.8")
-
-    // Test Orchestrator - runs each test in isolated process
-    androidTestUtil("androidx.test:orchestrator:1.5.0")
-
-    // MockK - mocking library for Kotlin
-    androidTestImplementation("io.mockk:mockk-android:1.13.8")
-    androidTestImplementation("io.mockk:mockk-agent:1.13.8")
-}
-
 // Wire generateWasmInitJs to run before every wasmJs task that touches resources or
 // compiles wasmJs code. wasmJsProcessResources is critical — it reads from
 // src/wasmJsMain/resources where init.js is generated.
@@ -306,4 +209,3 @@ afterEvaluate {
         dependsOn(generateWasmInitJs)
     }
 }
-

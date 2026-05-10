@@ -1,4 +1,5 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+@file:Suppress("DEPRECATION", "OPT_IN_USAGE")
+
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -7,11 +8,11 @@ plugins {
 }
 
 kotlin {
-    androidTarget {
-        compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_11)
-        }
-    }
+    android {
+        namespace = "com.antonchuraev.homesearchchecklist.core.navigation.api"
+        compileSdk = libs.versions.android.compileSdk.get().toInt()
+        minSdk = libs.versions.android.minSdk.get().toInt()
+}
 
     listOf(iosArm64(), iosSimulatorArm64()).forEach {
         it.binaries.framework {
@@ -36,16 +37,3 @@ kotlin {
         }
     }
 }
-
-android {
-    namespace = "com.antonchuraev.homesearchchecklist.core.navigation.api"
-    compileSdk = libs.versions.android.compileSdk.get().toInt()
-    defaultConfig {
-        minSdk = libs.versions.android.minSdk.get().toInt()
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-    }
-}
-
