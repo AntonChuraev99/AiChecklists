@@ -39,14 +39,31 @@ class TemplatesRepositoryImpl(
     override suspend fun getTemplates(): List<ChecklistTemplate> {
         cachedTemplates?.let { return it }
 
+        val bytes = try {
+            Res.readBytes("files/templates.json")
+        } catch (e: Exception) {
+            logger.error(
+                "TemplatesRepository",
+                "Resource read failed for files/templates.json: ${e::class.simpleName}: ${e.message}"
+            )
+            return emptyList()
+        }
+
+        val templatesJson = bytes.decodeToString()
+        logger.debug(
+            "TemplatesRepository",
+            "Read templates.json: ${bytes.size} bytes, first16='${templatesJson.take(16)}'"
+        )
+
         return try {
-            val bytes = Res.readBytes("files/templates.json")
-            val templatesJson = bytes.decodeToString()
             val config = json.decodeFromString<TemplatesConfig>(templatesJson)
             logger.debug("TemplatesRepository", "Loaded ${config.templates.size} templates from bundled JSON")
             config.templates.also { cachedTemplates = it }
         } catch (e: Exception) {
-            logger.error("TemplatesRepository", "Failed to load templates: ${e.message}")
+            logger.error(
+                "TemplatesRepository",
+                "JSON parse failed (${bytes.size} bytes): ${e::class.simpleName}: ${e.message}"
+            )
             emptyList()
         }
     }
