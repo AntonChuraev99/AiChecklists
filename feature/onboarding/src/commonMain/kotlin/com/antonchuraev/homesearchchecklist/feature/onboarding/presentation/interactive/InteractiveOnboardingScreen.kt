@@ -31,7 +31,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppLinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -258,13 +258,12 @@ private fun OnboardingProgressBar(
 ) {
     val progress = (currentStep + 1).toFloat() / totalSteps.toFloat()
 
-    LinearProgressIndicator(
+    AppLinearProgressIndicator(
         progress = { progress },
         modifier = modifier
             .fillMaxWidth()
             .height(4.dp)
             .clip(RoundedCornerShape(2.dp)),
-        color = MaterialTheme.colorScheme.primary,
         trackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
     )
 }
