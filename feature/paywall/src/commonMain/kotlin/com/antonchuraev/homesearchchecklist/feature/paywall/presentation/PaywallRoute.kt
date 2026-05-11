@@ -8,10 +8,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.paywall_save_percent
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.paywall.data.PaywallConfig
 import kotlin.math.round
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -125,7 +128,7 @@ fun PaywallRoute(
     ) {
         val yearlyMonthlyEq = yearlyProduct.priceAmount / 12.0
         val savingsPct = ((1.0 - yearlyMonthlyEq / monthlyProduct.priceAmount) * 100).toInt()
-        if (savingsPct >= 5) "Save $savingsPct%" else null
+        if (savingsPct >= 5) stringResource(Res.string.paywall_save_percent, savingsPct) else null
     } else null
 
     val yearlyMonthlyEq = if (yearlyProduct != null && yearlyProduct.priceAmount > 0.0) {

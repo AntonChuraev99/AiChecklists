@@ -1,0 +1,29 @@
+<resources>
+    <string name="app_name">Gisti - AI Чек-листы</string>
+
+    <!-- Виджет -->
+    <string name="widget_name">Чек-лист</string>
+    <string name="widget_description">Отображайте и отмечайте элементы чек-листа</string>
+    <string name="widget_loading">Загрузка…</string>
+
+    <!-- Состояния виджета -->
+    <string name="widget_not_found">Чек-лист не найден</string>
+    <string name="widget_select_another">Выбрать другой</string>
+    <string name="widget_tap_to_configure">Нажмите для настройки</string>
+    <string name="widget_select_checklist_display">Выберите чек-лист для отображения</string>
+    <string name="widget_no_items">Нет элементов</string>
+    <string name="widget_checked">Отмечено</string>
+    <string name="widget_unchecked">Не отмечено</string>
+
+    <!-- Уведомления напоминаний -->
+    <string name="reminder_all_completed">Все элементы выполнены!</string>
+    <string name="reminder_notification_channel">Напоминания о чек-листах</string>
+    <string name="reminder_notification_channel_desc">Уведомления о напоминаниях и дедлайнах чек-листов</string>
+    <string name="reminder_notification_tap">Нажмите, чтобы открыть</string>
+    <plurals name="reminder_items_remaining">
+        <item quantity="one">%d элемент остался</item>
+        <item quantity="few">%d элемента осталось</item>
+        <item quantity="many">%d элементов осталось</item>
+        <item quantity="other">%d элементов осталось</item>
+    </plurals>
+</resources>

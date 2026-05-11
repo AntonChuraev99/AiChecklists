@@ -1,0 +1,853 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Приложение -->
+    <string name="app_name">Gisti - AI Чек-листы</string>
+
+    <!-- Общие -->
+    <string name="save">Сохранить</string>
+    <string name="cancel">Отмена</string>
+    <string name="ok">ОК</string>
+    <string name="error">Ошибка</string>
+    <string name="selected">Выбрано:</string>
+    <string name="select">Выбрать</string>
+    <string name="delete">Удалить</string>
+    <string name="add_item">Добавить элемент</string>
+    <string name="add_item_placeholder">Добавить элемент...</string>
+
+    <!-- Онбординг -->
+    <string name="onboarding_skip">Пропустить</string>
+    <string name="onboarding_continue">Продолжить</string>
+    <!-- Страница 1 — Создание с ИИ -->
+    <string name="onboarding_page1_title">Создание с ИИ</string>
+    <string name="onboarding_page1_description">Фото, PDF, ссылка, текст или голос — ИИ мгновенно превращает любой контент в чёткий чек-лист.</string>
+
+    <!-- Страница 2 — Заполнение с ИИ -->
+    <string name="onboarding_page2_title">Заполнение с ИИ</string>
+    <string name="onboarding_page2_description">Есть новый контент? Загрузите фото, ссылку или файл — ИИ автоматически отметит подходящие пункты в вашем чек-листе.</string>
+
+    <!-- Страница 3 — Экспорт и поделиться -->
+    <string name="onboarding_page3_title">Экспорт &amp; Поделиться</string>
+    <string name="onboarding_page3_description">Делитесь прогрессом в формате PDF или текста. Удобно для отчётов, клиентов или личных записей.</string>
+
+    <!-- Интерактивный онбординг -->
+    <string name="onboarding_interactive_category_title">Что хотите организовать?</string>
+    <string name="onboarding_interactive_category_subtitle">Выберите одно, чтобы начать</string>
+    <string name="onboarding_interactive_category_travel">Путешествия</string>
+    <string name="onboarding_interactive_category_home">Дом &amp; Переезд</string>
+    <string name="onboarding_interactive_category_shopping">Покупки</string>
+    <string name="onboarding_interactive_category_work">Работа &amp; Проекты</string>
+    <string name="onboarding_interactive_category_health">Здоровье</string>
+    <string name="onboarding_interactive_category_education">Учёба</string>
+    <string name="onboarding_interactive_category_fitness">Фитнес</string>
+    <string name="onboarding_interactive_category_cooking">Кулинария</string>
+    <string name="onboarding_interactive_category_finance">Финансы</string>
+    <string name="onboarding_interactive_category_events">Мероприятия</string>
+    <string name="onboarding_interactive_style_title">Какой формат списка предпочитаете?</string>
+    <string name="onboarding_interactive_style_subtitle">Это определит ваш первый чек-лист</string>
+    <string name="onboarding_interactive_style_minimalist">Минималистичный</string>
+    <string name="onboarding_interactive_style_minimalist_desc">Только самое важное</string>
+    <string name="onboarding_interactive_style_detailed">Подробный</string>
+    <string name="onboarding_interactive_style_detailed_desc">Каждый шаг расписан</string>
+    <string name="onboarding_interactive_style_chaotic">Всё и ещё больше</string>
+    <string name="onboarding_interactive_style_chaotic_desc">Дополнительные подсказки, о которых легко забыть</string>
+    <string name="onboarding_interactive_template_title">Выберите чек-лист</string>
+    <string name="onboarding_interactive_template_subtitle">Выберите отправную точку</string>
+    <string name="onboarding_interactive_template_items_count">%1$d элементов</string>
+    <string name="onboarding_interactive_customize_title">Настройте под себя</string>
+    <string name="onboarding_interactive_customize_subtitle">Отключите то, что не нужно</string>
+    <string name="onboarding_interactive_customize_continue">Продолжить</string>
+    <string name="onboarding_interactive_creating_title">Создаём ваш чек-лист…</string>
+    <string name="onboarding_interactive_creating_social">Более 12 000 чек-листов создано с Gisti</string>
+    <string name="onboarding_interactive_preview_title">Ваш чек-лист готов!</string>
+    <string name="onboarding_interactive_preview_subtitle">Нажмите на элементы, чтобы отметить их</string>
+    <string name="onboarding_interactive_preview_button">Сохранить &amp; Продолжить</string>
+    <string name="onboarding_preview_all_checked">Всё отмечено!</string>
+
+    <!-- Шаг «Узнать больше» -->
+    <string name="onboarding_discover_title">Ваш чек-лист готов!</string>
+    <string name="onboarding_discover_subtitle">Настройте под себя</string>
+
+    <string name="onboarding_discover_reminder_title">Настроить напоминания</string>
+    <string name="onboarding_discover_reminder_subtitle">Получайте напоминания в нужный момент</string>
+    <string name="onboarding_discover_widget_title">Добавить виджет</string>
+    <string name="onboarding_discover_widget_subtitle">Быстрый доступ с главного экрана</string>
+    <string name="onboarding_discover_share_title">Поделиться чек-листом</string>
+    <string name="onboarding_discover_share_subtitle">Экспортируйте или поделитесь мгновенно</string>
+
+    <string name="onboarding_discover_reminder_sheet_title">Быстрое напоминание</string>
+    <string name="onboarding_discover_reminder_tonight">Сегодня вечером, 21:00</string>
+    <string name="onboarding_discover_reminder_daily">Ежедневно, 9:00</string>
+    <string name="onboarding_discover_reminder_weekly">Еженедельно, понедельник</string>
+    <string name="onboarding_discover_reminder_custom">Настроить…</string>
+    <string name="onboarding_discover_reminder_done">Напоминание установлено!</string>
+
+    <string name="onboarding_discover_widget_sheet_title">Добавить виджет на главный экран</string>
+    <string name="onboarding_discover_widget_step1">Нажмите и удерживайте главный экран</string>
+    <string name="onboarding_discover_widget_step2">Нажмите «Виджеты» и найдите Gisti</string>
+    <string name="onboarding_discover_widget_step3">Перетащите виджет на главный экран</string>
+    <string name="onboarding_discover_widget_done">Понятно</string>
+
+    <string name="onboarding_discover_maybe_later">Позже</string>
+    <string name="onboarding_discover_completed">%1$d из %2$d выполнено</string>
+
+    <!-- Боковое меню -->
+    <string name="drawer_section_navigate">Навигация</string>
+    <string name="drawer_section_help">Помощь &amp; Обратная связь</string>
+    <string name="drawer_section_about">О приложении</string>
+    <string name="drawer_tagline">ИИ Чек-листы</string>
+    <string name="drawer_version_label">Версия %1$s</string>
+    <string name="drawer_logo_content_description">Логотип Gisti</string>
+    <string name="drawer_item_home">Главная</string>
+
+    <!-- Главный экран -->
+    <string name="main_title">Мои чек-листы</string>
+    <string name="main_empty_title">Готовы навести порядок?</string>
+    <string name="main_empty_description">Создайте первый чек-лист или позвольте ИИ составить его из текста, фото или документа.</string>
+    <string name="main_create_checklist">Создать чек-лист</string>
+    <string name="main_create_checklist_locked">Откройте больше с Премиум</string>
+    <string name="main_ai_analysis">ИИ-анализ</string>
+    <string name="main_no_items">Пусто</string>
+    <string name="main_menu">Меню</string>
+    <string name="main_menu_support">Поддержка</string>
+    <string name="main_menu_rate_app">Оценить приложение</string>
+    <string name="main_menu_leave_feedback">Оставить отзыв</string>
+
+    <!-- Экран «Обновления» -->
+    <string name="update_feed_title">Обновления</string>
+    <string name="update_feed_menu_item">Обновления</string>
+    <string name="update_feed_empty_title">Обновлений пока нет</string>
+    <string name="update_feed_empty_description">Заходите позже — здесь будут новости и советы</string>
+    <string name="update_feed_unlock_with_premium">Откройте больше с Про</string>
+    <string name="unlock_more_with_premium">Откройте больше с Про</string>
+    <string name="update_feed_version_header">Версия %1$s</string>
+
+    <!-- Экран создания -->
+    <string name="create_title">Новый чек-лист</string>
+    <string name="create_name_section">Название чек-листа</string>
+    <string name="create_name_placeholder">Например, задачи по проекту</string>
+    <string name="create_items_section">Элементы</string>
+    <string name="create_add_item">Добавить элемент</string>
+    <string name="create_add_item_dialog_title">Добавить элемент</string>
+    <string name="create_item_name_label">Текст элемента</string>
+    <string name="create_edit_item">Редактировать элемент</string>
+    <string name="create_confirm_item_edit">Сохранить изменения</string>
+
+    <!-- Экран шаблонов -->
+    <string name="templates_title">Шаблоны</string>
+    <string name="templates_search_placeholder">Поиск шаблонов...</string>
+    <string name="templates_no_results">Шаблоны не найдены</string>
+    <string name="templates_no_results_description">Попробуйте другой поисковый запрос</string>
+    <string name="templates_empty_title">Шаблоны недоступны</string>
+    <string name="templates_empty_description">Загляните позже — здесь появятся готовые чек-листы.</string>
+    <string name="templates_item_count">%1$d элементов</string>
+    <string name="templates_preview_items">Шаблон содержит %1$d элементов:</string>
+    <string name="templates_and_more">... и ещё %1$d элементов</string>
+    <string name="templates_use_template">Использовать шаблон</string>
+    <string name="templates_section_title">Выберите шаблон</string>
+    <string name="templates_tap_to_use">Нажмите, чтобы использовать</string>
+    <string name="templates_create_manually">Создать вручную</string>
+    <string name="templates_create_with_ai">Создать с ИИ</string>
+
+    <!-- Экран предпросмотра шаблона -->
+    <string name="template_preview_title">Предпросмотр</string>
+    <string name="template_preview_items_count">%1$d элементов</string>
+    <string name="template_preview_create_button">Создать чек-лист (%1$d элементов)</string>
+    <string name="template_preview_creating">Создание...</string>
+    <string name="template_preview_remove_item">Удалить элемент</string>
+    <string name="template_preview_add_item">Добавить элемент</string>
+    <string name="template_preview_add_item_hint">Добавить элемент...</string>
+
+    <!-- Экран предпросмотра результата ИИ-анализа -->
+    <string name="analyze_preview_title">Результат ИИ</string>
+    <string name="analyze_preview_fill_title">Результат заполнения ИИ</string>
+    <string name="analyze_preview_for_checklist">Для чек-листа: %1$s</string>
+    <string name="analyze_preview_name_label">Название чек-листа</string>
+    <string name="analyze_preview_fill_name_label">Название заполнения</string>
+    <string name="analyze_preview_items_count">%1$d элементов</string>
+    <string name="analyze_preview_create_button">Создать чек-лист (%1$d элементов)</string>
+    <string name="analyze_preview_create_fill_button">Создать заполнение (%1$d элементов)</string>
+    <string name="analyze_preview_creating">Создание...</string>
+    <string name="analyze_preview_remove_item">Удалить элемент</string>
+    <string name="analyze_preview_add_item">Добавить элемент</string>
+    <string name="analyze_preview_add_item_hint">Добавить элемент...</string>
+
+    <!-- Экран анализа -->
+    <string name="analyze_title">ИИ-анализ</string>
+    <string name="analyze_button">Анализировать</string>
+    <string name="analyze_loading">Анализируем контент</string>
+    <string name="analyze_loading_description">ИИ извлекает элементы чек-листа...</string>
+    <string name="analyze_select_source">Что хотите проанализировать?</string>
+    <string name="analyze_enter_data">Добавьте контент</string>
+    <string name="analyze_source_photo">Фото</string>
+    <string name="analyze_source_pdf">PDF</string>
+    <string name="analyze_source_text_file">Текстовый файл</string>
+    <string name="analyze_source_link">Ссылка</string>
+    <string name="analyze_source_text">Вставить текст</string>
+    <string name="analyze_source_voice">Голос</string>
+    <string name="analyze_url_label">URL</string>
+    <string name="analyze_url_placeholder">https://example.com/article</string>
+    <string name="analyze_text_placeholder">Вставьте заметки с совещания, статьи, инструкции — всё, что хотите превратить в чек-лист...</string>
+    <string name="analyze_text_label">Ваш текст</string>
+    <string name="analyze_select_photo">Выбрать фото</string>
+    <string name="analyze_select_pdf">Выбрать PDF</string>
+    <string name="analyze_select_file">Выбрать файл</string>
+    <string name="analyze_result_title">Ваш чек-лист готов!</string>
+    <string name="analyze_items_found">Извлечено элементов:</string>
+    <string name="analyze_and_more">... и ещё %1$d</string>
+    <string name="analyze_checklist_name_label">Название чек-листа</string>
+    <string name="analyze_checklist_name_placeholder">Мой чек-лист</string>
+    <string name="analyze_create_checklist">Создать чек-лист</string>
+    <string name="analyze_error_no_input">Выберите источник для анализа</string>
+    <string name="analyze_error_empty_url">Введите URL для анализа</string>
+    <string name="analyze_error_invalid_url">Введите корректный URL</string>
+    <string name="analyze_error_empty_text">Введите текст для анализа</string>
+    <string name="analyze_error_no_file">Выберите файл для анализа</string>
+    <string name="analyze_error_empty_name">Дайте чек-листу название</string>
+    <string name="analyze_cost_info">Это действие стоит %1$d кредитов</string>
+    <string name="analyze_not_enough_credits">Недостаточно кредитов. Получите больше, чтобы продолжить.</string>
+
+    <!-- Запись голоса -->
+    <string name="analyze_voice_tap_to_record">Нажмите для записи</string>
+    <string name="analyze_voice_recording">Запись...</string>
+    <string name="analyze_voice_stop">Стоп</string>
+    <string name="analyze_voice_recorded">Записано</string>
+    <string name="analyze_voice_play">Воспроизвести запись</string>
+    <string name="analyze_voice_delete">Удалить запись</string>
+    <string name="analyze_voice_permission_required">Необходим доступ к микрофону</string>
+    <string name="analyze_voice_permission_denied">Доступ к микрофону запрещён. Разрешите его, чтобы записывать голос.</string>
+    <string name="analyze_voice_permission_denied_settings">Доступ к микрофону отключён. Включите его в настройках для записи голоса.</string>
+    <string name="analyze_voice_open_settings">Открыть настройки</string>
+    <string name="analyze_error_no_recording">Запишите голосовое сообщение для анализа</string>
+
+    <!-- Выбор цели заполнения -->
+    <string name="fill_target_title">Куда заполнить?</string>
+    <string name="fill_target_main">Заполнить основной чек-лист</string>
+    <string name="fill_target_main_description">Обновить существующие элементы результатами ИИ</string>
+    <string name="fill_target_new">Создать новое заполнение</string>
+    <string name="fill_target_new_description">Создать отдельное заполнение для этого анализа</string>
+
+    <!-- Применение заполнения (режим fill-default) -->
+    <string name="fill_apply">Применить к чек-листу</string>
+
+    <!-- Режим заполнения (Fill via AI) -->
+    <string name="analyze_fill_title">Заполнение с ИИ</string>
+    <string name="analyze_fill_result_title">Заполнение ИИ готово!</string>
+    <string name="analyze_fill_for_checklist">Заполняется чек-лист: %1$s</string>
+    <string name="analyze_fill_stats">%1$d из %2$d элементов отмечено</string>
+    <string name="analyze_fill_name_label">Название заполнения</string>
+    <string name="analyze_fill_name_placeholder">Например, Квартира на Ленина</string>
+    <string name="analyze_create_fill">Создать заполнение</string>
+    <string name="analyze_saving">Сохранение...</string>
+
+    <!-- Экран деталей чек-листа -->
+    <string name="checklist_not_found">Чек-лист не найден</string>
+    <string name="checklist_edit_title">Редактировать чек-лист</string>
+    <string name="checklist_edit">Редактировать</string>
+    <string name="checklist_progress">Прогресс</string>
+    <string name="checklist_no_items">В этом чек-листе нет элементов.\nНажмите +, чтобы добавить.</string>
+    <string name="checklist_delete_title">Удалить чек-лист?</string>
+    <string name="checklist_delete_message">Удалить «%1$s»? Это действие нельзя отменить.</string>
+    <string name="checklist_template_items">Элементов в шаблоне: %1$d</string>
+    <string name="checklist_fills_section">Заполнения</string>
+    <string name="checklist_no_fills">Заполнений пока нет.\nСоздайте новое заполнение, чтобы начать отмечать элементы.</string>
+    <string name="checklist_no_fills_title">Заполнений пока нет</string>
+    <string name="checklist_no_fills_description">Создайте заполнение, чтобы начать отмечать элементы. Каждое заполнение отслеживает прогресс отдельно.</string>
+    <string name="checklist_add_fill">Новое заполнение</string>
+    <string name="checklist_add_fill_ai">Заполнить с ИИ</string>
+    <string name="checklist_new_fill">Создать новое заполнение</string>
+    <string name="checklist_view_all_fills">Все заполнения</string>
+    <string name="checklist_fills_count">ещё %1$d заполнений</string>
+    <string name="fills_list_title">Все заполнения</string>
+    <string name="fills_default_name">Основное</string>
+    <string name="checklist_add_fill_dialog_title">Новое заполнение</string>
+    <string name="checklist_fill_name_label">Название заполнения</string>
+    <string name="checklist_fill_name_placeholder">Например, Квартира на Ленина</string>
+    <string name="reorder">Изменить порядок</string>
+    <string name="done">Готово</string>
+    <string name="delete_item">Удалить элемент</string>
+    <string name="undo">Отменить</string>
+    <string name="more_options">Дополнительно</string>
+    <string name="separate_completed">Отделить выполненные</string>
+    <string name="auto_delete_completed">Удалять элементы после выполнения</string>
+    <string name="delete_completed_items">Удалить выполненные элементы</string>
+    <string name="completed_count">Выполнено (%1$d)</string>
+    <string name="delete_checklist">Удалить чек-лист</string>
+    <string name="collapse">Свернуть</string>
+    <string name="expand">Развернуть</string>
+
+    <string name="checklist_fill_delete_title">Удалить заполнение?</string>
+    <string name="checklist_fill_delete_message">Удалить «%1$s»? Это действие нельзя отменить.</string>
+
+    <!-- Экран деталей заполнения -->
+    <string name="fill_not_found">Заполнение не найдено</string>
+    <string name="fill_complete_title">Всё выполнено!</string>
+    <string name="fill_complete_description">Отличная работа!</string>
+    <string name="fill_edit_title">Редактировать заполнение</string>
+    <string name="fill_add_note">Добавить заметку</string>
+    <string name="fill_note_dialog_title">Заметка</string>
+
+    <!-- Строка действий с элементом (сохранено для formatItemReminderLabel) -->
+    <string name="detail_item_action_note">Заметка</string>
+    <string name="detail_item_action_edit_note">Редактировать заметку</string>
+    <string name="detail_item_action_remind">Напомнить</string>
+    <string name="detail_item_reminder_missed">Пропущено (%1$s)</string>
+    <string name="detail_item_reminder_at">%1$s</string>
+
+    <!-- Шторка деталей элемента (стиль Things) -->
+    <string name="detail_item_sheet_action_reminder">Напоминание</string>
+    <string name="detail_item_sheet_action_note">Заметка</string>
+    <string name="detail_item_sheet_action_edit_note">Редактировать заметку</string>
+    <string name="detail_item_sheet_action_delete">Удалить элемент</string>
+    <string name="detail_item_sheet_subtitle_no_reminder">Нажмите, чтобы установить</string>
+    <string name="detail_item_sheet_subtitle_no_note">Нажмите, чтобы добавить</string>
+
+    <!-- Приоритет элемента (звезда) -->
+    <string name="item_priority_mark">Отметить как важный</string>
+    <string name="item_priority_unmark">Снять пометку важного</string>
+    <string name="item_priority_action">Важный</string>
+    <string name="fill_note_placeholder">Добавьте заметку к этому элементу...</string>
+    <string name="fill_cover_change">Изменить обложку</string>
+    <string name="fill_cover_remove">Удалить обложку</string>
+
+    <!-- Баннер Premium -->
+    <string name="premium_banner_title">Стать Премиум</string>
+    <string name="premium_banner_description">Ежедневное пополнение кредитов ИИ</string>
+    <string name="premium_banner_upgrade">Улучшить</string>
+    <string name="premium_banner_active_title">Премиум-участник</string>
+    <string name="premium_banner_valid_until">Активен до %1$s</string>
+
+    <!-- Ограничения -->
+    <string name="limit_reached_title">Лимит чек-листов исчерпан</string>
+    <string name="limit_reached_message">Достигнут максимум из %1$d чек-листов на бесплатном тарифе. Перейдите на Премиум для безлимитных чек-листов.</string>
+    <string name="limit_upgrade">Перейти на Премиум</string>
+    <string name="limit_fill_reached_title">Лимит заполнений исчерпан</string>
+    <string name="limit_fill_reached_message">Достигнут максимум из %1$d заполнений для этого чек-листа. Перейдите на Премиум для безлимитных заполнений.</string>
+    <string name="limit_checklist_count">%1$d/%2$d чек-листов</string>
+    <string name="limit_fill_count">%1$d/%2$d заполнений</string>
+
+    <!-- Кредиты ИИ -->
+    <string name="credits_display">%1$d кредитов</string>
+    <string name="credits_get_more">Получить кредиты</string>
+    <string name="credits_your_credits">Ваши кредиты ИИ</string>
+    <string name="credits_refill_info">Пополняются ежедневно в 12:00 CET</string>
+    <string name="credits_refill_to">до %1$d</string>
+    <string name="credits_premium_benefit">Премиум: ежедневное пополнение до %1$d кредитов</string>
+
+    <!-- Экран статуса подписки -->
+    <string name="subscription_status_title">Ваша подписка</string>
+    <string name="subscription_status_active">Премиум-участник</string>
+    <string name="subscription_status_valid_until">Премиум-доступ действителен до</string>
+    <string name="subscription_status_back">На главную</string>
+    <string name="subscription_status_credits_section">Кредиты ИИ</string>
+    <string name="subscription_status_credits_info">Кредиты пополняются ежедневно в 12:00 CET</string>
+    <string name="subscription_status_daily_cap">Ежедневное пополнение: до %1$d кредитов</string>
+    <string name="subscription_purchase_success">🎉 Добро пожаловать в Премиум! Наслаждайтесь безлимитным доступом.</string>
+
+    <!-- Экран Paywall -->
+    <string name="paywall_title">Раскройте весь потенциал</string>
+    <string name="paywall_subtitle">Получите безлимитный доступ ко всем функциям</string>
+    <string name="paywall_feature_checklists">Безлимитные чек-листы и заполнения</string>
+    <string name="paywall_feature_ai">Ежедневное пополнение кредитов ИИ (до 300)</string>
+    <string name="paywall_feature_sync">Приоритетная поддержка</string>
+    <string name="paywall_continue">Подписаться сейчас</string>
+    <string name="paywall_restore">Восстановить покупки</string>
+    <string name="paywall_best_value">Лучшее предложение</string>
+    <string name="paywall_free_trial_badge">%1$d дней бесплатно</string>
+    <string name="paywall_start_trial">Начать бесплатный период</string>
+    <string name="paywall_per_month">в месяц</string>
+    <!-- УСТАРЕЛО: заменено на paywall_trial_terms_yearly / paywall_trial_terms_monthly -->
+    <string name="paywall_trial_terms">%1$d-дневный пробный период, затем %2$s/месяц. Автопродление. Отмена в любое время.</string>
+    <string name="paywall_trial_terms_yearly">%1$d-дневный пробный период, затем %2$s/год. Автопродление. Отмена в любое время.</string>
+    <string name="paywall_trial_terms_monthly">%1$d-дневный пробный период, затем %2$s/месяц. Автопродление. Отмена в любое время.</string>
+    <string name="paywall_no_subscription_found">Активная подписка не найдена</string>
+    <string name="paywall_days_free">%1$d-дневный пробный период</string>
+    <string name="paywall_go_premium">Перейти на Премиум</string>
+    <string name="paywall_then_price">затем %1$s / месяц</string>
+    <string name="paywall_start_free_trial">Начать бесплатный период</string>
+    <string name="paywall_subscribe_now">Подписаться сейчас</string>
+    <string name="paywall_retry">Попробовать снова</string>
+    <string name="paywall_load_error">Не удалось загрузить варианты подписки.\nПроверьте соединение и попробуйте снова.</string>
+    <string name="paywall_no_payment_now">Оплата сейчас не требуется</string>
+    <string name="paywall_cancel_anytime">Отмена в любое время</string>
+    <string name="paywall_timeline_today">Сегодня</string>
+    <string name="paywall_timeline_due">%1$s</string>
+    <string name="paywall_timeline_free">Пробный период</string>
+    <string name="paywall_terms">Условия использования</string>
+    <string name="paywall_privacy">Политика конфиденциальности</string>
+    <string name="paywall_support">Поддержка</string>
+    <string name="paywall_preview_item1">Безлимитное создание с ИИ</string>
+    <string name="paywall_preview_item2">Безлимитное заполнение с ИИ</string>
+    <string name="paywall_preview_item3">Экспорт PDF &amp; текста</string>
+    <string name="paywall_preview_item4">300 кредитов ИИ ежедневно</string>
+    <string name="paywall_preview_tagline">Суть любого\nконтента — в один клик</string>
+
+    <!-- Экран загрузки -->
+    <string name="splash_loading">Подготовка...</string>
+
+    <!-- Ошибки (используются во ViewModel) -->
+    <string name="error_add_at_least_one_item">Добавьте хотя бы один элемент</string>
+    <string name="error_create_checklist_failed">Не удалось создать чек-лист</string>
+    <string name="error_generate_pdf_failed">Не удалось создать PDF</string>
+    <string name="error_no_data_available">Данные недоступны</string>
+    <string name="error_template_not_found">Шаблон не найден</string>
+    <string name="error_template_load_failed">Не удалось загрузить шаблон</string>
+    <string name="error_fill_not_found">Основное заполнение не найдено</string>
+
+    <!-- Экран поделиться -->
+    <string name="share">Поделиться</string>
+    <string name="share_screen_title">Поделиться чек-листом</string>
+    <string name="share_select_format">Выберите формат</string>
+    <string name="share_as_text">Обычный текст</string>
+    <string name="share_as_text_description">Удобный для копирования формат для сообщений</string>
+    <string name="share_as_pdf">Документ PDF</string>
+    <string name="share_as_pdf_description">Форматированный документ с флажками</string>
+    <string name="share_button">Поделиться</string>
+    <string name="share_generating_pdf">Создание PDF...</string>
+    <string name="share_error">Не удалось поделиться</string>
+
+    <!-- Шторка обратной связи -->
+    <string name="feedback_only_title">Оставить отзыв</string>
+    <string name="feedback_only_description">Расскажите, что думаете</string>
+    <string name="feedback_thanks_message">Спасибо за отзыв!</string>
+
+    <!-- CSAT-опрос -->
+    <string name="csat_title">Как вам Gisti?</string>
+    <string name="csat_not_good">Не нравится</string>
+    <string name="csat_okay">Нормально</string>
+    <string name="csat_love_it">Обожаю!</string>
+    <string name="csat_whats_the_problem">В чём главная проблема?</string>
+    <string name="csat_what_could_be_better">Что можно улучшить?</string>
+    <string name="csat_what_do_you_like">Что нравится больше всего?</string>
+    <!-- Чипы «Не нравится» -->
+    <string name="csat_chip_buggy">Баги</string>
+    <string name="csat_chip_slow">Медленно</string>
+    <string name="csat_chip_hard_to_use">Сложно использовать</string>
+    <string name="csat_chip_inaccurate_ai">Неточный ИИ</string>
+    <string name="csat_chip_too_expensive">Дорого</string>
+    <!-- Чипы «Нормально» -->
+    <string name="csat_chip_more_features">Больше функций</string>
+    <string name="csat_chip_better_design">Лучший дизайн</string>
+    <string name="csat_chip_faster">Быстрее</string>
+    <string name="csat_chip_more_templates">Больше шаблонов</string>
+    <string name="csat_chip_better_ai">Лучший ИИ</string>
+    <!-- Позитивные чипы -->
+    <string name="csat_chip_ai_quality">Качество ИИ</string>
+    <string name="csat_chip_templates">Шаблоны</string>
+    <string name="csat_chip_nice_design">Приятный дизайн</string>
+    <string name="csat_chip_easy_export">Удобный экспорт</string>
+    <string name="csat_chip_easy_to_use">Легко пользоваться</string>
+    <string name="csat_feedback_placeholder">Поделитесь мыслями…</string>
+    <string name="csat_submit">Отправить</string>
+    <string name="csat_thank_you_title">Спасибо за отзыв!</string>
+    <string name="csat_thank_you_description">Не могли бы вы оставить оценку?\nЭто очень нам поможет!</string>
+    <string name="csat_rate_button">Оценить в Google Play</string>
+    <string name="csat_maybe_later">Позже</string>
+
+    <!-- Напоминания -->
+    <string name="reminder_set_reminder">Установить напоминание</string>
+    <string name="reminder_in_one_hour">Через 1 час</string>
+    <string name="reminder_tomorrow_morning">Завтра утром</string>
+    <string name="reminder_tomorrow_evening">Завтра вечером</string>
+    <string name="reminder_pick_date_time">Выбрать дату &amp; время</string>
+    <string name="reminder_remove">Удалить напоминание</string>
+    <string name="reminder_select_time">Выбрать время</string>
+    <string name="reminder_next">Далее</string>
+    <string name="reminder_all_completed">Все элементы выполнены!</string>
+    <string name="reminder_notification_channel">Напоминания о чек-листах</string>
+    <string name="reminder_notification_channel_desc">Уведомления о напоминаниях и дедлайнах чек-листов</string>
+    <string name="reminder_notification_tap">Нажмите, чтобы открыть</string>
+    <plurals name="reminder_items_remaining">
+        <item quantity="one">%d элемент остался</item>
+        <item quantity="few">%d элемента осталось</item>
+        <item quantity="many">%d элементов осталось</item>
+        <item quantity="other">%d элементов осталось</item>
+    </plurals>
+    <string name="reminder_exact_alarm_title">Включить точные напоминания</string>
+    <string name="reminder_exact_alarm_step1">Нажмите «Открыть настройки» ниже</string>
+    <string name="reminder_exact_alarm_step2">Найдите «Будильники &amp; напоминания»</string>
+    <string name="reminder_exact_alarm_step3">Включите для Gisti</string>
+    <string name="reminder_exact_alarm_description">Без этого напоминания могут приходить с небольшой задержкой.</string>
+    <string name="reminder_exact_alarm_dont_show">Больше не показывать</string>
+    <string name="reminder_exact_alarm_open_settings">Открыть настройки</string>
+    <string name="reminder_exact_alarm_skip">Пропустить</string>
+    <string name="reminder_exact_alarm_granted">Точные напоминания включены!</string>
+    <string name="reminder_exact_alarm_denied">Напоминания могут приходить с небольшой задержкой</string>
+
+    <!-- Разрешение на уведомления -->
+    <string name="reminder_notification_permission_title">Включить уведомления</string>
+    <string name="reminder_notification_permission_description">Разрешите Gisti уведомлять вас, когда наступит время напоминания, чтобы не пропустить важный чек-лист.</string>
+    <string name="reminder_notification_permission_feature1">Получайте уведомления в точно заданное время</string>
+    <string name="reminder_notification_permission_feature2">Видите название чек-листа и оставшиеся элементы</string>
+    <string name="reminder_notification_permission_feature3">Нажмите на уведомление, чтобы сразу перейти</string>
+    <string name="reminder_notification_permission_enable">Включить уведомления</string>
+    <string name="reminder_notification_permission_skip">Не сейчас</string>
+
+    <!-- Типы повторения -->
+    <string name="reminder_repeat_none">Не повторять</string>
+    <string name="reminder_repeat_daily">Каждый день</string>
+    <string name="reminder_repeat_weekly">Каждую неделю</string>
+    <string name="reminder_repeat_monthly">Каждый месяц</string>
+    <string name="reminder_repeat_weekdays">По будням</string>
+    <string name="reminder_repeat_biweekly">Каждые 2 недели</string>
+    <string name="reminder_repeat_quarterly">Каждые 3 месяца</string>
+    <string name="reminder_repeat_yearly">Каждый год</string>
+    <string name="reminder_repeat_custom">Настроить…</string>
+
+    <!-- Интервал повторения -->
+    <string name="reminder_repeat_every">Каждые</string>
+    <string name="reminder_repeat_days">дней</string>
+    <string name="reminder_repeat_weeks">недель</string>
+    <string name="reminder_repeat_months">месяцев</string>
+    <string name="reminder_repeat_years">лет</string>
+
+    <string name="reminder_repeat_on">Повторять в</string>
+    <!-- Дни недели (сокращённо) -->
+    <string name="reminder_weekday_mon">П</string>
+    <string name="reminder_weekday_tue">В</string>
+    <string name="reminder_weekday_wed">С</string>
+    <string name="reminder_weekday_thu">Ч</string>
+    <string name="reminder_weekday_fri">П</string>
+    <string name="reminder_weekday_sat">С</string>
+    <string name="reminder_weekday_sun">В</string>
+
+    <!-- Условие окончания -->
+    <string name="reminder_ends">Заканчивается</string>
+    <string name="reminder_ends_never">Никогда</string>
+    <string name="reminder_ends_on_date">По дате</string>
+    <string name="reminder_ends_after_count">После</string>
+    <string name="reminder_ends_occurrences">повторений</string>
+
+    <!-- Сброс отметок -->
+    <string name="reminder_reset_checks">Сбрасывать отметки каждый раз</string>
+    <string name="reminder_reset_checks_desc">Снимать все отметки при повторе напоминания</string>
+
+    <!-- Сводные метки -->
+    <string name="reminder_repeat_label">Повтор</string>
+    <string name="reminder_repeat_summary_daily">Каждый день</string>
+    <string name="reminder_repeat_summary_weekly">Каждую неделю</string>
+    <string name="reminder_repeat_summary_monthly">Каждый месяц</string>
+    <string name="reminder_repeat_summary_weekdays">Пн–Пт</string>
+    <string name="reminder_repeat_summary_biweekly">Каждые 2 недели</string>
+    <string name="reminder_repeat_summary_quarterly">Каждые 3 месяца</string>
+    <string name="reminder_repeat_summary_yearly">Каждый год</string>
+
+    <!-- Вкладки шторки напоминания -->
+    <string name="reminder_tab_once">Один раз</string>
+    <string name="reminder_tab_repeat">Повтор</string>
+    <string name="reminder_repeat_time_label">Время дня</string>
+    <string name="reminder_remove_repeat">Удалить расписание повтора</string>
+    <string name="reminder_repeat_active">Повтор: %1$s в %2$s</string>
+
+    <!-- Шторка правила повтора -->
+    <string name="reminder_repeat_title">Повтор</string>
+    <string name="reminder_repeat_save">Сохранить</string>
+    <string name="reminder_ends_done">Готово</string>
+
+    <!-- Общие метки доступности -->
+    <string name="back">Назад</string>
+    <string name="feedback">Обратная связь</string>
+    <string name="completed_label">Выполнено</string>
+
+    <!-- Детали чек-листа — отмена удаления -->
+    <string name="checklist_item_deleted">«%1$s» удалён</string>
+
+    <!-- Экран поделиться — предпросмотр -->
+    <string name="share_items_progress">%1$d/%2$d элементов</string>
+
+    <!-- Онбординг — интерактивный — шаг настройки -->
+    <string name="onboarding_interactive_settings">Настройки</string>
+
+    <!-- Диалог согласия -->
+    <string name="consent_title">Конфиденциальность &amp; Данные</string>
+    <string name="consent_body">Мы используем аналитику для улучшения приложения и оценки эффективности рекламы. Ваши данные помогают понять, как используются функции, и оптимизировать ваш опыт.\n\nВы согласны на сбор данных в аналитических и рекламных целях?</string>
+    <string name="consent_accept">Принять</string>
+    <string name="consent_decline">Отклонить</string>
+
+    <!-- Настройка виджета -->
+    <string name="widget_config_title">Выбрать чек-лист</string>
+    <string name="widget_config_items_count">%1$d элементов</string>
+    <string name="widget_config_empty_title">Чек-листов пока нет</string>
+    <string name="widget_config_empty_description">Сначала создайте чек-лист в приложении, затем вернитесь для настройки виджета.</string>
+
+    <!-- Иллюстрации функций -->
+    <string name="illustration_photo">Фото</string>
+    <string name="illustration_pdf">PDF</string>
+    <string name="illustration_text">Текст</string>
+    <string name="illustration_link">Ссылка</string>
+    <string name="illustration_voice">Голос</string>
+    <string name="illustration_task_extracted">Задача извлечена из контента</string>
+    <string name="illustration_another_item">Ещё один элемент из вашего ввода</string>
+    <string name="illustration_ai_generated">Элемент чек-листа, созданный ИИ</string>
+    <string name="illustration_apartment_check">🏠 Проверка квартиры</string>
+    <string name="illustration_kitchen">Состояние кухни</string>
+    <string name="illustration_windows">Окна &amp; двери</string>
+    <string name="illustration_plumbing">Сантехника работает</string>
+    <string name="illustration_main_street">✅ Квартира на Ленина</string>
+    <string name="illustration_project_review">Обзор проекта</string>
+    <string name="illustration_progress">3/3 ✓</string>
+    <string name="illustration_review_document">Проверить документ</string>
+    <string name="illustration_send_email">Отправить письмо</string>
+    <string name="illustration_final_approval">Финальное согласование</string>
+    <string name="illustration_share">Поделиться</string>
+    <string name="illustration_ai_badge">✨ ИИ</string>
+    <string name="illustration_unlimited_create">Безлимитное создание с ИИ</string>
+    <string name="illustration_unlimited_fill">Безлимитное заполнение с ИИ</string>
+    <string name="illustration_pdf_text_export">Экспорт PDF &amp; текста</string>
+    <string name="illustration_credits_daily">300 кредитов ИИ ежедневно</string>
+
+    <!-- Экран настроек -->
+    <string name="settings_title">Настройки</string>
+    <string name="settings_theme">Тема</string>
+    <string name="settings_theme_light">Светлая</string>
+    <string name="settings_theme_dark">Тёмная</string>
+    <string name="settings_theme_system">Системная</string>
+    <string name="settings_dynamic_color">Динамические цвета</string>
+    <string name="settings_dynamic_color_description">Использовать цвета из обоев (Android 12+)</string>
+    <string name="settings_back">Назад</string>
+
+    <!-- Отладочный экран -->
+    <!-- Экспорт PDF -->
+    <string name="pdf_note_label">Примечание:</string>
+    <string name="pdf_page_number">Страница %1$d из %2$d</string>
+
+    <string name="debug_title">Меню отладки</string>
+    <string name="debug_developer_tools">Инструменты разработчика</string>
+    <string name="debug_app_info">Информация о приложении</string>
+    <string name="debug_app_info_description">Версия, сборка и прочие детали</string>
+    <string name="debug_reset_onboarding">Сбросить онбординг</string>
+    <string name="debug_reset_onboarding_description">Показать экран приветствия снова</string>
+    <string name="debug_clear_data">Очистить данные</string>
+    <string name="debug_clear_data_description">Удалить все локальные данные</string>
+    <string name="debug_create_test">Создать тестовые чек-листы</string>
+    <string name="debug_create_test_description">Добавить демо-данные для тестирования</string>
+    <string name="debug_app_info_dialog_title">Информация о приложении</string>
+    <string name="debug_label_name">Название</string>
+    <string name="debug_label_version">Версия</string>
+    <string name="debug_label_build">Сборка</string>
+    <string name="debug_test_restore_credits">Тест восстановления кредитов</string>
+    <string name="debug_test_restore_credits_description">Симулировать восстановление кредитов после покупки</string>
+    <string name="debug_restore_credits_success">Кредиты восстановлены: %1$d</string>
+    <string name="debug_restore_credits_error">Не удалось восстановить кредиты</string>
+    <string name="debug_store_screenshots">Скриншоты магазина</string>
+    <string name="debug_store_screenshots_description">Предпросмотр экранов для App Store/Play Store</string>
+    <string name="debug_repeat_rule_presets">Пресеты правил повтора</string>
+    <string name="debug_repeat_rule_presets_description">Предпросмотр шторки с 8 умными пресетами повтора</string>
+    <string name="debug_show_csat">Показать CSAT-опрос</string>
+    <string name="debug_show_csat_description">Принудительно показать CSAT-шторку для тестирования</string>
+    <string name="debug_interactive_onboarding">Интерактивный онбординг</string>
+    <string name="debug_interactive_onboarding_description">Открыть новый интерактивный онбординг</string>
+
+    <!-- Каталог экранов -->
+    <string name="debug_catalog_title">Каталог экранов</string>
+    <string name="debug_catalog_entry_description">Просмотр всех экранов приложения (для скриншот-тестов)</string>
+    <string name="debug_catalog_section_state">Начальное состояние</string>
+    <string name="debug_catalog_section_lifecycle">Жизненный цикл</string>
+    <string name="debug_catalog_section_create">Создание</string>
+    <string name="debug_catalog_section_detail">Детали</string>
+    <string name="debug_catalog_section_ai">ИИ</string>
+    <string name="debug_catalog_section_monetisation">Монетизация</string>
+    <string name="debug_catalog_section_other">Прочее</string>
+    <string name="debug_catalog_state_empty">Пусто (нет данных)</string>
+    <string name="debug_catalog_state_empty_desc">Очищено, бесплатный пользователь, 10 кредитов</string>
+    <string name="debug_catalog_state_with_data">С данными (3 чек-листа)</string>
+    <string name="debug_catalog_state_with_data_desc">3 чек-листа, бесплатный пользователь, 10 кредитов</string>
+    <string name="debug_catalog_state_free_limit">Достигнут лимит (4 чек-листа)</string>
+    <string name="debug_catalog_state_free_limit_desc">4 чек-листа, бесплатный — показывает кнопку апсейла</string>
+    <string name="debug_catalog_state_premium">Премиум-пользователь</string>
+    <string name="debug_catalog_state_premium_desc">3 чек-листа, Премиум, 300 кредитов</string>
+    <string name="debug_catalog_onboarding">Онбординг</string>
+    <string name="debug_catalog_onboarding_desc">Статичный онбординг-пейджер</string>
+    <string name="debug_catalog_interactive_onboarding">Интерактивный онбординг</string>
+    <string name="debug_catalog_interactive_onboarding_desc">Анимированный интерактивный онбординг</string>
+    <string name="debug_catalog_main">Главная</string>
+    <string name="debug_catalog_main_desc">Главный экран со списком чек-листов</string>
+    <string name="debug_catalog_templates">Шаблоны</string>
+    <string name="debug_catalog_templates_desc">Галерея шаблонов чек-листов</string>
+    <string name="debug_catalog_template_preview">Предпросмотр шаблона</string>
+    <string name="debug_catalog_template_preview_desc">Предпросмотр одного шаблона (daily_tasks)</string>
+    <string name="debug_catalog_create_new">Создать новый</string>
+    <string name="debug_catalog_create_new_desc">Пустой экран создания чек-листа</string>
+    <string name="debug_catalog_create_edit">Создание (режим редактирования)</string>
+    <string name="debug_catalog_create_edit_desc">Редактирование первого сидированного чек-листа — требует seed</string>
+    <string name="debug_catalog_checklist_detail">Детали чек-листа</string>
+    <string name="debug_catalog_checklist_detail_desc">Детальный вид — требует seed</string>
+    <string name="debug_catalog_fill_detail">Детали заполнения</string>
+    <string name="debug_catalog_fill_detail_desc">Детальный вид заполнения — требует seed</string>
+    <string name="debug_catalog_fills_list">Список заполнений</string>
+    <string name="debug_catalog_fills_list_desc">Все заполнения для чек-листа — требует seed</string>
+    <string name="debug_catalog_share_checklist">Поделиться чек-листом</string>
+    <string name="debug_catalog_share_checklist_desc">Экран экспорта — требует seed</string>
+    <string name="debug_catalog_analyze_empty">Анализ (пустой)</string>
+    <string name="debug_catalog_analyze_empty_desc">Экран анализа, чек-лист не выбран</string>
+    <string name="debug_catalog_analyze_for_checklist">Анализ (с чек-листом)</string>
+    <string name="debug_catalog_analyze_for_checklist_desc">Анализ, привязанный к первому сидированному чек-листу</string>
+    <string name="debug_catalog_analyze_result_preview">Предпросмотр результата анализа</string>
+    <string name="debug_catalog_analyze_result_preview_desc">Показывает пустое состояние предпросмотра результата</string>
+    <string name="debug_catalog_paywall">Paywall (вариант RC)</string>
+    <string name="debug_catalog_paywall_desc">Экран подписки / пробного периода (вариант из Remote Config)</string>
+    <string name="debug_catalog_paywall_timeline">Paywall · Timeline</string>
+    <string name="debug_catalog_paywall_timeline_desc">Принудительный A/B-вариант: Timeline (3-шаговый пробный период)</string>
+    <string name="debug_catalog_paywall_features">Paywall · Features</string>
+    <string name="debug_catalog_paywall_features_desc">Принудительный A/B-вариант: сетка функций</string>
+    <string name="debug_catalog_paywall_compare">Paywall · Compare</string>
+    <string name="debug_catalog_paywall_compare_desc">Принудительный A/B-вариант: таблица сравнения</string>
+    <string name="debug_catalog_subscription_success">Статус подписки (успех)</string>
+    <string name="debug_catalog_subscription_success_desc">Экран подтверждения успешной покупки</string>
+    <string name="debug_catalog_subscription_pending">Статус подписки (ожидание)</string>
+    <string name="debug_catalog_subscription_pending_desc">Экран ожидания / без сообщения</string>
+    <string name="debug_catalog_settings">Настройки</string>
+    <string name="debug_catalog_settings_desc">Экран настроек приложения</string>
+    <string name="debug_catalog_update_feed">Лента обновлений</string>
+    <string name="debug_catalog_update_feed_desc">История версий / лента обновлений</string>
+    <string name="debug_catalog_store_screenshot">Скриншот магазина</string>
+    <string name="debug_catalog_store_screenshot_desc">Страницы маркетинговых скриншотов</string>
+
+    <!-- Paywall V1 — A/B редизайн (paywall_v1_*) -->
+    <!-- Действия верхней панели -->
+    <string name="paywall_v1_close_cd">Закрыть</string>
+    <string name="paywall_v1_restore_action">Восстановить</string>
+
+    <!-- Веб-версия: вместо paywall показывает CTA «Установить мобильное приложение» -->
+    <string name="paywall_web_install_title">Получите полный опыт Gisti</string>
+    <string name="paywall_web_install_description">Подписки и полные функции доступны в мобильном приложении. Установите Gisti на телефон для безлимитных чек-листов, заполнений с ИИ, экспорта и напоминаний.</string>
+    <string name="paywall_web_install_android_label">Android</string>
+    <string name="paywall_web_install_android_status">Доступно в Google Play</string>
+    <string name="paywall_web_install_android_cta">Получить в Google Play</string>
+    <string name="paywall_web_install_ios_label">iOS</string>
+    <string name="paywall_web_install_ios_status">Скоро</string>
+    <string name="paywall_web_install_ios_hint">Уже готовим. Следите за обновлениями.</string>
+
+    <!-- Таблетка пробного периода (Вариант A) -->
+    <string name="paywall_v1_timeline_days_free">%1$d ДНЕЙ БЕСПЛАТНО</string>
+
+    <!-- Вариант A: заголовок и текст Timeline -->
+    <string name="paywall_v1_timeline_headline">Попробуйте Gisti Про,\nбесплатно.</string>
+    <string name="paywall_v1_timeline_body">Превращайте фото, голосовые заметки или PDF в умные чек-листы — мгновенно.</string>
+
+    <!-- Метка раздела Timeline -->
+    <string name="paywall_v1_how_trial_works">КАК РАБОТАЕТ ПРОБНЫЙ ПЕРИОД</string>
+
+    <!-- Шаги Timeline (2 шага: Сегодня → конец пробного периода. Шаг «День 2» удалён —
+         обещал push-уведомление, которое мы не отправляем, что является риском по политике
+         Google Play «Обманчивое поведение». Если добавим реальные уведомления перед
+         окончанием пробного периода — вернуть.) -->
+    <string name="paywall_v1_timeline_step1_title">Сегодня</string>
+    <string name="paywall_v1_timeline_step1_body">Разблокируйте Gisti Про — 300 ИИ-запросов каждый день, безлимитные чек-листы и повторяющиеся напоминания.</string>
+    <string name="paywall_v1_timeline_step3_title">День 3</string>
+    <string name="paywall_v1_timeline_step3_body">Пробный период заканчивается, начинается платная Про-подписка.</string>
+
+    <!-- Вариант B: заголовок и текст Features -->
+    <string name="paywall_v1_features_headline">Всё от Про,\nбесплатно %1$d дней</string>
+    <string name="paywall_v1_features_body">Без дневных лимитов, без ограничений по чек-листам, без ограничений по напоминаниям. Отмена в любое время.</string>
+
+    <!-- Вариант B: строки функций — реальные преимущества Про. -->
+    <!-- УСТАРЕЛО (сохранено для совместимости переводов, больше не отображается):
+         paywall_v1_feature_photo_*, paywall_v1_feature_voice_*, paywall_v1_feature_pdf_*,
+         paywall_v1_feature_link_*. Все четыре типа ввода доступны на бесплатном тарифе;
+         указывать их как эксклюзив Про было вводящим в заблуждение. -->
+    <string name="paywall_v1_feature_photo_title">Фото в чек-лист</string>
+    <string name="paywall_v1_feature_photo_body">Сфотографируйте холодильник, рецепт, доску.</string>
+    <string name="paywall_v1_feature_voice_title">Голосовые заметки</string>
+    <string name="paywall_v1_feature_voice_body">Надиктуйте — Gisti структурирует.</string>
+    <string name="paywall_v1_feature_pdf_title">PDF &amp; документы</string>
+    <string name="paywall_v1_feature_pdf_body">Загружайте программы, инструкции, рецепты.</string>
+    <string name="paywall_v1_feature_link_title">Любая ссылка</string>
+    <string name="paywall_v1_feature_link_body">Статьи и посты — превращаются в шаги.</string>
+    <!-- Активные строки функций -->
+    <string name="paywall_v1_feature_ai_runs_title">300 ИИ-запросов каждый день</string>
+    <string name="paywall_v1_feature_ai_runs_body">Пополняются ежедневно. Планируйте поездки, рецепты и проекты на неделю.</string>
+    <string name="paywall_v1_feature_unlimited_lists_title">Безлимитные чек-листы</string>
+    <string name="paywall_v1_feature_unlimited_lists_body">Никакого ограничения в 4 чек-листа. Создавайте столько, сколько нужно.</string>
+    <string name="paywall_v1_feature_unlimited_fills_title">Безлимитные заполнения</string>
+    <string name="paywall_v1_feature_unlimited_fills_body">Используйте один чек-лист для разных поездок, сессий, проектов.</string>
+    <string name="paywall_v1_feature_unlimited_reminders_title">Безлимитные повторяющиеся напоминания</string>
+    <string name="paywall_v1_feature_unlimited_reminders_body">Ежедневно, еженедельно, по настройке — устанавливайте сколько угодно.</string>
+    <!-- УДАЛЕНО: paywall_v1_feature_sync_title / _body — продукт только мобильный, синхронизации между устройствами нет -->
+
+    <!-- Вариант C: заголовок и текст Compare -->
+    <string name="paywall_v1_compare_headline">Сравните и выберите.</string>
+    <string name="paywall_v1_compare_body">Одинаковые ИИ-инструменты — Про снимает ограничения. Попробуйте Про бесплатно %1$d дней.</string>
+
+    <!-- Вариант C: заголовки таблицы сравнения -->
+    <string name="paywall_v1_compare_feature">ФУНКЦИЯ</string>
+    <string name="paywall_v1_compare_free">Бесплатно</string>
+    <string name="paywall_v1_compare_pro">Про</string>
+
+    <!-- Вариант C: строки сравнения — только реальные различия. -->
+    <!-- УСТАРЕЛО (сохранено для совместимости переводов, больше не отображается):
+         paywall_v1_compare_row_photo, _voice, _pdf_link — все типы ввода доступны на бесплатном
+         paywall_v1_compare_row_priority_ai — одна модель Gemini для всех
+         paywall_v1_compare_row_ai_checklists — заменён на _ai_requests с корректными значениями -->
+    <string name="paywall_v1_compare_row_ai_checklists">ИИ чек-листов / день</string>
+    <string name="paywall_v1_compare_row_photo">Ввод фото</string>
+    <string name="paywall_v1_compare_row_voice">Ввод голоса</string>
+    <string name="paywall_v1_compare_row_pdf_link">Импорт PDF &amp; ссылок</string>
+    <string name="paywall_v1_compare_row_reminders">Умные напоминания</string>
+    <string name="paywall_v1_compare_row_priority_ai">Лучшая ИИ-модель (Gemini 2.5 Flash)</string>
+    <!-- Активные строки + значения -->
+    <string name="paywall_v1_compare_row_ai_requests">ИИ-запросы</string>
+    <string name="paywall_v1_compare_row_checklists">Чек-листы</string>
+    <string name="paywall_v1_compare_row_fills">Заполнений / список</string>
+    <string name="paywall_v1_compare_row_recurring_reminders">Повторяющиеся напоминания</string>
+    <string name="paywall_v1_compare_value_free_credits">100 один раз</string>
+    <string name="paywall_v1_compare_value_pro_credits">300/день</string>
+    <string name="paywall_v1_compare_value_unlimited">Безлимитно</string>
+
+    <!-- Строки тарифных планов -->
+    <string name="paywall_v1_yearly_label">Годовой</string>
+    <string name="paywall_v1_monthly_label">Месячный</string>
+    <string name="paywall_v1_best_value_badge">ВЫГОДНЕЕ ВСЕГО</string>
+    <string name="paywall_v1_billed_monthly">Оплата ежемесячно</string>
+    <!-- %1$s = ежемесячный эквивалент годовой цены (например «2,50 $» или «915,83 ₸») -->
+    <string name="paywall_v1_billed_annually_subtitle">%1$s/мес · оплата раз в год</string>
+    <!-- УСТАРЕЛО: процент скидки теперь вычисляется динамически в PaywallRoute -->
+    <string name="paywall_v1_save_72">Скидка 72%</string>
+    <!-- %1$d = динамически вычисленный процент -->
+    <string name="paywall_save_percent">Скидка %1$d%%</string>
+
+    <!-- Закреплённый CTA -->
+    <string name="paywall_v1_cta_start_trial">Начать %1$d-дневный пробный период</string>
+    <!-- УСТАРЕЛО: заменено на paywall_v1_cta_sub_yearly / paywall_v1_cta_sub_monthly -->
+    <string name="paywall_v1_cta_sub">Затем 20$/год. Автопродление. Отмена в любое время.</string>
+    <!-- Однострочное раскрытие CTA. ПРИМЕЧАНИЕ: Политика подписок Google Play 4.5 требует
+         видимого раскрытия «автопродления» перед покупкой. Если Play-ревью снова это отметит —
+         восстановить «Автопродление. » между %1$s/год. и Отмена. -->
+    <string name="paywall_v1_cta_sub_yearly">Затем %1$s/год. Отмена в любое время.</string>
+    <string name="paywall_v1_cta_sub_monthly">Затем %1$s/месяц. Отмена в любое время.</string>
+
+    <!-- Еженедельный режим («Моя неделя») -->
+    <string name="templates_create_weekly">Моя неделя</string>
+    <string name="weekly_mode_title">Моя неделя</string>
+    <string name="weekday_monday">Понедельник</string>
+    <string name="weekday_tuesday">Вторник</string>
+    <string name="weekday_wednesday">Среда</string>
+    <string name="weekday_thursday">Четверг</string>
+    <string name="weekday_friday">Пятница</string>
+    <string name="weekday_saturday">Суббота</string>
+    <string name="weekday_sunday">Воскресенье</string>
+    <!-- %1$s = локализованное название дня, например «Добавить для понедельника» -->
+    <string name="weekly_add_for_day">Добавить для %1$s</string>
+    <string name="weekly_move_to_day_title">Перенести на день</string>
+    <string name="weekly_move_to_day_action">Перенести на…</string>
+    <string name="weekly_paywall_locked_title">Функция Премиум</string>
+    <string name="weekly_paywall_locked_message">Бесплатным пользователям доступен 1 еженедельный чек-лист. Перейдите на Премиум для безлимитных еженедельных чек-листов.</string>
+    <string name="weekly_overdue_section_title">Просрочено</string>
+    <string name="reminder_paywall_locked_title">Функция Премиум</string>
+    <string name="reminder_paywall_locked_message">Бесплатным пользователям доступно 1 активное напоминание. Перейдите на Премиум для безлимитных напоминаний на чек-листах и элементах.</string>
+    <string name="reminder_paywall_locked_cta">Стать Про</string>
+
+    <!-- Экран «Сегодня» -->
+    <string name="today_title">Сегодня</string>
+    <string name="today_empty_state_title">На сегодня ничего нет</string>
+    <string name="today_empty_state_description">Отдыхайте или создайте новую задачу</string>
+    <string name="today_all_done_title">Всё выполнено на сегодня</string>
+    <string name="today_all_done_description">Отлично! Все задачи на сегодня выполнены.</string>
+    <string name="today_no_checklists_description">Создайте первый чек-лист, чтобы начать.</string>
+    <string name="today_section_past_due">Просрочено</string>
+    <string name="today_section_today">Сегодня</string>
+    <string name="today_open_menu">Открыть меню</string>
+
+    <!-- Вкладки навигационной панели -->
+    <string name="today_tab_today">Сегодня</string>
+    <string name="today_tab_lists">Списки</string>
+</resources>

@@ -119,6 +119,7 @@
     <string name="update_feed_empty_description">Check back later for news and tips</string>
     <string name="update_feed_unlock_with_premium">Become Pro to Unlock More</string>
     <string name="unlock_more_with_premium">Become Pro to Unlock More</string>
+    <string name="update_feed_version_header">Version %1$s</string>
 
     <!-- Create Screen -->
     <string name="create_title">New Checklist</string>
@@ -801,6 +802,8 @@
     <string name="paywall_v1_billed_annually_subtitle">%1$s/mo · billed annually</string>
     <!-- DEPRECATED: savings % is now computed dynamically in PaywallRoute from real prices -->
     <string name="paywall_v1_save_72">Save 72%</string>
+    <!-- %1$d = dynamically computed percentage -->
+    <string name="paywall_save_percent">Save %1$d%%</string>
 
     <!-- Sticky CTA -->
     <string name="paywall_v1_cta_start_trial">Start %1$d-day free trial</string>
@@ -841,7 +844,8 @@
     <string name="today_empty_state_title">Nothing for today</string>
     <string name="today_empty_state_description">Enjoy your day or create a new task</string>
     <string name="today_all_done_title">All done for today</string>
-    <string name="today_all_done_description">Great job! You\'ve completed everything scheduled for today.</string>
+    <string name="today_all_done_description">Great job! You've completed everything scheduled for today.</string>
+    <string name="today_no_checklists_description">Create your first checklist to get started.</string>
     <string name="today_section_past_due">Past due</string>
     <string name="today_section_today">Today</string>
     <string name="today_open_menu">Open menu</string>
