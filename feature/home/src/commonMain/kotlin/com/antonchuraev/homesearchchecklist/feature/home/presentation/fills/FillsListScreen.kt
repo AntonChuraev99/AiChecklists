@@ -20,7 +20,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppLinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -186,13 +186,11 @@ private fun FillCard(
                 Row(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    LinearProgressIndicator(
+                    AppLinearProgressIndicator(
                         progress = { progress },
                         modifier = Modifier
                             .weight(1f)
                             .height(6.dp),
-                        color = MaterialTheme.colorScheme.primary,
-                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
                     )
                     Spacer(modifier = Modifier.width(AppDimens.SpacingSm))
                     Text(

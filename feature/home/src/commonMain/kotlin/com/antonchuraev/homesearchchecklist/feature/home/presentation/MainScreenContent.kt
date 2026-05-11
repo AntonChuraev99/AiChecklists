@@ -29,7 +29,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppLinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -198,12 +198,11 @@ fun MainScreenContent(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
                                     ) {
-                                        LinearProgressIndicator(
+                                        AppLinearProgressIndicator(
                                             progress = { checklistWithProgress.progress },
                                             modifier = Modifier
                                                 .weight(1f)
                                                 .clip(MaterialTheme.shapes.small),
-                                            color = MaterialTheme.colorScheme.primary,
                                             trackColor = MaterialTheme.colorScheme.outlineVariant,
                                         )
                                         Text(
