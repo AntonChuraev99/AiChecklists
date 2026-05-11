@@ -133,6 +133,27 @@ feature/
   debug/                 # Developer tools (debug builds only)
 ```
 
+### Compose Resources in KMP-Android Library Modules
+
+After AGP 9 migration the new AKMP DSL (`kotlin { android { ... } }`) **does not enable Android resources by default**. Any KMP-library module that ships its own `composeResources/` (files, drawables, fonts, values) **must** opt in explicitly — otherwise `Res.readBytes`/`Res.getDrawable` will throw `MissingResourceException` at runtime because the assets never get packed into the APK.
+
+```kotlin
+kotlin {
+    android {
+        namespace = "..."
+        compileSdk = libs.versions.android.compileSdk.get().toInt()
+        minSdk = libs.versions.android.minSdk.get().toInt()
+        withHostTest {}
+        androidResources {           // ← REQUIRED for any module with composeResources/
+            enable = true
+        }
+    }
+    // ...
+}
+```
+
+Currently the block is present in `composeApp`, `core/designsystem`, and `feature/create` (the only modules with their own `composeResources/`). The other 19 KMP-library modules don't need it today, but **add it the moment you add `src/commonMain/composeResources/`** — see `docs/solutions/build-system/agp9-feature-module-androidresources-fix-2026-05-11.md` for the full root-cause analysis.
+
 ### MVI Pattern
 
 ViewModels extend `AppViewModel<State, Intent, SideEffect>` from `core:common:api`:
