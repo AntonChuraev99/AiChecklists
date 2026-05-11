@@ -33,7 +33,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.LinearProgressIndicator
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppLinearProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -248,13 +248,12 @@ private fun ProgressHeader(fill: ChecklistFill) {
             )
         }
         Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
-        LinearProgressIndicator(
+        AppLinearProgressIndicator(
             progress = { progress },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(8.dp),
             color = if (isComplete) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
-            trackColor = MaterialTheme.colorScheme.surfaceVariant,
         )
         Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
     }
