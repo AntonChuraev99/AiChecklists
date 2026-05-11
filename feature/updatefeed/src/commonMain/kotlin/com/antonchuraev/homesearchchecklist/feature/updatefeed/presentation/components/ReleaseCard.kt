@@ -30,10 +30,15 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.collapse
+import aichecklists.core.designsystem.generated.resources.expand
+import aichecklists.core.designsystem.generated.resources.update_feed_version_header
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.feature.updatefeed.domain.model.UpdatePostAction
 import com.antonchuraev.homesearchchecklist.feature.updatefeed.domain.model.VersionReleaseGroup
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * A collapsible release card in the Google Play release-notes style.
@@ -87,7 +92,7 @@ internal fun ReleaseCard(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "Version ${release.version}",
+                    text = stringResource(Res.string.update_feed_version_header, release.version),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -95,7 +100,11 @@ internal fun ReleaseCard(
                 )
                 Icon(
                     imageVector = Icons.Filled.ExpandMore,
-                    contentDescription = if (expanded) "Collapse" else "Expand",
+                    contentDescription = if (expanded) {
+                        stringResource(Res.string.collapse)
+                    } else {
+                        stringResource(Res.string.expand)
+                    },
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.graphicsLayer {
                         rotationZ = if (expanded) 180f else 0f

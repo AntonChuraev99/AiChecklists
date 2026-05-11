@@ -41,11 +41,23 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.main_create_checklist
+import aichecklists.core.designsystem.generated.resources.today_all_done_description
+import aichecklists.core.designsystem.generated.resources.today_all_done_title
+import aichecklists.core.designsystem.generated.resources.today_empty_state_description
+import aichecklists.core.designsystem.generated.resources.today_empty_state_title
+import aichecklists.core.designsystem.generated.resources.today_no_checklists_description
+import aichecklists.core.designsystem.generated.resources.today_open_menu
+import aichecklists.core.designsystem.generated.resources.today_section_past_due
+import aichecklists.core.designsystem.generated.resources.today_section_today
+import aichecklists.core.designsystem.generated.resources.today_title
 import com.antonchuraev.homesearchchecklist.core.common.api.State
 import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.stringResource
 
 // ---------------------------------------------------------------------------
 // TodayScreen — "My Day" view
@@ -149,12 +161,12 @@ fun TodayScreen(
     val scope = rememberCoroutineScope()
 
     AppScaffold(
-        title = "Today",
+        title = stringResource(Res.string.today_title),
         navigationIcon = {
             IconButton(onClick = { scope.launch { drawerState.open() } }) {
                 Icon(
                     imageVector = Icons.Filled.Menu,
-                    contentDescription = "Open menu",
+                    contentDescription = stringResource(Res.string.today_open_menu),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -165,25 +177,25 @@ fun TodayScreen(
 
             TodayScreenState.Empty -> EmptyState(
                 icon = Icons.Outlined.WbSunny,
-                title = "Nothing for today",
-                description = "Enjoy your day or create a new task",
+                title = stringResource(Res.string.today_empty_state_title),
+                description = stringResource(Res.string.today_empty_state_description),
             )
 
             TodayScreenState.AllDone -> EmptyState(
                 icon = Icons.Outlined.CheckCircle,
-                title = "All done for today",
-                description = "Great job! You've completed everything scheduled for today.",
+                title = stringResource(Res.string.today_all_done_title),
+                description = stringResource(Res.string.today_all_done_description),
             )
 
             TodayScreenState.NoChecklists -> EmptyState(
                 icon = Icons.Outlined.WbSunny,
-                title = "Nothing for today",
-                description = "Create your first checklist to get started.",
+                title = stringResource(Res.string.today_empty_state_title),
+                description = stringResource(Res.string.today_no_checklists_description),
                 action = {
                     // AppButton requires non-zero width; fillMaxWidth is provided by EmptyState's
                     // Column(horizontal = ScreenPaddingHorizontal). Wrap in a width-constrained Box.
                     com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton(
-                        text = "Create Checklist",
+                        text = stringResource(Res.string.main_create_checklist),
                         onClick = onCreateChecklistClick,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -234,7 +246,7 @@ private fun TodaySuccessContent(
         if (state.pastDue.isNotEmpty()) {
             stickyHeader(key = "header_past_due") {
                 TodaySectionHeader(
-                    title = "Past due",
+                    title = stringResource(Res.string.today_section_past_due),
                     isPastDue = true,
                 )
             }
@@ -253,7 +265,7 @@ private fun TodaySuccessContent(
         if (state.today.isNotEmpty()) {
             stickyHeader(key = "header_today") {
                 TodaySectionHeader(
-                    title = "Today",
+                    title = stringResource(Res.string.today_section_today),
                     isPastDue = false,
                 )
             }
