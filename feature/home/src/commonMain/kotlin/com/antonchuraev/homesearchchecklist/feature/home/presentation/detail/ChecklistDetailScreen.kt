@@ -37,6 +37,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Surface
@@ -124,6 +125,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.font.FontWeight
@@ -131,7 +133,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -605,8 +609,15 @@ private fun ChecklistDetailContent(
         state.defaultFill?.items?.firstOrNull { it.id == id }
     }
     if (detailsItem != null) {
+        val isEditingThisItem = state.editingItemTextFor == detailsItem.id
         ItemDetailsSheet(
             item = detailsItem,
+            isEditingText = isEditingThisItem,
+            editingTextDraft = state.editingItemTextDraft,
+            onStartTextEdit = { onIntent(ChecklistDetailIntent.OnStartItemTextEdit(detailsItem.id)) },
+            onTextDraftChange = { onIntent(ChecklistDetailIntent.OnItemTextDraftChange(it)) },
+            onConfirmTextEdit = { onIntent(ChecklistDetailIntent.OnConfirmItemTextEdit) },
+            onCancelTextEdit = { onIntent(ChecklistDetailIntent.OnCancelItemTextEdit) },
             onReminderClick = { onIntent(ChecklistDetailIntent.OnItemReminderClick(detailsItem.id)) },
             onNoteClick = { onIntent(ChecklistDetailIntent.OnAddNoteClick(detailsItem.id)) },
             onTogglePriority = { onIntent(ChecklistDetailIntent.OnToggleItemPriority(detailsItem.id)) },
@@ -1186,6 +1197,12 @@ internal fun ChecklistItemCard(
 @Composable
 internal fun ItemDetailsSheet(
     item: ChecklistFillItem,
+    isEditingText: Boolean = false,
+    editingTextDraft: String = "",
+    onStartTextEdit: () -> Unit = {},
+    onTextDraftChange: (String) -> Unit = {},
+    onConfirmTextEdit: () -> Unit = {},
+    onCancelTextEdit: () -> Unit = {},
     onReminderClick: () -> Unit,
     onNoteClick: () -> Unit,
     onTogglePriority: () -> Unit,
@@ -1204,15 +1221,64 @@ internal fun ItemDetailsSheet(
                 .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
                 .padding(bottom = AppDimens.SpacingXxl)
         ) {
-            // Item name as sheet title
-            Text(
-                text = item.text,
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = AppDimens.SpacingMd)
-            )
+            // Item name as sheet title — tap to enter inline edit mode
+            if (isEditingText) {
+                val focusRequester = remember { FocusRequester() }
+                val keyboardController = LocalSoftwareKeyboardController.current
+                var hasGainedFocus by remember { mutableStateOf(false) }
+                val canSave = remember(editingTextDraft, item.text) {
+                    val trimmed = editingTextDraft.trim()
+                    trimmed.isNotEmpty() && trimmed != item.text.trim()
+                }
+
+                LaunchedEffect(Unit) {
+                    focusRequester.requestFocus()
+                    keyboardController?.show()
+                }
+
+                // Header: Save action top-right, independent of title width
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    AppButtonText(
+                        text = stringResource(Res.string.save),
+                        onClick = onConfirmTextEdit,
+                        enabled = canSave,
+                    )
+                }
+
+                BasicTextField(
+                    value = editingTextDraft,
+                    onValueChange = onTextDraftChange,
+                    textStyle = MaterialTheme.typography.headlineSmall.copy(
+                        color = MaterialTheme.colorScheme.onSurface
+                    ),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = AppDimens.SpacingMd)
+                        .focusRequester(focusRequester)
+                        .onFocusChanged { focusState ->
+                            if (focusState.isFocused) {
+                                hasGainedFocus = true
+                            } else if (hasGainedFocus) {
+                                onConfirmTextEdit()
+                            }
+                        }
+                )
+            } else {
+                Text(
+                    text = item.text,
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = AppDimens.MinTouchTarget)
+                        .clickable(onClick = onStartTextEdit)
+                        .padding(bottom = AppDimens.SpacingMd)
+                )
+            }
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 

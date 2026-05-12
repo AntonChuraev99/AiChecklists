@@ -141,6 +141,12 @@ data class ChecklistFillItem private constructor(
         reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount
     )
 
+    /** Update text while preserving id, checked state, note, weekday, priority, and reminder fields */
+    fun withText(text: String) = ChecklistFillItem(
+        text, checked, note, id, weekday, priority,
+        reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount
+    )
+
     /** Toggle priority between 0 (normal) and 1 (starred); preserves all other fields */
     fun withPriority(priority: Int) = ChecklistFillItem(
         text, checked, note, id, weekday, priority,
