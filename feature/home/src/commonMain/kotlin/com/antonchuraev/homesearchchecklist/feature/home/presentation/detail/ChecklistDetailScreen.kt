@@ -460,18 +460,12 @@ private fun ChecklistDetailContent(
                     .padding(horizontal = AppDimens.ScreenPaddingHorizontal),
                 verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
             ) {
+                // Progress header with checklist name + completion celebration
                 item {
-                    Text(
-                        text = state.checklist.name,
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        modifier = Modifier.padding(top = AppDimens.SpacingMd)
+                    ProgressHeader(
+                        fill = defaultFill,
+                        name = state.checklist.name,
                     )
-                }
-
-                // Progress header with completion celebration
-                item {
-                    ProgressHeader(fill = defaultFill)
                 }
 
                 // View all fills button (if there are additional fills)
@@ -823,7 +817,7 @@ private fun ChecklistDetailContent(
 }
 
 @Composable
-private fun ProgressHeader(fill: ChecklistFill) {
+private fun ProgressHeader(fill: ChecklistFill, name: String) {
     val checkedCount = fill.items.count { it.checked }
     val totalCount = fill.items.size
     val progress = if (totalCount > 0) checkedCount.toFloat() / totalCount else 0f
@@ -843,9 +837,20 @@ private fun ProgressHeader(fill: ChecklistFill) {
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Text(
+                text = name,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = AppDimens.SpacingMd),
+            )
             Text(
                 text = "$checkedCount / $totalCount",
                 style = MaterialTheme.typography.titleMedium,
