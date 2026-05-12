@@ -42,7 +42,7 @@ fun AddItemInputField(
 
     Row(
         modifier = modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.Top,
+        verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
     ) {
         AppTextField(
