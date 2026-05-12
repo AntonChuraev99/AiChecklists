@@ -843,14 +843,9 @@ private fun ProgressHeader(fill: ChecklistFill) {
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = stringResource(Res.string.checklist_progress),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onBackground
-            )
             Text(
                 text = "$checkedCount / $totalCount",
                 style = MaterialTheme.typography.titleMedium,
