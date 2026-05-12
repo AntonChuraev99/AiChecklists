@@ -63,11 +63,13 @@ Gisti transforms any content into actionable checklists using AI:
 
 ## Build Commands
 
+> **AGP 9 module split (since 2026-05-10):** `composeApp` is now a **KMP library** (commonMain + androidMain + iosMain + wasmJsMain). The Android **application** lives in `:androidApp`. Use `:androidApp` for any `assemble*` / `bundle*` / `install*` / `connectedAndroidTest` task. KMP/iOS/wasmJs tasks stay on `:composeApp`. See `docs/solutions/build-system/agp-9-migration-2026-05-10.md`.
+
 ```bash
 ./gradlew build                                       # Full build for all targets
-./gradlew composeApp:assembleDebug                    # Android debug APK
-./gradlew composeApp:bundleRelease                    # Android release bundle
-./gradlew composeApp:connectedAndroidTest             # Run Android instrumented tests
+./gradlew androidApp:assembleDebug                    # Android debug APK
+./gradlew androidApp:bundleRelease                    # Android release bundle (AAB)
+./gradlew androidApp:connectedAndroidTest             # Run Android instrumented tests
 ./gradlew composeApp:wasmJsBrowserDevelopmentRun --continuous  # Web dev server on http://localhost:9090/
 ./gradlew composeApp:wasmJsBrowserDistribution        # Web production bundle (Cloudflare Workers asset dir)
 ```
@@ -79,7 +81,7 @@ For iOS, open `iosApp/iosApp.xcodeproj` in Xcode.
 ```bash
 $ANDROID_SDK/emulator/emulator -list-avds          # List emulators
 $ANDROID_SDK/emulator/emulator -avd Pixel_9 &      # Start emulator
-./gradlew composeApp:installDebug                   # Build and install
+./gradlew androidApp:installDebug                   # Build and install (NB: :androidApp, not :composeApp)
 adb shell am start -n com.antonchuraev.aichecklists/com.antonchuraev.homesearchchecklist.MainActivity
 ```
 
