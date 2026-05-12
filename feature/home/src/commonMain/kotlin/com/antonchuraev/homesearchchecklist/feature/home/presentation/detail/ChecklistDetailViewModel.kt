@@ -330,8 +330,20 @@ class ChecklistDetailViewModel(
 
             // Item details sheet
             is ChecklistDetailIntent.OnItemTapForDetails -> updateContentState { it.copy(itemDetailsSheetFor = intent.itemId) }
-            ChecklistDetailIntent.OnDismissItemDetailsSheet -> updateContentState { it.copy(itemDetailsSheetFor = null) }
+            ChecklistDetailIntent.OnDismissItemDetailsSheet -> updateContentState {
+                it.copy(
+                    itemDetailsSheetFor = null,
+                    editingItemTextFor = null,
+                    editingItemTextDraft = ""
+                )
+            }
             is ChecklistDetailIntent.OnDeleteItemFromSheet -> deleteItemFromSheet(intent.itemId)
+
+            // Inline text edit inside ItemDetailsSheet
+            is ChecklistDetailIntent.OnStartItemTextEdit -> startItemTextEdit(intent.itemId)
+            is ChecklistDetailIntent.OnItemTextDraftChange -> updateItemTextDraft(intent.text)
+            ChecklistDetailIntent.OnConfirmItemTextEdit -> confirmItemTextEdit()
+            ChecklistDetailIntent.OnCancelItemTextEdit -> cancelItemTextEdit()
 
             // Reminder paywall upgrade from locked banner
             ChecklistDetailIntent.OnReminderUpgradeClick -> {
@@ -1408,6 +1420,77 @@ class ChecklistDetailViewModel(
                     mapOf("item_id" to itemId, "error" to (e.message ?: "unknown"))
                 )
             }
+        }
+    }
+
+    private fun startItemTextEdit(itemId: String) {
+        val state = _screenState.value as? ChecklistDetailState.Content ?: return
+        val item = state.defaultFill?.items?.firstOrNull { it.id == itemId } ?: return
+        updateContentState {
+            it.copy(
+                editingItemTextFor = itemId,
+                editingItemTextDraft = item.text
+            )
+        }
+    }
+
+    private fun updateItemTextDraft(text: String) {
+        updateContentState { it.copy(editingItemTextDraft = text) }
+    }
+
+    private fun cancelItemTextEdit() {
+        updateContentState { it.copy(editingItemTextFor = null, editingItemTextDraft = "") }
+    }
+
+    private fun confirmItemTextEdit() {
+        val state = _screenState.value as? ChecklistDetailState.Content ?: return
+        val itemId = state.editingItemTextFor ?: return  // double-fire guard
+        val newText = state.editingItemTextDraft.trim()
+        val fill = state.defaultFill ?: return
+
+        // Blank text — cancel, not commit
+        if (newText.isBlank()) {
+            cancelItemTextEdit()
+            return
+        }
+
+        val currentItem = fill.items.firstOrNull { it.id == itemId }
+        if (currentItem == null || currentItem.text == newText) {
+            // No-op — just close edit mode
+            cancelItemTextEdit()
+            return
+        }
+
+        val updatedFillItems = fill.items.map { item ->
+            if (item.id == itemId) item.withText(newText) else item
+        }
+        val updatedFill = fill.copy(items = updatedFillItems)
+
+        // Template items are keyed by text (same pattern as deleteItemFromSheet)
+        val oldText = currentItem.text
+        val updatedTemplateItems = state.checklist.items.map { templateItem ->
+            if (templateItem.text == oldText) templateItem.withText(newText) else templateItem
+        }
+        val updatedChecklist = state.checklist.copy(items = updatedTemplateItems)
+
+        // Optimistic state update
+        updateContentState {
+            it.copy(
+                defaultFill = updatedFill,
+                checklist = updatedChecklist,
+                editingItemTextFor = null,
+                editingItemTextDraft = ""
+            )
+        }
+
+        // Persist
+        viewModelScope.launch {
+            repository.updateFill(updatedFill)
+            repository.updateChecklistTemplate(updatedChecklist)
+            analyticsTracker.event(
+                "item_text_edited",
+                mapOf("checklist_id" to checklistId.toString())
+            )
         }
     }
 

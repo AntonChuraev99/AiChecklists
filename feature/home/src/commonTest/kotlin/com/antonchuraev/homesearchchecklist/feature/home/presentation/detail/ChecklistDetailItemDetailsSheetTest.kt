@@ -326,6 +326,128 @@ class ChecklistDetailItemDetailsSheetTest {
         assertNull(navigator.lastPaywallSource)
     }
 
+    // ── OnStartItemTextEdit ───────────────────────────────────────────────
+
+    @Test
+    fun onStartItemTextEdit_setsEditingItemTextForAndDraft() = runTest {
+        val vm = createViewModel()
+        val state = contentState(vm)
+        assertNull(state.editingItemTextFor)
+        assertEquals("", state.editingItemTextDraft)
+
+        vm.onIntent(ChecklistDetailIntent.OnItemTapForDetails(itemNoReminder.id))
+        vm.onIntent(ChecklistDetailIntent.OnStartItemTextEdit(itemNoReminder.id))
+
+        val updated = contentState(vm)
+        assertEquals(itemNoReminder.id, updated.editingItemTextFor)
+        assertEquals(itemNoReminder.text, updated.editingItemTextDraft)
+    }
+
+    // ── OnItemTextDraftChange ─────────────────────────────────────────────
+
+    @Test
+    fun onItemTextDraftChange_updatesDraftWithoutMutatingFill() = runTest {
+        val vm = createViewModel()
+        vm.onIntent(ChecklistDetailIntent.OnItemTapForDetails(itemNoReminder.id))
+        vm.onIntent(ChecklistDetailIntent.OnStartItemTextEdit(itemNoReminder.id))
+
+        vm.onIntent(ChecklistDetailIntent.OnItemTextDraftChange("Updated text"))
+
+        val updated = contentState(vm)
+        assertEquals("Updated text", updated.editingItemTextDraft)
+        // Fill must NOT be modified yet — only draft changes
+        assertNull(repository.lastUpdatedFill)
+    }
+
+    // ── OnConfirmItemTextEdit — blank text → cancel ───────────────────────
+
+    @Test
+    fun onConfirmItemTextEdit_blankText_cancelsWithoutUpdatingRepo() = runTest {
+        val vm = createViewModel()
+        vm.onIntent(ChecklistDetailIntent.OnItemTapForDetails(itemNoReminder.id))
+        vm.onIntent(ChecklistDetailIntent.OnStartItemTextEdit(itemNoReminder.id))
+        vm.onIntent(ChecklistDetailIntent.OnItemTextDraftChange("   "))
+
+        vm.onIntent(ChecklistDetailIntent.OnConfirmItemTextEdit)
+
+        val updated = contentState(vm)
+        assertNull(updated.editingItemTextFor)
+        assertEquals("", updated.editingItemTextDraft)
+        // Repo must NOT be touched
+        assertNull(repository.lastUpdatedFill)
+        assertNull(repository.lastUpdatedChecklist)
+    }
+
+    // ── OnConfirmItemTextEdit — same text → no-op ─────────────────────────
+
+    @Test
+    fun onConfirmItemTextEdit_sameText_cancelsWithoutUpdatingRepo() = runTest {
+        val vm = createViewModel()
+        vm.onIntent(ChecklistDetailIntent.OnItemTapForDetails(itemNoReminder.id))
+        vm.onIntent(ChecklistDetailIntent.OnStartItemTextEdit(itemNoReminder.id))
+        // draft already equals item.text — no change
+        vm.onIntent(ChecklistDetailIntent.OnItemTextDraftChange(itemNoReminder.text))
+
+        vm.onIntent(ChecklistDetailIntent.OnConfirmItemTextEdit)
+
+        val updated = contentState(vm)
+        assertNull(updated.editingItemTextFor)
+        assertNull(repository.lastUpdatedFill)
+        assertNull(repository.lastUpdatedChecklist)
+    }
+
+    // ── OnConfirmItemTextEdit — valid new text → dual update ─────────────
+
+    @Test
+    fun onConfirmItemTextEdit_validText_updatesBothFillAndTemplate() = runTest {
+        val vm = createViewModel()
+        val newText = "Renamed item"
+
+        vm.onIntent(ChecklistDetailIntent.OnItemTapForDetails(itemNoReminder.id))
+        vm.onIntent(ChecklistDetailIntent.OnStartItemTextEdit(itemNoReminder.id))
+        vm.onIntent(ChecklistDetailIntent.OnItemTextDraftChange(newText))
+        vm.onIntent(ChecklistDetailIntent.OnConfirmItemTextEdit)
+
+        // Edit mode closed
+        val updated = contentState(vm)
+        assertNull(updated.editingItemTextFor)
+        assertEquals("", updated.editingItemTextDraft)
+
+        // Fill updated with new text
+        val savedFill = repository.lastUpdatedFill
+        assertNotNull(savedFill)
+        val updatedItem = savedFill.items.firstOrNull { it.id == itemNoReminder.id }
+        assertNotNull(updatedItem)
+        assertEquals(newText, updatedItem.text)
+
+        // Template also updated — template items keyed by original text (ids differ from fill)
+        val savedChecklist = repository.lastUpdatedChecklist
+        assertNotNull(savedChecklist)
+        // The original text must no longer appear; new text must be present
+        assertFalse(savedChecklist.items.any { it.text == itemNoReminder.text })
+        assertTrue(savedChecklist.items.any { it.text == newText })
+    }
+
+    // ── OnDismissItemDetailsSheet cancels active edit ─────────────────────
+
+    @Test
+    fun onDismissItemDetailsSheet_cancelsActiveEdit() = runTest {
+        val vm = createViewModel()
+        vm.onIntent(ChecklistDetailIntent.OnItemTapForDetails(itemNoReminder.id))
+        vm.onIntent(ChecklistDetailIntent.OnStartItemTextEdit(itemNoReminder.id))
+        vm.onIntent(ChecklistDetailIntent.OnItemTextDraftChange("draft text"))
+
+        // Dismiss while in edit mode
+        vm.onIntent(ChecklistDetailIntent.OnDismissItemDetailsSheet)
+
+        val updated = contentState(vm)
+        assertNull(updated.itemDetailsSheetFor)
+        assertNull(updated.editingItemTextFor)
+        assertEquals("", updated.editingItemTextDraft)
+        // No persist call
+        assertNull(repository.lastUpdatedFill)
+    }
+
     // ─── Test doubles ─────────────────────────────────────────────────────
 
     private class FakeReminderScheduler : ChecklistReminderScheduler {
