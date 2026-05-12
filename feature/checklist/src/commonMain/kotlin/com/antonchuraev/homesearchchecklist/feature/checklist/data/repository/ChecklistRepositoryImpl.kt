@@ -89,6 +89,10 @@ class ChecklistRepositoryImpl(
         return checklistDao.getById(id)?.toDomain()
     }
 
+    override fun observeChecklistById(id: Long): Flow<Checklist?> {
+        return checklistDao.observeChecklistById(id).map { it?.toDomain() }
+    }
+
     // Display preferences
     override suspend fun setSeparateCompleted(checklistId: Long, value: Boolean) {
         checklistDao.setSeparateCompleted(checklistId, value)

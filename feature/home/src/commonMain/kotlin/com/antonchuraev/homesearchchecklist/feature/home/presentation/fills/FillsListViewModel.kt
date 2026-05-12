@@ -8,6 +8,7 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -26,19 +27,20 @@ class FillsListViewModel(
 
     private fun loadData() {
         viewModelScope.launch {
-            val checklist = repository.getChecklistById(checklistId)
-            if (checklist == null) {
-                _screenState.value = FillsListState.NotFound
-                return@launch
-            }
-
-            // Get all fills including default, sorted by date
-            repository.getFillsByChecklistId(checklistId).collect { fills ->
-                _screenState.value = FillsListState.Content(
-                    checklist = checklist,
-                    fills = fills
-                )
-            }
+            combine(
+                repository.observeChecklistById(checklistId),
+                repository.getFillsByChecklistId(checklistId)
+            ) { checklist, fills -> checklist to fills }
+                .collect { (checklist, fills) ->
+                    if (checklist == null) {
+                        _screenState.value = FillsListState.NotFound
+                        return@collect
+                    }
+                    _screenState.value = FillsListState.Content(
+                        checklist = checklist,
+                        fills = fills
+                    )
+                }
         }
     }
 

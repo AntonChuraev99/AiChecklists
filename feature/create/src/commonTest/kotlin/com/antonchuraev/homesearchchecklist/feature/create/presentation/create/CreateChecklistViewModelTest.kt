@@ -335,6 +335,7 @@ class CreateChecklistViewModelTest {
 
         override suspend fun deleteChecklist(checklist: Checklist) = notUsed()
         override suspend fun getChecklistById(id: Long): Checklist? = loadResult
+        override fun observeChecklistById(id: Long): Flow<Checklist?> = flowOf(loadResult)
         override suspend fun reorderChecklists(orderedIds: List<Long>) = notUsed()
 
         override suspend fun setSeparateCompleted(checklistId: Long, value: Boolean) = notUsed()

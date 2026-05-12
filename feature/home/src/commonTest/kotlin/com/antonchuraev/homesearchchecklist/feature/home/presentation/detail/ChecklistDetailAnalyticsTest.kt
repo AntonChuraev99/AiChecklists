@@ -230,6 +230,7 @@ class ChecklistDetailAnalyticsTest {
         override suspend fun updateChecklistTemplate(checklist: Checklist) {}
         override suspend fun deleteChecklist(checklist: Checklist) {}
         override suspend fun getChecklistById(id: Long): Checklist? = storedChecklist
+        override fun observeChecklistById(id: Long): Flow<Checklist?> = flowOf(storedChecklist)
         override suspend fun setSeparateCompleted(checklistId: Long, value: Boolean) {}
         override suspend fun setAutoDeleteCompleted(checklistId: Long, value: Boolean) {}
         override suspend fun setReminder(checklistId: Long, reminderAt: Long?) {}

@@ -71,19 +71,14 @@ class ChecklistDetailViewModel(
 
     private fun loadData() {
         loadDataJob = viewModelScope.launch {
-            val checklist = repository.getChecklistById(checklistId)
-            if (checklist == null) {
-                _screenState.value = ChecklistDetailState.NotFound
-                return@launch
-            }
-
             combine(
+                repository.observeChecklistById(checklistId),
                 repository.getDefaultFillByChecklistId(checklistId),
                 repository.getAdditionalFillsByChecklistId(checklistId)
-            ) { defaultFill, additionalFills ->
-                defaultFill to additionalFills
-            }.collect { (defaultFill, additionalFills) ->
-                if (defaultFill == null) {
+            ) { checklist, defaultFill, additionalFills ->
+                Triple(checklist, defaultFill, additionalFills)
+            }.collect { (checklist, defaultFill, additionalFills) ->
+                if (checklist == null || defaultFill == null) {
                     _screenState.value = ChecklistDetailState.NotFound
                     return@collect
                 }
@@ -108,7 +103,14 @@ class ChecklistDetailViewModel(
         val sortedFill = defaultFill?.withSortedItems()
         val currentState = _screenState.value
         _screenState.value = if (currentState is ChecklistDetailState.Content) {
+            // Keep `checklist` in sync with Room — name/items/reminders edited from
+            // EditChecklistScreen or other writers must propagate live. The toggle
+            // flags (separateCompleted/autoDeleteCompleted) are intentionally NOT
+            // re-derived here because each toggle handler already updates them
+            // optimistically and persists asynchronously; overwriting them on every
+            // Flow emission would flicker the switches during in-flight writes.
             currentState.copy(
+                checklist = checklist,
                 defaultFill = sortedFill,
                 additionalFillsCount = additionalFillsCount
             )
