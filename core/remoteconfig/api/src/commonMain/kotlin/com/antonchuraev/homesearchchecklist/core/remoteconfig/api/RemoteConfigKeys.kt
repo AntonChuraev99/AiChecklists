@@ -57,7 +57,14 @@ object RemoteConfigDefaults {
     const val TEMPLATES_JSON = ""
 
     // Onboarding type: "interactive" | "default" | "none" (none = skip to main)
-    const val ONBOARDING = "interactive"
+    //
+    // Empty client default is intentional: any non-empty value MUST come from Firebase
+    // Remote Config so we can distinguish "RC successfully returned a variant" from
+    // "fetch failed / experiment not assigned yet". Empty value falls back to DEFAULT
+    // (slide-based onboarding) inside GetOnboardingVariantUseCase. Without this guard
+    // every user with stale/empty RC silently lands in the "interactive" treatment,
+    // collapsing the A/B distribution.
+    const val ONBOARDING = ""
 
     // Paywall A/B variant default
     const val PAYWALL_VARIANT = "features_v1"

@@ -27,5 +27,5 @@ val userFeatureModule = module {
     } bind UserDataRepository::class
 
     factory { CompleteOnboardingUseCase(get()) }
-    factory { GetOnboardingVariantUseCase(get()) }
+    factory { GetOnboardingVariantUseCase(remoteConfigProvider = get(), logger = get()) }
 }

@@ -37,7 +37,6 @@ class SplashViewModel(
         log("start init")
         startBackgroundSync()
         log("started startBackgroundSync")
-        // Navigation — fast path, only reads cache
         viewModelScope.launch {
 
             log("start getUserData()")
@@ -46,34 +45,42 @@ class SplashViewModel(
             }
             log("getUserData() took ${duration.inWholeMilliseconds}ms, userId=${cached.userId.take(8)}, isBlank:${cached.userId.isBlank()}")
 
-            if (cached.userId.isNotBlank()) {
-                // Set analytics userId BEFORE navigation to avoid unattributed screen_view events
+            // Step 1: ensure we have a userId BEFORE fetching Remote Config so
+            // Firebase A/B Testing can attribute the user to an experiment cohort.
+            val userData = if (cached.userId.isNotBlank()) {
                 analyticsTracker.setUserId(cached.userId)
-                // Returning user: navigate immediately from cache; Remote Config fetch
-                // runs in background (startBackgroundSync) so A/B variant applies next launch.
-                navigateTo(cached.isOnboardingPassed)
+                cached
             } else {
-                // New user (first launch only): must wait for registration
+                // New user (first launch only): must wait for registration.
                 val result = userDataRepository.ensureUserRegistered()
-                val userData = result.getOrNull()?.userData ?: cached
+                val newUserData = result.getOrNull()?.userData ?: cached
 
                 result.onSuccess { data ->
-                    // Analytics userId MUST be set before fetchAndActivate so the
-                    // Firebase A/B experiment can attribute this user to a variant.
                     analyticsTracker.setUserId(data.userData.userId)
                     appScope.launch { linkWithPaywall(data.userData.userId, isNewUser = data.isNewUser) }
                 }
+                newUserData
+            }
 
-                // Block navigation until Remote Config is activated, so the correct
-                // onboarding variant is known before the first screen is shown.
-                // Timeout keeps Splash responsive on poor networks (falls back to defaults).
+            // Step 2: whenever onboarding still needs to be shown, BLOCK
+            // navigation until Remote Config is activated. Without this gate
+            // the A/B variant resolver reads stale defaults and every user
+            // collapses into the same client-side fallback variant — exactly
+            // the bug we are fixing here (see Amplitude 14d distribution:
+            // interactive_onboarding=47 uniques vs slides=0).
+            //
+            // Returning users who already passed onboarding skip the wait —
+            // their variant no longer matters and a 3s gate would only delay
+            // the first frame for no benefit. RC refresh still happens via
+            // startBackgroundSync so other RC-driven features stay fresh.
+            if (!userData.isOnboardingPassed) {
                 val activated = withTimeoutOrNull(REMOTE_CONFIG_FETCH_TIMEOUT) {
                     runCatching { remoteConfigProvider.fetchAndActivate() }.getOrDefault(false)
                 }
-                log("fetchAndActivate (new user) activated=$activated")
-
-                navigateTo(userData.isOnboardingPassed)
+                log("fetchAndActivate (onboarding pending) activated=$activated, hasUserId=${userData.userId.isNotBlank()}")
             }
+
+            navigateTo(userData.isOnboardingPassed)
         }
     }
 
