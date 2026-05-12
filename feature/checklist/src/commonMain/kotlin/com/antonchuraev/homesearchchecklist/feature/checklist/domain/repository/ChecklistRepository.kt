@@ -17,6 +17,15 @@ interface ChecklistRepository {
     suspend fun updateChecklistTemplate(checklist: Checklist)
     suspend fun deleteChecklist(checklist: Checklist)
     suspend fun getChecklistById(id: Long): Checklist?
+
+    /**
+     * Reactive view of a single checklist. Emits a fresh value every time the row changes
+     * (e.g. name edited from the Edit screen, reminder set, repeat schedule updated).
+     *
+     * Use this in screens that must reflect template changes live; for one-shot snapshots
+     * call [getChecklistById] instead.
+     */
+    fun observeChecklistById(id: Long): Flow<Checklist?>
     suspend fun reorderChecklists(orderedIds: List<Long>)
 
     // Display preferences

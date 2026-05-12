@@ -1154,6 +1154,8 @@ class InteractiveOnboardingViewModelTest {
             // Return saved checklist after addChecklist was called
             return if (id == savedChecklistId) lastAddedChecklist?.copy(id = id) else null
         }
+        override fun observeChecklistById(id: Long): Flow<Checklist?> =
+            flowOf(if (id == savedChecklistId) lastAddedChecklist?.copy(id = id) else null)
         override suspend fun reorderChecklists(orderedIds: List<Long>) {}
         override suspend fun setSeparateCompleted(checklistId: Long, value: Boolean) {}
         override suspend fun setAutoDeleteCompleted(checklistId: Long, value: Boolean) {}
