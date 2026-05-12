@@ -1,6 +1,7 @@
 @file:Suppress("DEPRECATION", "OPT_IN_USAGE")
 
 import java.util.Properties
+import org.jetbrains.kotlin.gradle.targets.wasm.binaryen.BinaryenExec
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -208,4 +209,48 @@ afterEvaluate {
     }.configureEach {
         dependsOn(generateWasmInitJs)
     }
+}
+
+// ============================================================
+// Tune BinaryenExec (wasm-opt) for Cloudflare Workers Builds.
+//
+// Kotlin 2.3.20 default runs 7 optimization passes on a single thread:
+//   -O3 -O3 --gufa -O3 --type-merging -O3 -Oz
+// On Cloudflare's 2 vCPU runner this takes 5–7 minutes and tips the
+// 20-minute build timeout for the wasmJsBrowserDistribution pipeline.
+//
+// We keep all feature flags (--enable-gc etc — required by Kotlin/Wasm-GC
+// bytecode) and --no-inline correctness directives, and replace the seven
+// optimization passes with a single -O2. Bundle grows ~10–20%; the
+// Optimize task drops from 5–7 min to ~30–90 sec.
+//
+// Default args reference (kotlin-gradle-plugin BinaryenConfig):
+//   --enable-gc, --enable-reference-types, --enable-exception-handling,
+//   --enable-bulk-memory, --enable-nontrapping-float-to-int, --closed-world,
+//   --no-inline=kotlin.wasm.internal.throwValue,
+//   --no-inline=kotlin.wasm.internal.getKotlinException,
+//   --no-inline=kotlin.wasm.internal.jsToKotlinStringAdapter,
+//   --inline-functions-with-loops, --traps-never-happen, --fast-math,
+//   --type-ssa, -O3, -O3, --gufa, -O3, --type-merging, -O3, -Oz
+// ============================================================
+tasks.withType<BinaryenExec>().configureEach {
+    binaryenArgs = mutableListOf(
+        // Feature flags — required by Kotlin/Wasm-GC bytecode
+        "--enable-gc",
+        "--enable-reference-types",
+        "--enable-exception-handling",
+        "--enable-bulk-memory",
+        "--enable-nontrapping-float-to-int",
+        "--closed-world",
+        // No-inline directives — correctness (preserve exception unwinding)
+        "--no-inline=kotlin.wasm.internal.throwValue",
+        "--no-inline=kotlin.wasm.internal.getKotlinException",
+        "--no-inline=kotlin.wasm.internal.jsToKotlinStringAdapter",
+        // Cheap optimization toggles
+        "--inline-functions-with-loops",
+        "--traps-never-happen",
+        "--fast-math",
+        // Single -O2 pass instead of 5x -O3 + --gufa + --type-merging + -Oz
+        "-O2",
+    )
 }
