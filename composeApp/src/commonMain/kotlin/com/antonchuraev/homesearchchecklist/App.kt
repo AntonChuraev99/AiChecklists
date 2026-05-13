@@ -57,6 +57,7 @@ import com.antonchuraev.homesearchchecklist.feature.debug.presentation.DebugScre
 import com.antonchuraev.homesearchchecklist.feature.debug.presentation.ScreenCatalogScreen
 import com.antonchuraev.homesearchchecklist.feature.debug.presentation.StoreScreenshotScreen
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.MainScreen
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.calendar.CalendarRoute
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.today.TodayRoute
 import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.OnboardingScreen
 import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive.InteractiveOnboardingScreen
@@ -209,6 +210,13 @@ fun App() {
                                             launchSingleTop = true
                                         }
                                     },
+                                    onCalendarClick = {
+                                        if (navConsumed) return@AppNavigationDrawerContent
+                                        navConsumed = true
+                                        navController.navigate(AppNavRoute.Calendar) {
+                                            launchSingleTop = true
+                                        }
+                                    },
                                     onUpdateFeedClick = {
                                         if (navConsumed) return@AppNavigationDrawerContent
                                         navConsumed = true
@@ -343,6 +351,13 @@ fun App() {
                                             launchSingleTop = true
                                         }
                                     },
+                                    onCalendarClick = {
+                                        if (navConsumed) return@AppNavigationDrawerContent
+                                        navConsumed = true
+                                        navController.navigate(AppNavRoute.Calendar) {
+                                            launchSingleTop = true
+                                        }
+                                    },
                                     onUpdateFeedClick = {
                                         if (navConsumed) return@AppNavigationDrawerContent
                                         navConsumed = true
@@ -402,6 +417,13 @@ fun App() {
                                             launchSingleTop = true
                                         }
                                     },
+                                    onCalendarClick = {
+                                        if (navConsumed) return@AppNavigationDrawerContent
+                                        navConsumed = true
+                                        navController.navigate(AppNavRoute.Calendar) {
+                                            launchSingleTop = true
+                                        }
+                                    },
                                     onUpdateFeedClick = { /* already here */ },
                                     onSettingsClick = {
                                         if (navConsumed) return@AppNavigationDrawerContent
@@ -455,6 +477,13 @@ fun App() {
                                         navController.popBackStack(AppNavRoute.Main, inclusive = false)
                                     },
                                     onTodayClick = { /* already here */ },
+                                    onCalendarClick = {
+                                        if (navConsumed) return@AppNavigationDrawerContent
+                                        navConsumed = true
+                                        navController.navigate(AppNavRoute.Calendar) {
+                                            launchSingleTop = true
+                                        }
+                                    },
                                     onUpdateFeedClick = {
                                         if (navConsumed) return@AppNavigationDrawerContent
                                         navConsumed = true
@@ -481,6 +510,74 @@ fun App() {
                         }
                     ) {
                         TodayRoute(
+                            drawerState = drawerState,
+                            onCreateChecklistClick = {
+                                navigator.navigateToTemplatesScreen()
+                            },
+                        )
+                    }
+                }
+
+                composable<AppNavRoute.Calendar> {
+                    // Fresh Closed DrawerState per entry — same rationale as Main/Today routes.
+                    val drawerState = remember { DrawerState(initialValue = DrawerValue.Closed) }
+                    val scope = rememberCoroutineScope()
+                    var navConsumed by remember { mutableStateOf(false) }
+                    LaunchedEffect(navConsumed) {
+                        if (navConsumed) {
+                            delay(500)
+                            navConsumed = false
+                        }
+                    }
+
+                    ModalNavigationDrawer(
+                        drawerState = drawerState,
+                        drawerContent = {
+                            ModalDrawerSheet(
+                                drawerContainerColor = MaterialTheme.colorScheme.surface
+                            ) {
+                                AppNavigationDrawerContent(
+                                    selectedItemId = DrawerDestination.Calendar,
+                                    onCloseDrawer = { scope.launch { drawerState.close() } },
+                                    onHomeClick = {
+                                        if (navConsumed) return@AppNavigationDrawerContent
+                                        navConsumed = true
+                                        navController.popBackStack(AppNavRoute.Main, inclusive = false)
+                                    },
+                                    onTodayClick = {
+                                        if (navConsumed) return@AppNavigationDrawerContent
+                                        navConsumed = true
+                                        navController.navigate(AppNavRoute.Today) {
+                                            launchSingleTop = true
+                                        }
+                                    },
+                                    onCalendarClick = { /* already here */ },
+                                    onUpdateFeedClick = {
+                                        if (navConsumed) return@AppNavigationDrawerContent
+                                        navConsumed = true
+                                        navController.navigate(AppNavRoute.UpdateFeed) {
+                                            launchSingleTop = true
+                                        }
+                                    },
+                                    onSettingsClick = {
+                                        if (navConsumed) return@AppNavigationDrawerContent
+                                        navConsumed = true
+                                        navController.navigate(AppNavRoute.Settings) {
+                                            launchSingleTop = true
+                                        }
+                                    },
+                                    onRateAppClick = {
+                                        csatViewModel.sendIntent(CsatIntent.ForceShow)
+                                    },
+                                    onLeaveFeedbackClick = {
+                                        csatViewModel.sendIntent(CsatIntent.ForceShowFeedback)
+                                    },
+                                    versionName = AppBuildConfig.versionName,
+                                )
+                            }
+                        }
+                    ) {
+                        CalendarRoute(
                             drawerState = drawerState,
                             onCreateChecklistClick = {
                                 navigator.navigateToTemplatesScreen()
@@ -620,6 +717,10 @@ private fun NavController.handle(command: NavCommand) {
         }
 
         is NavCommand.ToToday -> navigate(AppNavRoute.Today) {
+            launchSingleTop = true
+        }
+
+        is NavCommand.ToCalendar -> navigate(AppNavRoute.Calendar) {
             launchSingleTop = true
         }
 

@@ -65,5 +65,7 @@ sealed interface NavCommand {
 
     data object ToToday : NavCommand
 
+    data object ToCalendar : NavCommand
+
     data object ToScreenCatalog : NavCommand
 }

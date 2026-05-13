@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.home.di
 
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.MainScreenViewModel
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.calendar.CalendarViewModel
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.ChecklistDetailViewModel
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.fill.FillDetailViewModel
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.fills.FillsListViewModel
@@ -12,6 +13,7 @@ import org.koin.dsl.module
 val homeFeatureModule = module {
     viewModelOf(::MainScreenViewModel)
     viewModelOf(::TodayViewModel)
+    viewModelOf(::CalendarViewModel)
     viewModel { (checklistId: Long) ->
         ChecklistDetailViewModel(checklistId, get(), get(), get(), get(), get(), get(), get())
     }

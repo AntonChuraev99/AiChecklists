@@ -851,6 +851,10 @@
     <string name="today_tab_today">Сегодня</string>
     <string name="today_tab_lists">Списки</string>
 
+    <!-- Экран «Календарь» -->
+    <string name="calendar_nav_label">Календарь</string>
+    <string name="calendar_title">Календарь</string>
+
     <!-- Smart Add: подписи чипов (TokenChipPreview) -->
     <!-- Дни -->
     <string name="smart_add_chip_today">Сегодня</string>
