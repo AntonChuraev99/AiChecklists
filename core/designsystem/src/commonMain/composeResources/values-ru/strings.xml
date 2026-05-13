@@ -850,4 +850,33 @@
     <!-- Вкладки навигационной панели -->
     <string name="today_tab_today">Сегодня</string>
     <string name="today_tab_lists">Списки</string>
+
+    <!-- Smart Add: подписи чипов (TokenChipPreview) -->
+    <!-- Дни -->
+    <string name="smart_add_chip_today">Сегодня</string>
+    <string name="smart_add_chip_tomorrow">Завтра</string>
+    <string name="smart_add_chip_day_after_tomorrow">Послезавтра</string>
+    <!-- Суффикс времени: "в HH:MM" — %1$s = строка времени -->
+    <string name="smart_add_chip_at_time">в %1$s</string>
+    <!-- Только время: "в HH:MM" -->
+    <string name="smart_add_chip_time_only">в %1$s</string>
+    <!-- Дни недели -->
+    <string name="smart_add_chip_weekday_monday">Понедельник</string>
+    <string name="smart_add_chip_weekday_tuesday">Вторник</string>
+    <string name="smart_add_chip_weekday_wednesday">Среда</string>
+    <string name="smart_add_chip_weekday_thursday">Четверг</string>
+    <string name="smart_add_chip_weekday_friday">Пятница</string>
+    <string name="smart_add_chip_weekday_saturday">Суббота</string>
+    <string name="smart_add_chip_weekday_sunday">Воскресенье</string>
+    <!-- Повторы -->
+    <string name="smart_add_chip_repeat_daily">Ежедневно</string>
+    <string name="smart_add_chip_repeat_weekly">Еженедельно</string>
+    <string name="smart_add_chip_repeat_monthly">Ежемесячно</string>
+    <string name="smart_add_chip_repeat_yearly">Ежегодно</string>
+    <string name="smart_add_chip_repeat_weekdays">По будням</string>
+    <!-- Комбо: "По %1$s в %2$s" — %1$s = день недели, %2$s = HH:MM -->
+    <string name="smart_add_chip_combined_weekday_repeat">По %1$s в %2$s</string>
+    <!-- Подсказки Smart Add: показываются когда пользователь добавляет неполную фразу -->
+    <string name="smart_add_hint_add_item_text">Добавь текст пункта — например «созвон каждое воскресенье в 12»</string>
+    <string name="smart_add_hint_add_time">Допиши время — например «в 12» или «в 7 утра»</string>
 </resources>

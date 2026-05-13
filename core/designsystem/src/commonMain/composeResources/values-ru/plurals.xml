@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Smart Add chip: подписи для относительных смещений -->
+    <!-- Russian uses three plural forms: one (1, 21, 31…), few (2–4, 22–24…), many (5–20…) -->
+    <plurals name="smart_add_chip_in_minutes">
+        <item quantity="one">Через %d минуту</item>
+        <item quantity="few">Через %d минуты</item>
+        <item quantity="many">Через %d минут</item>
+        <item quantity="other">Через %d минуты</item>
+    </plurals>
+    <plurals name="smart_add_chip_in_hours">
+        <item quantity="one">Через %d час</item>
+        <item quantity="few">Через %d часа</item>
+        <item quantity="many">Через %d часов</item>
+        <item quantity="other">Через %d часа</item>
+    </plurals>
+    <plurals name="smart_add_chip_in_days">
+        <item quantity="one">Через %d день</item>
+        <item quantity="few">Через %d дня</item>
+        <item quantity="many">Через %d дней</item>
+        <item quantity="other">Через %d дня</item>
+    </plurals>
+    <plurals name="smart_add_chip_in_weeks">
+        <item quantity="one">Через %d неделю</item>
+        <item quantity="few">Через %d недели</item>
+        <item quantity="many">Через %d недель</item>
+        <item quantity="other">Через %d недели</item>
+    </plurals>
+</resources>

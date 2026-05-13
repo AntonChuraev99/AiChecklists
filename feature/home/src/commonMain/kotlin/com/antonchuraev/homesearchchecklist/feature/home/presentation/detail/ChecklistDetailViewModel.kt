@@ -13,6 +13,7 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Check
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatEndCondition
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatType
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.parser.SmartDateParser
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.PendingRepeatConfig
@@ -20,21 +21,22 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.Remind
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.buildRepeatSummary
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.combinePickerResults
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.resolvePresetName
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.UserLimits
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetUserLimitsUseCase
 import kotlin.time.Clock
 import kotlin.time.Instant
-import kotlinx.datetime.*
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
-import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.UserLimits
+import kotlinx.datetime.*
 
 class ChecklistDetailViewModel(
     private val checklistId: Long,
@@ -43,7 +45,8 @@ class ChecklistDetailViewModel(
     private val getUserLimitsUseCase: GetUserLimitsUseCase,
     private val analyticsTracker: AnalyticsTracker,
     private val reminderScheduler: ChecklistReminderScheduler,
-    private val datastore: AppDatastore
+    private val datastore: AppDatastore,
+    private val smartDateParser: SmartDateParser,
 ) : AppViewModel<ChecklistDetailState, ChecklistDetailIntent, Nothing>() {
 
     private val _screenState = MutableStateFlow<ChecklistDetailState>(ChecklistDetailState.Loading)
@@ -58,6 +61,16 @@ class ChecklistDetailViewModel(
     // Content state was created.
     private val _userLimits = MutableStateFlow<UserLimits?>(null)
 
+    /**
+     * Backing flow for the inline add-item text field. Owned by the ViewModel so we can
+     * debounce without touching Compose state. The screen mirrors [ChecklistDetailState.Content.pendingItemInput]
+     * for display and fires [ChecklistDetailIntent.OnItemInputChanged] on each keystroke.
+     */
+    private val _pendingItemInput = MutableStateFlow("")
+
+    /** Guard against rapid double-tap on the add button. */
+    private var isAddingItem = false
+
     private var loadDataJob: Job? = null
 
     /** True when user navigated to exact alarm settings; used to detect return. */
@@ -67,6 +80,32 @@ class ChecklistDetailViewModel(
 
     init {
         loadData()
+        observeInputForParsing()
+    }
+
+    /**
+     * Debounced Smart Add parser. Mirrors [_pendingItemInput] into
+     * [ChecklistDetailState.Content.pendingItemInput] and runs the parser 200ms after the
+     * last keystroke, storing the result in [ChecklistDetailState.Content.parsedToken].
+     *
+     * Using a dedicated flow + debounce avoids invoking the regex parser on every character
+     * and prevents unnecessary Compose recompositions from transient intermediate states.
+     */
+    @OptIn(kotlinx.coroutines.FlowPreview::class)
+    private fun observeInputForParsing() {
+        viewModelScope.launch {
+            _pendingItemInput
+                .debounce(200)
+                .collect { text ->
+                    val token = if (text.isNotBlank()) {
+                        val now = Clock.System.now().toEpochMilliseconds()
+                        smartDateParser.parse(text, now, TimeZone.currentSystemDefault())
+                    } else {
+                        null
+                    }
+                    updateContentState { it.copy(parsedToken = token) }
+                }
+        }
     }
 
     private fun loadData() {
@@ -157,7 +196,8 @@ class ChecklistDetailViewModel(
             ChecklistDetailIntent.OnDismissDeleteConfirmation -> updateContentState { it.copy(showDeleteConfirmation = false) }
             is ChecklistDetailIntent.OnItemCheckedChange -> updateItemChecked(intent.itemId, intent.checked)
             is ChecklistDetailIntent.OnAddNoteClick -> openNoteDialog(intent.itemId)
-            is ChecklistDetailIntent.OnAddItem -> addItem(intent.text)
+            is ChecklistDetailIntent.OnItemInputChanged -> handleItemInputChanged(intent.text)
+            ChecklistDetailIntent.OnAddItemWithParse -> addItemWithParse()
             is ChecklistDetailIntent.OnNoteChanged -> updateContentState { it.copy(editingNote = intent.note) }
             ChecklistDetailIntent.OnSaveNote -> saveNote()
             ChecklistDetailIntent.OnDismissNoteDialog -> updateContentState { it.copy(noteDialogItemId = null, editingNote = "") }
@@ -551,26 +591,130 @@ class ChecklistDetailViewModel(
         }
     }
 
-    private fun addItem(text: String) {
-        val state = _screenState.value as? ChecklistDetailState.Content ?: return
-        val fill = state.defaultFill ?: return
-        val trimmed = text.trim()
-        if (trimmed.isEmpty()) return
+    private fun handleItemInputChanged(text: String) {
+        // Mirror the raw text into state immediately (for the TextField to display) and
+        // into the backing flow (which feeds the debounced parser).
+        _pendingItemInput.value = text
+        updateContentState { it.copy(pendingItemInput = text) }
+    }
 
-        val newFillItem = ChecklistFillItem(text = trimmed, checked = false, note = null)
+    /**
+     * Submits the current [ChecklistDetailState.Content.pendingItemInput].
+     *
+     * If [ChecklistDetailState.Content.parsedToken] is non-null:
+     *   - Strips [ParsedDateToken.originalSubstring] from the input text
+     *   - Creates a new [ChecklistFillItem] with the reminder fields from the token
+     *   - If stripping leaves a blank text, the add is skipped (no empty items with reminders)
+     *
+     * If parsedToken is null — plain add (same as the former OnAddItem behaviour).
+     *
+     * Applies a double-fire guard to prevent duplicate items from rapid taps.
+     */
+    private fun addItemWithParse() {
+        if (isAddingItem) return
+        isAddingItem = true
+
+        val state = _screenState.value as? ChecklistDetailState.Content ?: run {
+            isAddingItem = false
+            return
+        }
+        val fill = state.defaultFill ?: run { isAddingItem = false; return }
+        val rawText = state.pendingItemInput
+        val token = state.parsedToken
+
+        val itemText: String
+        val reminderAt: Long?
+        val repeatRule: ReminderRepeatRule?
+        val repeatTimeOfDayMinutes: Int?
+
+        if (token != null) {
+            // Strip the matched date/time substring and trim surrounding whitespace
+            val stripped = (rawText.removeRange(token.startIndex, token.endIndex)).trim()
+            val isStrandedPrep = stripped.lowercase() in STRANDED_TIME_PREPOSITIONS
+            when {
+                stripped.isBlank() -> {
+                    // Only the trigger phrase was typed — show hint, do not clear input
+                    updateContentState { it.copy(snackbarMessage = SNACKBAR_SMART_ADD_HINT_ADD_TEXT) }
+                    isAddingItem = false
+                    return
+                }
+                isStrandedPrep -> {
+                    // A time preposition is left over ("в", "at") — user started typing a time but
+                    // didn't finish. Show hint without clearing input so they can complete it.
+                    updateContentState { it.copy(snackbarMessage = SNACKBAR_SMART_ADD_HINT_ADD_TIME) }
+                    isAddingItem = false
+                    return
+                }
+            }
+            itemText = stripped
+            reminderAt = token.reminderAt
+            repeatRule = token.repeatRule
+            repeatTimeOfDayMinutes = token.timeOfDayMinutes
+        } else {
+            val trimmed = rawText.trim()
+            if (trimmed.isEmpty()) { isAddingItem = false; return }
+            itemText = trimmed
+            reminderAt = null
+            repeatRule = null
+            repeatTimeOfDayMinutes = null
+        }
+
+        // Clear input state immediately (optimistic UX)
+        _pendingItemInput.value = ""
+        updateContentState { it.copy(pendingItemInput = "", parsedToken = null) }
+
+        val newFillItem = if (token != null) {
+            val base = ChecklistFillItem(text = itemText, checked = false, note = null)
+            val withRepeat = if (repeatRule != null && repeatTimeOfDayMinutes != null) {
+                // Compute first trigger time (same logic as saveItemReminder)
+                val tz = TimeZone.currentSystemDefault()
+                val now = Clock.System.now()
+                val today = now.toLocalDateTime(tz).date
+                val timeHour = repeatTimeOfDayMinutes / 60
+                val timeMinute = repeatTimeOfDayMinutes % 60
+                val triggerTime = LocalTime(timeHour, timeMinute)
+                val todayTrigger = LocalDateTime(today, triggerTime).toInstant(tz).toEpochMilliseconds()
+                val firstTriggerAt = if (todayTrigger > now.toEpochMilliseconds()) {
+                    todayTrigger
+                } else {
+                    val tomorrow = today.plus(1, DateTimeUnit.DAY)
+                    LocalDateTime(tomorrow, triggerTime).toInstant(tz).toEpochMilliseconds()
+                }
+                base.withRepeatRule(repeatRule, repeatTimeOfDayMinutes, firstTriggerAt)
+            } else {
+                base
+            }
+            withRepeat.withReminderAt(reminderAt)
+        } else {
+            ChecklistFillItem(text = itemText, checked = false, note = null)
+        }
+
         val updatedFill = fill.copy(items = fill.items + newFillItem)
-
-        val newChecklistItem = ChecklistItem(text = trimmed)
+        val newChecklistItem = ChecklistItem(text = itemText)
         val updatedChecklist = state.checklist.copy(items = state.checklist.items + newChecklistItem)
         updateContentState { it.copy(checklist = updatedChecklist) }
 
         viewModelScope.launch {
             repository.updateFill(updatedFill)
             repository.updateChecklistTemplate(updatedChecklist)
+
+            // Schedule alarms for the new item if reminder was parsed
+            if (reminderAt != null) {
+                reminderScheduler.scheduleItemReminder(checklistId, fill.id, newFillItem.id, reminderAt)
+            }
+            val nextAt = newFillItem.repeatNextAt
+            if (repeatRule != null && nextAt != null) {
+                reminderScheduler.scheduleItemRepeat(checklistId, fill.id, newFillItem.id, nextAt)
+            }
+
+            val hasReminder = reminderAt != null || repeatRule != null
             analyticsTracker.event("item_added_quick", mapOf(
                 "checklist_id" to checklistId.toString(),
-                "item_count" to updatedFill.items.size.toString()
+                "item_count" to updatedFill.items.size.toString(),
+                "has_smart_reminder" to hasReminder.toString()
             ))
+
+            isAddingItem = false
         }
     }
 
@@ -1506,5 +1650,22 @@ class ChecklistDetailViewModel(
         const val SNACKBAR_EXACT_DENIED = "exact_alarm_denied"
         /** Max independent repeat schedules for free users. Matches Remote Config default. */
         const val MAX_FREE_REPEAT_SCHEDULES = 1
+        /**
+         * Smart Add hint: user typed only the trigger phrase (no item text), or all non-trigger
+         * text was stripped to blank. Tell them to add actual task text.
+         */
+        const val SNACKBAR_SMART_ADD_HINT_ADD_TEXT = "smart_add_hint_add_text"
+        /**
+         * Smart Add hint: after stripping the trigger phrase, a lone time-preposition remains
+         * (e.g. "в" / "at" — mirrors RuDateLexicon.timePrepositions + EnDateLexicon.timePrepositions).
+         * The user likely started typing a time but did not finish.
+         */
+        const val SNACKBAR_SMART_ADD_HINT_ADD_TIME = "smart_add_hint_add_time"
+        /**
+         * Stranded time-preposition tokens that trigger the "finish the time" hint.
+         * Mirrors RuDateLexicon.timePrepositions + EnDateLexicon.timePrepositions; kept here
+         * because those objects are `internal` to feature:checklist.
+         */
+        val STRANDED_TIME_PREPOSITIONS = setOf("в", "во", "at")
     }
 }

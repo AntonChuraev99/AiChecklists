@@ -604,6 +604,36 @@
     <string name="settings_dynamic_color_description">Use colors from your wallpaper (Android 12+)</string>
     <string name="settings_back">Back</string>
 
+    <!-- Smart Add chip labels (TokenChipPreview) -->
+    <!-- Day keys -->
+    <string name="smart_add_chip_today">Today</string>
+    <string name="smart_add_chip_tomorrow">Tomorrow</string>
+    <string name="smart_add_chip_day_after_tomorrow">Day after tomorrow</string>
+    <!-- Time suffix: "at HH:MM" — %1$s is the formatted time string -->
+    <string name="smart_add_chip_at_time">at %1$s</string>
+    <!-- Absolute time only: "at HH:MM" -->
+    <string name="smart_add_chip_time_only">at %1$s</string>
+    <!-- Relative offsets (plurals defined in plurals.xml) -->
+    <!-- Weekday names -->
+    <string name="smart_add_chip_weekday_monday">Monday</string>
+    <string name="smart_add_chip_weekday_tuesday">Tuesday</string>
+    <string name="smart_add_chip_weekday_wednesday">Wednesday</string>
+    <string name="smart_add_chip_weekday_thursday">Thursday</string>
+    <string name="smart_add_chip_weekday_friday">Friday</string>
+    <string name="smart_add_chip_weekday_saturday">Saturday</string>
+    <string name="smart_add_chip_weekday_sunday">Sunday</string>
+    <!-- Repeat keys -->
+    <string name="smart_add_chip_repeat_daily">Daily</string>
+    <string name="smart_add_chip_repeat_weekly">Weekly</string>
+    <string name="smart_add_chip_repeat_monthly">Monthly</string>
+    <string name="smart_add_chip_repeat_yearly">Yearly</string>
+    <string name="smart_add_chip_repeat_weekdays">Weekdays</string>
+    <!-- Combined: "Every %1$s at %2$s" — %1$s = weekday, %2$s = HH:MM -->
+    <string name="smart_add_chip_combined_weekday_repeat">Every %1$s at %2$s</string>
+    <!-- Smart Add hints shown when user submits an incomplete trigger phrase -->
+    <string name="smart_add_hint_add_item_text">Add task text — e.g. "call mom every Sunday at 12"</string>
+    <string name="smart_add_hint_add_time">Finish the time — e.g. "at 12" or "at 7am"</string>
+
     <!-- Debug Screen -->
     <!-- PDF Export -->
     <string name="pdf_note_label">Note:</string>

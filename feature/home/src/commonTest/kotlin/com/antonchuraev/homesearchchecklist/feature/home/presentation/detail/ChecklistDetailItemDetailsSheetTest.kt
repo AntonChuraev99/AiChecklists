@@ -149,7 +149,8 @@ class ChecklistDetailItemDetailsSheetTest {
             ),
             analyticsTracker = FakeAnalyticsTracker(),
             reminderScheduler = scheduler,
-            datastore = datastore
+            datastore = datastore,
+            smartDateParser = FakeSmartDateParser(),
         )
     }
 
@@ -587,5 +588,14 @@ class ChecklistDetailItemDetailsSheetTest {
         override fun setUserProperties(properties: Map<String, Any>) {}
         override fun screenView(name: String) {}
         override fun event(name: String, params: Map<String, Any>) {}
+    }
+
+    private class FakeSmartDateParser :
+        com.antonchuraev.homesearchchecklist.feature.checklist.domain.parser.SmartDateParser {
+        override fun parse(
+            input: String,
+            now: Long,
+            timeZone: kotlinx.datetime.TimeZone,
+        ): com.antonchuraev.homesearchchecklist.feature.checklist.domain.parser.model.ParsedDateToken? = null
     }
 }
