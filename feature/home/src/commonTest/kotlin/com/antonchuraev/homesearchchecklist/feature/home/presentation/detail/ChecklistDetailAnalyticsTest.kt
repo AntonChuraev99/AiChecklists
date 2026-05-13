@@ -118,7 +118,8 @@ class ChecklistDetailAnalyticsTest {
             ),
             analyticsTracker = analyticsTracker,
             reminderScheduler = FakeReminderScheduler(),
-            datastore = datastore
+            datastore = datastore,
+            smartDateParser = FakeSmartDateParser(),
         )
     }
 
@@ -181,7 +182,9 @@ class ChecklistDetailAnalyticsTest {
     @Test
     fun addItem_firesItemAddedQuickWithParams() = runTest {
         val vm = createViewModel()
-        vm.onIntent(ChecklistDetailIntent.OnAddItem("New item"))
+        // OnItemInputChanged sets text; OnAddItemWithParse submits it (plain path — no parsedToken)
+        vm.onIntent(ChecklistDetailIntent.OnItemInputChanged("New item"))
+        vm.onIntent(ChecklistDetailIntent.OnAddItemWithParse)
 
         assertTrue(analyticsTracker.hasEvent("item_added_quick"))
         assertEquals("1", analyticsTracker.getEventParam("item_added_quick", "checklist_id"))
@@ -344,5 +347,13 @@ class ChecklistDetailAnalyticsTest {
         override fun cancelItemReminder(checklistId: Long, fillId: Long, itemId: String) {}
         override fun scheduleItemRepeat(checklistId: Long, fillId: Long, itemId: String, triggerAtMillis: Long) {}
         override fun cancelItemRepeat(checklistId: Long, fillId: Long, itemId: String) {}
+    }
+
+    private class FakeSmartDateParser : com.antonchuraev.homesearchchecklist.feature.checklist.domain.parser.SmartDateParser {
+        override fun parse(
+            input: String,
+            now: Long,
+            timeZone: kotlinx.datetime.TimeZone,
+        ): com.antonchuraev.homesearchchecklist.feature.checklist.domain.parser.model.ParsedDateToken? = null
     }
 }

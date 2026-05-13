@@ -30,6 +30,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -154,6 +155,10 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Check
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatEndCondition
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatType
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.parser.model.ParsedDateToken
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.smartadd.containsRepeat
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.smartadd.resolveChipLabel
+import com.antonchuraev.homesearchchecklist.desingsystem.components.TokenChipPreview
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.weekly.MoveToDayBottomSheet
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.weekly.WeeklyChecklistDetailContent
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.PendingRepeatConfig
@@ -239,19 +244,49 @@ private fun ChecklistDetailContent(
     onIntent: (ChecklistDetailIntent) -> Unit
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
+    val smartAddHintActive = remember { mutableStateOf(false) }
+    // Normalized snapshot of the input at the moment the hint snackbar was shown.
+    // We dismiss the snackbar only when the user makes a meaningful change
+    // (whitespace-only edits don't dismiss — they haven't changed the parser-visible content).
+    val smartAddHintTriggerInput = remember { mutableStateOf<String?>(null) }
 
-    // Snackbar message from ViewModel (exact alarm permission result)
+    // Snackbar message from ViewModel (exact alarm permission result + Smart Add hints)
     val exactGrantedMessage = stringResource(Res.string.reminder_exact_alarm_granted)
     val exactDeniedMessage = stringResource(Res.string.reminder_exact_alarm_denied)
+    val smartAddHintAddText = stringResource(Res.string.smart_add_hint_add_item_text)
+    val smartAddHintAddTime = stringResource(Res.string.smart_add_hint_add_time)
     LaunchedEffect(state.snackbarMessage) {
         val message = state.snackbarMessage ?: return@LaunchedEffect
+        val isSmartAddHint = message == ChecklistDetailViewModel.SNACKBAR_SMART_ADD_HINT_ADD_TEXT ||
+            message == ChecklistDetailViewModel.SNACKBAR_SMART_ADD_HINT_ADD_TIME
         val text = when (message) {
             ChecklistDetailViewModel.SNACKBAR_EXACT_GRANTED -> exactGrantedMessage
             ChecklistDetailViewModel.SNACKBAR_EXACT_DENIED -> exactDeniedMessage
+            ChecklistDetailViewModel.SNACKBAR_SMART_ADD_HINT_ADD_TEXT -> smartAddHintAddText
+            ChecklistDetailViewModel.SNACKBAR_SMART_ADD_HINT_ADD_TIME -> smartAddHintAddTime
             else -> message
         }
-        snackbarHostState.showSnackbar(text)
+        smartAddHintActive.value = isSmartAddHint
+        if (isSmartAddHint) {
+            val currentInput = (state as? ChecklistDetailState.Content)?.pendingItemInput.orEmpty()
+            smartAddHintTriggerInput.value = currentInput.normalizeForHintComparison()
+        }
+        snackbarHostState.showSnackbar(text, withDismissAction = true)
+        smartAddHintActive.value = false
+        smartAddHintTriggerInput.value = null
         onIntent(ChecklistDetailIntent.OnSnackbarDismissed)
+    }
+
+    // Auto-dismiss smart-add hint snackbar as soon as user makes a meaningful edit.
+    // Whitespace-only changes (e.g. trailing space) preserve the snackbar — they don't
+    // actually change what the parser would see on the next tap.
+    val contentState = state as? ChecklistDetailState.Content
+    LaunchedEffect(contentState?.pendingItemInput) {
+        if (!smartAddHintActive.value) return@LaunchedEffect
+        val currentNormalized = contentState?.pendingItemInput.orEmpty().normalizeForHintComparison()
+        if (currentNormalized != smartAddHintTriggerInput.value) {
+            snackbarHostState.currentSnackbarData?.dismiss()
+        }
     }
 
     // Undo snackbar for swipe-to-delete
@@ -295,7 +330,12 @@ private fun ChecklistDetailContent(
                 onIntent(ChecklistDetailIntent.OnBackClick)
             }
         },
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+        snackbarHost = {
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier.imePadding(),
+            )
+        },
         actions = {
             if (isEditMode) {
                 // Edit mode: only "Done" button
@@ -534,8 +574,14 @@ private fun ChecklistDetailContent(
                 if (addItemActive && !isEditMode) {
                     item(key = "inline_add_item") {
                         InlineAddItemInput(
-                            onAddItem = { onIntent(ChecklistDetailIntent.OnAddItem(it)) },
+                            text = state.pendingItemInput,
+                            onTextChange = { onIntent(ChecklistDetailIntent.OnItemInputChanged(it)) },
+                            parsedToken = state.parsedToken,
+                            onAddItem = {
+                                onIntent(ChecklistDetailIntent.OnAddItemWithParse)
+                            },
                             onClose = { hadText ->
+                                onIntent(ChecklistDetailIntent.OnItemInputChanged(""))
                                 onIntent(ChecklistDetailIntent.OnQuickAddCancelled(hadText = hadText))
                                 addItemActive = false
                             }
@@ -2135,10 +2181,12 @@ private fun CompletedSectionHeader(
 
 @Composable
 private fun InlineAddItemInput(
-    onAddItem: (String) -> Unit,
-    onClose: (hadText: Boolean) -> Unit
+    text: String,
+    onTextChange: (String) -> Unit,
+    parsedToken: ParsedDateToken?,
+    onAddItem: () -> Unit,
+    onClose: (hadText: Boolean) -> Unit,
 ) {
-    var text by remember { mutableStateOf("") }
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
     val density = LocalDensity.current
@@ -2159,45 +2207,77 @@ private fun InlineAddItemInput(
         wasKeyboardVisible = isKeyboardVisible
     }
 
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.Top
-    ) {
-        AppTextField(
-            value = text,
-            onValueChange = { text = it },
-            placeholder = stringResource(Res.string.add_item_placeholder),
-            singleLine = false,
-            modifier = Modifier
-                .weight(1f)
-                .focusRequester(focusRequester),
-            keyboardOptions = KeyboardOptions(
-                imeAction = ImeAction.Done,
-                capitalization = KeyboardCapitalization.Sentences
-            ),
-            keyboardActions = KeyboardActions(
-                onDone = {
-                    if (text.isNotBlank()) {
-                        onAddItem(text)
-                        text = ""
-                    }
-                }
-            )
-        )
-        IconButton(
-            onClick = {
-                if (text.isNotBlank()) {
-                    onAddItem(text)
-                    text = ""
-                } else {
-                    onClose(false)
+    Column(modifier = Modifier.fillMaxWidth()) {
+        // Smart Add chip — animated above the input row so it stays visible above the IME.
+        // Chip visibility is gated on parsedToken from ViewModel state, not local state,
+        // so the animation is driven by the debounced parser result (200ms after typing stops).
+        AnimatedVisibility(
+            visible = parsedToken != null,
+            enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
+            exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut(),
+        ) {
+            if (parsedToken != null) {
+                val chipLabel = resolveChipLabel(parsedToken.display)
+                val isRepeat = parsedToken.display.containsRepeat()
+                androidx.compose.foundation.layout.Box(
+                    modifier = Modifier.padding(bottom = AppDimens.SpacingSm)
+                ) {
+                    TokenChipPreview(
+                        label = chipLabel,
+                        isRepeat = isRepeat,
+                    )
                 }
             }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top
         ) {
-            Icon(
-                imageVector = if (text.isNotBlank()) Icons.Outlined.Check else Icons.Outlined.Add,
-                contentDescription = stringResource(Res.string.add_item)
+            AppTextField(
+                value = text,
+                onValueChange = onTextChange,
+                placeholder = stringResource(Res.string.add_item_placeholder),
+                singleLine = false,
+                modifier = Modifier
+                    .weight(1f)
+                    .focusRequester(focusRequester),
+                keyboardOptions = KeyboardOptions(
+                    imeAction = ImeAction.Done,
+                    capitalization = KeyboardCapitalization.Sentences
+                ),
+                keyboardActions = KeyboardActions(
+                    onDone = {
+                        if (text.isNotBlank()) onAddItem()
+                    }
+                )
             )
+            IconButton(
+                onClick = {
+                    if (text.isNotBlank()) {
+                        onAddItem()
+                    } else {
+                        onClose(false)
+                    }
+                }
+            ) {
+                Icon(
+                    imageVector = if (text.isNotBlank()) Icons.Outlined.Check else Icons.Outlined.Add,
+                    contentDescription = stringResource(Res.string.add_item)
+                )
+            }
         }
     }
 }
+
+private val WHITESPACE_RUN_REGEX = Regex("""\s+""")
+
+/**
+ * Normalizes input for smart-add hint dismissal comparison.
+ *
+ * Collapses consecutive whitespace to a single space and trims, so that
+ * whitespace-only edits (e.g. trailing space, internal double space) do
+ * not look like meaningful content changes from the parser's perspective.
+ */
+private fun String.normalizeForHintComparison(): String =
+    trim().replace(WHITESPACE_RUN_REGEX, " ")

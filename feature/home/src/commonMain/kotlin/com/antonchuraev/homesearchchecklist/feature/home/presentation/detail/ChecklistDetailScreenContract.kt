@@ -8,6 +8,7 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Check
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatEndCondition
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatType
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.parser.model.ParsedDateToken
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.PendingRepeatConfig
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderTab
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.UserLimits
@@ -72,6 +73,9 @@ sealed interface ChecklistDetailState : State {
         // Paywall locked banners: shown instead of normal tab content when free user is at limit
         val reminderSheetLocked: Boolean = false,
         val itemReminderSheetLocked: Boolean = false,
+        // Smart Add parser state: text input is owned by ViewModel to allow debounced parsing
+        val pendingItemInput: String = "",
+        val parsedToken: ParsedDateToken? = null,
     ) : ChecklistDetailState
 }
 
@@ -88,7 +92,15 @@ sealed interface ChecklistDetailIntent : Intent {
     // Item actions (for default fill) — id-based for safe partition support
     data class OnItemCheckedChange(val itemId: String, val checked: Boolean) : ChecklistDetailIntent
     data class OnAddNoteClick(val itemId: String) : ChecklistDetailIntent
-    data class OnAddItem(val text: String) : ChecklistDetailIntent
+    /** Fires on every keystroke in the inline add-item field (debounced 200ms in VM). */
+    data class OnItemInputChanged(val text: String) : ChecklistDetailIntent
+    /**
+     * Submits the current [ChecklistDetailState.Content.pendingItemInput].
+     * If [ChecklistDetailState.Content.parsedToken] is non-null the reminder fields are
+     * applied and the matched substring is stripped from the text. Replaces the former
+     * [OnAddItem] in all screen call-sites (Option B — single intent, branching inside VM).
+     */
+    data object OnAddItemWithParse : ChecklistDetailIntent
     data class OnNoteChanged(val note: String) : ChecklistDetailIntent
     data object OnSaveNote : ChecklistDetailIntent
     data object OnDismissNoteDialog : ChecklistDetailIntent

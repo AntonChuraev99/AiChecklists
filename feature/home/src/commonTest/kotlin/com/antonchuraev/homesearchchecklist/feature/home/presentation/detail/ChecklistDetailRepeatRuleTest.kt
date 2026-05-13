@@ -126,7 +126,8 @@ class ChecklistDetailRepeatRuleTest {
             ),
             analyticsTracker = analyticsTracker,
             reminderScheduler = scheduler,
-            datastore = datastore
+            datastore = datastore,
+            smartDateParser = FakeSmartDateParser(),
         )
     }
 
@@ -917,5 +918,14 @@ class ChecklistDetailRepeatRuleTest {
         override fun cancelItemReminder(checklistId: Long, fillId: Long, itemId: String) {}
         override fun scheduleItemRepeat(checklistId: Long, fillId: Long, itemId: String, triggerAtMillis: Long) {}
         override fun cancelItemRepeat(checklistId: Long, fillId: Long, itemId: String) {}
+    }
+
+    private class FakeSmartDateParser :
+        com.antonchuraev.homesearchchecklist.feature.checklist.domain.parser.SmartDateParser {
+        override fun parse(
+            input: String,
+            now: Long,
+            timeZone: kotlinx.datetime.TimeZone,
+        ): com.antonchuraev.homesearchchecklist.feature.checklist.domain.parser.model.ParsedDateToken? = null
     }
 }
