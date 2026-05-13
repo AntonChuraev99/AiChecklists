@@ -7,12 +7,10 @@ import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
-import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetUserLimitsUseCase
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
@@ -44,7 +42,6 @@ private const val TAG = "CalendarViewModel"
  */
 class CalendarViewModel(
     private val repository: ChecklistRepository,
-    private val getUserLimitsUseCase: GetUserLimitsUseCase,
     private val appNavigator: AppNavigator,
     private val logger: AppLogger,
     /**
@@ -57,12 +54,6 @@ class CalendarViewModel(
     /** Incrementing this triggers a full re-fetch by flatMapLatest. */
     private val _retryTrigger = MutableStateFlow(0)
 
-    /**
-     * Whether the premium teaser chip has been dismissed this session.
-     * Independent of screenState so it survives Content ↔ Empty transitions.
-     */
-    private val _isChipDismissed = MutableStateFlow(false)
-
     @OptIn(ExperimentalCoroutinesApi::class)
     override val screenState: StateFlow<CalendarState> = _retryTrigger
         .flatMapLatest { buildRemindersFlow() }
@@ -73,8 +64,6 @@ class CalendarViewModel(
     override fun onIntent(intent: CalendarIntent) {
         when (intent) {
             is CalendarIntent.OnReminderClick -> handleReminderClick(intent.info)
-            CalendarIntent.OnUpgradeToGridClick -> appNavigator.navigateToPaywall("calendar_grid")
-            CalendarIntent.OnDismissTeaser -> _isChipDismissed.update { true }
             CalendarIntent.OnCreateChecklistClick -> appNavigator.navigateToTemplatesScreen()
             CalendarIntent.OnRetry -> _retryTrigger.update { it + 1 }
         }
@@ -92,41 +81,28 @@ class CalendarViewModel(
     // ─── Flow assembly ───────────────────────────────────────────────────────
 
     /**
-     * Builds the combined reminders + isPremium + isChipDismissed flow.
+     * Builds the reminders flow for the configured [-7d, +30d] range.
      *
      * Called once per [_retryTrigger] emission. [catch] translates repository
      * exceptions into [CalendarState.Error] — no silent empty list.
      */
-    private fun buildRemindersFlow() = combine(
-        repository.observeRemindersInRange(
-            fromMs = rangeStart(clock()),
-            toMs = rangeEnd(clock()),
-        ),
-        getUserLimitsUseCase().map { it.isPremium },
-        _isChipDismissed,
-    ) { reminders, isPremium, chipDismissed ->
-        mapToState(reminders, isPremium, chipDismissed)
-    }.catch { e ->
-        logger.error(TAG, "calendar_range_fetch_failed", e)
-        emit(CalendarState.Error(e.message ?: "Unknown error"))
-    }
+    private fun buildRemindersFlow() = repository.observeRemindersInRange(
+        fromMs = rangeStart(clock()),
+        toMs = rangeEnd(clock()),
+    ).map { reminders -> mapToState(reminders) }
+        .catch { e ->
+            logger.error(TAG, "calendar_range_fetch_failed", e)
+            emit(CalendarState.Error(e.message ?: "Unknown error"))
+        }
 
     // ─── State mapping ───────────────────────────────────────────────────────
 
-    private fun mapToState(
-        reminders: List<TodayReminderInfo>,
-        isPremium: Boolean,
-        isChipDismissed: Boolean,
-    ): CalendarState {
-        if (reminders.isEmpty()) return CalendarState.Empty(isPremium)
+    private fun mapToState(reminders: List<TodayReminderInfo>): CalendarState {
+        if (reminders.isEmpty()) return CalendarState.Empty
 
         val nowMs = clock()
         val tz = TimeZone.currentSystemDefault()
-        return CalendarState.Content(
-            agenda = buildAgenda(reminders, nowMs, tz),
-            isPremium = isPremium,
-            isChipDismissed = isChipDismissed,
-        )
+        return CalendarState.Content(agenda = buildAgenda(reminders, nowMs, tz))
     }
 
     /**
@@ -148,8 +124,16 @@ class CalendarViewModel(
         val startOfToday = startOfDayMs(nowMs, tz)
         val todayEpochDay = epochDayFor(startOfToday, tz)
 
-        val pastDue = reminders.filter { it.reminderAt < startOfToday }.sortedBy { it.reminderAt }
-        val upcoming = reminders.filter { it.reminderAt >= startOfToday }.sortedBy { it.reminderAt }
+        // Past-due bucket only catches one-shot (non-recurring) past entries:
+        // those are reminders the user actually missed. Past recurring entries
+        // are history — they fired on that day — and belong under their own
+        // date header instead of the urgency-tinted "Past due" group.
+        val pastDue = reminders
+            .filter { it.reminderAt < startOfToday && !it.isRecurring }
+            .sortedBy { it.reminderAt }
+        val dated = reminders
+            .filter { it.reminderAt >= startOfToday || it.isRecurring }
+            .sortedBy { it.reminderAt }
 
         val result = mutableListOf<AgendaItem>()
 
@@ -163,12 +147,12 @@ class CalendarViewModel(
             pastDue.forEach { result += AgendaItem.ReminderRow(it) }
         }
 
-        // ── Upcoming: group by local date, always include today ───────────────
-        // Build a map: epochDay → reminders. Insert today with empty list as sentinel.
+        // ── Dated entries: group by local date, always include today ──────────
+        // Both past-recurring (history) and future reminders flow through here.
         val byDay = linkedMapOf<Long, MutableList<TodayReminderInfo>>()
         byDay[todayEpochDay] = mutableListOf() // today always present
 
-        for (reminder in upcoming) {
+        for (reminder in dated) {
             val day = epochDayFor(reminder.reminderAt, tz)
             byDay.getOrPut(day) { mutableListOf() } += reminder
         }

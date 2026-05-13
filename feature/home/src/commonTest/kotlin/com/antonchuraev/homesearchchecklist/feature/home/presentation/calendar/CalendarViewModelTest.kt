@@ -4,7 +4,6 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.core.navigation.api.NavCommand
-import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistRepeatInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
@@ -13,23 +12,11 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ItemR
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
-import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.LoginResult
-import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallOffering
-import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PurchaseResult
-import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.RestoreResult
-import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.SubscriptionStatus
-import com.antonchuraev.homesearchchecklist.feature.paywall.domain.repository.PaywallRepository
-import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetUserLimitsUseCase
-import com.antonchuraev.homesearchchecklist.feature.user.domain.model.RegistrationData
-import com.antonchuraev.homesearchchecklist.feature.user.domain.model.UserData
-import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
@@ -130,46 +117,9 @@ private open class FakeChecklistRepository : ChecklistRepository {
     override suspend fun togglePriority(fillId: Long, itemId: String): Result<Unit> = Result.success(Unit)
 }
 
-private class FakeUserDataRepository(isPremium: Boolean = false) : UserDataRepository {
-    private val userData = UserData(userId = "test", isPremium = isPremium)
-    private val flow = MutableStateFlow(userData)
-    override fun getUserDataFlow(): StateFlow<UserData> = flow
-    override suspend fun getUserData(): UserData = userData
-    override suspend fun update(userData: UserData) {}
-    override suspend fun ensureUserRegistered(): Result<RegistrationData> =
-        Result.success(RegistrationData(userData = userData, isNewUser = false))
-    override suspend fun syncWithServer(): Result<RegistrationData> =
-        Result.success(RegistrationData(userData = userData, isNewUser = false))
-    override suspend fun isPaywallLinked(): Boolean = false
-    override suspend fun setPaywallLinked(linked: Boolean) {}
-    override suspend fun restoreCreditsAfterPurchase(): Result<Int> = Result.success(0)
-    override suspend fun getFirstLaunchAtMillis(): Long = 0L
-}
-
-private class FakeRemoteConfigProvider : RemoteConfigProvider {
-    override suspend fun fetchAndActivate(): Boolean = true
-    override fun getBoolean(key: String, defaultValue: Boolean): Boolean = defaultValue
-    override fun getString(key: String, defaultValue: String): String = defaultValue
-    override fun getLong(key: String, defaultValue: Long): Long = defaultValue
-}
-
-private class FakePaywallRepository(
-    status: SubscriptionStatus = SubscriptionStatus.FREE
-) : PaywallRepository {
-    override val subscriptionStatus: Flow<SubscriptionStatus> = flowOf(status)
-    override suspend fun getOfferings(): Result<PaywallOffering?> = Result.success(null)
-    override suspend fun purchase(packageId: String): PurchaseResult = PurchaseResult.Error("not implemented")
-    override suspend fun restorePurchases(): RestoreResult = RestoreResult.Error("not implemented")
-    override suspend fun refreshSubscriptionStatus() {}
-    override fun isConfigured(): Boolean = true
-    override suspend fun logIn(appUserId: String): Result<LoginResult> = Result.failure(NotImplementedError())
-    override suspend fun logOut(): Result<SubscriptionStatus> = Result.failure(NotImplementedError())
-}
-
 private class FakeNavigator : AppNavigator {
     val navigatedChecklistIds = mutableListOf<Long>()
     val navigatedFillIds = mutableListOf<Long>()
-    val paywallSources = mutableListOf<String>()
     var navigatedToTemplates = false
 
     override val commands: Flow<NavCommand> = emptyFlow()
@@ -195,7 +145,7 @@ private class FakeNavigator : AppNavigator {
         navigatedFillIds.add(fillId)
     }
     override fun navigateToFillsList(checklistId: Long) {}
-    override fun navigateToPaywall(source: String) { paywallSources.add(source) }
+    override fun navigateToPaywall(source: String) {}
     override fun navigateToPaywallVariant(source: String, forceVariant: String) {}
     override fun navigateToSubscriptionStatus(showSuccessMessage: Boolean) {}
     override fun navigateToShareChecklist(checklistId: Long) {}
@@ -278,17 +228,8 @@ class CalendarViewModelTest {
     private suspend fun CalendarViewModel.awaitState(): CalendarState =
         screenState.first { it !is CalendarState.Loading }
 
-    private fun buildVm(
-        isPremium: Boolean = false,
-        paywallStatus: SubscriptionStatus = SubscriptionStatus.FREE,
-    ): CalendarViewModel = CalendarViewModel(
+    private fun buildVm(): CalendarViewModel = CalendarViewModel(
         repository = repo,
-        getUserLimitsUseCase = GetUserLimitsUseCase(
-            remoteConfigProvider = FakeRemoteConfigProvider(),
-            checklistRepository = repo,
-            paywallRepository = FakePaywallRepository(paywallStatus),
-            userDataRepository = FakeUserDataRepository(isPremium),
-        ),
         appNavigator = navigator,
         logger = logger,
         // Pin the clock to a known timestamp so tests don't break when run on
@@ -406,24 +347,6 @@ class CalendarViewModelTest {
         )
     }
 
-    // ── 6. Reactivity: isPremium false → true updates Content state ───────────
-
-    @Test
-    fun reactivity_isPremiumChanges_contentStateUpdates() = runTest {
-        // Non-premium user: FakePaywallRepository emits FREE
-        repo.emitReminders(listOf(checklistReminder(reminderAt = TODAY_3PM_MS)))
-
-        // Build with isPremium=false (Firestore) and FREE (RC)
-        val vm = buildVm(isPremium = false, paywallStatus = SubscriptionStatus.FREE)
-        val state = vm.awaitState()
-
-        assertIs<CalendarState.Content>(state)
-        assertFalse(state.isPremium, "User should start as non-premium")
-        // isPremium=true only comes from the PaywallRepository or UserData flows.
-        // In this test, both are fixed fakes — we verify the initial false value.
-        // Full reactive test would require mutable fake flows (covered by GetUserLimitsUseCase tests).
-    }
-
     // ── 7. Reactivity: new reminder emitted while observed → agenda updates ──
 
     @Test
@@ -477,34 +400,6 @@ class CalendarViewModelTest {
         assertTrue(navigator.navigatedChecklistIds.isEmpty())
     }
 
-    // ── 9. Intent: OnUpgradeToGridClick → navigateToPaywall("calendar_grid") ─
-
-    @Test
-    fun intent_onUpgradeToGridClick_navigatesToPaywallWithCorrectSource() = runTest {
-        val vm = buildVm()
-
-        vm.sendIntent(CalendarIntent.OnUpgradeToGridClick)
-
-        assertEquals(listOf("calendar_grid"), navigator.paywallSources)
-    }
-
-    // ── 10. Intent: OnDismissTeaser → Content.isChipDismissed = true ─────────
-
-    @Test
-    fun intent_onDismissTeaser_setsChipDismissedInContentState() = runTest {
-        repo.emitReminders(listOf(checklistReminder(reminderAt = TODAY_3PM_MS)))
-        val vm = buildVm()
-        val initial = vm.awaitState()
-        assertIs<CalendarState.Content>(initial)
-        assertFalse(initial.isChipDismissed)
-
-        vm.sendIntent(CalendarIntent.OnDismissTeaser)
-
-        val updated = vm.screenState.first { it is CalendarState.Content && (it as CalendarState.Content).isChipDismissed }
-        assertIs<CalendarState.Content>(updated)
-        assertTrue(updated.isChipDismissed)
-    }
-
     // ── 11. Intent: OnCreateChecklistClick → navigateToTemplatesScreen ────────
 
     @Test
@@ -545,12 +440,6 @@ class CalendarViewModelTest {
 
         val vm = CalendarViewModel(
             repository = errorRepo,
-            getUserLimitsUseCase = GetUserLimitsUseCase(
-                remoteConfigProvider = FakeRemoteConfigProvider(),
-                checklistRepository = errorRepo,
-                paywallRepository = FakePaywallRepository(),
-                userDataRepository = FakeUserDataRepository(),
-            ),
             appNavigator = navigator,
             logger = logger,
         )

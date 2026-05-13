@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -12,16 +13,21 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarViewWeek
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.outlined.Alarm
@@ -35,9 +41,22 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,19 +65,20 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.calendar_empty_cta
+import aichecklists.core.designsystem.generated.resources.calendar_nav_label
+import aichecklists.core.designsystem.generated.resources.today_title
 import aichecklists.core.designsystem.generated.resources.calendar_empty_description
 import aichecklists.core.designsystem.generated.resources.calendar_empty_title
 import aichecklists.core.designsystem.generated.resources.calendar_error_retry
 import aichecklists.core.designsystem.generated.resources.calendar_error_title
 import aichecklists.core.designsystem.generated.resources.calendar_grid_week_label
-import aichecklists.core.designsystem.generated.resources.calendar_teaser_cta
-import aichecklists.core.designsystem.generated.resources.calendar_teaser_description
-import aichecklists.core.designsystem.generated.resources.calendar_teaser_dismiss
-import aichecklists.core.designsystem.generated.resources.calendar_teaser_title
+import aichecklists.core.designsystem.generated.resources.calendar_next_week
+import aichecklists.core.designsystem.generated.resources.calendar_prev_week
 import aichecklists.core.designsystem.generated.resources.calendar_title
 import aichecklists.core.designsystem.generated.resources.today_open_menu
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
@@ -69,6 +89,8 @@ import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.today.TodayBody
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.today.TodayScreenState
 import kotlinx.coroutines.launch
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
@@ -111,11 +133,15 @@ import org.jetbrains.compose.resources.stringResource
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CalendarScreen(
-    state: CalendarState,
+    todayState: TodayScreenState,
+    calendarState: CalendarState,
     drawerState: DrawerState,
-    onIntent: (CalendarIntent) -> Unit,
+    onTodayReminderClick: (checklistId: Long, fillId: Long?) -> Unit,
+    onTodayCreateChecklistClick: () -> Unit,
+    onCalendarIntent: (CalendarIntent) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
+    val pagerState = rememberPagerState(initialPage = 0, pageCount = { 2 })
 
     AppScaffold(
         title = stringResource(Res.string.calendar_title),
@@ -129,12 +155,53 @@ fun CalendarScreen(
             }
         },
     ) {
-        when (state) {
-            CalendarState.Loading -> CalendarLoadingContent()
-            is CalendarState.Content -> CalendarContent(state = state, onIntent = onIntent)
-            is CalendarState.Empty -> CalendarEmptyState(state = state, onIntent = onIntent)
-            is CalendarState.Error -> CalendarErrorState(state = state, onIntent = onIntent)
+        Column(modifier = Modifier.fillMaxSize()) {
+            PrimaryTabRow(
+                selectedTabIndex = pagerState.currentPage,
+                containerColor = MaterialTheme.colorScheme.background,
+            ) {
+                Tab(
+                    selected = pagerState.currentPage == 0,
+                    onClick = { scope.launch { pagerState.animateScrollToPage(0) } },
+                    text = { Text(stringResource(Res.string.today_title)) },
+                )
+                Tab(
+                    selected = pagerState.currentPage == 1,
+                    onClick = { scope.launch { pagerState.animateScrollToPage(1) } },
+                    text = { Text(stringResource(Res.string.calendar_nav_label)) },
+                )
+            }
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize(),
+            ) { page ->
+                when (page) {
+                    0 -> TodayBody(
+                        state = todayState,
+                        onReminderClick = onTodayReminderClick,
+                        onCreateChecklistClick = onTodayCreateChecklistClick,
+                    )
+                    1 -> CalendarTabBody(
+                        state = calendarState,
+                        onIntent = onCalendarIntent,
+                    )
+                }
+            }
         }
+    }
+}
+
+/** Calendar tab body (was the body of the standalone CalendarScreen). */
+@Composable
+private fun CalendarTabBody(
+    state: CalendarState,
+    onIntent: (CalendarIntent) -> Unit,
+) {
+    when (state) {
+        CalendarState.Loading -> CalendarLoadingContent()
+        is CalendarState.Content -> CalendarContent(state = state, onIntent = onIntent)
+        CalendarState.Empty -> CalendarEmptyState(onIntent = onIntent)
+        is CalendarState.Error -> CalendarErrorState(state = state, onIntent = onIntent)
     }
 }
 
@@ -169,25 +236,101 @@ private fun CalendarContent(
     // We do a single pass here at composition time (cheap for ~35 agenda items max).
     val headerIndexMap: Map<Long, Int> = buildHeaderIndexMap(state.agenda)
 
+    // Briefly highlight the DateHeader matching a tapped week-grid cell.
+    // Works regardless of whether LazyColumn can actually scroll — if agenda
+    // fits the viewport, scroll is a no-op but the highlight still gives
+    // unambiguous "yes, I targeted this date" feedback.
+    var tappedEpochDay by remember { mutableStateOf<Long?>(null) }
+    LaunchedEffect(tappedEpochDay) {
+        if (tappedEpochDay != null) {
+            kotlinx.coroutines.delay(900)
+            tappedEpochDay = null
+        }
+    }
+
+    // First-open auto-scroll: jump to today's DateHeader so the user lands on
+    // "now" rather than on -7 days of past history. Gated by rememberSaveable
+    // so manual scrolling past this point is preserved on tab switch / config
+    // change (we don't snap back to today every time CalendarContent recomposes).
+    var didInitialScroll by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(headerIndexMap, didInitialScroll) {
+        if (didInitialScroll) return@LaunchedEffect
+        if (headerIndexMap.isEmpty()) return@LaunchedEffect
+        val todayDate = Instant.fromEpochMilliseconds(currentTimeMillis())
+            .toLocalDateTime(TimeZone.currentSystemDefault())
+            .date
+        val todayEpochDay = todayDate.toEpochDays().toLong()
+        val index = headerIndexMap[todayEpochDay] ?: return@LaunchedEffect
+        listState.scrollToItem(index)
+        didInitialScroll = true
+    }
+
+    // Derive the epochDay of the agenda's currently-visible "leading" DateHeader.
+    // Walking backward from firstVisibleItemIndex finds the section the user is
+    // currently looking at. WeekGridContent uses this to (a) align its week to
+    // the visible date and (b) underline the matching day cell.
+    val firstVisibleEpochDay by remember(state.agenda) {
+        derivedStateOf {
+            val firstVisible = listState.firstVisibleItemIndex
+            var i = firstVisible.coerceAtMost(state.agenda.lastIndex)
+            while (i >= 0) {
+                val item = state.agenda.getOrNull(i)
+                if (item is AgendaItem.DateHeader && item.epochDay != Long.MIN_VALUE) {
+                    return@derivedStateOf item.epochDay
+                }
+                i--
+            }
+            null
+        }
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
 
-        // ---- Top banner: teaser chip OR week grid ----
-        when {
-            state.isPremium -> WeekGridContent(
-                agenda = state.agenda,
-                onCellClick = { epochDay ->
-                    val index = headerIndexMap[epochDay] ?: return@WeekGridContent
+        // ---- Top banner: week grid (free for everyone — monetization TBD) ----
+        WeekGridContent(
+            agenda = state.agenda,
+            currentVisibleEpochDay = firstVisibleEpochDay,
+            onCellClick = { epochDay ->
+                tappedEpochDay = epochDay
+                headerIndexMap[epochDay]?.let { index ->
                     scope.launch { listState.animateScrollToItem(index) }
-                },
-            )
-            !state.isChipDismissed -> PremiumTeaserChip(onIntent = onIntent)
-            else -> Unit
-        }
+                }
+            },
+            onPrevWeekClick = {
+                val anchor = firstVisibleEpochDay
+                if (anchor != null) {
+                    val target = weekMondayEpochDay(anchor) - 7
+                    val index = headerIndexMap[target]
+                        ?: headerIndexMap.entries
+                            .filter { it.key < anchor }
+                            .maxByOrNull { it.key }
+                            ?.value
+                    if (index != null) {
+                        scope.launch { listState.animateScrollToItem(index) }
+                    }
+                }
+            },
+            onNextWeekClick = {
+                val anchor = firstVisibleEpochDay
+                if (anchor != null) {
+                    val target = weekMondayEpochDay(anchor) + 7
+                    val index = headerIndexMap[target]
+                        ?: headerIndexMap.entries
+                            .filter { it.key > anchor }
+                            .minByOrNull { it.key }
+                            ?.value
+                    if (index != null) {
+                        scope.launch { listState.animateScrollToItem(index) }
+                    }
+                }
+            },
+        )
 
         // ---- Agenda list ----
         AgendaListContent(
             agenda = state.agenda,
             listState = listState,
+            highlightedEpochDay = tappedEpochDay,
             onReminderClick = { info -> onIntent(CalendarIntent.OnReminderClick(info)) },
         )
     }
@@ -201,6 +344,7 @@ private fun CalendarContent(
 private fun AgendaListContent(
     agenda: List<AgendaItem>,
     listState: LazyListState,
+    highlightedEpochDay: Long?,
     onReminderClick: (TodayReminderInfo) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -216,7 +360,10 @@ private fun AgendaListContent(
             when (agendaItem) {
                 is AgendaItem.DateHeader -> {
                     stickyHeader(key = "header:${agendaItem.epochDay}") {
-                        CalendarDateHeader(header = agendaItem)
+                        CalendarDateHeader(
+                            header = agendaItem,
+                            isHighlighted = agendaItem.epochDay == highlightedEpochDay,
+                        )
                     }
                 }
                 is AgendaItem.ReminderRow -> {
@@ -253,9 +400,19 @@ private fun buildHeaderIndexMap(agenda: List<AgendaItem>): Map<Long, Int> {
 @Composable
 private fun CalendarDateHeader(
     header: AgendaItem.DateHeader,
+    isHighlighted: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
-    val bgColor = MaterialTheme.colorScheme.background
+    val targetBg = if (isHighlighted) {
+        MaterialTheme.colorScheme.primaryContainer
+    } else {
+        MaterialTheme.colorScheme.background
+    }
+    val bgColor by animateColorAsState(
+        targetValue = targetBg,
+        animationSpec = tween(durationMillis = 250),
+        label = "calendar_header_highlight",
+    )
     val labelColor = if (header.isPastDue) {
         MaterialTheme.colorScheme.error
     } else {
@@ -408,93 +565,28 @@ private fun formatReminderTime(reminderAt: Long): String {
 }
 
 // ---------------------------------------------------------------------------
-// PremiumTeaserChip — free users, chip not dismissed (U4)
-// ---------------------------------------------------------------------------
-
-@Composable
-private fun PremiumTeaserChip(
-    onIntent: (CalendarIntent) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    AppCard(
-        modifier = modifier.padding(
-            horizontal = AppDimens.SpacingLg,
-            vertical = AppDimens.SpacingMd,
-        ),
-        contentPadding = PaddingValues(
-            horizontal = AppDimens.SpacingMd,
-            vertical = AppDimens.SpacingSm,
-        ),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            // Left: calendar-week icon + title + description
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd),
-                modifier = Modifier.weight(1f),
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.CalendarViewWeek,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(AppDimens.IconSizeMd),
-                )
-                Column {
-                    Text(
-                        text = stringResource(Res.string.calendar_teaser_title),
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        text = stringResource(Res.string.calendar_teaser_description),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-
-            // Right: CTA button + dismiss icon
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                AppButtonText(
-                    text = stringResource(Res.string.calendar_teaser_cta),
-                    onClick = { onIntent(CalendarIntent.OnUpgradeToGridClick) },
-                )
-                IconButton(onClick = { onIntent(CalendarIntent.OnDismissTeaser) }) {
-                    Icon(
-                        imageVector = Icons.Filled.Close,
-                        contentDescription = stringResource(Res.string.calendar_teaser_dismiss),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(AppDimens.IconSizeMd),
-                    )
-                }
-            }
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// WeekGridContent — premium users — Mon-Sun 7-cell row (U4)
+// WeekGridContent — Mon-Sun 7-cell row above agenda
 // ---------------------------------------------------------------------------
 
 @Composable
 private fun WeekGridContent(
     agenda: List<AgendaItem>,
+    currentVisibleEpochDay: Long?,
     onCellClick: (epochDay: Long) -> Unit,
+    onPrevWeekClick: () -> Unit,
+    onNextWeekClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // Compute current week Monday (today's weekday offset back to Monday).
+    // Anchor the displayed week on the agenda's currently-visible date.
+    // Falls back to "today" when nothing is visible yet (initial composition).
     val today = Instant.fromEpochMilliseconds(currentTimeMillis())
         .toLocalDateTime(TimeZone.currentSystemDefault())
         .date
-    val mondayOffset = today.dayOfWeek.ordinal // Mon=0 … Sun=6 in kotlinx.datetime
-    val monday = today.minus(mondayOffset, DateTimeUnit.DAY)
+    val anchorDate = currentVisibleEpochDay?.let {
+        kotlinx.datetime.LocalDate.fromEpochDays(it.toInt())
+    } ?: today
+    val mondayOffset = anchorDate.dayOfWeek.ordinal // Mon=0 … Sun=6
+    val monday = anchorDate.minus(mondayOffset, DateTimeUnit.DAY)
     val sunday = monday.plus(6, DateTimeUnit.DAY)
 
     // Collect dates that have at least one reminder.
@@ -506,7 +598,6 @@ private fun WeekGridContent(
         }
         .toSet()
 
-    // Week label: e.g. "May 12 — May 18"
     val weekLabel = buildString {
         append(formatShortDate(monday))
         append(" — ")
@@ -519,16 +610,41 @@ private fun WeekGridContent(
             .padding(horizontal = AppDimens.SpacingLg, vertical = AppDimens.SpacingMd),
         verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
     ) {
-        Text(
-            text = stringResource(Res.string.calendar_grid_week_label),
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = weekLabel,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(
+                onClick = onPrevWeekClick,
+                modifier = Modifier.size(AppDimens.IconSizeMd + AppDimens.SpacingMd),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.ChevronLeft,
+                    contentDescription = stringResource(Res.string.calendar_prev_week),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(AppDimens.IconSizeMd),
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = weekLabel,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+            IconButton(
+                onClick = onNextWeekClick,
+                modifier = Modifier.size(AppDimens.IconSizeMd + AppDimens.SpacingMd),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.ChevronRight,
+                    contentDescription = stringResource(Res.string.calendar_next_week),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(AppDimens.IconSizeMd),
+                )
+            }
+        }
 
         Spacer(modifier = Modifier.height(AppDimens.SpacingXs))
 
@@ -540,14 +656,56 @@ private fun WeekGridContent(
                 val cellDate = monday.plus(dayOffset, DateTimeUnit.DAY)
                 val cellEpochDay = cellDate.toEpochDays().toLong()
                 val isToday = cellDate == today
+                val isPast = cellDate < today
                 val hasReminder = cellEpochDay in datesWithReminders
+                val isCurrentScroll = cellEpochDay == currentVisibleEpochDay
 
                 WeekGridCell(
                     date = cellDate,
                     isToday = isToday,
+                    isPast = isPast,
                     hasReminder = hasReminder,
+                    isCurrentScroll = isCurrentScroll,
                     onClick = { onCellClick(cellEpochDay) },
                     modifier = Modifier.weight(1f),
+                )
+            }
+        }
+
+        // Scroll-position indicator: a single primary-colored bar that slides
+        // horizontally under the day cell whose date matches the agenda's
+        // currently-visible DateHeader. M3 tab-indicator pattern with a tween
+        // slide animation between positions.
+        Spacer(modifier = Modifier.height(AppDimens.SpacingXs))
+        val currentIdx = (0..6).firstOrNull { dayOffset ->
+            monday.plus(dayOffset, DateTimeUnit.DAY).toEpochDays().toLong() ==
+                currentVisibleEpochDay
+        }
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth().height(3.dp)) {
+            val totalSpacing = AppDimens.SpacingXs * 6
+            val cellW = (this.maxWidth - totalSpacing) / 7
+            val indicatorW = cellW * 0.6f
+            val centerOffset = (cellW - indicatorW) / 2
+            val targetX = if (currentIdx != null) {
+                (cellW + AppDimens.SpacingXs) * currentIdx + centerOffset
+            } else {
+                0.dp
+            }
+            val animX by animateDpAsState(
+                targetValue = targetX,
+                animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
+                label = "calendar_indicator_x",
+            )
+            if (currentIdx != null) {
+                Box(
+                    modifier = Modifier
+                        .offset(x = animX)
+                        .width(indicatorW)
+                        .height(3.dp)
+                        .background(
+                            color = MaterialTheme.colorScheme.primary,
+                            shape = RoundedCornerShape(2.dp),
+                        ),
                 )
             }
         }
@@ -559,20 +717,36 @@ private fun WeekGridContent(
     )
 }
 
+/** Compute the epoch-day of the Monday of the week containing [anchorEpochDay]. */
+private fun weekMondayEpochDay(anchorEpochDay: Long): Long {
+    val date = LocalDate.fromEpochDays(anchorEpochDay.toInt())
+    val mondayOffset = date.dayOfWeek.ordinal // Mon=0 … Sun=6
+    return date.minus(mondayOffset, DateTimeUnit.DAY).toEpochDays().toLong()
+}
+
 @Composable
 private fun WeekGridCell(
     date: LocalDate,
     isToday: Boolean,
+    isPast: Boolean,
     hasReminder: Boolean,
+    isCurrentScroll: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Tappable on today, past-with-history, or future-with-reminders.
+    val isInteractive = hasReminder || isToday
     val bgColor = when {
         isToday -> MaterialTheme.colorScheme.primaryContainer
         else -> MaterialTheme.colorScheme.surfaceContainerHigh
     }
+    // Past days are dimmed (history) regardless of whether they have content.
+    // Future days without reminders are also dimmed (nothing scheduled).
+    // Today stays full-opacity (primaryContainer signals it).
     val textColor = when {
         isToday -> MaterialTheme.colorScheme.onPrimaryContainer
+        isPast -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+        !isInteractive -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
         else -> MaterialTheme.colorScheme.onSurface
     }
 
@@ -584,7 +758,7 @@ private fun WeekGridCell(
             .aspectRatio(1f)
             .clip(RoundedCornerShape(AppDimens.SpacingSm))
             .background(bgColor)
-            .clickable(onClick = onClick)
+            .then(if (isInteractive) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(vertical = AppDimens.SpacingXs),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -600,17 +774,21 @@ private fun WeekGridCell(
             fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
             color = textColor,
         )
-        // Dot indicator — only when reminders exist on this date
-        if (hasReminder) {
-            Spacer(modifier = Modifier.height(2.dp))
-            Box(
+        Spacer(modifier = Modifier.height(4.dp))
+        // Bottom slot: dot for dates with reminders; fixed-size spacer otherwise.
+        // (Current-scroll indicator lives as a text underline on the number above.)
+        when {
+            hasReminder -> Box(
                 modifier = Modifier
-                    .size(5.dp)
-                    .background(MaterialTheme.colorScheme.primary, CircleShape),
+                    .size(6.dp)
+                    .background(
+                        MaterialTheme.colorScheme.primary.copy(
+                            alpha = if (isPast) 0.45f else 1f,
+                        ),
+                        CircleShape,
+                    ),
             )
-        } else {
-            // Reserve space so cells without dot have consistent height
-            Spacer(modifier = Modifier.height(7.dp))
+            else -> Spacer(modifier = Modifier.height(6.dp))
         }
     }
 }
@@ -627,7 +805,6 @@ private fun formatShortDate(date: LocalDate): String {
 
 @Composable
 private fun CalendarEmptyState(
-    state: CalendarState.Empty,
     onIntent: (CalendarIntent) -> Unit,
     modifier: Modifier = Modifier,
 ) {

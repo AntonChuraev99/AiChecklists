@@ -15,6 +15,7 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Check
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistRepeatInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ItemReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.expandInRange
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import kotlinx.coroutines.flow.Flow
@@ -352,15 +353,24 @@ class ChecklistRepositoryImpl(
                     isRecurring = false,
                 )
             }
-            // Recurring next occurrence (independent of one-shot)
+            // Recurring — expand all occurrences in [fromMs..toMs] using the rule,
+            // not just the single scheduled next-fire stored in repeatNextAt.
+            val rule = entity.repeatRule
             val repeatNextAt = entity.repeatNextAt
-            if (repeatNextAt != null && repeatNextAt in fromMs..toMs) {
-                result += TodayReminderInfo.ChecklistLevel(
-                    checklistId = entity.id,
-                    checklistName = entity.name,
-                    reminderAt = repeatNextAt,
-                    isRecurring = true,
-                )
+            if (rule != null && repeatNextAt != null) {
+                rule.expandInRange(
+                    startTriggerMillis = repeatNextAt,
+                    startOccurrenceCount = entity.repeatOccurrenceCount,
+                    fromMs = fromMs,
+                    toMs = toMs,
+                ).forEach { occurrenceMs ->
+                    result += TodayReminderInfo.ChecklistLevel(
+                        checklistId = entity.id,
+                        checklistName = entity.name,
+                        reminderAt = occurrenceMs,
+                        isRecurring = true,
+                    )
+                }
             }
         }
 
@@ -382,19 +392,27 @@ class ChecklistRepositoryImpl(
                         priority = item.priority,
                     )
                 }
-                // Recurring
-                val repeatNextAt = item.repeatNextAt
-                if (repeatNextAt != null && repeatNextAt in fromMs..toMs) {
-                    result += TodayReminderInfo.ItemLevel(
-                        checklistId = fillEntity.checklistId,
-                        checklistName = checklistName,
-                        fillId = fillEntity.id,
-                        itemId = item.id,
-                        itemText = item.text,
-                        reminderAt = repeatNextAt,
-                        isRecurring = true,
-                        priority = item.priority,
-                    )
+                // Recurring — same expansion pattern as checklist-level.
+                val itemRule = item.repeatRule
+                val itemRepeatNextAt = item.repeatNextAt
+                if (itemRule != null && itemRepeatNextAt != null) {
+                    itemRule.expandInRange(
+                        startTriggerMillis = itemRepeatNextAt,
+                        startOccurrenceCount = item.repeatOccurrenceCount,
+                        fromMs = fromMs,
+                        toMs = toMs,
+                    ).forEach { occurrenceMs ->
+                        result += TodayReminderInfo.ItemLevel(
+                            checklistId = fillEntity.checklistId,
+                            checklistName = checklistName,
+                            fillId = fillEntity.id,
+                            itemId = item.id,
+                            itemText = item.text,
+                            reminderAt = occurrenceMs,
+                            isRecurring = true,
+                            priority = item.priority,
+                        )
+                    }
                 }
             }
         }

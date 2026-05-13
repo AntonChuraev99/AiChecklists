@@ -12,7 +12,7 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Today
  *
  * Emitted by [CalendarViewModel.screenState]. UI renders one of four variants:
  * - [Loading] — initial load, show progress indicator.
- * - [Content] — agenda items available, may or may not have premium.
+ * - [Content] — agenda items available.
  * - [Empty] — no reminders in the fetch range.
  * - [Error] — repository threw an exception; user can retry.
  */
@@ -27,34 +27,18 @@ sealed interface CalendarState : State {
      * @param agenda Flat list of [AgendaItem] entries (headers + rows) in
      *   display order. Past-due group first (if any), then date sections
      *   ascending, always including today even if empty.
-     * @param isPremium True if the user holds an active premium entitlement.
-     *   Used to show/hide the calendar-grid upgrade teaser chip.
-     * @param isChipDismissed True after the user taps "Dismiss" on the
-     *   upgrade teaser. Persists only for the VM lifetime (not DataStore).
      */
-    data class Content(
-        val agenda: List<AgendaItem>,
-        val isPremium: Boolean,
-        val isChipDismissed: Boolean = false,
-    ) : CalendarState
+    data class Content(val agenda: List<AgendaItem>) : CalendarState
 
-    /**
-     * No reminders in the [-7d, +30d] range.
-     *
-     * @param isPremium Forwarded so the UI can still show the teaser.
-     */
-    data class Empty(
-        val isPremium: Boolean,
-    ) : CalendarState
+    /** No reminders in the [-7d, +30d] range. */
+    data object Empty : CalendarState
 
     /**
      * Repository threw an exception.
      *
      * @param message Debug-friendly description (not shown raw to the user).
      */
-    data class Error(
-        val message: String,
-    ) : CalendarState
+    data class Error(val message: String) : CalendarState
 }
 
 // ─── Intent ───────────────────────────────────────────────────────────────────
@@ -67,12 +51,6 @@ sealed interface CalendarIntent : Intent {
     /** User tapped a reminder row. */
     data class OnReminderClick(val info: TodayReminderInfo) : CalendarIntent
 
-    /** User tapped the "Upgrade to Grid" CTA on the premium teaser. */
-    data object OnUpgradeToGridClick : CalendarIntent
-
-    /** User dismissed the premium teaser chip. */
-    data object OnDismissTeaser : CalendarIntent
-
     /** User tapped "Create Checklist" from the empty state. */
     data object OnCreateChecklistClick : CalendarIntent
 
@@ -83,16 +61,9 @@ sealed interface CalendarIntent : Intent {
 // ─── SideEffect ───────────────────────────────────────────────────────────────
 
 /**
- * One-shot side effects emitted by [CalendarViewModel].
- *
- * NOTE: This project routes navigation via [AppNavigator] directly from the VM,
- * so this sealed interface is declared for completeness / future use but the
- * current CalendarViewModel implementation uses Nothing (no side effects emitted
- * through the AppViewModel channel — navigation happens via AppNavigator).
+ * Reserved sealed interface for future one-shot side effects. The current
+ * CalendarViewModel routes navigation directly via [AppNavigator] and emits
+ * no side effects through the AppViewModel channel, so the type parameter is
+ * [Nothing] in the VM declaration. Kept here for symmetry with other screens.
  */
-sealed interface CalendarSideEffect : SideEffect {
-    data class NavigateToChecklist(val id: Long) : CalendarSideEffect
-    data class NavigateToFill(val id: Long) : CalendarSideEffect
-    data class NavigateToPaywall(val source: String) : CalendarSideEffect
-    data object NavigateToCreateChecklist : CalendarSideEffect
-}
+sealed interface CalendarSideEffect : SideEffect

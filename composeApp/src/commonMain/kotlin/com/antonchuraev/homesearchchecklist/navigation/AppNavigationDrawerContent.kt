@@ -125,17 +125,6 @@ fun AppNavigationDrawerContent(
             modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
         )
         NavigationDrawerItem(
-            label = { Text(stringResource(Res.string.today_title)) },
-            icon = { Icon(Icons.Outlined.WbSunny, contentDescription = null) },
-            selected = selectedItemId == DrawerDestination.Today,
-            onClick = {
-                onCloseDrawer()
-                onTodayClick()
-            },
-            colors = drawerItemColors,
-            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
-        )
-        NavigationDrawerItem(
             label = { Text(stringResource(Res.string.calendar_nav_label)) },
             icon = { Icon(Icons.Outlined.CalendarMonth, contentDescription = null) },
             selected = selectedItemId == DrawerDestination.Calendar,

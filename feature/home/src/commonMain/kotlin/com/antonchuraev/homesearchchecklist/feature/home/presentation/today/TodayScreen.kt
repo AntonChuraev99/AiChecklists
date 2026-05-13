@@ -172,6 +172,29 @@ fun TodayScreen(
             }
         },
     ) {
+        TodayBody(
+            state = state,
+            onReminderClick = onReminderClick,
+            onCreateChecklistClick = onCreateChecklistClick,
+        )
+    }
+}
+
+/**
+ * Renders the Today screen body (without the [AppScaffold] wrapper).
+ *
+ * Used directly inside the Calendar tab host so the tab area gets the Today
+ * agenda content without nesting a second top bar. The standalone
+ * [TodayScreen] composable wraps this body in [AppScaffold].
+ */
+@Composable
+fun TodayBody(
+    state: TodayScreenState,
+    onReminderClick: (checklistId: Long, fillId: Long?) -> Unit,
+    onCreateChecklistClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier = modifier.fillMaxSize()) {
         when (state) {
             TodayScreenState.Loading -> TodayLoadingContent()
 
@@ -192,8 +215,6 @@ fun TodayScreen(
                 title = stringResource(Res.string.today_empty_state_title),
                 description = stringResource(Res.string.today_no_checklists_description),
                 action = {
-                    // AppButton requires non-zero width; fillMaxWidth is provided by EmptyState's
-                    // Column(horizontal = ScreenPaddingHorizontal). Wrap in a width-constrained Box.
                     com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton(
                         text = stringResource(Res.string.main_create_checklist),
                         onClick = onCreateChecklistClick,

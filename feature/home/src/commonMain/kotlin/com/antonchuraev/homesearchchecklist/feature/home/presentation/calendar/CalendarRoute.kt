@@ -4,37 +4,48 @@ import androidx.compose.material3.DrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.today.TodayIntent
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.today.TodayViewModel
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
- * Route composable for the Calendar screen.
+ * Route composable for the Calendar destination.
  *
- * Injects [CalendarViewModel] via Koin and connects it to [CalendarScreen].
- * Public — App.kt lives in a different Gradle module (composeApp) and must
- * access this composable directly.
+ * Hosts a 2-tab UI ("Today" and "Calendar"). The screen embeds the Today
+ * agenda body in tab 0 and the week-grid + range agenda in tab 1. Two
+ * separate ViewModels are injected — they live for the lifetime of this
+ * route and survive tab switches without re-creation.
  *
- * SideEffect routing pattern: this project routes navigation directly from the
- * ViewModel via [AppNavigator], so no LaunchedEffect side-effect collection is
- * needed here (same pattern as TodayRoute).
+ * SideEffect routing pattern: this project routes navigation directly from
+ * each ViewModel via [AppNavigator], so no LaunchedEffect side-effect
+ * collection is needed here.
  */
 @Composable
 fun CalendarRoute(
     drawerState: DrawerState,
     onCreateChecklistClick: () -> Unit,
-    viewModel: CalendarViewModel = koinViewModel(),
+    todayViewModel: TodayViewModel = koinViewModel(),
+    calendarViewModel: CalendarViewModel = koinViewModel(),
 ) {
-    val state by viewModel.screenState.collectAsStateWithLifecycle()
+    val todayState by todayViewModel.screenState.collectAsStateWithLifecycle()
+    val calendarState by calendarViewModel.screenState.collectAsStateWithLifecycle()
 
     CalendarScreen(
-        state = state,
+        todayState = todayState,
+        calendarState = calendarState,
         drawerState = drawerState,
-        onIntent = { intent ->
-            // Intercept OnCreateChecklistClick to also trigger the external callback
-            // (keeps the Route in control of outbound navigation, same as TodayRoute).
+        onTodayReminderClick = { checklistId, fillId ->
+            todayViewModel.sendIntent(TodayIntent.OnReminderClick(checklistId, fillId))
+        },
+        onTodayCreateChecklistClick = {
+            todayViewModel.sendIntent(TodayIntent.OnCreateChecklistClick)
+            onCreateChecklistClick()
+        },
+        onCalendarIntent = { intent ->
             if (intent is CalendarIntent.OnCreateChecklistClick) {
                 onCreateChecklistClick()
             }
-            viewModel.sendIntent(intent)
+            calendarViewModel.sendIntent(intent)
         },
     )
 }
