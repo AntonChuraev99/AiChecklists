@@ -107,6 +107,7 @@ class UpdateFeedViewModelTest {
         override fun navigateToUpdateFeed() {}
         override fun navigateToSettings() {}
         override fun navigateToToday() {}
+        override fun navigateToCalendar() {}
         override fun navigateToScreenCatalog() {}
         override fun showWidgetInstruction() {}
         override fun requestCreateWeeklyChecklist() {}

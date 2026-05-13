@@ -884,4 +884,19 @@
     <!-- Navigation Bar tabs -->
     <string name="today_tab_today">Today</string>
     <string name="today_tab_lists">Lists</string>
+
+    <!-- Calendar Screen -->
+    <string name="calendar_nav_label">Calendar</string>
+    <string name="calendar_title">Calendar</string>
+    <string name="calendar_empty_title">No reminders coming up</string>
+    <string name="calendar_empty_description">Create a checklist with reminders to see your week here.</string>
+    <string name="calendar_empty_cta">Create Checklist</string>
+    <string name="calendar_error_title">Couldn\'t load your calendar</string>
+    <string name="calendar_error_retry">Retry</string>
+    <string name="calendar_section_past_due">Past due</string>
+    <string name="calendar_teaser_title">Week View</string>
+    <string name="calendar_teaser_description">See your full week at a glance — Premium</string>
+    <string name="calendar_teaser_cta">Show Week View</string>
+    <string name="calendar_teaser_dismiss">Dismiss week view promotion</string>
+    <string name="calendar_grid_week_label">This Week</string>
 </resources>

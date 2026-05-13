@@ -96,5 +96,7 @@ class AppNavigatorImpl : AppNavigator {
 
     override fun navigateToToday() = emit(NavCommand.ToToday)
 
+    override fun navigateToCalendar() = emit(NavCommand.ToCalendar)
+
     override fun navigateToScreenCatalog() = emit(NavCommand.ToScreenCatalog)
 }

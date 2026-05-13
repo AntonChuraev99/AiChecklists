@@ -16,6 +16,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Article
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Campaign
 import androidx.compose.material.icons.outlined.Feedback
 import androidx.compose.material.icons.outlined.Home
@@ -39,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.feature.paywall.data.PaywallConfig
 import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.calendar_nav_label
 import aichecklists.core.designsystem.generated.resources.drawer_item_home
 import aichecklists.core.designsystem.generated.resources.today_title
 import aichecklists.core.designsystem.generated.resources.drawer_logo_content_description
@@ -71,6 +73,7 @@ object DrawerDestination {
     const val UpdateFeed = "update_feed"
     const val Settings = "settings"
     const val Today = "today"
+    const val Calendar = "calendar"
 }
 
 @Composable
@@ -79,6 +82,7 @@ fun AppNavigationDrawerContent(
     onCloseDrawer: () -> Unit,
     onHomeClick: () -> Unit,
     onTodayClick: () -> Unit = {},
+    onCalendarClick: () -> Unit = {},
     onUpdateFeedClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onRateAppClick: () -> Unit,
@@ -127,6 +131,17 @@ fun AppNavigationDrawerContent(
             onClick = {
                 onCloseDrawer()
                 onTodayClick()
+            },
+            colors = drawerItemColors,
+            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+        )
+        NavigationDrawerItem(
+            label = { Text(stringResource(Res.string.calendar_nav_label)) },
+            icon = { Icon(Icons.Outlined.CalendarMonth, contentDescription = null) },
+            selected = selectedItemId == DrawerDestination.Calendar,
+            onClick = {
+                onCloseDrawer()
+                onCalendarClick()
             },
             colors = drawerItemColors,
             modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
