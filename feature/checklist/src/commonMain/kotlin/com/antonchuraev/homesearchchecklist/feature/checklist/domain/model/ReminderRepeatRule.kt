@@ -5,6 +5,7 @@ import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.isoDayNumber
+import kotlinx.datetime.minus
 import kotlinx.datetime.plus
 import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
@@ -112,6 +113,98 @@ fun ReminderRepeatRule.computeNextOccurrence(
     }
 
     return result
+}
+
+/**
+ * Expand a recurring rule into every occurrence within `[fromMs..toMs]`.
+ *
+ * Walks forward from [startTriggerMillis] using [computeNextOccurrence], collecting
+ * each fire-time that falls within the requested range. Past occurrences (before
+ * [fromMs]) are skipped silently; occurrences after [toMs] terminate the walk.
+ *
+ * Used by Calendar / Today views to render every future fire-time, not just the
+ * single scheduled next occurrence stored in the DB.
+ *
+ * @param startTriggerMillis the currently scheduled next-fire time (from DB)
+ * @param startOccurrenceCount how many times the rule has already fired (from DB)
+ * @param fromMs range start (inclusive)
+ * @param toMs range end (inclusive)
+ * @param maxOccurrences hard cap to defend against runaway iteration (default 200)
+ */
+fun ReminderRepeatRule.expandInRange(
+    startTriggerMillis: Long,
+    startOccurrenceCount: Int,
+    fromMs: Long,
+    toMs: Long,
+    maxOccurrences: Int = 200,
+): List<Long> {
+    if (toMs < fromMs) return emptyList()
+    val result = mutableListOf<Long>()
+
+    // ── Backward walk: collect past occurrences in [fromMs, startTriggerMillis) ──
+    // Recurring history: e.g. daily reminder shows on every past day in the range.
+    val pastOccurrences = mutableListOf<Long>()
+    var prev: Long? = previousOccurrence(startTriggerMillis)
+    var backIterations = 0
+    while (prev != null && prev >= fromMs && backIterations < maxOccurrences) {
+        pastOccurrences += prev
+        val nextPrev = previousOccurrence(prev)
+        if (nextPrev == null || nextPrev >= prev) break // safety
+        prev = nextPrev
+        backIterations++
+    }
+    // Result must be chronological — past occurrences first, oldest to newest.
+    result += pastOccurrences.reversed()
+
+    // ── Forward walk: from startTriggerMillis upward to toMs ──
+    var current = startTriggerMillis
+    var count = startOccurrenceCount
+    var fwdIterations = 0
+    while (fwdIterations < maxOccurrences) {
+        if (current > toMs) break
+        if (current >= fromMs) result += current
+
+        val next = computeNextOccurrence(
+            currentTriggerMillis = current,
+            currentCount = count,
+            nowMillis = current,
+        ) ?: break
+        if (next <= current) break
+
+        current = next
+        count++
+        fwdIterations++
+    }
+
+    return result
+}
+
+/**
+ * Step one period backward from [currentTriggerMillis]. Mirror of the simple
+ * subtract path inside [computeNextOccurrence] — used for backward expansion
+ * (showing past recurring occurrences as journal entries in Calendar).
+ *
+ * Returns null for weekday-based WEEKLY rules (the inverse of [findNextWeekday]
+ * isn't worth the complexity for this read-only history feature) and for any
+ * rule whose end-condition makes a past occurrence meaningless.
+ */
+private fun ReminderRepeatRule.previousOccurrence(currentTriggerMillis: Long): Long? {
+    val tz = TimeZone.currentSystemDefault()
+    val dt = Instant.fromEpochMilliseconds(currentTriggerMillis).toLocalDateTime(tz)
+    val time = dt.time
+    val prevDate = when (type) {
+        RepeatType.DAILY -> dt.date.minus(interval, DateTimeUnit.DAY)
+        RepeatType.WEEKLY -> {
+            if (weekDays.isNullOrEmpty()) {
+                dt.date.minus(interval.toLong() * 7, DateTimeUnit.DAY)
+            } else {
+                return null // weekday-based backward walk not supported (see doc)
+            }
+        }
+        RepeatType.MONTHLY -> dt.date.minus(interval, DateTimeUnit.MONTH)
+        RepeatType.YEARLY -> dt.date.minus(interval, DateTimeUnit.YEAR)
+    }
+    return LocalDateTime(prevDate, time).toInstant(tz).toEpochMilliseconds()
 }
 
 /**

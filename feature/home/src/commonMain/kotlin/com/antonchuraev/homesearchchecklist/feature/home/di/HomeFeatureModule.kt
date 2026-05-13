@@ -13,7 +13,7 @@ import org.koin.dsl.module
 val homeFeatureModule = module {
     viewModelOf(::MainScreenViewModel)
     viewModelOf(::TodayViewModel)
-    viewModelOf(::CalendarViewModel)
+    viewModel { CalendarViewModel(get(), get(), get()) }
     viewModel { (checklistId: Long) ->
         ChecklistDetailViewModel(checklistId, get(), get(), get(), get(), get(), get(), get())
     }

@@ -894,9 +894,7 @@
     <string name="calendar_error_title">Couldn\'t load your calendar</string>
     <string name="calendar_error_retry">Retry</string>
     <string name="calendar_section_past_due">Past due</string>
-    <string name="calendar_teaser_title">Week View</string>
-    <string name="calendar_teaser_description">See your full week at a glance — Premium</string>
-    <string name="calendar_teaser_cta">Show Week View</string>
-    <string name="calendar_teaser_dismiss">Dismiss week view promotion</string>
     <string name="calendar_grid_week_label">This Week</string>
+    <string name="calendar_prev_week">Previous week</string>
+    <string name="calendar_next_week">Next week</string>
 </resources>
