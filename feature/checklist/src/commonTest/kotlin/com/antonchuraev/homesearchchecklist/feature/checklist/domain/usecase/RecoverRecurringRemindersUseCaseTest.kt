@@ -87,6 +87,8 @@ class RecoverRecurringRemindersUseCaseTest {
         override fun observeRemindersInRange(fromMs: Long, toMs: Long): Flow<List<com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo>> = flowOf(emptyList())
         override suspend fun getRemindersInRange(fromMs: Long, toMs: Long): List<com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo> = emptyList()
         override suspend fun togglePriority(fillId: Long, itemId: String): Result<Unit> = Result.success(Unit)
+        override suspend fun addAttachment(fillId: Long, itemId: String, attachment: com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Attachment) = Unit
+        override suspend fun removeAttachment(fillId: Long, itemId: String, attachmentId: String) = Unit
     }
 
     // ─── Tests ────────────────────────────────────────────────────────

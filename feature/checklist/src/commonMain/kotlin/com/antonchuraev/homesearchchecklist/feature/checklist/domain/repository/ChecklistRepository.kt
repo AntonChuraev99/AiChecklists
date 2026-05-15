@@ -1,5 +1,6 @@
 package com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository
 
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Attachment
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistRepeatInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
@@ -104,6 +105,24 @@ interface ChecklistRepository {
      * Returns [Result.failure] if the fill or item is not found.
      */
     suspend fun togglePriority(fillId: Long, itemId: String): Result<Unit>
+
+    // Attachments
+    // Items are stored as JSON inside the fill row — no dedicated SQL column.
+    // Both helpers follow the dual-update pattern: fill updated via updateFill();
+    // attachments do NOT propagate to the checklist template (per-fill data only).
+
+    /**
+     * Appends [attachment] to [itemId] inside fill [fillId].
+     * Internally loads the fill, calls [ChecklistFillItem.withAttachmentAdded], then [updateFill].
+     */
+    suspend fun addAttachment(fillId: Long, itemId: String, attachment: Attachment)
+
+    /**
+     * Removes the attachment identified by [attachmentId] from [itemId] inside fill [fillId].
+     * Internally loads the fill, calls [ChecklistFillItem.withAttachmentRemoved], then [updateFill].
+     * No-op if [attachmentId] is not found.
+     */
+    suspend fun removeAttachment(fillId: Long, itemId: String, attachmentId: String)
 
     // Fills (instances)
     fun getFillsByChecklistId(checklistId: Long): Flow<List<ChecklistFill>>

@@ -120,6 +120,7 @@ class ChecklistDetailAnalyticsTest {
             reminderScheduler = FakeReminderScheduler(),
             datastore = datastore,
             smartDateParser = FakeSmartDateParser(),
+            attachmentStorage = FakeAttachmentStorage(),
         )
     }
 
@@ -266,6 +267,8 @@ class ChecklistDetailAnalyticsTest {
         override fun observeRemindersInRange(fromMs: Long, toMs: Long): Flow<List<com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo>> = flowOf(emptyList())
         override suspend fun getRemindersInRange(fromMs: Long, toMs: Long): List<com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo> = emptyList()
         override suspend fun togglePriority(fillId: Long, itemId: String): Result<Unit> = Result.success(Unit)
+        override suspend fun addAttachment(fillId: Long, itemId: String, attachment: com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Attachment) = Unit
+        override suspend fun removeAttachment(fillId: Long, itemId: String, attachmentId: String) = Unit
     }
 
     private class FakeUserDataRepository : UserDataRepository {
@@ -356,5 +359,14 @@ class ChecklistDetailAnalyticsTest {
             now: Long,
             timeZone: kotlinx.datetime.TimeZone,
         ): com.antonchuraev.homesearchchecklist.feature.checklist.domain.parser.model.ParsedDateToken? = null
+    }
+
+    private class FakeAttachmentStorage : com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePort {
+        override suspend fun storeAttachment(sourcePath: String, fillId: Long, itemId: String, attachmentId: String, originalFileName: String): String? = null
+        override suspend fun deleteAttachment(path: String) {}
+        override suspend fun deleteAttachmentsFor(fillId: Long, itemId: String) {}
+        override suspend fun deleteAttachmentsForFill(fillId: Long) {}
+        override suspend fun probeImage(path: String, mimeType: String?): Pair<Int?, Int?> = null to null
+        override suspend fun sizeOf(path: String): Long = 0L
     }
 }

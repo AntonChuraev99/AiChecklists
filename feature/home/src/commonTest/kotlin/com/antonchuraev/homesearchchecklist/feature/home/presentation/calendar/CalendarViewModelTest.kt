@@ -115,6 +115,8 @@ private open class FakeChecklistRepository : ChecklistRepository {
     override suspend fun getRemindersInRange(fromMs: Long, toMs: Long): List<TodayReminderInfo> =
         _remindersSharedFlow.replayCache.firstOrNull() ?: emptyList()
     override suspend fun togglePriority(fillId: Long, itemId: String): Result<Unit> = Result.success(Unit)
+    override suspend fun addAttachment(fillId: Long, itemId: String, attachment: com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Attachment) = Unit
+    override suspend fun removeAttachment(fillId: Long, itemId: String, attachmentId: String) = Unit
 }
 
 private class FakeNavigator : AppNavigator {

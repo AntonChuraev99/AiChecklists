@@ -68,7 +68,9 @@ import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material.icons.outlined.RemoveDone
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Note
+import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.NoteAdd
 import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.Notifications
@@ -172,6 +174,9 @@ import aichecklists.core.designsystem.generated.resources.*
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import com.antonchuraev.homesearchchecklist.core.common.api.PlatformCapabilities
+import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.picker.FilePickerType
+import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.picker.rememberFilePickerLauncher
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlinx.coroutines.launch
@@ -250,11 +255,15 @@ private fun ChecklistDetailContent(
     // (whitespace-only edits don't dismiss — they haven't changed the parser-visible content).
     val smartAddHintTriggerInput = remember { mutableStateOf<String?>(null) }
 
-    // Snackbar message from ViewModel (exact alarm permission result + Smart Add hints)
+    // Snackbar message from ViewModel (exact alarm, Smart Add hints, and attachment feedback)
     val exactGrantedMessage = stringResource(Res.string.reminder_exact_alarm_granted)
     val exactDeniedMessage = stringResource(Res.string.reminder_exact_alarm_denied)
     val smartAddHintAddText = stringResource(Res.string.smart_add_hint_add_item_text)
     val smartAddHintAddTime = stringResource(Res.string.smart_add_hint_add_time)
+    val attachmentPremiumLimitMsg = stringResource(Res.string.attachment_premium_limit_reached_snackbar)
+    val attachmentLoadErrorMsg = stringResource(Res.string.attachment_load_error)
+    val attachmentTooLargeMsg = stringResource(Res.string.attachment_size_too_large_snackbar)
+    val attachmentDeletedMsg = stringResource(Res.string.attachment_deleted_snackbar)
     LaunchedEffect(state.snackbarMessage) {
         val message = state.snackbarMessage ?: return@LaunchedEffect
         val isSmartAddHint = message == ChecklistDetailViewModel.SNACKBAR_SMART_ADD_HINT_ADD_TEXT ||
@@ -264,6 +273,10 @@ private fun ChecklistDetailContent(
             ChecklistDetailViewModel.SNACKBAR_EXACT_DENIED -> exactDeniedMessage
             ChecklistDetailViewModel.SNACKBAR_SMART_ADD_HINT_ADD_TEXT -> smartAddHintAddText
             ChecklistDetailViewModel.SNACKBAR_SMART_ADD_HINT_ADD_TIME -> smartAddHintAddTime
+            ChecklistDetailViewModel.SNACKBAR_ATTACHMENT_PREMIUM_LIMIT -> attachmentPremiumLimitMsg
+            ChecklistDetailViewModel.SNACKBAR_ATTACHMENT_LOAD_ERROR -> attachmentLoadErrorMsg
+            ChecklistDetailViewModel.SNACKBAR_ATTACHMENT_TOO_LARGE -> attachmentTooLargeMsg
+            ChecklistDetailViewModel.SNACKBAR_ATTACHMENT_DELETED -> attachmentDeletedMsg
             else -> message
         }
         smartAddHintActive.value = isSmartAddHint
@@ -304,11 +317,60 @@ private fun ChecklistDetailContent(
         }
     }
 
+    // ── Attachment: FilePicker launchers ────────────────────────────────────────
+    // Two static pickers (IMAGE + PDF) — avoids re-keying a single picker on type change.
+    val imagePicker = rememberFilePickerLauncher(type = FilePickerType.IMAGE) { result ->
+        val itemId = state.pendingAttachmentItemId ?: return@rememberFilePickerLauncher
+        onIntent(ChecklistDetailIntent.OnImagePickerLaunched)
+        if (result == null) return@rememberFilePickerLauncher
+        onIntent(
+            ChecklistDetailIntent.OnAttachmentPicked(
+                itemId = itemId,
+                sourcePath = result.filePath,
+                fileName = result.fileName,
+                mimeType = result.mimeType,
+            )
+        )
+    }
+    val filePicker = rememberFilePickerLauncher(type = FilePickerType.PDF) { result ->
+        val itemId = state.pendingAttachmentItemId ?: return@rememberFilePickerLauncher
+        onIntent(ChecklistDetailIntent.OnFilePickerLaunched)
+        if (result == null) return@rememberFilePickerLauncher
+        onIntent(
+            ChecklistDetailIntent.OnAttachmentPicked(
+                itemId = itemId,
+                sourcePath = result.filePath,
+                fileName = result.fileName,
+                mimeType = result.mimeType,
+            )
+        )
+    }
+
+    // Launch picker as a side effect of state flags (cleared immediately after launch
+    // via OnImagePickerLaunched / OnFilePickerLaunched intent to prevent re-launch on recompose).
+    LaunchedEffect(state.triggerImagePicker) {
+        if (state.triggerImagePicker) imagePicker.launch()
+    }
+    LaunchedEffect(state.triggerFilePicker) {
+        if (state.triggerFilePicker) filePicker.launch()
+    }
+
+    // ── Attachment: open-externally via AttachmentOpener ────────────────────────
+    val attachmentOpener: com.antonchuraev.homesearchchecklist.core.common.api.AttachmentOpener = org.koin.compose.koinInject()
+    val coroutineScope = rememberCoroutineScope()    // shared with reorder below
+    LaunchedEffect(state.pendingOpenExternallyPath) {
+        val path = state.pendingOpenExternallyPath ?: return@LaunchedEffect
+        onIntent(ChecklistDetailIntent.OnOpenExternallyDispatched)
+        coroutineScope.launch {
+            attachmentOpener.openExternally(path, state.pendingOpenExternallyMimeType)
+        }
+    }
+
     var addItemActive by remember { mutableStateOf(false) }
     var isEditMode by rememberSaveable { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val hapticFeedback = LocalHapticFeedback.current
-    val coroutineScope = rememberCoroutineScope()
+    // coroutineScope declared above (shared with attachment open-externally handler)
 
     // Wiggle animation for edit mode
     val wiggleTransition = rememberInfiniteTransition(label = "wiggle")
@@ -656,6 +718,7 @@ private fun ChecklistDetailContent(
     }
     if (detailsItem != null) {
         val isEditingThisItem = state.editingItemTextFor == detailsItem.id
+        val isPremium = state.userLimits?.isPremium == true
         ItemDetailsSheet(
             item = detailsItem,
             isEditingText = isEditingThisItem,
@@ -669,7 +732,29 @@ private fun ChecklistDetailContent(
             onTogglePriority = { onIntent(ChecklistDetailIntent.OnToggleItemPriority(detailsItem.id)) },
             onDelete = { onIntent(ChecklistDetailIntent.OnDeleteItemFromSheet(detailsItem.id)) },
             onDismiss = { onIntent(ChecklistDetailIntent.OnDismissItemDetailsSheet) },
+            onAttachmentClick = { id -> onIntent(ChecklistDetailIntent.OnAttachmentClick(id)) },
+            onAddImageClick = { onIntent(ChecklistDetailIntent.OnAddImageAttachment(detailsItem.id)) },
+            onAddFileClick = { onIntent(ChecklistDetailIntent.OnAddFileAttachment(detailsItem.id)) },
+            canAddAttachment = isPremium || detailsItem.attachments.size < ChecklistDetailViewModel.FREE_ATTACHMENT_LIMIT_PER_ITEM,
         )
+    }
+
+    // ── AttachmentFullscreenViewer ───────────────────────────────────────────────
+    val viewerState = state.attachmentViewerState
+    if (viewerState != null) {
+        val viewerItem = state.defaultFill?.items?.firstOrNull { it.id == viewerState.itemId }
+        if (viewerItem != null && viewerItem.attachments.isNotEmpty()) {
+            AttachmentFullscreenViewer(
+                attachments = viewerItem.attachments,
+                initialAttachmentId = viewerState.initialAttachmentId,
+                onClose = { onIntent(ChecklistDetailIntent.OnCloseAttachmentViewer) },
+                onDelete = { id -> onIntent(ChecklistDetailIntent.OnDeleteAttachment(viewerState.itemId, id)) },
+                onOpenExternally = { id -> onIntent(ChecklistDetailIntent.OnOpenAttachmentExternally(id)) },
+            )
+        } else {
+            // Last attachment was deleted — auto-close the viewer.
+            LaunchedEffect(Unit) { onIntent(ChecklistDetailIntent.OnCloseAttachmentViewer) }
+        }
     }
 
     // Note dialog
@@ -1254,6 +1339,11 @@ internal fun ItemDetailsSheet(
     onTogglePriority: () -> Unit,
     onDelete: () -> Unit,
     onDismiss: () -> Unit,
+    // Attachment callbacks — defaulted so existing call sites compile unchanged
+    onAttachmentClick: (attachmentId: String) -> Unit = {},
+    onAddImageClick: () -> Unit = {},
+    onAddFileClick: () -> Unit = {},
+    canAddAttachment: Boolean = true,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
@@ -1376,6 +1466,48 @@ internal fun ItemDetailsSheet(
             )
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+            // ── Attachments section (Android only — gated via PlatformCapabilities) ──
+            if (PlatformCapabilities.attachmentsSupported) {
+                val attachmentCount = item.attachments.size
+                val attachmentsSubtitle = when (attachmentCount) {
+                    0 -> stringResource(Res.string.detail_item_sheet_subtitle_no_attachments)
+                    1 -> stringResource(Res.string.detail_item_sheet_subtitle_attachment_count_one, 1)
+                    else -> stringResource(Res.string.detail_item_sheet_subtitle_attachment_count_other, attachmentCount)
+                }
+                val attachmentsIconTint = if (attachmentCount > 0)
+                    MaterialTheme.colorScheme.primary
+                else
+                    MaterialTheme.colorScheme.onSurfaceVariant
+
+                // Row header — static, no chevron; thumbnails expand inline below
+                ItemDetailsSheetRow(
+                    icon = if (attachmentCount > 0)
+                        Icons.Filled.AttachFile
+                    else
+                        Icons.Outlined.AttachFile,
+                    iconTint = attachmentsIconTint,
+                    title = stringResource(Res.string.detail_item_sheet_action_attachments),
+                    subtitle = attachmentsSubtitle,
+                    showChevron = false,
+                    onClick = {},
+                )
+
+                // Inline thumbnails below — not wrapped in ItemDetailsSheetRow.
+                // The parent Column has horizontal padding = ScreenPaddingHorizontal (16dp).
+                // AttachmentsThumbnailRow uses zero horizontal contentPadding so tiles align
+                // with the left edge of the other rows inside the same Column.
+                AttachmentsThumbnailRow(
+                    attachments = item.attachments,
+                    onAttachmentClick = onAttachmentClick,
+                    onAddImageClick = onAddImageClick,
+                    onAddFileClick = onAddFileClick,
+                    canAddMore = canAddAttachment,
+                    modifier = Modifier.padding(top = AppDimens.SpacingSm, bottom = AppDimens.SpacingMd),
+                )
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            }
 
             // ── Priority row ──
             val isImportant = item.priority > 0

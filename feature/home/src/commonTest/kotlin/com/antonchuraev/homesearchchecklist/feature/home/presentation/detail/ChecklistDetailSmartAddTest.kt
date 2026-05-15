@@ -141,6 +141,7 @@ class ChecklistDetailSmartAddTest {
             reminderScheduler = scheduler,
             datastore = datastore,
             smartDateParser = parser,
+            attachmentStorage = FakeAttachmentStorage(),
         )
     }
 
@@ -510,6 +511,8 @@ class ChecklistDetailSmartAddTest {
         override fun observeRemindersInRange(fromMs: Long, toMs: Long): Flow<List<TodayReminderInfo>> = flowOf(emptyList())
         override suspend fun getRemindersInRange(fromMs: Long, toMs: Long): List<TodayReminderInfo> = emptyList()
         override suspend fun togglePriority(fillId: Long, itemId: String): Result<Unit> = Result.success(Unit)
+        override suspend fun addAttachment(fillId: Long, itemId: String, attachment: com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Attachment) = Unit
+        override suspend fun removeAttachment(fillId: Long, itemId: String, attachmentId: String) = Unit
     }
 
     private class FakeSmartAddNavigator : AppNavigator {
@@ -582,5 +585,14 @@ class ChecklistDetailSmartAddTest {
         override fun setUserProperties(properties: Map<String, Any>) {}
         override fun screenView(name: String) {}
         override fun event(name: String, params: Map<String, Any>) {}
+    }
+
+    private class FakeAttachmentStorage : com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePort {
+        override suspend fun storeAttachment(sourcePath: String, fillId: Long, itemId: String, attachmentId: String, originalFileName: String): String? = null
+        override suspend fun deleteAttachment(path: String) {}
+        override suspend fun deleteAttachmentsFor(fillId: Long, itemId: String) {}
+        override suspend fun deleteAttachmentsForFill(fillId: Long) {}
+        override suspend fun probeImage(path: String, mimeType: String?): Pair<Int?, Int?> = null to null
+        override suspend fun sizeOf(path: String): Long = 0L
     }
 }
