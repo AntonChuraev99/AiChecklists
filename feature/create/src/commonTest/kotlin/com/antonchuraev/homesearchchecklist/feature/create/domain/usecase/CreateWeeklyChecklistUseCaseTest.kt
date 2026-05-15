@@ -67,6 +67,8 @@ class CreateWeeklyChecklistUseCaseTest {
         override fun observeRemindersInRange(fromMs: Long, toMs: Long): Flow<List<com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo>> = kotlinx.coroutines.flow.flowOf(emptyList())
         override suspend fun getRemindersInRange(fromMs: Long, toMs: Long): List<com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo> = emptyList()
         override suspend fun togglePriority(fillId: Long, itemId: String): Result<Unit> = Result.success(Unit)
+        override suspend fun addAttachment(fillId: Long, itemId: String, attachment: com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Attachment) = Unit
+        override suspend fun removeAttachment(fillId: Long, itemId: String, attachmentId: String) = Unit
         override suspend fun getPastDueRepeatSchedules(nowMillis: Long): List<ChecklistRepeatInfo> = emptyList()
         override suspend fun getTotalAdditionalFillCount(): Int = 0
         override suspend fun getWeeklyChecklistCount(): Int = weeklyCount

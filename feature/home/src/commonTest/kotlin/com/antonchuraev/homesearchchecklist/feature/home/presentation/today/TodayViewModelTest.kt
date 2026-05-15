@@ -130,6 +130,8 @@ private class FakeRepository(
     override suspend fun getRemindersInRange(fromMs: Long, toMs: Long): List<TodayReminderInfo> =
         remindersInRange
     override suspend fun togglePriority(fillId: Long, itemId: String): Result<Unit> = Result.success(Unit)
+    override suspend fun addAttachment(fillId: Long, itemId: String, attachment: com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Attachment) = Unit
+    override suspend fun removeAttachment(fillId: Long, itemId: String, attachmentId: String) = Unit
 }
 
 // ─── Helpers for building test data ─────────────────────────────────────────

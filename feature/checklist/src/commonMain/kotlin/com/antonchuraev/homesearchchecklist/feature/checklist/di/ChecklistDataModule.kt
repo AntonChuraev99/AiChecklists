@@ -1,5 +1,6 @@
 package com.antonchuraev.homesearchchecklist.feature.checklist.di
 
+import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePort
 import com.antonchuraev.homesearchchecklist.core.common.api.getDatabaseBuilder
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistDatabase
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.repository.ChecklistRepositoryImpl
@@ -12,8 +13,9 @@ private val database: ChecklistDatabase by lazy {
     )
 }
 
-internal fun createChecklistRepository(): ChecklistRepository =
+internal fun createChecklistRepository(attachmentStorage: AttachmentStoragePort): ChecklistRepository =
     ChecklistRepositoryImpl(
         checklistDao = database.checklistDao(),
-        fillDao = database.checklistFillDao()
+        fillDao = database.checklistFillDao(),
+        attachmentStorage = attachmentStorage,
     )

@@ -1,6 +1,9 @@
 package com.antonchuraev.homesearchchecklist.di
 
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentOpener
+import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStorage
+import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePort
 import com.antonchuraev.homesearchchecklist.csat.ObservableAnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.datastore.api.UserAppDatastoreProvider
 import com.antonchuraev.homesearchchecklist.feature.analyze.data.config.GeminiConfig
@@ -35,4 +38,11 @@ actual fun platformModule(): Module = module {
     single { DeviceIdProvider(UserAppDatastoreProvider.instance) }
     single<AnalyticsTracker> { ObservableAnalyticsTracker(StubAnalyticsTracker) }
     single<ChecklistReminderScheduler> { StubReminderScheduler }
+
+    // AttachmentStorage: wasmJs stub — all methods are no-op / return null.
+    // Bound as AttachmentStoragePort so ViewModel stays platform-agnostic in commonMain.
+    single<AttachmentStoragePort> { AttachmentStorage() }
+
+    // AttachmentOpener: wasmJs stub — openExternally always returns false.
+    single { AttachmentOpener() }
 }

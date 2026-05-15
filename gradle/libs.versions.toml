@@ -40,6 +40,7 @@ kotlinxDatetime = "0.8.0"
 kotlinxDatetimeWasm = "0.8.0"
 amplitude = "1.22.4"
 reorderable = "3.1.0"
+coil3 = "3.4.0"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -123,6 +124,9 @@ play-services-appset = { module = "com.google.android.gms:play-services-appset",
 
 # Reorderable (drag & drop for LazyColumn/LazyRow)
 reorderable = { module = "sh.calvin.reorderable:reorderable", version.ref = "reorderable" }
+
+# Coil 3 — image loading for Android and Compose Multiplatform
+coil3-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil3" }
 
 [bundles]
 koin-feature = [

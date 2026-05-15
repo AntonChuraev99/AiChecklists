@@ -1,5 +1,6 @@
 package com.antonchuraev.homesearchchecklist.feature.checklist.data.repository
 
+import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePort
 import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistDao
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistEntity
@@ -8,6 +9,7 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistF
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ReminderConverters
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.toDomain
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.toEntity
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Attachment
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
@@ -26,7 +28,8 @@ import kotlinx.coroutines.flow.map
 
 class ChecklistRepositoryImpl(
     private val checklistDao: ChecklistDao,
-    private val fillDao: ChecklistFillDao
+    private val fillDao: ChecklistFillDao,
+    private val attachmentStorage: AttachmentStoragePort,
 ) : ChecklistRepository {
 
     // Checklists (templates)
@@ -82,6 +85,14 @@ class ChecklistRepositoryImpl(
     }
 
     override suspend fun deleteChecklist(checklist: Checklist) {
+        // Enumerate all fills before the DB delete so we know which attachment directories to clean.
+        // Room's ForeignKey.CASCADE will delete fill rows automatically when the checklist row is
+        // removed — but file cleanup must happen first to avoid orphaned files on disk.
+        val fillsForChecklist = fillDao.getAllFillsByChecklistId(checklist.id)
+        for (fill in fillsForChecklist) {
+            attachmentStorage.deleteAttachmentsForFill(fill.id)
+        }
+
         checklistDao.deleteById(checklist.id)
         reindexPositions()
     }
@@ -242,6 +253,34 @@ class ChecklistRepositoryImpl(
         }
     }
 
+    // Attachments
+
+    override suspend fun addAttachment(fillId: Long, itemId: String, attachment: Attachment) {
+        val fillEntity = fillDao.getById(fillId) ?: return
+        val updatedItems = fillEntity.items.map { item ->
+            if (item.id == itemId) item.withAttachmentAdded(attachment) else item
+        }
+        fillDao.insert(fillEntity.copy(items = updatedItems))
+    }
+
+    override suspend fun removeAttachment(fillId: Long, itemId: String, attachmentId: String) {
+        val fillEntity = fillDao.getById(fillId) ?: return
+
+        // Find the attachment path before removing it from the domain model,
+        // so we can clean up the file. File delete happens first — DB orphan (if persist
+        // fails) is safer than file orphan (silently consumes user storage forever).
+        val targetItem = fillEntity.items.firstOrNull { it.id == itemId }
+        val attachmentPath = targetItem?.attachments?.firstOrNull { it.id == attachmentId }?.path
+        if (attachmentPath != null) {
+            attachmentStorage.deleteAttachment(attachmentPath)
+        }
+
+        val updatedItems = fillEntity.items.map { item ->
+            if (item.id == itemId) item.withAttachmentRemoved(attachmentId) else item
+        }
+        fillDao.insert(fillEntity.copy(items = updatedItems))
+    }
+
     // Weekly mode
     override suspend fun getWeeklyChecklistCount(): Int {
         return checklistDao.getWeeklyChecklistCount()
@@ -283,6 +322,9 @@ class ChecklistRepositoryImpl(
     }
 
     override suspend fun deleteFill(fill: ChecklistFill) {
+        // Clean up attachment files before removing the DB row.
+        // File delete first — a DB orphan is recoverable on next delete; a file orphan is not.
+        attachmentStorage.deleteAttachmentsForFill(fill.id)
         fillDao.deleteById(fill.id)
     }
 

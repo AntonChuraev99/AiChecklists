@@ -91,6 +91,10 @@ data class ChecklistFill(
  * - [repeatTimeOfDayMinutes]: minutes-since-midnight for repeat trigger
  * - [repeatNextAt]: next repeat epoch millis
  * - [repeatOccurrenceCount]: how many times this item's repeat has fired
+ *
+ * [attachments]: user-added files/images. Lives in the JSON blob (no SQL column).
+ * Decoded with ignoreUnknownKeys=true — old DB rows without this field default to emptyList().
+ * Attachments belong to the fill only (not the template), matching [note] semantics.
  */
 @ConsistentCopyVisibility
 @Serializable
@@ -106,73 +110,84 @@ data class ChecklistFillItem private constructor(
     val repeatRule: ReminderRepeatRule? = null,
     val repeatTimeOfDayMinutes: Int? = null,
     val repeatNextAt: Long? = null,
-    val repeatOccurrenceCount: Int = 0
+    val repeatOccurrenceCount: Int = 0,
+    // ── Attachments (end of constructor — safest position for JSON schema additions) ──
+    val attachments: List<Attachment> = emptyList(),
 ) {
     constructor(
         text: String,
         checked: Boolean,
         note: String? = null,
         weekday: Int? = null,
-        priority: Int = 0
+        priority: Int = 0,
     ) : this(
         text = text,
         checked = checked,
         note = note,
         id = generateId(),
         weekday = weekday,
-        priority = priority
+        priority = priority,
+        attachments = emptyList(),
     )
 
-    /** Update checked state while preserving id, weekday, priority, and reminder fields */
+    /** Update checked state while preserving id, weekday, priority, reminder fields, and attachments */
     fun withChecked(checked: Boolean) = ChecklistFillItem(
         text, checked, note, id, weekday, priority,
-        reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount
+        reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount,
+        attachments,
     )
 
-    /** Update note while preserving id, weekday, priority, and reminder fields */
+    /** Update note while preserving id, weekday, priority, reminder fields, and attachments */
     fun withNote(note: String?) = ChecklistFillItem(
         text, checked, note, id, weekday, priority,
-        reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount
+        reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount,
+        attachments,
     )
 
-    /** Update weekday while preserving id, text, checked state, note, priority, and reminder fields */
+    /** Update weekday while preserving id, text, checked state, note, priority, reminder fields, and attachments */
     fun withWeekday(weekday: Int?) = ChecklistFillItem(
         text, checked, note, id, weekday, priority,
-        reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount
+        reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount,
+        attachments,
     )
 
-    /** Update text while preserving id, checked state, note, weekday, priority, and reminder fields */
+    /** Update text while preserving id, checked state, note, weekday, priority, reminder fields, and attachments */
     fun withText(text: String) = ChecklistFillItem(
         text, checked, note, id, weekday, priority,
-        reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount
+        reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount,
+        attachments,
     )
 
     /** Toggle priority between 0 (normal) and 1 (starred); preserves all other fields */
     fun withPriority(priority: Int) = ChecklistFillItem(
         text, checked, note, id, weekday, priority,
-        reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount
+        reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount,
+        attachments,
     )
 
     /** Set or clear the one-shot reminder timestamp; preserves all other fields */
     fun withReminderAt(reminderAt: Long?) = ChecklistFillItem(
         text, checked, note, id, weekday, priority,
-        reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount
+        reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount,
+        attachments,
     )
 
     /** Set the recurring repeat schedule; preserves all other fields */
     fun withRepeatRule(
         rule: ReminderRepeatRule,
         timeOfDayMinutes: Int,
-        nextAt: Long
+        nextAt: Long,
     ) = ChecklistFillItem(
         text, checked, note, id, weekday, priority,
-        reminderAt, rule, timeOfDayMinutes, nextAt, repeatOccurrenceCount
+        reminderAt, rule, timeOfDayMinutes, nextAt, repeatOccurrenceCount,
+        attachments,
     )
 
     /** Advance the repeat schedule to the next trigger; preserves all other fields */
     fun withRepeatAdvanced(nextAt: Long?, newCount: Int) = ChecklistFillItem(
         text, checked, note, id, weekday, priority,
-        reminderAt, repeatRule, repeatTimeOfDayMinutes, nextAt, newCount
+        reminderAt, repeatRule, repeatTimeOfDayMinutes, nextAt, newCount,
+        attachments,
     )
 
     /** Clear all reminder data (both one-shot and repeat) while preserving all other fields */
@@ -182,7 +197,29 @@ data class ChecklistFillItem private constructor(
         repeatRule = null,
         repeatTimeOfDayMinutes = null,
         repeatNextAt = null,
-        repeatOccurrenceCount = 0
+        repeatOccurrenceCount = 0,
+        attachments = attachments,
+    )
+
+    /** Append [att] to the end of [attachments]; preserves all other fields */
+    fun withAttachmentAdded(att: Attachment) = ChecklistFillItem(
+        text, checked, note, id, weekday, priority,
+        reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount,
+        attachments = attachments + att,
+    )
+
+    /** Remove the attachment with [attachmentId]; preserves order and all other fields. No-op if id not found. */
+    fun withAttachmentRemoved(attachmentId: String) = ChecklistFillItem(
+        text, checked, note, id, weekday, priority,
+        reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount,
+        attachments = attachments.filter { it.id != attachmentId },
+    )
+
+    /** Replace [attachments] entirely; used by the repository after a platform store/delete op. */
+    fun withAttachments(attachments: List<Attachment>) = ChecklistFillItem(
+        text, checked, note, id, weekday, priority,
+        reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount,
+        attachments = attachments,
     )
 
     /** Returns true if this item has any active reminder (one-shot OR recurring) */

@@ -76,8 +76,27 @@ sealed interface ChecklistDetailState : State {
         // Smart Add parser state: text input is owned by ViewModel to allow debounced parsing
         val pendingItemInput: String = "",
         val parsedToken: ParsedDateToken? = null,
+        // Attachments: viewer state — null = closed
+        val attachmentViewerState: AttachmentViewerState? = null,
+        // Pending picker item: which item triggered the file picker (so the callback knows where to attach)
+        val pendingAttachmentItemId: String? = null,
+        // Open-externally request: non-null while waiting for the Composable to launch the ACTION_VIEW intent
+        val pendingOpenExternallyPath: String? = null,
+        val pendingOpenExternallyMimeType: String? = null,
+        // Image picker / file picker launch triggers (cleared immediately after picker launches)
+        val triggerImagePicker: Boolean = false,
+        val triggerFilePicker: Boolean = false,
     ) : ChecklistDetailState
 }
+
+/**
+ * Holds the currently-viewed attachment and its parent item.
+ * [initialAttachmentId] is the attachment that should be shown first in the pager.
+ */
+data class AttachmentViewerState(
+    val itemId: String,
+    val initialAttachmentId: String,
+)
 
 sealed interface ChecklistDetailIntent : Intent {
     data object OnBackClick : ChecklistDetailIntent
@@ -200,6 +219,28 @@ sealed interface ChecklistDetailIntent : Intent {
     // Reminder paywall upgrade (called from locked banner inside ReminderSheet)
     data object OnReminderUpgradeClick : ChecklistDetailIntent
     data object OnItemReminderUpgradeClick : ChecklistDetailIntent
+
+    // Attachments
+    data class OnAttachmentClick(val attachmentId: String) : ChecklistDetailIntent
+    data class OnAddImageAttachment(val itemId: String) : ChecklistDetailIntent
+    data class OnAddFileAttachment(val itemId: String) : ChecklistDetailIntent
+    data class OnDeleteAttachment(val itemId: String, val attachmentId: String) : ChecklistDetailIntent
+    data class OnOpenAttachmentExternally(val attachmentId: String) : ChecklistDetailIntent
+    data object OnCloseAttachmentViewer : ChecklistDetailIntent
+    data object OnImagePickerLaunched : ChecklistDetailIntent
+    data object OnFilePickerLaunched : ChecklistDetailIntent
+    /**
+     * Internal intent: dispatched from the Composable after FilePicker returns a result.
+     * [itemId] comes from [ChecklistDetailState.Content.pendingAttachmentItemId].
+     */
+    data class OnAttachmentPicked(
+        val itemId: String,
+        val sourcePath: String,
+        val fileName: String,
+        val mimeType: String?,
+    ) : ChecklistDetailIntent
+    /** Dispatched when the open-externally ACTION_VIEW intent has been sent by the Composable. */
+    data object OnOpenExternallyDispatched : ChecklistDetailIntent
 
     // Priority
     data class OnToggleItemPriority(val itemId: String) : ChecklistDetailIntent

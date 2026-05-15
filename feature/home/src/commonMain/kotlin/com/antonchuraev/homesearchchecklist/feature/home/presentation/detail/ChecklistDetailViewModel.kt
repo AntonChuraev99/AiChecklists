@@ -3,9 +3,11 @@ package com.antonchuraev.homesearchchecklist.feature.home.presentation.detail
 import androidx.lifecycle.viewModelScope
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
+import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePort
 import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppDatastore
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Attachment
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
@@ -47,6 +49,7 @@ class ChecklistDetailViewModel(
     private val reminderScheduler: ChecklistReminderScheduler,
     private val datastore: AppDatastore,
     private val smartDateParser: SmartDateParser,
+    private val attachmentStorage: AttachmentStoragePort,
 ) : AppViewModel<ChecklistDetailState, ChecklistDetailIntent, Nothing>() {
 
     private val _screenState = MutableStateFlow<ChecklistDetailState>(ChecklistDetailState.Loading)
@@ -393,6 +396,20 @@ class ChecklistDetailViewModel(
             ChecklistDetailIntent.OnItemReminderUpgradeClick -> {
                 updateContentState { it.copy(itemReminderSheetFor = null, itemReminderSheetLocked = false) }
                 navigator.navigateToPaywall(source = "detail_item_reminder_limit")
+            }
+
+            // Attachments
+            is ChecklistDetailIntent.OnAddImageAttachment -> handleAddAttachment(intent.itemId, isImage = true)
+            is ChecklistDetailIntent.OnAddFileAttachment -> handleAddAttachment(intent.itemId, isImage = false)
+            is ChecklistDetailIntent.OnAttachmentPicked -> handleAttachmentPicked(intent)
+            is ChecklistDetailIntent.OnAttachmentClick -> handleOpenViewer(intent.attachmentId)
+            ChecklistDetailIntent.OnCloseAttachmentViewer -> updateContentState { it.copy(attachmentViewerState = null) }
+            is ChecklistDetailIntent.OnDeleteAttachment -> handleDeleteAttachment(intent.itemId, intent.attachmentId)
+            is ChecklistDetailIntent.OnOpenAttachmentExternally -> handleOpenExternally(intent.attachmentId)
+            ChecklistDetailIntent.OnImagePickerLaunched -> updateContentState { it.copy(triggerImagePicker = false) }
+            ChecklistDetailIntent.OnFilePickerLaunched -> updateContentState { it.copy(triggerFilePicker = false) }
+            ChecklistDetailIntent.OnOpenExternallyDispatched -> updateContentState {
+                it.copy(pendingOpenExternallyPath = null, pendingOpenExternallyMimeType = null)
             }
 
             // Priority
@@ -1638,6 +1655,123 @@ class ChecklistDetailViewModel(
         }
     }
 
+    // ── Attachment handlers ──────────────────────────────────────────────────────
+
+    private fun handleAddAttachment(itemId: String, isImage: Boolean) {
+        val content = _screenState.value as? ChecklistDetailState.Content ?: return
+        val item = content.defaultFill?.items?.firstOrNull { it.id == itemId } ?: return
+        val isPremium = content.userLimits?.isPremium ?: false
+        if (!isPremium && item.attachments.size >= FREE_ATTACHMENT_LIMIT_PER_ITEM) {
+            updateContentState { it.copy(snackbarMessage = SNACKBAR_ATTACHMENT_PREMIUM_LIMIT) }
+            return
+        }
+        updateContentState {
+            it.copy(
+                pendingAttachmentItemId = itemId,
+                triggerImagePicker = isImage,
+                triggerFilePicker = !isImage,
+            )
+        }
+    }
+
+    private fun handleAttachmentPicked(intent: ChecklistDetailIntent.OnAttachmentPicked) =
+        viewModelScope.launch {
+            val content = _screenState.value as? ChecklistDetailState.Content ?: return@launch
+            val fillId = content.defaultFill?.id ?: return@launch
+
+            val attachmentId = Attachment.generateId()
+            val storedPath = attachmentStorage.storeAttachment(
+                sourcePath = intent.sourcePath,
+                fillId = fillId,
+                itemId = intent.itemId,
+                attachmentId = attachmentId,
+                originalFileName = intent.fileName,
+            )
+            if (storedPath == null) {
+                updateContentState {
+                    it.copy(
+                        pendingAttachmentItemId = null,
+                        snackbarMessage = SNACKBAR_ATTACHMENT_LOAD_ERROR,
+                    )
+                }
+                return@launch
+            }
+
+            val sizeBytes = attachmentStorage.sizeOf(storedPath)
+            if (sizeBytes > MAX_ATTACHMENT_SIZE_BYTES) {
+                attachmentStorage.deleteAttachment(storedPath)
+                updateContentState {
+                    it.copy(
+                        pendingAttachmentItemId = null,
+                        snackbarMessage = SNACKBAR_ATTACHMENT_TOO_LARGE,
+                    )
+                }
+                return@launch
+            }
+
+            val (w, h) = attachmentStorage.probeImage(storedPath, intent.mimeType)
+            val attachment = Attachment(
+                id = attachmentId,
+                path = storedPath,
+                fileName = intent.fileName,
+                mimeType = intent.mimeType,
+                sizeBytes = sizeBytes,
+                createdAt = currentTimeMillis(),
+                width = w,
+                height = h,
+            )
+            repository.addAttachment(fillId, intent.itemId, attachment)
+            updateContentState { it.copy(pendingAttachmentItemId = null) }
+            // Repository emits a Flow update; combine() in loadData() picks up the new fill state.
+        }
+
+    private fun handleOpenViewer(attachmentId: String) {
+        val content = _screenState.value as? ChecklistDetailState.Content ?: return
+        val item = content.defaultFill?.items?.firstOrNull { fillItem ->
+            fillItem.attachments.any { it.id == attachmentId }
+        } ?: return
+        updateContentState {
+            it.copy(
+                attachmentViewerState = AttachmentViewerState(
+                    itemId = item.id,
+                    initialAttachmentId = attachmentId,
+                )
+            )
+        }
+    }
+
+    private fun handleDeleteAttachment(itemId: String, attachmentId: String) =
+        viewModelScope.launch {
+            val content = _screenState.value as? ChecklistDetailState.Content ?: return@launch
+            val fillId = content.defaultFill?.id ?: return@launch
+            // Check whether the viewer was showing this item's last attachment — close it
+            // proactively so the UI doesn't flash an empty viewer while waiting for the
+            // Flow update from the repository.
+            val item = content.defaultFill.items.firstOrNull { it.id == itemId }
+            val wasLastAttachment = item != null && item.attachments.size <= 1
+            if (wasLastAttachment) {
+                updateContentState { it.copy(attachmentViewerState = null) }
+            }
+            repository.removeAttachment(fillId, itemId, attachmentId)
+            // Repository handles file deletion and DB persistence; Flow update follows.
+            updateContentState { it.copy(snackbarMessage = SNACKBAR_ATTACHMENT_DELETED) }
+        }
+
+    private fun handleOpenExternally(attachmentId: String) {
+        val attachment = (_screenState.value as? ChecklistDetailState.Content)
+            ?.defaultFill?.items?.flatMap { it.attachments }
+            ?.firstOrNull { it.id == attachmentId }
+            ?: return
+        updateContentState {
+            it.copy(
+                pendingOpenExternallyPath = attachment.path,
+                pendingOpenExternallyMimeType = attachment.mimeType,
+            )
+        }
+    }
+
+    // ── Shared helpers ───────────────────────────────────────────────────────────
+
     private inline fun updateContentState(update: (ChecklistDetailState.Content) -> ChecklistDetailState.Content) {
         _screenState.update { state ->
             if (state is ChecklistDetailState.Content) update(state) else state
@@ -1667,5 +1801,24 @@ class ChecklistDetailViewModel(
          * because those objects are `internal` to feature:checklist.
          */
         val STRANDED_TIME_PREPOSITIONS = setOf("в", "во", "at")
+
+        // ── Attachment limits and snackbar keys ──────────────────────────────
+        /** Max attachments per item for free-tier users. */
+        const val FREE_ATTACHMENT_LIMIT_PER_ITEM = 3
+
+        /** Max file size accepted during store (10 MB). Oversized files are deleted immediately. */
+        const val MAX_ATTACHMENT_SIZE_BYTES = 10L * 1024L * 1024L
+
+        /** Free-tier limit reached: upgrade prompt. Resolved to a string in the Composable. */
+        const val SNACKBAR_ATTACHMENT_PREMIUM_LIMIT = "attachment_premium_limit"
+
+        /** File could not be copied to storage (content:// read error, disk full, etc.). */
+        const val SNACKBAR_ATTACHMENT_LOAD_ERROR = "attachment_load_error"
+
+        /** File exceeds MAX_ATTACHMENT_SIZE_BYTES. */
+        const val SNACKBAR_ATTACHMENT_TOO_LARGE = "attachment_too_large"
+
+        /** Attachment was successfully deleted (used as confirmation snackbar). */
+        const val SNACKBAR_ATTACHMENT_DELETED = "attachment_deleted"
     }
 }

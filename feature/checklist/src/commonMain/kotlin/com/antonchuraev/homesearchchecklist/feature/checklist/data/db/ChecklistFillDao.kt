@@ -33,6 +33,10 @@ interface ChecklistFillDao {
     @Query("SELECT * FROM checklist_fills WHERE isDefault = 1")
     suspend fun getAllDefaultFills(): List<ChecklistFillEntity>
 
+    /** Returns all fills (default + additional) for a checklist (used for attachment cleanup before checklist delete). */
+    @Query("SELECT * FROM checklist_fills WHERE checklistId = :checklistId")
+    suspend fun getAllFillsByChecklistId(checklistId: Long): List<ChecklistFillEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(fill: ChecklistFillEntity): Long
 

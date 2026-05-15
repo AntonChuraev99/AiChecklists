@@ -310,6 +310,23 @@
     <string name="fill_cover_change">Change Cover</string>
     <string name="fill_cover_remove">Remove Cover</string>
 
+    <!-- Item Details Sheet — Attachments section -->
+    <string name="detail_item_sheet_action_attachments">Attachments</string>
+    <string name="detail_item_sheet_subtitle_no_attachments">Tap to add</string>
+    <string name="detail_item_sheet_subtitle_attachment_count_one">%1$d attachment</string>
+    <string name="detail_item_sheet_subtitle_attachment_count_other">%1$d attachments</string>
+    <string name="attachment_add_image_button">Add image</string>
+    <string name="attachment_add_file_button">Add file</string>
+    <string name="attachment_remove_button">Remove</string>
+    <string name="attachment_open_external_button">Open</string>
+    <string name="attachment_fullscreen_close_cd">Close</string>
+    <string name="attachment_fullscreen_delete_cd">Delete attachment</string>
+    <string name="attachment_fullscreen_counter">%1$d of %2$d</string>
+    <string name="attachment_premium_limit_reached_snackbar">Free plan: 3 attachments per item. Upgrade to Premium for unlimited.</string>
+    <string name="attachment_load_error">Couldn\'t load attachment</string>
+    <string name="attachment_size_too_large_snackbar">Attachment too large (max 10 MB)</string>
+    <string name="attachment_deleted_snackbar">Attachment deleted</string>
+
     <!-- Premium Banner -->
     <string name="premium_banner_title">Go Premium</string>
     <string name="premium_banner_description">Daily AI credits refill</string>
