@@ -1,23 +1,24 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerState
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -29,17 +30,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCreditsChip
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import aichecklists.core.designsystem.generated.resources.Res
-import aichecklists.core.designsystem.generated.resources.credits_display
-import aichecklists.core.designsystem.generated.resources.credits_get_more
 import aichecklists.core.designsystem.generated.resources.done
+import aichecklists.core.designsystem.generated.resources.main_action_ai_chat
 import aichecklists.core.designsystem.generated.resources.main_create_checklist
 import aichecklists.core.designsystem.generated.resources.main_create_checklist_locked
 import aichecklists.core.designsystem.generated.resources.main_menu
@@ -66,6 +66,8 @@ fun MainScreen(
     /** When true, the bottom "Create Checklist" bar is suppressed.
      *  Set to true when the caller (App.kt) provides a FAB instead. */
     hideBottomBar: Boolean = false,
+    /** Navigate to the AI Chat screen. Wired in App.kt NavHost. */
+    onNavigateToAiChat: (() -> Unit)? = null,
 ) {
     val analyticsTracker: AnalyticsTracker = koinInject()
     LaunchedEffect(Unit) { analyticsTracker.screenView("main") }
@@ -98,10 +100,10 @@ fun MainScreen(
             } else {
                 if (screenState is MainScreenState.Success) {
                     val state = screenState as MainScreenState.Success
-                    CreditsChip(
+                    AppCreditsChip(
                         credits = state.aiCredits,
                         isPremium = state.subscriptionStatus.isActive,
-                        onClick = { viewModel.sendIntent(MainScreenIntent.OnCreditsClick) }
+                        onClick = { viewModel.sendIntent(MainScreenIntent.OnCreditsClick) },
                     )
                 }
             }
@@ -113,13 +115,15 @@ fun MainScreen(
                 val state = screenState as MainScreenState.Success
                 val canCreateChecklist = state.userLimits?.canCreateChecklist ?: true
 
-                Box(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(AppDimens.ScreenPaddingHorizontal)
+                        .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
                         .padding(bottom = AppDimens.SpacingLg)
-                        .navigationBarsPadding()
+                        .navigationBarsPadding(),
+                    verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
                 ) {
+                    // Primary action: Create Checklist (locked state preserved)
                     AppButton(
                         text = stringResource(
                             if (canCreateChecklist) Res.string.main_create_checklist
@@ -127,8 +131,40 @@ fun MainScreen(
                         ),
                         onClick = { viewModel.sendIntent(MainScreenIntent.OnAddChecklistClick) },
                         icon = if (canCreateChecklist) Icons.Filled.Add else Icons.Outlined.Lock,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     )
+
+                    // Secondary action: AI Chat — FilledTonalButton (secondaryContainer) to
+                    // visually distinguish from the primary Create action. Stacked vertically
+                    // below Create per user preference («пусть кнопки на главном экране будут
+                    // вертикально расположены а не в ряду»).
+                    if (onNavigateToAiChat != null) {
+                        FilledTonalButton(
+                            onClick = onNavigateToAiChat,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = MaterialTheme.shapes.small,
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            ),
+                            contentPadding = PaddingValues(
+                                horizontal = 16.dp,
+                                vertical = 12.dp,
+                            ),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.AutoAwesome,
+                                contentDescription = null,
+                                modifier = Modifier.size(AppDimens.IconSizeMd),
+                            )
+                            Spacer(modifier = Modifier.size(ButtonDefaults.IconSpacing))
+                            Text(
+                                text = stringResource(Res.string.main_action_ai_chat),
+                                style = MaterialTheme.typography.labelLarge,
+                                maxLines = 1,
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -168,43 +204,5 @@ fun MainScreen(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun CreditsChip(
-    credits: Int,
-    isPremium: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val showGetMore = credits == 0
-
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(
-                if (showGetMore) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.primaryContainer
-            )
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        Icon(
-            imageVector = Icons.Outlined.AutoAwesome,
-            contentDescription = null,
-            modifier = Modifier.size(16.dp),
-            tint = if (showGetMore) MaterialTheme.colorScheme.onPrimary
-                   else MaterialTheme.colorScheme.primary
-        )
-        Text(
-            text = if (showGetMore) stringResource(Res.string.credits_get_more)
-                   else stringResource(Res.string.credits_display, credits),
-            style = MaterialTheme.typography.labelMedium,
-            color = if (showGetMore) MaterialTheme.colorScheme.onPrimary
-                    else MaterialTheme.colorScheme.onPrimaryContainer
-        )
     }
 }

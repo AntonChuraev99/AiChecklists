@@ -7,8 +7,12 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Rout
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ToolCall
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.ChatLocale
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.LocalIntentRouter
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatClassifierApiService
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatCompletionApiService
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChecklistContext
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.RemoteClassificationResult
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.RemoteCompletionResult
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.UserData
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -46,6 +50,22 @@ private class FakeChatClassifierApiService(
         callCount++
         lastUserId = userId
         lastText = text
+        return result
+    }
+}
+
+private class FakeChatCompletionApiService(
+    private val result: RemoteCompletionResult = RemoteCompletionResult.ServiceError,
+) : ChatCompletionApiService {
+    var callCount = 0
+
+    override suspend fun complete(
+        userId: String,
+        messages: List<ChatMessage>,
+        locale: ChatLocale,
+        checklistsSummary: List<ChecklistContext>,
+    ): RemoteCompletionResult {
+        callCount++
         return result
     }
 }
@@ -91,6 +111,7 @@ private fun lowConfidenceLayer1(intent: ChatIntent = ChatIntent.Unknown("?")) = 
 private fun makeRepo(
     layer1Result: IntentClassification,
     remoteResult: RemoteClassificationResult = RemoteClassificationResult.ServiceError,
+    completionResult: RemoteCompletionResult = RemoteCompletionResult.ServiceError,
     userId: String = "user-123",
 ): Triple<AiChatRepositoryImpl, FakeLocalIntentRouter, FakeChatClassifierApiService> {
     val router = FakeLocalIntentRouter(layer1Result)
@@ -98,6 +119,7 @@ private fun makeRepo(
     val repo = AiChatRepositoryImpl(
         router = router,
         classifierApi = classifier,
+        completionApi = FakeChatCompletionApiService(completionResult),
         userDataRepository = FakeUserDataRepository(userId),
         logger = NoOpLogger,
     )
@@ -217,6 +239,7 @@ class AiChatRepositoryImplTest {
         val repo = AiChatRepositoryImpl(
             router = router,
             classifierApi = classifier,
+            completionApi = FakeChatCompletionApiService(),
             userDataRepository = FakeUserDataRepository(userId = ""),
             logger = NoOpLogger,
         )
@@ -262,5 +285,79 @@ class AiChatRepositoryImplTest {
 
         assertEquals(0, classifier.callCount, "Threshold is >=, so 0.7 must not escalate")
         assertEquals(RoutingLayer.Local, result.layer)
+    }
+
+    // ── 9. completeFreeForm: success → returns RemoteCompletionResult.Success ──
+
+    @Test
+    fun completeFreeForm_success_returnsSuccessResult() = runTest {
+        val expectedContent = "Here are some suggestions for your week."
+        val router = FakeLocalIntentRouter(highConfidenceLayer1())
+        val completionApi = FakeChatCompletionApiService(
+            RemoteCompletionResult.Success(content = expectedContent, creditsRemaining = 297)
+        )
+        val repo = AiChatRepositoryImpl(
+            router = router,
+            classifierApi = FakeChatClassifierApiService(RemoteClassificationResult.ServiceError),
+            completionApi = completionApi,
+            userDataRepository = FakeUserDataRepository("user-xyz"),
+            logger = NoOpLogger,
+        )
+
+        val result = repo.completeFreeForm(
+            messages = emptyList(),
+            locale = ChatLocale.En,
+            checklistsSummary = emptyList(),
+        )
+
+        assertEquals(1, completionApi.callCount)
+        assertIs<RemoteCompletionResult.Success>(result)
+        assertEquals(expectedContent, result.content)
+        assertEquals(297, result.creditsRemaining)
+    }
+
+    // ── 10. completeFreeForm: blank userId → ServiceError, no network call ─────
+
+    @Test
+    fun completeFreeForm_blankUserId_returnsServiceError() = runTest {
+        val completionApi = FakeChatCompletionApiService(RemoteCompletionResult.Success("x", 0))
+        val repo = AiChatRepositoryImpl(
+            router = FakeLocalIntentRouter(highConfidenceLayer1()),
+            classifierApi = FakeChatClassifierApiService(RemoteClassificationResult.ServiceError),
+            completionApi = completionApi,
+            userDataRepository = FakeUserDataRepository(userId = ""),
+            logger = NoOpLogger,
+        )
+
+        val result = repo.completeFreeForm(
+            messages = emptyList(),
+            locale = ChatLocale.En,
+            checklistsSummary = emptyList(),
+        )
+
+        assertEquals(0, completionApi.callCount, "No network call when userId is blank")
+        assertIs<RemoteCompletionResult.ServiceError>(result)
+    }
+
+    // ── 11. completeFreeForm: InsufficientCredits propagated ─────────────────
+
+    @Test
+    fun completeFreeForm_insufficientCredits_propagatedToCallerUnchanged() = runTest {
+        val completionApi = FakeChatCompletionApiService(RemoteCompletionResult.InsufficientCredits)
+        val repo = AiChatRepositoryImpl(
+            router = FakeLocalIntentRouter(highConfidenceLayer1()),
+            classifierApi = FakeChatClassifierApiService(RemoteClassificationResult.ServiceError),
+            completionApi = completionApi,
+            userDataRepository = FakeUserDataRepository("user-abc"),
+            logger = NoOpLogger,
+        )
+
+        val result = repo.completeFreeForm(
+            messages = emptyList(),
+            locale = ChatLocale.Ru,
+            checklistsSummary = emptyList(),
+        )
+
+        assertIs<RemoteCompletionResult.InsufficientCredits>(result)
     }
 }

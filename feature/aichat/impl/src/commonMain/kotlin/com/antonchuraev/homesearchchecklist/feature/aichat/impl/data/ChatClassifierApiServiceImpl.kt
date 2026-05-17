@@ -15,6 +15,8 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.offsetIn
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -73,6 +75,7 @@ internal class ChatClassifierApiServiceImpl(
                     userId = userId,
                     text = text,
                     locale = locale.toApiString(),
+                    timezoneOffsetMinutes = currentTimezoneOffsetMinutes(),
                 )
             )
         }
@@ -119,6 +122,9 @@ internal class ChatClassifierApiServiceImpl(
         @SerialName("user_id") val userId: String,
         val text: String,
         val locale: String,
+        // Phase C.4.a — server uses this to resolve relative dates ("tomorrow",
+        // "в пятницу в 18") into ISO timestamps with the user's local offset.
+        @SerialName("timezone_offset_minutes") val timezoneOffsetMinutes: Int,
     )
 
     @Serializable
@@ -150,7 +156,8 @@ internal class ChatClassifierApiServiceImpl(
         "set_reminder" -> ChatIntent.SetReminder
         "move_reminders" -> ChatIntent.MoveReminders
         "find_items" -> ChatIntent.FindItems
-        "free_form", "unknown" -> ChatIntent.Unknown(rawText = "")
+        "free_form" -> ChatIntent.FreeForm
+        "unknown" -> ChatIntent.Unknown(rawText = "")
         else -> {
             logger.warning(TAG, "toChatIntent: unknown intent string '$this'")
             ChatIntent.Unknown(rawText = "")
@@ -214,6 +221,7 @@ internal class ChatClassifierApiServiceImpl(
             val q = query?.ifBlank { null } ?: return null
             ToolCall.FindItemsQuery(query = q)
         }
+        ChatIntent.FreeForm -> null
         is ChatIntent.Unknown -> null
     }
 
@@ -233,4 +241,15 @@ internal class ChatClassifierApiServiceImpl(
 
     private fun tomorrowMillis(): Long =
         (Clock.System.now() + 1.hours * 24).toEpochMilliseconds()
+
+    /**
+     * Current device's timezone offset from UTC, in minutes.
+     * Used by Phase C.4.a so Gemini can render `dateIso` in the user's local time.
+     * Example: Moscow (UTC+3) → 180, Los Angeles (UTC-8) → -480.
+     */
+    private fun currentTimezoneOffsetMinutes(): Int {
+        val now = Clock.System.now()
+        val offsetSeconds = now.offsetIn(TimeZone.currentSystemDefault()).totalSeconds
+        return offsetSeconds / 60
+    }
 }

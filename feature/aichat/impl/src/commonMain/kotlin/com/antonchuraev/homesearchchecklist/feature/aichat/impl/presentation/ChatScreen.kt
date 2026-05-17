@@ -20,6 +20,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
@@ -31,12 +32,13 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Chat
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.RoutingLayer
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ToolCall
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.AiChatPricingHelpSheet
-import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatPricingCaption
 import org.jetbrains.compose.resources.stringResource
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatHeader
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatInputRow
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatMessageBubble
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatPreviewCard
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatPricingRow
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatTypingIndicator
 import kotlinx.coroutines.launch
 
 /**
@@ -48,11 +50,12 @@ import kotlinx.coroutines.launch
  * Layout (top → bottom):
  * ```
  * ChatHeader (TopAppBar)
- * ───────────────────────
+ * ChatPricingRow ("≈ 0–3 credits per query" + help icon)
+ * ───────────────────────────────────────────────────────
  * LazyColumn (messages, weight=1f)
  *   ↳ ChatMessageBubble per message
  *   ↳ ChatPreviewCard  (if state.pendingPreview != null, as last sticky item)
- * ───────────────────────
+ * ───────────────────────────────────────────────────────
  * ChatInputRow (pinned to bottom, above IME)
  * ```
  *
@@ -67,6 +70,7 @@ fun ChatScreen(
     state: ChatScreenState,
     onIntent: (ChatScreenIntent) -> Unit,
     drawerState: DrawerState = DrawerState(DrawerValue.Closed),
+    onNavigateToPaywall: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
@@ -87,10 +91,24 @@ fun ChatScreen(
 
     // Auto-scroll to the newest item on changes. With reverseLayout = true the
     // newest item lives at index 0 (visually at the bottom near the input row).
-    val totalItemCount = state.messages.size + if (state.pendingPreview != null) 1 else 0
+    // Count also includes the typing indicator so the list scrolls when it appears.
+    val totalItemCount = state.messages.size +
+        (if (state.pendingPreview != null) 1 else 0) +
+        (if (state.isProcessing && state.pendingPreview == null) 1 else 0)
+
+    // First appearance (history loads async from Room): snap to bottom instantly so
+    // the user opens straight into the latest message — no visible scroll animation.
+    // Subsequent count changes (new user/assistant message, typing indicator) keep
+    // the smooth animateScrollToItem behaviour.
+    val hasInitializedScroll = remember { mutableStateOf(false) }
     LaunchedEffect(totalItemCount) {
         if (totalItemCount > 0) {
-            listState.animateScrollToItem(0)
+            if (!hasInitializedScroll.value) {
+                listState.scrollToItem(0)            // instant
+                hasInitializedScroll.value = true
+            } else {
+                listState.animateScrollToItem(0)     // animated
+            }
         }
     }
 
@@ -105,6 +123,7 @@ fun ChatScreen(
                 creditBalance = state.creditBalance,
                 onBackClick = { onIntent(ChatScreenIntent.OnBackClick) },
                 onMenuClick = { scope.launch { drawerState.open() } },
+                navigateToPaywall = onNavigateToPaywall,
             )
         },
     ) { scaffoldPadding ->
@@ -114,6 +133,13 @@ fun ChatScreen(
                 .padding(scaffoldPadding)
                 .imePadding(),
         ) {
+            // Pricing info band — sits directly below the TopAppBar,
+            // above the message list. Caption + help icon; tapping help
+            // opens AiChatPricingHelpSheet via OnHelpClick intent.
+            ChatPricingRow(
+                onWhyClick = { onIntent(ChatScreenIntent.OnHelpClick) },
+            )
+
             // Message list — occupies all remaining vertical space
             LazyColumn(
                 modifier = Modifier
@@ -133,9 +159,18 @@ fun ChatScreen(
             ) {
                 // With reverseLayout = true, FIRST declared item renders at the BOTTOM
                 // of the viewport. So we declare in newest-first order:
+                //   typing indicator (shown when processing and no preview card yet)
                 //   pendingPreview (most recent action)
                 //   user/assistant messages reversed (newest first)
                 //   welcome bubble (oldest, rendered at top of viewport)
+
+                // Typing indicator — visible during Layer 1→2→3 round-trip only.
+                // Hidden once pendingPreview appears (user already sees the result card).
+                if (state.isProcessing && state.pendingPreview == null) {
+                    item(key = "__typing") {
+                        ChatTypingIndicator()
+                    }
+                }
 
                 state.pendingPreview?.let { preview ->
                     item(key = "preview_card") {
@@ -162,12 +197,6 @@ fun ChatScreen(
                     ChatMessageBubble(message = welcomeBubble)
                 }
             }
-
-            // Pricing caption — small clickable line above input, opens pricing sheet on "?" tap.
-            // Replaces the "?" icon that used to live in the header (closer to where cost matters).
-            ChatPricingCaption(
-                onWhyClick = { onIntent(ChatScreenIntent.OnHelpClick) },
-            )
 
             // Input row is OUTSIDE LazyColumn — always pinned above the keyboard
             ChatInputRow(

@@ -1,14 +1,8 @@
 package com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBackIos
-import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Menu
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -18,37 +12,47 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.back
-import aichecklists.core.designsystem.generated.resources.chat_credits_balance
 import aichecklists.core.designsystem.generated.resources.chat_title
 import org.jetbrains.compose.resources.stringResource
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCreditsChip
 
 /**
  * Top app bar for the AI Chat screen.
  *
- * Layout:
- *   [menu] AI Chat ............................. [✨ N]
+ * ## Layout
+ * ```
+ * [menu/back]          AI Chat          [✨ N | Get More]
+ * ```
  *
- * The actions area shows ONLY a compact balance chip: AutoAwesome icon + raw
- * credit number, no surrounding text. Pricing explanation is no longer here —
- * it lives in [ChatPricingCaption] above the input row, which is closer to the
- * point where the cost actually matters.
+ * Single-line title only. The pricing caption ("≈ 0–3 credits per query" + help icon)
+ * has been moved to a dedicated [ChatPricingRow] composable rendered immediately below
+ * this bar in [ChatScreen]'s content column. This keeps the TopAppBar uncluttered and
+ * follows the standard MD3 "small title bar" pattern.
  *
- * Matches the brand-consistent CreditsChip pattern used on the Main screen
- * (Icons.Outlined.AutoAwesome + primaryContainer background).
+ * ## Credit chip
+ * Uses the shared [AppCreditsChip] from core/designsystem:
+ * - `credits > 0` → shows count with AutoAwesome icon (primaryContainer bg)
+ * - `credits ≤ 0 && !isPremium` → shows "Get More" CTA (primary bg) — mid-conversation
+ *   upsell moment, consistent with MainScreen.
+ * - `isPremium` → shows ∞ symbol
+ *
+ * ## Token mapping
+ * - Container: `MaterialTheme.colorScheme.surface` (TopAppBar default)
+ * - Title: `MaterialTheme.colorScheme.onSurface` (titleLarge)
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatHeader(
     creditBalance: Int,
     onBackClick: () -> Unit,
+    isPremium: Boolean = false,
     onMenuClick: (() -> Unit)? = null,
+    navigateToPaywall: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     CenterAlignedTopAppBar(
@@ -82,29 +86,12 @@ fun ChatHeader(
             }
         },
         actions = {
-            // Brand-consistent compact balance chip — icon + number, no text label.
-            // Matches MainScreen.CreditsChip pattern (AutoAwesome + primaryContainer).
-            Row(
-                modifier = Modifier
-                    .padding(end = 8.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.primaryContainer)
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.AutoAwesome,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-                Text(
-                    text = stringResource(Res.string.chat_credits_balance, creditBalance),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
-            }
+            AppCreditsChip(
+                credits = creditBalance,
+                isPremium = isPremium,
+                onClick = navigateToPaywall,
+                modifier = Modifier.padding(end = 8.dp),
+            )
         },
         colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
             containerColor = MaterialTheme.colorScheme.surface,

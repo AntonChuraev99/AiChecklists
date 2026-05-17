@@ -75,9 +75,27 @@ val MIGRATION_10_11 = object : Migration(10, 11) {
     }
 }
 
+val MIGRATION_11_12 = object : Migration(11, 12) {
+    override suspend fun migrate(connection: SQLiteConnection) {
+        connection.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `ai_chat_history` (
+                `id` TEXT NOT NULL,
+                `role` TEXT NOT NULL,
+                `content` TEXT NOT NULL,
+                `timestamp` INTEGER NOT NULL,
+                `costCredits` INTEGER NOT NULL DEFAULT 0,
+                `routedLayer` TEXT,
+                PRIMARY KEY(`id`)
+            )
+            """.trimIndent()
+        )
+    }
+}
+
 @Database(
-    entities = [ChecklistEntity::class, ChecklistFillEntity::class],
-    version = 11,
+    entities = [ChecklistEntity::class, ChecklistFillEntity::class, ChatHistoryEntry::class],
+    version = 12,
     exportSchema = true
 )
 @TypeConverters(ChecklistItemConverters::class, ReminderConverters::class)
@@ -85,13 +103,14 @@ val MIGRATION_10_11 = object : Migration(10, 11) {
 abstract class ChecklistDatabase : RoomDatabase() {
     abstract fun checklistDao(): ChecklistDao
     abstract fun checklistFillDao(): ChecklistFillDao
+    abstract fun chatHistoryDao(): ChatHistoryDao
 
     companion object {
         fun getRoomDatabase(
             builder: Builder<ChecklistDatabase>
         ): ChecklistDatabase {
             return builder
-                .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
+                .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
                 .fallbackToDestructiveMigration(dropAllTables = false)
                 .setQueryCoroutineContext(Dispatchers.Default)
                 .build()

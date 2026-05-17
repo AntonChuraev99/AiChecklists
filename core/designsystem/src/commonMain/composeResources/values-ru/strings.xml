@@ -328,6 +328,7 @@
     <!-- Кредиты ИИ -->
     <string name="credits_display">%1$d кредитов</string>
     <string name="credits_get_more">Получить кредиты</string>
+    <string name="credits_premium_unlimited">∞ кредитов</string>
     <string name="credits_your_credits">Ваши кредиты ИИ</string>
     <string name="credits_refill_info">Пополняются ежедневно в 12:00 CET</string>
     <string name="credits_refill_to">до %1$d</string>
@@ -891,6 +892,7 @@
     <string name="chat_title">AI-чат</string>
     <string name="chat_input_placeholder">Спросите что угодно…</string>
     <string name="chat_send_action">Отправить</string>
+    <string name="chat_typing_indicator_a11y">AI печатает…</string>
     <string name="chat_help_action">О стоимости</string>
     <string name="chat_credits_label">Осталось %1$d кредитов · ≈ 0–3</string>
     <string name="chat_credits_balance">%1$d</string>
@@ -927,6 +929,8 @@
 
     <!-- AI-чат: навигация и snackbar-сообщения -->
     <string name="nav_ai_chat">AI-чат</string>
+    <string name="main_open_ai_chat">Открыть AI-ассистент</string>
+    <string name="main_action_ai_chat">AI чат</string>
     <string name="chat_requires_premium">Это действие доступно только в Premium.</string>
     <string name="chat_ambiguous_match">Вы имели в виду: %1$s? Уточните, пожалуйста.</string>
     <string name="chat_not_found">Ничего не найдено: %1$s</string>
@@ -934,4 +938,28 @@
     <string name="chat_generic_error">Что-то пошло не так. Попробуйте ещё раз.</string>
     <string name="chat_apply_error">Не удалось применить изменение. Попробуйте ещё раз.</string>
     <string name="chat_extract_fail">Понял запрос, но не смог извлечь детали. Уточните, пожалуйста.</string>
+    <!-- Результаты команд AI-чата -->
+    <string name="chat_dispatch_added">Добавлено «%1$s».</string>
+    <string name="chat_dispatch_added_to">Добавлено «%1$s» в %2$s.</string>
+    <string name="chat_dispatch_deleted">Удалено «%1$s» из %2$s.</string>
+    <string name="chat_dispatch_item_not_found">В %2$s не нашёл пункт «%1$s».</string>
+    <string name="chat_dispatch_completed">Отметил «%1$s» как выполнено в %2$s.</string>
+    <string name="chat_dispatch_already_done">«%1$s» уже отмечено как выполнено.</string>
+    <string name="chat_dispatch_created_empty">Создан чек-лист «%1$s».</string>
+    <string name="chat_dispatch_created_with_one">Создан чек-лист «%1$s» с одним пунктом.</string>
+    <string name="chat_dispatch_created_with_many">Создан чек-лист «%1$s» с %2$s пунктами.</string>
+    <string name="chat_dispatch_reminder_set">Напоминание для «%1$s» поставлено на %2$s.</string>
+    <string name="chat_dispatch_no_reminders_on_day">Напоминаний не найдено на %1$s.</string>
+    <string name="chat_dispatch_moved_one">Перенёс 1 напоминание на %1$s.</string>
+    <string name="chat_dispatch_moved_many">Перенёс %1$s напоминаний на %2$s.</string>
+    <string name="chat_dispatch_find_blank">Уточни, что искать.</string>
+    <string name="chat_dispatch_find_no_match">По запросу «%1$s» ничего не найдено.</string>
+    <string name="chat_dispatch_find_success">Найдено %1$s пунктов: %2$s</string>
+    <string name="chat_dispatch_operation_failed">Операция не удалась: %1$s</string>
+    <string name="chat_dispatch_no_checklists">Чек-листов пока нет. Создай первый.</string>
+    <string name="chat_dispatch_no_checklist_match">Чек-лист «%1$s» не найден.</string>
+    <string name="chat_dispatch_fill_load_failed">Не удалось открыть заполнение чек-листа «%1$s».</string>
+    <string name="chat_insufficient_credits">Недостаточно кредитов для AI-ответа. Пополните баланс или оформите Premium.</string>
+    <string name="chat_completion_error">AI не смог ответить. Попробуйте ещё раз.</string>
+    <string name="chat_history_load_error">Не удалось загрузить историю чата.</string>
 </resources>

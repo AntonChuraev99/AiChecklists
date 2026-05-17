@@ -254,6 +254,13 @@ fun App() {
                             drawerState = drawerState,
                             isEditMode = isEditMode,
                             onEditModeChange = { isEditMode = it },
+                            onNavigateToAiChat = {
+                                if (navConsumed) return@MainScreen
+                                navConsumed = true
+                                navController.navigate(AppNavRoute.AiChat) {
+                                    launchSingleTop = true
+                                }
+                            },
                         )
                     }
                 }
@@ -692,6 +699,11 @@ fun App() {
                             drawerState = drawerState,
                             snackbarHostState = snackbarHostState,
                             onBack = { navController.popBackStack() },
+                            onNavigateToPaywall = {
+                                navController.navigate(AppNavRoute.Paywall(source = "chat_credits_chip")) {
+                                    launchSingleTop = true
+                                }
+                            },
                         )
                     }
                 }

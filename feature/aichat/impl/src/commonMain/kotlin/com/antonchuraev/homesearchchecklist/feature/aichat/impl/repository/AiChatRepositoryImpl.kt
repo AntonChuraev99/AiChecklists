@@ -2,32 +2,38 @@ package com.antonchuraev.homesearchchecklist.feature.aichat.impl.repository
 
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatIntent
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.IntentClassification
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.RoutingLayer
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.ChatLocale
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.LocalIntentRouter
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AiChatRepository
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatClassifierApiService
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatCompletionApiService
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChecklistContext
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.RemoteClassificationResult
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.RemoteCompletionResult
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 
 /**
- * Phase B implementation: Layer 1 local router with Layer 2 cloud classifier fallback.
+ * Phase C implementation: Layer 1 → Layer 2 → Layer 3 routing chain.
  *
- * Classification flow:
+ * Classification flow ([classify]):
  *   1. [LocalIntentRouter.route] → Layer 1 result
- *   2. If confidence >= [LAYER_1_CONFIDENCE_THRESHOLD] → return immediately (0 credits spent)
- *   3. Otherwise → call [ChatClassifierApiService.classify] (Layer 2, costs 1 credit)
- *      - [RemoteClassificationResult.Success]          → return Classifier result
- *      - [RemoteClassificationResult.InsufficientCredits] → return Unknown (caller shows inline message)
- *      - [RemoteClassificationResult.NetworkError]     → graceful degradation, return Layer 1 result
- *      - [RemoteClassificationResult.ServiceError]     → graceful degradation, return Layer 1 result
+ *   2. If confidence >= [LAYER_1_CONFIDENCE_THRESHOLD] → return immediately (0 credits)
+ *   3. Otherwise → [ChatClassifierApiService.classify] (Layer 2, 1 credit)
+ *      - Success with intent=FreeForm → ViewModel calls [completeFreeForm] (Layer 3, 3 credits)
+ *      - Success with structured intent → return Classifier result
+ *      - InsufficientCredits → return Unknown (caller shows inline message)
+ *      - NetworkError / ServiceError → graceful degradation to Layer 1 result
  *
- * Layer 2 is skipped entirely when [userId] is blank (unregistered user).
+ * [completeFreeForm] delegates to [ChatCompletionApiService] with full message history.
+ * Layer 2 and Layer 3 are skipped when [userId] is blank (unregistered user).
  */
 internal class AiChatRepositoryImpl(
     private val router: LocalIntentRouter,
     private val classifierApi: ChatClassifierApiService,
+    private val completionApi: ChatCompletionApiService,
     private val userDataRepository: UserDataRepository,
     private val logger: AppLogger,
 ) : AiChatRepository {
@@ -81,5 +87,25 @@ internal class AiChatRepositoryImpl(
                 layer1
             }
         }
+    }
+
+    override suspend fun completeFreeForm(
+        messages: List<ChatMessage>,
+        locale: ChatLocale,
+        checklistsSummary: List<ChecklistContext>,
+    ): RemoteCompletionResult {
+        val userId = userDataRepository.getUserData().userId
+        if (userId.isBlank()) {
+            logger.warning(TAG, "completeFreeForm skipped: userId blank (user not registered yet)")
+            return RemoteCompletionResult.ServiceError
+        }
+
+        logger.debug(TAG, "completeFreeForm: messages=${messages.size} locale=$locale checklists=${checklistsSummary.size}")
+        return completionApi.complete(
+            userId = userId,
+            messages = messages,
+            locale = locale,
+            checklistsSummary = checklistsSummary,
+        )
     }
 }

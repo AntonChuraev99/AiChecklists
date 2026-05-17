@@ -7,10 +7,10 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.ChatLocale
  * KMP-compatible [ChatLocaleProvider] implemented via [currentSystemLanguage] expect/actual.
  *
  * On Android: delegates to [Locale.getDefault().language].
- * On wasmJs/iOS: falls back to "en" (system locale APIs are not uniformly available
- * across KMP targets in Phase A; Phase B will add proper expect/actual if needed).
+ * On iOS: delegates to [NSLocale.currentLocale.languageCode].
+ * On wasmJs: delegates to [navigator.language] (first 2 chars, lowercase).
  *
- * // Pending: docs/todos/2026-05-13-ai-chat-assistant.md (Phase B: proper iOS/wasmJs locale)
+ * All three targets have real platform implementations — no fallback stubs.
  */
 class AndroidChatLocaleProvider : ChatLocaleProvider {
     override fun current(): ChatLocale = ChatLocale.fromLanguageTag(currentSystemLanguage())
