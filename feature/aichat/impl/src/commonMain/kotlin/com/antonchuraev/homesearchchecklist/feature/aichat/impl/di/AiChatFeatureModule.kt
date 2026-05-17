@@ -1,5 +1,6 @@
 package com.antonchuraev.homesearchchecklist.feature.aichat.impl.di
 
+import com.antonchuraev.homesearchchecklist.core.datastore.api.AiChatPreferencesRepository
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.LocalIntentRouter
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AiChatRepository
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatClassifierApiService
@@ -57,6 +58,7 @@ val aiChatFeatureModule = module {
             classifierApi = get(),
             completionApi = get(),
             userDataRepository = get(),
+            aiChatPreferencesRepository = get(),
             logger = get(),
         )
     }
@@ -72,6 +74,8 @@ val aiChatFeatureModule = module {
             chatHistoryRepository = get(),
             checklistRepository = get(),
             userDataRepository = get(),
+            aiChatPreferencesRepository = get<AiChatPreferencesRepository>(),
+            analytics = get(),
             logger = get(),
         )
     }

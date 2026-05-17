@@ -32,6 +32,7 @@ kotlin {
         commonMain.dependencies {
             api(projects.feature.aichat.api)
             implementation(projects.core.common.api)
+            implementation(projects.core.datastore.api)
             implementation(projects.core.designsystem)
             implementation(projects.feature.checklist)
             implementation(projects.feature.user)

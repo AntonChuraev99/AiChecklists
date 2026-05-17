@@ -81,8 +81,11 @@ internal object RuIntentLexicon {
     )
 
     // ─── CreateChecklist ──────────────────────────────────────────────────────
-    // "новый список покупок", "создай список для поездки"
+    // "новый список покупок", "создай список для поездки", "создай в апки сделать ..."
     val createChecklist: Set<String> = setOf(
+        // Single-word broad triggers — match anything starting with these
+        "создай", "создать", "новый",
+        // Multi-word specific triggers (kept for precision when present)
         "новый список",
         "создать список",
         "создай список",

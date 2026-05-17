@@ -957,6 +957,14 @@
     <string name="chat_pricing_apply_note">Write actions (add / delete / set) always show a preview. Credits are charged when we figure out what you meant, not when you tap Apply.</string>
     <string name="chat_pricing_got_it">Got it</string>
 
+    <!-- AI Chat Settings sheet -->
+    <string name="chat_settings_open">Chat settings</string>
+    <string name="chat_settings_title">Chat Settings</string>
+    <string name="chat_settings_balance_label">Credit balance</string>
+    <string name="chat_settings_get_more">Get more</string>
+    <string name="chat_settings_deep_thinking_title">Deep Thinking</string>
+    <string name="chat_settings_deep_thinking_subtitle">All queries skip the local router and go straight to the advanced model (3 credits per reply).</string>
+
     <!-- AI Chat navigation / snackbar messages -->
     <string name="nav_ai_chat">AI Chat</string>
     <string name="main_open_ai_chat">Open AI Assistant</string>
@@ -993,4 +1001,14 @@
     <string name="chat_insufficient_credits">Not enough credits for AI assist. Refill or upgrade to Premium.</string>
     <string name="chat_completion_error">AI couldn\'t respond. Please try again.</string>
     <string name="chat_history_load_error">Couldn\'t load chat history.</string>
+    <string name="chat_feedback_open">Leave feedback</string>
+    <string name="chat_feedback_title">Leave Feedback</string>
+    <string name="chat_feedback_subtitle">Helps improve future answers. We\'ll send this question + reply along with your feedback.</string>
+    <string name="chat_feedback_question_label">Question</string>
+    <string name="chat_feedback_answer_label">AI reply</string>
+    <string name="chat_feedback_placeholder">What went wrong? What was missing?</string>
+    <string name="chat_feedback_submit">Submit</string>
+    <string name="chat_feedback_cancel">Cancel</string>
+    <string name="chat_feedback_submitted">Thanks! Feedback submitted.</string>
+    <string name="chat_feedback_blank_hint">Please enter feedback text</string>
 </resources>

@@ -83,8 +83,11 @@ internal object EnIntentLexicon {
     )
 
     // ─── CreateChecklist ──────────────────────────────────────────────────────
-    // "new shopping list", "create list for trip", "create checklist"
+    // "new shopping list", "create list for trip", "create marketing screenshots todo"
     val createChecklist: Set<String> = setOf(
+        // Single-word broad triggers — match anything starting with these
+        "create", "new", "make",
+        // Multi-word specific triggers (kept for precision when present)
         "new list",
         "create a list",
         "create list",
