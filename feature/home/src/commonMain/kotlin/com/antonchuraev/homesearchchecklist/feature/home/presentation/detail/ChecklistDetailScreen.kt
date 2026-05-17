@@ -30,6 +30,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -147,6 +148,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonSecondary
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonText
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppItemMetaChip
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppTextField
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
@@ -1210,44 +1212,12 @@ internal fun ChecklistItemCard(
                         }
                     }
 
-                    if (!isEditMode && item.hasActiveReminder) {
-                        val reminderMissed = isReminderMissed(item)
-                        val reminderLabel = formatItemReminderLabel(item)
-                        val chipColor = if (reminderMissed)
-                            MaterialTheme.colorScheme.error
-                        else
-                            MaterialTheme.colorScheme.primary
-
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Notifications,
-                                contentDescription = null,
-                                modifier = Modifier.size(14.dp),
-                                tint = chipColor
-                            )
-                            Text(
-                                text = reminderLabel,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = chipColor
-                            )
-                        }
+                    if (!isEditMode) {
+                        ItemMetaRow(item = item)
                     }
                 }
-                // Priority star — read-only indicator, vertically centered relative to whole card.
-                // No clickable modifier — toggling happens inside ItemDetailsSheet (30/70 hit-zone preserved).
-                if (!isEditMode && item.priority > 0) {
-                    Icon(
-                        imageVector = Icons.Filled.Star,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .padding(start = AppDimens.SpacingSm)
-                            .size(20.dp)
-                    )
-                }
+                // Priority is now shown as a chip inside ItemMetaRow (below item text).
+                // The star Icon here is intentionally removed to avoid duplication.
             }
 
             // ── Tap overlay: invisible 30/70 split (above visual layer) ──
@@ -1594,6 +1564,75 @@ private fun ItemDetailsSheetRow(
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+
+/**
+ * Renders a horizontal row of 0–3 read-only meta chips below the item text:
+ * priority (⭐), reminder (🔔), and attachments (📎), in that fixed order.
+ *
+ * Design decisions:
+ * - Uses [AppItemMetaChip] (core:designsystem, 6th App* component).
+ * - Row, NOT FlowRow — prevents wrapping to 2–3 lines on compact screens.
+ *   Reminder label is width-capped at 140dp with ellipsis to protect layout on
+ *   very narrow devices (320dp - 30% checkbox ≈ 224dp usable).
+ * - Only rendered when at least one chip is active; zero chips = invisible (no spacer).
+ * - Reminder uses [formatItemReminderLabel] (already Composable, handles missed/repeat).
+ *   Missed reminder uses errorContainer/onErrorContainer for visual urgency.
+ * - No clickable / indication on any chip — toggling is handled by ItemDetailsSheet.
+ * - Priority is shown here as a chip; the old right-aligned Star Icon is removed.
+ */
+@Composable
+private fun ItemMetaRow(
+    item: ChecklistFillItem,
+    modifier: Modifier = Modifier,
+) {
+    val hasPriority = item.priority > 0
+    val hasReminder = item.hasActiveReminder
+    val hasAttachments = item.attachments.isNotEmpty()
+
+    if (!hasPriority && !hasReminder && !hasAttachments) return
+
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (hasPriority) {
+            AppItemMetaChip(
+                icon = Icons.Filled.Star,
+                label = stringResource(Res.string.item_chip_priority),
+                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            )
+        }
+
+        if (hasReminder) {
+            val reminderMissed = isReminderMissed(item)
+            val reminderLabel = formatItemReminderLabel(item)
+            AppItemMetaChip(
+                icon = Icons.Filled.Notifications,
+                label = reminderLabel,
+                containerColor = if (reminderMissed)
+                    MaterialTheme.colorScheme.errorContainer
+                else
+                    MaterialTheme.colorScheme.primaryContainer,
+                contentColor = if (reminderMissed)
+                    MaterialTheme.colorScheme.onErrorContainer
+                else
+                    MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.widthIn(max = 140.dp),
+            )
+        }
+
+        if (hasAttachments) {
+            AppItemMetaChip(
+                icon = Icons.Filled.AttachFile,
+                label = item.attachments.size.toString(),
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
             )
         }
     }

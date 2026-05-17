@@ -914,4 +914,7 @@
     <string name="calendar_grid_week_label">This Week</string>
     <string name="calendar_prev_week">Previous week</string>
     <string name="calendar_next_week">Next week</string>
+
+    <!-- Item meta chips (read-only indicators below item text in ChecklistItemCard) -->
+    <string name="item_chip_priority">Important</string>
 </resources>
