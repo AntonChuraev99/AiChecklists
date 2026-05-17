@@ -883,4 +883,7 @@
     <!-- Подсказки Smart Add: показываются когда пользователь добавляет неполную фразу -->
     <string name="smart_add_hint_add_item_text">Добавь текст пункта — например «созвон каждое воскресенье в 12»</string>
     <string name="smart_add_hint_add_time">Допиши время — например «в 12» или «в 7 утра»</string>
+
+    <!-- Чипы meta-данных пункта (read-only индикаторы под текстом в ChecklistItemCard) -->
+    <string name="item_chip_priority">Важное</string>
 </resources>
