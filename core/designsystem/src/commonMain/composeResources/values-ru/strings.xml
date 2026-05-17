@@ -893,6 +893,9 @@
     <string name="chat_send_action">Отправить</string>
     <string name="chat_help_action">О стоимости</string>
     <string name="chat_credits_label">Осталось %1$d кредитов · ≈ 0–3</string>
+    <string name="chat_credits_balance">%1$d</string>
+    <string name="chat_pricing_caption">≈ 0–3 кредита за запрос</string>
+    <string name="chat_pricing_caption_action">Почему?</string>
 
     <!-- AI-чат: preview card -->
     <string name="chat_preview_apply">Применить</string>

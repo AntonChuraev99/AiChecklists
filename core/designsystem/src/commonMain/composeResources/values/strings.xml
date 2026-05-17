@@ -925,6 +925,11 @@
     <string name="chat_help_action">Pricing info</string>
     <!-- %1$d = credit balance, shown as "3 credits left · ≈ 0–3" -->
     <string name="chat_credits_label">%1$d credits left · ≈ 0–3</string>
+    <!-- Compact balance: just the number, icon explains what it is. -->
+    <string name="chat_credits_balance">%1$d</string>
+    <!-- Pricing caption shown above input row; tap "?" opens the full pricing sheet. -->
+    <string name="chat_pricing_caption">≈ 0–3 credits per query</string>
+    <string name="chat_pricing_caption_action">Why?</string>
     <string name="chat_preview_apply">Apply</string>
     <string name="chat_preview_cancel">Cancel</string>
     <string name="chat_preview_will_create_one">This will create 1 item:</string>
