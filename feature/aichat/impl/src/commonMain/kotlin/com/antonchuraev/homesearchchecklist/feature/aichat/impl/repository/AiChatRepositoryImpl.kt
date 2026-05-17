@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.aichat.impl.repository
 
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
+import com.antonchuraev.homesearchchecklist.core.datastore.api.AiChatPreferencesRepository
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatIntent
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.IntentClassification
@@ -14,6 +15,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.Checkl
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.RemoteClassificationResult
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.RemoteCompletionResult
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
+import kotlinx.coroutines.flow.first
 
 /**
  * Phase C implementation: Layer 1 → Layer 2 → Layer 3 routing chain.
@@ -35,6 +37,7 @@ internal class AiChatRepositoryImpl(
     private val classifierApi: ChatClassifierApiService,
     private val completionApi: ChatCompletionApiService,
     private val userDataRepository: UserDataRepository,
+    private val aiChatPreferencesRepository: AiChatPreferencesRepository,
     private val logger: AppLogger,
 ) : AiChatRepository {
 
@@ -44,6 +47,19 @@ internal class AiChatRepositoryImpl(
     }
 
     override suspend fun classify(input: String, locale: ChatLocale): IntentClassification {
+        // Deep Thinking bypass — user opted into "always full chat" mode.
+        // Skip Layer 1 and Layer 2 entirely; return FreeForm at full confidence so
+        // ViewModel routes straight to handleFreeForm → completeFreeForm (Layer 3, 3 credits).
+        if (aiChatPreferencesRepository.deepThinkingEnabledFlow.first()) {
+            logger.info(TAG, "Deep thinking ON — bypassing Layer 1/2, returning FreeForm")
+            return IntentClassification(
+                intent = ChatIntent.FreeForm,
+                confidence = 1.0f,
+                layer = RoutingLayer.FullChat,
+                preBuiltToolCall = null,
+            )
+        }
+
         val layer1 = router.route(input, locale)
         logger.debug(TAG, "Layer1: ${layer1.intent::class.simpleName} conf=${layer1.confidence}")
 

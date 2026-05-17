@@ -20,7 +20,13 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Tool
  *                       updated optimistically from server API responses on Layer 2/3 success.
  *                       Hidden in UI when ≤ 0 (loading state or genuinely empty).
  * @param showPricingSheet  Whether the pricing help bottom sheet is visible.
+ * @param showSettingsSheet Whether the chat settings bottom sheet is visible.
+ * @param deepThinkingEnabled When true, all queries bypass Layer 1+2 and go straight to Layer 3
+ *                            (completeFreeForm, 3 credits each). Persisted in DataStore.
  * @param isProcessing  True while the router is classifying / dispatching (disables Send).
+ * @param feedbackTarget    Non-null when the feedback sheet is open for this assistant message.
+ * @param feedbackText      Current text typed in the feedback input field.
+ * @param isSubmittingFeedback True while the feedback is being submitted (disables Submit button).
  */
 data class ChatScreenState(
     val messages: List<ChatMessage> = emptyList(),
@@ -28,7 +34,12 @@ data class ChatScreenState(
     val pendingPreview: PendingPreview? = null,
     val creditBalance: Int = 0,
     val showPricingSheet: Boolean = false,
+    val showSettingsSheet: Boolean = false,
+    val deepThinkingEnabled: Boolean = false,
     val isProcessing: Boolean = false,
+    val feedbackTarget: ChatMessage? = null,
+    val feedbackText: String = "",
+    val isSubmittingFeedback: Boolean = false,
 ) : State
 
 /**
@@ -86,6 +97,27 @@ sealed interface ChatScreenIntent : Intent {
 
     /** User tapped the back / navigation icon. */
     data object OnBackClick : ChatScreenIntent
+
+    /** User tapped the settings gear icon in the top bar. */
+    data object OnSettingsClick : ChatScreenIntent
+
+    /** User dismissed the chat settings bottom sheet. */
+    data object OnSettingsDismiss : ChatScreenIntent
+
+    /** User toggled the "Deep Thinking" switch in the settings sheet. */
+    data class OnDeepThinkingToggle(val enabled: Boolean) : ChatScreenIntent
+
+    /** User tapped the feedback icon on an assistant bubble — opens the feedback sheet. */
+    data class OnFeedbackOpen(val message: ChatMessage) : ChatScreenIntent
+
+    /** User is typing in the feedback text field. */
+    data class OnFeedbackTextChange(val text: String) : ChatScreenIntent
+
+    /** User tapped Submit in the feedback sheet. */
+    data object OnFeedbackSubmit : ChatScreenIntent
+
+    /** User dismissed the feedback sheet (drag, scrim tap, or Cancel button). */
+    data object OnFeedbackDismiss : ChatScreenIntent
 }
 
 // ---------------------------------------------------------------------------

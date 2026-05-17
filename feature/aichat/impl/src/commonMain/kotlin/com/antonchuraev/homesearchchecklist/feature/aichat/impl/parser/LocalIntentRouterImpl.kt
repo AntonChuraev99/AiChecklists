@@ -122,10 +122,12 @@ internal class LocalIntentRouterImpl(
     // ─── Classification dispatch ──────────────────────────────────────────────
 
     private fun classify(normalized: String, lower: String, locale: ChatLocale): IntentClassification {
-        // Priority order: more specific / longer phrases first
-        tryCreateChecklist(normalized, lower, locale)?.let { return it }
+        // SetReminder / MoveReminders run before CreateChecklist because the broad
+        // CreateChecklist triggers ("создай", "create", "new") would otherwise swallow
+        // "создай напоминание" and "create reminder" phrases that belong to SetReminder.
         tryMoveReminders(normalized, lower, locale)?.let { return it }
         trySetReminder(normalized, lower, locale)?.let { return it }
+        tryCreateChecklist(normalized, lower, locale)?.let { return it }
         tryCreateItem(normalized, lower, locale)?.let { return it }
         tryDeleteItem(normalized, lower, locale)?.let { return it }
         tryCompleteItem(normalized, lower, locale)?.let { return it }
@@ -148,14 +150,19 @@ internal class LocalIntentRouterImpl(
             .firstOrNull { containsAtBoundary(lower, it) } ?: return null
 
         val endIdx = firstMatchEnd(lower, keywords)
-        val payload = lower.substring(endIdx).trim()
+        // Take EVERYTHING after the trigger keyword as the raw name.
+        // Layer 1 is broad-recall; if the user wanted a clean name they would type it cleanly.
+        // We do strip leading prepositions ("в ", "для ", "to ", "for ") only — they are
+        // never part of a user-meaningful list name, but the rest (including typos and noise)
+        // is preserved verbatim. Layer 2 may refine if needed.
+        // IMPORTANT: extract the name from the ORIGINAL `normalized` (case-preserved) input,
+        // not from `lower`, so the user sees their original casing in the preview.
+        val rawName = normalized.substring(endIdx).trim().removeLeadingPrepsCaseAware(locale)
+        val name = rawName.ifBlank { null }
+        val confidence = if (name != null) CONF_FULL else CONF_PARTIAL
 
-        // Name is everything after the keyword that is not a preposition
-        val hint = payload.removeLeadingStopWords(locale).ifBlank { null }
-        val confidence = if (hint != null) CONF_FULL else CONF_PARTIAL
-
-        logger.debug(TAG, "CreateChecklist matched='$matched' name='$hint' conf=$confidence")
-        return IntentClassification(ChatIntent.CreateChecklist, confidence, RoutingLayer.Local)
+        logger.debug(TAG, "CreateChecklist matched='$matched' name='${name?.take(40)}' conf=$confidence")
+        return IntentClassification(ChatIntent.CreateChecklist(name), confidence, RoutingLayer.Local)
     }
 
     // ─── MoveReminders ────────────────────────────────────────────────────────
@@ -354,6 +361,33 @@ internal class LocalIntentRouterImpl(
         for (prep in prepositions.sortedByDescending { it.length }) {
             if (result.startsWith(prep)) {
                 result = result.removePrefix(prep).trimStart()
+                break
+            }
+        }
+        return result
+    }
+
+    /**
+     * Strips leading prepositions from a name candidate but preserves case of the rest.
+     * "в апки сделать рекламные скрины" → "апки сделать рекламные скрины"
+     * "for the trip" → "the trip"
+     *
+     * Unlike [removeLeadingStopWords], this works on the case-preserved string
+     * and performs case-insensitive prefix matching, so the user sees their original
+     * capitalisation in the preview.
+     */
+    private fun String.removeLeadingPrepsCaseAware(locale: ChatLocale): String {
+        val prepositions = when (locale) {
+            ChatLocale.Ru -> RuIntentLexicon.hintPrepositions
+            ChatLocale.En -> EnIntentLexicon.hintPrepositions
+        }
+        var result = this.trimStart()
+        for (prep in prepositions.sortedByDescending { it.length }) {
+            if (result.length > prep.length &&
+                result.substring(0, prep.length).lowercase() == prep &&
+                result[prep.length].isWhitespace()
+            ) {
+                result = result.substring(prep.length).trimStart()
                 break
             }
         }

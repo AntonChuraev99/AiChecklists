@@ -1,8 +1,10 @@
 package com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation
 
 import androidx.lifecycle.viewModelScope
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
+import com.antonchuraev.homesearchchecklist.core.datastore.api.AiChatPreferencesRepository
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.dispatcher.ToolCallDispatcher
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatIntent
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
@@ -19,6 +21,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.Remote
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.preview.ToolCallPreviewRenderer
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,6 +29,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.random.Random
 
 /**
@@ -50,6 +54,8 @@ class ChatViewModel(
     private val chatHistoryRepository: ChatHistoryRepository,
     private val checklistRepository: ChecklistRepository,
     private val userDataRepository: UserDataRepository,
+    private val aiChatPreferencesRepository: AiChatPreferencesRepository,
+    private val analytics: AnalyticsTracker,
     private val logger: AppLogger,
 ) : AppViewModel<ChatScreenState, ChatScreenIntent, ChatScreenSideEffect>() {
 
@@ -86,6 +92,14 @@ class ChatViewModel(
         viewModelScope.launch {
             userDataRepository.getUserDataFlow().collect { userData ->
                 _screenState.value = _screenState.value.copy(creditBalance = userData.aiCredits)
+            }
+        }
+
+        // Mirror persisted Deep Thinking preference so the settings sheet toggle
+        // reflects the stored value on every screen entry.
+        viewModelScope.launch {
+            aiChatPreferencesRepository.deepThinkingEnabledFlow.collect { enabled ->
+                _screenState.value = _screenState.value.copy(deepThinkingEnabled = enabled)
             }
         }
     }
@@ -129,6 +143,93 @@ class ChatViewModel(
             ChatScreenIntent.OnBackClick -> {
                 viewModelScope.launch { _sideEffect.emit(ChatScreenSideEffect.NavigateBack) }
             }
+
+            ChatScreenIntent.OnSettingsClick -> {
+                _screenState.value = _screenState.value.copy(showSettingsSheet = true)
+            }
+
+            ChatScreenIntent.OnSettingsDismiss -> {
+                _screenState.value = _screenState.value.copy(showSettingsSheet = false)
+            }
+
+            is ChatScreenIntent.OnDeepThinkingToggle -> {
+                // Persist to DataStore; the Flow collector in init {} will update state automatically.
+                viewModelScope.launch {
+                    aiChatPreferencesRepository.setDeepThinkingEnabled(intent.enabled)
+                }
+            }
+
+            is ChatScreenIntent.OnFeedbackOpen -> {
+                _screenState.value = _screenState.value.copy(
+                    feedbackTarget = intent.message,
+                    feedbackText = "",
+                )
+            }
+
+            is ChatScreenIntent.OnFeedbackTextChange -> {
+                _screenState.value = _screenState.value.copy(feedbackText = intent.text)
+            }
+
+            ChatScreenIntent.OnFeedbackDismiss -> {
+                _screenState.value = _screenState.value.copy(
+                    feedbackTarget = null,
+                    feedbackText = "",
+                    isSubmittingFeedback = false,
+                )
+            }
+
+            ChatScreenIntent.OnFeedbackSubmit -> handleFeedbackSubmit()
+        }
+    }
+
+    // ─── Feedback flow ────────────────────────────────────────────────────────
+
+    private fun handleFeedbackSubmit() {
+        val state = _screenState.value
+        val target = state.feedbackTarget ?: return
+        val feedbackText = state.feedbackText.trim()
+
+        // Silent-skip is FORBIDDEN (CLAUDE.md rule) — emit snackbar instead of returning quietly.
+        if (feedbackText.isBlank()) {
+            viewModelScope.launch {
+                _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_feedback_blank_hint"))
+            }
+            return
+        }
+
+        // Find the user question that preceded this assistant message in the history.
+        val messages = state.messages
+        val assistantIdx = messages.indexOfFirst { it.id == target.id }
+        val precedingUser = messages
+            .take(assistantIdx.coerceAtLeast(0))
+            .lastOrNull { it.role == ChatRole.User }
+        val question = precedingUser?.content ?: ""
+        val answer = target.content
+
+        _screenState.value = state.copy(isSubmittingFeedback = true)
+
+        viewModelScope.launch {
+            // MVP: emit an Amplitude/Firebase event with the question/answer/feedback
+            // triplet so the team can mine it offline. Real per-feedback Cloud Function
+            // endpoint will be swapped in later (event remains in addition / as a backup).
+            // Pending: docs/todos/2026-05-17-chat-feedback-real-endpoint.md
+            analytics.event(
+                name = "ai_chat_feedback",
+                params = mapOf(
+                    "question" to question,
+                    "answer" to answer,
+                    "feedback" to feedbackText,
+                    "message_id" to target.id,
+                    "routed_layer" to (target.routedLayer?.name ?: "unknown"),
+                ),
+            )
+            logger.info(TAG, "FEEDBACK tracked: feedback_len=${feedbackText.length} message_id=${target.id}")
+            _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_feedback_submitted"))
+            _screenState.value = _screenState.value.copy(
+                feedbackTarget = null,
+                feedbackText = "",
+                isSubmittingFeedback = false,
+            )
         }
     }
 
@@ -175,7 +276,9 @@ class ChatViewModel(
                     costCredits = userCost,
                 )
                 updateMessage(userMsg.id) { taggedUserMsg }
-                chatHistoryRepository.append(taggedUserMsg)
+                // Persist with NonCancellable so a back-nav during classify/dispatch
+                // doesn't drop the user message between state.messages and Room.
+                withContext(NonCancellable) { chatHistoryRepository.append(taggedUserMsg) }
 
                 when (val intent = classification.intent) {
                     is ChatIntent.Unknown -> {
@@ -200,7 +303,7 @@ class ChatViewModel(
                     ChatIntent.CreateItem,
                     ChatIntent.DeleteItem,
                     ChatIntent.CompleteItem,
-                    ChatIntent.CreateChecklist,
+                    is ChatIntent.CreateChecklist,
                     ChatIntent.SetReminder,
                     ChatIntent.MoveReminders -> {
                         // Layer 2 (Classifier) pre-builds the ToolCall with server-extracted entities.
@@ -344,7 +447,9 @@ class ChatViewModel(
             routedLayer = routedLayer,
         )
         updateMessages { it + msg }
-        chatHistoryRepository.append(msg)
+        // NonCancellable: Layer 3 response is the user-visible reply; never lose it
+        // to a back-nav that cancels viewModelScope mid-flight.
+        withContext(NonCancellable) { chatHistoryRepository.append(msg) }
     }
 
     /**
@@ -462,8 +567,11 @@ class ChatViewModel(
                 else ToolCall.CompleteItem(checklistHint = hint, itemText = itemText)
             }
 
-            ChatIntent.CreateChecklist -> {
-                val name = extractChecklistName(lower, locale)
+            is ChatIntent.CreateChecklist -> {
+                // Prefer name from the classifier (already extracted in Layer 1 from raw input,
+                // or from Layer 2 server-side). Falls back to fuzzy extraction from raw text
+                // only when the intent didn't carry a name (edge case).
+                val name = intent.name ?: extractChecklistName(lower, locale)
                 if (name.isNullOrBlank()) null
                 else ToolCall.CreateChecklist(name = name, initialItems = emptyList())
             }
@@ -616,10 +724,14 @@ class ChatViewModel(
             costCredits = 0,
         )
         updateMessages { it + msg }
-        // Persist every assistant message regardless of routing layer
+        // Persist every assistant message regardless of routing layer.
+        // NonCancellable so a fast back-nav between updateMessages() and append()
+        // doesn't strand the message in state without a Room row.
         viewModelScope.launch {
-            runCatching { chatHistoryRepository.append(msg) }
-                .onFailure { e -> logger.error(TAG, "addAssistantMessage: persist failed — ${e.message}", e) }
+            withContext(NonCancellable) {
+                runCatching { chatHistoryRepository.append(msg) }
+                    .onFailure { e -> logger.error(TAG, "addAssistantMessage: persist failed — ${e.message}", e) }
+            }
         }
     }
 

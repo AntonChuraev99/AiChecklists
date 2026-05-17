@@ -5,8 +5,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.RateReview
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -14,9 +19,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.chat_feedback_open
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatRole
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * Renders a single chat message bubble.
@@ -35,6 +43,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Chat
 fun ChatMessageBubble(
     message: ChatMessage,
     modifier: Modifier = Modifier,
+    onFeedbackClick: ((ChatMessage) -> Unit)? = null,
 ) {
     val isUser = message.role == ChatRole.User
 
@@ -93,10 +102,27 @@ fun ChatMessageBubble(
                 }
             }
 
-            // Cost badge is shown only when credits were actually deducted (> 0).
+            // Cost badge: shown only for user messages where credits were actually deducted (> 0).
             // Layer 1 (local router) is always free → badge stays hidden for most messages.
             if (isUser && message.costCredits > 0) {
                 InlineCostBadge(cost = message.costCredits)
+            }
+
+            // Feedback icon: shown only for assistant messages.
+            // 20dp — inline-decorative badge exception to the 24dp default rule
+            // (small affordance tucked below the bubble, similar to InlineCostBadge at 16dp).
+            if (!isUser && onFeedbackClick != null) {
+                IconButton(
+                    onClick = { onFeedbackClick(message) },
+                    modifier = Modifier.size(28.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.RateReview,
+                        contentDescription = stringResource(Res.string.chat_feedback_open),
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
     }

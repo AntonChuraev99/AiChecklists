@@ -927,6 +927,14 @@
     <string name="chat_pricing_apply_note">Действия на запись (добавить / удалить / поставить) всегда показывают предпросмотр. Кредиты списываются когда мы поняли запрос, а не при подтверждении.</string>
     <string name="chat_pricing_got_it">Понятно</string>
 
+    <!-- Настройки AI-чата -->
+    <string name="chat_settings_open">Настройки чата</string>
+    <string name="chat_settings_title">Настройки чата</string>
+    <string name="chat_settings_balance_label">Баланс кредитов</string>
+    <string name="chat_settings_get_more">Получить больше</string>
+    <string name="chat_settings_deep_thinking_title">Глубокое мышление</string>
+    <string name="chat_settings_deep_thinking_subtitle">Все запросы идут сразу к продвинутой модели (3 кредита за ответ). Без локального роутинга.</string>
+
     <!-- AI-чат: навигация и snackbar-сообщения -->
     <string name="nav_ai_chat">AI-чат</string>
     <string name="main_open_ai_chat">Открыть AI-ассистент</string>
@@ -962,4 +970,14 @@
     <string name="chat_insufficient_credits">Недостаточно кредитов для AI-ответа. Пополните баланс или оформите Premium.</string>
     <string name="chat_completion_error">AI не смог ответить. Попробуйте ещё раз.</string>
     <string name="chat_history_load_error">Не удалось загрузить историю чата.</string>
+    <string name="chat_feedback_open">Оставить отзыв</string>
+    <string name="chat_feedback_title">Оставить отзыв</string>
+    <string name="chat_feedback_subtitle">Поможет улучшить ответы. Мы отправим этот вопрос и ответ вместе с вашим отзывом.</string>
+    <string name="chat_feedback_question_label">Вопрос</string>
+    <string name="chat_feedback_answer_label">Ответ ИИ</string>
+    <string name="chat_feedback_placeholder">Что было не так? Чего не хватило?</string>
+    <string name="chat_feedback_submit">Отправить</string>
+    <string name="chat_feedback_cancel">Отмена</string>
+    <string name="chat_feedback_submitted">Спасибо! Отзыв отправлен.</string>
+    <string name="chat_feedback_blank_hint">Введите текст отзыва</string>
 </resources>

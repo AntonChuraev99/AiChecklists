@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation
 
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
+import com.antonchuraev.homesearchchecklist.core.datastore.api.AiChatPreferencesRepository
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.dispatcher.ToolCallDispatcher
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatIntent
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.DispatchOutcome
@@ -33,11 +34,13 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatRole
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 // ─── Fakes ────────────────────────────────────────────────────────────────────
@@ -138,6 +141,20 @@ private object NoOpLogger : AppLogger {
     override fun error(tag: String, message: String, throwable: Throwable?) = Unit
 }
 
+private class FakeAiChatPreferencesRepository(
+    initial: Boolean = false,
+) : AiChatPreferencesRepository {
+    private val _flow = MutableStateFlow(initial)
+    var lastSet: Boolean? = null
+
+    override val deepThinkingEnabledFlow: kotlinx.coroutines.flow.Flow<Boolean> = _flow
+
+    override suspend fun setDeepThinkingEnabled(enabled: Boolean) {
+        lastSet = enabled
+        _flow.value = enabled
+    }
+}
+
 private class FakeUserDataRepository(
     initialCredits: Int = 0,
 ) : UserDataRepository {
@@ -158,6 +175,16 @@ private class FakeUserDataRepository(
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+private class FakeAnalyticsTracker : com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker {
+    val events = mutableListOf<Pair<String, Map<String, Any>>>()
+    override fun setUserId(userId: String) {}
+    override fun setUserProperties(properties: Map<String, Any>) {}
+    override fun screenView(name: String) {}
+    override fun event(name: String, params: Map<String, Any>) {
+        events.add(name to params)
+    }
+}
+
 private fun makeVm(
     repo: AiChatRepository = FakeAiChatRepository(),
     dispatcher: FakeToolCallDispatcher = FakeToolCallDispatcher(),
@@ -165,6 +192,8 @@ private fun makeVm(
     historyRepo: ChatHistoryRepository = FakeChatHistoryRepository(),
     checklistRepo: ChecklistRepository = FakeChecklistRepository(),
     userDataRepo: UserDataRepository = FakeUserDataRepository(),
+    aiChatPreferencesRepo: AiChatPreferencesRepository = FakeAiChatPreferencesRepository(),
+    analytics: com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker = FakeAnalyticsTracker(),
 ): ChatViewModel = ChatViewModel(
     aiChatRepository = repo,
     toolCallDispatcher = dispatcher,
@@ -173,6 +202,8 @@ private fun makeVm(
     chatHistoryRepository = historyRepo,
     checklistRepository = checklistRepo,
     userDataRepository = userDataRepo,
+    aiChatPreferencesRepository = aiChatPreferencesRepo,
+    analytics = analytics,
     logger = NoOpLogger,
 )
 
@@ -446,5 +477,121 @@ class ChatViewModelTest {
         val effect = effectDeferred.await()
         assertIs<ChatScreenSideEffect.ShowSnackbar>(effect)
         assertEquals("chat_requires_premium", effect.messageKey)
+    }
+
+    // ── 11. OnSettingsClick → showSettingsSheet = true ───────────────────────
+
+    @Test
+    fun onSettingsClick_setsShowSettingsSheetTrue() {
+        val vm = makeVm()
+        assertEquals(false, vm.screenState.value.showSettingsSheet)
+
+        vm.sendIntent(ChatScreenIntent.OnSettingsClick)
+
+        assertEquals(true, vm.screenState.value.showSettingsSheet)
+    }
+
+    // ── 12. OnDeepThinkingToggle → persists to repo and updates state ─────────
+
+    @Test
+    fun onDeepThinkingToggle_persistsAndUpdatesState() = runTest {
+        val fakePrefsRepo = FakeAiChatPreferencesRepository(initial = false)
+        val vm = makeVm(aiChatPreferencesRepo = fakePrefsRepo)
+
+        // Initially false
+        assertEquals(false, vm.screenState.value.deepThinkingEnabled)
+
+        // Toggle ON
+        vm.sendIntent(ChatScreenIntent.OnDeepThinkingToggle(true))
+
+        // DataStore was called with correct value
+        assertEquals(true, fakePrefsRepo.lastSet)
+        // Flow emission updates state automatically (UnconfinedTestDispatcher runs coroutines eagerly)
+        assertEquals(true, vm.screenState.value.deepThinkingEnabled)
+
+        // Toggle OFF
+        vm.sendIntent(ChatScreenIntent.OnDeepThinkingToggle(false))
+        assertEquals(false, fakePrefsRepo.lastSet)
+        assertEquals(false, vm.screenState.value.deepThinkingEnabled)
+    }
+
+    // ── 13. OnFeedbackOpen → sets feedbackTarget, clears feedbackText ────────
+
+    @Test
+    fun onFeedbackOpen_setsTargetAndOpensSheet() {
+        val vm = makeVm()
+        val assistantMsg = ChatMessage(
+            id = "asst_1",
+            role = ChatRole.Assistant,
+            content = "Here is your answer.",
+            timestamp = 1_000L,
+        )
+        // Inject a message directly into state via AppendAssistantMessage round-trip pattern —
+        // simpler: directly set feedbackText to something to confirm it's reset on open.
+        vm.sendIntent(ChatScreenIntent.OnFeedbackTextChange("old text"))
+        vm.sendIntent(ChatScreenIntent.OnFeedbackOpen(assistantMsg))
+
+        val state = vm.screenState.value
+        assertNotNull(state.feedbackTarget)
+        assertEquals("asst_1", state.feedbackTarget?.id)
+        assertEquals("", state.feedbackText, "feedbackText must be cleared when sheet opens")
+        assertEquals(false, state.isSubmittingFeedback)
+    }
+
+    // ── 14. OnFeedbackSubmit with blank text → emits hint snackbar, no dismiss ──
+
+    @Test
+    fun onFeedbackSubmit_blankText_emitsHintSnackbar() = runTest {
+        val vm = makeVm()
+        val assistantMsg = ChatMessage(
+            id = "asst_2",
+            role = ChatRole.Assistant,
+            content = "Some AI answer.",
+            timestamp = 1_000L,
+        )
+        vm.sendIntent(ChatScreenIntent.OnFeedbackOpen(assistantMsg))
+        // feedbackText stays blank (default "")
+
+        val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            vm.sideEffect.first()
+        }
+
+        vm.sendIntent(ChatScreenIntent.OnFeedbackSubmit)
+
+        val effect = effectDeferred.await()
+        assertIs<ChatScreenSideEffect.ShowSnackbar>(effect)
+        assertEquals("chat_feedback_blank_hint", effect.messageKey)
+        // Sheet must remain open — target is not cleared
+        assertNotNull(vm.screenState.value.feedbackTarget)
+    }
+
+    // ── 15. OnFeedbackSubmit with non-blank text → logs, emits submitted snackbar, clears ──
+
+    @Test
+    fun onFeedbackSubmit_nonBlank_clearsTargetAndEmitsSubmittedSnackbar() = runTest {
+        val vm = makeVm()
+        val assistantMsg = ChatMessage(
+            id = "asst_3",
+            role = ChatRole.Assistant,
+            content = "This is the AI reply.",
+            timestamp = 2_000L,
+        )
+        vm.sendIntent(ChatScreenIntent.OnFeedbackOpen(assistantMsg))
+        vm.sendIntent(ChatScreenIntent.OnFeedbackTextChange("The answer was too vague."))
+
+        val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            vm.sideEffect.first()
+        }
+
+        vm.sendIntent(ChatScreenIntent.OnFeedbackSubmit)
+
+        val effect = effectDeferred.await()
+        assertIs<ChatScreenSideEffect.ShowSnackbar>(effect)
+        assertEquals("chat_feedback_submitted", effect.messageKey)
+
+        val state = vm.screenState.value
+        assertNull(state.feedbackTarget, "feedbackTarget must be cleared after submit")
+        assertEquals("", state.feedbackText, "feedbackText must be cleared after submit")
+        assertEquals(false, state.isSubmittingFeedback)
     }
 }

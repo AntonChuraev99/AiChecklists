@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBackIos
 import androidx.compose.material.icons.outlined.Menu
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -17,42 +18,33 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.back
+import aichecklists.core.designsystem.generated.resources.chat_settings_open
 import aichecklists.core.designsystem.generated.resources.chat_title
-import org.jetbrains.compose.resources.stringResource
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCreditsChip
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * Top app bar for the AI Chat screen.
  *
  * ## Layout
  * ```
- * [menu/back]          AI Chat          [✨ N | Get More]
+ * [menu/back]      AI Chat      [✨ N | Get More]  [⚙]
  * ```
  *
- * Single-line title only. The pricing caption ("≈ 0–3 credits per query" + help icon)
- * has been moved to a dedicated [ChatPricingRow] composable rendered immediately below
- * this bar in [ChatScreen]'s content column. This keeps the TopAppBar uncluttered and
- * follows the standard MD3 "small title bar" pattern.
- *
- * ## Credit chip
- * Uses the shared [AppCreditsChip] from core/designsystem:
- * - `credits > 0` → shows count with AutoAwesome icon (primaryContainer bg)
- * - `credits ≤ 0 && !isPremium` → shows "Get More" CTA (primary bg) — mid-conversation
- *   upsell moment, consistent with MainScreen.
- * - `isPremium` → shows ∞ symbol
- *
- * ## Token mapping
- * - Container: `MaterialTheme.colorScheme.surface` (TopAppBar default)
- * - Title: `MaterialTheme.colorScheme.onSurface` (titleLarge)
+ * Credit chip stays visible in the bar for at-a-glance balance + Get-More CTA when
+ * the user hits zero. The gear icon opens the settings sheet for the Deep Thinking
+ * toggle (and richer credit info). Pricing caption (`≈ 0–3 credits per query`) is
+ * rendered in [ChatPricingRow] below this bar.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatHeader(
     creditBalance: Int,
+    onSettingsClick: () -> Unit,
     onBackClick: () -> Unit,
     isPremium: Boolean = false,
+    onCreditsClick: (() -> Unit)? = null,
     onMenuClick: (() -> Unit)? = null,
-    navigateToPaywall: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     CenterAlignedTopAppBar(
@@ -89,9 +81,16 @@ fun ChatHeader(
             AppCreditsChip(
                 credits = creditBalance,
                 isPremium = isPremium,
-                onClick = navigateToPaywall,
-                modifier = Modifier.padding(end = 8.dp),
+                onClick = onCreditsClick,
+                modifier = Modifier.padding(end = 4.dp),
             )
+            IconButton(onClick = onSettingsClick) {
+                Icon(
+                    imageVector = Icons.Outlined.Settings,
+                    contentDescription = stringResource(Res.string.chat_settings_open),
+                    tint = MaterialTheme.colorScheme.onSurface,
+                )
+            }
         },
         colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
             containerColor = MaterialTheme.colorScheme.surface,

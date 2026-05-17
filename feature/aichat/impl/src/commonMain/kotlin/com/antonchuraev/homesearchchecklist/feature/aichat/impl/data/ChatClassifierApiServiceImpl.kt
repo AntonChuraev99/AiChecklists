@@ -152,7 +152,7 @@ internal class ChatClassifierApiServiceImpl(
         "create_item" -> ChatIntent.CreateItem
         "delete_item" -> ChatIntent.DeleteItem
         "complete_item" -> ChatIntent.CompleteItem
-        "create_checklist" -> ChatIntent.CreateChecklist
+        "create_checklist" -> ChatIntent.CreateChecklist(name = null)
         "set_reminder" -> ChatIntent.SetReminder
         "move_reminders" -> ChatIntent.MoveReminders
         "find_items" -> ChatIntent.FindItems
@@ -194,7 +194,7 @@ internal class ChatClassifierApiServiceImpl(
             val text = itemText?.ifBlank { null } ?: return null
             ToolCall.CompleteItem(checklistHint = checklistHint, itemText = text)
         }
-        ChatIntent.CreateChecklist -> {
+        is ChatIntent.CreateChecklist -> {
             val name = checklistName?.ifBlank { null } ?: return null
             ToolCall.CreateChecklist(name = name, initialItems = emptyList())
         }

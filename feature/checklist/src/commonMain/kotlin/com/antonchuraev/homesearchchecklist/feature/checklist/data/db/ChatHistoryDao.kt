@@ -11,7 +11,20 @@ interface ChatHistoryDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(entry: ChatHistoryEntry)
 
-    @Query("SELECT * FROM ai_chat_history ORDER BY timestamp ASC LIMIT :limit")
+    // Take the *latest* :limit rows (DESC LIMIT) and re-order them ASC so the
+    // chat feed gets oldest→newest. Without the subquery, plain ORDER BY ASC LIMIT
+    // returns the OLDEST N rows — which silently hides recent messages once the
+    // user crosses the limit. See bug: messages disappearing after re-entering chat.
+    @Query(
+        """
+        SELECT * FROM (
+            SELECT * FROM ai_chat_history
+            ORDER BY timestamp DESC
+            LIMIT :limit
+        )
+        ORDER BY timestamp ASC
+        """
+    )
     fun observeRecent(limit: Int): Flow<List<ChatHistoryEntry>>
 
     @Query("DELETE FROM ai_chat_history")

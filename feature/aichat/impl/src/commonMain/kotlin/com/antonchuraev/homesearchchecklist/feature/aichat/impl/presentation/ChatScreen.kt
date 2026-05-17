@@ -32,6 +32,8 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Chat
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.RoutingLayer
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ToolCall
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.AiChatPricingHelpSheet
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatFeedbackSheet
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatSettingsSheet
 import org.jetbrains.compose.resources.stringResource
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatHeader
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatInputRow
@@ -121,9 +123,10 @@ fun ChatScreen(
         topBar = {
             ChatHeader(
                 creditBalance = state.creditBalance,
+                onSettingsClick = { onIntent(ChatScreenIntent.OnSettingsClick) },
                 onBackClick = { onIntent(ChatScreenIntent.OnBackClick) },
+                onCreditsClick = onNavigateToPaywall,
                 onMenuClick = { scope.launch { drawerState.open() } },
-                navigateToPaywall = onNavigateToPaywall,
             )
         },
     ) { scaffoldPadding ->
@@ -188,11 +191,16 @@ fun ChatScreen(
                     items = state.messages.asReversed(),
                     key = { it.id },
                 ) { message ->
-                    ChatMessageBubble(message = message)
+                    ChatMessageBubble(
+                        message = message,
+                        onFeedbackClick = { onIntent(ChatScreenIntent.OnFeedbackOpen(it)) },
+                    )
                 }
 
                 // Welcome bubble — declared last, so it renders at the TOP of viewport
                 // (above all real messages). Follows system locale via stringResource.
+                // No feedback callback for the welcome bubble — it's a static affordance,
+                // not a real AI response to user input.
                 item(key = "__welcome") {
                     ChatMessageBubble(message = welcomeBubble)
                 }
@@ -212,6 +220,38 @@ fun ChatScreen(
     if (state.showPricingSheet) {
         AiChatPricingHelpSheet(
             onDismiss = { onIntent(ChatScreenIntent.OnHelpDismiss) },
+        )
+    }
+
+    // Settings sheet overlay — opens from the gear icon in the top bar
+    if (state.showSettingsSheet) {
+        ChatSettingsSheet(
+            creditBalance = state.creditBalance,
+            isPremium = false, // Pending: docs/todos/2026-05-17-chat-settings-premium-flag.md
+            deepThinkingEnabled = state.deepThinkingEnabled,
+            onDeepThinkingToggle = { onIntent(ChatScreenIntent.OnDeepThinkingToggle(it)) },
+            onGetMoreClick = {
+                onIntent(ChatScreenIntent.OnSettingsDismiss)
+                onNavigateToPaywall?.invoke()
+            },
+            onDismiss = { onIntent(ChatScreenIntent.OnSettingsDismiss) },
+        )
+    }
+
+    // Feedback sheet overlay — opens when user taps the RateReview icon on an assistant bubble
+    state.feedbackTarget?.let { target ->
+        val previousUserQuestion = remember(state.messages, target.id) {
+            val idx = state.messages.indexOfFirst { it.id == target.id }
+            state.messages.take(idx.coerceAtLeast(0)).lastOrNull { it.role == ChatRole.User }?.content
+        }
+        ChatFeedbackSheet(
+            target = target,
+            previousUserQuestion = previousUserQuestion,
+            feedbackText = state.feedbackText,
+            isSubmitting = state.isSubmittingFeedback,
+            onTextChange = { onIntent(ChatScreenIntent.OnFeedbackTextChange(it)) },
+            onSubmit = { onIntent(ChatScreenIntent.OnFeedbackSubmit) },
+            onDismiss = { onIntent(ChatScreenIntent.OnFeedbackDismiss) },
         )
     }
 }

@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.aichat.impl.repository
 
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
+import com.antonchuraev.homesearchchecklist.core.datastore.api.AiChatPreferencesRepository
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatIntent
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.IntentClassification
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.RoutingLayer
@@ -15,8 +16,10 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.Remote
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.RemoteCompletionResult
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.UserData
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -94,6 +97,14 @@ private object NoOpLogger : AppLogger {
     override fun error(tag: String, message: String, throwable: Throwable?) = Unit
 }
 
+private class FakeAiChatPreferencesRepository(
+    initial: Boolean = false,
+) : AiChatPreferencesRepository {
+    private val _flow = MutableStateFlow(initial)
+    override val deepThinkingEnabledFlow: Flow<Boolean> = _flow
+    override suspend fun setDeepThinkingEnabled(enabled: Boolean) { _flow.value = enabled }
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 private fun highConfidenceLayer1(intent: ChatIntent = ChatIntent.CreateItem) = IntentClassification(
@@ -113,6 +124,7 @@ private fun makeRepo(
     remoteResult: RemoteClassificationResult = RemoteClassificationResult.ServiceError,
     completionResult: RemoteCompletionResult = RemoteCompletionResult.ServiceError,
     userId: String = "user-123",
+    deepThinking: Boolean = false,
 ): Triple<AiChatRepositoryImpl, FakeLocalIntentRouter, FakeChatClassifierApiService> {
     val router = FakeLocalIntentRouter(layer1Result)
     val classifier = FakeChatClassifierApiService(remoteResult)
@@ -121,6 +133,7 @@ private fun makeRepo(
         classifierApi = classifier,
         completionApi = FakeChatCompletionApiService(completionResult),
         userDataRepository = FakeUserDataRepository(userId),
+        aiChatPreferencesRepository = FakeAiChatPreferencesRepository(deepThinking),
         logger = NoOpLogger,
     )
     return Triple(repo, router, classifier)
@@ -241,6 +254,7 @@ class AiChatRepositoryImplTest {
             classifierApi = classifier,
             completionApi = FakeChatCompletionApiService(),
             userDataRepository = FakeUserDataRepository(userId = ""),
+            aiChatPreferencesRepository = FakeAiChatPreferencesRepository(),
             logger = NoOpLogger,
         )
 
@@ -301,6 +315,7 @@ class AiChatRepositoryImplTest {
             classifierApi = FakeChatClassifierApiService(RemoteClassificationResult.ServiceError),
             completionApi = completionApi,
             userDataRepository = FakeUserDataRepository("user-xyz"),
+            aiChatPreferencesRepository = FakeAiChatPreferencesRepository(),
             logger = NoOpLogger,
         )
 
@@ -326,6 +341,7 @@ class AiChatRepositoryImplTest {
             classifierApi = FakeChatClassifierApiService(RemoteClassificationResult.ServiceError),
             completionApi = completionApi,
             userDataRepository = FakeUserDataRepository(userId = ""),
+            aiChatPreferencesRepository = FakeAiChatPreferencesRepository(),
             logger = NoOpLogger,
         )
 
@@ -349,6 +365,7 @@ class AiChatRepositoryImplTest {
             classifierApi = FakeChatClassifierApiService(RemoteClassificationResult.ServiceError),
             completionApi = completionApi,
             userDataRepository = FakeUserDataRepository("user-abc"),
+            aiChatPreferencesRepository = FakeAiChatPreferencesRepository(),
             logger = NoOpLogger,
         )
 
@@ -359,5 +376,29 @@ class AiChatRepositoryImplTest {
         )
 
         assertIs<RemoteCompletionResult.InsufficientCredits>(result)
+    }
+
+    // ── 12. Deep Thinking bypass: classify returns FreeForm immediately ────────
+
+    @Test
+    fun classify_deepThinkingOn_returnsFreeFormImmediately() = runTest {
+        val router = FakeLocalIntentRouter(highConfidenceLayer1(ChatIntent.CreateItem))
+        val classifier = FakeChatClassifierApiService(RemoteClassificationResult.ServiceError)
+        val repo = AiChatRepositoryImpl(
+            router = router,
+            classifierApi = classifier,
+            completionApi = FakeChatCompletionApiService(),
+            userDataRepository = FakeUserDataRepository("user-deep"),
+            aiChatPreferencesRepository = FakeAiChatPreferencesRepository(initial = true),
+            logger = NoOpLogger,
+        )
+
+        val result = repo.classify("any input text", ChatLocale.Ru)
+
+        assertIs<ChatIntent.FreeForm>(result.intent)
+        assertEquals(1.0f, result.confidence)
+        assertEquals(RoutingLayer.FullChat, result.layer)
+        assertEquals(0, router.callCount, "Layer 1 must NOT be called when deep thinking is ON")
+        assertEquals(0, classifier.callCount, "Layer 2 must NOT be called when deep thinking is ON")
     }
 }

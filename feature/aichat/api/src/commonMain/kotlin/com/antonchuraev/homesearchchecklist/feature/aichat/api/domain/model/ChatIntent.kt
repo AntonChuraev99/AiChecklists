@@ -13,7 +13,12 @@ sealed interface ChatIntent {
     data object FindItems : ChatIntent
     data object DeleteItem : ChatIntent
     data object CompleteItem : ChatIntent
-    data object CreateChecklist : ChatIntent
+    /**
+     * @param name Raw name extracted from input (everything after the trigger keyword).
+     *             Null when only a trigger is present without any payload.
+     *             Layer 2 (Classifier) may produce a refined name via preBuiltToolCall.
+     */
+    data class CreateChecklist(val name: String?) : ChatIntent
     data object MoveReminders : ChatIntent
 
     /**

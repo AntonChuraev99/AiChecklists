@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -16,7 +15,6 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.ImeAction
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.chat_input_placeholder
 import aichecklists.core.designsystem.generated.resources.chat_send_action
@@ -29,7 +27,9 @@ import org.jetbrains.compose.resources.stringResource
  *
  * Layout: [AppTextField] (weight=1f) + [Send IconButton]
  *
- * - [AppTextField] uses `singleLine = true` for chat-style input (vs multiline for add-item).
+ * - [AppTextField] is multiline (up to 5 lines, then internal scroll) so long dictated
+ *   phrases stay readable without horizontal scrolling. Enter inserts a newline (Telegram /
+ *   WhatsApp pattern); Send is triggered ONLY by the trailing button.
  * - Send button is enabled only when [text] is not blank; tint follows enabled state.
  * - [Modifier.imePadding] is applied to the outer Row so the row lifts above the IME
  *   without the rest of the scaffold content being squished.
@@ -65,13 +65,11 @@ fun ChatInputRow(
             value = text,
             onValueChange = onTextChange,
             placeholder = stringResource(Res.string.chat_input_placeholder),
-            singleLine = true,
+            singleLine = false,
+            maxLines = 5,
             enabled = isEnabled,
             modifier = Modifier.weight(1f),
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-            keyboardActions = KeyboardActions(
-                onSend = { if (canSend) onSend() }
-            ),
+            keyboardOptions = KeyboardOptions.Default,
         )
 
         // FilledIconButton — M3 expressive / WhatsApp / Telegram pattern for primary CTA in chat.

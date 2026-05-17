@@ -668,6 +668,39 @@ class LocalIntentRouterImplTest {
         assertTrue(result.confidence >= 0.6f)
     }
 
+    // ─── CreateChecklist — single-word broad triggers ─────────────────────────
+
+    @Test
+    fun createChecklist_ru_singleSozdayWithNoisyPayload() = runTest {
+        val result = router.route(
+            "создай в апки сделать рекламные скрины подумать как длетьа через ии",
+            ChatLocale.Ru,
+        )
+        assertIs<ChatIntent.CreateChecklist>(result.intent)
+        assertTrue(result.confidence >= 0.6f)
+        // Leading preposition "в" must be stripped; the rest preserved verbatim
+        assertEquals(
+            "апки сделать рекламные скрины подумать как длетьа через ии",
+            (result.intent as ChatIntent.CreateChecklist).name,
+        )
+    }
+
+    @Test
+    fun createChecklist_ru_singleSozdat_simple() = runTest {
+        val result = router.route("создать проект на выходные", ChatLocale.Ru)
+        assertIs<ChatIntent.CreateChecklist>(result.intent)
+        assertTrue(result.confidence >= 0.6f)
+        assertEquals("проект на выходные", (result.intent as ChatIntent.CreateChecklist).name)
+    }
+
+    @Test
+    fun createChecklist_en_singleCreate() = runTest {
+        val result = router.route("create marketing screenshots todo", ChatLocale.En)
+        assertIs<ChatIntent.CreateChecklist>(result.intent)
+        assertTrue(result.confidence >= 0.6f)
+        assertEquals("marketing screenshots todo", (result.intent as ChatIntent.CreateChecklist).name)
+    }
+
     // ─── MoveReminders — RU ──────────────────────────────────────────────────
 
     @Test

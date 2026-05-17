@@ -20,9 +20,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.chat_preview_apply
 import aichecklists.core.designsystem.generated.resources.chat_preview_cancel
@@ -111,6 +116,16 @@ fun ChatPreviewCard(
 
             // Editable item text — for any intent that carries a user-visible payload.
             if (showItemField) {
+                // Auto-focus + raise IME the moment the preview card appears so the user
+                // can immediately edit the captured raw payload (often noisy after a long
+                // dictated phrase) without an extra tap. Card is recreated on each new
+                // preview, so LaunchedEffect(Unit) fires exactly once per preview lifecycle.
+                val focusRequester = remember { FocusRequester() }
+                val keyboard = LocalSoftwareKeyboardController.current
+                LaunchedEffect(Unit) {
+                    focusRequester.requestFocus()
+                    keyboard?.show()
+                }
                 OutlinedTextField(
                     value = preview.editableItemText,
                     onValueChange = onItemTextChange,
@@ -122,8 +137,14 @@ fun ChatPreviewCard(
                             )
                         )
                     },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
+                    // Multiline: grows up to 6 lines so the user sees the full raw payload
+                    // (often noisy long phrases) without horizontal scrolling. Beyond 6 lines
+                    // the field scrolls vertically inside.
+                    minLines = 1,
+                    maxLines = 6,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(focusRequester),
                 )
             } else {
                 // For MoveAllReminders / FindItemsQuery there is no editable payload —
