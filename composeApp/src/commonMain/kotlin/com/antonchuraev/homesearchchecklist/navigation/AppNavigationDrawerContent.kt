@@ -24,6 +24,7 @@ import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.MailOutline
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material.icons.outlined.SmartToy
 import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -41,6 +42,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.feature.paywall.data.PaywallConfig
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.calendar_nav_label
+import aichecklists.core.designsystem.generated.resources.nav_ai_chat
 import aichecklists.core.designsystem.generated.resources.drawer_item_home
 import aichecklists.core.designsystem.generated.resources.today_title
 import aichecklists.core.designsystem.generated.resources.drawer_logo_content_description
@@ -74,6 +76,7 @@ object DrawerDestination {
     const val Settings = "settings"
     const val Today = "today"
     const val Calendar = "calendar"
+    const val AiChat = "ai_chat"
 }
 
 @Composable
@@ -83,6 +86,7 @@ fun AppNavigationDrawerContent(
     onHomeClick: () -> Unit,
     onTodayClick: () -> Unit = {},
     onCalendarClick: () -> Unit = {},
+    onAiChatClick: () -> Unit = {},
     onUpdateFeedClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onRateAppClick: () -> Unit,
@@ -131,6 +135,17 @@ fun AppNavigationDrawerContent(
             onClick = {
                 onCloseDrawer()
                 onCalendarClick()
+            },
+            colors = drawerItemColors,
+            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+        )
+        NavigationDrawerItem(
+            label = { Text(stringResource(Res.string.nav_ai_chat)) },
+            icon = { Icon(Icons.Outlined.SmartToy, contentDescription = null) },
+            selected = selectedItemId == DrawerDestination.AiChat,
+            onClick = {
+                onCloseDrawer()
+                onAiChatClick()
             },
             colors = drawerItemColors,
             modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)

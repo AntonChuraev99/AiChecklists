@@ -917,4 +917,39 @@
 
     <!-- Item meta chips (read-only indicators below item text in ChecklistItemCard) -->
     <string name="item_chip_priority">Important</string>
+
+    <!-- AI Chat Screen -->
+    <string name="chat_title">AI Chat</string>
+    <string name="chat_input_placeholder">Ask anything…</string>
+    <string name="chat_send_action">Send</string>
+    <string name="chat_help_action">Pricing info</string>
+    <!-- %1$d = credit balance, shown as "3 credits left · ≈ 0–3" -->
+    <string name="chat_credits_label">%1$d credits left · ≈ 0–3</string>
+    <string name="chat_preview_apply">Apply</string>
+    <string name="chat_preview_cancel">Cancel</string>
+    <string name="chat_preview_will_create_one">This will create 1 item:</string>
+    <string name="chat_preview_will_create_checklist">New checklist:</string>
+    <string name="chat_preview_will_delete">This will delete:</string>
+    <string name="chat_preview_will_complete">This will mark as done:</string>
+    <string name="chat_preview_will_set_reminder">Set a reminder for:</string>
+    <string name="chat_preview_will_move_reminders">Move all reminders:</string>
+    <string name="chat_unknown_intent_hint">I didn\'t catch that. Try «add milk to shopping» or «remind me on Friday at 6pm».</string>
+
+    <!-- AI Chat Pricing Help Sheet -->
+    <string name="chat_pricing_sheet_title">How AI Chat charges credits</string>
+    <string name="chat_pricing_layer1_title">Standard commands — free</string>
+    <string name="chat_pricing_layer1_detail">Add, find, delete, mark done, simple reminders. Processed on your device, no credits.</string>
+    <string name="chat_pricing_layer2_title">Smart commands — 1 credit</string>
+    <string name="chat_pricing_layer2_detail">Bulk operations, ambiguous wording. We use the cheapest AI model to understand.</string>
+    <string name="chat_pricing_layer3_title">Open questions — 3 credits</string>
+    <string name="chat_pricing_layer3_detail">«What should I do this week?», planning, summaries. Full AI reasoning.</string>
+    <string name="chat_pricing_apply_note">Write actions (add / delete / set) always show a preview. Credits are charged when we figure out what you meant, not when you tap Apply.</string>
+    <string name="chat_pricing_got_it">Got it</string>
+
+    <!-- AI Chat navigation / snackbar messages -->
+    <string name="nav_ai_chat">AI Chat</string>
+    <string name="chat_requires_premium">This action requires a Premium subscription.</string>
+    <string name="chat_ambiguous_match">Did you mean: %1$s? Please clarify.</string>
+    <string name="chat_not_found">Nothing found: %1$s</string>
+    <string name="chat_assistant_welcome">Hi! I can help you manage your checklists. Try «add milk to shopping» or «remind me on Friday at 6pm».</string>
 </resources>
