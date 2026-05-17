@@ -931,4 +931,7 @@
     <string name="chat_ambiguous_match">Вы имели в виду: %1$s? Уточните, пожалуйста.</string>
     <string name="chat_not_found">Ничего не найдено: %1$s</string>
     <string name="chat_assistant_welcome">Привет! Я помогу управлять чек-листами. Попробуйте «добавь молоко в покупки» или «напомни в пятницу в 18».</string>
+    <string name="chat_generic_error">Что-то пошло не так. Попробуйте ещё раз.</string>
+    <string name="chat_apply_error">Не удалось применить изменение. Попробуйте ещё раз.</string>
+    <string name="chat_extract_fail">Понял запрос, но не смог извлечь детали. Уточните, пожалуйста.</string>
 </resources>

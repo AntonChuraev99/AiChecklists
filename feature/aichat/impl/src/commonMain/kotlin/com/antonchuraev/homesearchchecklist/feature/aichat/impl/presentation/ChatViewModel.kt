@@ -67,6 +67,12 @@ class ChatViewModel(
                 )
             }
 
+            is ChatScreenIntent.AppendAssistantMessage -> {
+                // ChatRoute resolved a localised messageKey and is round-tripping
+                // the final text back so it lands in chat history with correct locale.
+                addAssistantMessage(intent.text)
+            }
+
             ChatScreenIntent.OnPreviewApply -> handlePreviewApply()
 
             ChatScreenIntent.OnPreviewCancel -> {
@@ -124,7 +130,7 @@ class ChatViewModel(
 
                 when (val intent = classification.intent) {
                     is ChatIntent.Unknown -> {
-                        addAssistantMessage("I didn't catch that. Try «add milk to shopping» or «remind me on Friday at 6pm».")
+                        _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_unknown_intent_hint"))
                         _screenState.value = _screenState.value.copy(isProcessing = false)
                     }
 
@@ -147,7 +153,7 @@ class ChatViewModel(
                         // Prefer that over re-running local text extraction from raw text.
                         val toolCall = classification.preBuiltToolCall ?: buildToolCall(intent, text, locale)
                         if (toolCall == null) {
-                            addAssistantMessage("I understood your intent but couldn't extract the details. Please try again with more specifics.")
+                            _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_extract_fail"))
                             _screenState.value = _screenState.value.copy(isProcessing = false)
                             return@runCatching
                         }
@@ -165,7 +171,7 @@ class ChatViewModel(
                 }
             }.onFailure { e ->
                 logger.error(TAG, "handleSend failed", e)
-                addAssistantMessage("Something went wrong. Please try again.")
+                _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_generic_error"))
                 _screenState.value = _screenState.value.copy(isProcessing = false)
             }
         }
@@ -187,7 +193,7 @@ class ChatViewModel(
             }.onFailure { e ->
                 logger.error(TAG, "handlePreviewApply failed", e)
                 _screenState.value = _screenState.value.copy(pendingPreview = null)
-                addAssistantMessage("Something went wrong applying the change. Please try again.")
+                _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_apply_error"))
             }
             _screenState.value = _screenState.value.copy(isProcessing = false)
         }
@@ -248,7 +254,12 @@ class ChatViewModel(
             }
             is DispatchOutcome.AmbiguousMatch -> {
                 val candidates = outcome.candidates.take(3).joinToString(", ")
-                addAssistantMessage("Did you mean: $candidates? Please clarify which checklist.")
+                _sideEffect.emit(
+                    ChatScreenSideEffect.ShowAssistantMessage(
+                        messageKey = "chat_ambiguous_match",
+                        args = listOf(candidates),
+                    )
+                )
             }
             is DispatchOutcome.NotFound -> {
                 addAssistantMessage(outcome.reason)
