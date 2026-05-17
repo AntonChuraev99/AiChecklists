@@ -85,12 +85,12 @@ fun ChatScreen(
         )
     }
 
-    // Auto-scroll to bottom when new messages arrive or a preview card appears.
-    // Total item count = messages.size + (1 if preview is shown).
+    // Auto-scroll to the newest item on changes. With reverseLayout = true the
+    // newest item lives at index 0 (visually at the bottom near the input row).
     val totalItemCount = state.messages.size + if (state.pendingPreview != null) 1 else 0
     LaunchedEffect(totalItemCount) {
         if (totalItemCount > 0) {
-            listState.animateScrollToItem(totalItemCount - 1)
+            listState.animateScrollToItem(0)
         }
     }
 
@@ -120,33 +120,23 @@ fun ChatScreen(
                     .weight(1f)
                     .fillMaxWidth(),
                 state = listState,
+                // reverseLayout = items are laid out bottom-up (newest at the bottom,
+                // oldest at the top). This is the standard chat pattern (Telegram /
+                // WhatsApp) — items pin to the bottom by default, no gap on
+                // near-empty chat, no recomposition lag when keyboard opens.
+                reverseLayout = true,
                 contentPadding = PaddingValues(
                     horizontal = AppDimens.ScreenPaddingHorizontal,
                     vertical = AppDimens.SpacingMd,
                 ),
-                // Pin items to bottom of the list so a near-empty chat doesn't leave
-                // a big gap between welcome bubble and the input row. As content grows,
-                // items naturally fill the column and behave like a normal scroll list.
-                verticalArrangement = Arrangement.spacedBy(
-                    AppDimens.SpacingMd,
-                    alignment = androidx.compose.ui.Alignment.Bottom,
-                ),
+                verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd),
             ) {
-                // Welcome bubble — always first, follows system locale via stringResource
-                item(key = "__welcome") {
-                    ChatMessageBubble(message = welcomeBubble)
-                }
+                // With reverseLayout = true, FIRST declared item renders at the BOTTOM
+                // of the viewport. So we declare in newest-first order:
+                //   pendingPreview (most recent action)
+                //   user/assistant messages reversed (newest first)
+                //   welcome bubble (oldest, rendered at top of viewport)
 
-                items(
-                    items = state.messages,
-                    key = { it.id },
-                ) { message ->
-                    ChatMessageBubble(message = message)
-                }
-
-                // Preview card appears after the last message as a sticky bottom item.
-                // Kept INSIDE LazyColumn so it participates in the same scroll region
-                // and scrolls naturally when more messages arrive below it.
                 state.pendingPreview?.let { preview ->
                     item(key = "preview_card") {
                         ChatPreviewCard(
@@ -154,9 +144,22 @@ fun ChatScreen(
                             onApply = { onIntent(ChatScreenIntent.OnPreviewApply) },
                             onCancel = { onIntent(ChatScreenIntent.OnPreviewCancel) },
                             onItemTextChange = { onIntent(ChatScreenIntent.OnPreviewItemTextChange(it)) },
-                            modifier = Modifier.padding(top = AppDimens.SpacingSm),
+                            modifier = Modifier.padding(bottom = AppDimens.SpacingSm),
                         )
                     }
+                }
+
+                items(
+                    items = state.messages.asReversed(),
+                    key = { it.id },
+                ) { message ->
+                    ChatMessageBubble(message = message)
+                }
+
+                // Welcome bubble — declared last, so it renders at the TOP of viewport
+                // (above all real messages). Follows system locale via stringResource.
+                item(key = "__welcome") {
+                    ChatMessageBubble(message = welcomeBubble)
                 }
             }
 
