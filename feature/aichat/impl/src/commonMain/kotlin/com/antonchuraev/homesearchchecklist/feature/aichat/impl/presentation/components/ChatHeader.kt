@@ -1,14 +1,15 @@
 package com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBackIos
-import androidx.compose.material.icons.outlined.HelpOutline
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Menu
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -19,33 +20,33 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.back
-import aichecklists.core.designsystem.generated.resources.chat_credits_label
-import aichecklists.core.designsystem.generated.resources.chat_help_action
+import aichecklists.core.designsystem.generated.resources.chat_credits_balance
 import aichecklists.core.designsystem.generated.resources.chat_title
 import org.jetbrains.compose.resources.stringResource
 
 /**
  * Top app bar for the AI Chat screen.
  *
- * Actions area contains two elements (left to right):
- * 1. An informational [AssistChip] showing credit balance and cost range.
- *    It is NOT interactive (onClick = null) — read-only indicator only.
- * 2. A help [IconButton] that opens the pricing bottom sheet.
+ * Layout:
+ *   [menu] AI Chat ............................. [✨ N]
  *
- * @param creditBalance  Current AI credit balance (0 in Phase A).
- * @param onHelpClick    Called when the user taps "?" to open pricing info.
- * @param onBackClick    Called when the user taps the navigation back icon.
- * @param onMenuClick    Called when the user taps the hamburger menu icon to open the drawer.
- *                       If null, shows a back arrow instead (default for push-nav destinations).
+ * The actions area shows ONLY a compact balance chip: AutoAwesome icon + raw
+ * credit number, no surrounding text. Pricing explanation is no longer here —
+ * it lives in [ChatPricingCaption] above the input row, which is closer to the
+ * point where the cost actually matters.
+ *
+ * Matches the brand-consistent CreditsChip pattern used on the Main screen
+ * (Icons.Outlined.AutoAwesome + primaryContainer background).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatHeader(
     creditBalance: Int,
-    onHelpClick: () -> Unit,
     onBackClick: () -> Unit,
     onMenuClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
@@ -56,6 +57,9 @@ fun ChatHeader(
             Text(
                 text = stringResource(Res.string.chat_title),
                 style = MaterialTheme.typography.titleLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                softWrap = false,
             )
         },
         navigationIcon = {
@@ -78,31 +82,28 @@ fun ChatHeader(
             }
         },
         actions = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // Credit + cost-range chip — informational only, no onClick
-                AssistChip(
-                    onClick = {},
-                    enabled = false,
-                    label = {
-                        Text(
-                            text = stringResource(Res.string.chat_credits_label, creditBalance),
-                            style = MaterialTheme.typography.labelSmall,
-                        )
-                    },
-                    colors = AssistChipDefaults.assistChipColors(
-                        disabledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                        disabledLabelColor = MaterialTheme.colorScheme.onSurface,
-                    ),
-                    border = null,
+            // Brand-consistent compact balance chip — icon + number, no text label.
+            // Matches MainScreen.CreditsChip pattern (AutoAwesome + primaryContainer).
+            Row(
+                modifier = Modifier
+                    .padding(end = 8.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer)
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.AutoAwesome,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.primary,
                 )
-                Spacer(modifier = Modifier.width(4.dp))
-                IconButton(onClick = onHelpClick) {
-                    Icon(
-                        imageVector = Icons.Outlined.HelpOutline,
-                        contentDescription = stringResource(Res.string.chat_help_action),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                Text(
+                    text = stringResource(Res.string.chat_credits_balance, creditBalance),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
             }
         },
         colors = TopAppBarDefaults.centerAlignedTopAppBarColors(

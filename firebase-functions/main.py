@@ -1269,3 +1269,189 @@ def on_rc_event_created(event: firestore_fn.Event) -> None:
         pass
 
     _handle_rc_event_payload(data, event_id)
+
+
+# ============================================================================
+# FUNCTION: classify_chat_intent (Phase B — Layer 2 cheap classifier)
+# ============================================================================
+#
+# Called by AiChatRepositoryImpl when local Layer 1 router returns
+# confidence < 0.7. Routes the user phrase through gemini-2.5-flash-lite with
+# structured JSON output. Cost: 1 credit per successful classification
+# (deducted atomically before the AI call — refunded only manually if Gemini
+# returns garbage; intentional simplicity for Phase B MVP).
+# ============================================================================
+
+CHAT_INTENT_COST = 1  # Layer 2 cost — much cheaper than analyze/generate (30 credits)
+CHAT_INTENT_MAX_INPUT_LEN = 500  # 99th percentile chat command length is well under this
+
+# Prompt schema kept in sync with ChatIntent + ToolCall sealed types in
+# feature/aichat/api/domain/model/. Adding a new intent here requires updating
+# both files atomically — otherwise classifier output won't map to a known
+# ToolCall and ViewModel falls through to Unknown.
+CLASSIFY_CHAT_INTENT_PROMPT = """You are an intent classifier for a checklist app named Gisti.
+
+Detect what the user wants to do. Return ONLY a JSON object (no markdown, no commentary).
+
+Schema:
+{
+  "intent": one of [
+    "create_item",        # add a new item to a checklist
+    "delete_item",        # remove an item from a checklist
+    "complete_item",      # mark an item as done
+    "create_checklist",   # create a new checklist
+    "set_reminder",       # set a reminder on an item
+    "move_reminders",     # bulk move all reminders from one day to another
+    "find_items",         # search items across checklists
+    "free_form",          # open question, planning, summarisation
+    "unknown"             # cannot determine intent
+  ],
+  "entities": {
+    "itemText": "the item name (for create_item/delete_item/complete_item/set_reminder) or null",
+    "checklistHint": "the target checklist name hint (e.g. \\"shopping\\") or null",
+    "checklistName": "name for the new checklist (only for create_checklist) or null",
+    "dateIso": "ISO-8601 date for set_reminder or null",
+    "query": "search query for find_items or null"
+  },
+  "confidence": 0.0-1.0
+}
+
+Rules:
+- Match the user's language. Russian, English and mixed input are all valid.
+- "В чек-лист X добавь Y" or "Add Y to X" both mean intent=create_item, itemText=Y, checklistHint=X.
+- "Перенеси все напоминания с понедельника на среду" → move_reminders, dateIso=null (server resolves dates).
+- If a phrase is genuinely ambiguous, prefer "unknown" with confidence < 0.5 over guessing.
+- If the user asks a free-form question (planning, summary), set intent=free_form.
+
+User locale: {locale}
+User input: "{text}"
+"""
+
+
+def reserve_chat_credit(user_id: str) -> int | None:
+    """
+    Atomically check-and-deduct 1 credit for a Layer 2 classification call.
+    Mirrors reserve_credits() but uses a small per-call cost (CHAT_INTENT_COST)
+    instead of action_cost (30) so chat stays affordable for free users.
+
+    Returns the new remaining balance, or None if user document is missing or
+    has insufficient credits. Caller MUST treat None as 402 Payment Required.
+    """
+    user_ref = db.collection("users").document(user_id)
+
+    @firestore.transactional
+    def txn(transaction):
+        snapshot = user_ref.get(transaction=transaction)
+        if not snapshot.exists:
+            return None
+        current = snapshot.get("ai_credits") or 0
+        if current < CHAT_INTENT_COST:
+            return None
+        new_count = current - CHAT_INTENT_COST
+        transaction.update(user_ref, {
+            "ai_credits": new_count,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        })
+        return new_count
+
+    return txn(db.transaction())
+
+
+@functions_framework.http
+def classify_chat_intent(request: Request):
+    """
+    Classify a chat command via Gemini 2.5 Flash-Lite with structured JSON output.
+
+    Request body:
+    {
+        "user_id": "string",
+        "text": "user phrase, max 500 chars",
+        "locale": "ru" | "en" (informational; classifier handles mixed input)
+    }
+
+    Response:
+    {
+        "success": true,
+        "intent": "create_item" | ... | "unknown",
+        "entities": { ... },
+        "confidence": 0.0–1.0,
+        "credits_remaining": int  # new balance after this call's deduction
+    }
+
+    Error responses:
+        400 — missing/invalid fields
+        402 — insufficient credits
+        500 — Gemini call or JSON parse failed (credit already deducted, see code comment)
+    """
+    if request.method == "OPTIONS":
+        return cors_preflight_ok()
+
+    data, error = validate_request(request)
+    if error is not None:
+        return create_error_response(error, 400)
+
+    text = (data.get("text") or "").strip()
+    locale = (data.get("locale") or "en").strip().lower()
+    if not text:
+        return create_error_response("text is required", 400)
+    if len(text) > CHAT_INTENT_MAX_INPUT_LEN:
+        return create_error_response(
+            f"text too long (max {CHAT_INTENT_MAX_INPUT_LEN} chars)", 400
+        )
+    if locale not in ("ru", "en"):
+        # Default unknown locales to en — classifier handles mixed input anyway
+        locale = "en"
+
+    user_id = data["user_id"]
+
+    # Server is authoritative for credit accounting — client cannot bypass.
+    # Deduct BEFORE the AI call so concurrent requests can't oversell.
+    new_credits = reserve_chat_credit(user_id)
+    if new_credits is None:
+        return create_error_response("insufficient credits", 402)
+
+    prompt = CLASSIFY_CHAT_INTENT_PROMPT.format(locale=locale, text=text)
+
+    try:
+        response = call_gemini(prompt, "text", "")
+        result = parse_gemini_json(response.text)
+
+        # Light validation — never trust LLM output blindly
+        intent = result.get("intent", "unknown")
+        if intent not in {
+            "create_item", "delete_item", "complete_item",
+            "create_checklist", "set_reminder", "move_reminders",
+            "find_items", "free_form", "unknown",
+        }:
+            intent = "unknown"
+
+        entities = result.get("entities") or {}
+        if not isinstance(entities, dict):
+            entities = {}
+
+        try:
+            confidence = float(result.get("confidence", 0.0))
+        except (TypeError, ValueError):
+            confidence = 0.0
+        confidence = max(0.0, min(1.0, confidence))
+
+        # Log usage stats (separate from credit deduction — credits are the source of truth)
+        try:
+            increment_usage(user_id, "classify_chat_intent", "text")
+        except Exception:
+            # Usage logging is best-effort; never block the response on it
+            pass
+
+        return create_success_response({
+            "intent": intent,
+            "entities": entities,
+            "confidence": confidence,
+            "credits_remaining": new_credits,
+        })
+
+    except Exception as e:
+        # Credit was already deducted in reserve_chat_credit. We accept this loss
+        # for Phase B MVP simplicity — Gemini failures are rare and a single
+        # credit refund is not worth the complexity of a compensating transaction.
+        # Pending: docs/todos/2026-05-17-ai-chat-layer-2-cloud-classifier.md
+        return create_error_response(f"classification failed: {str(e)}", 500)

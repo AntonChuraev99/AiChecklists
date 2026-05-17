@@ -23,12 +23,16 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.chat_assistant_welcome
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatRole
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.RoutingLayer
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ToolCall
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.AiChatPricingHelpSheet
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatPricingCaption
+import org.jetbrains.compose.resources.stringResource
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatHeader
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatInputRow
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatMessageBubble
@@ -69,6 +73,18 @@ fun ChatScreen(
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
+    // Welcome bubble is a UI affordance, not data — kept in composable scope
+    // so the system locale drives its text without needing ViewModel locale state.
+    val welcomeText = stringResource(Res.string.chat_assistant_welcome)
+    val welcomeBubble = remember(welcomeText) {
+        ChatMessage(
+            id = "__welcome",
+            role = ChatRole.Assistant,
+            content = welcomeText,
+            timestamp = 0L,
+        )
+    }
+
     // Auto-scroll to bottom when new messages arrive or a preview card appears.
     // Total item count = messages.size + (1 if preview is shown).
     val totalItemCount = state.messages.size + if (state.pendingPreview != null) 1 else 0
@@ -87,7 +103,6 @@ fun ChatScreen(
         topBar = {
             ChatHeader(
                 creditBalance = state.creditBalance,
-                onHelpClick = { onIntent(ChatScreenIntent.OnHelpClick) },
                 onBackClick = { onIntent(ChatScreenIntent.OnBackClick) },
                 onMenuClick = { scope.launch { drawerState.open() } },
             )
@@ -111,6 +126,11 @@ fun ChatScreen(
                 ),
                 verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd),
             ) {
+                // Welcome bubble — always first, follows system locale via stringResource
+                item(key = "__welcome") {
+                    ChatMessageBubble(message = welcomeBubble)
+                }
+
                 items(
                     items = state.messages,
                     key = { it.id },
@@ -133,6 +153,12 @@ fun ChatScreen(
                     }
                 }
             }
+
+            // Pricing caption — small clickable line above input, opens pricing sheet on "?" tap.
+            // Replaces the "?" icon that used to live in the header (closer to where cost matters).
+            ChatPricingCaption(
+                onWhyClick = { onIntent(ChatScreenIntent.OnHelpClick) },
+            )
 
             // Input row is OUTSIDE LazyColumn — always pinned above the keyboard
             ChatInputRow(

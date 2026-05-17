@@ -2,6 +2,8 @@ package com.antonchuraev.homesearchchecklist.feature.aichat.impl.di
 
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.LocalIntentRouter
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AiChatRepository
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatClassifierApiService
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.data.ChatClassifierApiServiceImpl
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.parser.LocalIntentRouterImpl
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.ChatViewModel
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.preview.ToolCallPreviewRenderer
@@ -17,8 +19,10 @@ import org.koin.dsl.module
  * Their implementations live in composeApp and are registered in the app-level Koin module,
  * because [ToolCallDispatcher] requires access to the full ChecklistRepository graph.
  *
+ * [UserDataRepository] is bound in userFeatureModule and resolved via get() here.
+ *
  * Registration order in appModule:
- *   modules(aiChatFeatureModule, /* app-level module with ToolCallDispatcher + ChatLocaleProvider */)
+ *   modules(userFeatureModule, aiChatFeatureModule, /* app-level module with ToolCallDispatcher + ChatLocaleProvider */)
  */
 val aiChatFeatureModule = module {
     single<LocalIntentRouter> {
@@ -27,8 +31,16 @@ val aiChatFeatureModule = module {
             logger = get(),
         )
     }
+    single<ChatClassifierApiService> {
+        ChatClassifierApiServiceImpl(logger = get())
+    }
     single<AiChatRepository> {
-        AiChatRepositoryImpl(router = get())
+        AiChatRepositoryImpl(
+            router = get(),
+            classifierApi = get(),
+            userDataRepository = get(),
+            logger = get(),
+        )
     }
     single<ToolCallPreviewRenderer> {
         ToolCallPreviewRendererImpl()

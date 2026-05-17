@@ -43,11 +43,10 @@ class ChatViewModel(
     private val logger: AppLogger,
 ) : AppViewModel<ChatScreenState, ChatScreenIntent, ChatScreenSideEffect>() {
 
-    private val _screenState = MutableStateFlow(
-        ChatScreenState(
-            messages = listOf(welcomeMessage()),
-        )
-    )
+    // Welcome message is rendered as a fixed UI affordance in ChatScreen
+    // (via stringResource so it follows the system locale). ViewModel keeps
+    // messages strictly as user-driven content — empty at first composition.
+    private val _screenState = MutableStateFlow(ChatScreenState())
     override val screenState: StateFlow<ChatScreenState> = _screenState
 
     private val _sideEffect = MutableSharedFlow<ChatScreenSideEffect>(extraBufferCapacity = 16)
@@ -144,7 +143,9 @@ class ChatViewModel(
                     ChatIntent.CreateChecklist,
                     ChatIntent.SetReminder,
                     ChatIntent.MoveReminders -> {
-                        val toolCall = buildToolCall(intent, text, locale)
+                        // Layer 2 (Classifier) pre-builds the ToolCall with server-extracted entities.
+                        // Prefer that over re-running local text extraction from raw text.
+                        val toolCall = classification.preBuiltToolCall ?: buildToolCall(intent, text, locale)
                         if (toolCall == null) {
                             addAssistantMessage("I understood your intent but couldn't extract the details. Please try again with more specifics.")
                             _screenState.value = _screenState.value.copy(isProcessing = false)
@@ -467,12 +468,5 @@ class ChatViewModel(
 
     private companion object {
         const val TAG = "ChatViewModel"
-
-        fun welcomeMessage() = ChatMessage(
-            id = "welcome",
-            role = ChatRole.Assistant,
-            content = "Hi! I can help you manage your checklists. Try «add milk to shopping» or «remind me on Friday at 6pm».",
-            timestamp = 0L,
-        )
     }
 }
