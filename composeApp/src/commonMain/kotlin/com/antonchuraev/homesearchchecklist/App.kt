@@ -57,6 +57,7 @@ import com.antonchuraev.homesearchchecklist.feature.debug.presentation.DebugScre
 import com.antonchuraev.homesearchchecklist.feature.debug.presentation.ScreenCatalogScreen
 import com.antonchuraev.homesearchchecklist.feature.debug.presentation.StoreScreenshotScreen
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.MainScreen
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.ChatRoute
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.calendar.CalendarRoute
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.today.TodayRoute
 import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.OnboardingScreen
@@ -217,6 +218,13 @@ fun App() {
                                             launchSingleTop = true
                                         }
                                     },
+                                    onAiChatClick = {
+                                        if (navConsumed) return@AppNavigationDrawerContent
+                                        navConsumed = true
+                                        navController.navigate(AppNavRoute.AiChat) {
+                                            launchSingleTop = true
+                                        }
+                                    },
                                     onUpdateFeedClick = {
                                         if (navConsumed) return@AppNavigationDrawerContent
                                         navConsumed = true
@@ -358,6 +366,13 @@ fun App() {
                                             launchSingleTop = true
                                         }
                                     },
+                                    onAiChatClick = {
+                                        if (navConsumed) return@AppNavigationDrawerContent
+                                        navConsumed = true
+                                        navController.navigate(AppNavRoute.AiChat) {
+                                            launchSingleTop = true
+                                        }
+                                    },
                                     onUpdateFeedClick = {
                                         if (navConsumed) return@AppNavigationDrawerContent
                                         navConsumed = true
@@ -424,6 +439,13 @@ fun App() {
                                             launchSingleTop = true
                                         }
                                     },
+                                    onAiChatClick = {
+                                        if (navConsumed) return@AppNavigationDrawerContent
+                                        navConsumed = true
+                                        navController.navigate(AppNavRoute.AiChat) {
+                                            launchSingleTop = true
+                                        }
+                                    },
                                     onUpdateFeedClick = { /* already here */ },
                                     onSettingsClick = {
                                         if (navConsumed) return@AppNavigationDrawerContent
@@ -481,6 +503,13 @@ fun App() {
                                         if (navConsumed) return@AppNavigationDrawerContent
                                         navConsumed = true
                                         navController.navigate(AppNavRoute.Calendar) {
+                                            launchSingleTop = true
+                                        }
+                                    },
+                                    onAiChatClick = {
+                                        if (navConsumed) return@AppNavigationDrawerContent
+                                        navConsumed = true
+                                        navController.navigate(AppNavRoute.AiChat) {
                                             launchSingleTop = true
                                         }
                                     },
@@ -552,6 +581,13 @@ fun App() {
                                         }
                                     },
                                     onCalendarClick = { /* already here */ },
+                                    onAiChatClick = {
+                                        if (navConsumed) return@AppNavigationDrawerContent
+                                        navConsumed = true
+                                        navController.navigate(AppNavRoute.AiChat) {
+                                            launchSingleTop = true
+                                        }
+                                    },
                                     onUpdateFeedClick = {
                                         if (navConsumed) return@AppNavigationDrawerContent
                                         navConsumed = true
@@ -582,6 +618,80 @@ fun App() {
                             onCreateChecklistClick = {
                                 navigator.navigateToTemplatesScreen()
                             },
+                        )
+                    }
+                }
+
+                composable<AppNavRoute.AiChat> {
+                    // Fresh Closed DrawerState per entry — same rationale as Main/Today/Calendar.
+                    val drawerState = remember { DrawerState(initialValue = DrawerValue.Closed) }
+                    val scope = rememberCoroutineScope()
+                    var navConsumed by remember { mutableStateOf(false) }
+                    LaunchedEffect(navConsumed) {
+                        if (navConsumed) {
+                            delay(500)
+                            navConsumed = false
+                        }
+                    }
+
+                    ModalNavigationDrawer(
+                        drawerState = drawerState,
+                        drawerContent = {
+                            ModalDrawerSheet(
+                                drawerContainerColor = MaterialTheme.colorScheme.surface
+                            ) {
+                                AppNavigationDrawerContent(
+                                    selectedItemId = DrawerDestination.AiChat,
+                                    onCloseDrawer = { scope.launch { drawerState.close() } },
+                                    onHomeClick = {
+                                        if (navConsumed) return@AppNavigationDrawerContent
+                                        navConsumed = true
+                                        navController.popBackStack(AppNavRoute.Main, inclusive = false)
+                                    },
+                                    onTodayClick = {
+                                        if (navConsumed) return@AppNavigationDrawerContent
+                                        navConsumed = true
+                                        navController.navigate(AppNavRoute.Today) {
+                                            launchSingleTop = true
+                                        }
+                                    },
+                                    onCalendarClick = {
+                                        if (navConsumed) return@AppNavigationDrawerContent
+                                        navConsumed = true
+                                        navController.navigate(AppNavRoute.Calendar) {
+                                            launchSingleTop = true
+                                        }
+                                    },
+                                    onAiChatClick = { /* already here */ },
+                                    onUpdateFeedClick = {
+                                        if (navConsumed) return@AppNavigationDrawerContent
+                                        navConsumed = true
+                                        navController.navigate(AppNavRoute.UpdateFeed) {
+                                            launchSingleTop = true
+                                        }
+                                    },
+                                    onSettingsClick = {
+                                        if (navConsumed) return@AppNavigationDrawerContent
+                                        navConsumed = true
+                                        navController.navigate(AppNavRoute.Settings) {
+                                            launchSingleTop = true
+                                        }
+                                    },
+                                    onRateAppClick = {
+                                        csatViewModel.sendIntent(CsatIntent.ForceShow)
+                                    },
+                                    onLeaveFeedbackClick = {
+                                        csatViewModel.sendIntent(CsatIntent.ForceShowFeedback)
+                                    },
+                                    versionName = AppBuildConfig.versionName,
+                                )
+                            }
+                        }
+                    ) {
+                        ChatRoute(
+                            drawerState = drawerState,
+                            snackbarHostState = snackbarHostState,
+                            onBack = { navController.popBackStack() },
                         )
                     }
                 }

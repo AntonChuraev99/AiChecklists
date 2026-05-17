@@ -104,6 +104,7 @@ kotlin {
             implementation(projects.feature.sharing)
             implementation(projects.feature.updatefeed)
             implementation(projects.feature.settings)
+            implementation(projects.feature.aichat.impl)
             implementation(projects.core.datastore.impl)
 
             implementation(compose.runtime)

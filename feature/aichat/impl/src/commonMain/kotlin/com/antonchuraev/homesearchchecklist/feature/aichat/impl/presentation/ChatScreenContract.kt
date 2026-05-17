@@ -1,0 +1,81 @@
+package com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation
+
+import com.antonchuraev.homesearchchecklist.core.common.api.Intent
+import com.antonchuraev.homesearchchecklist.core.common.api.SideEffect
+import com.antonchuraev.homesearchchecklist.core.common.api.State
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ToolCall
+
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
+
+/**
+ * Immutable UI state for [ChatScreen].
+ *
+ * @param messages     Ordered chat history (ascending by timestamp).
+ * @param inputText    Current text in the input field.
+ * @param pendingPreview  Non-null when a write-intent preview card should be shown.
+ * @param creditBalance  User's remaining AI credits (0 in Phase A, Layer 1 = always free).
+ * @param showPricingSheet  Whether the pricing help bottom sheet is visible.
+ * @param isProcessing  True while the router is classifying / dispatching (disables Send).
+ */
+data class ChatScreenState(
+    val messages: List<ChatMessage> = emptyList(),
+    val inputText: String = "",
+    val pendingPreview: PendingPreview? = null,
+    val creditBalance: Int = 0,
+    val showPricingSheet: Boolean = false,
+    val isProcessing: Boolean = false,
+) : State
+
+/**
+ * A pending write-intent that has been classified and awaits user approval.
+ *
+ * @param toolCall        The structured action to execute on [OnPreviewApply].
+ * @param humanReadable   Pre-rendered description string shown inside [ChatPreviewCard].
+ *                        Formatted by the ViewModel so the composable stays dumb.
+ */
+data class PendingPreview(
+    val toolCall: ToolCall,
+    val humanReadable: String,
+)
+
+// ---------------------------------------------------------------------------
+// Intent
+// ---------------------------------------------------------------------------
+
+sealed interface ChatScreenIntent : Intent {
+    /** User typed in the input field. */
+    data class OnInputChange(val text: String) : ChatScreenIntent
+
+    /** User tapped Send (or IME action) with non-blank input. */
+    data object OnSendClick : ChatScreenIntent
+
+    /** User tapped the "?" pricing help icon in the top bar. */
+    data object OnHelpClick : ChatScreenIntent
+
+    /** User dismissed the pricing help bottom sheet. */
+    data object OnHelpDismiss : ChatScreenIntent
+
+    /** User approved the pending write-intent preview. */
+    data object OnPreviewApply : ChatScreenIntent
+
+    /** User cancelled the pending write-intent preview. */
+    data object OnPreviewCancel : ChatScreenIntent
+
+    /** User tapped the back / navigation icon. */
+    data object OnBackClick : ChatScreenIntent
+}
+
+// ---------------------------------------------------------------------------
+// SideEffect
+// ---------------------------------------------------------------------------
+
+sealed interface ChatScreenSideEffect : SideEffect {
+    /** Show a snackbar with a localised message. [messageKey] maps to a string resource key. */
+    data class ShowSnackbar(val messageKey: String) : ChatScreenSideEffect
+
+    /** Navigate back (handled by the host NavController). */
+    data object NavigateBack : ChatScreenSideEffect
+}

@@ -75,4 +75,7 @@ sealed interface AppNavRoute {
 
     @Serializable
     data object ScreenCatalog : AppNavRoute
+
+    @Serializable
+    data object AiChat : AppNavRoute
 }
