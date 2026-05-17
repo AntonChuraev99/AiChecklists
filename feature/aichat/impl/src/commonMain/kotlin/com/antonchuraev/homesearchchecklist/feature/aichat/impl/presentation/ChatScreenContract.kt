@@ -32,13 +32,20 @@ data class ChatScreenState(
 /**
  * A pending write-intent that has been classified and awaits user approval.
  *
- * @param toolCall        The structured action to execute on [OnPreviewApply].
- * @param humanReadable   Pre-rendered description string shown inside [ChatPreviewCard].
- *                        Formatted by the ViewModel so the composable stays dumb.
+ * @param toolCall              The structured action to execute on [OnPreviewApply].
+ * @param humanReadable         Pre-rendered description string (used for AddAssistantMessage fallback).
+ * @param targetChecklistHint   Resolved checklist hint extracted from the user phrase
+ *                              (e.g. «апки» for «добавь в апки тест»). May be null when
+ *                              the user didn't specify a target list.
+ * @param editableItemText      The current item text shown in the preview's text field.
+ *                              Initially equals the item parsed from user input. The user
+ *                              can edit before tapping Apply — final dispatch uses this value.
  */
 data class PendingPreview(
     val toolCall: ToolCall,
     val humanReadable: String,
+    val targetChecklistHint: String? = null,
+    val editableItemText: String = "",
 )
 
 // ---------------------------------------------------------------------------
@@ -57,6 +64,9 @@ sealed interface ChatScreenIntent : Intent {
 
     /** User dismissed the pricing help bottom sheet. */
     data object OnHelpDismiss : ChatScreenIntent
+
+    /** User edited the item text inside the preview card. */
+    data class OnPreviewItemTextChange(val text: String) : ChatScreenIntent
 
     /** User approved the pending write-intent preview. */
     data object OnPreviewApply : ChatScreenIntent

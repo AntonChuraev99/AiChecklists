@@ -886,4 +886,46 @@
 
     <!-- Чипы meta-данных пункта (read-only индикаторы под текстом в ChecklistItemCard) -->
     <string name="item_chip_priority">Важное</string>
+
+    <!-- AI-чат: заголовок, ввод, действия -->
+    <string name="chat_title">AI-чат</string>
+    <string name="chat_input_placeholder">Спросите что угодно…</string>
+    <string name="chat_send_action">Отправить</string>
+    <string name="chat_help_action">О стоимости</string>
+    <string name="chat_credits_label">Осталось %1$d кредитов · ≈ 0–3</string>
+
+    <!-- AI-чат: preview card -->
+    <string name="chat_preview_apply">Применить</string>
+    <string name="chat_preview_cancel">Отмена</string>
+    <string name="chat_preview_will_create_one">Будет создан один пункт:</string>
+    <string name="chat_preview_will_create_checklist">Новый чек-лист:</string>
+    <string name="chat_preview_will_delete">Будет удалён пункт:</string>
+    <string name="chat_preview_will_complete">Будет отмечен как выполнен:</string>
+    <string name="chat_preview_will_set_reminder">Поставить напоминание для:</string>
+    <string name="chat_preview_will_move_reminders">Перенести все напоминания:</string>
+    <string name="chat_preview_checklist_label">В чек-лист: %1$s</string>
+    <string name="chat_preview_no_checklist_hint">Чек-лист не указан — добавим в первый.</string>
+    <string name="chat_preview_item_label">Текст пункта</string>
+    <string name="chat_preview_new_list_label">Название списка</string>
+
+    <!-- AI-чат: подсказки и сообщения -->
+    <string name="chat_unknown_intent_hint">Не понял запрос. Попробуйте «добавь молоко в покупки» или «напомни в пятницу в 18».</string>
+
+    <!-- AI-чат: pricing bottom sheet -->
+    <string name="chat_pricing_sheet_title">Как AI-чат списывает кредиты</string>
+    <string name="chat_pricing_layer1_title">Стандартные команды — бесплатно</string>
+    <string name="chat_pricing_layer1_detail">Добавить, найти, удалить, отметить, простые напоминания. Обрабатываем на устройстве, без кредитов.</string>
+    <string name="chat_pricing_layer2_title">Умные команды — 1 кредит</string>
+    <string name="chat_pricing_layer2_detail">Массовые операции и неоднозначные формулировки. Используем самую дешёвую AI-модель.</string>
+    <string name="chat_pricing_layer3_title">Открытые вопросы — 3 кредита</string>
+    <string name="chat_pricing_layer3_detail">«Что мне сделать на неделе?», планирование, итоги. Полное AI-рассуждение.</string>
+    <string name="chat_pricing_apply_note">Действия на запись (добавить / удалить / поставить) всегда показывают предпросмотр. Кредиты списываются когда мы поняли запрос, а не при подтверждении.</string>
+    <string name="chat_pricing_got_it">Понятно</string>
+
+    <!-- AI-чат: навигация и snackbar-сообщения -->
+    <string name="nav_ai_chat">AI-чат</string>
+    <string name="chat_requires_premium">Это действие доступно только в Premium.</string>
+    <string name="chat_ambiguous_match">Вы имели в виду: %1$s? Уточните, пожалуйста.</string>
+    <string name="chat_not_found">Ничего не найдено: %1$s</string>
+    <string name="chat_assistant_welcome">Привет! Я помогу управлять чек-листами. Попробуйте «добавь молоко в покупки» или «напомни в пятницу в 18».</string>
 </resources>

@@ -933,6 +933,10 @@
     <string name="chat_preview_will_complete">This will mark as done:</string>
     <string name="chat_preview_will_set_reminder">Set a reminder for:</string>
     <string name="chat_preview_will_move_reminders">Move all reminders:</string>
+    <string name="chat_preview_checklist_label">In checklist: %1$s</string>
+    <string name="chat_preview_no_checklist_hint">No checklist specified — will use the first one.</string>
+    <string name="chat_preview_item_label">Item</string>
+    <string name="chat_preview_new_list_label">List name</string>
     <string name="chat_unknown_intent_hint">I didn\'t catch that. Try «add milk to shopping» or «remind me on Friday at 6pm».</string>
 
     <!-- AI Chat Pricing Help Sheet -->
