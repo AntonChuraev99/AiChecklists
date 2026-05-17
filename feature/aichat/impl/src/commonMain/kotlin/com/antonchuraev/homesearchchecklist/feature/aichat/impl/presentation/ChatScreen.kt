@@ -127,6 +127,7 @@ fun ChatScreen(
                             preview = preview,
                             onApply = { onIntent(ChatScreenIntent.OnPreviewApply) },
                             onCancel = { onIntent(ChatScreenIntent.OnPreviewCancel) },
+                            onItemTextChange = { onIntent(ChatScreenIntent.OnPreviewItemTextChange(it)) },
                             modifier = Modifier.padding(top = AppDimens.SpacingSm),
                         )
                     }

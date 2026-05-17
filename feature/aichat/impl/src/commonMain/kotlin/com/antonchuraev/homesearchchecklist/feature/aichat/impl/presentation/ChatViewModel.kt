@@ -61,6 +61,13 @@ class ChatViewModel(
 
             ChatScreenIntent.OnSendClick -> handleSend()
 
+            is ChatScreenIntent.OnPreviewItemTextChange -> {
+                val current = _screenState.value.pendingPreview ?: return
+                _screenState.value = _screenState.value.copy(
+                    pendingPreview = current.copy(editableItemText = intent.text)
+                )
+            }
+
             ChatScreenIntent.OnPreviewApply -> handlePreviewApply()
 
             ChatScreenIntent.OnPreviewCancel -> {
@@ -145,7 +152,12 @@ class ChatViewModel(
                         }
                         val humanReadable = previewRenderer.render(toolCall)
                         _screenState.value = _screenState.value.copy(
-                            pendingPreview = PendingPreview(toolCall, humanReadable),
+                            pendingPreview = PendingPreview(
+                                toolCall = toolCall,
+                                humanReadable = humanReadable,
+                                targetChecklistHint = extractHint(toolCall),
+                                editableItemText = extractItemText(toolCall),
+                            ),
                             isProcessing = false,
                         )
                     }
@@ -166,7 +178,9 @@ class ChatViewModel(
 
         viewModelScope.launch {
             runCatching {
-                val outcome = toolCallDispatcher.dispatch(preview.toolCall)
+                // Apply user's edits (if any) before dispatching.
+                val finalToolCall = applyEditedText(preview.toolCall, preview.editableItemText)
+                val outcome = toolCallDispatcher.dispatch(finalToolCall)
                 _screenState.value = _screenState.value.copy(pendingPreview = null)
                 handleOutcomeInline(outcome)
             }.onFailure { e ->
@@ -176,6 +190,52 @@ class ChatViewModel(
             }
             _screenState.value = _screenState.value.copy(isProcessing = false)
         }
+    }
+
+    /**
+     * Replaces the item text in [original] with the user's edited [edited] value.
+     * Item-less tool calls (CreateChecklist with no name change yet, MoveAllReminders, FindItemsQuery)
+     * are returned unchanged — they are not surfaced through the editable preview field today.
+     */
+    private fun applyEditedText(original: ToolCall, edited: String): ToolCall {
+        val trimmed = edited.trim()
+        if (trimmed.isEmpty()) return original
+        return when (original) {
+            is ToolCall.AddItem -> original.copy(itemText = trimmed)
+            is ToolCall.DeleteItem -> original.copy(itemText = trimmed)
+            is ToolCall.CompleteItem -> original.copy(itemText = trimmed)
+            is ToolCall.SetItemReminder -> original.copy(itemText = trimmed)
+            is ToolCall.CreateChecklist -> original.copy(name = trimmed)
+            is ToolCall.MoveAllReminders -> original
+            is ToolCall.FindItemsQuery -> original
+        }
+    }
+
+    /**
+     * Extracts a checklist hint (target list name) from a write-intent ToolCall for preview display.
+     * Returns null for tool calls that don't carry a target list (CreateChecklist, MoveAllReminders, FindItemsQuery).
+     */
+    private fun extractHint(toolCall: ToolCall): String? = when (toolCall) {
+        is ToolCall.AddItem -> toolCall.checklistHint
+        is ToolCall.DeleteItem -> toolCall.checklistHint
+        is ToolCall.CompleteItem -> toolCall.checklistHint
+        is ToolCall.SetItemReminder -> toolCall.checklistHint
+        is ToolCall.CreateChecklist,
+        is ToolCall.MoveAllReminders,
+        is ToolCall.FindItemsQuery -> null
+    }
+
+    /**
+     * Extracts the user-editable text (item name or new list name) for preview's text field.
+     */
+    private fun extractItemText(toolCall: ToolCall): String = when (toolCall) {
+        is ToolCall.AddItem -> toolCall.itemText
+        is ToolCall.DeleteItem -> toolCall.itemText
+        is ToolCall.CompleteItem -> toolCall.itemText
+        is ToolCall.SetItemReminder -> toolCall.itemText
+        is ToolCall.CreateChecklist -> toolCall.name
+        is ToolCall.MoveAllReminders,
+        is ToolCall.FindItemsQuery -> ""
     }
 
     // ─── Outcome handlers ─────────────────────────────────────────────────────
@@ -291,7 +351,30 @@ class ChatViewModel(
         }
         if (remainder.isBlank()) return Pair(null, null)
 
-        // Extract checklist hint after preposition (EN: in/to/for, RU: в/к/для)
+        // Leading-preposition pattern: "<prep> <hint> <item...>"
+        //   «в апки тест» → hint="апки", item="тест"
+        //   «in shopping milk bread» → hint="shopping", item="milk bread"
+        // Falls through to middle-prep search below when remainder doesn't start with a preposition.
+        val leadingPrepRu = listOf("в ", "к ", "для ", "на ", "по ")
+        val leadingPrepEn = listOf("into ", "in ", "to ", "for ")
+        val leadingPreps = if (locale == ChatLocale.Ru) leadingPrepRu else leadingPrepEn
+        for (prep in leadingPreps.sortedByDescending { it.length }) {
+            if (remainder.startsWith(prep)) {
+                val afterPrep = remainder.removePrefix(prep).trim()
+                if (afterPrep.isEmpty()) return Pair(null, null)
+                val firstSpace = afterPrep.indexOf(' ')
+                return if (firstSpace > 0) {
+                    val hint = afterPrep.substring(0, firstSpace).trim().ifBlank { null }
+                    val itemText = afterPrep.substring(firstSpace + 1).trim().ifBlank { null }
+                    Pair(itemText, hint)
+                } else {
+                    // single word after prep → treat as hint only; user didn't name an item
+                    Pair(null, afterPrep.trim().ifBlank { null })
+                }
+            }
+        }
+
+        // Middle-preposition pattern "<item...> <prep> <hint>"
         val hintPrepositionsEn = listOf(" in ", " to ", " for ", " into ")
         val hintPrepositionsRu = listOf(" в ", " к ", " для ", " на ", " по ")
         val prepositions = if (locale == ChatLocale.Ru) hintPrepositionsRu else hintPrepositionsEn
