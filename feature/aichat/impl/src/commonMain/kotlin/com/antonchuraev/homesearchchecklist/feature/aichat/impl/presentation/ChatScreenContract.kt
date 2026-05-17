@@ -68,6 +68,14 @@ sealed interface ChatScreenIntent : Intent {
     /** User edited the item text inside the preview card. */
     data class OnPreviewItemTextChange(val text: String) : ChatScreenIntent
 
+    /**
+     * ChatRoute round-trip for localised assistant messages: ViewModel emits
+     * [ChatScreenSideEffect.ShowAssistantMessage] with a string-resource key,
+     * ChatRoute resolves it via stringResource() in Composable scope, then
+     * sends it back here so the message lands in the chat history.
+     */
+    data class AppendAssistantMessage(val text: String) : ChatScreenIntent
+
     /** User approved the pending write-intent preview. */
     data object OnPreviewApply : ChatScreenIntent
 
@@ -85,6 +93,16 @@ sealed interface ChatScreenIntent : Intent {
 sealed interface ChatScreenSideEffect : SideEffect {
     /** Show a snackbar with a localised message. [messageKey] maps to a string resource key. */
     data class ShowSnackbar(val messageKey: String) : ChatScreenSideEffect
+
+    /**
+     * Ask ChatRoute to resolve a localised assistant message and append it to the chat.
+     * Avoids hardcoded EN strings in ViewModel — Composable scope owns string-resource lookup.
+     * Optional [args] support `%1$s` / `%2$s` etc. placeholder substitution.
+     */
+    data class ShowAssistantMessage(
+        val messageKey: String,
+        val args: List<String> = emptyList(),
+    ) : ChatScreenSideEffect
 
     /** Navigate back (handled by the host NavController). */
     data object NavigateBack : ChatScreenSideEffect

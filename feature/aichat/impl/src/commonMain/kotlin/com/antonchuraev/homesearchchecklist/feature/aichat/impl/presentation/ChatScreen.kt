@@ -124,7 +124,13 @@ fun ChatScreen(
                     horizontal = AppDimens.ScreenPaddingHorizontal,
                     vertical = AppDimens.SpacingMd,
                 ),
-                verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd),
+                // Pin items to bottom of the list so a near-empty chat doesn't leave
+                // a big gap between welcome bubble and the input row. As content grows,
+                // items naturally fill the column and behave like a normal scroll list.
+                verticalArrangement = Arrangement.spacedBy(
+                    AppDimens.SpacingMd,
+                    alignment = androidx.compose.ui.Alignment.Bottom,
+                ),
             ) {
                 // Welcome bubble — always first, follows system locale via stringResource
                 item(key = "__welcome") {

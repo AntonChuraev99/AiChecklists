@@ -961,4 +961,8 @@
     <string name="chat_ambiguous_match">Did you mean: %1$s? Please clarify.</string>
     <string name="chat_not_found">Nothing found: %1$s</string>
     <string name="chat_assistant_welcome">Hi! I can help you manage your checklists. Try «add milk to shopping» or «remind me on Friday at 6pm».</string>
+    <!-- Inline assistant error messages — surfaced when ViewModel hits a recoverable failure -->
+    <string name="chat_generic_error">Something went wrong. Please try again.</string>
+    <string name="chat_apply_error">Something went wrong applying the change. Please try again.</string>
+    <string name="chat_extract_fail">I understood your intent but couldn\'t extract the details. Please try again with more specifics.</string>
 </resources>
