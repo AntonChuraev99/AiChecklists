@@ -951,7 +951,7 @@
     <string name="chat_pricing_layer1_title">Standard commands — free</string>
     <string name="chat_pricing_layer1_detail">Add, find, delete, mark done, simple reminders. Processed on your device, no credits.</string>
     <string name="chat_pricing_layer2_title">Smart commands — 1 credit</string>
-    <string name="chat_pricing_layer2_detail">Bulk operations, ambiguous wording. We use the cheapest AI model to understand.</string>
+    <string name="chat_pricing_layer2_detail">Bulk operations or ambiguous wording. AI helps us understand exactly what you mean.</string>
     <string name="chat_pricing_layer3_title">Open questions — 3 credits</string>
     <string name="chat_pricing_layer3_detail">«What should I do this week?», planning, summaries. Full AI reasoning.</string>
     <string name="chat_pricing_apply_note">Write actions (add / delete / set) always show a preview. Credits are charged when we figure out what you meant, not when you tap Apply.</string>

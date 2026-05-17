@@ -921,7 +921,7 @@
     <string name="chat_pricing_layer1_title">Стандартные команды — бесплатно</string>
     <string name="chat_pricing_layer1_detail">Добавить, найти, удалить, отметить, простые напоминания. Обрабатываем на устройстве, без кредитов.</string>
     <string name="chat_pricing_layer2_title">Умные команды — 1 кредит</string>
-    <string name="chat_pricing_layer2_detail">Массовые операции и неоднозначные формулировки. Используем самую дешёвую AI-модель.</string>
+    <string name="chat_pricing_layer2_detail">Массовые операции и неоднозначные формулировки. AI помогает точно понять, что вы имели в виду.</string>
     <string name="chat_pricing_layer3_title">Открытые вопросы — 3 кредита</string>
     <string name="chat_pricing_layer3_detail">«Что мне сделать на неделе?», планирование, итоги. Полное AI-рассуждение.</string>
     <string name="chat_pricing_apply_note">Действия на запись (добавить / удалить / поставить) всегда показывают предпросмотр. Кредиты списываются когда мы поняли запрос, а не при подтверждении.</string>

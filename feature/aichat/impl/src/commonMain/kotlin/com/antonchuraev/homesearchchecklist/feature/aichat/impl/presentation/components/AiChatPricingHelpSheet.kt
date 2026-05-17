@@ -48,7 +48,7 @@ import org.jetbrains.compose.resources.stringResource
  * Pricing help bottom sheet explaining the 3-tier credit system.
  *
  * - Layer 1 (Local): free — device-side intent routing
- * - Layer 2 (Classifier): 1 credit — cheapest AI model for ambiguous commands
+ * - Layer 2 (Classifier): 1 credit — gemini-flash-lite for ambiguous commands
  * - Layer 3 (FullChat): 3 credits — full AI reasoning for open questions
  *
  * Opens when the user taps the "?" icon in [ChatHeader].
