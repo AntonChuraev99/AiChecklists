@@ -16,7 +16,9 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Tool
  * @param messages     Ordered chat history (ascending by timestamp).
  * @param inputText    Current text in the input field.
  * @param pendingPreview  Non-null when a write-intent preview card should be shown.
- * @param creditBalance  User's remaining AI credits (0 in Phase A, Layer 1 = always free).
+ * @param creditBalance  User's remaining AI credits. Live value from [UserDataRepository.getUserDataFlow],
+ *                       updated optimistically from server API responses on Layer 2/3 success.
+ *                       Hidden in UI when ≤ 0 (loading state or genuinely empty).
  * @param showPricingSheet  Whether the pricing help bottom sheet is visible.
  * @param isProcessing  True while the router is classifying / dispatching (disables Send).
  */

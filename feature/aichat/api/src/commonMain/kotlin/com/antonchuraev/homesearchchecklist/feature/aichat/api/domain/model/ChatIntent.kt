@@ -16,6 +16,12 @@ sealed interface ChatIntent {
     data object CreateChecklist : ChatIntent
     data object MoveReminders : ChatIntent
 
+    /**
+     * Open-ended / conversational input that Layer 1 and Layer 2 cannot classify
+     * into a concrete tool call. Escalated to Layer 3 (full chat completion, 3 credits).
+     */
+    data object FreeForm : ChatIntent
+
     /** Raw text preserved for display in snackbar / escalation to Layer 2. */
     data class Unknown(val rawText: String) : ChatIntent
 }

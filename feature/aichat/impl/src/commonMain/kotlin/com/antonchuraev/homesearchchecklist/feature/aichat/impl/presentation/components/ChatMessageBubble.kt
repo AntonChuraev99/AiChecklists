@@ -22,7 +22,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Chat
  * Renders a single chat message bubble.
  *
  * - [ChatRole.User]      → right-aligned, primaryContainer bubble, with [InlineCostBadge]
- * - [ChatRole.Assistant] → left-aligned, surfaceVariant bubble, no cost badge
+ * - [ChatRole.Assistant] → left-aligned, surfaceContainerHigh bubble, no cost badge
  *
  * Bubble shapes use an asymmetric corner strategy (the "tail" corner is 4dp):
  *  User:      top-start=16, top-end=16, bottom-end=4, bottom-start=16
@@ -63,29 +63,39 @@ fun ChatMessageBubble(
                     )
                 },
                 color = if (isUser) {
-                    MaterialTheme.colorScheme.primaryContainer
+                    MaterialTheme.colorScheme.primaryContainer  // md.sys.color.primary-container
                 } else {
-                    MaterialTheme.colorScheme.surfaceVariant
+                    MaterialTheme.colorScheme.surfaceContainerHigh  // md.sys.color.surface-container-high (M3 Expressive)
                 },
                 modifier = Modifier.widthIn(max = 280.dp),
             ) {
-                Text(
-                    text = message.content,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (isUser) {
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                    modifier = Modifier.padding(
-                        horizontal = AppDimens.SpacingMd,
-                        vertical = AppDimens.SpacingSm,
-                    ),
-                )
+                if (isUser) {
+                    Text(
+                        text = message.content,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(
+                            horizontal = AppDimens.SpacingMd,
+                            vertical = AppDimens.SpacingSm,
+                        ),
+                    )
+                } else {
+                    ChatMarkdownText(
+                        markdown = message.content,
+                        style = MaterialTheme.typography.bodyMedium,
+                        // surfaceContainerHigh pairs with onSurface per MD3 tonal pairing rules
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(
+                            horizontal = AppDimens.SpacingMd,
+                            vertical = AppDimens.SpacingSm,
+                        ),
+                    )
+                }
             }
 
-            // Cost badge is only shown for user messages (assistant messages never charge credits)
-            if (isUser) {
+            // Cost badge is shown only when credits were actually deducted (> 0).
+            // Layer 1 (local router) is always free → badge stays hidden for most messages.
+            if (isUser && message.costCredits > 0) {
                 InlineCostBadge(cost = message.costCredits)
             }
         }

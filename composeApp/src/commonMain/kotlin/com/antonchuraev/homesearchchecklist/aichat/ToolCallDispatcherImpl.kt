@@ -58,7 +58,7 @@ class ToolCallDispatcherImpl(
             is ToolCall.FindItemsQuery -> handleFind(toolCall)
         }
     }.getOrElse { e ->
-        DispatchOutcome.NotFound("Operation failed: ${e.message ?: "unknown error"}")
+        DispatchOutcome.NotFound("chat_dispatch_operation_failed", listOf(e.message ?: "unknown error"))
     }
 
     // ─── AddItem ──────────────────────────────────────────────────────────────
@@ -77,8 +77,11 @@ class ToolCallDispatcherImpl(
         val updatedChecklist = checklist.copy(items = checklist.items + newTemplateItem)
         checklistRepository.updateChecklistTemplate(updatedChecklist)
 
-        val hint = toolCall.checklistHint?.let { " to ${checklist.name}" }.orEmpty()
-        return DispatchOutcome.Success("Added «${toolCall.itemText}»$hint.")
+        return if (toolCall.checklistHint != null) {
+            DispatchOutcome.Success("chat_dispatch_added_to", listOf(toolCall.itemText, checklist.name))
+        } else {
+            DispatchOutcome.Success("chat_dispatch_added", listOf(toolCall.itemText))
+        }
     }
 
     // ─── DeleteItem ───────────────────────────────────────────────────────────
@@ -88,7 +91,7 @@ class ToolCallDispatcherImpl(
             ?: return resolveChecklistFailure(toolCall.checklistHint)
 
         val matchingFillItem = fill.items.firstOrNull { it.text.contains(toolCall.itemText, ignoreCase = true) }
-            ?: return DispatchOutcome.NotFound("No item matching «${toolCall.itemText}» found in ${checklist.name}.")
+            ?: return DispatchOutcome.NotFound("chat_dispatch_item_not_found", listOf(toolCall.itemText, checklist.name))
 
         val updatedFill = fill.copy(items = fill.items.filter { it.id != matchingFillItem.id })
         checklistRepository.updateFill(updatedFill)
@@ -100,7 +103,7 @@ class ToolCallDispatcherImpl(
             checklistRepository.updateChecklistTemplate(updatedChecklist)
         }
 
-        return DispatchOutcome.Success("Deleted «${matchingFillItem.text}» from ${checklist.name}.")
+        return DispatchOutcome.Success("chat_dispatch_deleted", listOf(matchingFillItem.text, checklist.name))
     }
 
     // ─── CompleteItem ─────────────────────────────────────────────────────────
@@ -110,10 +113,10 @@ class ToolCallDispatcherImpl(
             ?: return resolveChecklistFailure(toolCall.checklistHint)
 
         val matchingItem = fill.items.firstOrNull { it.text.contains(toolCall.itemText, ignoreCase = true) }
-            ?: return DispatchOutcome.NotFound("No item matching «${toolCall.itemText}» found in ${checklist.name}.")
+            ?: return DispatchOutcome.NotFound("chat_dispatch_item_not_found", listOf(toolCall.itemText, checklist.name))
 
         if (matchingItem.checked) {
-            return DispatchOutcome.Success("«${matchingItem.text}» is already marked as done.")
+            return DispatchOutcome.Success("chat_dispatch_already_done", listOf(matchingItem.text))
         }
 
         val updatedFill = fill.copy(
@@ -121,7 +124,7 @@ class ToolCallDispatcherImpl(
         )
         checklistRepository.updateFill(updatedFill)
 
-        return DispatchOutcome.Success("Marked «${matchingItem.text}» as done in ${checklist.name}.")
+        return DispatchOutcome.Success("chat_dispatch_completed", listOf(matchingItem.text, checklist.name))
     }
 
     // ─── CreateChecklist ──────────────────────────────────────────────────────
@@ -144,10 +147,11 @@ class ToolCallDispatcherImpl(
         )
         checklistRepository.addChecklist(newChecklist)
 
-        val itemsSuffix = if (toolCall.initialItems.isNotEmpty())
-            " with ${toolCall.initialItems.size} item${if (toolCall.initialItems.size == 1) "" else "s"}"
-        else ""
-        return DispatchOutcome.Success("Created checklist «${toolCall.name}»$itemsSuffix.")
+        return when (toolCall.initialItems.size) {
+            0 -> DispatchOutcome.Success("chat_dispatch_created_empty", listOf(toolCall.name))
+            1 -> DispatchOutcome.Success("chat_dispatch_created_with_one", listOf(toolCall.name))
+            else -> DispatchOutcome.Success("chat_dispatch_created_with_many", listOf(toolCall.name, toolCall.initialItems.size.toString()))
+        }
     }
 
     // ─── SetItemReminder ──────────────────────────────────────────────────────
@@ -157,7 +161,7 @@ class ToolCallDispatcherImpl(
             ?: return resolveChecklistFailure(toolCall.checklistHint)
 
         val matchingItem = fill.items.firstOrNull { it.text.contains(toolCall.itemText, ignoreCase = true) }
-            ?: return DispatchOutcome.NotFound("No item matching «${toolCall.itemText}» found in ${checklist.name}.")
+            ?: return DispatchOutcome.NotFound("chat_dispatch_item_not_found", listOf(toolCall.itemText, checklist.name))
 
         val updatedFill = fill.copy(
             items = fill.items.map {
@@ -166,8 +170,7 @@ class ToolCallDispatcherImpl(
         )
         checklistRepository.updateFill(updatedFill)
 
-        val timeStr = formatTimestamp(toolCall.at)
-        return DispatchOutcome.Success("Reminder set for «${matchingItem.text}» at $timeStr.")
+        return DispatchOutcome.Success("chat_dispatch_reminder_set", listOf(matchingItem.text, formatTimestamp(toolCall.at)))
     }
 
     // ─── MoveAllReminders ─────────────────────────────────────────────────────
@@ -179,8 +182,7 @@ class ToolCallDispatcherImpl(
         )
 
         if (reminders.isEmpty()) {
-            val fromDay = formatDay(toolCall.fromDayStartMs)
-            return DispatchOutcome.NotFound("No reminders found on $fromDay.")
+            return DispatchOutcome.NotFound("chat_dispatch_no_reminders_on_day", listOf(formatDay(toolCall.fromDayStartMs)))
         }
 
         val offsetMs = toolCall.toDayStartMs - toolCall.fromDayStartMs
@@ -198,15 +200,17 @@ class ToolCallDispatcherImpl(
             }
         }
 
-        val toDay = formatDay(toolCall.toDayStartMs)
-        return DispatchOutcome.Success("Moved $movedCount reminder${if (movedCount == 1) "" else "s"} to $toDay.")
+        return when (movedCount) {
+            1 -> DispatchOutcome.Success("chat_dispatch_moved_one", listOf(formatDay(toolCall.toDayStartMs)))
+            else -> DispatchOutcome.Success("chat_dispatch_moved_many", listOf(movedCount.toString(), formatDay(toolCall.toDayStartMs)))
+        }
     }
 
     // ─── FindItemsQuery ───────────────────────────────────────────────────────
 
     private suspend fun handleFind(toolCall: ToolCall.FindItemsQuery): DispatchOutcome {
         if (toolCall.query.isBlank()) {
-            return DispatchOutcome.NotFound("Please provide a search term.")
+            return DispatchOutcome.NotFound("chat_dispatch_find_blank", emptyList())
         }
 
         val allChecklists = checklistRepository.checklists.first()
@@ -223,11 +227,11 @@ class ToolCallDispatcherImpl(
         }
 
         return if (results.isEmpty()) {
-            DispatchOutcome.NotFound("Nothing matches «${toolCall.query}».")
+            DispatchOutcome.NotFound("chat_dispatch_find_no_match", listOf(toolCall.query))
         } else {
             val summary = results.take(5).joinToString("; ") { (list, item) -> "«$item» in $list" }
             val suffix = if (results.size > 5) " (+${results.size - 5} more)" else ""
-            DispatchOutcome.Success("Found ${results.size} item${if (results.size == 1) "" else "s"}: $summary$suffix")
+            DispatchOutcome.Success("chat_dispatch_find_success", listOf(results.size.toString(), "$summary$suffix"))
         }
     }
 
@@ -261,15 +265,15 @@ class ToolCallDispatcherImpl(
      */
     private suspend fun resolveChecklistFailure(hint: String?): DispatchOutcome {
         if (hint == null) {
-            return DispatchOutcome.NotFound("No checklists found. Create one first.")
+            return DispatchOutcome.NotFound("chat_dispatch_no_checklists", emptyList())
         }
 
         val allChecklists = checklistRepository.checklists.first()
         val matches = allChecklists.filter { it.name.contains(hint, ignoreCase = true) }
         return when {
-            matches.isEmpty() -> DispatchOutcome.NotFound("No checklist matching «$hint» found.")
+            matches.isEmpty() -> DispatchOutcome.NotFound("chat_dispatch_no_checklist_match", listOf(hint))
             matches.size > 1 -> DispatchOutcome.AmbiguousMatch(matches.take(3).map { it.name })
-            else -> DispatchOutcome.NotFound("Could not load fill for checklist «${matches.first().name}».")
+            else -> DispatchOutcome.NotFound("chat_dispatch_fill_load_failed", listOf(matches.first().name))
         }
     }
 

@@ -89,7 +89,7 @@
     <header>
         <div class="logo">Gisti</div>
         <h1>Privacy Policy</h1>
-        <p class="last-updated">Last updated: March 14, 2026</p>
+        <p class="last-updated">Last updated: May 17, 2026</p>
     </header>
 
     <main>
@@ -116,7 +116,7 @@
         <p>We use Firebase Crashlytics to collect crash reports and diagnostic information. This helps us identify and fix issues to improve app stability.</p>
 
         <p><strong>Content You Provide</strong></p>
-        <p>When you use our AI-powered features, you may provide:</p>
+        <p>When you use our AI-powered features (Create with AI, Fill with AI), you may provide:</p>
         <ul>
             <li>Photos and images</li>
             <li>PDF documents</li>
@@ -124,7 +124,18 @@
             <li>Web links</li>
             <li>Voice recordings</li>
         </ul>
-        <p>This content is processed by Google's Gemini AI to generate checklists. We do not permanently store your uploaded content on our servers.</p>
+        <p>This content is processed by Google's Gemini AI to generate or fill checklists. We do not permanently store your uploaded content on our servers.</p>
+
+        <p><strong>AI Chat Assistant Content</strong></p>
+        <p>When you use the AI Chat Assistant, the following data is processed:</p>
+        <ul>
+            <li><strong>Your typed messages</strong> — the natural-language commands or questions you send in the chat.</li>
+            <li><strong>Conversation history</strong> — when you ask an open question (planning, summary, "what should I do this week?"), we send the last few exchanges of the current conversation so the AI can keep context.</li>
+            <li><strong>Optional checklist summary</strong> — for open questions, we may send the <em>names</em> and <em>completion counts</em> (e.g. "Shopping — 5 items, 2 done") of your most recent checklists so the AI can refer to them in its answer. <strong>We never send the full text of your checklist items.</strong></li>
+            <li><strong>System locale and timezone offset</strong> — so the AI can answer in your language and resolve relative dates ("tomorrow", "Friday at 6pm") into your local time.</li>
+        </ul>
+        <p>This data is processed by Google's Gemini AI through our serverless functions (Google Cloud Functions) hosted in the United States (us-central1). It is not stored permanently on our servers; it is forwarded to Gemini, which under the Gemini API terms does not use API-key requests for model training by default.</p>
+        <p>Your full chat history is stored only <strong>locally on your device</strong> so you can refer back to it. We do not have access to it. Uninstalling the app or clearing app data removes the history completely.</p>
 
         <h2>Third-Party Services</h2>
 
@@ -143,8 +154,15 @@
         <p>Privacy Policy: <a href="https://policies.google.com/privacy" target="_blank">policies.google.com/privacy</a></p>
 
         <p><strong>Google Gemini AI</strong></p>
-        <p>We use Gemini AI to analyze content and generate checklists. Your content is processed according to Google's AI terms.</p>
+        <p>We use Gemini AI for three independent features:</p>
+        <ul>
+            <li><strong>Create / Fill checklists from content</strong> — photos, PDFs, links, text, voice recordings you intentionally upload.</li>
+            <li><strong>AI Chat — intent classification</strong> — your typed chat command, when our on-device parser is unsure how to handle it.</li>
+            <li><strong>AI Chat — free-form answers</strong> — the recent conversation history plus an optional summary of your checklist names and completion counts, when you ask an open question.</li>
+        </ul>
+        <p>All AI requests go through our serverless functions in Google Cloud (us-central1) so the API key is never exposed to your device. We do not store the request bodies; we keep only anonymized usage statistics (number of calls, intent labels) and a credit-deduction audit log keyed by your anonymous device identifier.</p>
         <p>Privacy Policy: <a href="https://policies.google.com/privacy" target="_blank">policies.google.com/privacy</a></p>
+        <p>Gemini API data usage: <a href="https://ai.google.dev/gemini-api/terms" target="_blank">ai.google.dev/gemini-api/terms</a></p>
 
         <p><strong>RevenueCat</strong></p>
         <p>We use RevenueCat to manage subscriptions and in-app purchases. RevenueCat processes payment information through the respective app stores (Google Play, Apple App Store).</p>
@@ -161,7 +179,8 @@
         <p>For users outside the EEA/UK, analytics and ad attribution data is collected by default as permitted under applicable law. You can always reset your Advertising ID or opt out via your device settings.</p>
 
         <h2>Data Storage</h2>
-        <p>Your checklists and app data are stored locally on your device. We do not store your personal checklists on our servers.</p>
+        <p>Your checklists, chat history, and app data are stored locally on your device. We do not store your personal checklists or your AI chat history on our servers.</p>
+        <p>The only data we keep server-side is the minimum required for subscription and credit accounting: your anonymous device identifier, current credit balance, premium status, and an aggregated usage counter per AI feature. None of this contains the text of your checklists or chat messages.</p>
 
         <h2>Data Sharing</h2>
         <p>We do not sell, trade, or rent your personal information to third parties. We share anonymized analytics and conversion data with Google (Firebase Analytics and Google Ads) for app improvement and advertising measurement purposes. All other data is shared only with the third-party services listed above as necessary to provide app functionality.</p>

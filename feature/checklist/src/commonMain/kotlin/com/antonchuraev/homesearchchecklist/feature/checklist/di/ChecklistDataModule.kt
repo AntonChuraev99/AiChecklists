@@ -19,3 +19,13 @@ internal fun createChecklistRepository(attachmentStorage: AttachmentStoragePort)
         fillDao = database.checklistFillDao(),
         attachmentStorage = attachmentStorage,
     )
+
+/**
+ * Returns the singleton [ChecklistDatabase] instance.
+ * Exposed so other feature DI modules (e.g. aiChatFeatureModule) can obtain
+ * DAOs from the same database without creating a second connection.
+ * [attachmentStorage] is accepted to ensure the database is only built after
+ * the storage dependency is ready (mirrors [createChecklistRepository] contract).
+ */
+internal fun getChecklistDatabase(@Suppress("UNUSED_PARAMETER") attachmentStorage: AttachmentStoragePort): ChecklistDatabase =
+    database

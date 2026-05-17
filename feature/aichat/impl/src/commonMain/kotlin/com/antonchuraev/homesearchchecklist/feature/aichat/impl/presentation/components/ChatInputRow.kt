@@ -9,10 +9,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.Send
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -74,19 +74,19 @@ fun ChatInputRow(
             ),
         )
 
-        IconButton(
+        // FilledIconButton — M3 expressive / WhatsApp / Telegram pattern for primary CTA in chat.
+        // Uses default squircle shape (M3 standard for icon buttons, not circular pill) for
+        // consistency with the rest of the design system.
+        // Disabled state colors are handled automatically by FilledIconButton.colors().
+        FilledIconButton(
             onClick = onSend,
             enabled = canSend,
+            colors = IconButtonDefaults.filledIconButtonColors(),
         ) {
             Icon(
-                imageVector = Icons.AutoMirrored.Outlined.Send,
+                imageVector = Icons.AutoMirrored.Filled.Send,
                 contentDescription = stringResource(Res.string.chat_send_action),
                 modifier = Modifier.size(AppDimens.IconSizeMd),
-                tint = if (canSend) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                },
             )
         }
     }

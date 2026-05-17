@@ -1294,7 +1294,7 @@ CLASSIFY_CHAT_INTENT_PROMPT = """You are an intent classifier for a checklist ap
 Detect what the user wants to do. Return ONLY a JSON object (no markdown, no commentary).
 
 Schema:
-{
+{{
   "intent": one of [
     "create_item",        # add a new item to a checklist
     "delete_item",        # remove an item from a checklist
@@ -1306,15 +1306,15 @@ Schema:
     "free_form",          # open question, planning, summarisation
     "unknown"             # cannot determine intent
   ],
-  "entities": {
+  "entities": {{
     "itemText": "the item name (for create_item/delete_item/complete_item/set_reminder) or null",
     "checklistHint": "the target checklist name hint (e.g. \\"shopping\\") or null",
     "checklistName": "name for the new checklist (only for create_checklist) or null",
-    "dateIso": "ISO-8601 date for set_reminder or null",
+    "dateIso": "ISO-8601 date+time with timezone offset for set_reminder; null otherwise",
     "query": "search query for find_items or null"
-  },
+  }},
   "confidence": 0.0-1.0
-}
+}}
 
 Rules:
 - Match the user's language. Russian, English and mixed input are all valid.
@@ -1323,7 +1323,19 @@ Rules:
 - If a phrase is genuinely ambiguous, prefer "unknown" with confidence < 0.5 over guessing.
 - If the user asks a free-form question (planning, summary), set intent=free_form.
 
+Date parsing (set_reminder only — return dateIso in ISO 8601 with the user's timezone offset):
+- ALWAYS compute relative to "Current UTC time" below — do not use any training-data baseline.
+- "tomorrow" / "завтра" / "tomorrow at 9am" → next calendar day in the user's timezone.
+- "in 3 hours" / "через 3 часа" → current local time + 3 hours.
+- "Friday at 6pm" / "в пятницу в 18" → upcoming Friday at the stated local time.
+- "next Monday" / "в следующий понедельник" → the Monday of next week in the user's timezone.
+- If only a time is given ("at 9am" / "в 9 утра"), assume today if that time is still in the future locally, otherwise tomorrow.
+- The user's timezone is "{tz_offset}" minutes offset from UTC. Render dateIso WITH that offset (e.g. "2026-05-18T09:00:00+05:00" for +300 minutes).
+- If date cannot be determined, return dateIso=null (client falls back to "+24h").
+
 User locale: {locale}
+Current UTC time (ISO 8601): {now_utc}
+User timezone offset (minutes from UTC): {tz_offset}
 User input: "{text}"
 """
 
@@ -1355,6 +1367,50 @@ def reserve_chat_credit(user_id: str) -> int | None:
         return new_count
 
     return txn(db.transaction())
+
+
+def refund_chat_credit(user_id: str, reason: str) -> bool:
+    """
+    Refund CHAT_INTENT_COST credits previously deducted by reserve_chat_credit.
+
+    Called when a downstream Gemini call fails after the credit was already
+    reserved. Inverse of reserve_chat_credit — increments balance in a single
+    Firestore transaction and logs to credits_refund_log for audit.
+
+    Best-effort: a failure here is swallowed so the original error (the reason
+    we are refunding in the first place) is what the caller surfaces to the
+    client. Returns True on success, False if user doc is missing or txn fails.
+    """
+    user_ref = db.collection("users").document(user_id)
+
+    @firestore.transactional
+    def txn(transaction):
+        snapshot = user_ref.get(transaction=transaction)
+        if not snapshot.exists:
+            return False
+        current = snapshot.get("ai_credits") or 0
+        new_count = current + CHAT_INTENT_COST
+        transaction.update(user_ref, {
+            "ai_credits": new_count,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        })
+        return True
+
+    try:
+        ok = txn(db.transaction())
+        if ok:
+            try:
+                db.collection("credits_refund_log").add({
+                    "user_id": user_id,
+                    "reason": reason,
+                    "amount": CHAT_INTENT_COST,
+                    "refunded_at": datetime.now(timezone.utc).isoformat(),
+                })
+            except Exception:
+                pass
+        return ok
+    except Exception:
+        return False
 
 
 @functions_framework.http
@@ -1402,6 +1458,15 @@ def classify_chat_intent(request: Request):
         # Default unknown locales to en — classifier handles mixed input anyway
         locale = "en"
 
+    # Optional timezone offset (minutes from UTC). Client sends current device
+    # offset so Gemini can resolve relative dates ("tomorrow", "in 3 hours")
+    # into the user's local time. Clamp to the IANA range UTC-12 .. UTC+14.
+    try:
+        tz_offset_minutes = int(data.get("timezone_offset_minutes") or 0)
+    except (TypeError, ValueError):
+        tz_offset_minutes = 0
+    tz_offset_minutes = max(-720, min(840, tz_offset_minutes))
+
     user_id = data["user_id"]
 
     # Server is authoritative for credit accounting — client cannot bypass.
@@ -1410,7 +1475,12 @@ def classify_chat_intent(request: Request):
     if new_credits is None:
         return create_error_response("insufficient credits", 402)
 
-    prompt = CLASSIFY_CHAT_INTENT_PROMPT.format(locale=locale, text=text)
+    prompt = CLASSIFY_CHAT_INTENT_PROMPT.format(
+        locale=locale,
+        tz_offset=tz_offset_minutes,
+        now_utc=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        text=text,
+    )
 
     try:
         response = call_gemini(prompt, "text", "")
@@ -1450,8 +1520,239 @@ def classify_chat_intent(request: Request):
         })
 
     except Exception as e:
-        # Credit was already deducted in reserve_chat_credit. We accept this loss
-        # for Phase B MVP simplicity — Gemini failures are rare and a single
-        # credit refund is not worth the complexity of a compensating transaction.
-        # Pending: docs/todos/2026-05-17-ai-chat-layer-2-cloud-classifier.md
+        # Gemini call or JSON parse failed AFTER reserve_chat_credit deducted 1.
+        # Refund the credit so the user is not charged for our failure.
+        # Best-effort — refund failure is swallowed; original error is surfaced.
+        refund_chat_credit(user_id, reason=f"chat_classifier_gemini_failure: {type(e).__name__}")
         return create_error_response(f"classification failed: {str(e)}", 500)
+
+
+# ============================================================================
+# FUNCTION: chat_completion (Phase C.2 — Layer 3 full free-form reasoning)
+# ============================================================================
+#
+# Called by AiChatRepositoryImpl when intent is FreeForm (open question,
+# planning, summarisation). Routes the conversation through gemini-2.5-flash
+# (NOT lite — Layer 3 needs better reasoning for open questions).
+#
+# Cost: 3 credits per successful completion (atomic Firestore deduction).
+#
+# Privacy: checklist content lives on-device (Room). Server never reads it
+# from Firestore. The CLIENT decides what summary (names + counts) to send.
+# Conversation history is sent as-is to Gemini. Privacy Policy MUST document
+# this — see docs/security-playbook.md.
+# ============================================================================
+
+CHAT_COMPLETION_COST = 3                   # Layer 3 — Flash full model
+CHAT_COMPLETION_MAX_MESSAGES = 12          # sliding window — oldest dropped
+CHAT_COMPLETION_MAX_TOTAL_CHARS = 6000     # combined across all messages
+CHAT_COMPLETION_MAX_CHECKLISTS = 8         # context items from client
+
+CHAT_COMPLETION_PROMPT_TEMPLATE = """You are Gisti, an AI assistant for a checklist app. Help the user plan, prioritise, and summarise their tasks.
+
+Rules:
+- Reply in the user's language ({locale}). Be concise — 1–3 short paragraphs max.
+- Use markdown bullets or numbered lists only when listing items. No headings.
+- Refer only to the user's actual checklists shown below. Do not invent items.
+- If the user asks for a mutation ("delete item X"), reply: "Just type the command directly, e.g. «remove X from groceries» — I'll show a preview." Do not perform mutations from this endpoint.
+- If the user goes fully off-topic (weather, math), politely redirect to checklist help.
+
+Current UTC time: {now_utc}
+User timezone offset (minutes from UTC): {tz_offset}
+
+User's checklists ({checklists_count} most recent):
+{checklists_summary}
+
+Conversation history (oldest → newest):
+{history}
+"""
+
+
+def reserve_chat_completion_credits(user_id: str) -> int | None:
+    """
+    Atomically deduct CHAT_COMPLETION_COST credits for one Layer 3 call.
+    Returns the new balance, or None if user is missing or under-credited.
+    """
+    user_ref = db.collection("users").document(user_id)
+
+    @firestore.transactional
+    def txn(transaction):
+        snapshot = user_ref.get(transaction=transaction)
+        if not snapshot.exists:
+            return None
+        current = snapshot.get("ai_credits") or 0
+        if current < CHAT_COMPLETION_COST:
+            return None
+        new_count = current - CHAT_COMPLETION_COST
+        transaction.update(user_ref, {
+            "ai_credits": new_count,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        })
+        return new_count
+
+    return txn(db.transaction())
+
+
+def refund_chat_completion_credits(user_id: str, reason: str) -> bool:
+    """Best-effort refund of CHAT_COMPLETION_COST credits on Gemini failure."""
+    user_ref = db.collection("users").document(user_id)
+
+    @firestore.transactional
+    def txn(transaction):
+        snapshot = user_ref.get(transaction=transaction)
+        if not snapshot.exists:
+            return False
+        current = snapshot.get("ai_credits") or 0
+        transaction.update(user_ref, {
+            "ai_credits": current + CHAT_COMPLETION_COST,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        })
+        return True
+
+    try:
+        ok = txn(db.transaction())
+        if ok:
+            try:
+                db.collection("credits_refund_log").add({
+                    "user_id": user_id,
+                    "reason": reason,
+                    "amount": CHAT_COMPLETION_COST,
+                    "refunded_at": datetime.now(timezone.utc).isoformat(),
+                })
+            except Exception:
+                pass
+        return ok
+    except Exception:
+        return False
+
+
+def _call_gemini_flash(prompt: str) -> str:
+    """Call gemini-2.5-flash (NOT lite) for free-form reasoning."""
+    model = genai.GenerativeModel("gemini-2.5-flash")
+    response = model.generate_content(prompt)
+    return (response.text or "").strip()
+
+
+def _format_checklists_summary(items) -> str:
+    """Render the optional client-provided checklists into a plain bullet list."""
+    if not items or not isinstance(items, list):
+        return "(no recent checklists provided)"
+    lines = []
+    for item in items[:CHAT_COMPLETION_MAX_CHECKLISTS]:
+        if not isinstance(item, dict):
+            continue
+        name = (item.get("name") or "(unnamed)").strip() or "(unnamed)"
+        total = int(item.get("totalItems") or 0)
+        done = int(item.get("doneItems") or 0)
+        lines.append(f"- {name} ({total} items, {done} done)")
+    return "\n".join(lines) if lines else "(no recent checklists provided)"
+
+
+@functions_framework.http
+def chat_completion(request: Request):
+    """
+    Layer 3 — full chat completion via Gemini Flash for free-form questions.
+
+    Request body:
+    {
+        "user_id": "string",
+        "messages": [{"role": "user|assistant", "content": "..."}, ...],
+        "locale": "ru" | "en",
+        "timezone_offset_minutes": -720..840,
+        "checklists_summary": [{"name": "...", "totalItems": N, "doneItems": N}, ...]
+    }
+
+    Response:
+        200 → { "success": true, "content": "...", "credits_remaining": int }
+        400 → invalid payload
+        402 → insufficient credits
+        500 → Gemini failure (credits refunded automatically)
+    """
+    if request.method == "OPTIONS":
+        return cors_preflight_ok()
+
+    data, error = validate_request(request)
+    if error is not None:
+        return create_error_response(error, 400)
+
+    user_id = (data.get("user_id") or "").strip()
+    if not user_id:
+        return create_error_response("user_id is required", 400)
+
+    messages_raw = data.get("messages")
+    if not isinstance(messages_raw, list) or not messages_raw:
+        return create_error_response("messages must be a non-empty list", 400)
+
+    # Sliding window — keep last N exchanges.
+    messages = messages_raw[-CHAT_COMPLETION_MAX_MESSAGES:]
+
+    total_chars = 0
+    normalised = []
+    for m in messages:
+        if not isinstance(m, dict):
+            return create_error_response("each message must be an object", 400)
+        role = (m.get("role") or "").strip().lower()
+        content = m.get("content")
+        if role not in ("user", "assistant"):
+            return create_error_response("message.role must be 'user' or 'assistant'", 400)
+        if not isinstance(content, str) or not content.strip():
+            return create_error_response("message.content must be a non-empty string", 400)
+        total_chars += len(content)
+        if total_chars > CHAT_COMPLETION_MAX_TOTAL_CHARS:
+            return create_error_response(
+                f"messages exceed {CHAT_COMPLETION_MAX_TOTAL_CHARS} chars cap", 400
+            )
+        normalised.append({"role": role, "content": content})
+
+    locale = (data.get("locale") or "en").strip().lower()
+    if locale not in ("ru", "en"):
+        locale = "en"
+
+    try:
+        tz_offset_minutes = int(data.get("timezone_offset_minutes") or 0)
+    except (TypeError, ValueError):
+        tz_offset_minutes = 0
+    tz_offset_minutes = max(-720, min(840, tz_offset_minutes))
+
+    checklists_raw = data.get("checklists_summary") or []
+    checklists_summary_text = _format_checklists_summary(checklists_raw)
+
+    new_credits = reserve_chat_completion_credits(user_id)
+    if new_credits is None:
+        return create_error_response("insufficient credits", 402)
+
+    history_text = "\n".join(
+        f"{'User' if m['role'] == 'user' else 'Assistant'}: {m['content']}"
+        for m in normalised
+    )
+
+    prompt = CHAT_COMPLETION_PROMPT_TEMPLATE.format(
+        locale=locale,
+        now_utc=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        tz_offset=tz_offset_minutes,
+        checklists_count=min(len(checklists_raw), CHAT_COMPLETION_MAX_CHECKLISTS),
+        checklists_summary=checklists_summary_text,
+        history=history_text,
+    )
+
+    try:
+        content = _call_gemini_flash(prompt)
+        if not content:
+            raise ValueError("Gemini returned empty response")
+
+        try:
+            increment_usage(user_id, "chat_completion", "text")
+        except Exception:
+            pass
+
+        return create_success_response({
+            "content": content,
+            "credits_remaining": new_credits,
+        })
+
+    except Exception as e:
+        refund_chat_completion_credits(
+            user_id,
+            reason=f"chat_completion_gemini_failure: {type(e).__name__}"
+        )
+        return create_error_response(f"completion failed: {str(e)}", 500)

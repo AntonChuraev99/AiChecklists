@@ -43,13 +43,14 @@ Before committing any new file, verify it does not contain patterns like `AIzaSy
 
 ### Product Concept
 
-Gisti transforms any content into actionable checklists using AI:
+Gisti transforms any content into actionable checklists using AI. **The AI Chat Assistant is the flagship interaction layer** — users converse naturally and the app reasons over their lists.
 
 | Feature | Description | Input Formats |
 |---------|-------------|---------------|
-| **1. Create via AI** | Generate a new checklist from any content | Photo, PDF, Text, Link, Voice |
-| **2. Fill via AI** | Auto-fill an existing checklist based on new content | Photo, PDF, Text, Link, Voice |
-| **3. Export** | Share your checklist in convenient formats | PDF, Plain Text |
+| **1. AI Chat Assistant** | Natural-language assistant — add/edit/find items, set reminders, plan your week through conversation. Tiered routing: free local commands (0 credits), cheap classifier (1 credit), full reasoning (3 credits). Persists conversation history across sessions. | Text (multi-turn dialogue) |
+| **2. Create via AI** | Generate a new checklist from any content | Photo, PDF, Text, Link, Voice |
+| **3. Fill via AI** | Auto-fill an existing checklist based on new content | Photo, PDF, Text, Link, Voice |
+| **4. Export** | Share your checklist in convenient formats | PDF, Plain Text |
 
 ### Business Model
 

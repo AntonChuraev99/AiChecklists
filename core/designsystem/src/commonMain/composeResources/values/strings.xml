@@ -346,6 +346,7 @@
     <!-- AI Credits -->
     <string name="credits_display">%1$d credits</string>
     <string name="credits_get_more">Get More Credits</string>
+    <string name="credits_premium_unlimited">∞ credits</string>
     <string name="credits_your_credits">Your AI Credits</string>
     <string name="credits_refill_info">Refills daily at 12:00 CET</string>
     <string name="credits_refill_to">up to %1$d</string>
@@ -922,6 +923,7 @@
     <string name="chat_title">AI Chat</string>
     <string name="chat_input_placeholder">Ask anything…</string>
     <string name="chat_send_action">Send</string>
+    <string name="chat_typing_indicator_a11y">AI is thinking…</string>
     <string name="chat_help_action">Pricing info</string>
     <!-- %1$d = credit balance, shown as "3 credits left · ≈ 0–3" -->
     <string name="chat_credits_label">%1$d credits left · ≈ 0–3</string>
@@ -957,6 +959,8 @@
 
     <!-- AI Chat navigation / snackbar messages -->
     <string name="nav_ai_chat">AI Chat</string>
+    <string name="main_open_ai_chat">Open AI Assistant</string>
+    <string name="main_action_ai_chat">AI Chat</string>
     <string name="chat_requires_premium">This action requires a Premium subscription.</string>
     <string name="chat_ambiguous_match">Did you mean: %1$s? Please clarify.</string>
     <string name="chat_not_found">Nothing found: %1$s</string>
@@ -965,4 +969,28 @@
     <string name="chat_generic_error">Something went wrong. Please try again.</string>
     <string name="chat_apply_error">Something went wrong applying the change. Please try again.</string>
     <string name="chat_extract_fail">I understood your intent but couldn\'t extract the details. Please try again with more specifics.</string>
+    <!-- AI Chat dispatch outcomes (C.1 i18n) -->
+    <string name="chat_dispatch_added">Added «%1$s».</string>
+    <string name="chat_dispatch_added_to">Added «%1$s» to %2$s.</string>
+    <string name="chat_dispatch_deleted">Deleted «%1$s» from %2$s.</string>
+    <string name="chat_dispatch_item_not_found">No item matching «%1$s» found in %2$s.</string>
+    <string name="chat_dispatch_completed">Marked «%1$s» as done in %2$s.</string>
+    <string name="chat_dispatch_already_done">«%1$s» is already marked as done.</string>
+    <string name="chat_dispatch_created_empty">Created checklist «%1$s».</string>
+    <string name="chat_dispatch_created_with_one">Created checklist «%1$s» with 1 item.</string>
+    <string name="chat_dispatch_created_with_many">Created checklist «%1$s» with %2$s items.</string>
+    <string name="chat_dispatch_reminder_set">Reminder set for «%1$s» at %2$s.</string>
+    <string name="chat_dispatch_no_reminders_on_day">No reminders found on %1$s.</string>
+    <string name="chat_dispatch_moved_one">Moved 1 reminder to %1$s.</string>
+    <string name="chat_dispatch_moved_many">Moved %1$s reminders to %2$s.</string>
+    <string name="chat_dispatch_find_blank">Please provide a search term.</string>
+    <string name="chat_dispatch_find_no_match">Nothing matches «%1$s».</string>
+    <string name="chat_dispatch_find_success">Found %1$s items: %2$s</string>
+    <string name="chat_dispatch_operation_failed">Operation failed: %1$s</string>
+    <string name="chat_dispatch_no_checklists">No checklists found. Create one first.</string>
+    <string name="chat_dispatch_no_checklist_match">No checklist matching «%1$s» found.</string>
+    <string name="chat_dispatch_fill_load_failed">Could not load fill for checklist «%1$s».</string>
+    <string name="chat_insufficient_credits">Not enough credits for AI assist. Refill or upgrade to Premium.</string>
+    <string name="chat_completion_error">AI couldn\'t respond. Please try again.</string>
+    <string name="chat_history_load_error">Couldn\'t load chat history.</string>
 </resources>

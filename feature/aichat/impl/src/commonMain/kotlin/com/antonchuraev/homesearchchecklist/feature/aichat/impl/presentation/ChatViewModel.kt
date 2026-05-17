@@ -8,16 +8,23 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Chat
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatRole
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.DispatchOutcome
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.RoutingLayer
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ToolCall
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.locale.ChatLocaleProvider
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.ChatLocale
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AiChatRepository
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChecklistContext
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatHistoryRepository
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.RemoteCompletionResult
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.preview.ToolCallPreviewRenderer
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
+import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.random.Random
 
@@ -30,27 +37,58 @@ import kotlin.random.Random
  *   3. OnPreviewApply → dispatch ToolCall → success message
  *   4. OnPreviewCancel → back to idle, no snackbar
  *
- * Phase A rules:
- *   - Layer 1 only (local routing), zero credits cost
- *   - No AI calls, no network, no [userDataRepository.consumeCredit()]
- *   - creditBalance is fetched once from [userDataRepository] and used as read-only display
+ * Phase C additions:
+ *   - [ChatIntent.FreeForm] → [aiChatRepository.completeFreeForm] (Layer 3, 3 credits)
+ *   - History persistence via [chatHistoryRepository] (Room, survives restarts)
+ *   - Checklist context built from [checklistRepository] for Layer 3 requests
  */
 class ChatViewModel(
     private val aiChatRepository: AiChatRepository,
     private val toolCallDispatcher: ToolCallDispatcher,
     private val previewRenderer: ToolCallPreviewRenderer,
     private val localeProvider: ChatLocaleProvider,
+    private val chatHistoryRepository: ChatHistoryRepository,
+    private val checklistRepository: ChecklistRepository,
+    private val userDataRepository: UserDataRepository,
     private val logger: AppLogger,
 ) : AppViewModel<ChatScreenState, ChatScreenIntent, ChatScreenSideEffect>() {
 
     // Welcome message is rendered as a fixed UI affordance in ChatScreen
     // (via stringResource so it follows the system locale). ViewModel keeps
-    // messages strictly as user-driven content — empty at first composition.
+    // messages strictly as user-driven content — seeded from Room history on init.
     private val _screenState = MutableStateFlow(ChatScreenState())
     override val screenState: StateFlow<ChatScreenState> = _screenState
 
     private val _sideEffect = MutableSharedFlow<ChatScreenSideEffect>(extraBufferCapacity = 16)
     val sideEffect: Flow<ChatScreenSideEffect> = _sideEffect.asSharedFlow()
+
+    init {
+        // Seed the message list from persisted history so the user sees
+        // their previous conversation immediately on re-entry.
+        viewModelScope.launch {
+            runCatching {
+                chatHistoryRepository.observeRecent(HISTORY_DISPLAY_LIMIT).first().also { history ->
+                    if (history.isNotEmpty()) {
+                        _screenState.value = _screenState.value.copy(messages = history)
+                        logger.debug(TAG, "init: loaded ${history.size} messages from history")
+                    }
+                }
+            }.onFailure { e ->
+                logger.error(TAG, "init: failed to load history — ${e.message}", e)
+                _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_history_load_error"))
+            }
+        }
+
+        // Mirror the cached credit balance from UserDataRepository.
+        // This is the canonical source (same pattern as MainScreenViewModel.aiCredits).
+        // Server API responses (Layer 2 / Layer 3) also update state directly for instant
+        // feedback; the next Firestore sync will reconcile any drift.
+        viewModelScope.launch {
+            userDataRepository.getUserDataFlow().collect { userData ->
+                _screenState.value = _screenState.value.copy(creditBalance = userData.aiCredits)
+            }
+        }
+    }
 
     override fun onIntent(intent: ChatScreenIntent) {
         when (intent) {
@@ -125,13 +163,29 @@ class ChatViewModel(
                 val classification = aiChatRepository.classify(text, locale)
                 logger.debug(TAG, "Classified '${text.take(40)}' → ${classification.intent::class.simpleName} conf=${classification.confidence}")
 
-                // Update user message with routing metadata
-                updateMessage(userMsg.id) { it.copy(routedLayer = classification.layer) }
+                // Update user message with routing metadata + cost, then persist it.
+                // Cost is known only after classification — appended in a single .copy() to
+                // avoid double recompose.
+                val userCost = when (classification.layer) {
+                    RoutingLayer.Classifier -> 1   // Layer 2: classify_chat_intent costs 1 credit
+                    else -> 0                       // Layer 1 (local) is free; unknown → 0
+                }
+                val taggedUserMsg = userMsg.copy(
+                    routedLayer = classification.layer,
+                    costCredits = userCost,
+                )
+                updateMessage(userMsg.id) { taggedUserMsg }
+                chatHistoryRepository.append(taggedUserMsg)
 
                 when (val intent = classification.intent) {
                     is ChatIntent.Unknown -> {
                         _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_unknown_intent_hint"))
                         _screenState.value = _screenState.value.copy(isProcessing = false)
+                    }
+
+                    // Layer 3 — open-ended conversation, no tool call preview
+                    ChatIntent.FreeForm -> {
+                        handleFreeForm(locale)
                     }
 
                     // Read intent — dispatch inline, no preview
@@ -199,6 +253,100 @@ class ChatViewModel(
         }
     }
 
+    // ─── FreeForm (Layer 3) flow ───────────────────────────────────────────────
+
+    /**
+     * Invoked when classification returns [ChatIntent.FreeForm].
+     *
+     * Builds a compact checklist context summary (top [CHECKLIST_SUMMARY_LIMIT] checklists,
+     * names + counts only — no item text), then calls [AiChatRepository.completeFreeForm].
+     * The assistant response is added as an inline message (no preview card — Layer 3 is
+     * read-only conversation output, not a write action).
+     */
+    private suspend fun handleFreeForm(locale: ChatLocale) {
+        val checklistsSummary = buildChecklistsSummary()
+        val currentMessages = _screenState.value.messages
+
+        val result = aiChatRepository.completeFreeForm(
+            messages = currentMessages,
+            locale = locale,
+            checklistsSummary = checklistsSummary,
+        )
+
+        when (result) {
+            is RemoteCompletionResult.Success -> {
+                logger.info(TAG, "FreeForm success: ${result.content.take(60)} credits_remaining=${result.creditsRemaining}")
+                // Optimistic credit update from server response — shown immediately,
+                // before the next Firestore sync updates UserDataRepository cache.
+                _screenState.value = _screenState.value.copy(creditBalance = result.creditsRemaining)
+                // Persist the fresh balance to local cache so other screens see it immediately.
+                runCatching {
+                    val currentUserData = userDataRepository.getUserData()
+                    userDataRepository.update(currentUserData.copy(aiCredits = result.creditsRemaining))
+                }.onFailure { e ->
+                    logger.error(TAG, "FreeForm: failed to persist updated credit balance — ${e.message}", e)
+                    // Non-fatal: UserDataRepository flow will reconcile on next Firestore sync.
+                }
+                addAndPersistAssistantMessage(
+                    content = result.content,
+                    routedLayer = RoutingLayer.FullChat,
+                    costCredits = 3,
+                )
+            }
+            RemoteCompletionResult.InsufficientCredits -> {
+                logger.info(TAG, "FreeForm: InsufficientCredits")
+                _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_insufficient_credits"))
+            }
+            RemoteCompletionResult.NetworkError,
+            RemoteCompletionResult.ServiceError -> {
+                logger.warning(TAG, "FreeForm: ${result::class.simpleName}")
+                _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_completion_error"))
+            }
+        }
+
+        _screenState.value = _screenState.value.copy(isProcessing = false)
+    }
+
+    /**
+     * Builds a compact summary of user's top [CHECKLIST_SUMMARY_LIMIT] checklists.
+     * Only names + item counts are included — no item text (privacy by design).
+     */
+    private suspend fun buildChecklistsSummary(): List<ChecklistContext> = runCatching {
+        checklistRepository.checklists.first()
+            .take(CHECKLIST_SUMMARY_LIMIT)
+            .map { checklist ->
+                ChecklistContext(
+                    name = checklist.name,
+                    totalItems = checklist.items.size,
+                    doneItems = checklist.items.count { it.checked },
+                )
+            }
+    }.getOrElse { e ->
+        logger.error(TAG, "buildChecklistsSummary failed — ${e.message}", e)
+        emptyList()
+    }
+
+    /**
+     * Adds an assistant message to [_screenState] and persists it to [chatHistoryRepository].
+     * Used for Layer 3 completions where the content is known at call time.
+     */
+    private suspend fun addAndPersistAssistantMessage(
+        content: String,
+        routedLayer: RoutingLayer?,
+        costCredits: Int = 0,
+    ) {
+        val msg = ChatMessage(
+            id = generateId(),
+            role = ChatRole.Assistant,
+            content = content,
+            timestamp = nowMillis(),
+            costCredits = costCredits,
+            routedLayer = routedLayer,
+        )
+        updateMessages { it + msg }
+        chatHistoryRepository.append(msg)
+    }
+
     /**
      * Replaces the item text in [original] with the user's edited [edited] value.
      * Item-less tool calls (CreateChecklist with no name change yet, MoveAllReminders, FindItemsQuery)
@@ -250,7 +398,12 @@ class ChatViewModel(
     private suspend fun handleOutcomeInline(outcome: DispatchOutcome) {
         when (outcome) {
             is DispatchOutcome.Success -> {
-                addAssistantMessage(outcome.humanReadable)
+                _sideEffect.emit(
+                    ChatScreenSideEffect.ShowAssistantMessage(
+                        messageKey = outcome.messageKey,
+                        args = outcome.args,
+                    )
+                )
             }
             is DispatchOutcome.AmbiguousMatch -> {
                 val candidates = outcome.candidates.take(3).joinToString(", ")
@@ -262,7 +415,12 @@ class ChatViewModel(
                 )
             }
             is DispatchOutcome.NotFound -> {
-                addAssistantMessage(outcome.reason)
+                _sideEffect.emit(
+                    ChatScreenSideEffect.ShowAssistantMessage(
+                        messageKey = outcome.messageKey,
+                        args = outcome.args,
+                    )
+                )
             }
             DispatchOutcome.RequiresPremium -> {
                 _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_requires_premium"))
@@ -336,8 +494,9 @@ class ChatViewModel(
                 )
             }
 
-            // FindItems and Unknown are handled separately — should not reach here
+            // FindItems, FreeForm and Unknown are handled separately — should not reach here
             ChatIntent.FindItems,
+            ChatIntent.FreeForm,
             is ChatIntent.Unknown -> null
         }
     }
@@ -457,6 +616,11 @@ class ChatViewModel(
             costCredits = 0,
         )
         updateMessages { it + msg }
+        // Persist every assistant message regardless of routing layer
+        viewModelScope.launch {
+            runCatching { chatHistoryRepository.append(msg) }
+                .onFailure { e -> logger.error(TAG, "addAssistantMessage: persist failed — ${e.message}", e) }
+        }
     }
 
     private fun updateMessages(transform: (List<ChatMessage>) -> List<ChatMessage>) {
@@ -479,5 +643,9 @@ class ChatViewModel(
 
     private companion object {
         const val TAG = "ChatViewModel"
+        /** Max messages to display from persisted history on screen open. */
+        const val HISTORY_DISPLAY_LIMIT = 20
+        /** Max checklists to include in Layer 3 context summary. */
+        const val CHECKLIST_SUMMARY_LIMIT = 8
     }
 }
