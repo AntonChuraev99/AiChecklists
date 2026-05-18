@@ -67,7 +67,7 @@ android {
         create("release") {
             val keystorePath = localProps.getProperty("KEYSTORE_FILE", "")
             if (keystorePath.isNotEmpty()) {
-                storeFile = file(keystorePath)
+                storeFile = rootProject.file(keystorePath)
                 storePassword = localProps.getProperty("KEYSTORE_PASSWORD", "")
                 keyAlias = localProps.getProperty("KEY_ALIAS", "gisti")
                 keyPassword = localProps.getProperty("KEY_PASSWORD", "")
