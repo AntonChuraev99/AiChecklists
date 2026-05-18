@@ -88,6 +88,41 @@
             }
         })();
     </script>
+    <script>
+        // Override Navigator.languages / Navigator.language so that Compose
+        // Resources resolves stringResource() from the user-selected locale
+        // instead of the browser's OS default.
+        //
+        // window.__customLocale is set by AppLocale.wasmJs.kt (actual for
+        // LocalAppLocale.provides) whenever the user picks a language in Settings.
+        // It is null/undefined on first load → falls back to original browser langs.
+        //
+        // IMPORTANT: this shim must execute BEFORE init.js so that Skiko / Compose
+        // reads the patched navigator.language during startup locale detection.
+        (function () {
+            var originalLanguages = navigator.languages;
+            var originalLanguage = navigator.language;
+            try {
+                Object.defineProperty(navigator, 'languages', {
+                    configurable: true,
+                    get: function () {
+                        return window.__customLocale ? [window.__customLocale] : originalLanguages;
+                    }
+                });
+                Object.defineProperty(navigator, 'language', {
+                    configurable: true,
+                    get: function () {
+                        return window.__customLocale || originalLanguage;
+                    }
+                });
+            } catch (e) {
+                // In environments where navigator properties are not configurable
+                // (some embedded WebViews / strict CSPs) the shim silently degrades —
+                // the app falls back to the browser's OS locale.
+                console.warn('[Gisti] Navigator locale shim not applied:', e);
+            }
+        })();
+    </script>
     <script type="module" src="./init.js"></script>
 </body>
 </html>

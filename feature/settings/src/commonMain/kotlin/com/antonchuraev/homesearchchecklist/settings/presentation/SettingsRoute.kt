@@ -40,6 +40,8 @@ fun SettingsScreen(
         dynamicColorEnabled = state.dynamicColorEnabled,
         dynamicColorSupported = state.dynamicColorSupported,
         onDynamicColorChange = { viewModel.sendIntent(SettingsIntent.ToggleDynamicColor(it)) },
+        selectedLanguage = state.selectedLanguage,
+        onLanguageChange = { viewModel.sendIntent(SettingsIntent.SelectLanguage(it)) },
         onBackClick = { viewModel.sendIntent(SettingsIntent.BackClick) },
         drawerState = drawerState,
         modifier = modifier,
