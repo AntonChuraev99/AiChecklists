@@ -378,10 +378,41 @@ class AiChatRepositoryImplTest {
         assertIs<RemoteCompletionResult.InsufficientCredits>(result)
     }
 
-    // ── 12. Deep Thinking bypass: classify returns FreeForm immediately ────────
+    // ── 12. Deep Thinking bypass: free-form input routes to Layer 3 ────────
 
     @Test
-    fun classify_deepThinkingOn_returnsFreeFormImmediately() = runTest {
+    fun classify_deepThinkingOn_layer1Unknown_returnsFreeForm() = runTest {
+        // Deep Thinking ON + Layer 1 cannot match a command → genuine open-ended question
+        // → must escalate to Layer 3 (FullChat). Layer 1 is still consulted (cheap), but
+        // its Unknown result lets the bypass kick in.
+        val router = FakeLocalIntentRouter(lowConfidenceLayer1())
+        val classifier = FakeChatClassifierApiService(RemoteClassificationResult.ServiceError)
+        val repo = AiChatRepositoryImpl(
+            router = router,
+            classifierApi = classifier,
+            completionApi = FakeChatCompletionApiService(),
+            userDataRepository = FakeUserDataRepository("user-deep"),
+            aiChatPreferencesRepository = FakeAiChatPreferencesRepository(initial = true),
+            logger = NoOpLogger,
+        )
+
+        val result = repo.classify("плануй мою неделю", ChatLocale.Ru)
+
+        assertIs<ChatIntent.FreeForm>(result.intent)
+        assertEquals(1.0f, result.confidence)
+        assertEquals(RoutingLayer.FullChat, result.layer)
+        assertEquals(0, classifier.callCount, "Layer 2 must NOT be called when deep thinking is ON")
+    }
+
+    // ── 13. Deep Thinking + Layer 1 command-intent: Layer 1 wins ───────────────
+
+    @Test
+    fun classify_deepThinkingOn_layer1ConfidentCommand_returnsLayer1() = runTest {
+        // Real-world scenario (2026-05-18 ai_chat_feedback events): user leaves Deep
+        // Thinking ON between sessions, then types «добавь в дела купить ведра». Layer 1
+        // detects CreateItem with CONF_FULL — we MUST prefer that over burning 3 credits
+        // on Layer 3 free-form chat. Otherwise every command-shaped query costs 3 credits
+        // and answers «извините, не поняла».
         val router = FakeLocalIntentRouter(highConfidenceLayer1(ChatIntent.CreateItem))
         val classifier = FakeChatClassifierApiService(RemoteClassificationResult.ServiceError)
         val repo = AiChatRepositoryImpl(
@@ -393,12 +424,10 @@ class AiChatRepositoryImplTest {
             logger = NoOpLogger,
         )
 
-        val result = repo.classify("any input text", ChatLocale.Ru)
+        val result = repo.classify("добавь молоко в покупки", ChatLocale.Ru)
 
-        assertIs<ChatIntent.FreeForm>(result.intent)
-        assertEquals(1.0f, result.confidence)
-        assertEquals(RoutingLayer.FullChat, result.layer)
-        assertEquals(0, router.callCount, "Layer 1 must NOT be called when deep thinking is ON")
-        assertEquals(0, classifier.callCount, "Layer 2 must NOT be called when deep thinking is ON")
+        assertIs<ChatIntent.CreateItem>(result.intent)
+        assertEquals(RoutingLayer.Local, result.layer)
+        assertEquals(0, classifier.callCount, "Layer 2 must NOT be called — Layer 1 already won")
     }
 }

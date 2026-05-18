@@ -47,11 +47,27 @@ internal class AiChatRepositoryImpl(
     }
 
     override suspend fun classify(input: String, locale: ChatLocale): IntentClassification {
+        // Always run Layer 1 first — it is free, fast, and command-intent recognition
+        // must NOT be bypassed by user-facing toggles. Deep Thinking is for open-ended
+        // questions ("plan my week"), not for "add milk to shopping" type commands.
+        // Real-world signal (2026-05-18): users left Deep Thinking ON between sessions,
+        // every add/delete/find command burned 3 credits on a Layer 3 meta-reply.
+        val layer1 = router.route(input, locale)
+        logger.debug(TAG, "Layer1: ${layer1.intent::class.simpleName} conf=${layer1.confidence}")
+
+        val layer1IsCommand = layer1.intent !is ChatIntent.Unknown &&
+            layer1.intent !is ChatIntent.FreeForm
+        val layer1IsConfident = layer1.confidence >= LAYER_1_CONFIDENCE_THRESHOLD
+
         // Deep Thinking bypass — user opted into "always full chat" mode.
-        // Skip Layer 1 and Layer 2 entirely; return FreeForm at full confidence so
-        // ViewModel routes straight to handleFreeForm → completeFreeForm (Layer 3, 3 credits).
+        // Honour the toggle ONLY when Layer 1 didn't find a confident command-intent;
+        // otherwise the user almost certainly meant a quick action, not a free-form chat.
         if (aiChatPreferencesRepository.deepThinkingEnabledFlow.first()) {
-            logger.info(TAG, "Deep thinking ON — bypassing Layer 1/2, returning FreeForm")
+            if (layer1IsCommand && layer1IsConfident) {
+                logger.info(TAG, "Deep thinking ON, but Layer1 matched ${layer1.intent::class.simpleName} confidently — routing as command")
+                return layer1
+            }
+            logger.info(TAG, "Deep thinking ON — routing to Layer 3 (FreeForm)")
             return IntentClassification(
                 intent = ChatIntent.FreeForm,
                 confidence = 1.0f,
@@ -60,10 +76,7 @@ internal class AiChatRepositoryImpl(
             )
         }
 
-        val layer1 = router.route(input, locale)
-        logger.debug(TAG, "Layer1: ${layer1.intent::class.simpleName} conf=${layer1.confidence}")
-
-        if (layer1.confidence >= LAYER_1_CONFIDENCE_THRESHOLD) {
+        if (layer1IsConfident) {
             return layer1
         }
 
