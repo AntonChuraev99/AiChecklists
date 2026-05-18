@@ -878,4 +878,50 @@ class LocalIntentRouterImplTest {
             assertEquals(RoutingLayer.Local, result.layer, "Expected Local layer for '$input'")
         }
     }
+
+    // ─── Regression: real Amplitude feedback cases (2026-05-18) ──────────────
+    // These inputs were routed to Layer 3 (FullChat) and received meta-responses
+    // instead of tool_call=add_item. Root cause: missing lexicon triggers.
+
+    @Test
+    fun createItem_realFeedbackCase_ruWithVerbStartingItem() = runTest {
+        // User typed: "добавь заказать два мусорных ведра в дела"
+        // Was incorrectly routed to Layer 3 — "заказать" was parsed as the intent verb
+        // instead of "добавь". Fix: "добавь" already in lexicon; test confirms full confidence.
+        val result = router.route("добавь заказать два мусорных ведра в дела", ChatLocale.Ru)
+        assertIs<ChatIntent.CreateItem>(result.intent)
+        assertTrue(result.confidence >= 0.7f, "Expected conf >= 0.7, got ${result.confidence}")
+        assertEquals(RoutingLayer.Local, result.layer)
+    }
+
+    @Test
+    fun createItem_realFeedbackCase_ruWithZapishiSynonym() = runTest {
+        // User typed: "запиши в дела заказать два мусорных ведра"
+        // Was incorrectly routed to Layer 3. Fix: "запиши" already in lexicon; test confirms.
+        val result = router.route("запиши в дела заказать два мусорных ведра", ChatLocale.Ru)
+        assertIs<ChatIntent.CreateItem>(result.intent)
+        assertTrue(result.confidence >= 0.7f, "Expected conf >= 0.7, got ${result.confidence}")
+        assertEquals(RoutingLayer.Local, result.layer)
+    }
+
+    @Test
+    fun createItem_realFeedbackCase_enWithVerbStartingItem() = runTest {
+        // User typed: "add order two trash cans to chores"
+        // Was incorrectly routed to Layer 3 — "order" confused the classifier.
+        // Fix: "add" in lexicon; item text is "order two trash cans"; hint="chores".
+        val result = router.route("add order two trash cans to chores", ChatLocale.En)
+        assertIs<ChatIntent.CreateItem>(result.intent)
+        assertTrue(result.confidence >= 0.7f, "Expected conf >= 0.7, got ${result.confidence}")
+        assertEquals(RoutingLayer.Local, result.layer)
+    }
+
+    @Test
+    fun createItem_realFeedbackCase_enWithNoteDownSynonym() = runTest {
+        // User typed: "note down order two trash cans to chores"
+        // Was routed to Layer 3 — "note down" not in lexicon. Fix: added in this patch.
+        val result = router.route("note down order two trash cans to chores", ChatLocale.En)
+        assertIs<ChatIntent.CreateItem>(result.intent)
+        assertTrue(result.confidence >= 0.7f, "Expected conf >= 0.7, got ${result.confidence}")
+        assertEquals(RoutingLayer.Local, result.layer)
+    }
 }

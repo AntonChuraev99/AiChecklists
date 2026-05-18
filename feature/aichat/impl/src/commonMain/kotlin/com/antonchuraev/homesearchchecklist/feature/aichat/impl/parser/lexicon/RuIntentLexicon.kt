@@ -9,7 +9,7 @@ package com.antonchuraev.homesearchchecklist.feature.aichat.impl.parser.lexicon
 internal object RuIntentLexicon {
 
     // ─── CreateItem ───────────────────────────────────────────────────────────
-    // "добавь молоко в покупки", "запиши молоко", "купи молоко"
+    // "добавь молоко в покупки", "запиши молоко", "купи молоко", "закинь в дела", "кинь", "вбей"
     val createItem: Set<String> = setOf(
         "добавить",
         "добавь",
@@ -19,6 +19,9 @@ internal object RuIntentLexicon {
         "купи",
         "положи",
         "поставь",
+        "закинь",
+        "кинь",
+        "вбей",
     )
 
     // ─── DeleteItem ───────────────────────────────────────────────────────────
