@@ -3,6 +3,7 @@ package com.antonchuraev.homesearchchecklist.settings.ui
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppTheme
+import com.antonchuraev.homesearchchecklist.settings.domain.AppLanguage
 import com.antonchuraev.homesearchchecklist.settings.domain.AppThemeMode
 
 // ---------------------------------------------------------------------------
@@ -20,6 +21,8 @@ private fun SettingsLightPreview() {
             dynamicColorEnabled = true,
             dynamicColorSupported = true,
             onDynamicColorChange = {},
+            selectedLanguage = AppLanguage.System,
+            onLanguageChange = {},
             onBackClick = {},
         )
     }
@@ -40,6 +43,8 @@ private fun SettingsDarkPreview() {
             dynamicColorEnabled = true,
             dynamicColorSupported = true,
             onDynamicColorChange = {},
+            selectedLanguage = AppLanguage.System,
+            onLanguageChange = {},
             onBackClick = {},
         )
     }
@@ -55,6 +60,8 @@ private fun SettingsLightSelectedPreview() {
             dynamicColorEnabled = false,
             dynamicColorSupported = true,
             onDynamicColorChange = {},
+            selectedLanguage = AppLanguage.English,
+            onLanguageChange = {},
             onBackClick = {},
         )
     }
@@ -70,6 +77,8 @@ private fun SettingsUnsupportedPreview() {
             dynamicColorEnabled = false,
             dynamicColorSupported = false,
             onDynamicColorChange = {},
+            selectedLanguage = AppLanguage.Russian,
+            onLanguageChange = {},
             onBackClick = {},
         )
     }

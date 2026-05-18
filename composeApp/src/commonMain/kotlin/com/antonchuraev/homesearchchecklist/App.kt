@@ -7,9 +7,13 @@ import com.antonchuraev.homesearchchecklist.csat.CsatBottomSheet
 import com.antonchuraev.homesearchchecklist.csat.CsatIntent
 import com.antonchuraev.homesearchchecklist.csat.CsatViewModel
 import com.antonchuraev.homesearchchecklist.csat.InAppReviewLauncher
+import com.antonchuraev.homesearchchecklist.core.datastore.api.AppLanguage
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppThemeMode
+import com.antonchuraev.homesearchchecklist.core.datastore.api.LanguageRepository
 import com.antonchuraev.homesearchchecklist.core.datastore.api.ThemeRepository
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppLocaleEnvironment
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppTheme
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.customAppLocale
 import com.antonchuraev.homesearchchecklist.settings.presentation.SettingsScreen
 import com.antonchuraev.homesearchchecklist.feature.updatefeed.presentation.components.WidgetInstructionOverlay
 import com.antonchuraev.homesearchchecklist.navigation.AppNavigationDrawerContent
@@ -122,6 +126,10 @@ fun App() {
             AppThemeMode.System -> systemDark
         }
 
+        val languageRepository: LanguageRepository = remember { koin.get<LanguageRepository>() }
+        val language by languageRepository.language.collectAsStateWithLifecycle(initialValue = AppLanguage.System)
+        LaunchedEffect(language) { customAppLocale = language.tag }
+
         val csatViewModel: CsatViewModel = koinInject()
         val csatState by csatViewModel.screenState.collectAsState()
 
@@ -148,6 +156,7 @@ fun App() {
         }
 
         AppTheme(darkTheme = darkTheme, dynamicColor = dynamicColor) {
+            AppLocaleEnvironment {
             val snackbarHostState = remember { SnackbarHostState() }
             val feedbackThanksMessage = stringResource(Res.string.feedback_thanks_message)
             LaunchedEffect(csatState.showFeedbackThanks) {
@@ -747,6 +756,7 @@ fun App() {
                 shouldLaunch = csatState.shouldLaunchReview,
                 onComplete = { csatViewModel.sendIntent(CsatIntent.ReviewComplete) },
             )
+            } // AppLocaleEnvironment
         }
     }
 }

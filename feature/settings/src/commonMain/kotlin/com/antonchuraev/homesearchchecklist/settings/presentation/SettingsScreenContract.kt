@@ -3,18 +3,21 @@ package com.antonchuraev.homesearchchecklist.settings.presentation
 import com.antonchuraev.homesearchchecklist.core.common.api.Intent
 import com.antonchuraev.homesearchchecklist.core.common.api.SideEffect
 import com.antonchuraev.homesearchchecklist.core.common.api.State
+import com.antonchuraev.homesearchchecklist.core.datastore.api.AppLanguage
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppThemeMode
 
 data class SettingsState(
     val selectedTheme: AppThemeMode = AppThemeMode.Light,
     val dynamicColorEnabled: Boolean = false,
     val dynamicColorSupported: Boolean = false,
+    val selectedLanguage: AppLanguage = AppLanguage.System,
     val isLoading: Boolean = true,
 ) : State
 
 sealed interface SettingsIntent : Intent {
     data class SelectTheme(val mode: AppThemeMode) : SettingsIntent
     data class ToggleDynamicColor(val enabled: Boolean) : SettingsIntent
+    data class SelectLanguage(val language: AppLanguage) : SettingsIntent
     data object BackClick : SettingsIntent
 }
 

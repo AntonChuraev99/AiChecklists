@@ -1,6 +1,8 @@
 package com.antonchuraev.homesearchchecklist.settings
 
+import com.antonchuraev.homesearchchecklist.core.datastore.api.AppLanguage
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppThemeMode
+import com.antonchuraev.homesearchchecklist.core.datastore.api.LanguageRepository
 import com.antonchuraev.homesearchchecklist.core.datastore.api.ThemeRepository
 import com.antonchuraev.homesearchchecklist.settings.presentation.SettingsIntent
 import com.antonchuraev.homesearchchecklist.settings.presentation.SettingsSideEffect
@@ -29,13 +31,15 @@ class SettingsViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
 
     private lateinit var fakeRepository: FakeThemeRepository
+    private lateinit var fakeLanguageRepository: FakeLanguageRepository
     private lateinit var viewModel: SettingsViewModel
 
     @BeforeTest
     fun setup() {
         Dispatchers.setMain(testDispatcher)
         fakeRepository = FakeThemeRepository()
-        viewModel = SettingsViewModel(fakeRepository)
+        fakeLanguageRepository = FakeLanguageRepository()
+        viewModel = SettingsViewModel(fakeRepository, fakeLanguageRepository)
     }
 
     @AfterTest
@@ -120,6 +124,40 @@ class SettingsViewModelTest {
         assertTrue(viewModel.screenState.value.dynamicColorEnabled)
         assertEquals(true, fakeRepository.lastSavedDynamicColor)
     }
+
+    // -------------------------------------------------------------------------
+    // Language tests
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun init_loadsCurrentLanguageFromRepository() = runTest {
+        fakeLanguageRepository.emitLanguage(AppLanguage.Russian)
+        advanceUntilIdle()
+
+        assertEquals(AppLanguage.Russian, viewModel.screenState.value.selectedLanguage)
+    }
+
+    @Test
+    fun selectLanguage_persistsToRepository() = runTest {
+        fakeLanguageRepository.emitLanguage(AppLanguage.System)
+        advanceUntilIdle()
+
+        viewModel.sendIntent(SettingsIntent.SelectLanguage(AppLanguage.English))
+        advanceUntilIdle()
+
+        assertEquals(AppLanguage.English, fakeLanguageRepository.lastSavedLanguage)
+    }
+
+    @Test
+    fun selectLanguage_emitsNewState() = runTest {
+        fakeLanguageRepository.emitLanguage(AppLanguage.System)
+        advanceUntilIdle()
+
+        viewModel.sendIntent(SettingsIntent.SelectLanguage(AppLanguage.Russian))
+        advanceUntilIdle()
+
+        assertEquals(AppLanguage.Russian, viewModel.screenState.value.selectedLanguage)
+    }
 }
 
 private class FakeThemeRepository : ThemeRepository {
@@ -147,5 +185,21 @@ private class FakeThemeRepository : ThemeRepository {
 
     fun emitDynamicColor(enabled: Boolean) {
         _dynamicColorFlow.value = enabled
+    }
+}
+
+private class FakeLanguageRepository : LanguageRepository {
+    private val _languageFlow = MutableStateFlow(AppLanguage.System)
+    var lastSavedLanguage: AppLanguage? = null
+
+    override val language: Flow<AppLanguage> = _languageFlow
+
+    override suspend fun setLanguage(language: AppLanguage) {
+        lastSavedLanguage = language
+        _languageFlow.value = language
+    }
+
+    fun emitLanguage(language: AppLanguage) {
+        _languageFlow.value = language
     }
 }
