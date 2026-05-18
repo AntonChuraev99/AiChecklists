@@ -307,7 +307,10 @@ fun App() {
 
                 composable<AppNavRoute.ChecklistDetail> { backStackEntry ->
                     val route = backStackEntry.toRoute<AppNavRoute.ChecklistDetail>()
-                    ChecklistDetailScreen(checklistId = route.checklistId)
+                    ChecklistDetailScreen(
+                        checklistId = route.checklistId,
+                        focusItemId = route.focusItemId,
+                    )
                 }
 
                 composable<AppNavRoute.FillDetail> { backStackEntry ->
@@ -799,12 +802,16 @@ private fun NavController.handle(command: NavCommand) {
         is NavCommand.ToAnalyzeResultPreview -> navigate(AppNavRoute.AnalyzeResultPreview)
 
         is NavCommand.ToChecklistDetail -> {
+            val route = AppNavRoute.ChecklistDetail(
+                checklistId = command.checklistId,
+                focusItemId = command.focusItemId,
+            )
             if (command.clearBackStack) {
-                navigate(AppNavRoute.ChecklistDetail(command.checklistId)) {
+                navigate(route) {
                     popUpTo(AppNavRoute.Main) { inclusive = false }
                 }
             } else {
-                navigate(AppNavRoute.ChecklistDetail(command.checklistId))
+                navigate(route)
             }
         }
 

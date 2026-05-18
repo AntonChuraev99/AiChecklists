@@ -70,8 +70,11 @@ class AppNavigatorImpl : AppNavigator {
 
     override fun navigateToAnalyzeResultPreview() = emit(NavCommand.ToAnalyzeResultPreview)
 
-    override fun navigateToChecklistDetail(checklistId: Long, clearBackStack: Boolean) =
-        emit(NavCommand.ToChecklistDetail(checklistId, clearBackStack))
+    override fun navigateToChecklistDetail(
+        checklistId: Long,
+        focusItemId: String?,
+        clearBackStack: Boolean,
+    ) = emit(NavCommand.ToChecklistDetail(checklistId, focusItemId, clearBackStack))
 
     override fun navigateToFillDetail(fillId: Long, clearBackStack: Boolean) =
         emit(NavCommand.ToFillDetail(fillId, clearBackStack))

@@ -71,7 +71,7 @@ private class FakeNavigator : AppNavigator {
     override fun navigateToTemplatePreview(templateId: String) {}
     override fun navigateToAnalyzeScreen(checklistId: Long?, fillDefault: Boolean) {}
     override fun navigateToAnalyzeResultPreview() {}
-    override fun navigateToChecklistDetail(checklistId: Long, clearBackStack: Boolean) {
+    override fun navigateToChecklistDetail(checklistId: Long, focusItemId: String?, clearBackStack: Boolean) {
         navigatedChecklistIds.add(checklistId)
     }
     override fun navigateToFillDetail(fillId: Long, clearBackStack: Boolean) {

@@ -41,6 +41,7 @@ sealed interface NavCommand {
 
     data class ToChecklistDetail(
         val checklistId: Long,
+        val focusItemId: String? = null,
         val clearBackStack: Boolean = false,
     ) : NavCommand
 
