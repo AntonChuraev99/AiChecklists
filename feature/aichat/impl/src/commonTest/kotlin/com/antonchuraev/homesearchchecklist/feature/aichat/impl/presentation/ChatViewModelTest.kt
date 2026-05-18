@@ -594,4 +594,76 @@ class ChatViewModelTest {
         assertEquals("", state.feedbackText, "feedbackText must be cleared after submit")
         assertEquals(false, state.isSubmittingFeedback)
     }
+
+    // ── 16. Success outcome with linkedChecklistId → SideEffect carries the id ──
+
+    @Test
+    fun previewApply_successWithLinkedChecklistId_sideEffectCarriesId() = runTest {
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.CreateItem,
+                confidence = 1.0f,
+                layer = RoutingLayer.Local,
+            )
+        )
+        val fakeDispatcher = FakeToolCallDispatcher(
+            outcome = DispatchOutcome.Success(
+                messageKey = "chat_dispatch_added_to",
+                args = listOf("milk", "Shopping"),
+                linkedChecklistId = 42L,
+            )
+        )
+        val vm = makeVm(repo = repo, dispatcher = fakeDispatcher)
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk to shopping"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+
+        val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            vm.sideEffect.first()
+        }
+
+        vm.sendIntent(ChatScreenIntent.OnPreviewApply)
+
+        val effect = effectDeferred.await()
+        assertIs<ChatScreenSideEffect.ShowAssistantMessage>(effect)
+        assertEquals(42L, effect.linkedChecklistId,
+            "Success outcome linkedChecklistId must be propagated to ShowAssistantMessage")
+    }
+
+    // ── 17. AppendAssistantMessage with linkedChecklistId → persisted on ChatMessage ──
+
+    @Test
+    fun appendAssistantMessage_withLinkedChecklistId_persistedOnMessage() = runTest {
+        val historyRepo = FakeChatHistoryRepository()
+        val vm = makeVm(historyRepo = historyRepo)
+
+        vm.sendIntent(
+            ChatScreenIntent.AppendAssistantMessage(
+                text = "Done! Added «milk» to Shopping.",
+                linkedChecklistId = 99L,
+            )
+        )
+
+        val messages = vm.screenState.value.messages
+        assertEquals(1, messages.size, "AppendAssistantMessage should add one message to state")
+        assertEquals(99L, messages.first().linkedChecklistId,
+            "linkedChecklistId must be forwarded to the ChatMessage domain model")
+    }
+
+    // ── 18. OnOpenChecklist intent → emits NavigateToChecklist SideEffect ────────
+
+    @Test
+    fun onOpenChecklist_emitsNavigateToChecklistSideEffect() = runTest {
+        val vm = makeVm()
+
+        val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            vm.sideEffect.first()
+        }
+
+        vm.sendIntent(ChatScreenIntent.OnOpenChecklist(checklistId = 7L))
+
+        val effect = effectDeferred.await()
+        assertIs<ChatScreenSideEffect.NavigateToChecklist>(effect)
+        assertEquals(7L, effect.checklistId)
+    }
 }

@@ -699,6 +699,9 @@ fun App() {
                             drawerState = drawerState,
                             snackbarHostState = snackbarHostState,
                             onBack = { navController.popBackStack() },
+                            onNavigateToChecklist = { checklistId ->
+                                navController.navigate(AppNavRoute.ChecklistDetail(checklistId))
+                            },
                             onNavigateToPaywall = {
                                 navController.navigate(AppNavRoute.Paywall(source = "chat_credits_chip")) {
                                     launchSingleTop = true

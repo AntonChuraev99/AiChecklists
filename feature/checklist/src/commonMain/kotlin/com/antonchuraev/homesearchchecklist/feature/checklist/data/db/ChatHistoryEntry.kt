@@ -18,4 +18,6 @@ data class ChatHistoryEntry(
     val timestamp: Long,
     val costCredits: Int = 0,
     val routedLayer: String? = null,
+    /** Foreign reference to the affected checklist; null for read/bulk/error messages. */
+    val linkedChecklistId: Long? = null,
 )

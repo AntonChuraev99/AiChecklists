@@ -1011,4 +1011,5 @@
     <string name="chat_feedback_cancel">Cancel</string>
     <string name="chat_feedback_submitted">Thanks for your feedback!</string>
     <string name="chat_feedback_blank_hint">Please enter feedback text</string>
+    <string name="chat_open_checklist">Open checklist</string>
 </resources>

@@ -59,6 +59,7 @@ internal class ChatHistoryRepositoryImpl(
         timestamp = timestamp,
         costCredits = costCredits,
         routedLayer = routedLayer?.toRoutingLayer(),
+        linkedChecklistId = linkedChecklistId,
     )
 
     private fun ChatMessage.toEntry(): ChatHistoryEntry = ChatHistoryEntry(
@@ -71,6 +72,7 @@ internal class ChatHistoryRepositoryImpl(
         timestamp = timestamp,
         costCredits = costCredits,
         routedLayer = routedLayer?.name,
+        linkedChecklistId = linkedChecklistId,
     )
 
     private fun String.toRoutingLayer(): RoutingLayer? = when (this) {

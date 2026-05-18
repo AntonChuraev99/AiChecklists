@@ -14,6 +14,13 @@ sealed interface DispatchOutcome {
     data class Success(
         val messageKey: String,
         val args: List<String> = emptyList(),
+        /**
+         * The checklist that was affected by this operation, if applicable.
+         * Non-null for AddItem, DeleteItem, CompleteItem, SetItemReminder, CreateChecklist.
+         * Null for FindItems, MoveAllReminders, and any error outcomes.
+         * Surfaced in [ChatMessageBubble] as an "Open checklist" deeplink button.
+         */
+        val linkedChecklistId: Long? = null,
     ) : DispatchOutcome
 
     data class AmbiguousMatch(val candidates: List<String>) : DispatchOutcome

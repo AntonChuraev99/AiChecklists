@@ -78,9 +78,9 @@ class ToolCallDispatcherImpl(
         checklistRepository.updateChecklistTemplate(updatedChecklist)
 
         return if (toolCall.checklistHint != null) {
-            DispatchOutcome.Success("chat_dispatch_added_to", listOf(toolCall.itemText, checklist.name))
+            DispatchOutcome.Success("chat_dispatch_added_to", listOf(toolCall.itemText, checklist.name), linkedChecklistId = checklist.id)
         } else {
-            DispatchOutcome.Success("chat_dispatch_added", listOf(toolCall.itemText))
+            DispatchOutcome.Success("chat_dispatch_added", listOf(toolCall.itemText), linkedChecklistId = checklist.id)
         }
     }
 
@@ -103,7 +103,7 @@ class ToolCallDispatcherImpl(
             checklistRepository.updateChecklistTemplate(updatedChecklist)
         }
 
-        return DispatchOutcome.Success("chat_dispatch_deleted", listOf(matchingFillItem.text, checklist.name))
+        return DispatchOutcome.Success("chat_dispatch_deleted", listOf(matchingFillItem.text, checklist.name), linkedChecklistId = checklist.id)
     }
 
     // ─── CompleteItem ─────────────────────────────────────────────────────────
@@ -116,7 +116,7 @@ class ToolCallDispatcherImpl(
             ?: return DispatchOutcome.NotFound("chat_dispatch_item_not_found", listOf(toolCall.itemText, checklist.name))
 
         if (matchingItem.checked) {
-            return DispatchOutcome.Success("chat_dispatch_already_done", listOf(matchingItem.text))
+            return DispatchOutcome.Success("chat_dispatch_already_done", listOf(matchingItem.text), linkedChecklistId = checklist.id)
         }
 
         val updatedFill = fill.copy(
@@ -124,7 +124,7 @@ class ToolCallDispatcherImpl(
         )
         checklistRepository.updateFill(updatedFill)
 
-        return DispatchOutcome.Success("chat_dispatch_completed", listOf(matchingItem.text, checklist.name))
+        return DispatchOutcome.Success("chat_dispatch_completed", listOf(matchingItem.text, checklist.name), linkedChecklistId = checklist.id)
     }
 
     // ─── CreateChecklist ──────────────────────────────────────────────────────
@@ -145,12 +145,12 @@ class ToolCallDispatcherImpl(
             name = toolCall.name,
             items = items,
         )
-        checklistRepository.addChecklist(newChecklist)
+        val newChecklistId = checklistRepository.addChecklist(newChecklist)
 
         return when (toolCall.initialItems.size) {
-            0 -> DispatchOutcome.Success("chat_dispatch_created_empty", listOf(toolCall.name))
-            1 -> DispatchOutcome.Success("chat_dispatch_created_with_one", listOf(toolCall.name))
-            else -> DispatchOutcome.Success("chat_dispatch_created_with_many", listOf(toolCall.name, toolCall.initialItems.size.toString()))
+            0 -> DispatchOutcome.Success("chat_dispatch_created_empty", listOf(toolCall.name), linkedChecklistId = newChecklistId)
+            1 -> DispatchOutcome.Success("chat_dispatch_created_with_one", listOf(toolCall.name), linkedChecklistId = newChecklistId)
+            else -> DispatchOutcome.Success("chat_dispatch_created_with_many", listOf(toolCall.name, toolCall.initialItems.size.toString()), linkedChecklistId = newChecklistId)
         }
     }
 
@@ -170,7 +170,7 @@ class ToolCallDispatcherImpl(
         )
         checklistRepository.updateFill(updatedFill)
 
-        return DispatchOutcome.Success("chat_dispatch_reminder_set", listOf(matchingItem.text, formatTimestamp(toolCall.at)))
+        return DispatchOutcome.Success("chat_dispatch_reminder_set", listOf(matchingItem.text, formatTimestamp(toolCall.at)), linkedChecklistId = checklist.id)
     }
 
     // ─── MoveAllReminders ─────────────────────────────────────────────────────

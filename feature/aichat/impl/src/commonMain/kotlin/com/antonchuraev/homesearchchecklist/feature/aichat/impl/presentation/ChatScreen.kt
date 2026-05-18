@@ -102,14 +102,21 @@ fun ChatScreen(
     // the user opens straight into the latest message — no visible scroll animation.
     // Subsequent count changes (new user/assistant message, typing indicator) keep
     // the smooth animateScrollToItem behaviour.
+    //
+    // scrollOffset = -10000: when the preview-card appears it can be taller than
+    // animateScrollToItem(0) leaves room for (the call only aligns item top-edge
+    // to viewport bottom-edge, so a tall card stays partially hidden behind the
+    // input row). A large negative offset asks the list to overscroll into the
+    // bottom, which LazyColumn clamps to "show the full last item flush against
+    // the input row" — the user always sees the Apply button.
     val hasInitializedScroll = remember { mutableStateOf(false) }
-    LaunchedEffect(totalItemCount) {
+    LaunchedEffect(totalItemCount, state.pendingPreview != null) {
         if (totalItemCount > 0) {
             if (!hasInitializedScroll.value) {
-                listState.scrollToItem(0)            // instant
+                listState.scrollToItem(0, scrollOffset = -10000)
                 hasInitializedScroll.value = true
             } else {
-                listState.animateScrollToItem(0)     // animated
+                listState.animateScrollToItem(0, scrollOffset = -10000)
             }
         }
     }
@@ -194,6 +201,9 @@ fun ChatScreen(
                     ChatMessageBubble(
                         message = message,
                         onFeedbackClick = { onIntent(ChatScreenIntent.OnFeedbackOpen(it)) },
+                        onOpenChecklist = message.linkedChecklistId?.let { id ->
+                            { onIntent(ChatScreenIntent.OnOpenChecklist(id)) }
+                        },
                     )
                 }
 

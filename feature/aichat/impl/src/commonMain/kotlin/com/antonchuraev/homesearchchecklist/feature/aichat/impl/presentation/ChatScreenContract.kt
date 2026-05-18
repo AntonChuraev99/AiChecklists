@@ -86,8 +86,13 @@ sealed interface ChatScreenIntent : Intent {
      * [ChatScreenSideEffect.ShowAssistantMessage] with a string-resource key,
      * ChatRoute resolves it via stringResource() in Composable scope, then
      * sends it back here so the message lands in the chat history.
+     * [linkedChecklistId] is preserved through the round-trip so the bubble
+     * can show an "Open checklist" button for successful write-intent outcomes.
      */
-    data class AppendAssistantMessage(val text: String) : ChatScreenIntent
+    data class AppendAssistantMessage(
+        val text: String,
+        val linkedChecklistId: Long? = null,
+    ) : ChatScreenIntent
 
     /** User approved the pending write-intent preview. */
     data object OnPreviewApply : ChatScreenIntent
@@ -118,6 +123,9 @@ sealed interface ChatScreenIntent : Intent {
 
     /** User dismissed the feedback sheet (drag, scrim tap, or Cancel button). */
     data object OnFeedbackDismiss : ChatScreenIntent
+
+    /** User tapped the "Open checklist" deeplink button on an assistant bubble. */
+    data class OnOpenChecklist(val checklistId: Long) : ChatScreenIntent
 }
 
 // ---------------------------------------------------------------------------
@@ -132,12 +140,18 @@ sealed interface ChatScreenSideEffect : SideEffect {
      * Ask ChatRoute to resolve a localised assistant message and append it to the chat.
      * Avoids hardcoded EN strings in ViewModel — Composable scope owns string-resource lookup.
      * Optional [args] support `%1$s` / `%2$s` etc. placeholder substitution.
+     * [linkedChecklistId] is forwarded to [ChatMessage] so the bubble can show an "Open
+     * checklist" deeplink button for successful write-intent dispatch outcomes.
      */
     data class ShowAssistantMessage(
         val messageKey: String,
         val args: List<String> = emptyList(),
+        val linkedChecklistId: Long? = null,
     ) : ChatScreenSideEffect
 
     /** Navigate back (handled by the host NavController). */
     data object NavigateBack : ChatScreenSideEffect
+
+    /** Navigate to [ChecklistDetail] for the given checklist (triggered by "Open checklist" button). */
+    data class NavigateToChecklist(val checklistId: Long) : ChatScreenSideEffect
 }
