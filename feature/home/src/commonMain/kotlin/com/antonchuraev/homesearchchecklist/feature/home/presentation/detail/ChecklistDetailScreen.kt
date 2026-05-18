@@ -192,6 +192,7 @@ import org.koin.core.parameter.parametersOf
 @Composable
 fun ChecklistDetailScreen(
     checklistId: Long,
+    focusItemId: String? = null,
     viewModel: ChecklistDetailViewModel = koinViewModel { parametersOf(checklistId) }
 ) {
     val analyticsTracker: AnalyticsTracker = koinInject()
@@ -211,7 +212,8 @@ fun ChecklistDetailScreen(
         )
         is ChecklistDetailState.Content -> ChecklistDetailContent(
             state = currentState,
-            onIntent = viewModel::sendIntent
+            onIntent = viewModel::sendIntent,
+            focusItemId = focusItemId,
         )
     }
 }
@@ -248,7 +250,8 @@ private fun NotFoundContent(onBack: () -> Unit) {
 @Composable
 private fun ChecklistDetailContent(
     state: ChecklistDetailState.Content,
-    onIntent: (ChecklistDetailIntent) -> Unit
+    onIntent: (ChecklistDetailIntent) -> Unit,
+    focusItemId: String? = null,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val smartAddHintActive = remember { mutableStateOf(false) }
@@ -373,6 +376,71 @@ private fun ChecklistDetailContent(
     val listState = rememberLazyListState()
     val hapticFeedback = LocalHapticFeedback.current
     // coroutineScope declared above (shared with attachment open-externally handler)
+
+    // ── Focus-item scroll + highlight (from Calendar deeplink) ─────────────────
+    // highlightedItemId drives animateColorAsState in ChecklistItemCard for a
+    // ~1s primaryContainer flash — same timing as CalendarScreen DateHeader highlight.
+    var highlightedItemId by remember { mutableStateOf<String?>(null) }
+    // One-shot guard: scroll happens only once per screen entry, not on every
+    // recomposition or back-stack restore. rememberSaveable survives configuration change.
+    var didFocusScroll by rememberSaveable { mutableStateOf(false) }
+
+    // Fade out the highlight after 1 s
+    LaunchedEffect(highlightedItemId) {
+        if (highlightedItemId == null) return@LaunchedEffect
+        kotlinx.coroutines.delay(1000L)
+        highlightedItemId = null
+    }
+
+    // Scroll to focusItemId once, as soon as items are available in state.
+    // Key includes defaultFill?.items so we retry if state was Loading when first composed.
+    LaunchedEffect(focusItemId, state.defaultFill?.items) {
+        if (didFocusScroll || focusItemId == null) return@LaunchedEffect
+        val fill = state.defaultFill ?: return@LaunchedEffect
+
+        // Derive unchecked / completed split exactly as the LazyColumn does.
+        val sourceUnchecked = if (state.separateCompleted) {
+            fill.items.filter { !it.checked }
+        } else {
+            fill.items
+        }
+        val completedInState = if (state.separateCompleted) {
+            fill.items.filter { it.checked }
+        } else {
+            emptyList()
+        }
+
+        // Compute target index in the LazyColumn:
+        //   slot 0 : ProgressHeader  (always)
+        //   slot 1 : ViewAllFillsCard (conditional)
+        //   slots … : unchecked items
+        //   slot   : inline_add_item (conditional — not active on fresh open)
+        //   slot   : completed_header (conditional)
+        //   slots … : completed items (conditional)
+        var index = 1 // ProgressHeader
+        if (state.additionalFillsCount > 0) index += 1 // ViewAllFillsCard
+
+        val uncheckedIdx = sourceUnchecked.indexOfFirst { it.id == focusItemId }
+        if (uncheckedIdx >= 0) {
+            index += uncheckedIdx
+        } else {
+            // Not in unchecked — look in completed section
+            index += sourceUnchecked.size
+            // inline_add_item is not active on first open (addItemActive == false)
+            if (state.separateCompleted && completedInState.isNotEmpty()) {
+                val completedIdx = completedInState.indexOfFirst { it.id == focusItemId }
+                if (completedIdx < 0) return@LaunchedEffect // item not found at all
+                index += 1 // completed_header
+                index += completedIdx
+            } else {
+                return@LaunchedEffect // item not found
+            }
+        }
+
+        listState.animateScrollToItem(index)
+        highlightedItemId = focusItemId
+        didFocusScroll = true
+    }
 
     // Wiggle animation for edit mode
     val wiggleTransition = rememberInfiniteTransition(label = "wiggle")
@@ -620,6 +688,7 @@ private fun ChecklistDetailContent(
                                         isEditMode = true
                                     }
                                 },
+                                isHighlighted = item.id == highlightedItemId,
                                 cardDragModifier = Modifier.longPressDraggableHandle(
                                     onDragStarted = {
                                         hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -698,6 +767,7 @@ private fun ChecklistDetailContent(
                                             isEditMode = true
                                         }
                                     },
+                                    isHighlighted = item.id == highlightedItemId,
                                 )
                             }
                         }
@@ -1147,10 +1217,20 @@ internal fun ChecklistItemCard(
     onCheckedChange: (Boolean) -> Unit,
     onItemTap: () -> Unit,
     onLongClick: () -> Unit,
+    isHighlighted: Boolean = false,
     cardDragModifier: Modifier = Modifier,
     modifier: Modifier = Modifier
 ) {
     val isDark = LocalIsDarkTheme.current
+
+    // Highlight animation: flash primaryContainer for ~1 s when navigated from Calendar.
+    // animateColorAsState provides a smooth fade-in/out over 280 ms on both edges.
+    val highlightColor by animateColorAsState(
+        targetValue = if (isHighlighted) MaterialTheme.colorScheme.primaryContainer
+        else Color.Transparent,
+        animationSpec = tween(durationMillis = 280),
+        label = "item_highlight",
+    )
 
     val cardModifier = modifier
         .fillMaxWidth()
@@ -1163,6 +1243,14 @@ internal fun ChecklistItemCard(
 
     val cardContent: @Composable () -> Unit = {
         Box(modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp)) {
+            // ── Highlight overlay: drawn first (behind content), fades in/out ──
+            if (highlightColor != Color.Transparent) {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(highlightColor)
+                )
+            }
             // ── Visual layer: Checkbox + Text at original positions ──
             Row(
                 modifier = Modifier

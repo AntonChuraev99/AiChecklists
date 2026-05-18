@@ -294,7 +294,7 @@ class ChecklistDetailReminderGateTest {
         override fun navigateToTemplatePreview(templateId: String) {}
         override fun navigateToAnalyzeScreen(checklistId: Long?, fillDefault: Boolean) {}
         override fun navigateToAnalyzeResultPreview() {}
-        override fun navigateToChecklistDetail(checklistId: Long, clearBackStack: Boolean) {}
+        override fun navigateToChecklistDetail(checklistId: Long, focusItemId: String?, clearBackStack: Boolean) {}
         override fun navigateToFillDetail(fillId: Long, clearBackStack: Boolean) {}
         override fun navigateToFillsList(checklistId: Long) {}
         var lastPaywallSource: String? = null

@@ -60,8 +60,13 @@ interface AppNavigator {
 
     /**
      * Navigate to checklist detail. If clearBackStack is true, clears back stack to main screen.
+     * If focusItemId is provided, the screen will scroll to that item and briefly highlight it.
      */
-    fun navigateToChecklistDetail(checklistId: Long, clearBackStack: Boolean = false)
+    fun navigateToChecklistDetail(
+        checklistId: Long,
+        focusItemId: String? = null,
+        clearBackStack: Boolean = false,
+    )
 
     /**
      * Navigate to fill detail. If clearBackStack is true, clears back stack to main screen.

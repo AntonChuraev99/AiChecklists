@@ -72,7 +72,10 @@ class CalendarViewModel(
     private fun handleReminderClick(info: TodayReminderInfo) {
         when (info) {
             is TodayReminderInfo.ItemLevel ->
-                appNavigator.navigateToFillDetail(info.fillId)
+                appNavigator.navigateToChecklistDetail(
+                    checklistId = info.checklistId,
+                    focusItemId = info.itemId,
+                )
             is TodayReminderInfo.ChecklistLevel ->
                 appNavigator.navigateToChecklistDetail(info.checklistId)
         }

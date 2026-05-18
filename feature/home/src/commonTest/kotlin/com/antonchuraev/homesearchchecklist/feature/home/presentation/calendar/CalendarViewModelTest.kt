@@ -30,6 +30,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 // ─── Time constants ───────────────────────────────────────────────────────────
@@ -119,10 +120,15 @@ private open class FakeChecklistRepository : ChecklistRepository {
     override suspend fun removeAttachment(fillId: Long, itemId: String, attachmentId: String) = Unit
 }
 
+private data class ChecklistDetailCall(val checklistId: Long, val focusItemId: String?)
+
 private class FakeNavigator : AppNavigator {
-    val navigatedChecklistIds = mutableListOf<Long>()
+    val checklistDetailCalls = mutableListOf<ChecklistDetailCall>()
     val navigatedFillIds = mutableListOf<Long>()
     var navigatedToTemplates = false
+
+    /** Convenience: all checklist IDs navigated to (ignoring focusItemId). */
+    val navigatedChecklistIds: List<Long> get() = checklistDetailCalls.map { it.checklistId }
 
     override val commands: Flow<NavCommand> = emptyFlow()
     override val events: SharedFlow<AppNavEvent> = MutableSharedFlow()
@@ -140,8 +146,8 @@ private class FakeNavigator : AppNavigator {
     override fun navigateToTemplatePreview(templateId: String) {}
     override fun navigateToAnalyzeScreen(checklistId: Long?, fillDefault: Boolean) {}
     override fun navigateToAnalyzeResultPreview() {}
-    override fun navigateToChecklistDetail(checklistId: Long, clearBackStack: Boolean) {
-        navigatedChecklistIds.add(checklistId)
+    override fun navigateToChecklistDetail(checklistId: Long, focusItemId: String?, clearBackStack: Boolean) {
+        checklistDetailCalls.add(ChecklistDetailCall(checklistId, focusItemId))
     }
     override fun navigateToFillDetail(fillId: Long, clearBackStack: Boolean) {
         navigatedFillIds.add(fillId)
@@ -376,7 +382,7 @@ class CalendarViewModelTest {
         assertEquals(2, updatedState.agenda.filterIsInstance<AgendaItem.ReminderRow>().size)
     }
 
-    // ── 8a. Intent: OnReminderClick checklist-level → navigateToChecklistDetail
+    // ── 8a. Intent: OnReminderClick checklist-level → navigateToChecklistDetail (legacy name kept)
 
     @Test
     fun intent_onReminderClick_checklistLevel_navigatesToChecklistDetail() = runTest {
@@ -389,17 +395,40 @@ class CalendarViewModelTest {
         assertTrue(navigator.navigatedFillIds.isEmpty())
     }
 
-    // ── 8b. Intent: OnReminderClick item-level → navigateToFillDetail ────────
+    // ── 8b. Intent: OnReminderClick item-level → navigateToChecklistDetail with focusItemId ──
 
     @Test
-    fun intent_onReminderClick_itemLevel_navigatesToFillDetail() = runTest {
+    fun intent_onReminderClick_itemLevel_navigatesToChecklistDetailWithFocusItemId() = runTest {
         val vm = buildVm()
-        val info = itemReminder(fillId = 42L, reminderAt = TODAY_3PM_MS)
+        val info = itemReminder(
+            checklistId = 42L,
+            fillId = 99L,
+            itemId = "item-7",
+            itemText = "Buy milk",
+            reminderAt = TODAY_3PM_MS,
+        )
 
         vm.sendIntent(CalendarIntent.OnReminderClick(info))
 
-        assertEquals(listOf(42L), navigator.navigatedFillIds)
-        assertTrue(navigator.navigatedChecklistIds.isEmpty())
+        assertEquals(1, navigator.checklistDetailCalls.size)
+        assertEquals(42L, navigator.checklistDetailCalls[0].checklistId)
+        assertEquals("item-7", navigator.checklistDetailCalls[0].focusItemId)
+        assertTrue(navigator.navigatedFillIds.isEmpty(), "FillDetail must NOT be used for item-level reminders")
+    }
+
+    // ── 8c. Intent: OnReminderClick checklist-level → navigateToChecklistDetail without focusItemId
+
+    @Test
+    fun intent_onReminderClick_checklistLevel_navigatesToChecklistDetailWithoutFocusItemId() = runTest {
+        val vm = buildVm()
+        val info = checklistReminder(checklistId = 7L, reminderAt = TODAY_3PM_MS)
+
+        vm.sendIntent(CalendarIntent.OnReminderClick(info))
+
+        assertEquals(1, navigator.checklistDetailCalls.size)
+        assertEquals(7L, navigator.checklistDetailCalls[0].checklistId)
+        assertNull(navigator.checklistDetailCalls[0].focusItemId)
+        assertTrue(navigator.navigatedFillIds.isEmpty())
     }
 
     // ── 11. Intent: OnCreateChecklistClick → navigateToTemplatesScreen ────────

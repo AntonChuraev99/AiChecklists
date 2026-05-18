@@ -93,7 +93,7 @@ class AppNavigatorImplTest {
         val job = launch { nav.commands.toList(received) }
         advanceUntilIdle()
 
-        assertEquals(NavCommand.ToChecklistDetail(checklistId = 42L, clearBackStack = true), received[0])
+        assertEquals(NavCommand.ToChecklistDetail(checklistId = 42L, focusItemId = null, clearBackStack = true), received[0])
         assertEquals(NavCommand.ToPaywallVariant(source = "debug", forceVariant = "timeline"), received[1])
         assertEquals(NavCommand.ToFillDetail(fillId = 99L, clearBackStack = false), received[2])
         assertEquals(NavCommand.ToCreateChecklistScreen(templateId = 7), received[3])
@@ -237,7 +237,7 @@ class AppNavigatorImplTest {
         advanceUntilIdle()
 
         assertEquals(NavCommand.ToMainScreen(clearBackStack = false), received[0])
-        assertEquals(NavCommand.ToChecklistDetail(checklistId = 10L, clearBackStack = false), received[1])
+        assertEquals(NavCommand.ToChecklistDetail(checklistId = 10L, focusItemId = null, clearBackStack = false), received[1])
         assertEquals(NavCommand.ToFillDetail(fillId = 20L, clearBackStack = false), received[2])
         assertEquals(NavCommand.ToPaywall(source = "unknown"), received[3])
         assertEquals(NavCommand.ToSubscriptionStatus(showSuccessMessage = false), received[4])
@@ -268,6 +268,32 @@ class AppNavigatorImplTest {
         advanceUntilIdle()
 
         assertEquals(0, received.size, "replay=0 must not deliver prior events to late subscribers")
+        job.cancel()
+    }
+
+    // ---------------------------------------------------------------------------
+    // Test 9: navigateToChecklistDetail with focusItemId carries it through Channel
+    // ---------------------------------------------------------------------------
+
+    /**
+     * When navigating to checklist detail with a focusItemId (from Calendar reminder deeplink),
+     * the focusItemId must be preserved round-trip through the Channel so App.kt
+     * can pass it to ChecklistDetailScreen for scroll-and-highlight.
+     */
+    @Test
+    fun commands_checklistDetailWithFocusItemId_carriedThroughChannel() = runTest {
+        val nav = AppNavigatorImpl()
+        nav.navigateToChecklistDetail(checklistId = 55L, focusItemId = "item-abc")
+
+        val received = mutableListOf<NavCommand>()
+        val job = launch { nav.commands.toList(received) }
+        advanceUntilIdle()
+
+        assertEquals(1, received.size)
+        val cmd = received[0] as NavCommand.ToChecklistDetail
+        assertEquals(55L, cmd.checklistId)
+        assertEquals("item-abc", cmd.focusItemId)
+        assertEquals(false, cmd.clearBackStack)
         job.cancel()
     }
 }
