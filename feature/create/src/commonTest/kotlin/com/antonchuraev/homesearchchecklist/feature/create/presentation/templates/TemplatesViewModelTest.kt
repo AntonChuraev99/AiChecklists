@@ -191,6 +191,7 @@ class TemplatesViewModelTest {
         override fun navigateToSettings() {}
         override fun navigateToToday() {}
         override fun navigateToCalendar() {}
+        override fun navigateToAiChat() {}
         override fun navigateToScreenCatalog() {}
         override fun showWidgetInstruction() {}
         override fun requestCreateWeeklyChecklist() {}

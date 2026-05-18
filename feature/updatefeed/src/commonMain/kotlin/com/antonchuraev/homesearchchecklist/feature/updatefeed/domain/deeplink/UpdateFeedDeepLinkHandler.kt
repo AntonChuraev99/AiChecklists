@@ -50,6 +50,14 @@ class UpdateFeedDeepLinkHandler(private val navigator: AppNavigator) {
                 navigator.showWidgetInstruction()
                 true
             }
+            "ai_chat" -> {
+                navigator.navigateToAiChat()
+                true
+            }
+            "calendar" -> {
+                navigator.navigateToCalendar()
+                true
+            }
             else -> false
         }
     }

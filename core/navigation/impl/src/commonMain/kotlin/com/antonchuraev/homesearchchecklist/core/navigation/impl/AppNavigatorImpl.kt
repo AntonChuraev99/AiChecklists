@@ -101,5 +101,7 @@ class AppNavigatorImpl : AppNavigator {
 
     override fun navigateToCalendar() = emit(NavCommand.ToCalendar)
 
+    override fun navigateToAiChat() = emit(NavCommand.ToAiChat)
+
     override fun navigateToScreenCatalog() = emit(NavCommand.ToScreenCatalog)
 }

@@ -92,5 +92,7 @@ interface AppNavigator {
 
     fun navigateToCalendar()
 
+    fun navigateToAiChat()
+
     fun navigateToScreenCatalog()
 }

@@ -6,6 +6,7 @@ import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.core.navigation.api.NavCommand
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Attachment
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistRepeatInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
@@ -108,6 +109,7 @@ class UpdateFeedViewModelTest {
         override fun navigateToSettings() {}
         override fun navigateToToday() {}
         override fun navigateToCalendar() {}
+        override fun navigateToAiChat() {}
         override fun navigateToScreenCatalog() {}
         override fun showWidgetInstruction() {}
         override fun requestCreateWeeklyChecklist() {}
@@ -189,6 +191,8 @@ class UpdateFeedViewModelTest {
         override suspend fun getRemindersInRange(fromMs: Long, toMs: Long): List<TodayReminderInfo> = emptyList()
         override suspend fun togglePriority(fillId: Long, itemId: String): Result<Unit> = Result.success(Unit)
         override fun observeRemindersInRange(fromMs: Long, toMs: Long): Flow<List<TodayReminderInfo>> = flowOf(emptyList())
+        override suspend fun addAttachment(fillId: Long, itemId: String, attachment: Attachment) {}
+        override suspend fun removeAttachment(fillId: Long, itemId: String, attachmentId: String) {}
     }
 
     private class FakeUserDataRepository : UserDataRepository {

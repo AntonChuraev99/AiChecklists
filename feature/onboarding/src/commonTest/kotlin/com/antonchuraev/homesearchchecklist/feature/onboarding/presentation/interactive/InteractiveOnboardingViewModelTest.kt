@@ -1239,6 +1239,7 @@ class InteractiveOnboardingViewModelTest {
         override fun navigateToSettings() {}
         override fun navigateToToday() {}
         override fun navigateToCalendar() {}
+        override fun navigateToAiChat() {}
         override fun navigateToScreenCatalog() {}
     }
 

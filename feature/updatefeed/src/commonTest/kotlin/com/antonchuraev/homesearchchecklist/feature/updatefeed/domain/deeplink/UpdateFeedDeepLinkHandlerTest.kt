@@ -24,6 +24,8 @@ class UpdateFeedDeepLinkHandlerTest {
         var mainScreenCallCount = 0
         var widgetInstructionCallCount = 0
         var backCallCount = 0
+        var aiChatCallCount = 0
+        var calendarCallCount = 0
 
         override val commands: Flow<NavCommand> = emptyFlow()
         override val events: SharedFlow<AppNavEvent> = MutableSharedFlow()
@@ -52,7 +54,8 @@ class UpdateFeedDeepLinkHandlerTest {
         override fun navigateToUpdateFeed() { updateFeedCallCount++ }
         override fun navigateToSettings() {}
         override fun navigateToToday() {}
-        override fun navigateToCalendar() {}
+        override fun navigateToCalendar() { calendarCallCount++ }
+        override fun navigateToAiChat() { aiChatCallCount++ }
         override fun navigateToScreenCatalog() {}
         override fun showWidgetInstruction() { widgetInstructionCallCount++ }
         override fun requestCreateWeeklyChecklist() { requestCreateWeeklyChecklistCount++ }
@@ -187,6 +190,22 @@ class UpdateFeedDeepLinkHandlerTest {
         val result = handler.handle("gisti://widget_instruction")
         assertTrue(result)
         assertEquals(1, nav.widgetInstructionCallCount)
+    }
+
+    @Test
+    fun `handle_aiChatUri_navigatesToAiChat`() {
+        val (handler, nav) = createHandler()
+        val result = handler.handle("gisti://ai_chat")
+        assertTrue(result)
+        assertEquals(1, nav.aiChatCallCount)
+    }
+
+    @Test
+    fun `handle_calendarUri_navigatesToCalendar`() {
+        val (handler, nav) = createHandler()
+        val result = handler.handle("gisti://calendar")
+        assertTrue(result)
+        assertEquals(1, nav.calendarCallCount)
     }
 
     @Test
