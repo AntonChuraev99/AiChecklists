@@ -1320,8 +1320,15 @@ Rules:
 - Match the user's language. Russian, English and mixed input are all valid.
 - "В чек-лист X добавь Y" or "Add Y to X" both mean intent=create_item, itemText=Y, checklistHint=X.
 - "Перенеси все напоминания с понедельника на среду" → move_reminders, dateIso=null (server resolves dates).
+- The itemText may itself START WITH A VERB ("заказать", "купить", "позвонить", "order", "buy", "call", "book"). Keep the whole phrase as itemText — DO NOT treat the inner verb as a separate intent. Examples that MUST be intent=create_item:
+  - "добавь заказать два мусорных ведра в дела" → itemText="заказать два мусорных ведра", checklistHint="дела"
+  - "запиши в дела заказать два мусорных ведра" → itemText="заказать два мусорных ведра", checklistHint="дела"
+  - "add order two trash cans to chores" → itemText="order two trash cans", checklistHint="chores"
+  - "note down call mom in today" → itemText="call mom", checklistHint="today"
+- Russian create_item synonyms (ALL imply intent=create_item): добавь, добавить, запиши, записать, закинь, кинь, вбей, купи, купить, положи, поставь.
+- English create_item synonyms: add, put, write down, note, note down, jot, jot down, log, record, pencil in, queue up, include, insert, buy, get, pick up.
 - If a phrase is genuinely ambiguous, prefer "unknown" with confidence < 0.5 over guessing.
-- If the user asks a free-form question (planning, summary), set intent=free_form.
+- Reserve intent=free_form ONLY for open-ended questions (planning, summary, off-topic chat). If the user clearly issues a command — even if you cannot extract a clean itemText — prefer the matching command intent with confidence ≤ 0.5 so the client can show an honest "could not parse" hint, instead of bouncing the user to free_form Layer 3.
 
 Date parsing (set_reminder only — return dateIso in ISO 8601 with the user's timezone offset):
 - ALWAYS compute relative to "Current UTC time" below — do not use any training-data baseline.
@@ -1554,7 +1561,7 @@ Rules:
 - Reply in the user's language ({locale}). Be concise — 1–3 short paragraphs max.
 - Use markdown bullets or numbered lists only when listing items. No headings.
 - Refer only to the user's actual checklists shown below. Do not invent items.
-- If the user asks for a mutation ("delete item X"), reply: "Just type the command directly, e.g. «remove X from groceries» — I'll show a preview." Do not perform mutations from this endpoint.
+- If the user's message looks like a mutation command (add / delete / complete an item, set a reminder, create or rename a checklist, move reminders), DO NOT echo their command back as an example, and DO NOT tell them to "type the command directly" — they already did. Instead, briefly say (in the user's language) that you did not quite parse this specific phrasing, then suggest they try shorter and simpler wording (e.g. one item per command). Never quote a near-verbatim version of what they just wrote as the "correct" way.
 - If the user goes fully off-topic (weather, math), politely redirect to checklist help.
 
 Current UTC time: {now_utc}

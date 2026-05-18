@@ -9,9 +9,12 @@ package com.antonchuraev.homesearchchecklist.feature.aichat.impl.parser.lexicon
 internal object EnIntentLexicon {
 
     // ─── CreateItem ───────────────────────────────────────────────────────────
-    // "add milk to shopping", "buy milk", "write down milk"
+    // "add milk to shopping", "buy milk", "write down milk", "note down call dentist", "jot down..."
     val createItem: Set<String> = setOf(
         "write down",
+        "note down",
+        "jot down",
+        "pencil in",
         "add",
         "buy",
         "get",
@@ -19,6 +22,10 @@ internal object EnIntentLexicon {
         "pick up",
         "include",
         "insert",
+        "note",
+        "jot",
+        "log",
+        "record",
     )
 
     // ─── DeleteItem ───────────────────────────────────────────────────────────
