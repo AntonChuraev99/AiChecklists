@@ -978,6 +978,6 @@
     <string name="chat_feedback_placeholder">Что было не так? Чего не хватило?</string>
     <string name="chat_feedback_submit">Отправить</string>
     <string name="chat_feedback_cancel">Отмена</string>
-    <string name="chat_feedback_submitted">Спасибо! Отзыв отправлен.</string>
+    <string name="chat_feedback_submitted">Спасибо за обратную связь!</string>
     <string name="chat_feedback_blank_hint">Введите текст отзыва</string>
 </resources>

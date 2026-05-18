@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.RateReview
 import androidx.compose.material3.Icon
@@ -35,6 +36,11 @@ import org.jetbrains.compose.resources.stringResource
  * Bubble shapes use an asymmetric corner strategy (the "tail" corner is 4dp):
  *  User:      top-start=16, top-end=16, bottom-end=4, bottom-start=16
  *  Assistant: top-start=16, top-end=16, bottom-end=16, bottom-start=4
+ *
+ * Text inside every bubble is wrapped in [SelectionContainer] so the user can
+ * long-press to select + copy via the platform's native selection toolbar
+ * (Android: long-press → handles + Copy in the contextual action bar;
+ *  iOS: long-press → magnifier + Copy menu; wasmJs: drag-select like normal web text).
  *
  * Max bubble width is capped at 75% of the parent width so long messages don't
  * take up the full screen and the left/right alignment remains visually distinct.
@@ -78,27 +84,29 @@ fun ChatMessageBubble(
                 },
                 modifier = Modifier.widthIn(max = 280.dp),
             ) {
-                if (isUser) {
-                    Text(
-                        text = message.content,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.padding(
-                            horizontal = AppDimens.SpacingMd,
-                            vertical = AppDimens.SpacingSm,
-                        ),
-                    )
-                } else {
-                    ChatMarkdownText(
-                        markdown = message.content,
-                        style = MaterialTheme.typography.bodyMedium,
-                        // surfaceContainerHigh pairs with onSurface per MD3 tonal pairing rules
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(
-                            horizontal = AppDimens.SpacingMd,
-                            vertical = AppDimens.SpacingSm,
-                        ),
-                    )
+                SelectionContainer {
+                    if (isUser) {
+                        Text(
+                            text = message.content,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.padding(
+                                horizontal = AppDimens.SpacingMd,
+                                vertical = AppDimens.SpacingSm,
+                            ),
+                        )
+                    } else {
+                        ChatMarkdownText(
+                            markdown = message.content,
+                            style = MaterialTheme.typography.bodyMedium,
+                            // surfaceContainerHigh pairs with onSurface per MD3 tonal pairing rules
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(
+                                horizontal = AppDimens.SpacingMd,
+                                vertical = AppDimens.SpacingSm,
+                            ),
+                        )
+                    }
                 }
             }
 

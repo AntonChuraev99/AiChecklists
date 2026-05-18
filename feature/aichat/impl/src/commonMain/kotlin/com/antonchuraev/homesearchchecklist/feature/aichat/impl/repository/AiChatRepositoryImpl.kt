@@ -78,6 +78,30 @@ internal class AiChatRepositoryImpl(
         return when (val remote = classifierApi.classify(userId, input, locale)) {
             is RemoteClassificationResult.Success -> {
                 logger.info(TAG, "Layer2 success: ${remote.intent::class.simpleName} conf=${remote.confidence} credits_remaining=${remote.creditsRemaining}")
+                // Graceful Layer 1 preference: if the cloud classifier gave up (FreeForm or Unknown)
+                // BUT the local router already matched a concrete command-intent, prefer the local
+                // result. This routes the user straight to a preview-card instead of burning 3 more
+                // credits on Layer 3 only to get a "sorry, didn't quite parse..." meta-reply.
+                // Real-world signal: ai_chat_feedback events showed Layer 3 spam on phrases like
+                // «добавь в дела купить 2 мус ведра» where Layer 1 was already confident enough.
+                val classifierIsVague = remote.intent is ChatIntent.FreeForm ||
+                    remote.intent is ChatIntent.Unknown
+                val layer1IsCommand = layer1.intent !is ChatIntent.Unknown &&
+                    layer1.intent !is ChatIntent.FreeForm
+                if (classifierIsVague && layer1IsCommand) {
+                    logger.info(
+                        TAG,
+                        "Layer2 vague (${remote.intent::class.simpleName}) — preferring Layer1 ${layer1.intent::class.simpleName}",
+                    )
+                    // Bump confidence to threshold so downstream handlers treat it as actionable,
+                    // but mark layer=Classifier because the credit was already spent on Layer 2.
+                    return IntentClassification(
+                        intent = layer1.intent,
+                        confidence = maxOf(layer1.confidence, LAYER_1_CONFIDENCE_THRESHOLD),
+                        layer = RoutingLayer.Classifier,
+                        preBuiltToolCall = null,
+                    )
+                }
                 IntentClassification(
                     intent = remote.intent,
                     confidence = remote.confidence,

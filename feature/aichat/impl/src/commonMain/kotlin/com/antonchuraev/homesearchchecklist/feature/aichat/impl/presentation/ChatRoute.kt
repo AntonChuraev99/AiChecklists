@@ -34,6 +34,8 @@ import aichecklists.core.designsystem.generated.resources.chat_dispatch_no_remin
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_operation_failed
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_reminder_set
 import aichecklists.core.designsystem.generated.resources.chat_extract_fail
+import aichecklists.core.designsystem.generated.resources.chat_feedback_blank_hint
+import aichecklists.core.designsystem.generated.resources.chat_feedback_submitted
 import aichecklists.core.designsystem.generated.resources.chat_generic_error
 import aichecklists.core.designsystem.generated.resources.chat_not_found
 import aichecklists.core.designsystem.generated.resources.chat_requires_premium
@@ -104,6 +106,8 @@ fun ChatRoute(
     val insufficientCreditsText = stringResource(Res.string.chat_insufficient_credits)
     val completionErrorText = stringResource(Res.string.chat_completion_error)
     val historyLoadErrorText = stringResource(Res.string.chat_history_load_error)
+    val feedbackSubmittedText = stringResource(Res.string.chat_feedback_submitted)
+    val feedbackBlankHintText = stringResource(Res.string.chat_feedback_blank_hint)
 
     val messages = remember(
         unknownText, genericErrorText, applyErrorText, extractFailText,
@@ -115,6 +119,7 @@ fun ChatRoute(
         dispatchFindBlankText, dispatchFindNoMatchFmt, dispatchFindSuccessFmt,
         dispatchOperationFailedFmt, dispatchNoChecklistsText, dispatchNoChecklistMatchFmt,
         dispatchFillLoadFailedFmt, insufficientCreditsText, completionErrorText, historyLoadErrorText,
+        feedbackSubmittedText, feedbackBlankHintText,
     ) {
         mapOf(
             "chat_unknown_intent_hint" to unknownText,
@@ -147,6 +152,8 @@ fun ChatRoute(
             "chat_insufficient_credits" to insufficientCreditsText,
             "chat_completion_error" to completionErrorText,
             "chat_history_load_error" to historyLoadErrorText,
+            "chat_feedback_submitted" to feedbackSubmittedText,
+            "chat_feedback_blank_hint" to feedbackBlankHintText,
         )
     }
 

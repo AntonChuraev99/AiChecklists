@@ -202,7 +202,9 @@ fun ChatScreen(
                 // No feedback callback for the welcome bubble — it's a static affordance,
                 // not a real AI response to user input.
                 item(key = "__welcome") {
-                    ChatMessageBubble(message = welcomeBubble)
+                    ChatMessageBubble(
+                        message = welcomeBubble,
+                    )
                 }
             }
 

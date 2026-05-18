@@ -1009,6 +1009,6 @@
     <string name="chat_feedback_placeholder">What went wrong? What was missing?</string>
     <string name="chat_feedback_submit">Submit</string>
     <string name="chat_feedback_cancel">Cancel</string>
-    <string name="chat_feedback_submitted">Thanks! Feedback submitted.</string>
+    <string name="chat_feedback_submitted">Thanks for your feedback!</string>
     <string name="chat_feedback_blank_hint">Please enter feedback text</string>
 </resources>
