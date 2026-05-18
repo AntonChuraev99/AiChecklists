@@ -18,11 +18,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.Modifier
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.chat_assistant_welcome
@@ -98,25 +101,23 @@ fun ChatScreen(
         (if (state.pendingPreview != null) 1 else 0) +
         (if (state.isProcessing && state.pendingPreview == null) 1 else 0)
 
-    // First appearance (history loads async from Room): snap to bottom instantly so
-    // the user opens straight into the latest message — no visible scroll animation.
-    // Subsequent count changes (new user/assistant message, typing indicator) keep
-    // the smooth animateScrollToItem behaviour.
-    //
-    // scrollOffset = -10000: when the preview-card appears it can be taller than
-    // animateScrollToItem(0) leaves room for (the call only aligns item top-edge
-    // to viewport bottom-edge, so a tall card stays partially hidden behind the
-    // input row). A large negative offset asks the list to overscroll into the
-    // bottom, which LazyColumn clamps to "show the full last item flush against
-    // the input row" — the user always sees the Apply button.
+    // Auto-scroll triggers:
+    //   1. totalItemCount changes — new user/assistant message, preview appears, typing
+    //      indicator — keeps the newest item visible.
+    //   2. imeBottom changes — when the keyboard closes the viewport grows; the
+    //      previously bottom-pinned item drifts up because LazyColumn does not re-anchor
+    //      on resize. Re-running scrollToItem(0) snaps it back so a tall preview-card
+    //      stays flush above the input row with Apply visible.
+    val density = LocalDensity.current
+    val imeBottom = WindowInsets.ime.getBottom(density)
     val hasInitializedScroll = remember { mutableStateOf(false) }
-    LaunchedEffect(totalItemCount, state.pendingPreview != null) {
+    LaunchedEffect(totalItemCount, imeBottom) {
         if (totalItemCount > 0) {
             if (!hasInitializedScroll.value) {
-                listState.scrollToItem(0, scrollOffset = -10000)
+                listState.scrollToItem(0)
                 hasInitializedScroll.value = true
             } else {
-                listState.animateScrollToItem(0, scrollOffset = -10000)
+                listState.animateScrollToItem(0)
             }
         }
     }
