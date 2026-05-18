@@ -122,7 +122,9 @@ class ChatViewModel(
             is ChatScreenIntent.AppendAssistantMessage -> {
                 // ChatRoute resolved a localised messageKey and is round-tripping
                 // the final text back so it lands in chat history with correct locale.
-                addAssistantMessage(intent.text)
+                // linkedChecklistId is preserved from the original ShowAssistantMessage
+                // side effect so the bubble can render the "Open checklist" button.
+                addAssistantMessage(intent.text, linkedChecklistId = intent.linkedChecklistId)
             }
 
             ChatScreenIntent.OnPreviewApply -> handlePreviewApply()
@@ -156,6 +158,12 @@ class ChatViewModel(
                 // Persist to DataStore; the Flow collector in init {} will update state automatically.
                 viewModelScope.launch {
                     aiChatPreferencesRepository.setDeepThinkingEnabled(intent.enabled)
+                }
+            }
+
+            is ChatScreenIntent.OnOpenChecklist -> {
+                viewModelScope.launch {
+                    _sideEffect.emit(ChatScreenSideEffect.NavigateToChecklist(intent.checklistId))
                 }
             }
 
@@ -213,6 +221,11 @@ class ChatViewModel(
             // triplet so the team can mine it offline. Real per-feedback Cloud Function
             // endpoint will be swapped in later (event remains in addition / as a backup).
             // Pending: docs/todos/2026-05-17-chat-feedback-real-endpoint.md
+            // Deep Thinking toggle state is included so analytics can correlate
+            // feedback complaints with the toggle. Real-world: most "didn't parse"
+            // feedbacks have been from users who left Deep Thinking ON between
+            // sessions — segmenting by this flag lets us measure if the
+            // command-override fix actually closes that segment.
             analytics.event(
                 name = "ai_chat_feedback",
                 params = mapOf(
@@ -221,6 +234,7 @@ class ChatViewModel(
                     "feedback" to feedbackText,
                     "message_id" to target.id,
                     "routed_layer" to (target.routedLayer?.name ?: "unknown"),
+                    "deep_thinking_enabled" to state.deepThinkingEnabled.toString(),
                 ),
             )
             logger.info(TAG, "FEEDBACK tracked: feedback_len=${feedbackText.length} message_id=${target.id}")
@@ -507,6 +521,7 @@ class ChatViewModel(
                     ChatScreenSideEffect.ShowAssistantMessage(
                         messageKey = outcome.messageKey,
                         args = outcome.args,
+                        linkedChecklistId = outcome.linkedChecklistId,
                     )
                 )
             }
@@ -715,13 +730,14 @@ class ChatViewModel(
 
     // ─── State helpers ────────────────────────────────────────────────────────
 
-    private fun addAssistantMessage(content: String) {
+    private fun addAssistantMessage(content: String, linkedChecklistId: Long? = null) {
         val msg = ChatMessage(
             id = generateId(),
             role = ChatRole.Assistant,
             content = content,
             timestamp = nowMillis(),
             costCredits = 0,
+            linkedChecklistId = linkedChecklistId,
         )
         updateMessages { it + msg }
         // Persist every assistant message regardless of routing layer.

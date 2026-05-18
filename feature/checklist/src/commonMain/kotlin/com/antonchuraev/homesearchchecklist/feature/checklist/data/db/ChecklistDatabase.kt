@@ -93,9 +93,17 @@ val MIGRATION_11_12 = object : Migration(11, 12) {
     }
 }
 
+val MIGRATION_12_13 = object : Migration(12, 13) {
+    override suspend fun migrate(connection: SQLiteConnection) {
+        // Add linkedChecklistId to ai_chat_history so "Open checklist" deeplink survives
+        // navigation away/back. Existing rows have no linked checklist — null is correct.
+        connection.execSQL("ALTER TABLE ai_chat_history ADD COLUMN linkedChecklistId INTEGER DEFAULT NULL")
+    }
+}
+
 @Database(
     entities = [ChecklistEntity::class, ChecklistFillEntity::class, ChatHistoryEntry::class],
-    version = 12,
+    version = 13,
     exportSchema = true
 )
 @TypeConverters(ChecklistItemConverters::class, ReminderConverters::class)
@@ -110,7 +118,7 @@ abstract class ChecklistDatabase : RoomDatabase() {
             builder: Builder<ChecklistDatabase>
         ): ChecklistDatabase {
             return builder
-                .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
+                .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
                 .fallbackToDestructiveMigration(dropAllTables = false)
                 .setQueryCoroutineContext(Dispatchers.Default)
                 .build()

@@ -12,5 +12,13 @@ data class ChatMessage(
     val content: String,
     val timestamp: Long,
     val costCredits: Int = 0,
-    val routedLayer: RoutingLayer? = null
+    val routedLayer: RoutingLayer? = null,
+    /**
+     * The checklist ID affected by the AI operation that produced this message, if any.
+     * Non-null only for successful write-intent dispatch outcomes (AddItem, DeleteItem,
+     * CompleteItem, SetItemReminder, CreateChecklist). Null for read intents (FindItems),
+     * bulk operations (MoveAllReminders), error messages, and the welcome bubble.
+     * Persisted to Room so the deeplink button survives navigation away/back.
+     */
+    val linkedChecklistId: Long? = null,
 )

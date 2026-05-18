@@ -69,6 +69,7 @@ fun ChatRoute(
     drawerState: DrawerState,
     snackbarHostState: SnackbarHostState,
     onBack: () -> Unit,
+    onNavigateToChecklist: ((Long) -> Unit)? = null,
     onNavigateToPaywall: (() -> Unit)? = null,
     viewModel: ChatViewModel = koinViewModel(),
 ) {
@@ -167,9 +168,15 @@ fun ChatRoute(
                 is ChatScreenSideEffect.ShowAssistantMessage -> {
                     val template = messages[effect.messageKey] ?: effect.messageKey
                     val resolved = applyFormatArgs(template, effect.args)
-                    viewModel.sendIntent(ChatScreenIntent.AppendAssistantMessage(resolved))
+                    viewModel.sendIntent(
+                        ChatScreenIntent.AppendAssistantMessage(
+                            text = resolved,
+                            linkedChecklistId = effect.linkedChecklistId,
+                        )
+                    )
                 }
                 ChatScreenSideEffect.NavigateBack -> onBack()
+                is ChatScreenSideEffect.NavigateToChecklist -> onNavigateToChecklist?.invoke(effect.checklistId)
             }
         }
     }

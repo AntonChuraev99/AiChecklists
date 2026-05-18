@@ -10,18 +10,21 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.outlined.RateReview
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.chat_feedback_open
+import aichecklists.core.designsystem.generated.resources.chat_open_checklist
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatRole
@@ -50,6 +53,7 @@ fun ChatMessageBubble(
     message: ChatMessage,
     modifier: Modifier = Modifier,
     onFeedbackClick: ((ChatMessage) -> Unit)? = null,
+    onOpenChecklist: (() -> Unit)? = null,
 ) {
     val isUser = message.role == ChatRole.User
 
@@ -116,20 +120,48 @@ fun ChatMessageBubble(
                 InlineCostBadge(cost = message.costCredits)
             }
 
-            // Feedback icon: shown only for assistant messages.
-            // 20dp — inline-decorative badge exception to the 24dp default rule
-            // (small affordance tucked below the bubble, similar to InlineCostBadge at 16dp).
-            if (!isUser && onFeedbackClick != null) {
-                IconButton(
-                    onClick = { onFeedbackClick(message) },
-                    modifier = Modifier.size(28.dp),
+            // Meta-action row: feedback + open-checklist deeplink, shown below assistant bubbles.
+            // Both are optional; if neither is set the row takes no space.
+            if (!isUser && (onFeedbackClick != null || onOpenChecklist != null)) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingXxs),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.RateReview,
-                        contentDescription = stringResource(Res.string.chat_feedback_open),
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    // Feedback icon — 20dp inline-decorative exception to the 24dp default rule
+                    // (small affordance tucked below the bubble, similar to InlineCostBadge at 16dp).
+                    if (onFeedbackClick != null) {
+                        IconButton(
+                            onClick = { onFeedbackClick(message) },
+                            modifier = Modifier.size(28.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.RateReview,
+                                contentDescription = stringResource(Res.string.chat_feedback_open),
+                                modifier = Modifier.size(20.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+
+                    // "Open checklist" deeplink button — only when the message carries a
+                    // linkedChecklistId (successful write-intent outcomes: AddItem, DeleteItem,
+                    // CompleteItem, SetItemReminder, CreateChecklist).
+                    if (onOpenChecklist != null) {
+                        TextButton(onClick = onOpenChecklist) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                            Text(
+                                text = stringResource(Res.string.chat_open_checklist),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(start = AppDimens.SpacingXxs),
+                            )
+                        }
+                    }
                 }
             }
         }
