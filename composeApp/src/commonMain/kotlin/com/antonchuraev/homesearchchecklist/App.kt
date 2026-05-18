@@ -856,6 +856,10 @@ private fun NavController.handle(command: NavCommand) {
             launchSingleTop = true
         }
 
+        is NavCommand.ToAiChat -> navigate(AppNavRoute.AiChat) {
+            launchSingleTop = true
+        }
+
         is NavCommand.ToScreenCatalog -> navigate(AppNavRoute.ScreenCatalog)
     }
 }
