@@ -36,8 +36,13 @@ kotlin {
             implementation(projects.core.designsystem)
             implementation(projects.feature.checklist)
             implementation(projects.feature.user)
+            // FilePicker + AudioRecorder expect/actual for attachment + voice input (Phase 3)
+            implementation(projects.feature.analyze)
+            // Coil 3 for attachment image thumbnails in chat chips and message bubbles (Phase 3)
+            implementation(libs.coil3.compose)
 
             implementation(compose.runtime)
+            implementation(compose.animation)
             implementation(compose.foundation)
             implementation(compose.material3)
             implementation(compose.materialIconsExtended)

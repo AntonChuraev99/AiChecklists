@@ -22,20 +22,28 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.Modifier
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.chat_assistant_welcome
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AttachmentSource
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatRole
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.RoutingLayer
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ToolCall
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.AiChatFeaturesHelpSheet
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.AiChatPricingHelpSheet
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatAttachmentChipStrip
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatAttachmentSourceSheet
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatFeedbackSheet
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatRecordingOverlay
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatSettingsSheet
 import org.jetbrains.compose.resources.stringResource
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatHeader
@@ -44,7 +52,11 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.com
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatPreviewCard
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatPricingRow
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatTypingIndicator
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.toLocalDateTime
 
 /**
  * AI Chat screen — stateless composable.
@@ -61,6 +73,8 @@ import kotlinx.coroutines.launch
  *   ↳ ChatMessageBubble per message
  *   ↳ ChatPreviewCard  (if state.pendingPreview != null, as last sticky item)
  * ───────────────────────────────────────────────────────
+ * ChatRecordingOverlay (AnimatedVisibility, above chip strip)
+ * ChatAttachmentChipStrip (AnimatedVisibility, above input)
  * ChatInputRow (pinned to bottom, above IME)
  * ```
  *
@@ -76,6 +90,10 @@ fun ChatScreen(
     onIntent: (ChatScreenIntent) -> Unit,
     drawerState: DrawerState = DrawerState(DrawerValue.Closed),
     onNavigateToPaywall: (() -> Unit)? = null,
+    onAttachmentSourcePicked: ((AttachmentSource) -> Unit)? = null,
+    onVoiceRecordingStarted: (() -> Unit)? = null,
+    onVoiceRecordingStopped: (() -> Unit)? = null,
+    onVoiceRecordingCancelled: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
@@ -92,6 +110,42 @@ fun ChatScreen(
             content = welcomeText,
             timestamp = 0L,
         )
+    }
+
+    // Attachment source sheet — local UI state, not in ViewModel
+    var showAttachmentSourceSheet by remember { mutableStateOf(false) }
+
+    // Drag-cancel state for recording overlay label
+    var isDragCancel by remember { mutableStateOf(false) }
+
+    // Recording duration timer — ticks every 1s while isRecording is true.
+    // Local to Screen because the ViewModel doesn't need this value.
+    var recordingDurationMs by remember { mutableLongStateOf(0L) }
+    LaunchedEffect(state.isRecording) {
+        if (state.isRecording) {
+            recordingDurationMs = 0L
+            while (true) {
+                delay(1_000L)
+                recordingDurationMs += 1_000L
+            }
+        } else {
+            recordingDurationMs = 0L
+        }
+    }
+
+    // Day divider visibility: "Today" pill appears only if the most recent message
+    // is from today. Without this check the divider hangs above yesterday's session
+    // and mis-labels it. Full per-day grouping (Yesterday + dated headers between
+    // day boundaries) is a future iteration — for now the simple gate prevents the
+    // most visible bug. Computed in Composable scope so `remember` is legal here.
+    val showTodayDivider = remember(state.messages) {
+        val last = state.messages.lastOrNull() ?: return@remember false
+        val tz = TimeZone.currentSystemDefault()
+        val startOfToday = kotlin.time.Clock.System.now()
+            .toLocalDateTime(tz).date
+            .atStartOfDayIn(tz)
+            .toEpochMilliseconds()
+        last.timestamp >= startOfToday
     }
 
     // Auto-scroll to the newest item on changes. With reverseLayout = true the
@@ -189,7 +243,9 @@ fun ChatScreen(
                             preview = preview,
                             onApply = { onIntent(ChatScreenIntent.OnPreviewApply) },
                             onCancel = { onIntent(ChatScreenIntent.OnPreviewCancel) },
+                            onReject = { onIntent(ChatScreenIntent.OnPreviewReject) },
                             onItemTextChange = { onIntent(ChatScreenIntent.OnPreviewItemTextChange(it)) },
+                            showRejectButton = preview.toolCall !is ToolCall.CreateChecklistFromAttachment,
                             modifier = Modifier.padding(bottom = AppDimens.SpacingSm),
                         )
                     }
@@ -202,10 +258,18 @@ fun ChatScreen(
                     ChatMessageBubble(
                         message = message,
                         onFeedbackClick = { onIntent(ChatScreenIntent.OnFeedbackOpen(it)) },
+                        onThumbUpClick = { onIntent(ChatScreenIntent.OnThumbUpClick(it)) },
                         onOpenChecklist = message.linkedChecklistId?.let { id ->
                             { onIntent(ChatScreenIntent.OnOpenChecklist(id)) }
                         },
+                        showSenderLabel = message.role == com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatRole.Assistant,
                     )
+                }
+
+                if (showTodayDivider) {
+                    item(key = "__day_divider") {
+                        com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatDayDivider()
+                    }
                 }
 
                 // Welcome bubble — declared last, so it renders at the TOP of viewport
@@ -215,24 +279,74 @@ fun ChatScreen(
                 item(key = "__welcome") {
                     ChatMessageBubble(
                         message = welcomeBubble,
+                        showSenderLabel = false,
                     )
                 }
             }
+
+            // Recording overlay — slides in from bottom when mic is active.
+            // Sits above the chip strip.
+            ChatRecordingOverlay(
+                isRecording = state.isRecording,
+                durationMs = recordingDurationMs,
+                isDragCancel = isDragCancel,
+            )
+
+            // Pending attachment chips — AnimatedVisibility driven by list size.
+            ChatAttachmentChipStrip(
+                attachments = state.pendingAttachments,
+                onRemove = { path -> onIntent(ChatScreenIntent.OnRemoveAttachment(path)) },
+            )
 
             // Input row is OUTSIDE LazyColumn — always pinned above the keyboard
             ChatInputRow(
                 text = state.inputText,
                 onTextChange = { onIntent(ChatScreenIntent.OnInputChange(it)) },
                 onSend = { onIntent(ChatScreenIntent.OnSendClick) },
+                onAttachFileClick = { showAttachmentSourceSheet = true },
+                onVoiceRecordingStarted = {
+                    onIntent(ChatScreenIntent.OnVoiceRecordingStarted)
+                    onVoiceRecordingStarted?.invoke()
+                },
+                onVoiceRecordingStopped = {
+                    onVoiceRecordingStopped?.invoke()
+                },
+                onVoiceRecordingCancelled = {
+                    onVoiceRecordingCancelled?.invoke()
+                },
+                onHelpClick = { onIntent(ChatScreenIntent.OnFeaturesHelpClick) },
+                hasAttachments = state.pendingAttachments.isNotEmpty(),
                 isEnabled = !state.isProcessing,
+                canSend = state.canSend,
+                isRecording = state.isRecording,
+                onDragCancelChanged = { isDragCancel = it },
             )
         }
+    }
+
+    // Attachment source sheet — presented above scaffold when user taps the clip icon
+    if (showAttachmentSourceSheet) {
+        ChatAttachmentSourceSheet(
+            onSourceSelected = { source ->
+                showAttachmentSourceSheet = false
+                onIntent(ChatScreenIntent.OnPickAttachment(source))
+                onAttachmentSourcePicked?.invoke(source)
+            },
+            onDismiss = { showAttachmentSourceSheet = false },
+        )
     }
 
     // Pricing sheet overlay — conditionally shown above the scaffold
     if (state.showPricingSheet) {
         AiChatPricingHelpSheet(
             onDismiss = { onIntent(ChatScreenIntent.OnHelpDismiss) },
+        )
+    }
+
+    // Features sheet overlay — opens from the "?" icon in the input row leading
+    if (state.showFeaturesSheet) {
+        AiChatFeaturesHelpSheet(
+            onDismiss = { onIntent(ChatScreenIntent.OnFeaturesHelpDismiss) },
         )
     }
 

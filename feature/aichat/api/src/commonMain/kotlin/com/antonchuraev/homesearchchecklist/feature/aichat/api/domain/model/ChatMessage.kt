@@ -16,9 +16,18 @@ data class ChatMessage(
     /**
      * The checklist ID affected by the AI operation that produced this message, if any.
      * Non-null only for successful write-intent dispatch outcomes (AddItem, DeleteItem,
-     * CompleteItem, SetItemReminder, CreateChecklist). Null for read intents (FindItems),
-     * bulk operations (MoveAllReminders), error messages, and the welcome bubble.
+     * CompleteItem, SetItemReminder, CreateChecklist, CreateChecklistFromAttachment,
+     * AttachToItem). Null for read intents (FindItems), bulk operations (MoveAllReminders),
+     * error messages, and the welcome bubble.
      * Persisted to Room so the deeplink button survives navigation away/back.
      */
     val linkedChecklistId: Long? = null,
+    /**
+     * Files the user attached to this message (user messages only).
+     * Stored as a transient list on the domain object; persisted to Room via JSON
+     * TypeConverter in [ChatHistoryEntry.attachmentsJson] (added in MIGRATION_13_14).
+     *
+     * Empty list for assistant messages and legacy messages from before v13.
+     */
+    val attachments: List<ChatAttachment> = emptyList(),
 )

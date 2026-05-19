@@ -31,6 +31,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.chat_preview_apply
 import aichecklists.core.designsystem.generated.resources.chat_preview_cancel
+import aichecklists.core.designsystem.generated.resources.chat_preview_reject
 import aichecklists.core.designsystem.generated.resources.chat_preview_checklist_label
 import aichecklists.core.designsystem.generated.resources.chat_preview_item_label
 import aichecklists.core.designsystem.generated.resources.chat_preview_new_list_label
@@ -39,6 +40,8 @@ import aichecklists.core.designsystem.generated.resources.chat_preview_will_comp
 import aichecklists.core.designsystem.generated.resources.chat_preview_will_create_checklist
 import aichecklists.core.designsystem.generated.resources.chat_preview_will_create_one
 import aichecklists.core.designsystem.generated.resources.chat_preview_will_delete
+import aichecklists.core.designsystem.generated.resources.chat_preview_will_attach_to_item
+import aichecklists.core.designsystem.generated.resources.chat_preview_will_create_from_attachment
 import aichecklists.core.designsystem.generated.resources.chat_preview_will_move_reminders
 import aichecklists.core.designsystem.generated.resources.chat_preview_will_set_reminder
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
@@ -56,10 +59,14 @@ import org.jetbrains.compose.resources.stringResource
  * Displays:
  * - Intent icon + header label (e.g. "This will create 1 item:")
  * - [PendingPreview.humanReadable] text (pre-rendered by the ViewModel, keeps composable dumb)
- * - Apply / Cancel action buttons
+ * - Cancel / Reject / Apply action buttons
  *
  * Uses [AppCard] (the project's design system wrapper) for consistent elevation/border.
- * The card itself is NOT clickable — only the two buttons inside are interactive.
+ * The card itself is NOT clickable — only the buttons inside are interactive.
+ *
+ * @param showRejectButton When `true` (default), shows the "I meant something else" button
+ *   between Cancel and Apply. Set to `false` for [ToolCall.CreateChecklistFromAttachment]
+ *   where there is no original text to re-classify.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,8 +74,10 @@ fun ChatPreviewCard(
     preview: PendingPreview,
     onApply: () -> Unit,
     onCancel: () -> Unit,
+    onReject: () -> Unit,
     onItemTextChange: (String) -> Unit,
     modifier: Modifier = Modifier,
+    showRejectButton: Boolean = true,
 ) {
     val (icon, headerRes) = preview.toolCall.iconAndHeader()
     val isCreateChecklist = preview.toolCall is ToolCall.CreateChecklist
@@ -158,7 +167,21 @@ fun ChatPreviewCard(
 
             Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
 
-            // Action buttons
+            // Reject — recovery action on its own row above the primary actions.
+            // Russian copy "Я имел в виду другое" + EN "I meant something else" are
+            // too long to fit alongside Cancel + Apply in a single Row on phone widths
+            // (Pixel 9 ~411dp dropped the primary button off-screen). Material 3
+            // split-actions: secondary recovery gets its own slot so primary Apply
+            // stays visible and the action hierarchy reads cleanly.
+            if (showRejectButton) {
+                AppButtonText(
+                    text = stringResource(Res.string.chat_preview_reject),
+                    onClick = onReject,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+
+            // Primary action row: Cancel (text, left) | Apply (filled, right).
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -196,4 +219,6 @@ private fun ToolCall.iconAndHeader(): Pair<ImageVector, StringResource> = when (
     is ToolCall.SetItemReminder -> Icons.Outlined.Notifications to Res.string.chat_preview_will_set_reminder
     is ToolCall.MoveAllReminders -> Icons.Outlined.SwapHoriz to Res.string.chat_preview_will_move_reminders
     is ToolCall.FindItemsQuery -> Icons.Outlined.Add to Res.string.chat_preview_will_create_one
+    is ToolCall.CreateChecklistFromAttachment -> Icons.AutoMirrored.Outlined.List to Res.string.chat_preview_will_create_from_attachment
+    is ToolCall.AttachToItem -> Icons.Outlined.Add to Res.string.chat_preview_will_attach_to_item
 }

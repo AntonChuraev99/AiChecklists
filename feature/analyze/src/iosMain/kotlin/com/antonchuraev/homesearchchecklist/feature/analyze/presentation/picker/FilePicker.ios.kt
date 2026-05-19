@@ -8,6 +8,7 @@ import platform.UIKit.UIApplication
 import platform.UIKit.UIDocumentPickerDelegateProtocol
 import platform.UIKit.UIDocumentPickerViewController
 import platform.UniformTypeIdentifiers.UTType
+import platform.UniformTypeIdentifiers.UTTypeAudio
 import platform.UniformTypeIdentifiers.UTTypeImage
 import platform.UniformTypeIdentifiers.UTTypePDF
 import platform.UniformTypeIdentifiers.UTTypePlainText
@@ -24,6 +25,7 @@ actual fun rememberFilePickerLauncher(
         FilePickerType.IMAGE -> listOf(UTTypeImage)
         FilePickerType.PDF -> listOf(UTTypePDF)
         FilePickerType.TEXT -> listOf(UTTypePlainText, UTTypeText)
+        FilePickerType.AUDIO -> listOf(UTTypeAudio)
     }
 
     return remember(type) {

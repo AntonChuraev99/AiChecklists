@@ -39,9 +39,11 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 // ─── Fakes ────────────────────────────────────────────────────────────────────
 
@@ -51,16 +53,27 @@ private class FakeAiChatRepository(
         confidence = 0f,
         layer = RoutingLayer.Local,
     ),
+    private val skipLayer1Result: IntentClassification? = null,
     private val completionResult: RemoteCompletionResult = RemoteCompletionResult.ServiceError,
 ) : AiChatRepository {
-    override suspend fun classify(input: String, locale: ChatLocale): IntentClassification =
-        classifyResult
+    var classifyCallCount = 0
+    var lastSkipLayer1: Boolean = false
+    var completeFreeFormCallCount = 0
+
+    override suspend fun classify(input: String, locale: ChatLocale, skipLayer1: Boolean): IntentClassification {
+        classifyCallCount++
+        lastSkipLayer1 = skipLayer1
+        return if (skipLayer1 && skipLayer1Result != null) skipLayer1Result else classifyResult
+    }
 
     override suspend fun completeFreeForm(
         messages: List<ChatMessage>,
         locale: ChatLocale,
         checklistsSummary: List<ChecklistContext>,
-    ): RemoteCompletionResult = completionResult
+    ): RemoteCompletionResult {
+        completeFreeFormCallCount++
+        return completionResult
+    }
 }
 
 private class FakeChatHistoryRepository : ChatHistoryRepository {
@@ -383,10 +396,10 @@ class ChatViewModelTest {
         assertEquals(listOf("milk", "Shopping"), effect.args)
     }
 
-    // ── 7. PreviewCancel → clears pendingPreview, no snackbar ────────────────
+    // ── 7. PreviewCancel → clears pendingPreview + emits ShowAssistantMessage ─
 
     @Test
-    fun previewCancel_clearsPendingPreviewSilently() = runTest {
+    fun previewCancel_clearsPendingPreviewAndEmitsCancelledMessage() = runTest {
         val repo = FakeAiChatRepository(
             classifyResult = IntentClassification(
                 intent = ChatIntent.CreateItem,
@@ -399,17 +412,18 @@ class ChatViewModelTest {
         vm.sendIntent(ChatScreenIntent.OnSendClick)
         assertIs<PendingPreview>(vm.screenState.value.pendingPreview)
 
-        // Track that no sideEffect is emitted
-        var sideEffectEmitted = false
-        val job = launch {
-            vm.sideEffect.collect { sideEffectEmitted = true }
+        val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            vm.sideEffect.first()
         }
 
         vm.sendIntent(ChatScreenIntent.OnPreviewCancel)
 
-        job.cancel()
+        // Preview must be cleared
         assertNull(vm.screenState.value.pendingPreview)
-        assertEquals(false, sideEffectEmitted, "Cancel must not emit any SideEffect")
+        // Assistant cancelled message must be emitted (silent dismiss FORBIDDEN per CLAUDE.md)
+        val effect = effectDeferred.await()
+        assertIs<ChatScreenSideEffect.ShowAssistantMessage>(effect)
+        assertEquals("chat_preview_cancelled_message", effect.messageKey)
     }
 
     // ── 8. Layer 1 (Local) → user message costCredits == 0 ───────────────────
@@ -665,5 +679,199 @@ class ChatViewModelTest {
         val effect = effectDeferred.await()
         assertIs<ChatScreenSideEffect.NavigateToChecklist>(effect)
         assertEquals(7L, effect.checklistId)
+    }
+
+    // ── 19. Attachment state — OnPickAttachment sets trigger-flag ────────────────
+
+    @Test
+    fun onPickAttachment_setsAttachmentPickerType() {
+        val vm = makeVm()
+        assertNull(vm.screenState.value.attachmentPickerType)
+
+        vm.sendIntent(ChatScreenIntent.OnPickAttachment(com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AttachmentSource.Image))
+
+        assertEquals(com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AttachmentSource.Image, vm.screenState.value.attachmentPickerType)
+    }
+
+    // ── 20. OnAttachmentPickerTriggered resets trigger-flag ───────────────────────
+
+    @Test
+    fun onAttachmentPickerTriggered_resetsPickerType() {
+        val vm = makeVm()
+        vm.sendIntent(ChatScreenIntent.OnPickAttachment(com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AttachmentSource.Pdf))
+        vm.sendIntent(ChatScreenIntent.OnAttachmentPickerTriggered)
+        assertNull(vm.screenState.value.attachmentPickerType, "Trigger-flag must be reset after Triggered intent")
+    }
+
+    // ── 21. OnAttachmentPicked adds to pendingAttachments ─────────────────────────
+
+    @Test
+    fun onAttachmentPicked_appendsToPendingList() {
+        val vm = makeVm()
+        val att = com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatAttachment(
+            sourcePath = "/tmp/photo.jpg",
+            mimeType = "image/jpeg",
+            fileName = "photo.jpg",
+        )
+
+        vm.sendIntent(ChatScreenIntent.OnAttachmentPicked(att))
+
+        val state = vm.screenState.value
+        assertEquals(1, state.pendingAttachments.size)
+        assertEquals("photo.jpg", state.pendingAttachments.first().fileName)
+        assertTrue(state.canSend, "canSend must be true when attachments are pending")
+    }
+
+    // ── 22. OnRemoveAttachment removes by sourcePath ───────────────────────────────
+
+    @Test
+    fun onRemoveAttachment_removesCorrectItem() {
+        val vm = makeVm()
+        val att1 = com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatAttachment(
+            sourcePath = "/tmp/a.jpg", mimeType = "image/jpeg", fileName = "a.jpg"
+        )
+        val att2 = com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatAttachment(
+            sourcePath = "/tmp/b.pdf", mimeType = "application/pdf", fileName = "b.pdf"
+        )
+        vm.sendIntent(ChatScreenIntent.OnAttachmentPicked(att1))
+        vm.sendIntent(ChatScreenIntent.OnAttachmentPicked(att2))
+        assertEquals(2, vm.screenState.value.pendingAttachments.size)
+
+        vm.sendIntent(ChatScreenIntent.OnRemoveAttachment(sourcePath = "/tmp/a.jpg"))
+
+        val remaining = vm.screenState.value.pendingAttachments
+        assertEquals(1, remaining.size)
+        assertEquals("b.pdf", remaining.first().fileName)
+    }
+
+    // ── 23. canSend is false when no text and no attachments ──────────────────────
+
+    @Test
+    fun canSend_falseWhenNoTextAndNoAttachments() {
+        val vm = makeVm()
+        assertFalse(vm.screenState.value.canSend, "canSend must be false on empty state")
+    }
+
+    // ── 24. Free-tier attachment quota — 4th pick emits snackbar ─────────────────
+
+    // ── 25. OnPreviewReject from Local source → classify called with skipLayer1=true ──
+
+    @Test
+    fun onPreviewReject_localSource_callsClassifyWithSkipLayer1True() = runTest {
+        // Setup: get a preview from Layer 1
+        val layer1Result = IntentClassification(
+            intent = ChatIntent.CreateItem,
+            confidence = 1.0f,
+            layer = RoutingLayer.Local,
+        )
+        // Reject will produce FreeForm from Layer 2 → completeFreeForm called
+        val layer2RejectResult = IntentClassification(
+            intent = ChatIntent.FreeForm,
+            confidence = 1.0f,
+            layer = RoutingLayer.FullChat,
+            preBuiltToolCall = null,
+        )
+        val repo = FakeAiChatRepository(
+            classifyResult = layer1Result,
+            skipLayer1Result = layer2RejectResult,
+            completionResult = RemoteCompletionResult.ServiceError,
+        )
+        val vm = makeVm(repo = repo)
+
+        // Send to get a preview from Layer 1
+        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk to shopping"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        assertNotNull(vm.screenState.value.pendingPreview)
+        assertEquals(RoutingLayer.Local, vm.screenState.value.pendingPreview?.sourceLayer)
+
+        // Reset call count after initial classify (for initial OnSendClick)
+        val initialCallCount = repo.classifyCallCount
+
+        // Collect the next sideEffect before reject
+        val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            vm.sideEffect.first()
+        }
+
+        vm.sendIntent(ChatScreenIntent.OnPreviewReject)
+
+        // Preview must be cleared immediately
+        assertNull(vm.screenState.value.pendingPreview)
+        // classify must have been called with skipLayer1=true
+        assertEquals(initialCallCount + 1, repo.classifyCallCount, "classify must be called once more on reject")
+        assertEquals(true, repo.lastSkipLayer1, "Reject from Local source must set skipLayer1=true")
+        // Since Layer 2 returned FreeForm, completeFreeForm was called (via handleFreeForm)
+        assertTrue(repo.completeFreeFormCallCount >= 1, "completeFreeForm must be called when Layer2 returns FreeForm on reject")
+
+        effectDeferred.await() // drain the sideEffect (ServiceError → chat_completion_error)
+    }
+
+    // ── 26. OnPreviewReject from Classifier source → completeFreeForm called directly ──
+
+    @Test
+    fun onPreviewReject_classifierSource_callsCompleteFreeFormDirectly() = runTest {
+        // Setup: produce a Classifier-layer preview
+        val preBuilt = ToolCall.AddItem(checklistHint = "shopping", itemText = "milk")
+        val classifierResult = IntentClassification(
+            intent = ChatIntent.CreateItem,
+            confidence = 0.9f,
+            layer = RoutingLayer.Classifier,
+            preBuiltToolCall = preBuilt,
+        )
+        val repo = FakeAiChatRepository(
+            classifyResult = classifierResult,
+            completionResult = RemoteCompletionResult.ServiceError,
+        )
+        val vm = makeVm(repo = repo)
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk to shopping"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        assertNotNull(vm.screenState.value.pendingPreview)
+        assertEquals(RoutingLayer.Classifier, vm.screenState.value.pendingPreview?.sourceLayer)
+
+        val initialClassifyCount = repo.classifyCallCount
+
+        val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            vm.sideEffect.first()
+        }
+
+        vm.sendIntent(ChatScreenIntent.OnPreviewReject)
+
+        assertNull(vm.screenState.value.pendingPreview)
+        // classify must NOT be called again — Classifier source escalates directly to Layer 3
+        assertEquals(initialClassifyCount, repo.classifyCallCount, "classify must NOT be called on Classifier→Layer3 escalation")
+        assertEquals(false, repo.lastSkipLayer1, "skipLayer1 must not have been set for this branch")
+        // completeFreeForm must have been called (Layer 3 escalation)
+        assertEquals(1, repo.completeFreeFormCallCount, "completeFreeForm must be called for Classifier→Layer3 escalation")
+
+        effectDeferred.await()
+    }
+
+    @Test
+    fun onAttachmentPicked_freeTierLimit_emitsSnackbarOnOverflow() = runTest {
+        val vm = makeVm()
+        val makeAtt: (String) -> ChatScreenIntent.OnAttachmentPicked = { name ->
+            ChatScreenIntent.OnAttachmentPicked(
+                com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatAttachment(
+                    sourcePath = "/tmp/$name", mimeType = "image/jpeg", fileName = name
+                )
+            )
+        }
+
+        // Add 3 (free limit)
+        vm.sendIntent(makeAtt("a.jpg"))
+        vm.sendIntent(makeAtt("b.jpg"))
+        vm.sendIntent(makeAtt("c.jpg"))
+        assertEquals(3, vm.screenState.value.pendingAttachments.size)
+
+        // 4th should emit ShowSnackbar and NOT add to the list
+        val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            vm.sideEffect.first()
+        }
+        vm.sendIntent(makeAtt("d.jpg"))
+
+        val effect = effectDeferred.await()
+        assertIs<ChatScreenSideEffect.ShowSnackbar>(effect)
+        assertEquals("chat_attach_limit_reached", effect.messageKey)
+        assertEquals(3, vm.screenState.value.pendingAttachments.size, "List must not grow beyond free limit")
     }
 }

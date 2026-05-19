@@ -924,4 +924,82 @@ class LocalIntentRouterImplTest {
         assertTrue(result.confidence >= 0.7f, "Expected conf >= 0.7, got ${result.confidence}")
         assertEquals(RoutingLayer.Local, result.layer)
     }
+
+    // ─── AttachToItem — RU ────────────────────────────────────────────────────
+
+    @Test
+    fun attachToItem_ru_attachThisTo_itemAndHint() = runTest {
+        val result = router.route("прикрепи это к молоко в покупках", ChatLocale.Ru)
+        val intent = result.intent
+        assertIs<ChatIntent.AttachToItem>(intent)
+        assertTrue(result.confidence >= 0.8f, "Expected conf >= 0.8, got ${result.confidence}")
+        assertEquals(RoutingLayer.Local, result.layer)
+        assertTrue(intent.itemText.contains("молоко", ignoreCase = true), "Expected itemText to contain 'молоко', got '${intent.itemText}'")
+        assertTrue(intent.checklistHint?.contains("покуп", ignoreCase = true) == true, "Expected hint to contain 'покуп', got '${intent.checklistHint}'")
+    }
+
+    @Test
+    fun attachToItem_ru_attachTo_itemOnly_noHint() = runTest {
+        val result = router.route("прикрепи к яйца", ChatLocale.Ru)
+        val intent = result.intent
+        assertIs<ChatIntent.AttachToItem>(intent)
+        assertTrue(result.confidence >= 0.6f)
+        assertEquals(RoutingLayer.Local, result.layer)
+        assertTrue(intent.itemText.isNotBlank(), "itemText should not be blank")
+    }
+
+    @Test
+    fun attachToItem_ru_addFileTo_itemAndHint() = runTest {
+        val result = router.route("добавь файл к молоко в покупки", ChatLocale.Ru)
+        assertIs<ChatIntent.AttachToItem>(result.intent)
+        assertTrue(result.confidence >= 0.6f)
+    }
+
+    @Test
+    fun attachToItem_ru_doesNotShadowCreateItem() = runTest {
+        // "добавь молоко в покупки" has no "к" preposition → should be CreateItem, not AttachToItem
+        val result = router.route("добавь молоко в покупки", ChatLocale.Ru)
+        assertIs<ChatIntent.CreateItem>(result.intent)
+    }
+
+    // ─── AttachToItem — EN ────────────────────────────────────────────────────
+
+    @Test
+    fun attachToItem_en_attachThisTo_itemAndHint() = runTest {
+        val result = router.route("attach this to milk in shopping", ChatLocale.En)
+        val intent = result.intent
+        assertIs<ChatIntent.AttachToItem>(intent)
+        assertTrue(result.confidence >= 0.8f, "Expected conf >= 0.8, got ${result.confidence}")
+        assertEquals(RoutingLayer.Local, result.layer)
+        assertTrue(intent.itemText.contains("milk", ignoreCase = true), "itemText should contain 'milk', got '${intent.itemText}'")
+    }
+
+    @Test
+    fun attachToItem_en_pinFileTo_itemAndHint() = runTest {
+        val result = router.route("pin file to eggs in groceries", ChatLocale.En)
+        val intent = result.intent
+        assertIs<ChatIntent.AttachToItem>(intent)
+        assertTrue(result.confidence >= 0.8f, "Expected conf >= 0.8, got ${result.confidence}")
+    }
+
+    @Test
+    fun attachToItem_en_addFileTo_item() = runTest {
+        val result = router.route("add file to butter", ChatLocale.En)
+        assertIs<ChatIntent.AttachToItem>(result.intent)
+        assertTrue(result.confidence >= 0.6f)
+    }
+
+    @Test
+    fun attachToItem_en_attachTo_multiWordItem() = runTest {
+        val result = router.route("attach to call the dentist", ChatLocale.En)
+        assertIs<ChatIntent.AttachToItem>(result.intent)
+        assertTrue(result.confidence >= 0.6f)
+    }
+
+    @Test
+    fun attachToItem_en_doesNotShadowCreateItem() = runTest {
+        // "add milk to shopping" — no "file" keyword, plain CreateItem
+        val result = router.route("add milk to shopping", ChatLocale.En)
+        assertIs<ChatIntent.CreateItem>(result.intent)
+    }
 }

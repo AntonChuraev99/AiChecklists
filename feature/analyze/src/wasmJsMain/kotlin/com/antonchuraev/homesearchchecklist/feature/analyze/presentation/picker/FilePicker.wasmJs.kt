@@ -41,6 +41,7 @@ private fun FilePickerType.toAccept(): String = when (this) {
     FilePickerType.IMAGE -> "image/*"
     FilePickerType.PDF -> "application/pdf"
     FilePickerType.TEXT -> "text/plain,.txt,.md"
+    FilePickerType.AUDIO -> "audio/*"
 }
 
 // ---------------------------------------------------------------------------

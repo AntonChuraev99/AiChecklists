@@ -345,6 +345,13 @@ ItemDetailsSheet(...) {
 
 ## Features
 
+### AI Chat Assistant (`feature/aichat/`)
+Natural-language assistant with tiered routing: Layer 1 (local parser, 0 credits) → Layer 2 (cloud classifier `classify_chat_intent`, 1 credit) → Layer 3 (full chat `chat_completion`, 3 credits). The Layer 3 system prompt lives in `firebase-functions/main.py` (`CHAT_COMPLETION_PROMPT_TEMPLATE` + `FEATURE_CATALOG_RU/EN`).
+
+**Hard rule:** any user-facing feature shipped in the app MUST be added to `FEATURE_CATALOG_RU` and `FEATURE_CATALOG_EN` in the same release, before redeploying `chat_completion`. Without an entry, the model will reply "I can't help with that" to how-to questions about the feature — a UX bug, not a limitation.
+
+Full enforcement guide (catalog rules, deploy steps, format-test, anti-patterns): **`docs/guidelines/ai-chat-feature-coverage.md`**.
+
 ### AI Analyze (`feature/analyze/`)
 Generates checklist items from various inputs (Photo, PDF, Text, WebLink, Voice) using Gemini AI. Key classes: `GeminiAiAnalyzer`, `AnalyzeViewModel`, `AnalyzeResultPreviewScreen`. API key via `GeminiConfig` injected from app module.
 
