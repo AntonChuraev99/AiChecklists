@@ -46,7 +46,13 @@ internal class AiChatRepositoryImpl(
         private const val LAYER_1_CONFIDENCE_THRESHOLD = 0.7f
     }
 
-    override suspend fun classify(input: String, locale: ChatLocale): IntentClassification {
+    override suspend fun classify(input: String, locale: ChatLocale, skipLayer1: Boolean): IntentClassification {
+        // skipLayer1=true: user rejected a Layer 1 preview and wants the next-tier interpretation.
+        // We skip the local router entirely and go straight to Layer 2 (cloud classifier).
+        if (skipLayer1) {
+            return classifySkipLayer1(input, locale)
+        }
+
         // Always run Layer 1 first — it is free, fast, and command-intent recognition
         // must NOT be bypassed by user-facing toggles. Deep Thinking is for open-ended
         // questions ("plan my week"), not for "add milk to shopping" type commands.
@@ -138,6 +144,70 @@ internal class AiChatRepositoryImpl(
             RemoteClassificationResult.ServiceError -> {
                 logger.warning(TAG, "Layer2 ServiceError — graceful degradation to Layer 1 result")
                 layer1
+            }
+        }
+    }
+
+    /**
+     * Reject-flow classification: skips Layer 1 entirely and goes straight to Layer 2.
+     *
+     * Does NOT respect the Deep Thinking toggle — when the user taps "I meant something else"
+     * they are explicitly asking for a higher-tier interpretation, not free-form chat.
+     */
+    private suspend fun classifySkipLayer1(input: String, locale: ChatLocale): IntentClassification {
+        logger.info(TAG, "classifySkipLayer1: skipping Layer1, going straight to Layer2")
+
+        val userId = userDataRepository.getUserData().userId
+        if (userId.isBlank()) {
+            logger.warning(TAG, "classifySkipLayer1: userId blank — escalating to Layer3 (FreeForm)")
+            return IntentClassification(
+                intent = ChatIntent.FreeForm,
+                confidence = 1.0f,
+                layer = RoutingLayer.FullChat,
+                preBuiltToolCall = null,
+            )
+        }
+
+        return when (val remote = classifierApi.classify(userId, input, locale)) {
+            is RemoteClassificationResult.Success -> {
+                logger.info(TAG, "classifySkipLayer1 Layer2 success: ${remote.intent::class.simpleName} conf=${remote.confidence}")
+                val isVague = remote.intent is ChatIntent.FreeForm || remote.intent is ChatIntent.Unknown
+                if (isVague) {
+                    // Vague Layer 2 → escalate to Layer 3
+                    logger.info(TAG, "classifySkipLayer1: Layer2 vague (${remote.intent::class.simpleName}) → FreeForm for Layer3")
+                    IntentClassification(
+                        intent = ChatIntent.FreeForm,
+                        confidence = 1.0f,
+                        layer = RoutingLayer.FullChat,
+                        preBuiltToolCall = null,
+                    )
+                } else {
+                    IntentClassification(
+                        intent = remote.intent,
+                        confidence = remote.confidence,
+                        layer = RoutingLayer.Classifier,
+                        preBuiltToolCall = remote.toolCall,
+                    )
+                }
+            }
+            RemoteClassificationResult.InsufficientCredits -> {
+                logger.info(TAG, "classifySkipLayer1: InsufficientCredits — returning Unknown")
+                IntentClassification(
+                    intent = ChatIntent.Unknown(rawText = input),
+                    confidence = 0f,
+                    layer = RoutingLayer.Classifier,
+                    preBuiltToolCall = null,
+                )
+            }
+            RemoteClassificationResult.NetworkError,
+            RemoteClassificationResult.ServiceError -> {
+                logger.warning(TAG, "classifySkipLayer1: Layer2 ${remote::class.simpleName} — escalating to Layer3 (FreeForm)")
+                IntentClassification(
+                    intent = ChatIntent.FreeForm,
+                    confidence = 1.0f,
+                    layer = RoutingLayer.FullChat,
+                    preBuiltToolCall = null,
+                )
             }
         }
     }

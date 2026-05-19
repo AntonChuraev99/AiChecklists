@@ -46,6 +46,7 @@ import aichecklists.core.designsystem.generated.resources.chat_requires_premium
 import aichecklists.core.designsystem.generated.resources.chat_thumb_up_thanks
 import aichecklists.core.designsystem.generated.resources.chat_unknown_intent_hint
 import aichecklists.core.designsystem.generated.resources.chat_voice_too_short
+import aichecklists.core.designsystem.generated.resources.chat_preview_cancelled_message
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AttachmentSource
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatAttachment
 import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.picker.FilePickerType
@@ -133,6 +134,7 @@ fun ChatRoute(
     val voiceTooShortText = stringResource(Res.string.chat_voice_too_short)
     val recordingCancelledText = stringResource(Res.string.chat_recording_cancelled)
     val thumbUpThanksText = stringResource(Res.string.chat_thumb_up_thanks)
+    val previewCancelledText = stringResource(Res.string.chat_preview_cancelled_message)
 
     val messages = remember(
         unknownText, genericErrorText, applyErrorText, extractFailText,
@@ -146,6 +148,7 @@ fun ChatRoute(
         dispatchFillLoadFailedFmt, insufficientCreditsText, completionErrorText, historyLoadErrorText,
         feedbackSubmittedText, feedbackBlankHintText,
         micPermissionDeniedText, voiceTooShortText, recordingCancelledText, thumbUpThanksText,
+        previewCancelledText,
     ) {
         mapOf(
             "chat_unknown_intent_hint" to unknownText,
@@ -184,6 +187,7 @@ fun ChatRoute(
             "chat_voice_too_short" to voiceTooShortText,
             "chat_recording_cancelled" to recordingCancelledText,
             "chat_thumb_up_thanks" to thumbUpThanksText,
+            "chat_preview_cancelled_message" to previewCancelledText,
         )
     }
 

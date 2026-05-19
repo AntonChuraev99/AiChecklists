@@ -3,9 +3,10 @@ package com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation
 import com.antonchuraev.homesearchchecklist.core.common.api.Intent
 import com.antonchuraev.homesearchchecklist.core.common.api.SideEffect
 import com.antonchuraev.homesearchchecklist.core.common.api.State
-import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatAttachment
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AttachmentSource
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatAttachment
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.RoutingLayer
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ToolCall
 
 // ---------------------------------------------------------------------------
@@ -73,12 +74,20 @@ data class ChatScreenState(
  * @param editableItemText      The current item text shown in the preview's text field.
  *                              Initially equals the item parsed from user input. The user
  *                              can edit before tapping Apply — final dispatch uses this value.
+ * @param originalText          The original raw user input that produced this preview.
+ *                              Used by [OnPreviewReject] to re-classify the text in the next layer.
+ *                              Empty string for attachment-only previews (reject is hidden in that case).
+ * @param sourceLayer           The routing layer that produced this preview.
+ *                              Used to decide which layer to escalate to on [OnPreviewReject]:
+ *                              Local → Classifier (Layer 2), Classifier → FullChat (Layer 3).
  */
 data class PendingPreview(
     val toolCall: ToolCall,
     val humanReadable: String,
     val targetChecklistHint: String? = null,
     val editableItemText: String = "",
+    val originalText: String = "",
+    val sourceLayer: RoutingLayer = RoutingLayer.Local,
 )
 
 // ---------------------------------------------------------------------------
@@ -125,6 +134,17 @@ sealed interface ChatScreenIntent : Intent {
 
     /** User cancelled the pending write-intent preview. */
     data object OnPreviewCancel : ChatScreenIntent
+
+    /**
+     * User tapped the "I meant something else" button on the pending preview.
+     *
+     * Escalates the original user input to the next pipeline layer:
+     * - [RoutingLayer.Local] preview → re-classify with [skipLayer1=true] (Layer 2, 1 credit)
+     * - [RoutingLayer.Classifier] preview → escalate directly to Layer 3 via [completeFreeForm] (3 credits)
+     *
+     * Hidden for [ToolCall.CreateChecklistFromAttachment] (no original text to re-classify).
+     */
+    data object OnPreviewReject : ChatScreenIntent
 
     /** User tapped the back / navigation icon. */
     data object OnBackClick : ChatScreenIntent

@@ -132,9 +132,15 @@ class ChatViewModel(
             ChatScreenIntent.OnPreviewApply -> handlePreviewApply()
 
             ChatScreenIntent.OnPreviewCancel -> {
-                // No SideEffect — cancel is a silent dismiss per spec
                 _screenState.value = _screenState.value.copy(pendingPreview = null)
+                // Emit assistant message to confirm cancellation — silent dismiss is FORBIDDEN
+                // (CLAUDE.md rule). The message appears in chat history as an inline reply.
+                viewModelScope.launch {
+                    _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_preview_cancelled_message"))
+                }
             }
+
+            ChatScreenIntent.OnPreviewReject -> handlePreviewReject()
 
             ChatScreenIntent.OnHelpClick -> {
                 _screenState.value = _screenState.value.copy(showPricingSheet = true)
@@ -263,13 +269,10 @@ class ChatViewModel(
         val target = state.feedbackTarget ?: return
         val feedbackText = state.feedbackText.trim()
 
-        // Silent-skip is FORBIDDEN (CLAUDE.md rule) — emit snackbar instead of returning quietly.
-        if (feedbackText.isBlank()) {
-            viewModelScope.launch {
-                _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_feedback_blank_hint"))
-            }
-            return
-        }
+        // Blank feedback is allowed — a bare thumb-down without comment is itself a valid
+        // signal (user disliked the answer but didn't want to elaborate). The Submit button
+        // in ChatFeedbackSheet is enabled regardless of text, so this handler must mirror
+        // that — silently dropping the submit because of empty text breaks the UI contract.
 
         // Find the user question that preceded this assistant message in the history.
         val messages = state.messages
@@ -414,6 +417,8 @@ class ChatViewModel(
                                 humanReadable = humanReadable,
                                 targetChecklistHint = extractHint(toolCall),
                                 editableItemText = extractItemText(toolCall),
+                                originalText = text,
+                                sourceLayer = classification.layer,
                             ),
                             isProcessing = false,
                         )
@@ -440,6 +445,8 @@ class ChatViewModel(
                                 humanReadable = humanReadable,
                                 targetChecklistHint = intent.checklistHint,
                                 editableItemText = intent.itemText,
+                                originalText = text,
+                                sourceLayer = classification.layer,
                             ),
                             isProcessing = false,
                         )
@@ -472,6 +479,127 @@ class ChatViewModel(
                 _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_apply_error"))
             }
             _screenState.value = _screenState.value.copy(isProcessing = false)
+        }
+    }
+
+    // ─── Preview reject flow ("I meant something else") ─────────────────────
+
+    /**
+     * User rejected the pending preview and wants the input re-classified in the next layer.
+     *
+     * Escalation logic:
+     * - Source = [RoutingLayer.Local]  → re-classify with [skipLayer1=true] (Layer 2, 1 credit).
+     *   If Layer 2 returns a command-intent → show a NEW preview with [sourceLayer=Classifier].
+     *   If Layer 2 returns FreeForm / Unknown → delegate to [handleFreeForm].
+     * - Source = [RoutingLayer.Classifier] → skip straight to Layer 3 via [handleFreeForm].
+     * - Source = [RoutingLayer.FullChat] → safety fallback: Layer 3 never produces a preview
+     *   card, so this branch should not occur in practice.
+     *
+     * The user message is NOT re-persisted — it already lives in Room from [handleSend].
+     * Credits for Layer 2 are deducted server-side; credit balance is reconciled via
+     * [userDataRepository.getUserDataFlow] collector in init.
+     */
+    private fun handlePreviewReject() {
+        val preview = _screenState.value.pendingPreview ?: return
+
+        // Guard: attachment-only previews have no original text to re-classify.
+        // The UI hides the Reject button for CreateChecklistFromAttachment, but
+        // defensive check here prevents a silent mis-classification.
+        if (preview.originalText.isBlank()) {
+            viewModelScope.launch {
+                _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_extract_fail"))
+            }
+            _screenState.value = _screenState.value.copy(pendingPreview = null)
+            return
+        }
+
+        _screenState.value = _screenState.value.copy(
+            pendingPreview = null,
+            isProcessing = true,
+        )
+
+        viewModelScope.launch {
+            runCatching {
+                val locale = localeProvider.current()
+                when (preview.sourceLayer) {
+                    RoutingLayer.Local -> {
+                        // Layer 1 → Layer 2 escalation
+                        logger.info(TAG, "handlePreviewReject: Layer1 source → escalating to Layer2 (skipLayer1=true)")
+                        val classification = aiChatRepository.classify(
+                            input = preview.originalText,
+                            locale = locale,
+                            skipLayer1 = true,
+                        )
+                        logger.debug(TAG, "Reject re-classify → ${classification.intent::class.simpleName} layer=${classification.layer}")
+
+                        when (val intent = classification.intent) {
+                            // FreeForm / Unknown from Layer 2 → escalate to Layer 3
+                            ChatIntent.FreeForm,
+                            is ChatIntent.Unknown -> handleFreeForm(locale)
+
+                            // FindItems is a read-intent inline result, no preview card
+                            ChatIntent.FindItems -> {
+                                val query = extractQuery(preview.originalText)
+                                val outcome = toolCallDispatcher.dispatch(ToolCall.FindItemsQuery(query))
+                                handleOutcomeInline(outcome)
+                                _screenState.value = _screenState.value.copy(isProcessing = false)
+                            }
+
+                            // Write-intent → build a new preview with sourceLayer=Classifier
+                            ChatIntent.CreateItem,
+                            ChatIntent.DeleteItem,
+                            ChatIntent.CompleteItem,
+                            is ChatIntent.CreateChecklist,
+                            ChatIntent.SetReminder,
+                            ChatIntent.MoveReminders -> {
+                                val toolCall = classification.preBuiltToolCall
+                                    ?: buildToolCall(intent, preview.originalText, locale)
+                                if (toolCall == null) {
+                                    _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_extract_fail"))
+                                    _screenState.value = _screenState.value.copy(isProcessing = false)
+                                    return@runCatching
+                                }
+                                val humanReadable = previewRenderer.render(toolCall)
+                                _screenState.value = _screenState.value.copy(
+                                    pendingPreview = PendingPreview(
+                                        toolCall = toolCall,
+                                        humanReadable = humanReadable,
+                                        targetChecklistHint = extractHint(toolCall),
+                                        editableItemText = extractItemText(toolCall),
+                                        originalText = preview.originalText,
+                                        sourceLayer = classification.layer,
+                                    ),
+                                    isProcessing = false,
+                                )
+                            }
+
+                            // AttachToItem without active attachments → can't re-build
+                            is ChatIntent.AttachToItem -> {
+                                _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_attach_no_files"))
+                                _screenState.value = _screenState.value.copy(isProcessing = false)
+                            }
+                        }
+                    }
+
+                    RoutingLayer.Classifier -> {
+                        // Layer 2 → Layer 3 escalation
+                        logger.info(TAG, "handlePreviewReject: Classifier source → escalating to Layer3 (completeFreeForm)")
+                        handleFreeForm(locale)
+                    }
+
+                    RoutingLayer.FullChat -> {
+                        // Safety fallback: Layer 3 never produces preview cards, so this
+                        // branch should not be reachable. Show a generic hint.
+                        logger.warning(TAG, "handlePreviewReject: unexpected FullChat sourceLayer — ignoring")
+                        _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_unknown_intent_hint"))
+                        _screenState.value = _screenState.value.copy(isProcessing = false)
+                    }
+                }
+            }.onFailure { e ->
+                logger.error(TAG, "handlePreviewReject failed", e)
+                _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_generic_error"))
+                _screenState.value = _screenState.value.copy(isProcessing = false)
+            }
         }
     }
 

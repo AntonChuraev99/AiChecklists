@@ -902,6 +902,8 @@
     <!-- AI-чат: preview card -->
     <string name="chat_preview_apply">Применить</string>
     <string name="chat_preview_cancel">Отмена</string>
+    <string name="chat_preview_reject">Я имел в виду другое</string>
+    <string name="chat_preview_cancelled_message">Действие отменено.</string>
     <string name="chat_preview_will_create_one">Будет создан один пункт:</string>
     <string name="chat_preview_will_create_checklist">Новый чек-лист:</string>
     <string name="chat_preview_will_delete">Будет удалён пункт:</string>
