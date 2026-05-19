@@ -928,7 +928,7 @@
 
     <!-- AI Chat Screen -->
     <string name="chat_title">AI Chat</string>
-    <string name="chat_input_placeholder">Ask anything…</string>
+    <string name="chat_input_placeholder">Message</string>
     <string name="chat_send_action">Send</string>
     <string name="chat_typing_indicator_a11y">AI is thinking…</string>
     <string name="chat_help_action">Pricing info</string>
@@ -941,12 +941,16 @@
     <string name="chat_pricing_caption_action">Why?</string>
     <string name="chat_preview_apply">Apply</string>
     <string name="chat_preview_cancel">Cancel</string>
+    <string name="chat_preview_reject">I meant something else</string>
+    <string name="chat_preview_cancelled_message">Action cancelled.</string>
     <string name="chat_preview_will_create_one">This will create 1 item:</string>
     <string name="chat_preview_will_create_checklist">New checklist:</string>
     <string name="chat_preview_will_delete">This will delete:</string>
     <string name="chat_preview_will_complete">This will mark as done:</string>
     <string name="chat_preview_will_set_reminder">Set a reminder for:</string>
     <string name="chat_preview_will_move_reminders">Move all reminders:</string>
+    <string name="chat_preview_will_create_from_attachment">Create checklist from file:</string>
+    <string name="chat_preview_will_attach_to_item">Attach file to item:</string>
     <string name="chat_preview_checklist_label">In checklist: %1$s</string>
     <string name="chat_preview_no_checklist_hint">No checklist specified — will use the first one.</string>
     <string name="chat_preview_item_label">Item</string>
@@ -1019,4 +1023,52 @@
     <string name="chat_feedback_submitted">Thanks for your feedback!</string>
     <string name="chat_feedback_blank_hint">Please enter feedback text</string>
     <string name="chat_open_checklist">Open checklist</string>
+
+    <!-- AI Chat — attachment flow strings (Phase 1) -->
+    <string name="chat_attach_no_files">No files attached. Please pick a file first.</string>
+    <string name="chat_attach_limit_reached">Attachment limit reached. Upgrade to Premium for unlimited attachments.</string>
+    <string name="chat_attach_unsupported_type">Unsupported file type: %1$s.</string>
+    <string name="chat_attach_analyze_empty">No checklist items could be extracted from «%1$s».</string>
+    <string name="chat_attach_analyze_failed">Could not analyze «%1$s». Please try again.</string>
+    <string name="chat_attach_store_failed">Could not save «%1$s». Check storage permissions.</string>
+    <string name="chat_recording_cancelled">Recording cancelled.</string>
+    <string name="chat_dispatch_created_from_attachment">Created «%1$s» with %2$s items.</string>
+    <string name="chat_dispatch_attached_one">«%1$s» attached to «%2$s» in %3$s.</string>
+    <string name="chat_dispatch_attached_many">%1$s files attached to «%2$s» in %3$s.</string>
+    <!-- Phase 3 UI strings: attachment + voice input -->
+    <string name="chat_attach_file_action">Attach file</string>
+    <string name="chat_record_voice">Record voice message</string>
+    <string name="chat_voice_press_hold_hint">Hold to record voice</string>
+    <string name="chat_voice_drag_cancel_hint">Slide up to cancel</string>
+    <string name="chat_voice_too_short">Recording too short. Hold the mic button longer.</string>
+    <string name="chat_recording_in_progress">Recording…</string>
+    <string name="chat_attachment_remove">Remove attachment</string>
+    <string name="chat_attachment_source_chooser_title">Attach</string>
+    <string name="chat_attachment_source_image">Image</string>
+    <string name="chat_attachment_source_pdf">PDF document</string>
+    <string name="chat_attachment_source_text">Text file</string>
+    <string name="chat_attachment_source_audio">Audio file</string>
+    <string name="chat_mic_permission_denied">Allow microphone access in Settings</string>
+    <string name="chat_input_placeholder_with_attachment">Describe what to do with the attachment…</string>
+    <string name="chat_features_help_action">How to use AI Chat</string>
+    <string name="chat_features_sheet_title">What AI Chat can do</string>
+    <string name="chat_features_intro">Talk to your checklists in natural language. Add items, set reminders, attach photos, record voice — the assistant will figure out what you mean. Tap the clip to attach a file, hold the mic to record voice.</string>
+    <string name="chat_features_examples_title">Try saying</string>
+    <string name="chat_features_example_create">Create a checklist «Shopping» with milk, bread, butter</string>
+    <string name="chat_features_example_add">Add butter to shopping</string>
+    <string name="chat_features_example_complete">Mark milk as done</string>
+    <string name="chat_features_example_delete">Remove bread from shopping</string>
+    <string name="chat_features_example_reminder">Remind me at 6 PM about milk</string>
+    <string name="chat_features_example_move">Move all reminders from Tuesday to Wednesday</string>
+    <string name="chat_features_example_find">Find where I have milk</string>
+    <string name="chat_features_example_attach">Attach this to milk in shopping (with a photo)</string>
+    <string name="chat_features_example_from_attachment">Create a checklist from this photo / PDF / text</string>
+    <string name="chat_features_got_it">Got it</string>
+    <string name="chat_assistant_label">AI Assistant</string>
+    <string name="chat_message_copy">Copy message</string>
+    <string name="chat_message_refresh">Regenerate response</string>
+    <string name="chat_message_thumb_up">Good response</string>
+    <string name="chat_message_thumb_down">Bad response</string>
+    <string name="chat_day_divider_today">Today</string>
+    <string name="chat_thumb_up_thanks">Thanks for the feedback</string>
 </resources>

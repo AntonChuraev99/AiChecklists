@@ -404,6 +404,75 @@ class AiChatRepositoryImplTest {
         assertEquals(0, classifier.callCount, "Layer 2 must NOT be called when deep thinking is ON")
     }
 
+    // ── skipLayer1 tests ─────────────────────────────────────────────────────
+
+    // ── 14a. skipLayer1=true → router.route() NOT called ────────────────────
+
+    @Test
+    fun classify_skipLayer1_doesNotCallRouter() = runTest {
+        val (repo, router, _) = makeRepo(
+            layer1Result = highConfidenceLayer1(ChatIntent.CreateItem),
+            remoteResult = RemoteClassificationResult.NetworkError,
+        )
+
+        repo.classify("how do I add an attachment", ChatLocale.En, skipLayer1 = true)
+
+        assertEquals(0, router.callCount, "Layer1 router must NOT be called when skipLayer1=true")
+    }
+
+    // ── 14b. skipLayer1=true → classifierApi.classify() IS called ───────────
+
+    @Test
+    fun classify_skipLayer1_callsClassifierApi() = runTest {
+        val (repo, _, classifier) = makeRepo(
+            layer1Result = highConfidenceLayer1(ChatIntent.CreateItem),
+            remoteResult = RemoteClassificationResult.NetworkError,
+        )
+
+        repo.classify("how do I add an attachment", ChatLocale.En, skipLayer1 = true)
+
+        assertEquals(1, classifier.callCount, "Layer2 classifier must be called when skipLayer1=true")
+    }
+
+    // ── 14c. skipLayer1=true + Layer2 FreeForm → returns FreeForm for Layer3 ─
+
+    @Test
+    fun classify_skipLayer1_layer2Vague_returnsFreeForm() = runTest {
+        val vagueResult = RemoteClassificationResult.Success(
+            intent = ChatIntent.FreeForm,
+            toolCall = null,
+            confidence = 0.5f,
+            creditsRemaining = 10,
+        )
+        val (repo, _, _) = makeRepo(
+            layer1Result = highConfidenceLayer1(ChatIntent.CreateItem),
+            remoteResult = vagueResult,
+        )
+
+        val result = repo.classify("how do I add an attachment", ChatLocale.En, skipLayer1 = true)
+
+        assertIs<ChatIntent.FreeForm>(result.intent)
+        assertEquals(1.0f, result.confidence)
+        assertEquals(RoutingLayer.FullChat, result.layer)
+        assertNull(result.preBuiltToolCall)
+    }
+
+    // ── 14d. skipLayer1=true + Layer2 NetworkError → returns FreeForm for Layer3
+
+    @Test
+    fun classify_skipLayer1_layer2NetworkError_returnsFreeForm() = runTest {
+        val (repo, _, classifier) = makeRepo(
+            layer1Result = highConfidenceLayer1(ChatIntent.CreateItem),
+            remoteResult = RemoteClassificationResult.NetworkError,
+        )
+
+        val result = repo.classify("how do I add an attachment", ChatLocale.En, skipLayer1 = true)
+
+        assertEquals(1, classifier.callCount)
+        assertIs<ChatIntent.FreeForm>(result.intent)
+        assertEquals(RoutingLayer.FullChat, result.layer)
+    }
+
     // ── 13. Deep Thinking + Layer 1 command-intent: Layer 1 wins ───────────────
 
     @Test

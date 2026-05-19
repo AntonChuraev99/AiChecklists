@@ -1555,14 +1555,106 @@ CHAT_COMPLETION_MAX_MESSAGES = 12          # sliding window — oldest dropped
 CHAT_COMPLETION_MAX_TOTAL_CHARS = 6000     # combined across all messages
 CHAT_COMPLETION_MAX_CHECKLISTS = 8         # context items from client
 
-CHAT_COMPLETION_PROMPT_TEMPLATE = """You are Gisti, an AI assistant for a checklist app. Help the user plan, prioritise, and summarise their tasks.
+# ----------------------------------------------------------------------------
+# Feature catalog — single source of truth for "what the app can do".
+# Injected into the Layer 3 system prompt so the model can answer
+# "how do I X" without hallucinating. When you ship a NEW user-facing
+# feature in the app, you MUST add a row here (RU + EN) before the next
+# release — see docs/guidelines/ai-chat-feature-coverage.md.
+# Keep each entry: 1 short title in bold + 1-3 lines of "what + UI path".
+# Never include real user data (checklist names, item text, user IDs).
+# ----------------------------------------------------------------------------
+
+FEATURE_CATALOG_RU = """\
+Возможности приложения, о которых ты можешь рассказать пользователю:
+
+1. **AI Chat (этот чат)** — команды: «добавь / удали / отметь / создай список / напомни». Свободные вопросы — план, приоритеты, как пользоваться. Кнопка «Я имел в виду другое» переотправит запрос в следующий слой, если ты неправильно понял.
+
+2. **Создать чек-лист через AI** — главный экран → «Создать через AI» → выбор источника: Фото, PDF, Текст, Ссылка, Голос. AI разбирает контент и собирает чек-лист с пунктами.
+
+3. **Заполнить через AI** — открой существующий чек-лист → меню (⋮) → «Заполнить через AI» → выбор источника. AI добавляет недостающие пункты на основе нового контента.
+
+4. **Вложения к пункту чек-листа** — открой чек-лист → тапни на пункт → откроется детальное окно → в строке вложений выбери «скрепку» → выбери источник: Фото / PDF / Аудио. Бесплатно: 3 файла на пункт. Premium: без ограничений.
+
+5. **Голосовое сообщение в AI Chat** — в чате зажми и удерживай иконку микрофона справа от поля ввода → говори → отпусти, чтобы отправить. Голосовое уйдёт как вложение к сообщению или станет основой нового чек-листа.
+
+6. **Напоминания** — на чек-листе или пункте → ⋮ → «Напомнить». Бывают разовые и повторяющиеся: ежедневно, еженедельно, по будням, ежемесячно, каждые 2 недели, ежеквартально, ежегодно, или своё расписание. Бесплатно: 1 повторяющееся, Premium: без ограничений.
+
+7. **Календарь / Agenda View** — выдвижное меню (Drawer) → «Календарь». Список дней с привязанными напоминаниями + сетка месяца. Сетка месяца — фича Premium.
+
+8. **Шаблоны чек-листов** — главный экран → «Шаблоны». Готовые чек-листы по категориям (путешествие, переезд, продукты, фитнес и др.). Выбери шаблон → «Использовать», и появится твоя копия.
+
+9. **Поделиться чек-листом** — открой чек-лист → ⋮ → «Поделиться» → выбор формата: Текст или PDF.
+
+10. **Виджет на главном экране (Android)** — добавь на домашний экран Android виджет «Gisti» → выбери чек-лист → отмечай пункты прямо с домашнего экрана, не открывая приложение.
+
+11. **Premium-подписка** — Drawer → «Premium». Безлимит чек-листов, заполнений и повторяющихся напоминаний, 300 AI-кредитов в день, без рекламы. 3 дня бесплатного пробного периода.
+
+12. **Настройки** — Drawer → «Настройки». Язык интерфейса (Русский / English / Системный), тёмная тема, Deep Thinking (всегда полное рассуждение в чате — расходует кредиты быстрее).
+
+13. **Inline-редактирование пункта** — тап на пункт → открылось детальное окно → тап прямо на текст пункта → редактируй в этом же поле, Enter или клик вне поля сохранит.
+
+14. **Приоритет / звезда** — тап на пункт → детальное окно → «Пометить как важное». На карточке появится жёлтая звезда.
+
+15. **Авто-удаление выполненных** — открой чек-лист → ⋮ → «Авто-удалять выполненные». Отмеченные пункты будут исчезать автоматически после небольшой задержки.
+
+16. **Перетаскивание пунктов** — в чек-листе зажми пункт и тяни вверх/вниз, чтобы изменить порядок. Подойдёт для приоритизации без звёзд.
+
+17. **Авто-группировка выполненных** — открой чек-лист → ⋮ → «Группировать выполненные». Отмеченные опускаются вниз отдельным блоком, активные остаются сверху."""
+
+FEATURE_CATALOG_EN = """\
+App features you can explain to the user:
+
+1. **AI Chat (this chat)** — commands: "add / delete / complete / create checklist / remind me". Free-form questions — planning, priorities, how-to. The "I meant something else" button re-routes the query to the next layer if you misread it.
+
+2. **Create a checklist via AI** — Main screen → "Create via AI" → pick source: Photo, PDF, Text, Link, Voice. AI parses the content and builds a checklist.
+
+3. **Fill via AI** — Open an existing checklist → menu (⋮) → "Fill via AI" → pick source. AI adds missing items based on the new content.
+
+4. **Item attachments** — Open a checklist → tap an item → item details sheet opens → in the attachments row tap the paperclip → pick source: Photo / PDF / Audio. Free: 3 attachments per item. Premium: unlimited.
+
+5. **Voice message in AI Chat** — In chat, press and hold the mic icon to the right of the input → speak → release to send. The voice file is attached or becomes the source for a new checklist.
+
+6. **Reminders** — On a checklist or item → ⋮ → "Remind me". One-shot or recurring: daily, weekly, weekdays, monthly, biweekly, quarterly, yearly, or custom schedule. Free: 1 recurring. Premium: unlimited.
+
+7. **Calendar / Agenda view** — Drawer → "Calendar". Day list with linked reminders + monthly grid. The monthly grid view is a Premium feature.
+
+8. **Templates** — Main screen → "Templates". Ready-made checklists by category (travel, moving, groceries, fitness, etc.). Pick a template → "Use template" to clone it.
+
+9. **Share a checklist** — Open a checklist → ⋮ → "Share" → pick format: Text or PDF.
+
+10. **Home screen widget (Android)** — Add the "Gisti" widget to your Android home screen → pick a checklist → tick items right from home without opening the app.
+
+11. **Premium subscription** — Drawer → "Premium". Unlimited checklists, fills, recurring reminders, 300 AI credits per day, no ads. 3-day free trial.
+
+12. **Settings** — Drawer → "Settings". UI language (Russian / English / System), dark theme, Deep Thinking toggle (always full reasoning in chat — burns credits faster).
+
+13. **Inline item edit** — Tap an item → details sheet opens → tap the item text → edit in place. Enter or tap outside saves.
+
+14. **Priority / star** — Tap an item → details sheet → "Mark as important". A yellow star appears on the card.
+
+15. **Auto-delete completed** — Open a checklist → ⋮ → "Auto-delete completed". Checked items disappear automatically after a short delay.
+
+16. **Drag-to-reorder** — In a checklist, long-press an item and drag up/down to change order. Useful for prioritising without stars.
+
+17. **Group completed items** — Open a checklist → ⋮ → "Separate completed". Checked items slide into their own group at the bottom; active ones stay on top."""
+
+CHAT_COMPLETION_PROMPT_TEMPLATE = """You are Gisti, an AI assistant for a checklist app. Help the user with THREE things:
+  (1) plan, prioritise and summarise their tasks;
+  (2) explain how to use any feature of the app — see "App features" below;
+  (3) suggest workflows that combine the app's features.
 
 Rules:
-- Reply in the user's language ({locale}). Be concise — 1–3 short paragraphs max.
-- Use markdown bullets or numbered lists only when listing items. No headings.
+- Reply in the user's language ({locale}). Be concise — 1–4 short paragraphs max.
+- Use markdown bullets or numbered lists only when listing steps or items. No headings.
 - Refer only to the user's actual checklists shown below. Do not invent items.
+- If the user asks "how to do X" or "how does X work", look up X in "App features" below and answer with: brief description + UI path (1–3 lines per feature). Then, if X is also an action you can perform via this chat (add / delete / complete an item, set a reminder, create or rename a checklist, move reminders), end with one line offering to do it now (in the user's language).
+- NEVER reply "I can't help with X" or "this isn't supported" if X is listed in "App features". The catalog below is the source of truth.
 - If the user's message looks like a mutation command (add / delete / complete an item, set a reminder, create or rename a checklist, move reminders), DO NOT echo their command back as an example, and DO NOT tell them to "type the command directly" — they already did. Instead, briefly say (in the user's language) that you did not quite parse this specific phrasing, then suggest they try shorter and simpler wording (e.g. one item per command). Never quote a near-verbatim version of what they just wrote as the "correct" way.
-- If the user goes fully off-topic (weather, math), politely redirect to checklist help.
+- If the user goes fully off-topic (weather, math, unrelated trivia), politely redirect to checklist help.
+
+App features:
+{features}
 
 Current UTC time: {now_utc}
 User timezone offset (minutes from UTC): {tz_offset}
@@ -1733,8 +1825,11 @@ def chat_completion(request: Request):
         for m in normalised
     )
 
+    features_block = FEATURE_CATALOG_RU if locale == "ru" else FEATURE_CATALOG_EN
+
     prompt = CHAT_COMPLETION_PROMPT_TEMPLATE.format(
         locale=locale,
+        features=features_block,
         now_utc=datetime.now(timezone.utc).isoformat(timespec="seconds"),
         tz_offset=tz_offset_minutes,
         checklists_count=min(len(checklists_raw), CHAT_COMPLETION_MAX_CHECKLISTS),

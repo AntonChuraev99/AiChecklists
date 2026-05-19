@@ -118,6 +118,25 @@ internal object EnIntentLexicon {
         "move",
     )
 
+    // ─── AttachToItem ─────────────────────────────────────────────────────────
+    // "attach this to milk in shopping", "pin file to eggs", "add file to butter"
+    val attachToItem: Set<String> = setOf(
+        "attach this to",
+        "attach to",
+        "attach file to",
+        "attach it to",
+        "pin this to",
+        "pin to",
+        "pin file to",
+        "add file to",
+        "add attachment to",
+        "add this to",
+        "link to",
+        "link this to",
+        "attach",
+        "pin",
+    )
+
     // ─── Hint prepositions (for ChecklistHintExtractor) ───────────────────────
     val hintPrepositions: Set<String> = setOf("in", "to", "for", "from", "into", "on")
 }

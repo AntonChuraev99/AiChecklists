@@ -897,7 +897,7 @@
 
     <!-- AI-чат: заголовок, ввод, действия -->
     <string name="chat_title">AI-чат</string>
-    <string name="chat_input_placeholder">Спросите что угодно…</string>
+    <string name="chat_input_placeholder">Сообщение</string>
     <string name="chat_send_action">Отправить</string>
     <string name="chat_typing_indicator_a11y">AI печатает…</string>
     <string name="chat_help_action">О стоимости</string>
@@ -909,12 +909,16 @@
     <!-- AI-чат: preview card -->
     <string name="chat_preview_apply">Применить</string>
     <string name="chat_preview_cancel">Отмена</string>
+    <string name="chat_preview_reject">Я имел в виду другое</string>
+    <string name="chat_preview_cancelled_message">Действие отменено.</string>
     <string name="chat_preview_will_create_one">Будет создан один пункт:</string>
     <string name="chat_preview_will_create_checklist">Новый чек-лист:</string>
     <string name="chat_preview_will_delete">Будет удалён пункт:</string>
     <string name="chat_preview_will_complete">Будет отмечен как выполнен:</string>
     <string name="chat_preview_will_set_reminder">Поставить напоминание для:</string>
     <string name="chat_preview_will_move_reminders">Перенести все напоминания:</string>
+    <string name="chat_preview_will_create_from_attachment">Создать чек-лист из файла:</string>
+    <string name="chat_preview_will_attach_to_item">Прикрепить файл к пункту:</string>
     <string name="chat_preview_checklist_label">В чек-лист: %1$s</string>
     <string name="chat_preview_no_checklist_hint">Чек-лист не указан — добавим в первый.</string>
     <string name="chat_preview_item_label">Текст пункта</string>
@@ -988,4 +992,52 @@
     <string name="chat_feedback_submitted">Спасибо за обратную связь!</string>
     <string name="chat_feedback_blank_hint">Введите текст отзыва</string>
     <string name="chat_open_checklist">Открыть чек-лист</string>
+
+    <!-- AI Chat — attachment flow strings (Phase 1) -->
+    <string name="chat_attach_no_files">Файлы не прикреплены. Сначала выберите файл.</string>
+    <string name="chat_attach_limit_reached">Достигнут лимит вложений. Перейдите на Premium для безлимитных вложений.</string>
+    <string name="chat_attach_unsupported_type">Неподдерживаемый тип файла: %1$s.</string>
+    <string name="chat_attach_analyze_empty">Из «%1$s» не удалось извлечь пункты чек-листа.</string>
+    <string name="chat_attach_analyze_failed">Не удалось проанализировать «%1$s». Попробуйте ещё раз.</string>
+    <string name="chat_attach_store_failed">Не удалось сохранить «%1$s». Проверьте разрешения.</string>
+    <string name="chat_recording_cancelled">Запись отменена.</string>
+    <string name="chat_dispatch_created_from_attachment">Создан чек-лист «%1$s» с %2$s пунктами.</string>
+    <string name="chat_dispatch_attached_one">«%1$s» прикреплён к «%2$s» в %3$s.</string>
+    <string name="chat_dispatch_attached_many">%1$s файлов прикреплено к «%2$s» в %3$s.</string>
+    <!-- Phase 3 UI strings: attachment + voice input -->
+    <string name="chat_attach_file_action">Прикрепить файл</string>
+    <string name="chat_record_voice">Записать голосовое сообщение</string>
+    <string name="chat_voice_press_hold_hint">Удерживайте, чтобы записать голос</string>
+    <string name="chat_voice_drag_cancel_hint">Сдвиньте вверх для отмены</string>
+    <string name="chat_voice_too_short">Запись слишком короткая. Удерживайте кнопку дольше.</string>
+    <string name="chat_recording_in_progress">Запись…</string>
+    <string name="chat_attachment_remove">Удалить вложение</string>
+    <string name="chat_attachment_source_chooser_title">Прикрепить</string>
+    <string name="chat_attachment_source_image">Изображение</string>
+    <string name="chat_attachment_source_pdf">PDF документ</string>
+    <string name="chat_attachment_source_text">Текстовый файл</string>
+    <string name="chat_attachment_source_audio">Аудио файл</string>
+    <string name="chat_mic_permission_denied">Разрешите доступ к микрофону в настройках</string>
+    <string name="chat_input_placeholder_with_attachment">Опишите, что сделать с вложением…</string>
+    <string name="chat_features_help_action">Как пользоваться AI Chat</string>
+    <string name="chat_features_sheet_title">Что умеет AI Chat</string>
+    <string name="chat_features_intro">Общайтесь с чеклистами обычным языком. Добавляйте пункты, ставьте напоминания, прикрепляйте фото, диктуйте голосом — ассистент сам поймёт, что вы хотите. Нажмите скрепку, чтобы прикрепить файл, удерживайте микрофон, чтобы записать голос.</string>
+    <string name="chat_features_examples_title">Примеры команд</string>
+    <string name="chat_features_example_create">Создай чеклист «Покупки» с молоком, хлебом, маслом</string>
+    <string name="chat_features_example_add">Добавь масло в покупки</string>
+    <string name="chat_features_example_complete">Отметь молоко выполненным</string>
+    <string name="chat_features_example_delete">Удали хлеб из покупок</string>
+    <string name="chat_features_example_reminder">Напомни в 18:00 про молоко</string>
+    <string name="chat_features_example_move">Перенеси все напоминания со вторника на среду</string>
+    <string name="chat_features_example_find">Найди, где у меня молоко</string>
+    <string name="chat_features_example_attach">Прикрепи это к молоку в покупках (с фото)</string>
+    <string name="chat_features_example_from_attachment">Создай чеклист из этого фото / PDF / текста</string>
+    <string name="chat_features_got_it">Понятно</string>
+    <string name="chat_assistant_label">AI-ассистент</string>
+    <string name="chat_message_copy">Скопировать сообщение</string>
+    <string name="chat_message_refresh">Сгенерировать заново</string>
+    <string name="chat_message_thumb_up">Хороший ответ</string>
+    <string name="chat_message_thumb_down">Плохой ответ</string>
+    <string name="chat_day_divider_today">Сегодня</string>
+    <string name="chat_thumb_up_thanks">Спасибо за отзыв</string>
 </resources>

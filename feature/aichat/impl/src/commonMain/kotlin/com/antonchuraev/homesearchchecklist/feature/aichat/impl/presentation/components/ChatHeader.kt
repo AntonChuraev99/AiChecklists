@@ -5,12 +5,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBackIos
 import androidx.compose.material.icons.outlined.Menu
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -47,7 +47,10 @@ fun ChatHeader(
     onMenuClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
-    CenterAlignedTopAppBar(
+    // M3 Small TopAppBar — title is LEFT-aligned (sits directly to the right of the
+    // navigation icon). The center-aligned variant places the title in the middle of
+    // the bar, which doesn't match the requested layout.
+    TopAppBar(
         modifier = modifier,
         title = {
             Text(
@@ -88,11 +91,12 @@ fun ChatHeader(
                 Icon(
                     imageVector = Icons.Outlined.Settings,
                     contentDescription = stringResource(Res.string.chat_settings_open),
-                    tint = MaterialTheme.colorScheme.onSurface,
+                    // onSurfaceVariant per AI Chat M3 design — lower-emphasis trailing action.
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         },
-        colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+        colors = TopAppBarDefaults.topAppBarColors(
             containerColor = MaterialTheme.colorScheme.surface,
             titleContentColor = MaterialTheme.colorScheme.onSurface,
         ),

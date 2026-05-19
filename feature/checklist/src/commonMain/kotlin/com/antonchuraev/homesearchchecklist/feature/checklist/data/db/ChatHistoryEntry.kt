@@ -9,6 +9,11 @@ import androidx.room3.PrimaryKey
  * One row per chat message. [role] is "user" or "assistant".
  * [routedLayer] is "Local" | "Classifier" | "FullChat" | null (assistant messages
  * get null or "FullChat" for Layer 3 responses).
+ *
+ * [attachmentsJson] stores the JSON-serialised [List<ChatAttachment>] for user messages
+ * that include file attachments (added in MIGRATION_13_14). Null for legacy rows and
+ * for assistant messages. Decoded with ignoreUnknownKeys=true so future ChatAttachment
+ * fields don't break older installs.
  */
 @Entity(tableName = "ai_chat_history")
 data class ChatHistoryEntry(
@@ -20,4 +25,6 @@ data class ChatHistoryEntry(
     val routedLayer: String? = null,
     /** Foreign reference to the affected checklist; null for read/bulk/error messages. */
     val linkedChecklistId: Long? = null,
+    /** JSON-serialised List<ChatAttachment>; null means no attachments (default for old rows). */
+    val attachmentsJson: String? = null,
 )

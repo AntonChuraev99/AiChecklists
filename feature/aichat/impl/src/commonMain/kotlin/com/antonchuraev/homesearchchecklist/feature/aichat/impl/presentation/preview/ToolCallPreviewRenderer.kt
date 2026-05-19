@@ -53,6 +53,20 @@ internal class ToolCallPreviewRendererImpl : ToolCallPreviewRenderer {
 
         // FindItemsQuery renders inline (no preview card), this is a safety fallback
         is ToolCall.FindItemsQuery -> ""
+
+        is ToolCall.CreateChecklistFromAttachment -> buildString {
+            val count = toolCall.attachments.size
+            append("Create checklist from ")
+            append(if (count == 1) toolCall.attachments.first().fileName else "$count files")
+        }
+
+        is ToolCall.AttachToItem -> buildString {
+            val count = toolCall.attachments.size
+            append("Attach ")
+            append(if (count == 1) toolCall.attachments.first().fileName else "$count files")
+            append(" to • ${toolCall.itemText}")
+            toolCall.checklistHint?.let { append(" (in $it)") }
+        }
     }
 
     // ─── Timestamp helpers (kotlinx-datetime, KMP-safe) ──────────────────────

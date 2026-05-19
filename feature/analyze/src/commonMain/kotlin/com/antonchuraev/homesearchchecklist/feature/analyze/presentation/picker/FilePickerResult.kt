@@ -15,5 +15,6 @@ data class FilePickerResult(
 enum class FilePickerType {
     IMAGE,
     PDF,
-    TEXT
+    TEXT,
+    AUDIO,
 }
