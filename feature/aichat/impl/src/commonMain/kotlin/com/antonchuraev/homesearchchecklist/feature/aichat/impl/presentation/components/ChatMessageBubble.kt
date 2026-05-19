@@ -88,18 +88,38 @@ fun ChatMessageBubble(
                 },
                 modifier = Modifier.widthIn(max = 280.dp),
             ) {
-                SelectionContainer {
-                    if (isUser) {
-                        Text(
-                            text = message.content,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.padding(
-                                horizontal = AppDimens.SpacingMd,
-                                vertical = AppDimens.SpacingSm,
-                            ),
-                        )
-                    } else {
+                if (isUser) {
+                    // User bubble: attachments (if any) rendered ABOVE the text
+                    androidx.compose.foundation.layout.Column(
+                        modifier = Modifier.padding(vertical = AppDimens.SpacingSm),
+                    ) {
+                        if (message.attachments.isNotEmpty()) {
+                            MessageAttachmentRow(
+                                attachments = message.attachments,
+                                modifier = Modifier.padding(
+                                    start = AppDimens.SpacingMd,
+                                    end = AppDimens.SpacingMd,
+                                    bottom = AppDimens.SpacingXs,
+                                ),
+                            )
+                        }
+                        if (message.content.isNotBlank()) {
+                            SelectionContainer {
+                                Text(
+                                    text = message.content,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.padding(
+                                        start = AppDimens.SpacingMd,
+                                        end = AppDimens.SpacingMd,
+                                        bottom = AppDimens.SpacingXs,
+                                    ),
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    SelectionContainer {
                         ChatMarkdownText(
                             markdown = message.content,
                             style = MaterialTheme.typography.bodyMedium,

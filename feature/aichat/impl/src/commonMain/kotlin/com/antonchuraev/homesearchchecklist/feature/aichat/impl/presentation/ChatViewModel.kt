@@ -6,6 +6,8 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AiChatPreferencesRepository
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.dispatcher.ToolCallDispatcher
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AttachmentSource
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatAttachment
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatIntent
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatRole
@@ -167,6 +169,44 @@ class ChatViewModel(
                 }
             }
 
+            // ── Attachment intents ────────────────────────────────────────────
+
+            is ChatScreenIntent.OnPickAttachment -> {
+                // Trigger-flag pattern (item-attachments solution): set the picker type so
+                // the UI's LaunchedEffect can launch the correct platform picker.
+                _screenState.value = _screenState.value.copy(
+                    attachmentPickerType = intent.source,
+                )
+            }
+
+            ChatScreenIntent.OnAttachmentPickerTriggered -> {
+                // Reset trigger-flag after UI has consumed it. Prevents re-launch on recompose.
+                _screenState.value = _screenState.value.copy(attachmentPickerType = null)
+            }
+
+            is ChatScreenIntent.OnAttachmentPicked -> handleAttachmentPicked(intent.attachment)
+
+            is ChatScreenIntent.OnRemoveAttachment -> {
+                _screenState.value = _screenState.value.copy(
+                    pendingAttachments = _screenState.value.pendingAttachments
+                        .filter { it.sourcePath != intent.sourcePath }
+                )
+            }
+
+            ChatScreenIntent.OnVoiceRecordingStarted -> {
+                // Phase 1: bookkeep state. Phase 3 will add AudioRecorder + permission check.
+                // Emit RequestRecordAudioPermission so the UI can ask at the right moment.
+                viewModelScope.launch {
+                    _sideEffect.emit(ChatScreenSideEffect.RequestRecordAudioPermission)
+                }
+                _screenState.value = _screenState.value.copy(
+                    isRecording = true,
+                    voiceRecordingError = null,
+                )
+            }
+
+            is ChatScreenIntent.OnVoiceRecordingStopped -> handleVoiceRecordingStopped(intent.recordingPath)
+
             is ChatScreenIntent.OnFeedbackOpen -> {
                 _screenState.value = _screenState.value.copy(
                     feedbackTarget = intent.message,
@@ -251,16 +291,24 @@ class ChatViewModel(
 
     private fun handleSend() {
         val text = _screenState.value.inputText.trim()
+        val attachments = _screenState.value.pendingAttachments
 
-        // Blank guard — silent skip is FORBIDDEN (global CLAUDE.md rule)
-        if (text.isBlank()) {
+        // Blank guard (silent skip FORBIDDEN — CLAUDE.md rule).
+        // With attachments, blank text is valid: user wants to Create checklist from file.
+        if (text.isBlank() && attachments.isEmpty()) {
             viewModelScope.launch {
                 _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_unknown_intent_hint"))
             }
             return
         }
 
-        // Append user message
+        // Attachments only (no text) → CreateChecklistFromAttachment directly, skip classifier.
+        if (text.isBlank() && attachments.isNotEmpty()) {
+            handleSendAttachmentsOnly(attachments)
+            return
+        }
+
+        // Append user message (with any pending attachments attached to it)
         val userMsg = ChatMessage(
             id = generateId(),
             role = ChatRole.User,
@@ -268,9 +316,14 @@ class ChatViewModel(
             timestamp = nowMillis(),
             costCredits = 0,
             routedLayer = null,
+            attachments = attachments,
         )
         updateMessages { it + userMsg }
-        _screenState.value = _screenState.value.copy(inputText = "", isProcessing = true)
+        _screenState.value = _screenState.value.copy(
+            inputText = "",
+            pendingAttachments = emptyList(),
+            isProcessing = true,
+        )
 
         viewModelScope.launch {
             runCatching {
@@ -339,6 +392,32 @@ class ChatViewModel(
                             isProcessing = false,
                         )
                     }
+
+                    // AttachToItem — show preview only if attachments are present;
+                    // otherwise emit a snackbar (silent-skip is forbidden).
+                    is ChatIntent.AttachToItem -> {
+                        val currentAttachments = _screenState.value.pendingAttachments
+                        if (currentAttachments.isEmpty()) {
+                            _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_attach_no_files"))
+                            _screenState.value = _screenState.value.copy(isProcessing = false)
+                            return@runCatching
+                        }
+                        val toolCall = ToolCall.AttachToItem(
+                            checklistHint = intent.checklistHint,
+                            itemText = intent.itemText,
+                            attachments = currentAttachments,
+                        )
+                        val humanReadable = previewRenderer.render(toolCall)
+                        _screenState.value = _screenState.value.copy(
+                            pendingPreview = PendingPreview(
+                                toolCall = toolCall,
+                                humanReadable = humanReadable,
+                                targetChecklistHint = intent.checklistHint,
+                                editableItemText = intent.itemText,
+                            ),
+                            isProcessing = false,
+                        )
+                    }
                 }
             }.onFailure { e ->
                 logger.error(TAG, "handleSend failed", e)
@@ -368,6 +447,91 @@ class ChatViewModel(
             }
             _screenState.value = _screenState.value.copy(isProcessing = false)
         }
+    }
+
+    // ─── Attachment-only send (no text, files present) ───────────────────────
+
+    /**
+     * Handles the case where the user tapped Send with attachments but no text.
+     * Dispatches directly to [ToolCall.CreateChecklistFromAttachment] (mirrors Create via AI UX).
+     * A preview card is shown so the user can confirm before execution.
+     */
+    private fun handleSendAttachmentsOnly(attachments: List<ChatAttachment>) {
+        val userMsg = ChatMessage(
+            id = generateId(),
+            role = ChatRole.User,
+            // Content shows file names as a summary since there is no text
+            content = attachments.joinToString(", ") { it.fileName },
+            timestamp = nowMillis(),
+            costCredits = 0,
+            routedLayer = RoutingLayer.Local,
+            attachments = attachments,
+        )
+        updateMessages { it + userMsg }
+        _screenState.value = _screenState.value.copy(
+            pendingAttachments = emptyList(),
+            isProcessing = true,
+        )
+
+        viewModelScope.launch {
+            runCatching {
+                withContext(NonCancellable) { chatHistoryRepository.append(userMsg) }
+                val toolCall = ToolCall.CreateChecklistFromAttachment(attachments)
+                val humanReadable = previewRenderer.render(toolCall)
+                _screenState.value = _screenState.value.copy(
+                    pendingPreview = PendingPreview(
+                        toolCall = toolCall,
+                        humanReadable = humanReadable,
+                        targetChecklistHint = null,
+                        editableItemText = "",
+                    ),
+                    isProcessing = false,
+                )
+            }.onFailure { e ->
+                logger.error(TAG, "handleSendAttachmentsOnly failed", e)
+                _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_generic_error"))
+                _screenState.value = _screenState.value.copy(isProcessing = false)
+            }
+        }
+    }
+
+    // ─── Attachment picked / voice recording ─────────────────────────────────
+
+    private fun handleAttachmentPicked(attachment: ChatAttachment) {
+        val current = _screenState.value.pendingAttachments
+        val isPremium = userDataRepository.getUserDataFlow().value.isPremium
+        val limit = if (isPremium) MAX_ATTACHMENTS_PREMIUM else MAX_ATTACHMENTS_FREE
+
+        if (current.size >= limit) {
+            viewModelScope.launch {
+                _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_attach_limit_reached"))
+            }
+            return
+        }
+        _screenState.value = _screenState.value.copy(
+            pendingAttachments = current + attachment,
+        )
+    }
+
+    private fun handleVoiceRecordingStopped(recordingPath: String?) {
+        _screenState.value = _screenState.value.copy(isRecording = false)
+
+        if (recordingPath == null) {
+            // User cancelled — silent skip FORBIDDEN, emit snackbar
+            viewModelScope.launch {
+                _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_recording_cancelled"))
+            }
+            return
+        }
+
+        // Successful recording: wrap as an Audio ChatAttachment and add to pending list
+        val audioAttachment = ChatAttachment(
+            sourcePath = recordingPath,
+            mimeType = "audio/m4a",
+            fileName = "voice_message.m4a",
+            sizeBytes = 0L, // actual size unknown until file is written; dispatcher can re-probe
+        )
+        handleAttachmentPicked(audioAttachment)
     }
 
     // ─── FreeForm (Layer 3) flow ───────────────────────────────────────────────
@@ -482,6 +646,10 @@ class ChatViewModel(
             is ToolCall.CreateChecklist -> original.copy(name = trimmed)
             is ToolCall.MoveAllReminders -> original
             is ToolCall.FindItemsQuery -> original
+            // Attachment tool calls: edited text updates itemText (item to attach to)
+            is ToolCall.AttachToItem -> original.copy(itemText = trimmed)
+            // CreateChecklistFromAttachment has no user-editable text field
+            is ToolCall.CreateChecklistFromAttachment -> original
         }
     }
 
@@ -494,9 +662,11 @@ class ChatViewModel(
         is ToolCall.DeleteItem -> toolCall.checklistHint
         is ToolCall.CompleteItem -> toolCall.checklistHint
         is ToolCall.SetItemReminder -> toolCall.checklistHint
+        is ToolCall.AttachToItem -> toolCall.checklistHint
         is ToolCall.CreateChecklist,
         is ToolCall.MoveAllReminders,
-        is ToolCall.FindItemsQuery -> null
+        is ToolCall.FindItemsQuery,
+        is ToolCall.CreateChecklistFromAttachment -> null
     }
 
     /**
@@ -507,9 +677,11 @@ class ChatViewModel(
         is ToolCall.DeleteItem -> toolCall.itemText
         is ToolCall.CompleteItem -> toolCall.itemText
         is ToolCall.SetItemReminder -> toolCall.itemText
+        is ToolCall.AttachToItem -> toolCall.itemText
         is ToolCall.CreateChecklist -> toolCall.name
         is ToolCall.MoveAllReminders,
-        is ToolCall.FindItemsQuery -> ""
+        is ToolCall.FindItemsQuery,
+        is ToolCall.CreateChecklistFromAttachment -> ""
     }
 
     // ─── Outcome handlers ─────────────────────────────────────────────────────
@@ -617,9 +789,11 @@ class ChatViewModel(
                 )
             }
 
-            // FindItems, FreeForm and Unknown are handled separately — should not reach here
+            // FindItems, FreeForm, AttachToItem and Unknown are handled separately
+            // and should not reach buildToolCall.
             ChatIntent.FindItems,
             ChatIntent.FreeForm,
+            is ChatIntent.AttachToItem,  // handled inline before buildToolCall is called
             is ChatIntent.Unknown -> null
         }
     }
@@ -775,5 +949,9 @@ class ChatViewModel(
         const val HISTORY_DISPLAY_LIMIT = 20
         /** Max checklists to include in Layer 3 context summary. */
         const val CHECKLIST_SUMMARY_LIMIT = 8
+        /** Free-tier attachment limit per chat message (mirrors item-attachments FREE_LIMIT = 3). */
+        const val MAX_ATTACHMENTS_FREE = 3
+        /** Premium users: generous cap to prevent accidental runaway picks. */
+        const val MAX_ATTACHMENTS_PREMIUM = 20
     }
 }

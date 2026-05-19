@@ -1,8 +1,10 @@
 package com.antonchuraev.homesearchchecklist.feature.analyze.di
 
+import com.antonchuraev.homesearchchecklist.feature.analyze.data.analyzer.FirebaseAiAnalyzerAdapter
 import com.antonchuraev.homesearchchecklist.feature.analyze.data.remote.FirebaseAiService
 import com.antonchuraev.homesearchchecklist.feature.analyze.data.remote.FirebaseAiServiceImpl
 import com.antonchuraev.homesearchchecklist.feature.analyze.data.repository.AnalyzeRepositoryImpl
+import com.antonchuraev.homesearchchecklist.feature.analyze.domain.analyzer.AiAnalyzer
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.repository.AnalyzeRepository
 import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.AnalyzeViewModel
 import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.preview.AnalyzeResultPreviewViewModel
@@ -21,6 +23,11 @@ val analyzeFeatureModule = module {
             userDataRepository = get()
         )
     }
+
+    // AiAnalyzer interface — adapter that exposes AnalyzeRepository under the
+    // domain abstraction. Consumed by ToolCallDispatcherImpl for AI Chat
+    // attachment flows (CreateChecklistFromAttachment).
+    single<AiAnalyzer> { FirebaseAiAnalyzerAdapter(analyzeRepository = get()) }
 
     // ViewModel with optional checklistId and fillDefault parameters
     viewModel { (checklistId: Long?, fillDefault: Boolean) ->

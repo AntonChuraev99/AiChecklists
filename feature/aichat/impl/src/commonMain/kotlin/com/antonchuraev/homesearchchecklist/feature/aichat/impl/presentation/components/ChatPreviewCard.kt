@@ -39,6 +39,8 @@ import aichecklists.core.designsystem.generated.resources.chat_preview_will_comp
 import aichecklists.core.designsystem.generated.resources.chat_preview_will_create_checklist
 import aichecklists.core.designsystem.generated.resources.chat_preview_will_create_one
 import aichecklists.core.designsystem.generated.resources.chat_preview_will_delete
+import aichecklists.core.designsystem.generated.resources.chat_preview_will_attach_to_item
+import aichecklists.core.designsystem.generated.resources.chat_preview_will_create_from_attachment
 import aichecklists.core.designsystem.generated.resources.chat_preview_will_move_reminders
 import aichecklists.core.designsystem.generated.resources.chat_preview_will_set_reminder
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
@@ -196,4 +198,6 @@ private fun ToolCall.iconAndHeader(): Pair<ImageVector, StringResource> = when (
     is ToolCall.SetItemReminder -> Icons.Outlined.Notifications to Res.string.chat_preview_will_set_reminder
     is ToolCall.MoveAllReminders -> Icons.Outlined.SwapHoriz to Res.string.chat_preview_will_move_reminders
     is ToolCall.FindItemsQuery -> Icons.Outlined.Add to Res.string.chat_preview_will_create_one
+    is ToolCall.CreateChecklistFromAttachment -> Icons.AutoMirrored.Outlined.List to Res.string.chat_preview_will_create_from_attachment
+    is ToolCall.AttachToItem -> Icons.Outlined.Add to Res.string.chat_preview_will_attach_to_item
 }

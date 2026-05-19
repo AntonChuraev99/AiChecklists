@@ -1,11 +1,20 @@
 package com.antonchuraev.homesearchchecklist.aichat
 
+import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
+import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePort
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.dispatcher.ToolCallDispatcher
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AttachmentSource
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatAttachment
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.DispatchOutcome
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ToolCall
-import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.mimeTypeToAttachmentSource
+import com.antonchuraev.homesearchchecklist.feature.analyze.domain.analyzer.AiAnalyzer
+import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeInputData
+import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeResult
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Attachment
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.UserData
@@ -40,11 +49,17 @@ import kotlinx.datetime.toLocalDateTime
 class ToolCallDispatcherImpl(
     private val checklistRepository: ChecklistRepository,
     private val userDataRepository: UserDataRepository,
+    private val aiAnalyzer: AiAnalyzer,
+    private val attachmentStorage: AttachmentStoragePort,
+    private val logger: AppLogger,
 ) : ToolCallDispatcher {
 
     companion object {
+        private const val TAG = "ToolCallDispatcher"
         private const val FREE_CHECKLIST_LIMIT = 4 // mirrors RemoteConfigDefaults.MAX_CHECKLISTS_FREE
         private const val MAX_FIND_RESULTS = 10
+        /** Free-tier max attachments per item (mirrors item-attachments FREE_ATTACHMENT_LIMIT_PER_ITEM). */
+        private const val FREE_ATTACH_LIMIT_PER_ITEM = 3
     }
 
     override suspend fun dispatch(toolCall: ToolCall): DispatchOutcome = runCatching {
@@ -56,8 +71,11 @@ class ToolCallDispatcherImpl(
             is ToolCall.SetItemReminder -> handleSetItemReminder(toolCall)
             is ToolCall.MoveAllReminders -> handleMoveAllReminders(toolCall)
             is ToolCall.FindItemsQuery -> handleFind(toolCall)
+            is ToolCall.CreateChecklistFromAttachment -> handleCreateChecklistFromAttachment(toolCall)
+            is ToolCall.AttachToItem -> handleAttachToItem(toolCall)
         }
     }.getOrElse { e ->
+        logger.error(TAG, "dispatch failed for ${toolCall::class.simpleName}", e)
         DispatchOutcome.NotFound("chat_dispatch_operation_failed", listOf(e.message ?: "unknown error"))
     }
 
@@ -234,6 +252,213 @@ class ToolCallDispatcherImpl(
             DispatchOutcome.Success("chat_dispatch_find_success", listOf(results.size.toString(), "$summary$suffix"))
         }
     }
+
+    // ─── CreateChecklistFromAttachment ───────────────────────────────────────
+
+    /**
+     * Routes attachment(s) through [GeminiAiAnalyzer] (same path as "Create via AI")
+     * and creates a new checklist from the extracted items.
+     *
+     * Premium gate: same as [handleCreateChecklist] — free users are limited to
+     * [FREE_CHECKLIST_LIMIT] total checklists (RC-driven; hardcoded here as fallback).
+     * Credits gate: [AiAnalyzer] consumes credits through the normal Cloud Function path.
+     * Currently GeminiAiAnalyzer calls the API directly (no credit deduction at this layer);
+     * Phase 3 will add credit validation via UserDataRepository before calling.
+     */
+    private suspend fun handleCreateChecklistFromAttachment(
+        toolCall: ToolCall.CreateChecklistFromAttachment,
+    ): DispatchOutcome {
+        // Premium gate
+        val userData = userDataRepository.getUserData()
+        if (!userData.isPremium) {
+            val allChecklists = checklistRepository.checklists.first()
+            if (allChecklists.size >= FREE_CHECKLIST_LIMIT) {
+                return DispatchOutcome.RequiresPremium
+            }
+        }
+
+        if (toolCall.attachments.isEmpty()) {
+            return DispatchOutcome.NotFound("chat_attach_no_files", emptyList())
+        }
+
+        // Use the first attachment to drive the analysis (multi-attachment support is
+        // straightforward but Gemini API takes one primary input per call; Phase 3
+        // can fan-out and merge results if needed).
+        val primary = toolCall.attachments.first()
+        val inputData = chatAttachmentToAnalyzeInput(primary)
+            ?: return DispatchOutcome.NotFound("chat_attach_unsupported_type", listOf(primary.mimeType))
+
+        logger.debug(TAG, "CreateChecklistFromAttachment: analyzing ${primary.fileName} via GeminiAiAnalyzer")
+        val result = aiAnalyzer.analyze(inputData, targetChecklist = null)
+
+        return result.fold(
+            onSuccess = { analyzeResult ->
+                if (analyzeResult.suggestedItems.isEmpty()) {
+                    return DispatchOutcome.NotFound("chat_attach_analyze_empty", listOf(primary.fileName))
+                }
+                val items = analyzeResult.suggestedItems.map {
+                    ChecklistItem(text = it.text, checked = false)
+                }
+                // Derive checklist name from the file name (strip extension)
+                val checklistName = primary.fileName
+                    .substringBeforeLast('.')
+                    .trim()
+                    .ifBlank { primary.fileName }
+
+                val newChecklist = Checklist(id = 0L, name = checklistName, items = items)
+                val newId = checklistRepository.addChecklist(newChecklist)
+                logger.info(TAG, "CreateChecklistFromAttachment: created checklist '$checklistName' id=$newId items=${items.size}")
+                DispatchOutcome.Success(
+                    "chat_dispatch_created_from_attachment",
+                    listOf(checklistName, items.size.toString()),
+                    linkedChecklistId = newId,
+                )
+            },
+            onFailure = { e ->
+                logger.error(TAG, "CreateChecklistFromAttachment: analyze failed — ${e.message}", e)
+                DispatchOutcome.NotFound("chat_attach_analyze_failed", listOf(primary.fileName))
+            },
+        )
+    }
+
+    // ─── AttachToItem ─────────────────────────────────────────────────────────
+
+    /**
+     * Stores attachment files via [AttachmentStoragePort] and appends them to the
+     * matching [ChecklistFillItem.attachments] list.
+     *
+     * Free tier: max [FREE_ATTACH_LIMIT_PER_ITEM] attachments per item (mirrors
+     * item-attachments quota). Premium: unlimited.
+     *
+     * File-first cleanup order (item-attachments solution principle): if DB write fails
+     * after files are stored, the stored files become orphans — acceptable (next cleanup
+     * cycle handles them). The reverse (DB written, file never stored) silently breaks
+     * the attachment path in the UI — worse UX.
+     */
+    private suspend fun handleAttachToItem(toolCall: ToolCall.AttachToItem): DispatchOutcome {
+        if (toolCall.attachments.isEmpty()) {
+            return DispatchOutcome.NotFound("chat_attach_no_files", emptyList())
+        }
+
+        val (checklist, fill) = resolveChecklistAndFill(toolCall.checklistHint)
+            ?: return resolveChecklistFailure(toolCall.checklistHint)
+
+        // Item disambiguation — must produce exactly 1 match (AmbiguousMatch if >1)
+        val matches = fill.items.filter {
+            it.text.contains(toolCall.itemText, ignoreCase = true)
+        }
+        val matchingItem = when {
+            matches.isEmpty() -> return DispatchOutcome.NotFound(
+                "chat_dispatch_item_not_found",
+                listOf(toolCall.itemText, checklist.name),
+            )
+            matches.size > 1 -> return DispatchOutcome.AmbiguousMatch(
+                matches.take(3).map { it.text },
+            )
+            else -> matches.first()
+        }
+
+        // Free-tier attachment quota check
+        val userData = userDataRepository.getUserData()
+        val existingCount = matchingItem.attachments.size
+        if (!userData.isPremium && existingCount >= FREE_ATTACH_LIMIT_PER_ITEM) {
+            return DispatchOutcome.RequiresPremium
+        }
+
+        // Store files (file-first order)
+        val storedAttachments = mutableListOf<Attachment>()
+        for (chatAttachment in toolCall.attachments) {
+            val stored = runCatching {
+                attachmentStorage.storeAttachment(
+                    sourcePath = chatAttachment.sourcePath,
+                    fillId = fill.id,
+                    itemId = matchingItem.id,
+                    attachmentId = generateAttachmentId(),
+                    originalFileName = chatAttachment.fileName,
+                )
+            }.getOrNull()
+
+            if (stored == null) {
+                logger.warning(TAG, "AttachToItem: failed to store ${chatAttachment.fileName}, skipping")
+                continue
+            }
+
+            val (w, h) = runCatching {
+                attachmentStorage.probeImage(stored, chatAttachment.mimeType)
+            }.getOrDefault(Pair(null, null))
+
+            storedAttachments.add(
+                Attachment(
+                    id = Attachment.generateId(),
+                    path = stored,
+                    fileName = chatAttachment.fileName,
+                    mimeType = chatAttachment.mimeType,
+                    sizeBytes = chatAttachment.sizeBytes,
+                    createdAt = kotlin.time.Clock.System.now().toEpochMilliseconds(),
+                    width = w,
+                    height = h,
+                )
+            )
+        }
+
+        if (storedAttachments.isEmpty()) {
+            return DispatchOutcome.NotFound("chat_attach_store_failed", listOf(toolCall.attachments.first().fileName))
+        }
+
+        // Append to fill item (immutable update via withAttachments helper)
+        val updatedItem = matchingItem.withAttachments(
+            matchingItem.attachments + storedAttachments
+        )
+        val updatedFill = fill.copy(
+            items = fill.items.map { if (it.id == matchingItem.id) updatedItem else it }
+        )
+        checklistRepository.updateFill(updatedFill)
+
+        logger.info(TAG, "AttachToItem: attached ${storedAttachments.size} file(s) to '${matchingItem.text}' in '${checklist.name}'")
+
+        return if (storedAttachments.size == 1) {
+            DispatchOutcome.Success(
+                "chat_dispatch_attached_one",
+                listOf(storedAttachments.first().fileName, matchingItem.text, checklist.name),
+                linkedChecklistId = checklist.id,
+            )
+        } else {
+            DispatchOutcome.Success(
+                "chat_dispatch_attached_many",
+                listOf(storedAttachments.size.toString(), matchingItem.text, checklist.name),
+                linkedChecklistId = checklist.id,
+            )
+        }
+    }
+
+    // ─── Attachment helpers ───────────────────────────────────────────────────
+
+    /**
+     * Converts a [ChatAttachment] to the appropriate [AnalyzeInputData] variant.
+     * Returns null for unknown / unsupported MIME types.
+     */
+    private fun chatAttachmentToAnalyzeInput(attachment: ChatAttachment): AnalyzeInputData? =
+        when (mimeTypeToAttachmentSource(attachment.mimeType)) {
+            AttachmentSource.Image -> AnalyzeInputData.Photo(
+                filePath = attachment.sourcePath,
+                mimeType = attachment.mimeType,
+            )
+            AttachmentSource.Pdf -> AnalyzeInputData.PdfDocument(
+                filePath = attachment.sourcePath,
+                fileName = attachment.fileName,
+            )
+            AttachmentSource.Text -> AnalyzeInputData.TextFile(
+                filePath = attachment.sourcePath,
+            )
+            AttachmentSource.Audio -> AnalyzeInputData.Audio(
+                filePath = attachment.sourcePath,
+                mimeType = attachment.mimeType,
+            )
+            null -> null
+        }
+
+    private fun generateAttachmentId(): String =
+        "chat_attach_${kotlin.time.Clock.System.now().toEpochMilliseconds()}_${(0..99999).random()}"
 
     // ─── Resolution helpers ───────────────────────────────────────────────────
 

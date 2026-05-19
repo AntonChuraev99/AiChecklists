@@ -223,6 +223,7 @@ internal class ChatClassifierApiServiceImpl(
         }
         ChatIntent.FreeForm -> null
         is ChatIntent.Unknown -> null
+        is ChatIntent.AttachToItem -> null   // attachments come from client, not server entities
     }
 
     /**

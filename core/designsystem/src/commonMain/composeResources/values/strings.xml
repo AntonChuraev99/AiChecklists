@@ -940,6 +940,8 @@
     <string name="chat_preview_will_complete">This will mark as done:</string>
     <string name="chat_preview_will_set_reminder">Set a reminder for:</string>
     <string name="chat_preview_will_move_reminders">Move all reminders:</string>
+    <string name="chat_preview_will_create_from_attachment">Create checklist from file:</string>
+    <string name="chat_preview_will_attach_to_item">Attach file to item:</string>
     <string name="chat_preview_checklist_label">In checklist: %1$s</string>
     <string name="chat_preview_no_checklist_hint">No checklist specified — will use the first one.</string>
     <string name="chat_preview_item_label">Item</string>
@@ -1012,4 +1014,30 @@
     <string name="chat_feedback_submitted">Thanks for your feedback!</string>
     <string name="chat_feedback_blank_hint">Please enter feedback text</string>
     <string name="chat_open_checklist">Open checklist</string>
+
+    <!-- AI Chat — attachment flow strings (Phase 1) -->
+    <string name="chat_attach_no_files">No files attached. Please pick a file first.</string>
+    <string name="chat_attach_limit_reached">Attachment limit reached. Upgrade to Premium for unlimited attachments.</string>
+    <string name="chat_attach_unsupported_type">Unsupported file type: %1$s.</string>
+    <string name="chat_attach_analyze_empty">No checklist items could be extracted from «%1$s».</string>
+    <string name="chat_attach_analyze_failed">Could not analyze «%1$s». Please try again.</string>
+    <string name="chat_attach_store_failed">Could not save «%1$s». Check storage permissions.</string>
+    <string name="chat_recording_cancelled">Recording cancelled.</string>
+    <string name="chat_dispatch_created_from_attachment">Created «%1$s» with %2$s items.</string>
+    <string name="chat_dispatch_attached_one">«%1$s» attached to «%2$s» in %3$s.</string>
+    <string name="chat_dispatch_attached_many">%1$s files attached to «%2$s» in %3$s.</string>
+    <!-- Phase 3 UI strings: attachment + voice input -->
+    <string name="chat_attach_file_action">Attach file</string>
+    <string name="chat_record_voice">Record voice message</string>
+    <string name="chat_voice_press_hold_hint">Hold to record voice</string>
+    <string name="chat_voice_drag_cancel_hint">Slide up to cancel</string>
+    <string name="chat_voice_too_short">Recording too short. Hold the mic button longer.</string>
+    <string name="chat_recording_in_progress">Recording… %1$s</string>
+    <string name="chat_attachment_remove">Remove attachment</string>
+    <string name="chat_attachment_source_chooser_title">Attach</string>
+    <string name="chat_attachment_source_image">Image</string>
+    <string name="chat_attachment_source_pdf">PDF document</string>
+    <string name="chat_attachment_source_text">Text file</string>
+    <string name="chat_attachment_source_audio">Audio file</string>
+    <string name="chat_mic_permission_denied">Allow microphone access in Settings</string>
 </resources>

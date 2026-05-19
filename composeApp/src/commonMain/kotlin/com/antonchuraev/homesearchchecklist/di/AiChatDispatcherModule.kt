@@ -1,9 +1,11 @@
 package com.antonchuraev.homesearchchecklist.di
 
-import com.antonchuraev.homesearchchecklist.aichat.ToolCallDispatcherImpl
 import com.antonchuraev.homesearchchecklist.aichat.AndroidChatLocaleProvider
+import com.antonchuraev.homesearchchecklist.aichat.ToolCallDispatcherImpl
+import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePort
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.dispatcher.ToolCallDispatcher
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.locale.ChatLocaleProvider
+import com.antonchuraev.homesearchchecklist.feature.analyze.domain.analyzer.AiAnalyzer
 import org.koin.dsl.module
 
 /**
@@ -20,6 +22,9 @@ val aiChatDispatcherModule = module {
         ToolCallDispatcherImpl(
             checklistRepository = get(),
             userDataRepository = get(),
+            aiAnalyzer = get<AiAnalyzer>(),
+            attachmentStorage = get<AttachmentStoragePort>(),
+            logger = get(),
         )
     }
     single<ChatLocaleProvider> {

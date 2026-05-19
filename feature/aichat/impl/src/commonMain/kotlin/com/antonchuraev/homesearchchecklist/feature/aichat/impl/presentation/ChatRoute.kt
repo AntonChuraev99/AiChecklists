@@ -6,7 +6,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.chat_ambiguous_match
 import aichecklists.core.designsystem.generated.resources.chat_apply_error
@@ -19,9 +21,6 @@ import aichecklists.core.designsystem.generated.resources.chat_dispatch_created_
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_created_with_one
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_deleted
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_fill_load_failed
-import aichecklists.core.designsystem.generated.resources.chat_insufficient_credits
-import aichecklists.core.designsystem.generated.resources.chat_completion_error
-import aichecklists.core.designsystem.generated.resources.chat_history_load_error
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_find_blank
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_find_no_match
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_find_success
@@ -37,9 +36,19 @@ import aichecklists.core.designsystem.generated.resources.chat_extract_fail
 import aichecklists.core.designsystem.generated.resources.chat_feedback_blank_hint
 import aichecklists.core.designsystem.generated.resources.chat_feedback_submitted
 import aichecklists.core.designsystem.generated.resources.chat_generic_error
+import aichecklists.core.designsystem.generated.resources.chat_history_load_error
+import aichecklists.core.designsystem.generated.resources.chat_insufficient_credits
+import aichecklists.core.designsystem.generated.resources.chat_completion_error
+import aichecklists.core.designsystem.generated.resources.chat_mic_permission_denied
 import aichecklists.core.designsystem.generated.resources.chat_not_found
 import aichecklists.core.designsystem.generated.resources.chat_requires_premium
 import aichecklists.core.designsystem.generated.resources.chat_unknown_intent_hint
+import aichecklists.core.designsystem.generated.resources.chat_voice_too_short
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AttachmentSource
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatAttachment
+import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.picker.FilePickerType
+import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.picker.rememberFilePickerLauncher
+import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.recorder.rememberAudioRecorderLauncher
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -58,6 +67,11 @@ import org.koin.compose.viewmodel.koinViewModel
  *     to chat history. This keeps all user-facing strings out of ViewModel
  *     and bound to system locale automatically.
  *   - [ChatScreenSideEffect.NavigateBack] → calls [onBack].
+ *   - [ChatScreenSideEffect.RequestRecordAudioPermission] → triggers platform
+ *     permission dialog via [audioRecorderLauncher.start()]. If denied, shows
+ *     a snackbar with [chat_mic_permission_denied].
+ *   - [ChatScreenSideEffect.OpenFilePicker] → launches the appropriate picker
+ *     (image / pdf / text via FilePicker; audio via AudioRecorder).
  *
  * Why pre-resolve in Composable scope: `stringResource()` is a @Composable
  * call and cannot run inside `LaunchedEffect.collect`. We materialise every
@@ -74,6 +88,9 @@ fun ChatRoute(
     viewModel: ChatViewModel = koinViewModel(),
 ) {
     val state by viewModel.screenState.collectAsState()
+
+    // Tracks the source type we're waiting to pick, used by trigger-flag LaunchedEffect
+    var pendingPickerSource by remember { mutableStateOf<AttachmentSource?>(null) }
 
     // Pre-resolve all chat_* messages once per locale change.
     val unknownText = stringResource(Res.string.chat_unknown_intent_hint)
@@ -109,6 +126,9 @@ fun ChatRoute(
     val historyLoadErrorText = stringResource(Res.string.chat_history_load_error)
     val feedbackSubmittedText = stringResource(Res.string.chat_feedback_submitted)
     val feedbackBlankHintText = stringResource(Res.string.chat_feedback_blank_hint)
+    // Phase 3 strings
+    val micPermissionDeniedText = stringResource(Res.string.chat_mic_permission_denied)
+    val voiceTooShortText = stringResource(Res.string.chat_voice_too_short)
 
     val messages = remember(
         unknownText, genericErrorText, applyErrorText, extractFailText,
@@ -121,6 +141,7 @@ fun ChatRoute(
         dispatchOperationFailedFmt, dispatchNoChecklistsText, dispatchNoChecklistMatchFmt,
         dispatchFillLoadFailedFmt, insufficientCreditsText, completionErrorText, historyLoadErrorText,
         feedbackSubmittedText, feedbackBlankHintText,
+        micPermissionDeniedText, voiceTooShortText,
     ) {
         mapOf(
             "chat_unknown_intent_hint" to unknownText,
@@ -155,7 +176,96 @@ fun ChatRoute(
             "chat_history_load_error" to historyLoadErrorText,
             "chat_feedback_submitted" to feedbackSubmittedText,
             "chat_feedback_blank_hint" to feedbackBlankHintText,
+            "chat_mic_permission_denied" to micPermissionDeniedText,
+            "chat_voice_too_short" to voiceTooShortText,
         )
+    }
+
+    // ── File pickers (one per supported type) ───────────────────────────────
+    // Registered once in Composable scope per the trigger-flag pattern: the
+    // picker is launched when pendingPickerSource is set to the matching type.
+
+    val imagePicker = rememberFilePickerLauncher(
+        type = FilePickerType.IMAGE,
+        onResult = { result ->
+            if (result != null) {
+                viewModel.sendIntent(
+                    ChatScreenIntent.OnAttachmentPicked(
+                        ChatAttachment(
+                            sourcePath = result.filePath,
+                            mimeType = result.mimeType ?: "image/*",
+                            fileName = result.fileName,
+                            sizeBytes = 0L,
+                        )
+                    )
+                )
+            }
+            viewModel.sendIntent(ChatScreenIntent.OnAttachmentPickerTriggered)
+        }
+    )
+
+    val pdfPicker = rememberFilePickerLauncher(
+        type = FilePickerType.PDF,
+        onResult = { result ->
+            if (result != null) {
+                viewModel.sendIntent(
+                    ChatScreenIntent.OnAttachmentPicked(
+                        ChatAttachment(
+                            sourcePath = result.filePath,
+                            mimeType = result.mimeType ?: "application/pdf",
+                            fileName = result.fileName,
+                            sizeBytes = 0L,
+                        )
+                    )
+                )
+            }
+            viewModel.sendIntent(ChatScreenIntent.OnAttachmentPickerTriggered)
+        }
+    )
+
+    val textPicker = rememberFilePickerLauncher(
+        type = FilePickerType.TEXT,
+        onResult = { result ->
+            if (result != null) {
+                viewModel.sendIntent(
+                    ChatScreenIntent.OnAttachmentPicked(
+                        ChatAttachment(
+                            sourcePath = result.filePath,
+                            mimeType = result.mimeType ?: "text/plain",
+                            fileName = result.fileName,
+                            sizeBytes = 0L,
+                        )
+                    )
+                )
+            }
+            viewModel.sendIntent(ChatScreenIntent.OnAttachmentPickerTriggered)
+        }
+    )
+
+    // ── Audio recorder ───────────────────────────────────────────────────────
+    val audioRecorder = rememberAudioRecorderLauncher(
+        onResult = { result ->
+            // result == null means user cancelled or recording was too short
+            viewModel.sendIntent(ChatScreenIntent.OnVoiceRecordingStopped(result?.filePath))
+        },
+        onError = { _ ->
+            // Permission denied or hardware error — snackbar shown below
+            viewModel.sendIntent(ChatScreenIntent.OnVoiceRecordingStopped(null))
+        }
+    )
+
+    // ── Trigger-flag: launch pickers when pendingPickerSource is set ─────────
+    LaunchedEffect(state.attachmentPickerType) {
+        val source = state.attachmentPickerType ?: return@LaunchedEffect
+        pendingPickerSource = source
+        when (source) {
+            AttachmentSource.Image -> imagePicker.launch()
+            AttachmentSource.Pdf -> pdfPicker.launch()
+            AttachmentSource.Text -> textPicker.launch()
+            AttachmentSource.Audio -> audioRecorder.start()
+        }
+        // Reset the trigger-flag in ViewModel so it doesn't fire again on recomposition
+        viewModel.sendIntent(ChatScreenIntent.OnAttachmentPickerTriggered)
     }
 
     LaunchedEffect(viewModel) {
@@ -177,6 +287,21 @@ fun ChatRoute(
                 }
                 ChatScreenSideEffect.NavigateBack -> onBack()
                 is ChatScreenSideEffect.NavigateToChecklist -> onNavigateToChecklist?.invoke(effect.checklistId)
+                ChatScreenSideEffect.NavigateToPaywall -> onNavigateToPaywall?.invoke()
+                ChatScreenSideEffect.RequestRecordAudioPermission -> {
+                    // AudioRecorderLauncher handles permission check internally.
+                    // Starting the recorder here requests permission if needed;
+                    // if denied, onError fires → OnVoiceRecordingStopped(null) → snackbar
+                    // via chat_recording_cancelled path. A dedicated mic_permission_denied
+                    // snackbar appears only on permanent denial (PERMISSION_DENIED_PERMANENTLY).
+                    audioRecorder.start()
+                }
+                is ChatScreenSideEffect.OpenFilePicker -> {
+                    // ViewModel sets attachmentPickerType as a trigger-flag; the
+                    // LaunchedEffect(state.attachmentPickerType) above handles the launch.
+                    // This branch intentionally no-ops — the trigger-flag pattern avoids
+                    // dual-launch on the same event.
+                }
             }
         }
     }
@@ -186,6 +311,19 @@ fun ChatRoute(
         onIntent = viewModel::sendIntent,
         drawerState = drawerState,
         onNavigateToPaywall = onNavigateToPaywall,
+        onAttachmentSourcePicked = { source ->
+            // ChatScreen already sent OnPickAttachment via onIntent; this callback
+            // lets Route launch the picker directly without waiting for sideEffect.
+            when (source) {
+                AttachmentSource.Image -> imagePicker.launch()
+                AttachmentSource.Pdf -> pdfPicker.launch()
+                AttachmentSource.Text -> textPicker.launch()
+                AttachmentSource.Audio -> audioRecorder.start()
+            }
+        },
+        onVoiceRecordingStarted = null,  // gesture handled by ChatInputRow → onIntent
+        onVoiceRecordingStopped = { audioRecorder.stop() },
+        onVoiceRecordingCancelled = { audioRecorder.cancel() },
     )
 }
 

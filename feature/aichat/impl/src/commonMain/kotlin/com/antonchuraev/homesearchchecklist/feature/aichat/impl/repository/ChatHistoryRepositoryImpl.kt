@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.aichat.impl.repository
 
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatAttachment
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatRole
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.RoutingLayer
@@ -9,6 +10,8 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChatHistor
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChatHistoryEntry
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.Json
 
 /**
  * Room-backed implementation of [ChatHistoryRepository].
@@ -24,6 +27,10 @@ internal class ChatHistoryRepositoryImpl(
 
     companion object {
         private const val TAG = "ChatHistoryRepository"
+
+        // ignoreUnknownKeys: forward-compat — future ChatAttachment fields won't crash old installs.
+        private val json = Json { ignoreUnknownKeys = true }
+        private val attachmentListSerializer = ListSerializer(ChatAttachment.serializer())
     }
 
     override fun observeRecent(limit: Int): Flow<List<ChatMessage>> =
@@ -60,6 +67,7 @@ internal class ChatHistoryRepositoryImpl(
         costCredits = costCredits,
         routedLayer = routedLayer?.toRoutingLayer(),
         linkedChecklistId = linkedChecklistId,
+        attachments = decodeAttachments(attachmentsJson),
     )
 
     private fun ChatMessage.toEntry(): ChatHistoryEntry = ChatHistoryEntry(
@@ -73,7 +81,30 @@ internal class ChatHistoryRepositoryImpl(
         costCredits = costCredits,
         routedLayer = routedLayer?.name,
         linkedChecklistId = linkedChecklistId,
+        attachmentsJson = encodeAttachments(attachments),
     )
+
+    /** Decodes a nullable JSON string → List<ChatAttachment>. Null / blank → emptyList(). */
+    private fun decodeAttachments(json: String?): List<ChatAttachment> {
+        if (json.isNullOrBlank()) return emptyList()
+        return runCatching {
+            ChatHistoryRepositoryImpl.json.decodeFromString(attachmentListSerializer, json)
+        }.getOrElse { e ->
+            logger.warning(TAG, "decodeAttachments: failed to parse json — ${e.message}")
+            emptyList()
+        }
+    }
+
+    /** Encodes List<ChatAttachment> → nullable JSON string. Empty list → null (saves storage). */
+    private fun encodeAttachments(list: List<ChatAttachment>): String? {
+        if (list.isEmpty()) return null
+        return runCatching {
+            json.encodeToString(attachmentListSerializer, list)
+        }.getOrElse { e ->
+            logger.warning(TAG, "encodeAttachments: failed to encode — ${e.message}")
+            null
+        }
+    }
 
     private fun String.toRoutingLayer(): RoutingLayer? = when (this) {
         "Local" -> RoutingLayer.Local

@@ -101,9 +101,19 @@ val MIGRATION_12_13 = object : Migration(12, 13) {
     }
 }
 
+// No-op schema change: attachmentsJson is stored as a nullable TEXT column.
+// The TypeConverter (JSON blob) handles serialisation; existing rows without this column
+// will read null and default to emptyList() in ChatHistoryRepositoryImpl.toChatMessage().
+val MIGRATION_13_14 = object : Migration(13, 14) {
+    override suspend fun migrate(connection: SQLiteConnection) {
+        // Schema unchanged for the SQL DDL perspective — we add a nullable TEXT column.
+        connection.execSQL("ALTER TABLE ai_chat_history ADD COLUMN attachmentsJson TEXT DEFAULT NULL")
+    }
+}
+
 @Database(
     entities = [ChecklistEntity::class, ChecklistFillEntity::class, ChatHistoryEntry::class],
-    version = 13,
+    version = 14,
     exportSchema = true
 )
 @TypeConverters(ChecklistItemConverters::class, ReminderConverters::class)
@@ -118,7 +128,7 @@ abstract class ChecklistDatabase : RoomDatabase() {
             builder: Builder<ChecklistDatabase>
         ): ChecklistDatabase {
             return builder
-                .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
+                .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14)
                 .fallbackToDestructiveMigration(dropAllTables = false)
                 .setQueryCoroutineContext(Dispatchers.Default)
                 .build()
