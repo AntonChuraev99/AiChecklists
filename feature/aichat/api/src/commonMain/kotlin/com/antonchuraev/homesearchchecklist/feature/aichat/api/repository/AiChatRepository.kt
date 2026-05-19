@@ -49,13 +49,16 @@ interface AiChatRepository {
     ): RemoteCompletionResult
 
     /**
-     * Transcribes a voice recording (AAC m4a) to text via the `transcribe_audio`
-     * Cloud Function. Spends 1 AI credit per successful call.
+     * Transcribes a voice recording to text via the `transcribe_audio` Cloud Function.
+     * Spends 1 AI credit per successful call.
      *
      * Contract:
      *   - The audio file at [audioPath] is read, base64-encoded, and sent to the
-     *     server. The local file is deleted after the call regardless of outcome —
-     *     callers must not assume the file still exists.
+     *     server together with [mimeType]. The local file is deleted after the call
+     *     regardless of outcome — callers must not assume the file still exists.
+     *   - [mimeType] is passed through to the server, which normalizes it for Gemini.
+     *     Pass whatever the platform recorder reported (Android: "audio/m4a", browsers:
+     *     "audio/webm;codecs=opus", Safari: "audio/mp4").
      *   - On [TranscriptionOutcome.Success] the [transcript] may be an empty string
      *     when the audio was silent or unintelligible; callers should handle this as
      *     a soft failure (snackbar, no input change).
@@ -64,6 +67,7 @@ interface AiChatRepository {
      */
     suspend fun transcribeAudio(
         audioPath: String,
+        mimeType: String,
         locale: ChatLocale,
     ): TranscriptionOutcome
 }

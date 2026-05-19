@@ -285,11 +285,16 @@ fun ChatRoute(
     val audioRecorder = rememberAudioRecorderLauncher(
         onResult = { result ->
             // result == null means user cancelled or recording was too short
-            viewModel.sendIntent(ChatScreenIntent.OnVoiceRecordingStopped(result?.filePath))
+            viewModel.sendIntent(
+                ChatScreenIntent.OnVoiceRecordingStopped(
+                    recordingPath = result?.filePath,
+                    mimeType = result?.mimeType ?: "audio/m4a",
+                )
+            )
         },
         onError = { _ ->
             // Permission denied or hardware error — snackbar shown below
-            viewModel.sendIntent(ChatScreenIntent.OnVoiceRecordingStopped(null))
+            viewModel.sendIntent(ChatScreenIntent.OnVoiceRecordingStopped(recordingPath = null))
         }
     )
 

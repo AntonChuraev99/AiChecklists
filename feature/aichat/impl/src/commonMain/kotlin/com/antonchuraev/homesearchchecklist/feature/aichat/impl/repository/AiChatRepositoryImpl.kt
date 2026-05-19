@@ -242,6 +242,7 @@ internal class AiChatRepositoryImpl(
     @OptIn(ExperimentalEncodingApi::class)
     override suspend fun transcribeAudio(
         audioPath: String,
+        mimeType: String,
         locale: ChatLocale,
     ): TranscriptionOutcome {
         val bytes = AudioFileBytes.read(audioPath)
@@ -260,13 +261,13 @@ internal class AiChatRepositoryImpl(
         }
 
         val base64 = Base64.encode(bytes)
-        logger.debug(TAG, "transcribeAudio: bytes=${bytes.size} b64_len=${base64.length} locale=$locale")
+        logger.debug(TAG, "transcribeAudio: bytes=${bytes.size} b64_len=${base64.length} mime=$mimeType locale=$locale")
 
         // File is no longer needed once we have the base64 payload — delete eagerly
         // so a failed transcription does not leak audio in cacheDir.
         AudioFileBytes.delete(audioPath)
 
-        return when (val result = transcribeApi.transcribe(userId, base64, locale)) {
+        return when (val result = transcribeApi.transcribe(userId, base64, mimeType, locale)) {
             is RemoteTranscriptionResult.Success -> {
                 if (result.transcript.isBlank()) {
                     logger.info(TAG, "transcribeAudio: empty transcript (silent or unintelligible)")

@@ -12,9 +12,16 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.ChatLocale
  * The function accepts AAC m4a audio (Gemini's `audio/mp4` MIME) up to ~5MB raw.
  */
 interface TranscribeAudioApiService {
+    /**
+     * @param mimeType Client-side audio MIME. Server normalizes it to a Gemini-compatible
+     *   container (audio/mp4 / audio/webm / audio/wav / audio/mpeg / audio/flac / audio/ogg).
+     *   Examples: Android emits "audio/m4a", browsers emit "audio/webm;codecs=opus",
+     *   Safari emits "audio/mp4". Pass through whatever the recorder reported.
+     */
     suspend fun transcribe(
         userId: String,
         audioBase64: String,
+        mimeType: String,
         locale: ChatLocale,
     ): RemoteTranscriptionResult
 }

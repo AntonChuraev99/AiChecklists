@@ -60,11 +60,12 @@ internal class TranscribeAudioApiServiceImpl(
     override suspend fun transcribe(
         userId: String,
         audioBase64: String,
+        mimeType: String,
         locale: ChatLocale,
     ): RemoteTranscriptionResult = runCatching {
         logger.debug(
             TAG,
-            "transcribe: userId=${userId.take(8)}... bytes_b64=${audioBase64.length} locale=$locale"
+            "transcribe: userId=${userId.take(8)}... bytes_b64=${audioBase64.length} mime=$mimeType locale=$locale"
         )
 
         val response: HttpResponse = httpClient.post(TRANSCRIBE_URL) {
@@ -73,6 +74,7 @@ internal class TranscribeAudioApiServiceImpl(
                 TranscribeRequest(
                     userId = userId,
                     audioBase64 = audioBase64,
+                    mimeType = mimeType,
                     locale = locale.toApiString(),
                 )
             )
@@ -118,6 +120,7 @@ internal class TranscribeAudioApiServiceImpl(
     private data class TranscribeRequest(
         @SerialName("user_id") val userId: String,
         @SerialName("audio_base64") val audioBase64: String,
+        @SerialName("mime_type") val mimeType: String,
         val locale: String,
     )
 

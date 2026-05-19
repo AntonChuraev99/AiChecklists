@@ -148,10 +148,158 @@ globalThis.__readStagedBytes = (path) => {
     try {
         const buf = globalThis.__filePickerStaging.get(path);
         if (!buf) return null;
-        return new Uint8Array(buf);
+        return buf instanceof Uint8Array ? buf : new Uint8Array(buf);
     } catch (e) {
         return null;
     }
+};
+
+globalThis.__deleteStagedBytes = (path) => {
+    try {
+        return globalThis.__filePickerStaging.delete(path);
+    } catch (e) {
+        return false;
+    }
+};
+
+// === Audio Recording bridge (MediaRecorder + getUserMedia) ===
+// State singleton — holds the active recording session.
+globalThis.__audioRecordingState = {
+    recorder: null,      // MediaRecorder instance
+    stream: null,        // MediaStream from getUserMedia
+    chunks: [],          // Array<Blob> chunks accumulated via dataavailable
+    mimeType: null,      // resolved MIME for this session
+    startedAtMs: 0,      // Date.now() when recording started
+};
+
+// Start microphone capture and begin recording.
+// Returns Promise<{ok: boolean, mimeType: string, error: string|null}>.
+globalThis.__audioRecordingStart = () => new Promise((resolve) => {
+    (async () => {
+        try {
+            if (globalThis.__audioRecordingState.recorder) {
+                resolve({ ok: false, mimeType: '', error: 'already recording' });
+                return;
+            }
+            // Probe MIME candidates — Chrome prefers webm;opus, Safari prefers mp4.
+            const candidates = [
+                'audio/webm;codecs=opus',
+                'audio/webm',
+                'audio/mp4',
+                'audio/ogg;codecs=opus',
+            ];
+            let chosenMime = '';
+            for (const m of candidates) {
+                if (typeof MediaRecorder !== 'undefined'
+                    && typeof MediaRecorder.isTypeSupported === 'function'
+                    && MediaRecorder.isTypeSupported(m)) {
+                    chosenMime = m;
+                    break;
+                }
+            }
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const recorderOpts = chosenMime ? { mimeType: chosenMime } : {};
+            const recorder = new MediaRecorder(stream, recorderOpts);
+            const chunks = [];
+            recorder.addEventListener('dataavailable', (e) => {
+                if (e.data && e.data.size > 0) chunks.push(e.data);
+            });
+            const state = globalThis.__audioRecordingState;
+            state.recorder = recorder;
+            state.stream = stream;
+            state.chunks = chunks;
+            // recorder.mimeType is set by the browser after construction — prefer it.
+            state.mimeType = recorder.mimeType || chosenMime || 'audio/webm';
+            state.startedAtMs = Date.now();
+            recorder.start();
+            resolve({ ok: true, mimeType: state.mimeType, error: null });
+        } catch (err) {
+            console.error('[AudioRecorder] start failed:', err);
+            // NotAllowedError = user denied mic, NotFoundError = no mic device.
+            const msg = (err && err.message) ? err.message : String(err);
+            resolve({ ok: false, mimeType: '', error: msg });
+        }
+    })();
+});
+
+// Stop recording, assemble Blob, save to staging map.
+// Returns Promise<{ok: boolean, path: string, mimeType: string, durationMs: number}>.
+globalThis.__audioRecordingStop = () => new Promise((resolve) => {
+    const state = globalThis.__audioRecordingState;
+    if (!state.recorder) {
+        resolve({ ok: false, path: '', mimeType: '', durationMs: 0 });
+        return;
+    }
+    const recorder = state.recorder;
+    const mimeType = state.mimeType;
+    const startedAt = state.startedAtMs;
+    const stream = state.stream;
+
+    const finalize = () => {
+        const chunks = state.chunks;
+        // Release mic indicator in the browser.
+        if (stream) {
+            try { stream.getTracks().forEach((t) => t.stop()); } catch (_) {}
+        }
+        // Reset state before async file read so caller can retry immediately.
+        state.recorder = null;
+        state.stream = null;
+        state.chunks = [];
+        state.mimeType = null;
+        state.startedAtMs = 0;
+
+        if (!chunks || chunks.length === 0) {
+            resolve({ ok: false, path: '', mimeType: mimeType, durationMs: 0 });
+            return;
+        }
+        const blob = new Blob(chunks, { type: mimeType });
+        const reader = new FileReader();
+        reader.onload = () => {
+            try {
+                const u8 = new Uint8Array(reader.result);
+                const uuid = (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
+                    ? crypto.randomUUID()
+                    : (Math.random().toString(36).slice(2) + Date.now());
+                const key = 'wasm-audio://' + uuid;
+                globalThis.__filePickerStaging.set(key, u8);
+                const durationMs = Date.now() - startedAt;
+                resolve({ ok: true, path: key, mimeType: mimeType, durationMs: durationMs });
+            } catch (e) {
+                console.error('[AudioRecorder] blob→u8 failed:', e);
+                resolve({ ok: false, path: '', mimeType: mimeType, durationMs: 0 });
+            }
+        };
+        reader.onerror = (e) => {
+            console.error('[AudioRecorder] FileReader error:', e);
+            resolve({ ok: false, path: '', mimeType: mimeType, durationMs: 0 });
+        };
+        reader.readAsArrayBuffer(blob);
+    };
+
+    recorder.addEventListener('stop', finalize, { once: true });
+    try {
+        recorder.stop();
+    } catch (e) {
+        console.error('[AudioRecorder] recorder.stop() threw:', e);
+        finalize();
+    }
+});
+
+// Cancel recording synchronously — releases mic without saving any bytes.
+// Returns true if a session was active and cancelled, false otherwise.
+globalThis.__audioRecordingCancel = () => {
+    const state = globalThis.__audioRecordingState;
+    if (!state.recorder) return false;
+    try { state.recorder.stop(); } catch (_) {}
+    if (state.stream) {
+        try { state.stream.getTracks().forEach((t) => t.stop()); } catch (_) {}
+    }
+    state.recorder = null;
+    state.stream = null;
+    state.chunks = [];
+    state.mimeType = null;
+    state.startedAtMs = 0;
+    return true;
 };
 
 // === Web Share / Clipboard bridge ===

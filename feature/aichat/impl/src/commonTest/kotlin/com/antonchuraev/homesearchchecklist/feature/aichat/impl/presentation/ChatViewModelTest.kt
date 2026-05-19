@@ -79,7 +79,7 @@ private class FakeAiChatRepository(
         return completionResult
     }
 
-    override suspend fun transcribeAudio(audioPath: String, locale: ChatLocale): TranscriptionOutcome {
+    override suspend fun transcribeAudio(audioPath: String, mimeType: String, locale: ChatLocale): TranscriptionOutcome {
         transcribeCallCount++
         lastTranscribePath = audioPath
         return transcribeResult
