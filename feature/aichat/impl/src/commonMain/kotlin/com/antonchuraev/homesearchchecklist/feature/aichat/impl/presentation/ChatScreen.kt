@@ -243,7 +243,9 @@ fun ChatScreen(
                             preview = preview,
                             onApply = { onIntent(ChatScreenIntent.OnPreviewApply) },
                             onCancel = { onIntent(ChatScreenIntent.OnPreviewCancel) },
+                            onReject = { onIntent(ChatScreenIntent.OnPreviewReject) },
                             onItemTextChange = { onIntent(ChatScreenIntent.OnPreviewItemTextChange(it)) },
+                            showRejectButton = preview.toolCall !is ToolCall.CreateChecklistFromAttachment,
                             modifier = Modifier.padding(bottom = AppDimens.SpacingSm),
                         )
                     }
