@@ -27,6 +27,19 @@ sealed interface ChatIntent {
      */
     data object FreeForm : ChatIntent
 
+    /**
+     * User wants to attach pending files to an existing checklist item.
+     * Extracted from phrases like «прикрепи это к молоко в покупках» /
+     * "attach this to milk in shopping".
+     *
+     * [itemText] — fuzzy item text extracted from the phrase.
+     * [checklistHint] — optional checklist name hint (e.g. "покупках" → "покупки").
+     */
+    data class AttachToItem(
+        val itemText: String,
+        val checklistHint: String?,
+    ) : ChatIntent
+
     /** Raw text preserved for display in snackbar / escalation to Layer 2. */
     data class Unknown(val rawText: String) : ChatIntent
 }

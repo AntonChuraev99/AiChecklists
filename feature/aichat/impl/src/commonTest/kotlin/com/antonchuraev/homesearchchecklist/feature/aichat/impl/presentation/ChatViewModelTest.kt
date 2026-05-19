@@ -39,9 +39,11 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 // ─── Fakes ────────────────────────────────────────────────────────────────────
 
@@ -665,5 +667,107 @@ class ChatViewModelTest {
         val effect = effectDeferred.await()
         assertIs<ChatScreenSideEffect.NavigateToChecklist>(effect)
         assertEquals(7L, effect.checklistId)
+    }
+
+    // ── 19. Attachment state — OnPickAttachment sets trigger-flag ────────────────
+
+    @Test
+    fun onPickAttachment_setsAttachmentPickerType() {
+        val vm = makeVm()
+        assertNull(vm.screenState.value.attachmentPickerType)
+
+        vm.sendIntent(ChatScreenIntent.OnPickAttachment(com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AttachmentSource.Image))
+
+        assertEquals(com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AttachmentSource.Image, vm.screenState.value.attachmentPickerType)
+    }
+
+    // ── 20. OnAttachmentPickerTriggered resets trigger-flag ───────────────────────
+
+    @Test
+    fun onAttachmentPickerTriggered_resetsPickerType() {
+        val vm = makeVm()
+        vm.sendIntent(ChatScreenIntent.OnPickAttachment(com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AttachmentSource.Pdf))
+        vm.sendIntent(ChatScreenIntent.OnAttachmentPickerTriggered)
+        assertNull(vm.screenState.value.attachmentPickerType, "Trigger-flag must be reset after Triggered intent")
+    }
+
+    // ── 21. OnAttachmentPicked adds to pendingAttachments ─────────────────────────
+
+    @Test
+    fun onAttachmentPicked_appendsToPendingList() {
+        val vm = makeVm()
+        val att = com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatAttachment(
+            sourcePath = "/tmp/photo.jpg",
+            mimeType = "image/jpeg",
+            fileName = "photo.jpg",
+        )
+
+        vm.sendIntent(ChatScreenIntent.OnAttachmentPicked(att))
+
+        val state = vm.screenState.value
+        assertEquals(1, state.pendingAttachments.size)
+        assertEquals("photo.jpg", state.pendingAttachments.first().fileName)
+        assertTrue(state.canSend, "canSend must be true when attachments are pending")
+    }
+
+    // ── 22. OnRemoveAttachment removes by sourcePath ───────────────────────────────
+
+    @Test
+    fun onRemoveAttachment_removesCorrectItem() {
+        val vm = makeVm()
+        val att1 = com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatAttachment(
+            sourcePath = "/tmp/a.jpg", mimeType = "image/jpeg", fileName = "a.jpg"
+        )
+        val att2 = com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatAttachment(
+            sourcePath = "/tmp/b.pdf", mimeType = "application/pdf", fileName = "b.pdf"
+        )
+        vm.sendIntent(ChatScreenIntent.OnAttachmentPicked(att1))
+        vm.sendIntent(ChatScreenIntent.OnAttachmentPicked(att2))
+        assertEquals(2, vm.screenState.value.pendingAttachments.size)
+
+        vm.sendIntent(ChatScreenIntent.OnRemoveAttachment(sourcePath = "/tmp/a.jpg"))
+
+        val remaining = vm.screenState.value.pendingAttachments
+        assertEquals(1, remaining.size)
+        assertEquals("b.pdf", remaining.first().fileName)
+    }
+
+    // ── 23. canSend is false when no text and no attachments ──────────────────────
+
+    @Test
+    fun canSend_falseWhenNoTextAndNoAttachments() {
+        val vm = makeVm()
+        assertFalse(vm.screenState.value.canSend, "canSend must be false on empty state")
+    }
+
+    // ── 24. Free-tier attachment quota — 4th pick emits snackbar ─────────────────
+
+    @Test
+    fun onAttachmentPicked_freeTierLimit_emitsSnackbarOnOverflow() = runTest {
+        val vm = makeVm()
+        val makeAtt: (String) -> ChatScreenIntent.OnAttachmentPicked = { name ->
+            ChatScreenIntent.OnAttachmentPicked(
+                com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatAttachment(
+                    sourcePath = "/tmp/$name", mimeType = "image/jpeg", fileName = name
+                )
+            )
+        }
+
+        // Add 3 (free limit)
+        vm.sendIntent(makeAtt("a.jpg"))
+        vm.sendIntent(makeAtt("b.jpg"))
+        vm.sendIntent(makeAtt("c.jpg"))
+        assertEquals(3, vm.screenState.value.pendingAttachments.size)
+
+        // 4th should emit ShowSnackbar and NOT add to the list
+        val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            vm.sideEffect.first()
+        }
+        vm.sendIntent(makeAtt("d.jpg"))
+
+        val effect = effectDeferred.await()
+        assertIs<ChatScreenSideEffect.ShowSnackbar>(effect)
+        assertEquals("chat_attach_limit_reached", effect.messageKey)
+        assertEquals(3, vm.screenState.value.pendingAttachments.size, "List must not grow beyond free limit")
     }
 }

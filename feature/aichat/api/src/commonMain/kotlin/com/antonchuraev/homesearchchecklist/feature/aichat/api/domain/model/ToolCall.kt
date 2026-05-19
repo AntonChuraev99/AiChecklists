@@ -47,4 +47,29 @@ sealed interface ToolCall {
     data class FindItemsQuery(
         val query: String
     ) : ToolCall
+
+    /**
+     * Attachment(s) with no accompanying item text: create a new checklist from the
+     * attachment content via [GeminiAiAnalyzer]. Identical UX to "Create via AI".
+     *
+     * [attachments] is non-empty by construction (the dispatcher should reject empty lists).
+     */
+    data class CreateChecklistFromAttachment(
+        val attachments: List<ChatAttachment>,
+    ) : ToolCall
+
+    /**
+     * Attachment(s) with a text hint pointing to an existing checklist item.
+     * The dispatcher stores the files via [AttachmentStoragePort] and appends
+     * them to [ChecklistFillItem.attachments] for the resolved item.
+     *
+     * [checklistHint] — fuzzy checklist name (may be null → use default checklist).
+     * [itemText]      — fuzzy item text used to locate the target fill item.
+     * [attachments]   — files to attach (non-empty).
+     */
+    data class AttachToItem(
+        val checklistHint: String?,
+        val itemText: String,
+        val attachments: List<ChatAttachment>,
+    ) : ToolCall
 }

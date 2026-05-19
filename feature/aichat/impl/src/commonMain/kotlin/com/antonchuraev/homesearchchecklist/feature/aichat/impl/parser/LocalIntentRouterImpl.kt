@@ -122,6 +122,9 @@ internal class LocalIntentRouterImpl(
     // ─── Classification dispatch ──────────────────────────────────────────────
 
     private fun classify(normalized: String, lower: String, locale: ChatLocale): IntentClassification {
+        // AttachToItem runs first: "прикрепи к" / "attach to" keywords are very specific
+        // and must not be shadowed by the broad CreateItem triggers ("добавь к", "add to").
+        tryAttachToItem(normalized, lower, locale)?.let { return it }
         // SetReminder / MoveReminders run before CreateChecklist because the broad
         // CreateChecklist triggers ("создай", "create", "new") would otherwise swallow
         // "создай напоминание" and "create reminder" phrases that belong to SetReminder.
@@ -133,6 +136,103 @@ internal class LocalIntentRouterImpl(
         tryCompleteItem(normalized, lower, locale)?.let { return it }
         tryFindItems(normalized, lower, locale)?.let { return it }
         return unknown(normalized)
+    }
+
+    // ─── AttachToItem ─────────────────────────────────────────────────────────
+
+    /**
+     * Recognises «прикрепи это к молоко в покупках» / "attach this to milk in shopping".
+     *
+     * Strategy:
+     *   1. Look for an attach-trigger keyword at a word-boundary.
+     *   2. Extract the sub-phrase AFTER the trigger.
+     *   3. Split on the target-preposition («к» / "to") to get [itemText] and optional [checklistHint].
+     *
+     * The extracted [itemText] and [checklistHint] are stored in the [IntentClassification]
+     * via [ChatIntent.AttachToItem]. The dispatcher will receive them on PreviewApply
+     * when [buildToolCall] converts the intent to [ToolCall.AttachToItem].
+     *
+     * Confidence:
+     *   FULL  (1.0) — specific multi-word trigger + item text extracted
+     *   PARTIAL (0.8) — single-word trigger + item text extracted
+     *   FUZZY (0.6) — keyword matched but no item text found
+     */
+    private fun tryAttachToItem(
+        normalized: String,
+        lower: String,
+        locale: ChatLocale,
+    ): IntentClassification? {
+        val keywords = when (locale) {
+            ChatLocale.Ru -> RuIntentLexicon.attachToItem
+            ChatLocale.En -> EnIntentLexicon.attachToItem
+        }
+
+        val matched = keywords.sortedByDescending { it.length }
+            .firstOrNull { containsAtBoundary(lower, it) } ?: return null
+
+        val isMultiWord = matched.contains(' ')
+        val endIdx = firstMatchEnd(lower, keywords)
+        val remainder = normalized.substring(endIdx).trim()
+        val remainderLower = lower.substring(endIdx).trim()
+
+        // After stripping the trigger, the remaining text is "<itemText> [в/in <checklistHint>]"
+        // or just "<itemText>" if no checklist hint is present.
+        // We split on the last occurrence of a hint-preposition to avoid false splits
+        // (e.g. "вода в стакане в покупках" → item="вода в стакане", hint="покупках").
+        val (itemText, checklistHint) = extractItemAndHintFromRemainder(remainderLower, remainder, locale)
+
+        val confidence = when {
+            isMultiWord && itemText != null -> CONF_FULL
+            itemText != null -> CONF_PARTIAL
+            else -> CONF_FUZZY
+        }
+
+        logger.debug(TAG, "AttachToItem matched='$matched' item='${itemText?.take(30)}' hint='$checklistHint' conf=$confidence")
+        return IntentClassification(
+            intent = ChatIntent.AttachToItem(
+                itemText = itemText ?: remainder,
+                checklistHint = checklistHint,
+            ),
+            confidence = confidence,
+            layer = RoutingLayer.Local,
+        )
+    }
+
+    /**
+     * Extracts (itemText, checklistHint) from the remainder after stripping the attach trigger.
+     *
+     * For RU: splits on last "в <word>" / "из <word>" at the end.
+     * For EN: splits on last " in <word>" / " from <word>" at the end.
+     *
+     * Returns the CASE-PRESERVED version of itemText (from [normalizedRemainder])
+     * paired with the lowercase hint for matching.
+     */
+    private fun extractItemAndHintFromRemainder(
+        lowerRemainder: String,
+        normalizedRemainder: String,
+        locale: ChatLocale,
+    ): Pair<String?, String?> {
+        if (lowerRemainder.isBlank()) return Pair(null, null)
+
+        val hintPreps = when (locale) {
+            ChatLocale.Ru -> listOf(" в ", " из ", " для ")
+            ChatLocale.En -> listOf(" in ", " from ", " for ")
+        }
+
+        for (prep in hintPreps.sortedByDescending { it.length }) {
+            val idx = lowerRemainder.lastIndexOf(prep)
+            if (idx > 0) {
+                val itemLower = lowerRemainder.substring(0, idx).trim()
+                val hintLower = lowerRemainder.substring(idx + prep.length).trim()
+                // Mirror split to case-preserved string for display
+                val itemText = normalizedRemainder.substring(0, idx).trim().ifBlank { null }
+                val hint = hintLower.ifBlank { null }
+                if (itemText != null) return Pair(itemText, hint)
+            }
+        }
+
+        // No preposition found — the whole remainder is the item text, no checklist hint
+        return Pair(normalizedRemainder.trim().ifBlank { null }, null)
     }
 
     // ─── CreateChecklist ──────────────────────────────────────────────────────
