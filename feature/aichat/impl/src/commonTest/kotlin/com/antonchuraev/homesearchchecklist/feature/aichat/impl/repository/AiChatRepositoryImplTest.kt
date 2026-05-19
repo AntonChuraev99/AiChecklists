@@ -83,6 +83,7 @@ private class FakeTranscribeAudioApiService(
     override suspend fun transcribe(
         userId: String,
         audioBase64: String,
+        mimeType: String,
         locale: ChatLocale,
     ): RemoteTranscriptionResult {
         callCount++

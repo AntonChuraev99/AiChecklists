@@ -220,7 +220,7 @@ class ChatViewModel(
                 )
             }
 
-            is ChatScreenIntent.OnVoiceRecordingStopped -> handleVoiceRecordingStopped(intent.recordingPath)
+            is ChatScreenIntent.OnVoiceRecordingStopped -> handleVoiceRecordingStopped(intent.recordingPath, intent.mimeType)
 
             is ChatScreenIntent.OnFeedbackOpen -> {
                 _screenState.value = _screenState.value.copy(
@@ -668,7 +668,7 @@ class ChatViewModel(
         )
     }
 
-    private fun handleVoiceRecordingStopped(recordingPath: String?) {
+    private fun handleVoiceRecordingStopped(recordingPath: String?, mimeType: String) {
         _screenState.value = _screenState.value.copy(isRecording = false)
 
         if (recordingPath == null) {
@@ -684,7 +684,7 @@ class ChatViewModel(
         _screenState.value = _screenState.value.copy(isTranscribing = true)
         viewModelScope.launch {
             val locale = localeProvider.current()
-            when (val outcome = aiChatRepository.transcribeAudio(recordingPath, locale)) {
+            when (val outcome = aiChatRepository.transcribeAudio(recordingPath, mimeType, locale)) {
                 is TranscriptionOutcome.Success -> {
                     // Append transcript to existing input so the user can dictate multiple times
                     val currentInput = _screenState.value.inputText

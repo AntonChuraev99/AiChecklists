@@ -223,7 +223,10 @@ sealed interface ChatScreenIntent : Intent {
      * [recordingPath] is null when recording was cancelled (no-op per silent-skip guard).
      * A null path → user cancelled → emit ShowSnackbar("chat_recording_cancelled").
      */
-    data class OnVoiceRecordingStopped(val recordingPath: String?) : ChatScreenIntent
+    data class OnVoiceRecordingStopped(
+        val recordingPath: String?,
+        val mimeType: String = "audio/m4a",
+    ) : ChatScreenIntent
 }
 
 // ---------------------------------------------------------------------------

@@ -397,8 +397,14 @@ def reserve_credits(user_id: str) -> int | None:
 # Shared AI helpers
 # ============================================================================
 
-def call_gemini(prompt: str, input_type: str, input_data: str):
-    """Call Gemini API with appropriate content type."""
+def call_gemini(prompt: str, input_type: str, input_data: str, audio_mime_type: str = "audio/mp4"):
+    """Call Gemini API with appropriate content type.
+
+    [audio_mime_type] is honored only when input_type == "audio_base64".
+    Allowed by Gemini: audio/mp4, audio/mpeg, audio/wav, audio/webm, audio/flac, audio/ogg.
+    Callers must normalize browser variants (e.g. "audio/m4a", "audio/webm;codecs=opus")
+    before invoking this function.
+    """
     model = genai.GenerativeModel("gemini-2.5-flash-lite")
     if input_type == "image_base64" and input_data:
         return model.generate_content([
@@ -406,9 +412,50 @@ def call_gemini(prompt: str, input_type: str, input_data: str):
         ])
     if input_type == "audio_base64" and input_data:
         return model.generate_content([
-            prompt, {"mime_type": "audio/mp4", "data": base64.b64decode(input_data)}
+            prompt, {"mime_type": audio_mime_type, "data": base64.b64decode(input_data)}
         ])
     return model.generate_content(prompt)
+
+
+# ----------------------------------------------------------------------------
+# Audio MIME normalization for Gemini Files API.
+#
+# Browsers vary in what MediaRecorder produces:
+#   - Chrome / Firefox / Edge → "audio/webm;codecs=opus"
+#   - Safari → "audio/mp4" (with codec params)
+#   - Android MediaRecorder (AAC/m4a) → "audio/m4a"
+# Gemini whitelist: audio/mp4, audio/mpeg, audio/wav, audio/webm, audio/flac, audio/ogg.
+# This function strips codec parameters and maps common aliases.
+# ----------------------------------------------------------------------------
+
+_GEMINI_AUDIO_MIME_WHITELIST = {
+    "audio/mp4", "audio/mpeg", "audio/wav", "audio/webm", "audio/flac", "audio/ogg",
+}
+
+
+def normalize_audio_mime(client_mime: str) -> str:
+    """Normalize a client-supplied audio MIME type for Gemini.
+
+    Returns a whitelisted MIME or falls back to "audio/mp4" if unrecognised
+    (Gemini's most permissive container — covers AAC/ALAC/etc).
+    """
+    if not client_mime:
+        return "audio/mp4"
+    # Strip codec parameters: "audio/webm;codecs=opus" → "audio/webm"
+    base = client_mime.split(";", 1)[0].strip().lower()
+    # Alias: m4a is an AAC-in-MP4 audio-only container
+    if base == "audio/m4a":
+        base = "audio/mp4"
+    # Alias: x-m4a (Safari)
+    if base == "audio/x-m4a":
+        base = "audio/mp4"
+    # Alias: mp3 → mpeg
+    if base == "audio/mp3":
+        base = "audio/mpeg"
+    if base in _GEMINI_AUDIO_MIME_WHITELIST:
+        return base
+    # Unknown — let Gemini try as mp4. Logged via response failure if it rejects.
+    return "audio/mp4"
 
 
 def parse_gemini_json(response_text: str) -> dict:
@@ -1578,7 +1625,8 @@ def transcribe_audio(request: Request):
     Request body:
     {
         "user_id": "string",
-        "audio_base64": "base64-encoded m4a audio (max ~6.7MB encoded / ~5MB raw)",
+        "audio_base64": "base64-encoded audio (max ~6.7MB encoded / ~5MB raw)",
+        "mime_type": "audio/m4a | audio/webm | audio/mp4 | ..." (optional, default audio/mp4),
         "locale": "ru" | "en" (informational; Gemini auto-detects)
     }
 
@@ -1613,6 +1661,12 @@ def transcribe_audio(request: Request):
     if locale not in ("ru", "en"):
         locale = "en"
 
+    # Normalize the client-supplied MIME (browsers send "audio/webm;codecs=opus",
+    # Android sends "audio/m4a", Safari sends "audio/mp4"). Gemini requires a
+    # whitelisted MIME without codec parameters.
+    client_mime = (data.get("mime_type") or "audio/mp4").strip()
+    gemini_mime = normalize_audio_mime(client_mime)
+
     user_id = data["user_id"]
 
     # Server is authoritative for credit accounting — deduct BEFORE the AI call
@@ -1622,7 +1676,7 @@ def transcribe_audio(request: Request):
         return create_error_response("insufficient credits", 402)
 
     try:
-        response = call_gemini(TRANSCRIBE_AUDIO_PROMPT, "audio_base64", audio_b64)
+        response = call_gemini(TRANSCRIBE_AUDIO_PROMPT, "audio_base64", audio_b64, audio_mime_type=gemini_mime)
         transcript = (response.text or "").strip()
 
         # Defensive: strip outer quotes if Gemini wrapped the transcript despite
