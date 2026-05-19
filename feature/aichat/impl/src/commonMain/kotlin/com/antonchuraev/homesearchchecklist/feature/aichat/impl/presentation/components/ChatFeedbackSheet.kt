@@ -17,12 +17,8 @@ import androidx.compose.material3.SheetState
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
@@ -75,8 +71,6 @@ fun ChatFeedbackSheet(
     modifier: Modifier = Modifier,
     sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
 ) {
-    val focusRequester = remember { FocusRequester() }
-
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -149,9 +143,7 @@ fun ChatFeedbackSheet(
                         capitalization = KeyboardCapitalization.Sentences,
                         imeAction = ImeAction.Default,
                     ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .focusRequester(focusRequester),
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
 
@@ -171,10 +163,12 @@ fun ChatFeedbackSheet(
                         onClick = onDismiss,
                         enabled = !isSubmitting,
                     )
+                    // Submit enabled even with blank text — user may want to send
+                    // pure thumb-down signal without typing a reason.
                     AppButton(
                         text = stringResource(Res.string.chat_feedback_submit),
                         onClick = onSubmit,
-                        enabled = !isSubmitting && feedbackText.isNotBlank(),
+                        enabled = !isSubmitting,
                     )
                 }
             }
@@ -186,10 +180,9 @@ fun ChatFeedbackSheet(
         }
     }
 
-    // Auto-focus the feedback field when the sheet appears
-    LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
-    }
+    // Auto-focus intentionally removed — sheet opens without raising the soft
+    // keyboard; user taps the field if they want to type. Reduces friction for
+    // pure thumb-down signal (no text needed).
 }
 
 // ---------------------------------------------------------------------------

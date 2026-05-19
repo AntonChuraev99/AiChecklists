@@ -16,7 +16,7 @@ class FilePickerLauncher(
 /**
  * Creates a file picker launcher that can be used to pick files.
  *
- * @param type The type of file to pick (IMAGE, PDF, TEXT)
+ * @param type The type of file to pick (IMAGE, PDF, TEXT, AUDIO)
  * @param onResult Callback invoked when a file is picked, or null if cancelled
  * @return FilePickerLauncher that can be used to trigger the picker
  */

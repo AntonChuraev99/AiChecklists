@@ -41,7 +41,9 @@ import aichecklists.core.designsystem.generated.resources.chat_insufficient_cred
 import aichecklists.core.designsystem.generated.resources.chat_completion_error
 import aichecklists.core.designsystem.generated.resources.chat_mic_permission_denied
 import aichecklists.core.designsystem.generated.resources.chat_not_found
+import aichecklists.core.designsystem.generated.resources.chat_recording_cancelled
 import aichecklists.core.designsystem.generated.resources.chat_requires_premium
+import aichecklists.core.designsystem.generated.resources.chat_thumb_up_thanks
 import aichecklists.core.designsystem.generated.resources.chat_unknown_intent_hint
 import aichecklists.core.designsystem.generated.resources.chat_voice_too_short
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AttachmentSource
@@ -129,6 +131,8 @@ fun ChatRoute(
     // Phase 3 strings
     val micPermissionDeniedText = stringResource(Res.string.chat_mic_permission_denied)
     val voiceTooShortText = stringResource(Res.string.chat_voice_too_short)
+    val recordingCancelledText = stringResource(Res.string.chat_recording_cancelled)
+    val thumbUpThanksText = stringResource(Res.string.chat_thumb_up_thanks)
 
     val messages = remember(
         unknownText, genericErrorText, applyErrorText, extractFailText,
@@ -141,7 +145,7 @@ fun ChatRoute(
         dispatchOperationFailedFmt, dispatchNoChecklistsText, dispatchNoChecklistMatchFmt,
         dispatchFillLoadFailedFmt, insufficientCreditsText, completionErrorText, historyLoadErrorText,
         feedbackSubmittedText, feedbackBlankHintText,
-        micPermissionDeniedText, voiceTooShortText,
+        micPermissionDeniedText, voiceTooShortText, recordingCancelledText, thumbUpThanksText,
     ) {
         mapOf(
             "chat_unknown_intent_hint" to unknownText,
@@ -178,6 +182,8 @@ fun ChatRoute(
             "chat_feedback_blank_hint" to feedbackBlankHintText,
             "chat_mic_permission_denied" to micPermissionDeniedText,
             "chat_voice_too_short" to voiceTooShortText,
+            "chat_recording_cancelled" to recordingCancelledText,
+            "chat_thumb_up_thanks" to thumbUpThanksText,
         )
     }
 
@@ -242,6 +248,25 @@ fun ChatRoute(
         }
     )
 
+    val audioFilePicker = rememberFilePickerLauncher(
+        type = FilePickerType.AUDIO,
+        onResult = { result ->
+            if (result != null) {
+                viewModel.sendIntent(
+                    ChatScreenIntent.OnAttachmentPicked(
+                        ChatAttachment(
+                            sourcePath = result.filePath,
+                            mimeType = result.mimeType ?: "audio/*",
+                            fileName = result.fileName,
+                            sizeBytes = 0L,
+                        )
+                    )
+                )
+            }
+            viewModel.sendIntent(ChatScreenIntent.OnAttachmentPickerTriggered)
+        }
+    )
+
     // ── Audio recorder ───────────────────────────────────────────────────────
     val audioRecorder = rememberAudioRecorderLauncher(
         onResult = { result ->
@@ -262,7 +287,9 @@ fun ChatRoute(
             AttachmentSource.Image -> imagePicker.launch()
             AttachmentSource.Pdf -> pdfPicker.launch()
             AttachmentSource.Text -> textPicker.launch()
-            AttachmentSource.Audio -> audioRecorder.start()
+            // Audio in source-chooser = "pick existing audio file from device storage".
+            // New voice recording is a separate flow via press-and-hold mic in ChatInputRow.
+            AttachmentSource.Audio -> audioFilePicker.launch()
         }
         // Reset the trigger-flag in ViewModel so it doesn't fire again on recomposition
         viewModel.sendIntent(ChatScreenIntent.OnAttachmentPickerTriggered)
@@ -318,10 +345,13 @@ fun ChatRoute(
                 AttachmentSource.Image -> imagePicker.launch()
                 AttachmentSource.Pdf -> pdfPicker.launch()
                 AttachmentSource.Text -> textPicker.launch()
-                AttachmentSource.Audio -> audioRecorder.start()
+                AttachmentSource.Audio -> audioFilePicker.launch()
             }
         },
-        onVoiceRecordingStarted = null,  // gesture handled by ChatInputRow → onIntent
+        // Press-and-hold mic gesture: ChatInputRow invokes this on finger down.
+        // Direct call to audioRecorder.start() (which itself handles permission
+        // request through ActivityResult API). Previously was `null` — no-op bug.
+        onVoiceRecordingStarted = { audioRecorder.start() },
         onVoiceRecordingStopped = { audioRecorder.stop() },
         onVoiceRecordingCancelled = { audioRecorder.cancel() },
     )

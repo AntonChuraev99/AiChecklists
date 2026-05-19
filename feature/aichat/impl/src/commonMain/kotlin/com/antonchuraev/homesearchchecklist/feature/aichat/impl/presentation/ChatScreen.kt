@@ -38,6 +38,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Chat
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatRole
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.RoutingLayer
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ToolCall
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.AiChatFeaturesHelpSheet
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.AiChatPricingHelpSheet
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatAttachmentChipStrip
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatAttachmentSourceSheet
@@ -53,6 +54,9 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.com
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatTypingIndicator
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.toLocalDateTime
 
 /**
  * AI Chat screen — stateless composable.
@@ -127,6 +131,21 @@ fun ChatScreen(
         } else {
             recordingDurationMs = 0L
         }
+    }
+
+    // Day divider visibility: "Today" pill appears only if the most recent message
+    // is from today. Without this check the divider hangs above yesterday's session
+    // and mis-labels it. Full per-day grouping (Yesterday + dated headers between
+    // day boundaries) is a future iteration — for now the simple gate prevents the
+    // most visible bug. Computed in Composable scope so `remember` is legal here.
+    val showTodayDivider = remember(state.messages) {
+        val last = state.messages.lastOrNull() ?: return@remember false
+        val tz = TimeZone.currentSystemDefault()
+        val startOfToday = kotlin.time.Clock.System.now()
+            .toLocalDateTime(tz).date
+            .atStartOfDayIn(tz)
+            .toEpochMilliseconds()
+        last.timestamp >= startOfToday
     }
 
     // Auto-scroll to the newest item on changes. With reverseLayout = true the
@@ -237,10 +256,18 @@ fun ChatScreen(
                     ChatMessageBubble(
                         message = message,
                         onFeedbackClick = { onIntent(ChatScreenIntent.OnFeedbackOpen(it)) },
+                        onThumbUpClick = { onIntent(ChatScreenIntent.OnThumbUpClick(it)) },
                         onOpenChecklist = message.linkedChecklistId?.let { id ->
                             { onIntent(ChatScreenIntent.OnOpenChecklist(id)) }
                         },
+                        showSenderLabel = message.role == com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatRole.Assistant,
                     )
+                }
+
+                if (showTodayDivider) {
+                    item(key = "__day_divider") {
+                        com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatDayDivider()
+                    }
                 }
 
                 // Welcome bubble — declared last, so it renders at the TOP of viewport
@@ -250,6 +277,7 @@ fun ChatScreen(
                 item(key = "__welcome") {
                     ChatMessageBubble(
                         message = welcomeBubble,
+                        showSenderLabel = false,
                     )
                 }
             }
@@ -284,6 +312,8 @@ fun ChatScreen(
                 onVoiceRecordingCancelled = {
                     onVoiceRecordingCancelled?.invoke()
                 },
+                onHelpClick = { onIntent(ChatScreenIntent.OnFeaturesHelpClick) },
+                hasAttachments = state.pendingAttachments.isNotEmpty(),
                 isEnabled = !state.isProcessing,
                 canSend = state.canSend,
                 isRecording = state.isRecording,
@@ -308,6 +338,13 @@ fun ChatScreen(
     if (state.showPricingSheet) {
         AiChatPricingHelpSheet(
             onDismiss = { onIntent(ChatScreenIntent.OnHelpDismiss) },
+        )
+    }
+
+    // Features sheet overlay — opens from the "?" icon in the input row leading
+    if (state.showFeaturesSheet) {
+        AiChatFeaturesHelpSheet(
+            onDismiss = { onIntent(ChatScreenIntent.OnFeaturesHelpDismiss) },
         )
     }
 

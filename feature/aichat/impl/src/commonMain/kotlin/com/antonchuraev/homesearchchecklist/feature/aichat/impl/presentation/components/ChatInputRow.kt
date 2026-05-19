@@ -1,33 +1,42 @@
 package com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components
 
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Surface
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,11 +52,12 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.chat_attach_file_action
+import aichecklists.core.designsystem.generated.resources.chat_features_help_action
 import aichecklists.core.designsystem.generated.resources.chat_input_placeholder
+import aichecklists.core.designsystem.generated.resources.chat_input_placeholder_with_attachment
 import aichecklists.core.designsystem.generated.resources.chat_record_voice
 import aichecklists.core.designsystem.generated.resources.chat_send_action
 import aichecklists.core.designsystem.generated.resources.chat_voice_press_hold_hint
-import com.antonchuraev.homesearchchecklist.desingsystem.components.AppTextField
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import org.jetbrains.compose.resources.stringResource
 
@@ -87,6 +97,8 @@ fun ChatInputRow(
     onVoiceRecordingStarted: () -> Unit,
     onVoiceRecordingStopped: () -> Unit,
     onVoiceRecordingCancelled: () -> Unit,
+    onHelpClick: () -> Unit = {},
+    hasAttachments: Boolean = false,
     isEnabled: Boolean = true,
     canSend: Boolean = false,
     isRecording: Boolean = false,
@@ -95,36 +107,19 @@ fun ChatInputRow(
 ) {
     // Pre-resolve strings in Composable scope (spec §10 rule 6)
     val attachFileLabel = stringResource(Res.string.chat_attach_file_action)
+    val helpLabel = stringResource(Res.string.chat_features_help_action)
     val recordVoiceLabel = stringResource(Res.string.chat_record_voice)
     val sendLabel = stringResource(Res.string.chat_send_action)
     val pressHoldHint = stringResource(Res.string.chat_voice_press_hold_hint)
+    val placeholder = stringResource(
+        if (hasAttachments) Res.string.chat_input_placeholder_with_attachment
+        else Res.string.chat_input_placeholder
+    )
 
     val isMic = !canSend
 
     // Track drag-cancel locally to drive the Crossfade icon state
     var isDragCancel by remember { mutableStateOf(false) }
-
-    // Animated mic button colors (spec §1, §2)
-    val micContainerTarget: Color = when {
-        isRecording -> MaterialTheme.colorScheme.errorContainer
-        !isMic -> MaterialTheme.colorScheme.primary
-        else -> MaterialTheme.colorScheme.surfaceContainerHigh
-    }
-    val micContainerColor by animateColorAsState(
-        targetValue = micContainerTarget,
-        animationSpec = tween(durationMillis = 150),
-        label = "mic_container_color",
-    )
-    val micContentTarget: Color = when {
-        isRecording -> MaterialTheme.colorScheme.onErrorContainer
-        !isMic -> MaterialTheme.colorScheme.onPrimary
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
-    val micContentColor by animateColorAsState(
-        targetValue = micContentTarget,
-        animationSpec = tween(durationMillis = 150),
-        label = "mic_content_color",
-    )
 
     // Scale animation: 1.0f → 1.2f when recording (spec §2)
     val micIconScale by animateFloatAsState(
@@ -136,18 +131,86 @@ fun ChatInputRow(
     // Threshold in pixels — computed via density in the pointerInput block
     val cancelThresholdDp = 80.dp
 
-    Row(
+    // Outer column applies the surface padding (M3 chat bar — `padding: 8px 16px 12px`).
+    // Inner pill is `surfaceContainerHigh`, 28dp radius, all 4 controls live inside.
+    // minHeight 56dp lets the pill grow when text wraps to multiple lines.
+    Column(
         modifier = modifier
             .fillMaxWidth()
             .imePadding()
             .padding(
-                horizontal = AppDimens.ScreenPaddingHorizontal,
-                vertical = AppDimens.SpacingMd,
+                start = AppDimens.ScreenPaddingHorizontal,
+                end = AppDimens.ScreenPaddingHorizontal,
+                top = AppDimens.SpacingSm,
+                bottom = AppDimens.SpacingMd,
             ),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
     ) {
-        // [1] Leading attach button
+        Surface(
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 56.dp),
+        ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(0.dp),
+        ) {
+        // [1] Leading help button (Telegram-style — replaces emoji slot)
+        IconButton(
+            onClick = onHelpClick,
+            enabled = isEnabled && !isRecording,
+            modifier = Modifier.size(48.dp),
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Outlined.HelpOutline,
+                contentDescription = helpLabel,
+                modifier = Modifier.size(AppDimens.IconSizeMd),
+                tint = if (isEnabled && !isRecording)
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                else
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+            )
+        }
+
+        // [2] Center text field — borderless Telegram-style.
+        // Indicator + container colors are transparent so the field blends into the row;
+        // placeholder swaps when attachments are pending.
+        TextField(
+            value = text,
+            onValueChange = if (isRecording) { _ -> } else onTextChange,
+            placeholder = {
+                androidx.compose.material3.Text(
+                    text = placeholder,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            },
+            singleLine = false,
+            maxLines = 4,
+            enabled = isEnabled && !isRecording,
+            modifier = Modifier.weight(1f),
+            keyboardOptions = KeyboardOptions(
+                imeAction = if (canSend) ImeAction.Send else ImeAction.Default,
+            ),
+            textStyle = MaterialTheme.typography.bodyLarge.copy(
+                color = MaterialTheme.colorScheme.onSurface,
+            ),
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = Color.Transparent,
+                unfocusedContainerColor = Color.Transparent,
+                disabledContainerColor = Color.Transparent,
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent,
+                disabledIndicatorColor = Color.Transparent,
+                errorIndicatorColor = Color.Transparent,
+            ),
+        )
+
+        // [3] Attach file button (moved to trailing side, next to Mic/Send — Telegram pattern)
         IconButton(
             onClick = onAttachFileClick,
             enabled = isEnabled && !isRecording,
@@ -164,29 +227,42 @@ fun ChatInputRow(
             )
         }
 
-        // [2] Center text field
-        AppTextField(
-            value = text,
-            onValueChange = if (isRecording) { _ -> } else onTextChange,
-            placeholder = stringResource(Res.string.chat_input_placeholder),
-            singleLine = false,
-            maxLines = 4,
-            enabled = isEnabled && !isRecording,
-            modifier = Modifier.weight(1f),
-            keyboardOptions = KeyboardOptions(
-                imeAction = if (canSend) ImeAction.Send else ImeAction.Default,
-            ),
-        )
-
-        // [3] Trailing Mic / Send FilledIconButton
+        // [4] Trailing Mic / Send FilledIconButton
         // Press-and-hold gesture for the mic button.
         // Uses awaitEachGesture (low-level) to support drag-up cancel tracking.
+        //
+        // CRITICAL: pointerInput keys MUST be stable across `isRecording` flips.
+        // Earlier we had `pointerInput(isMic, isRecording, cancelThresholdDp)` which
+        // recreated the modifier the moment recording started — the in-flight gesture
+        // coroutine was cancelled BEFORE the release event arrived, so onStop never
+        // fired. Recovery: read `isRecording` via `rememberUpdatedState` so the
+        // coroutine sees the latest value without recomposition tearing down the modifier.
+        val isRecordingLatest by rememberUpdatedState(isRecording)
         val micGestureModifier = if (isMic || isRecording) {
-            Modifier.pointerInput(isMic, isRecording, cancelThresholdDp) {
+            Modifier.pointerInput(Unit) {
                 awaitEachGesture {
                     val down = awaitFirstDown()
-                    val downY = down.position.y
 
+                    // Tap while already recording → finish & save (NOT cancel).
+                    // Previously this path landed in audioRecorder.start() which
+                    // delete()'d the existing file — entire recording lost on second tap.
+                    if (isRecordingLatest) {
+                        down.consume()
+                        // Wait for release so we don't process another down in the same gesture
+                        do {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull() ?: break
+                            if (!change.pressed) {
+                                change.consume()
+                                break
+                            }
+                            change.consume()
+                        } while (true)
+                        onVoiceRecordingStopped()
+                        return@awaitEachGesture
+                    }
+
+                    val downY = down.position.y
                     onVoiceRecordingStarted()
                     isDragCancel = false
                     onDragCancelChanged?.invoke(false)
@@ -224,11 +300,23 @@ fun ChatInputRow(
             }
         } else Modifier
 
-        val onButtonClick: () -> Unit = if (!isMic && !isRecording) onSend else ({})
-        FilledIconButton(
-            onClick = onButtonClick,
-            enabled = isEnabled,
-            modifier = micGestureModifier
+        // Telegram-style trailing button — plain icon container.
+        // CRITICAL: We use Box, NOT IconButton — IconButton internally applies
+        // `clickable {}` which consumes down events before `pointerInput { awaitEachGesture }`
+        // can see them. That collision is why press-and-hold mic was a silent no-op.
+        // Solution: switch modifier based on mode — `clickable` for Send-tap,
+        // `pointerInput` for Mic press-and-hold. Only one active at a time → no conflict.
+        val interactionModifier = if (!isMic && !isRecording) {
+            // Send mode: simple tap → onSend()
+            Modifier.clickable(enabled = isEnabled, onClick = onSend)
+        } else {
+            // Mic mode: press-and-hold gesture is the primary interaction
+            micGestureModifier
+        }
+        Box(
+            modifier = interactionModifier
+                .size(48.dp)
+                .clip(CircleShape)
                 .semantics {
                     role = Role.Button
                     customActions = listOf(
@@ -245,15 +333,18 @@ fun ChatInputRow(
                         )
                     )
                 },
-            colors = IconButtonDefaults.filledIconButtonColors(
-                containerColor = micContainerColor,
-                contentColor = micContentColor,
-            ),
+            contentAlignment = androidx.compose.ui.Alignment.Center,
         ) {
             val crossfadeTarget = when {
                 isRecording && isDragCancel -> "cancel"
                 isMic || isRecording -> "mic"
                 else -> "send"
+            }
+            // Icon tint: recording → error (red); idle mic → onSurfaceVariant; send → primary.
+            val iconTint = when {
+                isRecording -> MaterialTheme.colorScheme.error
+                isMic -> MaterialTheme.colorScheme.onSurfaceVariant
+                else -> MaterialTheme.colorScheme.primary
             }
             Crossfade(
                 targetState = crossfadeTarget,
@@ -264,6 +355,7 @@ fun ChatInputRow(
                     "cancel" -> Icon(
                         imageVector = Icons.Filled.Close,
                         contentDescription = recordVoiceLabel,
+                        tint = iconTint,
                         modifier = Modifier
                             .size(AppDimens.IconSizeMd)
                             .scale(micIconScale),
@@ -271,6 +363,7 @@ fun ChatInputRow(
                     "mic" -> Icon(
                         imageVector = Icons.Filled.Mic,
                         contentDescription = recordVoiceLabel,
+                        tint = iconTint,
                         modifier = Modifier
                             .size(AppDimens.IconSizeMd)
                             .scale(micIconScale),
@@ -278,12 +371,15 @@ fun ChatInputRow(
                     else -> Icon(
                         imageVector = Icons.AutoMirrored.Filled.Send,
                         contentDescription = sendLabel,
+                        tint = iconTint,
                         modifier = Modifier.size(AppDimens.IconSizeMd),
                     )
                 }
             }
         }
-    }
+        }  // end Row
+        }  // end Surface
+    }  // end Column
 }
 
 /**
