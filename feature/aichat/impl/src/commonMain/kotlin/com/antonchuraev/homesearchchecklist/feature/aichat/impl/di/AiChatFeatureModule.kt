@@ -6,8 +6,10 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AiChat
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatClassifierApiService
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatCompletionApiService
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatHistoryRepository
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.TranscribeAudioApiService
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.data.ChatClassifierApiServiceImpl
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.data.ChatCompletionApiServiceImpl
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.data.TranscribeAudioApiServiceImpl
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.parser.LocalIntentRouterImpl
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.ChatViewModel
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.preview.ToolCallPreviewRenderer
@@ -46,6 +48,9 @@ val aiChatFeatureModule = module {
     single<ChatCompletionApiService> {
         ChatCompletionApiServiceImpl(logger = get())
     }
+    single<TranscribeAudioApiService> {
+        TranscribeAudioApiServiceImpl(logger = get())
+    }
     single<ChatHistoryRepository> {
         ChatHistoryRepositoryImpl(
             dao = get<ChatHistoryDao>(),
@@ -57,6 +62,7 @@ val aiChatFeatureModule = module {
             router = get(),
             classifierApi = get(),
             completionApi = get(),
+            transcribeApi = get(),
             userDataRepository = get(),
             aiChatPreferencesRepository = get(),
             logger = get(),

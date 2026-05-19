@@ -44,6 +44,9 @@ import aichecklists.core.designsystem.generated.resources.chat_not_found
 import aichecklists.core.designsystem.generated.resources.chat_recording_cancelled
 import aichecklists.core.designsystem.generated.resources.chat_requires_premium
 import aichecklists.core.designsystem.generated.resources.chat_thumb_up_thanks
+import aichecklists.core.designsystem.generated.resources.chat_transcribe_empty
+import aichecklists.core.designsystem.generated.resources.chat_transcribe_error
+import aichecklists.core.designsystem.generated.resources.chat_transcribing
 import aichecklists.core.designsystem.generated.resources.chat_unknown_intent_hint
 import aichecklists.core.designsystem.generated.resources.chat_voice_too_short
 import aichecklists.core.designsystem.generated.resources.chat_preview_cancelled_message
@@ -135,6 +138,10 @@ fun ChatRoute(
     val recordingCancelledText = stringResource(Res.string.chat_recording_cancelled)
     val thumbUpThanksText = stringResource(Res.string.chat_thumb_up_thanks)
     val previewCancelledText = stringResource(Res.string.chat_preview_cancelled_message)
+    // Transcription strings (STT flow)
+    val transcribingText = stringResource(Res.string.chat_transcribing)
+    val transcribeEmptyText = stringResource(Res.string.chat_transcribe_empty)
+    val transcribeErrorText = stringResource(Res.string.chat_transcribe_error)
 
     val messages = remember(
         unknownText, genericErrorText, applyErrorText, extractFailText,
@@ -148,7 +155,7 @@ fun ChatRoute(
         dispatchFillLoadFailedFmt, insufficientCreditsText, completionErrorText, historyLoadErrorText,
         feedbackSubmittedText, feedbackBlankHintText,
         micPermissionDeniedText, voiceTooShortText, recordingCancelledText, thumbUpThanksText,
-        previewCancelledText,
+        previewCancelledText, transcribingText, transcribeEmptyText, transcribeErrorText,
     ) {
         mapOf(
             "chat_unknown_intent_hint" to unknownText,
@@ -188,6 +195,9 @@ fun ChatRoute(
             "chat_recording_cancelled" to recordingCancelledText,
             "chat_thumb_up_thanks" to thumbUpThanksText,
             "chat_preview_cancelled_message" to previewCancelledText,
+            "chat_transcribing" to transcribingText,
+            "chat_transcribe_empty" to transcribeEmptyText,
+            "chat_transcribe_error" to transcribeErrorText,
         )
     }
 

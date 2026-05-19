@@ -319,6 +319,7 @@ fun ChatScreen(
                 isEnabled = !state.isProcessing,
                 canSend = state.canSend,
                 isRecording = state.isRecording,
+                isTranscribing = state.isTranscribing,
                 onDragCancelChanged = { isDragCancel = it },
             )
         }

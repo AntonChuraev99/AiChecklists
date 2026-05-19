@@ -15,6 +15,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AiChat
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatHistoryRepository
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChecklistContext
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.RemoteCompletionResult
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.TranscriptionOutcome
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.preview.ToolCallPreviewRenderer
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
@@ -55,10 +56,13 @@ private class FakeAiChatRepository(
     ),
     private val skipLayer1Result: IntentClassification? = null,
     private val completionResult: RemoteCompletionResult = RemoteCompletionResult.ServiceError,
+    private val transcribeResult: TranscriptionOutcome = TranscriptionOutcome.ServiceError,
 ) : AiChatRepository {
     var classifyCallCount = 0
     var lastSkipLayer1: Boolean = false
     var completeFreeFormCallCount = 0
+    var transcribeCallCount = 0
+    var lastTranscribePath: String? = null
 
     override suspend fun classify(input: String, locale: ChatLocale, skipLayer1: Boolean): IntentClassification {
         classifyCallCount++
@@ -73,6 +77,12 @@ private class FakeAiChatRepository(
     ): RemoteCompletionResult {
         completeFreeFormCallCount++
         return completionResult
+    }
+
+    override suspend fun transcribeAudio(audioPath: String, locale: ChatLocale): TranscriptionOutcome {
+        transcribeCallCount++
+        lastTranscribePath = audioPath
+        return transcribeResult
     }
 }
 
@@ -873,5 +883,90 @@ class ChatViewModelTest {
         assertIs<ChatScreenSideEffect.ShowSnackbar>(effect)
         assertEquals("chat_attach_limit_reached", effect.messageKey)
         assertEquals(3, vm.screenState.value.pendingAttachments.size, "List must not grow beyond free limit")
+    }
+
+    // ── STT (Voice → Transcription) tests ────────────────────────────────────────
+
+    // 27. Success → input text set, isTranscribing cleared, no attachment
+    @Test
+    fun voiceRecorded_success_setsInputText_clearsTranscribing() = runTest {
+        val repo = FakeAiChatRepository(transcribeResult = TranscriptionOutcome.Success("hello world"))
+        val vm = makeVm(repo = repo)
+
+        vm.sendIntent(ChatScreenIntent.OnVoiceRecordingStopped("/tmp/rec.m4a"))
+
+        val state = vm.screenState.value
+        assertEquals("hello world", state.inputText, "Transcript must be placed into inputText")
+        assertFalse(state.isTranscribing, "isTranscribing must be false after success")
+        assertTrue(state.pendingAttachments.isEmpty(), "No audio attachment must be created on STT path")
+    }
+
+    // 28. Success → transcript appended to existing input with a space
+    @Test
+    fun voiceRecorded_success_appendsToExistingInput_withSpace() = runTest {
+        val repo = FakeAiChatRepository(transcribeResult = TranscriptionOutcome.Success("more text"))
+        val vm = makeVm(repo = repo)
+
+        // Pre-populate the input field
+        vm.sendIntent(ChatScreenIntent.OnInputChange("existing"))
+
+        vm.sendIntent(ChatScreenIntent.OnVoiceRecordingStopped("/tmp/rec.m4a"))
+
+        assertEquals("existing more text", vm.screenState.value.inputText)
+    }
+
+    // 29. EmptyTranscript → isTranscribing cleared, snackbar with correct key
+    @Test
+    fun voiceRecorded_emptyTranscript_emitsSnackbar() = runTest {
+        val repo = FakeAiChatRepository(transcribeResult = TranscriptionOutcome.EmptyTranscript)
+        val vm = makeVm(repo = repo)
+
+        val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            vm.sideEffect.first()
+        }
+
+        vm.sendIntent(ChatScreenIntent.OnVoiceRecordingStopped("/tmp/rec.m4a"))
+
+        val effect = effectDeferred.await()
+        assertIs<ChatScreenSideEffect.ShowSnackbar>(effect)
+        assertEquals("chat_transcribe_empty", effect.messageKey)
+        assertFalse(vm.screenState.value.isTranscribing)
+    }
+
+    // 30. NetworkError → isTranscribing cleared, snackbar with chat_transcribe_error
+    @Test
+    fun voiceRecorded_networkError_emitsSnackbar() = runTest {
+        val repo = FakeAiChatRepository(transcribeResult = TranscriptionOutcome.NetworkError)
+        val vm = makeVm(repo = repo)
+
+        val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            vm.sideEffect.first()
+        }
+
+        vm.sendIntent(ChatScreenIntent.OnVoiceRecordingStopped("/tmp/rec.m4a"))
+
+        val effect = effectDeferred.await()
+        assertIs<ChatScreenSideEffect.ShowSnackbar>(effect)
+        assertEquals("chat_transcribe_error", effect.messageKey)
+        assertFalse(vm.screenState.value.isTranscribing)
+    }
+
+    // 31. Cancelled recording (null path) → transcribeAudio NOT called, snackbar emitted
+    @Test
+    fun voiceRecordingCancelled_nullPath_doesNotCallTranscribe() = runTest {
+        val repo = FakeAiChatRepository()
+        val vm = makeVm(repo = repo)
+
+        val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            vm.sideEffect.first()
+        }
+
+        vm.sendIntent(ChatScreenIntent.OnVoiceRecordingStopped(null))
+
+        val effect = effectDeferred.await()
+        assertIs<ChatScreenSideEffect.ShowSnackbar>(effect)
+        assertEquals("chat_recording_cancelled", effect.messageKey)
+        assertEquals(0, repo.transcribeCallCount, "transcribeAudio must NOT be called when path is null")
+        assertFalse(vm.screenState.value.isTranscribing, "isTranscribing must remain false on cancel")
     }
 }

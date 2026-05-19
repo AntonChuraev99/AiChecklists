@@ -1011,6 +1011,9 @@
     <string name="chat_voice_drag_cancel_hint">Сдвиньте вверх для отмены</string>
     <string name="chat_voice_too_short">Запись слишком короткая. Удерживайте кнопку дольше.</string>
     <string name="chat_recording_in_progress">Запись…</string>
+    <string name="chat_transcribing">Расшифровываю…</string>
+    <string name="chat_transcribe_empty">Не удалось распознать речь. Попробуй ещё раз.</string>
+    <string name="chat_transcribe_error">Не удалось расшифровать. Проверь соединение и попробуй ещё раз.</string>
     <string name="chat_attachment_remove">Удалить вложение</string>
     <string name="chat_attachment_source_chooser_title">Прикрепить</string>
     <string name="chat_attachment_source_image">Изображение</string>

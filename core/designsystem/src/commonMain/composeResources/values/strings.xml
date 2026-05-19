@@ -1042,6 +1042,9 @@
     <string name="chat_voice_drag_cancel_hint">Slide up to cancel</string>
     <string name="chat_voice_too_short">Recording too short. Hold the mic button longer.</string>
     <string name="chat_recording_in_progress">Recording…</string>
+    <string name="chat_transcribing">Transcribing…</string>
+    <string name="chat_transcribe_empty">Couldn\'t hear anything in the recording. Try again.</string>
+    <string name="chat_transcribe_error">Couldn\'t transcribe the recording. Check connection and try again.</string>
     <string name="chat_attachment_remove">Remove attachment</string>
     <string name="chat_attachment_source_chooser_title">Attach</string>
     <string name="chat_attachment_source_image">Image</string>

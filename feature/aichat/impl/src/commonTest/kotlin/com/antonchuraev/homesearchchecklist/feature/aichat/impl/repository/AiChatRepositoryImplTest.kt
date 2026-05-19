@@ -14,6 +14,8 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatCo
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChecklistContext
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.RemoteClassificationResult
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.RemoteCompletionResult
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.RemoteTranscriptionResult
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.TranscribeAudioApiService
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.UserData
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import kotlinx.coroutines.flow.Flow
@@ -68,6 +70,21 @@ private class FakeChatCompletionApiService(
         locale: ChatLocale,
         checklistsSummary: List<ChecklistContext>,
     ): RemoteCompletionResult {
+        callCount++
+        return result
+    }
+}
+
+private class FakeTranscribeAudioApiService(
+    private val result: RemoteTranscriptionResult = RemoteTranscriptionResult.ServiceError,
+) : TranscribeAudioApiService {
+    var callCount = 0
+
+    override suspend fun transcribe(
+        userId: String,
+        audioBase64: String,
+        locale: ChatLocale,
+    ): RemoteTranscriptionResult {
         callCount++
         return result
     }
@@ -132,6 +149,7 @@ private fun makeRepo(
         router = router,
         classifierApi = classifier,
         completionApi = FakeChatCompletionApiService(completionResult),
+        transcribeApi = FakeTranscribeAudioApiService(),
         userDataRepository = FakeUserDataRepository(userId),
         aiChatPreferencesRepository = FakeAiChatPreferencesRepository(deepThinking),
         logger = NoOpLogger,
@@ -253,6 +271,7 @@ class AiChatRepositoryImplTest {
             router = router,
             classifierApi = classifier,
             completionApi = FakeChatCompletionApiService(),
+            transcribeApi = FakeTranscribeAudioApiService(),
             userDataRepository = FakeUserDataRepository(userId = ""),
             aiChatPreferencesRepository = FakeAiChatPreferencesRepository(),
             logger = NoOpLogger,
@@ -314,6 +333,7 @@ class AiChatRepositoryImplTest {
             router = router,
             classifierApi = FakeChatClassifierApiService(RemoteClassificationResult.ServiceError),
             completionApi = completionApi,
+            transcribeApi = FakeTranscribeAudioApiService(),
             userDataRepository = FakeUserDataRepository("user-xyz"),
             aiChatPreferencesRepository = FakeAiChatPreferencesRepository(),
             logger = NoOpLogger,
@@ -340,6 +360,7 @@ class AiChatRepositoryImplTest {
             router = FakeLocalIntentRouter(highConfidenceLayer1()),
             classifierApi = FakeChatClassifierApiService(RemoteClassificationResult.ServiceError),
             completionApi = completionApi,
+            transcribeApi = FakeTranscribeAudioApiService(),
             userDataRepository = FakeUserDataRepository(userId = ""),
             aiChatPreferencesRepository = FakeAiChatPreferencesRepository(),
             logger = NoOpLogger,
@@ -364,6 +385,7 @@ class AiChatRepositoryImplTest {
             router = FakeLocalIntentRouter(highConfidenceLayer1()),
             classifierApi = FakeChatClassifierApiService(RemoteClassificationResult.ServiceError),
             completionApi = completionApi,
+            transcribeApi = FakeTranscribeAudioApiService(),
             userDataRepository = FakeUserDataRepository("user-abc"),
             aiChatPreferencesRepository = FakeAiChatPreferencesRepository(),
             logger = NoOpLogger,
@@ -391,6 +413,7 @@ class AiChatRepositoryImplTest {
             router = router,
             classifierApi = classifier,
             completionApi = FakeChatCompletionApiService(),
+            transcribeApi = FakeTranscribeAudioApiService(),
             userDataRepository = FakeUserDataRepository("user-deep"),
             aiChatPreferencesRepository = FakeAiChatPreferencesRepository(initial = true),
             logger = NoOpLogger,
@@ -488,6 +511,7 @@ class AiChatRepositoryImplTest {
             router = router,
             classifierApi = classifier,
             completionApi = FakeChatCompletionApiService(),
+            transcribeApi = FakeTranscribeAudioApiService(),
             userDataRepository = FakeUserDataRepository("user-deep"),
             aiChatPreferencesRepository = FakeAiChatPreferencesRepository(initial = true),
             logger = NoOpLogger,
