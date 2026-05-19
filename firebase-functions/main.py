@@ -1535,6 +1535,120 @@ def classify_chat_intent(request: Request):
 
 
 # ============================================================================
+# FUNCTION: transcribe_audio (mic voice input → text for the chat input field)
+# ============================================================================
+#
+# Called by ChatViewModel after the user releases the mic button. The voice
+# recording (AAC m4a, base64-encoded) is sent to Gemini 2.5 Flash-Lite, which
+# returns the spoken text. The client places the transcript into the chat input
+# field so the user can edit before sending. This is pure speech-to-text — no
+# chat reasoning, no preview card, no Layer routing.
+#
+# Cost: 1 credit (same as Layer 2 classifier — cheap enough that free users can
+# dictate routinely, expensive enough that abuse costs credits). Atomic
+# Firestore deduction via reserve_chat_credit; refund on Gemini failure.
+#
+# Privacy: audio is sent directly to Gemini; nothing persisted server-side
+# besides the standard usage counter. The audio file is deleted client-side
+# after the response is received.
+# ============================================================================
+
+# Base64 expands raw bytes by ~4/3. Cap raw audio at 5MB (~5 min m4a @ 128 kbps)
+# so the encoded payload stays well under Cloud Functions' 10MB request ceiling.
+TRANSCRIBE_AUDIO_MAX_RAW_BYTES = 5 * 1024 * 1024
+TRANSCRIBE_AUDIO_MAX_B64_CHARS = (TRANSCRIBE_AUDIO_MAX_RAW_BYTES * 4 // 3) + 16
+
+TRANSCRIBE_AUDIO_PROMPT = """\
+You are a speech-to-text engine. Transcribe the audio exactly as spoken.
+
+Output rules (STRICT):
+- Return ONLY the transcript — no commentary, no labels, no quotes, no markdown.
+- Do NOT translate. Keep the original language (Russian / English / mixed).
+- Preserve natural sentence boundaries with periods.
+- If the audio is silent, unintelligible, or contains no speech, return an empty string.
+- Do NOT invent words. If unsure of a word, omit it rather than guess.
+"""
+
+
+@functions_framework.http
+def transcribe_audio(request: Request):
+    """
+    Transcribe an audio clip (AAC m4a, base64-encoded) to spoken text.
+
+    Request body:
+    {
+        "user_id": "string",
+        "audio_base64": "base64-encoded m4a audio (max ~6.7MB encoded / ~5MB raw)",
+        "locale": "ru" | "en" (informational; Gemini auto-detects)
+    }
+
+    Response:
+    {
+        "success": true,
+        "transcript": "the spoken text, or empty string if silent",
+        "credits_remaining": int
+    }
+
+    Error responses:
+        400 — missing fields or audio too large
+        402 — insufficient credits
+        500 — Gemini call failed (credit refunded)
+    """
+    if request.method == "OPTIONS":
+        return cors_preflight_ok()
+
+    data, error = validate_request(request)
+    if error is not None:
+        return create_error_response(error, 400)
+
+    audio_b64 = (data.get("audio_base64") or "").strip()
+    if not audio_b64:
+        return create_error_response("audio_base64 is required", 400)
+    if len(audio_b64) > TRANSCRIBE_AUDIO_MAX_B64_CHARS:
+        return create_error_response(
+            f"audio too large (max {TRANSCRIBE_AUDIO_MAX_RAW_BYTES // (1024 * 1024)} MB raw)", 400
+        )
+
+    locale = (data.get("locale") or "en").strip().lower()
+    if locale not in ("ru", "en"):
+        locale = "en"
+
+    user_id = data["user_id"]
+
+    # Server is authoritative for credit accounting — deduct BEFORE the AI call
+    # so concurrent requests cannot oversell credits.
+    new_credits = reserve_chat_credit(user_id)
+    if new_credits is None:
+        return create_error_response("insufficient credits", 402)
+
+    try:
+        response = call_gemini(TRANSCRIBE_AUDIO_PROMPT, "audio_base64", audio_b64)
+        transcript = (response.text or "").strip()
+
+        # Defensive: strip outer quotes if Gemini wrapped the transcript despite
+        # the prompt explicitly forbidding it. Mismatched quotes are left as-is.
+        if len(transcript) >= 2 and transcript[0] == transcript[-1] and transcript[0] in ("\"", "'"):
+            transcript = transcript[1:-1].strip()
+
+        # Best-effort usage logging — never block the response on it.
+        try:
+            increment_usage(user_id, "transcribe_audio", "audio_base64")
+        except Exception:
+            pass
+
+        return create_success_response({
+            "transcript": transcript,
+            "credits_remaining": new_credits,
+        })
+
+    except Exception as e:
+        # Gemini call failed AFTER reserve_chat_credit deducted 1.
+        # Refund so the user is not charged for our failure.
+        refund_chat_credit(user_id, reason=f"transcribe_audio_gemini_failure: {type(e).__name__}")
+        return create_error_response(f"transcription failed: {str(e)}", 500)
+
+
+# ============================================================================
 # FUNCTION: chat_completion (Phase C.2 — Layer 3 full free-form reasoning)
 # ============================================================================
 #
@@ -1576,7 +1690,7 @@ FEATURE_CATALOG_RU = """\
 
 4. **Вложения к пункту чек-листа** — открой чек-лист → тапни на пункт → откроется детальное окно → в строке вложений выбери «скрепку» → выбери источник: Фото / PDF / Аудио. Бесплатно: 3 файла на пункт. Premium: без ограничений.
 
-5. **Голосовое сообщение в AI Chat** — в чате зажми и удерживай иконку микрофона справа от поля ввода → говори → отпусти, чтобы отправить. Голосовое уйдёт как вложение к сообщению или станет основой нового чек-листа.
+5. **Голосовой ввод в AI Chat (speech-to-text)** — в чате при пустом поле ввода зажми и удерживай иконку микрофона справа → говори → отпусти. Запись расшифруется в текст и подставится в поле ввода, можно отредактировать перед отправкой. Стоит 1 кредит за расшифровку. Чтобы прикрепить готовый аудиофайл как вложение — используй «скрепку» 📎 и выбери «Аудио».
 
 6. **Напоминания** — на чек-листе или пункте → ⋮ → «Напомнить». Бывают разовые и повторяющиеся: ежедневно, еженедельно, по будням, ежемесячно, каждые 2 недели, ежеквартально, ежегодно, или своё расписание. Бесплатно: 1 повторяющееся, Premium: без ограничений.
 
@@ -1613,7 +1727,7 @@ App features you can explain to the user:
 
 4. **Item attachments** — Open a checklist → tap an item → item details sheet opens → in the attachments row tap the paperclip → pick source: Photo / PDF / Audio. Free: 3 attachments per item. Premium: unlimited.
 
-5. **Voice message in AI Chat** — In chat, press and hold the mic icon to the right of the input → speak → release to send. The voice file is attached or becomes the source for a new checklist.
+5. **Voice input in AI Chat (speech-to-text)** — In chat, with an empty input field, press and hold the mic icon on the right → speak → release. The recording is transcribed and the text is placed into the input field so you can edit before sending. Costs 1 credit per transcription. To attach an existing audio file as a message attachment instead, tap the paperclip 📎 and choose "Audio".
 
 6. **Reminders** — On a checklist or item → ⋮ → "Remind me". One-shot or recurring: daily, weekly, weekdays, monthly, biweekly, quarterly, yearly, or custom schedule. Free: 1 recurring. Premium: unlimited.
 

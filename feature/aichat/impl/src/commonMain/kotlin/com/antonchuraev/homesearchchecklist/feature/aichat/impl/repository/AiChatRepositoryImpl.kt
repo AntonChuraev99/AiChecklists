@@ -14,7 +14,13 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatCo
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChecklistContext
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.RemoteClassificationResult
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.RemoteCompletionResult
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.RemoteTranscriptionResult
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.TranscribeAudioApiService
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.TranscriptionOutcome
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.data.AudioFileBytes
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlinx.coroutines.flow.first
 
 /**
@@ -36,6 +42,7 @@ internal class AiChatRepositoryImpl(
     private val router: LocalIntentRouter,
     private val classifierApi: ChatClassifierApiService,
     private val completionApi: ChatCompletionApiService,
+    private val transcribeApi: TranscribeAudioApiService,
     private val userDataRepository: UserDataRepository,
     private val aiChatPreferencesRepository: AiChatPreferencesRepository,
     private val logger: AppLogger,
@@ -230,5 +237,57 @@ internal class AiChatRepositoryImpl(
             locale = locale,
             checklistsSummary = checklistsSummary,
         )
+    }
+
+    @OptIn(ExperimentalEncodingApi::class)
+    override suspend fun transcribeAudio(
+        audioPath: String,
+        locale: ChatLocale,
+    ): TranscriptionOutcome {
+        val bytes = AudioFileBytes.read(audioPath)
+        if (bytes == null || bytes.isEmpty()) {
+            logger.warning(TAG, "transcribeAudio: file missing or empty at $audioPath")
+            // No file → no credit to spend either, just bail cleanly.
+            AudioFileBytes.delete(audioPath)
+            return TranscriptionOutcome.FileMissing
+        }
+
+        val userId = userDataRepository.getUserData().userId
+        if (userId.isBlank()) {
+            logger.warning(TAG, "transcribeAudio skipped: userId blank (user not registered yet)")
+            AudioFileBytes.delete(audioPath)
+            return TranscriptionOutcome.ServiceError
+        }
+
+        val base64 = Base64.encode(bytes)
+        logger.debug(TAG, "transcribeAudio: bytes=${bytes.size} b64_len=${base64.length} locale=$locale")
+
+        // File is no longer needed once we have the base64 payload — delete eagerly
+        // so a failed transcription does not leak audio in cacheDir.
+        AudioFileBytes.delete(audioPath)
+
+        return when (val result = transcribeApi.transcribe(userId, base64, locale)) {
+            is RemoteTranscriptionResult.Success -> {
+                if (result.transcript.isBlank()) {
+                    logger.info(TAG, "transcribeAudio: empty transcript (silent or unintelligible)")
+                    TranscriptionOutcome.EmptyTranscript
+                } else {
+                    logger.info(TAG, "transcribeAudio: success len=${result.transcript.length} credits=${result.creditsRemaining}")
+                    TranscriptionOutcome.Success(result.transcript)
+                }
+            }
+            RemoteTranscriptionResult.InsufficientCredits -> {
+                logger.info(TAG, "transcribeAudio: InsufficientCredits")
+                TranscriptionOutcome.InsufficientCredits
+            }
+            RemoteTranscriptionResult.NetworkError -> {
+                logger.warning(TAG, "transcribeAudio: NetworkError")
+                TranscriptionOutcome.NetworkError
+            }
+            RemoteTranscriptionResult.ServiceError -> {
+                logger.warning(TAG, "transcribeAudio: ServiceError")
+                TranscriptionOutcome.ServiceError
+            }
+        }
     }
 }

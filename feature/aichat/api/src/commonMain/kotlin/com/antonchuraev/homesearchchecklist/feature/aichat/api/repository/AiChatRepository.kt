@@ -47,4 +47,49 @@ interface AiChatRepository {
         locale: ChatLocale,
         checklistsSummary: List<ChecklistContext>,
     ): RemoteCompletionResult
+
+    /**
+     * Transcribes a voice recording (AAC m4a) to text via the `transcribe_audio`
+     * Cloud Function. Spends 1 AI credit per successful call.
+     *
+     * Contract:
+     *   - The audio file at [audioPath] is read, base64-encoded, and sent to the
+     *     server. The local file is deleted after the call regardless of outcome —
+     *     callers must not assume the file still exists.
+     *   - On [TranscriptionOutcome.Success] the [transcript] may be an empty string
+     *     when the audio was silent or unintelligible; callers should handle this as
+     *     a soft failure (snackbar, no input change).
+     *
+     * Used by ChatViewModel for the press-and-hold mic gesture in the chat input row.
+     */
+    suspend fun transcribeAudio(
+        audioPath: String,
+        locale: ChatLocale,
+    ): TranscriptionOutcome
+}
+
+/**
+ * Outcome of [AiChatRepository.transcribeAudio].
+ *
+ * Modelled as a sealed result (rather than `Result<String>`) so callers can branch
+ * on specific failure modes without inspecting exception types.
+ */
+sealed interface TranscriptionOutcome {
+    /** Gemini returned a non-empty transcript. */
+    data class Success(val transcript: String) : TranscriptionOutcome
+
+    /** Gemini returned an empty transcript (silent / unintelligible audio). */
+    data object EmptyTranscript : TranscriptionOutcome
+
+    /** The audio file at the supplied path could not be read or was empty. */
+    data object FileMissing : TranscriptionOutcome
+
+    /** User has no AI credits left (server returned 402). */
+    data object InsufficientCredits : TranscriptionOutcome
+
+    /** Network failure, timeout, or any transient connectivity error. */
+    data object NetworkError : TranscriptionOutcome
+
+    /** Server returned a non-402 error (5xx, Gemini failure, audio too large). */
+    data object ServiceError : TranscriptionOutcome
 }

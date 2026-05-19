@@ -39,6 +39,9 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Tool
  * @param isRecording       True while the user is holding the mic button (voice recording).
  *                          Phase 1 only bookkeeps this value — recording infra lives in Phase 3.
  * @param voiceRecordingError Non-null when the last recording attempt failed.
+ * @param isTranscribing    True while a voice recording is being sent to the transcription
+ *                          Cloud Function. Input field and action buttons are disabled during
+ *                          this state; a progress indicator replaces the mic/send button.
  */
 data class ChatScreenState(
     val messages: List<ChatMessage> = emptyList(),
@@ -58,6 +61,7 @@ data class ChatScreenState(
     val attachmentPickerType: AttachmentSource? = null,
     val isRecording: Boolean = false,
     val voiceRecordingError: String? = null,
+    val isTranscribing: Boolean = false,
 ) : State {
     /** True when the Send button should be active (text entered OR attachments pending). */
     val canSend: Boolean get() = inputText.isNotBlank() || pendingAttachments.isNotEmpty()
@@ -212,10 +216,12 @@ sealed interface ChatScreenIntent : Intent {
     /**
      * User released the mic button (voice recording stop).
      * ViewModel flips [ChatScreenState.isRecording] to false and, when [recordingPath]
-     * is non-null, appends an Audio [ChatAttachment] to [ChatScreenState.pendingAttachments].
+     * is non-null, sends the file to the transcription Cloud Function
+     * ([AiChatRepository.transcribeAudio]) and appends the resulting text to the
+     * input field so the user can review and edit before sending.
      *
      * [recordingPath] is null when recording was cancelled (no-op per silent-skip guard).
-     * A null path with isRecording=true → user cancelled → emit ShowSnackbar("chat_recording_cancelled").
+     * A null path → user cancelled → emit ShowSnackbar("chat_recording_cancelled").
      */
     data class OnVoiceRecordingStopped(val recordingPath: String?) : ChatScreenIntent
 }

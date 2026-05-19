@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.text.KeyboardOptions
@@ -30,6 +31,7 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
@@ -86,6 +88,9 @@ import org.jetbrains.compose.resources.stringResource
  * @param isEnabled                 When false, all interactive elements are disabled.
  * @param canSend                   True when text is non-blank OR pendingAttachments is non-empty.
  * @param isRecording               True while voice recording is in progress.
+ * @param isTranscribing            True while audio is being sent to the transcription Cloud Function.
+ *                                  Hides the mic/send button and shows a [CircularProgressIndicator]
+ *                                  with a «Transcribing…» label. Input field is read-only in this state.
  * @param onDragCancelChanged       Reports drag-up cancel state to parent for overlay label.
  */
 @Composable
@@ -102,6 +107,7 @@ fun ChatInputRow(
     isEnabled: Boolean = true,
     canSend: Boolean = false,
     isRecording: Boolean = false,
+    isTranscribing: Boolean = false,
     onDragCancelChanged: ((Boolean) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -162,7 +168,7 @@ fun ChatInputRow(
         // [1] Leading help button (Telegram-style — replaces emoji slot)
         IconButton(
             onClick = onHelpClick,
-            enabled = isEnabled && !isRecording,
+            enabled = isEnabled && !isRecording && !isTranscribing,
             modifier = Modifier.size(48.dp),
         ) {
             Icon(
@@ -181,7 +187,7 @@ fun ChatInputRow(
         // placeholder swaps when attachments are pending.
         TextField(
             value = text,
-            onValueChange = if (isRecording) { _ -> } else onTextChange,
+            onValueChange = if (isRecording || isTranscribing) { _ -> } else onTextChange,
             placeholder = {
                 androidx.compose.material3.Text(
                     text = placeholder,
@@ -191,7 +197,7 @@ fun ChatInputRow(
             },
             singleLine = false,
             maxLines = 4,
-            enabled = isEnabled && !isRecording,
+            enabled = isEnabled && !isRecording && !isTranscribing,
             modifier = Modifier.weight(1f),
             keyboardOptions = KeyboardOptions(
                 imeAction = if (canSend) ImeAction.Send else ImeAction.Default,
@@ -213,7 +219,7 @@ fun ChatInputRow(
         // [3] Attach file button (moved to trailing side, next to Mic/Send — Telegram pattern)
         IconButton(
             onClick = onAttachFileClick,
-            enabled = isEnabled && !isRecording,
+            enabled = isEnabled && !isRecording && !isTranscribing,
             modifier = Modifier.size(48.dp),
         ) {
             Icon(
@@ -227,7 +233,12 @@ fun ChatInputRow(
             )
         }
 
-        // [4] Trailing Mic / Send FilledIconButton
+        // [4] Trailing Mic / Send / Transcribing indicator
+        //
+        // When isTranscribing=true, the entire trailing slot is replaced by a
+        // CircularProgressIndicator + label row (Crossfade "transcribing" branch).
+        // Mic / Send remain hidden until transcription completes.
+        //
         // Press-and-hold gesture for the mic button.
         // Uses awaitEachGesture (low-level) to support drag-up cancel tracking.
         //
@@ -306,12 +317,10 @@ fun ChatInputRow(
         // can see them. That collision is why press-and-hold mic was a silent no-op.
         // Solution: switch modifier based on mode — `clickable` for Send-tap,
         // `pointerInput` for Mic press-and-hold. Only one active at a time → no conflict.
-        val interactionModifier = if (!isMic && !isRecording) {
-            // Send mode: simple tap → onSend()
-            Modifier.clickable(enabled = isEnabled, onClick = onSend)
-        } else {
-            // Mic mode: press-and-hold gesture is the primary interaction
-            micGestureModifier
+        val interactionModifier = when {
+            isTranscribing -> Modifier  // no interaction while transcription is in progress
+            !isMic && !isRecording -> Modifier.clickable(enabled = isEnabled, onClick = onSend)
+            else -> micGestureModifier  // Mic mode: press-and-hold gesture
         }
         Box(
             modifier = interactionModifier
@@ -336,6 +345,7 @@ fun ChatInputRow(
             contentAlignment = androidx.compose.ui.Alignment.Center,
         ) {
             val crossfadeTarget = when {
+                isTranscribing -> "transcribing"
                 isRecording && isDragCancel -> "cancel"
                 isMic || isRecording -> "mic"
                 else -> "send"
@@ -352,6 +362,11 @@ fun ChatInputRow(
                 label = "mic_send_crossfade",
             ) { iconState ->
                 when (iconState) {
+                    "transcribing" -> CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
                     "cancel" -> Icon(
                         imageVector = Icons.Filled.Close,
                         contentDescription = recordVoiceLabel,

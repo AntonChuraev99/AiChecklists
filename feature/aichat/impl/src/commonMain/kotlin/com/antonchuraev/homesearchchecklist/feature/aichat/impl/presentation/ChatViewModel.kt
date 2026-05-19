@@ -20,6 +20,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AiChat
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChecklistContext
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatHistoryRepository
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.RemoteCompletionResult
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.TranscriptionOutcome
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.preview.ToolCallPreviewRenderer
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
@@ -678,14 +679,38 @@ class ChatViewModel(
             return
         }
 
-        // Successful recording: wrap as an Audio ChatAttachment and add to pending list
-        val audioAttachment = ChatAttachment(
-            sourcePath = recordingPath,
-            mimeType = "audio/m4a",
-            fileName = "voice_message.m4a",
-            sizeBytes = 0L, // actual size unknown until file is written; dispatcher can re-probe
-        )
-        handleAttachmentPicked(audioAttachment)
+        // Successful recording → transcribe to text via Cloud Function.
+        // Repository owns file cleanup; we just handle the outcome.
+        _screenState.value = _screenState.value.copy(isTranscribing = true)
+        viewModelScope.launch {
+            val locale = localeProvider.current()
+            when (val outcome = aiChatRepository.transcribeAudio(recordingPath, locale)) {
+                is TranscriptionOutcome.Success -> {
+                    // Append transcript to existing input so the user can dictate multiple times
+                    val currentInput = _screenState.value.inputText
+                    val merged = if (currentInput.isBlank()) outcome.transcript
+                                 else "$currentInput ${outcome.transcript}"
+                    _screenState.value = _screenState.value.copy(
+                        inputText = merged,
+                        isTranscribing = false,
+                    )
+                }
+                TranscriptionOutcome.EmptyTranscript -> {
+                    _screenState.value = _screenState.value.copy(isTranscribing = false)
+                    _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_transcribe_empty"))
+                }
+                TranscriptionOutcome.FileMissing,
+                TranscriptionOutcome.NetworkError,
+                TranscriptionOutcome.ServiceError -> {
+                    _screenState.value = _screenState.value.copy(isTranscribing = false)
+                    _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_transcribe_error"))
+                }
+                TranscriptionOutcome.InsufficientCredits -> {
+                    _screenState.value = _screenState.value.copy(isTranscribing = false)
+                    _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_insufficient_credits"))
+                }
+            }
+        }
     }
 
     // ─── FreeForm (Layer 3) flow ───────────────────────────────────────────────
