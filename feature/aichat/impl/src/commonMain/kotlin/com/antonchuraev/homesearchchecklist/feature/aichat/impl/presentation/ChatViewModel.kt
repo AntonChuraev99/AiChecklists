@@ -144,6 +144,14 @@ class ChatViewModel(
                 _screenState.value = _screenState.value.copy(showPricingSheet = false)
             }
 
+            ChatScreenIntent.OnFeaturesHelpClick -> {
+                _screenState.value = _screenState.value.copy(showFeaturesSheet = true)
+            }
+
+            ChatScreenIntent.OnFeaturesHelpDismiss -> {
+                _screenState.value = _screenState.value.copy(showFeaturesSheet = false)
+            }
+
             ChatScreenIntent.OnBackClick -> {
                 viewModelScope.launch { _sideEffect.emit(ChatScreenSideEffect.NavigateBack) }
             }
@@ -212,6 +220,24 @@ class ChatViewModel(
                     feedbackTarget = intent.message,
                     feedbackText = "",
                 )
+            }
+
+            is ChatScreenIntent.OnThumbUpClick -> {
+                // Fire-and-forget positive feedback signal + lightweight snackbar
+                // confirmation so the user sees that their tap was registered.
+                val msg = intent.message
+                analytics.event(
+                    name = "ai_chat_thumb_up",
+                    params = mapOf(
+                        "message_id" to msg.id,
+                        "routed_layer" to (msg.routedLayer?.name ?: "unknown"),
+                        "deep_thinking_enabled" to _screenState.value.deepThinkingEnabled.toString(),
+                    ),
+                )
+                logger.info(TAG, "THUMB_UP tracked: message_id=${msg.id}")
+                viewModelScope.launch {
+                    _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_thumb_up_thanks"))
+                }
             }
 
             is ChatScreenIntent.OnFeedbackTextChange -> {

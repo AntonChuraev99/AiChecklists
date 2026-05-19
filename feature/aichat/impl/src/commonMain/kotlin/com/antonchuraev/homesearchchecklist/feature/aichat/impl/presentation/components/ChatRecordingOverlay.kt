@@ -64,7 +64,10 @@ fun ChatRecordingOverlay(
     val seconds = (durationMs / 1000L) % 60L
     val formattedDuration = "$minutes:${seconds.toString().padStart(2, '0')}"
 
-    val inProgressLabel = stringResource(Res.string.chat_recording_in_progress, formattedDuration)
+    // Just "Recording…" — timer rendered separately on the right side (single source of truth).
+    // Previously the format string baked in the timer ("Recording… %1$s") which caused
+    // two timers to render side-by-side with the right-aligned Text below.
+    val inProgressLabel = stringResource(Res.string.chat_recording_in_progress)
     val dragCancelLabel = stringResource(Res.string.chat_voice_drag_cancel_hint)
 
     AnimatedVisibility(

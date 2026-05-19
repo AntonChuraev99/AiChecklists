@@ -921,7 +921,7 @@
 
     <!-- AI Chat Screen -->
     <string name="chat_title">AI Chat</string>
-    <string name="chat_input_placeholder">Ask anything…</string>
+    <string name="chat_input_placeholder">Message</string>
     <string name="chat_send_action">Send</string>
     <string name="chat_typing_indicator_a11y">AI is thinking…</string>
     <string name="chat_help_action">Pricing info</string>
@@ -1032,7 +1032,7 @@
     <string name="chat_voice_press_hold_hint">Hold to record voice</string>
     <string name="chat_voice_drag_cancel_hint">Slide up to cancel</string>
     <string name="chat_voice_too_short">Recording too short. Hold the mic button longer.</string>
-    <string name="chat_recording_in_progress">Recording… %1$s</string>
+    <string name="chat_recording_in_progress">Recording…</string>
     <string name="chat_attachment_remove">Remove attachment</string>
     <string name="chat_attachment_source_chooser_title">Attach</string>
     <string name="chat_attachment_source_image">Image</string>
@@ -1040,4 +1040,26 @@
     <string name="chat_attachment_source_text">Text file</string>
     <string name="chat_attachment_source_audio">Audio file</string>
     <string name="chat_mic_permission_denied">Allow microphone access in Settings</string>
+    <string name="chat_input_placeholder_with_attachment">Describe what to do with the attachment…</string>
+    <string name="chat_features_help_action">How to use AI Chat</string>
+    <string name="chat_features_sheet_title">What AI Chat can do</string>
+    <string name="chat_features_intro">Talk to your checklists in natural language. Add items, set reminders, attach photos, record voice — the assistant will figure out what you mean. Tap the clip to attach a file, hold the mic to record voice.</string>
+    <string name="chat_features_examples_title">Try saying</string>
+    <string name="chat_features_example_create">Create a checklist «Shopping» with milk, bread, butter</string>
+    <string name="chat_features_example_add">Add butter to shopping</string>
+    <string name="chat_features_example_complete">Mark milk as done</string>
+    <string name="chat_features_example_delete">Remove bread from shopping</string>
+    <string name="chat_features_example_reminder">Remind me at 6 PM about milk</string>
+    <string name="chat_features_example_move">Move all reminders from Tuesday to Wednesday</string>
+    <string name="chat_features_example_find">Find where I have milk</string>
+    <string name="chat_features_example_attach">Attach this to milk in shopping (with a photo)</string>
+    <string name="chat_features_example_from_attachment">Create a checklist from this photo / PDF / text</string>
+    <string name="chat_features_got_it">Got it</string>
+    <string name="chat_assistant_label">AI Assistant</string>
+    <string name="chat_message_copy">Copy message</string>
+    <string name="chat_message_refresh">Regenerate response</string>
+    <string name="chat_message_thumb_up">Good response</string>
+    <string name="chat_message_thumb_down">Bad response</string>
+    <string name="chat_day_divider_today">Today</string>
+    <string name="chat_thumb_up_thanks">Thanks for the feedback</string>
 </resources>

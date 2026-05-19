@@ -46,6 +46,7 @@ data class ChatScreenState(
     val creditBalance: Int = 0,
     val showPricingSheet: Boolean = false,
     val showSettingsSheet: Boolean = false,
+    val showFeaturesSheet: Boolean = false,
     val deepThinkingEnabled: Boolean = false,
     val isProcessing: Boolean = false,
     val feedbackTarget: ChatMessage? = null,
@@ -97,6 +98,12 @@ sealed interface ChatScreenIntent : Intent {
     /** User dismissed the pricing help bottom sheet. */
     data object OnHelpDismiss : ChatScreenIntent
 
+    /** User tapped the "?" features help icon in the input row leading position. */
+    data object OnFeaturesHelpClick : ChatScreenIntent
+
+    /** User dismissed the features help bottom sheet. */
+    data object OnFeaturesHelpDismiss : ChatScreenIntent
+
     /** User edited the item text inside the preview card. */
     data class OnPreviewItemTextChange(val text: String) : ChatScreenIntent
 
@@ -133,6 +140,9 @@ sealed interface ChatScreenIntent : Intent {
 
     /** User tapped the feedback icon on an assistant bubble — opens the feedback sheet. */
     data class OnFeedbackOpen(val message: ChatMessage) : ChatScreenIntent
+
+    /** User tapped thumb-up on an assistant bubble — fire-and-forget analytics, no UI. */
+    data class OnThumbUpClick(val message: ChatMessage) : ChatScreenIntent
 
     /** User is typing in the feedback text field. */
     data class OnFeedbackTextChange(val text: String) : ChatScreenIntent

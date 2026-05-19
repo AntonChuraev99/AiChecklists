@@ -4,11 +4,23 @@ import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 
+/**
+ * Android file picker actual.
+ *
+ * - [FilePickerType.IMAGE] uses the **Modern Photo Picker** API
+ *   ([ActivityResultContracts.PickVisualMedia]) — Android 13+ system-managed picker,
+ *   automatic backport on Android 11+ via Play services. No `READ_MEDIA_IMAGES`
+ *   permission required; the picker returns a session-scoped content URI.
+ * - [FilePickerType.PDF] / [FilePickerType.TEXT] / [FilePickerType.AUDIO] use
+ *   [ActivityResultContracts.OpenDocument] (SAF) since PickVisualMedia is
+ *   image/video-only.
+ */
 @Composable
 actual fun rememberFilePickerLauncher(
     type: FilePickerType,
@@ -16,18 +28,28 @@ actual fun rememberFilePickerLauncher(
 ): FilePickerLauncher {
     val context = LocalContext.current
 
-    val mimeTypes = when (type) {
-        FilePickerType.IMAGE -> arrayOf("image/*")
-        FilePickerType.PDF -> arrayOf("application/pdf")
-        FilePickerType.TEXT -> arrayOf("text/plain", "text/*")
+    val photoLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            onResult(getFileDetails(context, uri, FilePickerType.IMAGE))
+        } else {
+            onResult(null)
+        }
     }
 
-    val launcher = rememberLauncherForActivityResult(
+    val mimeTypes = when (type) {
+        FilePickerType.IMAGE -> arrayOf("image/*") // not used by photo picker; kept for OpenDocument fallback
+        FilePickerType.PDF -> arrayOf("application/pdf")
+        FilePickerType.TEXT -> arrayOf("text/plain", "text/*")
+        FilePickerType.AUDIO -> arrayOf("audio/*")
+    }
+
+    val docLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         if (uri != null) {
-            val result = getFileDetails(context, uri, type)
-            onResult(result)
+            onResult(getFileDetails(context, uri, type))
         } else {
             onResult(null)
         }
@@ -35,7 +57,14 @@ actual fun rememberFilePickerLauncher(
 
     return remember(type) {
         FilePickerLauncher {
-            launcher.launch(mimeTypes)
+            when (type) {
+                FilePickerType.IMAGE -> photoLauncher.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                )
+                FilePickerType.PDF,
+                FilePickerType.TEXT,
+                FilePickerType.AUDIO -> docLauncher.launch(mimeTypes)
+            }
         }
     }
 }
@@ -53,7 +82,7 @@ private fun getFileDetails(context: Context, uri: Uri, type: FilePickerType): Fi
 
     mimeType = context.contentResolver.getType(uri)
 
-    // Copy content:// URI to a temp file so FileReader can read it via File API
+    // Copy content:// URI to a temp file so callers can read it via File API
     val tempFile = copyUriToTempFile(context, uri, fileName)
     val filePath = tempFile?.absolutePath ?: uri.toString()
 
