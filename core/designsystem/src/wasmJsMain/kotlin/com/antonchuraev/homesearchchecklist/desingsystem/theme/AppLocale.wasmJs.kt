@@ -7,16 +7,30 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.text.intl.Locale
 
 /**
- * External binding to the window-level custom locale slot.
+ * Writes the user-selected locale into a global JS slot read by the
+ * Navigator.languages shim in index.html, which overrides what Compose
+ * Resources resolves via navigator.language / navigator.languages.
  *
- * Written by [LocalAppLocale.provides] when the user picks a language.
- * Read by the Navigator.languages shim in index.html to override the
- * locale that Compose Resources resolves (via navigator.language /
- * navigator.languages).
+ * null → shim falls back to original browser languages.
  *
- * null / undefined → shim falls back to original browser languages.
+ * Why not `external var`: Kotlin/Wasm compiles composeApp.js as an ESM
+ * module (strict mode). A top-level `external var` becomes a bare-name
+ * assignment in the JS binding, which throws ReferenceError unless the
+ * name is declared in module scope. `js("globalThis.X = v")` is the
+ * idiomatic Kotlin/Wasm bridge for writing to a global — same pattern
+ * used by core/remoteconfig for `__rcFetchPromise`.
  */
-private external var __customLocale: String?
+private fun writeCustomLocale(value: String?) {
+    if (value != null) setCustomLocaleGlobal(value) else clearCustomLocaleGlobal()
+}
+
+private fun setCustomLocaleGlobal(value: String) {
+    js("globalThis.__customLocale = value")
+}
+
+private fun clearCustomLocaleGlobal() {
+    js("globalThis.__customLocale = null")
+}
 
 /**
  * Snapshot of the device's default language tag taken on first use
@@ -38,13 +52,8 @@ actual object LocalAppLocale {
 
     @Composable
     actual infix fun provides(value: String?): ProvidedValue<*> {
-        val effective = if (value != null) {
-            __customLocale = value
-            value
-        } else {
-            __customLocale = null
-            deviceDefaultLocale
-        }
+        writeCustomLocale(value)
+        val effective = value ?: deviceDefaultLocale
         return LocalAppLocaleInternal provides effective
     }
 }
