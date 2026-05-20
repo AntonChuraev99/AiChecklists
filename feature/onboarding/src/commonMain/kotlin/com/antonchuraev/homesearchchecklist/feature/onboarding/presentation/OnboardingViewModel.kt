@@ -16,23 +16,28 @@ class OnboardingViewModel(
     private val savedStateHandle: SavedStateHandle,
     private val navigator: AppNavigator,
     private val completeOnboardingUseCase: CompleteOnboardingUseCase,
-    private val analyticsTracker: AnalyticsTracker
+    private val analyticsTracker: AnalyticsTracker,
+    private val isDebugBuild: Boolean = false,
 ) : AppViewModel<OnboardingState, OnboardingIntent, Nothing>() {
 
     private val _screenState = MutableStateFlow(OnboardingState())
     override val screenState: StateFlow<OnboardingState> = _screenState.asStateFlow()
 
     init {
-        val alreadyTracked = savedStateHandle.get<Boolean>(KEY_STARTED_TRACKED) == true
-        if (!alreadyTracked) {
-            analyticsTracker.event("onboarding_started", mapOf("variant" to "slides"))
-            savedStateHandle[KEY_STARTED_TRACKED] = true
+        // Skip analytics when launched from the debug menu to avoid polluting
+        // production Amplitude data with developer test sessions.
+        if (!isDebugBuild) {
+            val alreadyTracked = savedStateHandle.get<Boolean>(KEY_STARTED_TRACKED) == true
+            if (!alreadyTracked) {
+                analyticsTracker.event("onboarding_started", mapOf("variant" to "slides"))
+                savedStateHandle[KEY_STARTED_TRACKED] = true
+            }
+            // Always track ViewModel creation for diagnostics (helps identify process death)
+            analyticsTracker.event("onboarding_vm_created", mapOf(
+                "variant" to "slides",
+                "is_restored" to alreadyTracked.toString()
+            ))
         }
-        // Always track ViewModel creation for diagnostics (helps identify process death)
-        analyticsTracker.event("onboarding_vm_created", mapOf(
-            "variant" to "slides",
-            "is_restored" to alreadyTracked.toString()
-        ))
     }
 
     override fun onIntent(intent: OnboardingIntent) {
@@ -63,13 +68,15 @@ class OnboardingViewModel(
         val wasSkipped = currentPage < totalPages - 1
 
         viewModelScope.launch {
-            if (wasSkipped) {
-                analyticsTracker.event("onboarding_skipped", mapOf(
-                    "variant" to "slides",
-                    "page" to currentPage.toString()
-                ))
+            if (!isDebugBuild) {
+                if (wasSkipped) {
+                    analyticsTracker.event("onboarding_skipped", mapOf(
+                        "variant" to "slides",
+                        "page" to currentPage.toString()
+                    ))
+                }
+                analyticsTracker.event("onboarding_completed", mapOf("variant" to "slides"))
             }
-            analyticsTracker.event("onboarding_completed", mapOf("variant" to "slides"))
             completeOnboardingUseCase()
             navigator.navigateToMainScreen(clearBackStack = true)
         }

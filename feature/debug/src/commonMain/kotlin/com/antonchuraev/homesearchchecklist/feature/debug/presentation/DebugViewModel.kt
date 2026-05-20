@@ -41,6 +41,7 @@ class DebugViewModel(
                 _screenState.value.copy(restoreCreditsResult = null)
             DebugScreenIntent.OpenInteractiveOnboarding -> appNavigator.navigateToInteractiveOnboarding()
             DebugScreenIntent.OpenScreenCatalog -> appNavigator.navigateToScreenCatalog()
+            DebugScreenIntent.OpenOnboardings -> appNavigator.navigateToOnboardings()
         }
     }
 

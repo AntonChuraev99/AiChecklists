@@ -406,6 +406,7 @@ class SplashViewModelTest {
         override fun navigateToCalendar() {}
         override fun navigateToAiChat() {}
         override fun navigateToScreenCatalog() {}
+        override fun navigateToOnboardings() {}
     }
 
     /**
@@ -444,6 +445,7 @@ class SplashViewModelTest {
         override fun navigateToCalendar() {}
         override fun navigateToAiChat() {}
         override fun navigateToScreenCatalog() {}
+        override fun navigateToOnboardings() {}
     }
 
     private class NoOpLogger : AppLogger {

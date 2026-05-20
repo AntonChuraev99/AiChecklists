@@ -14,6 +14,7 @@ import com.antonchuraev.homesearchchecklist.csat.ObservableAnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.datastore.api.UserAppDatastoreProvider
 import com.antonchuraev.homesearchchecklist.feature.user.data.device.DeviceIdProvider
 import org.koin.core.module.Module
+import org.koin.core.qualifier.named
 import org.koin.dsl.module
 
 /**
@@ -44,4 +45,10 @@ actual fun platformModule(): Module = module {
     // AttachmentOpener: Android implementation uses FileProvider + Intent.ACTION_VIEW.
     // iOS/wasmJs stubs return false (attachments unsupported until Phase 5/v2).
     single { AttachmentOpener() }
+
+    // Exposes AppBuildConfig.isDebug to feature modules that live in commonMain
+    // and cannot import AppBuildConfig directly (it is an expect object in :composeApp).
+    // Used by OnboardingViewModel / InteractiveOnboardingViewModel to suppress
+    // analytics events when launched from the debug menu.
+    single(named("isDebugBuild")) { AppBuildConfig.isDebug }
 }

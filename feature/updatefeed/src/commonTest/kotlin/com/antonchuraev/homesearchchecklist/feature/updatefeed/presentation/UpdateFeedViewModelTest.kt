@@ -111,6 +111,7 @@ class UpdateFeedViewModelTest {
         override fun navigateToCalendar() {}
         override fun navigateToAiChat() {}
         override fun navigateToScreenCatalog() {}
+        override fun navigateToOnboardings() {}
         override fun showWidgetInstruction() {}
         override fun requestCreateWeeklyChecklist() {}
     }

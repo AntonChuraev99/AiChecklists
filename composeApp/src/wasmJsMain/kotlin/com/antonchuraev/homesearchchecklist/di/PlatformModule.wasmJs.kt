@@ -10,6 +10,7 @@ import com.antonchuraev.homesearchchecklist.feature.analyze.data.config.GeminiCo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
 import com.antonchuraev.homesearchchecklist.feature.user.data.device.DeviceIdProvider
 import org.koin.core.module.Module
+import org.koin.core.qualifier.named
 import org.koin.dsl.module
 
 private object StubAnalyticsTracker : AnalyticsTracker {
@@ -45,4 +46,7 @@ actual fun platformModule(): Module = module {
 
     // AttachmentOpener: wasmJs stub — openExternally always returns false.
     single { AttachmentOpener() }
+
+    // wasmJs builds are always production (no debug menu), so isDebugBuild = false.
+    single(named("isDebugBuild")) { false }
 }

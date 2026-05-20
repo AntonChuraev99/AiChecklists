@@ -58,6 +58,7 @@ import com.antonchuraev.homesearchchecklist.feature.create.presentation.create.C
 import com.antonchuraev.homesearchchecklist.feature.create.presentation.preview.TemplatePreviewScreen
 import com.antonchuraev.homesearchchecklist.feature.create.presentation.templates.TemplatesScreen
 import com.antonchuraev.homesearchchecklist.feature.debug.presentation.DebugScreen
+import com.antonchuraev.homesearchchecklist.feature.debug.presentation.OnboardingsScreen
 import com.antonchuraev.homesearchchecklist.feature.debug.presentation.ScreenCatalogScreen
 import com.antonchuraev.homesearchchecklist.feature.debug.presentation.StoreScreenshotScreen
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.MainScreen
@@ -302,6 +303,10 @@ fun App() {
 
                     composable<AppNavRoute.ScreenCatalog> {
                         ScreenCatalogScreen()
+                    }
+
+                    composable<AppNavRoute.Onboardings> {
+                        OnboardingsScreen()
                     }
                 }
 
@@ -871,5 +876,7 @@ private fun NavController.handle(command: NavCommand) {
         }
 
         is NavCommand.ToScreenCatalog -> navigate(AppNavRoute.ScreenCatalog)
+
+        is NavCommand.ToOnboardings -> navigate(AppNavRoute.Onboardings)
     }
 }

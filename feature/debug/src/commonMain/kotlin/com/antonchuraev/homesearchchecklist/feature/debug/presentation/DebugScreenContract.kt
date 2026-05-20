@@ -26,5 +26,6 @@ sealed interface DebugScreenIntent : Intent {
     data object DismissRestoreCreditsResult : DebugScreenIntent
     data object OpenInteractiveOnboarding : DebugScreenIntent
     data object OpenScreenCatalog : DebugScreenIntent
+    data object OpenOnboardings : DebugScreenIntent
 }
 

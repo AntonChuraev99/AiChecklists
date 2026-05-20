@@ -645,6 +645,15 @@
     <string name="debug_interactive_onboarding">Интерактивный онбординг</string>
     <string name="debug_interactive_onboarding_description">Открыть новый интерактивный онбординг</string>
 
+    <!-- Экран онбордингов (debug) -->
+    <string name="debug_onboardings_title">Онбординги</string>
+    <string name="debug_onboardings_description">Запустить любой вариант онбординга</string>
+    <string name="debug_onboardings_section_variants">Варианты</string>
+    <string name="debug_onboardings_interactive_title">Интерактивный онбординг</string>
+    <string name="debug_onboardings_interactive_desc">Шаги: категория → стиль → шаблон</string>
+    <string name="debug_onboardings_slides_title">Слайдовый онбординг</string>
+    <string name="debug_onboardings_slides_desc">3 слайда + paywall</string>
+
     <!-- Каталог экранов -->
     <string name="debug_catalog_title">Каталог экранов</string>
     <string name="debug_catalog_entry_description">Просмотр всех экранов приложения (для скриншот-тестов)</string>

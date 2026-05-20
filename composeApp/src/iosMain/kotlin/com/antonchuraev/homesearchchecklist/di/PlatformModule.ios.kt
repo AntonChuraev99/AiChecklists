@@ -10,6 +10,7 @@ import com.antonchuraev.homesearchchecklist.feature.analyze.data.config.GeminiCo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
 import com.antonchuraev.homesearchchecklist.feature.user.data.device.DeviceIdProvider
 import org.koin.core.module.Module
+import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import platform.Foundation.NSBundle
 
@@ -48,4 +49,7 @@ actual fun platformModule(): Module = module {
 
     // AttachmentOpener: iOS stub — openExternally always returns false (Phase 5).
     single { AttachmentOpener() }
+
+    // iOS builds are always production (no debug menu), so isDebugBuild = false.
+    single(named("isDebugBuild")) { false }
 }

@@ -104,4 +104,6 @@ class AppNavigatorImpl : AppNavigator {
     override fun navigateToAiChat() = emit(NavCommand.ToAiChat)
 
     override fun navigateToScreenCatalog() = emit(NavCommand.ToScreenCatalog)
+
+    override fun navigateToOnboardings() = emit(NavCommand.ToOnboardings)
 }

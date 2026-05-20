@@ -57,6 +57,7 @@ class UpdateFeedDeepLinkHandlerTest {
         override fun navigateToCalendar() { calendarCallCount++ }
         override fun navigateToAiChat() { aiChatCallCount++ }
         override fun navigateToScreenCatalog() {}
+        override fun navigateToOnboardings() {}
         override fun showWidgetInstruction() { widgetInstructionCallCount++ }
         override fun requestCreateWeeklyChecklist() { requestCreateWeeklyChecklistCount++ }
     }

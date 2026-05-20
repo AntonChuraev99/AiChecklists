@@ -36,7 +36,8 @@ class InteractiveOnboardingViewModel(
     private val checklistRepository: ChecklistRepository,
     private val analyticsTracker: AnalyticsTracker,
     private val reminderScheduler: ChecklistReminderScheduler,
-    private val checklistFormatter: ChecklistFormatter
+    private val checklistFormatter: ChecklistFormatter,
+    private val isDebugBuild: Boolean = false,
 ) : AppViewModel<InteractiveOnboardingState, InteractiveOnboardingIntent, Nothing>() {
 
     private val _screenState = MutableStateFlow(InteractiveOnboardingState())
@@ -48,16 +49,20 @@ class InteractiveOnboardingViewModel(
         viewModelScope.launch {
             allTemplates = templatesRepository.getTemplates()
         }
-        val alreadyTracked = savedStateHandle.get<Boolean>(KEY_STARTED_TRACKED) == true
-        if (!alreadyTracked) {
-            analyticsTracker.event("onboarding_started", mapOf("variant" to "interactive"))
-            savedStateHandle[KEY_STARTED_TRACKED] = true
+        // Skip analytics when launched from the debug menu to avoid polluting
+        // production Amplitude data with developer test sessions.
+        if (!isDebugBuild) {
+            val alreadyTracked = savedStateHandle.get<Boolean>(KEY_STARTED_TRACKED) == true
+            if (!alreadyTracked) {
+                analyticsTracker.event("onboarding_started", mapOf("variant" to "interactive"))
+                savedStateHandle[KEY_STARTED_TRACKED] = true
+            }
+            // Always track ViewModel creation for diagnostics (helps identify process death)
+            analyticsTracker.event("onboarding_vm_created", mapOf(
+                "variant" to "interactive",
+                "is_restored" to alreadyTracked.toString()
+            ))
         }
-        // Always track ViewModel creation for diagnostics (helps identify process death)
-        analyticsTracker.event("onboarding_vm_created", mapOf(
-            "variant" to "interactive",
-            "is_restored" to alreadyTracked.toString()
-        ))
     }
 
     override fun onIntent(intent: InteractiveOnboardingIntent) {
@@ -365,7 +370,7 @@ class InteractiveOnboardingViewModel(
             }
             state.copy(preview = state.preview.copy(items = updatedItems))
         }
-        analyticsTracker.event(
+        if (!isDebugBuild) analyticsTracker.event(
             "onboarding_preview_item_toggled",
             mapOf(
                 "auto_delete" to _screenState.value.autoDeleteCompleted.toString(),
@@ -422,7 +427,7 @@ class InteractiveOnboardingViewModel(
                         currentStep = InteractiveOnboardingStep.Paywall
                     )
                 }
-                analyticsTracker.event(
+                if (!isDebugBuild) analyticsTracker.event(
                     "onboarding_checklist_error",
                     mapOf("error" to e.message.orEmpty())
                 )
@@ -432,7 +437,7 @@ class InteractiveOnboardingViewModel(
 
     private fun handleSkip() {
         val state = _screenState.value
-        analyticsTracker.event(
+        if (!isDebugBuild) analyticsTracker.event(
             "onboarding_skipped",
             mapOf("variant" to "interactive", "step" to state.currentStep.name)
         )
@@ -522,7 +527,7 @@ class InteractiveOnboardingViewModel(
                 }
                 trackStep("discover_more_reminder", "type" to "once")
             } catch (e: Exception) {
-                analyticsTracker.event(
+                if (!isDebugBuild) analyticsTracker.event(
                     "onboarding_reminder_error",
                     mapOf("error" to e.message.orEmpty())
                 )
@@ -608,14 +613,14 @@ class InteractiveOnboardingViewModel(
                     )
                 }
 
-                analyticsTracker.event("repeat_schedule_set", buildMap {
+                if (!isDebugBuild) analyticsTracker.event("repeat_schedule_set", buildMap {
                     put("type", rule.type.name)
                     put("interval", rule.interval.toString())
                     put("preset", resolvePresetName(config))
                     put("source", "onboarding")
                 })
             } catch (e: Exception) {
-                analyticsTracker.event(
+                if (!isDebugBuild) analyticsTracker.event(
                     "onboarding_reminder_error",
                     mapOf("error" to e.message.orEmpty())
                 )
@@ -674,13 +679,15 @@ class InteractiveOnboardingViewModel(
 
     fun completeOnboarding() {
         viewModelScope.launch {
-            analyticsTracker.event(
-                "onboarding_completed",
-                mapOf(
-                    "variant" to "interactive",
-                    "checklist_created" to _screenState.value.checklistCreated.toString()
+            if (!isDebugBuild) {
+                analyticsTracker.event(
+                    "onboarding_completed",
+                    mapOf(
+                        "variant" to "interactive",
+                        "checklist_created" to _screenState.value.checklistCreated.toString()
+                    )
                 )
-            )
+            }
             completeOnboardingUseCase()
             navigator.navigateToMainScreen(clearBackStack = true)
         }
@@ -704,6 +711,7 @@ class InteractiveOnboardingViewModel(
     }
 
     private fun trackStep(stepName: String, vararg params: Pair<String, String>) {
+        if (isDebugBuild) return
         val baseParams = mutableMapOf("variant" to "interactive", "step" to stepName)
         params.forEach { baseParams[it.first] = it.second }
         analyticsTracker.event("onboarding_step_completed", baseParams)

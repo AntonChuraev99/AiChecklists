@@ -81,4 +81,7 @@ sealed interface AppNavRoute {
 
     @Serializable
     data object AiChat : AppNavRoute
+
+    @Serializable
+    data object Onboardings : AppNavRoute
 }

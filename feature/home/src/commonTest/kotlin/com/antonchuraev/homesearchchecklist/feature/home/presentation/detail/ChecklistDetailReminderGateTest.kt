@@ -308,6 +308,7 @@ class ChecklistDetailReminderGateTest {
         override fun navigateToCalendar() {}
         override fun navigateToAiChat() {}
         override fun navigateToScreenCatalog() {}
+        override fun navigateToOnboardings() {}
     }
 
     private class FakeRemoteConfigProvider : RemoteConfigProvider {

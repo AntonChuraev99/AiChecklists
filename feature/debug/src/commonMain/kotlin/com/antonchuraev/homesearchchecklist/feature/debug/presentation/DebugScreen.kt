@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.PlayCircleFilled
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.ThumbUp
@@ -116,6 +117,13 @@ fun DebugScreen(
             stringResource(Res.string.debug_interactive_onboarding_description)
         ) {
             viewModel.sendIntent(DebugScreenIntent.OpenInteractiveOnboarding)
+        },
+        DebugItem(
+            Icons.Default.PlayCircleFilled,
+            stringResource(Res.string.debug_onboardings_title),
+            stringResource(Res.string.debug_onboardings_description)
+        ) {
+            viewModel.sendIntent(DebugScreenIntent.OpenOnboardings)
         }
     )
 

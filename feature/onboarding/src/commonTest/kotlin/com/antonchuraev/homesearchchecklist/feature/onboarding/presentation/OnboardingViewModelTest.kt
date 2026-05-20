@@ -69,6 +69,20 @@ class OnboardingViewModelTest {
     }
 
     @Test
+    fun init_inDebugMode_doesNotTrackOnboardingStarted() = runTest {
+        OnboardingViewModel(
+            savedStateHandle = androidx.lifecycle.SavedStateHandle(),
+            navigator = fakeNavigator,
+            completeOnboardingUseCase = CompleteOnboardingUseCase(fakeUserDataRepository),
+            analyticsTracker = fakeAnalyticsTracker,
+            isDebugBuild = true,
+        )
+
+        assertTrue(!fakeAnalyticsTracker.hasEvent("onboarding_started"))
+        assertTrue(!fakeAnalyticsTracker.hasEvent("onboarding_vm_created"))
+    }
+
+    @Test
     fun initialState_isFirstPage() = runTest {
         val vm = createViewModel()
 
@@ -169,6 +183,7 @@ class OnboardingViewModelTest {
         override fun navigateToCalendar() {}
         override fun navigateToAiChat() {}
         override fun navigateToScreenCatalog() {}
+        override fun navigateToOnboardings() {}
     }
 
     private class FakeUserDataRepository : UserDataRepository {

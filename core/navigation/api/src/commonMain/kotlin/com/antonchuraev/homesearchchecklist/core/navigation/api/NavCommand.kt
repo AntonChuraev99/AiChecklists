@@ -71,4 +71,6 @@ sealed interface NavCommand {
     data object ToAiChat : NavCommand
 
     data object ToScreenCatalog : NavCommand
+
+    data object ToOnboardings : NavCommand
 }

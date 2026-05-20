@@ -419,6 +419,7 @@ class CreateChecklistViewModelTest {
         override fun navigateToCalendar() {}
         override fun navigateToAiChat() {}
         override fun navigateToScreenCatalog() {}
+        override fun navigateToOnboardings() {}
     }
 
     private class RecordingAnalyticsTracker : AnalyticsTracker {

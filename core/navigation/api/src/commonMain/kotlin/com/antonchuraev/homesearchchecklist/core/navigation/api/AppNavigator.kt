@@ -95,4 +95,6 @@ interface AppNavigator {
     fun navigateToAiChat()
 
     fun navigateToScreenCatalog()
+
+    fun navigateToOnboardings()
 }

@@ -153,6 +153,24 @@ class InteractiveOnboardingViewModelTest {
         assertEquals("interactive", fakeAnalyticsTracker.getEventParam("onboarding_started", "variant"))
     }
 
+    @Test
+    fun init_inDebugMode_doesNotTrackOnboardingStarted() = runTest {
+        InteractiveOnboardingViewModel(
+            savedStateHandle = androidx.lifecycle.SavedStateHandle(),
+            navigator = fakeNavigator,
+            completeOnboardingUseCase = CompleteOnboardingUseCase(fakeUserDataRepository),
+            templatesRepository = fakeTemplatesRepository,
+            checklistRepository = fakeChecklistRepository,
+            analyticsTracker = fakeAnalyticsTracker,
+            reminderScheduler = fakeReminderScheduler,
+            checklistFormatter = checklistFormatter,
+            isDebugBuild = true,
+        )
+
+        assertTrue(!fakeAnalyticsTracker.hasEvent("onboarding_started"))
+        assertTrue(!fakeAnalyticsTracker.hasEvent("onboarding_vm_created"))
+    }
+
     // --- Category selection ---
 
     @Test
@@ -1241,6 +1259,7 @@ class InteractiveOnboardingViewModelTest {
         override fun navigateToCalendar() {}
         override fun navigateToAiChat() {}
         override fun navigateToScreenCatalog() {}
+        override fun navigateToOnboardings() {}
     }
 
     private class FakeUserDataRepository : UserDataRepository {
