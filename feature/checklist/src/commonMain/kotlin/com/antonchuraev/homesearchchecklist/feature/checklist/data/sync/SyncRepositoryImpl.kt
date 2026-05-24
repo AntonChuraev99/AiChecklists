@@ -2,6 +2,7 @@ package com.antonchuraev.homesearchchecklist.feature.checklist.data.sync
 
 import com.antonchuraev.homesearchchecklist.core.auth.api.GoogleAuthRepository
 import com.antonchuraev.homesearchchecklist.core.auth.api.GoogleAuthState
+import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.AppResult
 import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistDao
@@ -35,7 +36,12 @@ class SyncRepositoryImpl(
     private val firestoreDataSource: FirestoreSyncDataSource,
     private val authRepository: GoogleAuthRepository,
     private val scope: CoroutineScope,
+    private val logger: AppLogger,
 ) : SyncRepository {
+
+    companion object {
+        private const val TAG = "Sync"
+    }
 
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -54,13 +60,13 @@ class SyncRepositoryImpl(
             .onEach { state ->
                 when (state) {
                     is GoogleAuthState.Authenticated -> {
-                        log("auth: authenticated uid=${state.user.firebaseUid}")
+                        logInfo("auth: authenticated uid=${state.user.firebaseUid}")
                         _syncState.value = SyncState.Idle
                         scope.launch { onUserAuthenticated(state.user.firebaseUid) }
                     }
                     is GoogleAuthState.Loading -> log("auth: loading...")
                     is GoogleAuthState.Error -> {
-                        log("auth: error=${state.message}")
+                        logError("auth: error=${state.message}")
                         _syncState.value = SyncState.Disabled
                         stopListening()
                     }
@@ -112,7 +118,7 @@ class SyncRepositoryImpl(
                         fills.forEach { fillDao.markSynced(it.id, updatedAt = currentTimeMillis()) }
                         log("push: '${entity.name}' synced OK")
                     } else if (result is AppResult.Error) {
-                        log("push: '${entity.name}' FAILED: ${result.exception.message}")
+                        logError("push: '${entity.name}' FAILED: ${result.exception.message}", result.exception)
                     }
                 }
             }
@@ -126,10 +132,10 @@ class SyncRepositoryImpl(
             }
 
             _syncState.value = SyncState.Idle
-            log("push: complete")
+            logInfo("push: complete")
             AppResult.Success(Unit)
         } catch (e: Exception) {
-            log("push: ERROR ${e.message}")
+            logError("push: ERROR ${e.message}", e)
             _syncState.value = SyncState.Error(e.message ?: "Sync failed")
             AppResult.Error(e)
         }
@@ -156,9 +162,9 @@ class SyncRepositoryImpl(
                 if (result is AppResult.Success) {
                     val now = currentTimeMillis()
                     allChecklists.forEach { checklistDao.markSynced(it.id, updatedAt = now) }
-                    log("initialUpload: batch OK, all marked synced")
+                    logInfo("initialUpload: batch OK, all marked synced")
                 } else if (result is AppResult.Error) {
-                    log("initialUpload: batch FAILED: ${result.exception.message}")
+                    logError("initialUpload: batch FAILED: ${result.exception.message}", result.exception)
                 }
             } else {
                 log("initialUpload: no checklists to upload")
@@ -167,7 +173,7 @@ class SyncRepositoryImpl(
             _syncState.value = SyncState.Idle
             AppResult.Success(Unit)
         } catch (e: Exception) {
-            log("initialUpload: ERROR ${e.message}")
+            logError("initialUpload: ERROR ${e.message}", e)
             _syncState.value = SyncState.Error(e.message ?: "Initial upload failed")
             AppResult.Error(e)
         }
@@ -189,14 +195,14 @@ class SyncRepositoryImpl(
                     AppResult.Success(Unit)
                 }
                 is AppResult.Error -> {
-                    log("pull: FAILED: ${result.exception.message}")
+                    logError("pull: FAILED: ${result.exception.message}", result.exception)
                     _syncState.value = SyncState.Error(result.exception.message ?: "Pull failed")
                     result
                 }
                 is AppResult.Loading -> AppResult.Loading
             }
         } catch (e: Exception) {
-            log("pull: ERROR ${e.message}")
+            logError("pull: ERROR ${e.message}", e)
             _syncState.value = SyncState.Error(e.message ?: "Pull failed")
             AppResult.Error(e)
         }
@@ -225,13 +231,13 @@ class SyncRepositoryImpl(
     }
 
     private suspend fun onUserAuthenticated(userId: String) {
-        log("onAuth: starting sync pipeline for uid=$userId")
+        logInfo("onAuth: starting sync pipeline for uid=$userId")
         checklistDao.assignUserIdToAll(userId)
         fillDao.assignUserIdToAll(userId)
         initialUpload()
         pullAndMerge()
         startListening()
-        log("onAuth: sync pipeline started")
+        logInfo("onAuth: sync pipeline started")
     }
 
     private suspend fun mergeRemoteChecklist(remote: ChecklistSyncData) {
@@ -260,9 +266,9 @@ class SyncRepositoryImpl(
         }
     }
 
-    private fun log(msg: String) {
-        println("[Sync] $msg")
-    }
+    private fun log(msg: String) = logger.debug(TAG, msg)
+    private fun logInfo(msg: String) = logger.info(TAG, msg)
+    private fun logError(msg: String, e: Throwable? = null) = logger.error(TAG, msg, e)
 
     // ── Mapping helpers ──
 
