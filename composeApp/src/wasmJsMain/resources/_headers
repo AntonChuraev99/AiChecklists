@@ -8,7 +8,7 @@
 #   - Compose resources (fixed names) → 1 day with revalidation.
 
 /*
-  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Opener-Policy: same-origin-allow-popups
   Cross-Origin-Embedder-Policy: require-corp
   Cross-Origin-Resource-Policy: cross-origin
   X-Content-Type-Options: nosniff
