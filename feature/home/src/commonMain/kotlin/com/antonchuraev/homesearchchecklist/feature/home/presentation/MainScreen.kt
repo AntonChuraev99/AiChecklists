@@ -43,6 +43,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.done
 import aichecklists.core.designsystem.generated.resources.google_sign_in_failed
+import aichecklists.core.designsystem.generated.resources.google_sign_in_required
 import aichecklists.core.designsystem.generated.resources.google_sign_in_success
 import aichecklists.core.designsystem.generated.resources.main_action_ai_chat
 import aichecklists.core.designsystem.generated.resources.main_create_checklist
@@ -86,6 +87,7 @@ fun MainScreen(
     // LaunchedEffect below can call showSnackbar without a @Composable context.
     val msgSignInSuccess = stringResource(Res.string.google_sign_in_success)
     val msgSignInFailed = stringResource(Res.string.google_sign_in_failed)
+    val msgSignInRequired = stringResource(Res.string.google_sign_in_required)
 
     LaunchedEffect(viewModel) {
         viewModel.sideEffect.collect { effect ->
@@ -94,9 +96,13 @@ fun MainScreen(
                     val text = when (effect.messageKey) {
                         "google_sign_in_success" -> msgSignInSuccess
                         "google_sign_in_failed" -> msgSignInFailed
+                        "google_sign_in_required" -> msgSignInRequired
                         else -> effect.messageKey
                     }
                     snackbarHostState.showSnackbar(text)
+                }
+                MainScreenSideEffect.NavigateToAiChat -> {
+                    onNavigateToAiChat?.invoke()
                 }
             }
         }
@@ -173,7 +179,7 @@ fun MainScreen(
                     // вертикально расположены а не в ряду»).
                     if (onNavigateToAiChat != null) {
                         FilledTonalButton(
-                            onClick = onNavigateToAiChat,
+                            onClick = { viewModel.sendIntent(MainScreenIntent.OnAiChatClick) },
                             modifier = Modifier.fillMaxWidth(),
                             shape = MaterialTheme.shapes.small,
                             colors = ButtonDefaults.filledTonalButtonColors(

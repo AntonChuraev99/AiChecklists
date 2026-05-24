@@ -7,9 +7,13 @@ import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
 import com.antonchuraev.homesearchchecklist.core.common.api.formatExpirationDate
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.SyncRepository
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.SubscriptionStatus
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.UserLimits
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetSubscriptionStatusUseCase
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetUserLimitsUseCase
 import com.antonchuraev.homesearchchecklist.feature.user.data.device.getPlatformName
+import com.antonchuraev.homesearchchecklist.feature.user.domain.model.UserData
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -34,6 +38,7 @@ class MainScreenViewModel(
     private val getUserLimitsUseCase: GetUserLimitsUseCase,
     private val analyticsTracker: AnalyticsTracker,
     private val googleAuthRepository: GoogleAuthRepository,
+    private val syncRepository: SyncRepository,
 ) : AppViewModel<MainScreenState, MainScreenIntent, MainScreenSideEffect>() {
 
     private val _showLimitDialog = MutableStateFlow(false)
@@ -45,6 +50,14 @@ class MainScreenViewModel(
         syncUserProperties()
         viewModelScope.launch {
             googleAuthRepository.restoreSession()
+        }
+        // Push pending sync changes whenever the checklist list changes.
+        // SyncRepository.pushPendingChanges() is a no-op when not signed in
+        // (SyncState.Disabled), so this is safe to run unconditionally.
+        viewModelScope.launch {
+            repository.checklists.collect {
+                syncRepository.pushPendingChanges()
+            }
         }
     }
 
@@ -71,7 +84,7 @@ class MainScreenViewModel(
         getSubscriptionStatusUseCase(),
         userDataRepository.getUserDataFlow(),
         getUserLimitsUseCase(),
-        _showLimitDialog
+        _showLimitDialog,
     ) { checklists, subscriptionStatus, userData, userLimits, showLimitDialog ->
         MainScreenState.Success(
             checklists = checklists,
@@ -92,7 +105,10 @@ class MainScreenViewModel(
         when (intent) {
             MainScreenIntent.OnAddChecklistClick -> handleAddChecklistClick()
             MainScreenIntent.OnAddChecklistFromTemplatesClick -> handleAddChecklistFromTemplatesClick()
-            MainScreenIntent.OnAiAnalyzeClick -> appNavigator.navigateToAnalyzeScreen()
+            MainScreenIntent.OnAiAnalyzeClick -> handleAiFeatureClick { appNavigator.navigateToAnalyzeScreen() }
+            MainScreenIntent.OnAiChatClick -> handleAiFeatureClick {
+                viewModelScope.launch { _sideEffect.emit(MainScreenSideEffect.NavigateToAiChat) }
+            }
             is MainScreenIntent.OnChecklistClick -> appNavigator.navigateToChecklistDetail(intent.checklistWithProgress.checklist.id)
             MainScreenIntent.OnPremiumBannerClick -> handlePremiumOrCreditsClick()
             MainScreenIntent.OnCreditsClick -> handlePremiumOrCreditsClick()
@@ -108,6 +124,23 @@ class MainScreenViewModel(
             MainScreenIntent.OnSignInClick -> handleSignInClick()
             MainScreenIntent.OnSignOutClick -> handleSignOutClick()
         }
+    }
+
+    /**
+     * Gates AI feature actions on web: when not signed in with Google on the
+     * web platform, shows a "sign in required" snackbar and does not proceed.
+     * On Android/iOS, proceeds unconditionally.
+     */
+    private fun handleAiFeatureClick(onAllowed: () -> Unit) {
+        val state = screenState.value as? MainScreenState.Success
+        val isWeb = getPlatformName() == "web"
+        if (isWeb && state?.isGoogleLinked == false) {
+            viewModelScope.launch {
+                _sideEffect.emit(MainScreenSideEffect.ShowSnackbar("google_sign_in_required"))
+            }
+            return
+        }
+        onAllowed()
     }
 
     private fun handleAddChecklistClick() {
@@ -174,7 +207,9 @@ class MainScreenViewModel(
 
     private fun handleSignOutClick() {
         viewModelScope.launch {
+            syncRepository.stopListening()
             googleAuthRepository.signOut()
+            userDataRepository.clearGoogleAccountData()
         }
     }
 }

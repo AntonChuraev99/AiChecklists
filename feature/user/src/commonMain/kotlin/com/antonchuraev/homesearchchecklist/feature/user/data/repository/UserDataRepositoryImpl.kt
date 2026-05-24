@@ -233,6 +233,13 @@ class UserDataRepositoryImpl(
         }
     }
 
+    override suspend fun clearGoogleAccountData() {
+        appDatastore.saveString(GOOGLE_EMAIL_KEY, "")
+        appDatastore.saveString(GOOGLE_DISPLAY_NAME_KEY, "")
+        appDatastore.saveString(GOOGLE_PHOTO_URL_KEY, "")
+        appDatastore.saveBoolean(IS_GOOGLE_LINKED_KEY, false)
+    }
+
     override suspend fun getFirstLaunchAtMillis(): Long {
         return appDatastore.observeString(FIRST_LAUNCH_AT_KEY, "").first().toLongOrNull() ?: 0L
     }

@@ -12,9 +12,7 @@ data class Checklist(
     val id: Long = 0L,
     val name: String,
     val items: List<ChecklistItem>,
-    // One-shot reminder (independent of repeat)
     val reminderAt: Long? = null,
-    // Recurring repeat schedule (independent of reminder)
     val repeatRule: ReminderRepeatRule? = null,
     val repeatTimeOfDayMinutes: Int? = null,
     val repeatNextAt: Long? = null,
@@ -22,8 +20,12 @@ data class Checklist(
     val separateCompleted: Boolean = false,
     val position: Int = 0,
     val autoDeleteCompleted: Boolean = false,
-    // View mode: Standard (flat list) or Weekly (items grouped by weekday)
-    val viewMode: ChecklistViewMode = ChecklistViewMode.Standard
+    val viewMode: ChecklistViewMode = ChecklistViewMode.Standard,
+    val cloudId: String? = null,
+    val userId: String? = null,
+    val updatedAt: Long = 0L,
+    val syncStatus: Int = 0,
+    val isDeleted: Boolean = false,
 )
 
 /**
@@ -76,7 +78,12 @@ data class ChecklistFill(
     val coverImagePath: String? = null,
     val items: List<ChecklistFillItem>,
     val createdAt: Long = 0L,
-    val isDefault: Boolean = false
+    val isDefault: Boolean = false,
+    val cloudId: String? = null,
+    val userId: String? = null,
+    val updatedAt: Long = 0L,
+    val syncStatus: Int = 0,
+    val isDeleted: Boolean = false,
 )
 
 /**

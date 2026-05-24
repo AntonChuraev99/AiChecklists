@@ -5,6 +5,8 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentOpener
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStorage
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePort
 import com.antonchuraev.homesearchchecklist.csat.ObservableAnalyticsTracker
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.FirestoreSyncDataSource
+import com.antonchuraev.homesearchchecklist.sync.IosFirestoreSyncDataSource
 import com.antonchuraev.homesearchchecklist.core.datastore.api.UserAppDatastoreProvider
 import com.antonchuraev.homesearchchecklist.feature.analyze.data.config.GeminiConfig
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
@@ -48,4 +50,6 @@ actual fun platformModule(): Module = module {
 
     // AttachmentOpener: iOS stub — openExternally always returns false (Phase 5).
     single { AttachmentOpener() }
+
+    single<FirestoreSyncDataSource> { IosFirestoreSyncDataSource() }
 }

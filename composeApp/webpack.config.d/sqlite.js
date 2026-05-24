@@ -1,17 +1,7 @@
-// Required COOP/COEP headers for OPFS (Origin Private File System) access.
-// WebWorkerSQLiteDriver uses OPFS for persistence, which requires SharedArrayBuffer,
-// which in turn requires cross-origin isolation via these headers.
+// SAH Pool VFS (migrated in ba2b585d) does NOT require SharedArrayBuffer,
+// so COOP/COEP headers are no longer needed. Removing them unblocks
+// Firebase Auth signInWithPopup() — COOP: same-origin prevents the SDK
+// from polling popup.closed, causing the auth handler to hang.
 //
-// CORP (Cross-Origin-Resource-Policy) is also required because COEP=require-corp
-// rejects any resource without an explicit CORP header. Compose's wasm/asset bundles
-// otherwise fail to load with "blocked by CORP" or wasm streaming truncation errors.
-;(function(config) {
-    if (config.devServer) {
-        config.devServer.headers = config.devServer.headers || [];
-        config.devServer.headers.push(
-            { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
-            { key: 'Cross-Origin-Embedder-Policy', value: 'require-corp' },
-            { key: 'Cross-Origin-Resource-Policy', value: 'cross-origin' }
-        );
-    }
-})(config);
+// The "Ignoring inability to install OPFS sqlite3_vfs" warning in console
+// is expected and harmless — SAH Pool VFS is the active driver.

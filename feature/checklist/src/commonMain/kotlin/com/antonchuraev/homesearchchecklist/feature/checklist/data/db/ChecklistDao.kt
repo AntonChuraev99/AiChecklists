@@ -12,14 +12,37 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ChecklistDao {
-    @Query("SELECT * FROM checklists ORDER BY position ASC")
+    @Query("SELECT * FROM checklists WHERE isDeleted = 0 ORDER BY position ASC")
     fun observeChecklists(): Flow<List<ChecklistEntity>>
 
-    @Query("SELECT * FROM checklists WHERE id = :id")
+    @Query("SELECT * FROM checklists WHERE id = :id AND isDeleted = 0")
     suspend fun getById(id: Long): ChecklistEntity?
 
     @Query("SELECT * FROM checklists WHERE id = :id")
     fun observeChecklistById(id: Long): Flow<ChecklistEntity?>
+
+    // ─── Sync ───
+
+    @Query("SELECT * FROM checklists WHERE syncStatus != 0")
+    suspend fun getPendingSync(): List<ChecklistEntity>
+
+    @Query("SELECT * FROM checklists WHERE cloudId = :cloudId")
+    suspend fun getByCloudId(cloudId: String): ChecklistEntity?
+
+    @Query("UPDATE checklists SET syncStatus = :status WHERE id = :id")
+    suspend fun updateSyncStatus(id: Long, status: Int)
+
+    @Query("UPDATE checklists SET syncStatus = :status, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun markSynced(id: Long, status: Int = 0, updatedAt: Long)
+
+    @Query("UPDATE checklists SET userId = :userId WHERE userId IS NULL")
+    suspend fun assignUserIdToAll(userId: String)
+
+    @Query("SELECT * FROM checklists WHERE isDeleted = 0 ORDER BY position ASC")
+    suspend fun getAllActive(): List<ChecklistEntity>
+
+    @Query("UPDATE checklists SET isDeleted = 1, syncStatus = 2, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun softDelete(id: Long, updatedAt: Long)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(checklist: ChecklistEntity): Long
@@ -42,7 +65,7 @@ interface ChecklistDao {
     @Query("UPDATE checklists SET position = position + 1")
     suspend fun incrementAllPositions()
 
-    @Query("SELECT * FROM checklists ORDER BY position ASC")
+    @Query("SELECT * FROM checklists WHERE isDeleted = 0 ORDER BY position ASC")
     suspend fun getAllOrderedByPosition(): List<ChecklistEntity>
 
     // ─── One-shot reminders ───
