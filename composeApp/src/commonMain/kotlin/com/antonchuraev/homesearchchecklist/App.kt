@@ -18,6 +18,7 @@ import com.antonchuraev.homesearchchecklist.settings.presentation.SettingsScreen
 import com.antonchuraev.homesearchchecklist.feature.updatefeed.presentation.components.WidgetInstructionOverlay
 import com.antonchuraev.homesearchchecklist.navigation.AppNavigationDrawerContent
 import com.antonchuraev.homesearchchecklist.navigation.DrawerDestination
+import com.antonchuraev.homesearchchecklist.gestures.ApplyEdgeSwipeExclusion
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -260,18 +261,28 @@ fun App() {
                             }
                         }
                     ) {
-                        MainScreen(
-                            drawerState = drawerState,
-                            isEditMode = isEditMode,
-                            onEditModeChange = { isEditMode = it },
-                            onNavigateToAiChat = {
-                                if (navConsumed) return@MainScreen
-                                navConsumed = true
-                                navController.navigate(AppNavRoute.AiChat) {
-                                    launchSingleTop = true
-                                }
-                            },
+                        // Reserve the left ~48dp as our own gesture area so
+                        // Android's edge swipe-back doesn't steal swipes meant
+                        // for opening the ModalNavigationDrawer.
+                        // Disabled while drawer is open (it owns the full
+                        // screen) or in edit mode (drag-reorder conflict).
+                        ApplyEdgeSwipeExclusion(
+                            enabled = drawerState.isClosed && !isEditMode
                         )
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            MainScreen(
+                                drawerState = drawerState,
+                                isEditMode = isEditMode,
+                                onEditModeChange = { isEditMode = it },
+                                onNavigateToAiChat = {
+                                    if (navConsumed) return@MainScreen
+                                    navConsumed = true
+                                    navController.navigate(AppNavRoute.AiChat) {
+                                        launchSingleTop = true
+                                    }
+                                },
+                            )
+                        }
                     }
                 }
 
