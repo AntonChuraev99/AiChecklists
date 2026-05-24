@@ -15,6 +15,7 @@ import com.antonchuraev.homesearchchecklist.core.datastore.api.ThemeRepository
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppLocaleEnvironment
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppTheme
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.customAppLocale
+import com.antonchuraev.homesearchchecklist.feature.user.data.device.getPlatformName
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.UserData
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import com.antonchuraev.homesearchchecklist.settings.presentation.SettingsScreen
@@ -139,6 +140,18 @@ fun App() {
             .collectAsStateWithLifecycle(initialValue = UserData())
 
         val scope = rememberCoroutineScope()
+
+        val handleSignIn: () -> Unit = {
+            scope.launch {
+                googleAuthRepository.signInWithGoogle().onSuccess { user ->
+                    val idToken = googleAuthRepository.getIdToken() ?: return@launch
+                    userDataRepository.linkGoogleAccount(
+                        idToken = idToken,
+                        platform = getPlatformName(),
+                    )
+                }
+            }
+        }
 
         val csatViewModel: CsatViewModel = koinInject()
         val csatState by csatViewModel.screenState.collectAsState()
@@ -268,11 +281,7 @@ fun App() {
                                     isGoogleLinked = userData.isGoogleLinked,
                                     googleEmail = userData.googleEmail,
                                     googleDisplayName = userData.googleDisplayName,
-                                    onSignInClick = {
-                                        // Sign-in is triggered via MainScreenViewModel from the content,
-                                        // but the drawer also needs a route — navigate to main first
-                                        // then the ViewModel intent handles the flow.
-                                    },
+                                    onSignInClick = handleSignIn,
                                     onSignOutClick = {
                                         scope.launch { googleAuthRepository.signOut() }
                                     },
@@ -431,7 +440,7 @@ fun App() {
                                     isGoogleLinked = userData.isGoogleLinked,
                                     googleEmail = userData.googleEmail,
                                     googleDisplayName = userData.googleDisplayName,
-                                    onSignInClick = {},
+                                    onSignInClick = handleSignIn,
                                     onSignOutClick = {
                                         scope.launch { googleAuthRepository.signOut() }
                                     },
@@ -511,7 +520,7 @@ fun App() {
                                     isGoogleLinked = userData.isGoogleLinked,
                                     googleEmail = userData.googleEmail,
                                     googleDisplayName = userData.googleDisplayName,
-                                    onSignInClick = {},
+                                    onSignInClick = handleSignIn,
                                     onSignOutClick = {
                                         scope.launch { googleAuthRepository.signOut() }
                                     },
@@ -591,7 +600,7 @@ fun App() {
                                     isGoogleLinked = userData.isGoogleLinked,
                                     googleEmail = userData.googleEmail,
                                     googleDisplayName = userData.googleDisplayName,
-                                    onSignInClick = {},
+                                    onSignInClick = handleSignIn,
                                     onSignOutClick = {
                                         scope.launch { googleAuthRepository.signOut() }
                                     },
@@ -673,7 +682,7 @@ fun App() {
                                     isGoogleLinked = userData.isGoogleLinked,
                                     googleEmail = userData.googleEmail,
                                     googleDisplayName = userData.googleDisplayName,
-                                    onSignInClick = {},
+                                    onSignInClick = handleSignIn,
                                     onSignOutClick = {
                                         scope.launch { googleAuthRepository.signOut() }
                                     },
@@ -755,7 +764,7 @@ fun App() {
                                     isGoogleLinked = userData.isGoogleLinked,
                                     googleEmail = userData.googleEmail,
                                     googleDisplayName = userData.googleDisplayName,
-                                    onSignInClick = {},
+                                    onSignInClick = handleSignIn,
                                     onSignOutClick = {
                                         scope.launch { googleAuthRepository.signOut() }
                                     },
