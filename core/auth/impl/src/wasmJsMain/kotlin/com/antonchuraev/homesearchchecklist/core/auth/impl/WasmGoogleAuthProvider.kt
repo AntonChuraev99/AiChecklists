@@ -1,14 +1,16 @@
+@file:OptIn(kotlin.js.ExperimentalWasmJsInterop::class)
+
 package com.antonchuraev.homesearchchecklist.core.auth.impl
 
 import com.antonchuraev.homesearchchecklist.core.auth.api.GoogleAuthState
 import com.antonchuraev.homesearchchecklist.core.auth.api.GoogleUser
+import kotlin.js.Promise
+import kotlinx.coroutines.await
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlin.js.Promise
 
 @Serializable
 private data class JsSignInResult(
@@ -21,10 +23,17 @@ private data class JsSignInResult(
     val error: String? = null,
 )
 
-private fun readGoogleSignIn(): JsAny? = js("globalThis.__googleSignIn()")
-private fun readCurrentUser(): JsAny? = js("globalThis.__getCurrentFirebaseUser()")
-private fun callSignOut(): JsAny? = js("globalThis.__firebaseSignOut()")
-private fun readAuthReady(): JsAny? = js("globalThis.__authReadyPromise")
+private fun readGoogleSignIn(): Promise<JsAny?> =
+    js("globalThis.__googleSignIn()")
+
+private fun readCurrentUser(): Promise<JsAny?> =
+    js("globalThis.__getCurrentFirebaseUser()")
+
+private fun callSignOut(): Promise<JsAny?> =
+    js("globalThis.__firebaseSignOut()")
+
+private fun readAuthReady(): Promise<JsAny?> =
+    js("globalThis.__authReadyPromise")
 
 private val json = Json { ignoreUnknownKeys = true }
 
@@ -36,48 +45,52 @@ internal class WasmGoogleAuthProvider : AuthProvider {
     private var cachedIdToken: String? = null
 
     override suspend fun restoreSession() {
-        val promise = readAuthReady() ?: return
-        @Suppress("UNCHECKED_CAST")
-        val resultJson = (promise as Promise<JsString?>).await<JsString?>()
-        if (resultJson != null) {
-            val result = json.decodeFromString<JsSignInResult>(resultJson.toString())
-            cachedIdToken = result.idToken
-            _authState.value = GoogleAuthState.Authenticated(result.toGoogleUser())
+        val result = readAuthReady().await<JsAny?>() ?: return
+        val resultStr = result.toString()
+        if (resultStr.isNotBlank() && resultStr != "null") {
+            val parsed = json.decodeFromString<JsSignInResult>(resultStr)
+            cachedIdToken = parsed.idToken
+            _authState.value = GoogleAuthState.Authenticated(parsed.toGoogleUser())
         }
     }
 
     override suspend fun signIn(): Result<GoogleUser> {
         _authState.value = GoogleAuthState.Loading
-        val promise = readGoogleSignIn() ?: return Result.failure(Exception("Google Sign-In bridge not available"))
+        return try {
+            val result = readGoogleSignIn().await<JsAny?>()
+                ?: return Result.failure(Exception("Google Sign-In returned null"))
+            val parsed = json.decodeFromString<JsSignInResult>(result.toString())
 
-        @Suppress("UNCHECKED_CAST")
-        val resultJson = (promise as Promise<JsString>).await<JsString>()
-        val result = json.decodeFromString<JsSignInResult>(resultJson.toString())
-
-        return if (result.ok) {
-            cachedIdToken = result.idToken
-            val user = result.toGoogleUser()
-            _authState.value = GoogleAuthState.Authenticated(user)
-            Result.success(user)
-        } else {
-            _authState.value = GoogleAuthState.NotAuthenticated
-            Result.failure(Exception(result.error ?: "Sign-in failed"))
+            if (parsed.ok) {
+                cachedIdToken = parsed.idToken
+                val user = parsed.toGoogleUser()
+                _authState.value = GoogleAuthState.Authenticated(user)
+                Result.success(user)
+            } else {
+                _authState.value = GoogleAuthState.NotAuthenticated
+                Result.failure(Exception(parsed.error ?: "Sign-in failed"))
+            }
+        } catch (e: Exception) {
+            _authState.value = GoogleAuthState.Error(e.message ?: "Sign-in error")
+            Result.failure(e)
         }
     }
 
     override suspend fun signOut() {
-        callSignOut()
+        callSignOut().await<JsAny?>()
         cachedIdToken = null
         _authState.value = GoogleAuthState.NotAuthenticated
     }
 
     override suspend fun getIdToken(): String? {
-        val promise = readCurrentUser() ?: return cachedIdToken
-        @Suppress("UNCHECKED_CAST")
-        val resultJson = (promise as Promise<JsString?>).await<JsString?>() ?: return null
-        val result = json.decodeFromString<JsSignInResult>(resultJson.toString())
-        cachedIdToken = result.idToken
-        return result.idToken
+        return try {
+            val result = readCurrentUser().await<JsAny?>() ?: return cachedIdToken
+            val parsed = json.decodeFromString<JsSignInResult>(result.toString())
+            cachedIdToken = parsed.idToken
+            parsed.idToken
+        } catch (_: Exception) {
+            cachedIdToken
+        }
     }
 }
 
