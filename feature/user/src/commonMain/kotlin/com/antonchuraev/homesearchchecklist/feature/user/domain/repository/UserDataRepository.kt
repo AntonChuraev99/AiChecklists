@@ -57,4 +57,25 @@ interface UserDataRepository {
      * Returns 0 if not yet recorded.
      */
     suspend fun getFirstLaunchAtMillis(): Long
+
+    /**
+     * Link a Google account with the server and update local state.
+     * On web, this grants the starter credits pack (same as mobile install).
+     *
+     * @param idToken Firebase ID token from Google Sign-In
+     * @param platform "android", "ios", or "web"
+     * @return Result with link outcome including bonus credits
+     */
+    suspend fun linkGoogleAccount(
+        idToken: String,
+        platform: String,
+    ): Result<LinkGoogleAccountResult> = Result.failure(UnsupportedOperationException("Not implemented"))
 }
+
+data class LinkGoogleAccountResult(
+    val googleEmail: String,
+    val aiCredits: Int,
+    val isPremium: Boolean,
+    val bonusCreditsGranted: Int,
+    val isExistingAccount: Boolean,
+)

@@ -38,6 +38,7 @@ class GistiAndroidApplication : GistiApplication() {
                 allowOverride(true)
                 androidLogger()
                 androidContext(this@GistiAndroidApplication)
+                properties(mapOf("GOOGLE_WEB_CLIENT_ID" to BuildConfig.GOOGLE_WEB_CLIENT_ID))
                 // appModule: base KMP module (from composeApp di/)
                 // androidAppModule: Android-specific bindings requiring BuildConfig
                 modules(appModule, androidAppModule)

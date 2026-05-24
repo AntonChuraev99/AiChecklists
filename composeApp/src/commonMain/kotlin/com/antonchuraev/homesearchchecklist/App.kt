@@ -1,5 +1,6 @@
 package com.antonchuraev.homesearchchecklist
 
+import com.antonchuraev.homesearchchecklist.core.auth.api.GoogleAuthRepository
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
 import com.antonchuraev.homesearchchecklist.core.navigation.api.NavCommand
 import com.antonchuraev.homesearchchecklist.feature.create.domain.usecase.CreateWeeklyChecklistUseCase
@@ -14,6 +15,8 @@ import com.antonchuraev.homesearchchecklist.core.datastore.api.ThemeRepository
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppLocaleEnvironment
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppTheme
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.customAppLocale
+import com.antonchuraev.homesearchchecklist.feature.user.domain.model.UserData
+import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import com.antonchuraev.homesearchchecklist.settings.presentation.SettingsScreen
 import com.antonchuraev.homesearchchecklist.feature.updatefeed.presentation.components.WidgetInstructionOverlay
 import com.antonchuraev.homesearchchecklist.navigation.AppNavigationDrawerContent
@@ -129,6 +132,13 @@ fun App() {
         val languageRepository: LanguageRepository = remember { koin.get<LanguageRepository>() }
         val language by languageRepository.language.collectAsStateWithLifecycle(initialValue = AppLanguage.System)
         LaunchedEffect(language) { customAppLocale = language.tag }
+
+        val googleAuthRepository: GoogleAuthRepository = remember { koin.get<GoogleAuthRepository>() }
+        val userDataRepository: UserDataRepository = remember { koin.get<UserDataRepository>() }
+        val userData by userDataRepository.getUserDataFlow()
+            .collectAsStateWithLifecycle(initialValue = UserData())
+
+        val scope = rememberCoroutineScope()
 
         val csatViewModel: CsatViewModel = koinInject()
         val csatState by csatViewModel.screenState.collectAsState()
@@ -255,6 +265,17 @@ fun App() {
                                         csatViewModel.sendIntent(CsatIntent.ForceShowFeedback)
                                     },
                                     versionName = AppBuildConfig.versionName,
+                                    isGoogleLinked = userData.isGoogleLinked,
+                                    googleEmail = userData.googleEmail,
+                                    googleDisplayName = userData.googleDisplayName,
+                                    onSignInClick = {
+                                        // Sign-in is triggered via MainScreenViewModel from the content,
+                                        // but the drawer also needs a route — navigate to main first
+                                        // then the ViewModel intent handles the flow.
+                                    },
+                                    onSignOutClick = {
+                                        scope.launch { googleAuthRepository.signOut() }
+                                    },
                                 )
                             }
                         }
@@ -407,6 +428,13 @@ fun App() {
                                         csatViewModel.sendIntent(CsatIntent.ForceShowFeedback)
                                     },
                                     versionName = AppBuildConfig.versionName,
+                                    isGoogleLinked = userData.isGoogleLinked,
+                                    googleEmail = userData.googleEmail,
+                                    googleDisplayName = userData.googleDisplayName,
+                                    onSignInClick = {},
+                                    onSignOutClick = {
+                                        scope.launch { googleAuthRepository.signOut() }
+                                    },
                                 )
                             }
                         }
@@ -480,6 +508,13 @@ fun App() {
                                         csatViewModel.sendIntent(CsatIntent.ForceShowFeedback)
                                     },
                                     versionName = AppBuildConfig.versionName,
+                                    isGoogleLinked = userData.isGoogleLinked,
+                                    googleEmail = userData.googleEmail,
+                                    googleDisplayName = userData.googleDisplayName,
+                                    onSignInClick = {},
+                                    onSignOutClick = {
+                                        scope.launch { googleAuthRepository.signOut() }
+                                    },
                                 )
                             }
                         }
@@ -553,6 +588,13 @@ fun App() {
                                         csatViewModel.sendIntent(CsatIntent.ForceShowFeedback)
                                     },
                                     versionName = AppBuildConfig.versionName,
+                                    isGoogleLinked = userData.isGoogleLinked,
+                                    googleEmail = userData.googleEmail,
+                                    googleDisplayName = userData.googleDisplayName,
+                                    onSignInClick = {},
+                                    onSignOutClick = {
+                                        scope.launch { googleAuthRepository.signOut() }
+                                    },
                                 )
                             }
                         }
@@ -628,6 +670,13 @@ fun App() {
                                         csatViewModel.sendIntent(CsatIntent.ForceShowFeedback)
                                     },
                                     versionName = AppBuildConfig.versionName,
+                                    isGoogleLinked = userData.isGoogleLinked,
+                                    googleEmail = userData.googleEmail,
+                                    googleDisplayName = userData.googleDisplayName,
+                                    onSignInClick = {},
+                                    onSignOutClick = {
+                                        scope.launch { googleAuthRepository.signOut() }
+                                    },
                                 )
                             }
                         }
@@ -703,6 +752,13 @@ fun App() {
                                         csatViewModel.sendIntent(CsatIntent.ForceShowFeedback)
                                     },
                                     versionName = AppBuildConfig.versionName,
+                                    isGoogleLinked = userData.isGoogleLinked,
+                                    googleEmail = userData.googleEmail,
+                                    googleDisplayName = userData.googleDisplayName,
+                                    onSignInClick = {},
+                                    onSignOutClick = {
+                                        scope.launch { googleAuthRepository.signOut() }
+                                    },
                                 )
                             }
                         }

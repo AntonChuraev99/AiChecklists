@@ -35,6 +35,7 @@ android {
 
         // BuildConfig fields — these are the source of truth for API keys in the app
         buildConfigField("String", "GEMINI_API_KEY", "\"${localProps.getProperty("GEMINI_API_KEY", "")}\"")
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${localProps.getProperty("GOOGLE_WEB_CLIENT_ID", "")}\"")
         // Amplitude key set per build type below
     }
 

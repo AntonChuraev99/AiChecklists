@@ -34,6 +34,7 @@ kotlin {
             implementation(projects.core.datastore.api)
             implementation(projects.core.navigation.api)
             implementation(projects.core.designsystem)
+            implementation(projects.core.auth.api)
 
             implementation(projects.feature.checklist)
             implementation(projects.feature.paywall)

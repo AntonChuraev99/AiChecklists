@@ -22,11 +22,14 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,6 +42,8 @@ import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.done
+import aichecklists.core.designsystem.generated.resources.google_sign_in_failed
+import aichecklists.core.designsystem.generated.resources.google_sign_in_success
 import aichecklists.core.designsystem.generated.resources.main_action_ai_chat
 import aichecklists.core.designsystem.generated.resources.main_create_checklist
 import aichecklists.core.designsystem.generated.resources.main_create_checklist_locked
@@ -75,7 +80,35 @@ fun MainScreen(
     val screenState: MainScreenState by viewModel.screenState.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Resolve snackbar message keys to localised strings up-front so the
+    // LaunchedEffect below can call showSnackbar without a @Composable context.
+    val msgSignInSuccess = stringResource(Res.string.google_sign_in_success)
+    val msgSignInFailed = stringResource(Res.string.google_sign_in_failed)
+
+    LaunchedEffect(viewModel) {
+        viewModel.sideEffect.collect { effect ->
+            when (effect) {
+                is MainScreenSideEffect.ShowSnackbar -> {
+                    val text = when (effect.messageKey) {
+                        "google_sign_in_success" -> msgSignInSuccess
+                        "google_sign_in_failed" -> msgSignInFailed
+                        else -> effect.messageKey
+                    }
+                    snackbarHostState.showSnackbar(text)
+                }
+            }
+        }
+    }
+
     AppScaffold(
+        snackbarHost = {
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier.navigationBarsPadding(),
+            )
+        },
         title = "",
         navigationIcon = if (!isEditMode) {
             {
@@ -199,7 +232,10 @@ fun MainScreen(
                         onExitEditMode = { onEditModeChange(false) },
                         onReorderChecklists = { orderedIds ->
                             viewModel.sendIntent(MainScreenIntent.OnReorderChecklists(orderedIds))
-                        }
+                        },
+                        onSignInClick = {
+                            viewModel.sendIntent(MainScreenIntent.OnSignInClick)
+                        },
                     )
                 }
             }

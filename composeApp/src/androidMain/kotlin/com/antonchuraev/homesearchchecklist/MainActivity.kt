@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.antonchuraev.homesearchchecklist.consent.ConsentDialog
+import com.antonchuraev.homesearchchecklist.core.auth.api.GoogleAuthRepository
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppContextHolder
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppThemeMode
@@ -88,6 +89,14 @@ class MainActivity : ComponentActivity() {
             }
 
             App()
+
+            // Provide Activity reference to GoogleAuthRepository so Credential Manager
+            // can display its bottom sheet. Must be called after Koin is initialized.
+            val googleAuthRepository: GoogleAuthRepository = koinInject()
+            val activity = this@MainActivity
+            LaunchedEffect(activity) {
+                googleAuthRepository.setActivityContext(activity)
+            }
 
             // Show consent dialog for EEA/UK users on first launch
             val consentManager = GistiApplication.consentManager

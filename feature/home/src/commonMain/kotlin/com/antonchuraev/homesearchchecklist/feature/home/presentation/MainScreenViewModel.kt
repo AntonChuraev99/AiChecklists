@@ -1,5 +1,6 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation
 
+import com.antonchuraev.homesearchchecklist.core.auth.api.GoogleAuthRepository
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
@@ -8,10 +9,14 @@ import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetSubscriptionStatusUseCase
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetUserLimitsUseCase
+import com.antonchuraev.homesearchchecklist.feature.user.data.device.getPlatformName
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
@@ -28,12 +33,19 @@ class MainScreenViewModel(
     private val userDataRepository: UserDataRepository,
     private val getUserLimitsUseCase: GetUserLimitsUseCase,
     private val analyticsTracker: AnalyticsTracker,
-) : AppViewModel<MainScreenState, MainScreenIntent, Nothing>() {
+    private val googleAuthRepository: GoogleAuthRepository,
+) : AppViewModel<MainScreenState, MainScreenIntent, MainScreenSideEffect>() {
 
     private val _showLimitDialog = MutableStateFlow(false)
 
+    private val _sideEffect = MutableSharedFlow<MainScreenSideEffect>(extraBufferCapacity = 16)
+    val sideEffect: Flow<MainScreenSideEffect> = _sideEffect.asSharedFlow()
+
     init {
         syncUserProperties()
+        viewModelScope.launch {
+            googleAuthRepository.restoreSession()
+        }
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -57,19 +69,22 @@ class MainScreenViewModel(
     override val screenState: StateFlow<MainScreenState> = combine(
         checklistsWithProgress,
         getSubscriptionStatusUseCase(),
-        userDataRepository.getUserDataFlow().map { it.aiCredits },
+        userDataRepository.getUserDataFlow(),
         getUserLimitsUseCase(),
         _showLimitDialog
-    ) { checklists, subscriptionStatus, aiCredits, userLimits, showLimitDialog ->
+    ) { checklists, subscriptionStatus, userData, userLimits, showLimitDialog ->
         MainScreenState.Success(
             checklists = checklists,
             subscriptionStatus = subscriptionStatus,
             formattedExpirationDate = subscriptionStatus.expirationDate?.let {
                 formatExpirationDate(it)
             },
-            aiCredits = aiCredits,
+            aiCredits = userData.aiCredits,
             userLimits = userLimits,
-            showLimitReachedDialog = showLimitDialog
+            showLimitReachedDialog = showLimitDialog,
+            isGoogleLinked = userData.isGoogleLinked,
+            googleEmail = userData.googleEmail,
+            googleDisplayName = userData.googleDisplayName,
         )
     }.defaultStateIn(MainScreenState.Loading)
 
@@ -90,6 +105,8 @@ class MainScreenViewModel(
                 viewModelScope.launch { repository.reorderChecklists(intent.orderedIds) }
             }
             MainScreenIntent.OnUpdateFeedClick -> appNavigator.navigateToUpdateFeed()
+            MainScreenIntent.OnSignInClick -> handleSignInClick()
+            MainScreenIntent.OnSignOutClick -> handleSignOutClick()
         }
     }
 
@@ -138,6 +155,26 @@ class MainScreenViewModel(
             appNavigator.navigateToSubscriptionStatus()
         } else {
             appNavigator.navigateToPaywall(source = "main_credits_chip")
+        }
+    }
+
+    private fun handleSignInClick() {
+        viewModelScope.launch {
+            val result = googleAuthRepository.signInWithGoogle()
+            result.onSuccess { googleUser ->
+                val idToken = googleAuthRepository.getIdToken() ?: return@launch
+                val platform = getPlatformName()
+                userDataRepository.linkGoogleAccount(idToken, platform)
+                _sideEffect.emit(MainScreenSideEffect.ShowSnackbar("google_sign_in_success"))
+            }.onFailure {
+                _sideEffect.emit(MainScreenSideEffect.ShowSnackbar("google_sign_in_failed"))
+            }
+        }
+    }
+
+    private fun handleSignOutClick() {
+        viewModelScope.launch {
+            googleAuthRepository.signOut()
         }
     }
 }

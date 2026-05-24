@@ -10,6 +10,7 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppDatastore
 import com.antonchuraev.homesearchchecklist.feature.user.data.device.DeviceIdProvider
+import com.antonchuraev.homesearchchecklist.feature.user.data.remote.LinkGoogleAccountApiResult
 import com.antonchuraev.homesearchchecklist.feature.user.data.remote.RegisterUserResult
 import com.antonchuraev.homesearchchecklist.feature.user.data.remote.RestoreCreditsResult
 import com.antonchuraev.homesearchchecklist.feature.user.data.remote.UserApiService
@@ -190,6 +191,10 @@ class UserDataRepositoryImplTest {
             )
             override suspend fun restoreCreditsAfterPurchase(userId: String) =
                 Result.success(RestoreCreditsResult(100, true, "ok"))
+            override suspend fun linkGoogleAccount(
+                userId: String, idToken: String, platform: String,
+            ): Result<LinkGoogleAccountApiResult> =
+                Result.failure(Exception("Not implemented in test"))
         }
 
         val stubDeviceIdProvider = DeviceIdProvider(
@@ -523,6 +528,11 @@ class UserDataRepositoryImplTest {
                 Result.failure(Exception("No more stub results (call #$index)"))
             }
         }
+
+        override suspend fun linkGoogleAccount(
+            userId: String, idToken: String, platform: String,
+        ): Result<LinkGoogleAccountApiResult> =
+            Result.failure(Exception("Not implemented in test"))
     }
 
     private class NoOpUserApiService : UserApiService {
@@ -532,6 +542,11 @@ class UserDataRepositoryImplTest {
             Result.failure(Exception("Not implemented in test"))
 
         override suspend fun restoreCreditsAfterPurchase(userId: String): Result<RestoreCreditsResult> =
+            Result.failure(Exception("Not implemented in test"))
+
+        override suspend fun linkGoogleAccount(
+            userId: String, idToken: String, platform: String,
+        ): Result<LinkGoogleAccountApiResult> =
             Result.failure(Exception("Not implemented in test"))
     }
 }

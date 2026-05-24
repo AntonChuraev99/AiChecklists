@@ -41,6 +41,8 @@ kotlinxDatetimeWasm = "0.8.0"
 amplitude = "1.22.4"
 reorderable = "3.1.0"
 coil3 = "3.4.0"
+credentialManager = "1.5.0"
+googleid = "1.1.1"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -93,6 +95,12 @@ firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "fir
 firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
 firebase-crashlytics = { module = "com.google.firebase:firebase-crashlytics" }
 firebase-config = { module = "com.google.firebase:firebase-config" }
+firebase-auth = { module = "com.google.firebase:firebase-auth" }
+
+# Credential Manager (Google Sign-In)
+credentials = { module = "androidx.credentials:credentials", version.ref = "credentialManager" }
+credentials-play-services = { module = "androidx.credentials:credentials-play-services-auth", version.ref = "credentialManager" }
+googleid = { module = "com.google.android.libraries.identity.googleid:googleid", version.ref = "googleid" }
 
 # Generative AI (Kotlin Multiplatform)
 generative-ai-google = { module = "dev.shreyaspatil.generativeai:generativeai-google", version.ref = "generativeAiKmp" }

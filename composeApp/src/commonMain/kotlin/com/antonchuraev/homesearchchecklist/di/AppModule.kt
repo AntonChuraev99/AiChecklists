@@ -21,6 +21,7 @@ import com.antonchuraev.homesearchchecklist.feature.sharing.di.sharingFeatureMod
 import com.antonchuraev.homesearchchecklist.feature.updatefeed.di.updateFeedFeatureModule
 import com.antonchuraev.homesearchchecklist.settings.di.settingsModule
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.impl.di.remoteConfigModule
+import com.antonchuraev.homesearchchecklist.core.auth.impl.googleAuthModule
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.di.aiChatFeatureModule
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.viewModelOf
@@ -46,6 +47,7 @@ val appModule = module {
         datastoreModule,
         aiChatFeatureModule,
         aiChatDispatcherModule,
+        googleAuthModule,
         platformModule()
     )
     single<AppDatastore> { UserAppDatastoreProvider.instance }

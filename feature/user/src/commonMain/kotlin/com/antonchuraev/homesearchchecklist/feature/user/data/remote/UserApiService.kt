@@ -61,7 +61,22 @@ interface UserApiService {
      * @return Result with restored credits info or error
      */
     suspend fun restoreCreditsAfterPurchase(userId: String): Result<RestoreCreditsResult>
+
+    suspend fun linkGoogleAccount(
+        userId: String,
+        idToken: String,
+        platform: String,
+    ): Result<LinkGoogleAccountApiResult>
 }
+
+data class LinkGoogleAccountApiResult(
+    val userId: String,
+    val googleEmail: String,
+    val isExistingAccount: Boolean,
+    val aiCredits: Int,
+    val isPremium: Boolean,
+    val bonusCreditsGranted: Int,
+)
 
 /**
  * Implementation of UserApiService using Ktor HTTP client.
@@ -132,6 +147,34 @@ class UserApiServiceImpl(
         }
     }
 
+    override suspend fun linkGoogleAccount(
+        userId: String,
+        idToken: String,
+        platform: String,
+    ): Result<LinkGoogleAccountApiResult> = runCatching {
+        logger.debug(TAG, "linkGoogleAccount: userId=${userId.take(8)}..., platform=$platform")
+
+        val response: HttpResponse = httpClient.post("$baseUrl/link_google_account") {
+            contentType(ContentType.Application.Json)
+            header(HttpHeaders.Authorization, "Bearer $idToken")
+            setBody(LinkGoogleAccountRequest(userId = userId, platform = platform))
+        }
+
+        val body = response.body<LinkGoogleAccountResponseDto>()
+        if (body.success) {
+            LinkGoogleAccountApiResult(
+                userId = body.userId ?: userId,
+                googleEmail = body.googleEmail ?: "",
+                isExistingAccount = body.isExistingAccount ?: false,
+                aiCredits = body.aiCredits ?: 0,
+                isPremium = body.isPremium ?: false,
+                bonusCreditsGranted = body.bonusCreditsGranted ?: 0,
+            )
+        } else {
+            throw Exception(body.error ?: "Failed to link Google account")
+        }
+    }
+
     override suspend fun restoreCreditsAfterPurchase(userId: String): Result<RestoreCreditsResult> = runCatching {
         logger.debug(TAG, "restoreCreditsAfterPurchase: userId=${userId.take(8)}...")
 
@@ -192,4 +235,22 @@ private data class RestoreCreditsResponseDto(
     @SerialName("ai_credits") val aiCredits: Int? = null,
     @SerialName("is_premium") val isPremium: Boolean? = null,
     val message: String? = null
+)
+
+@Serializable
+private data class LinkGoogleAccountRequest(
+    @SerialName("user_id") val userId: String,
+    val platform: String,
+)
+
+@Serializable
+private data class LinkGoogleAccountResponseDto(
+    val success: Boolean,
+    val error: String? = null,
+    @SerialName("user_id") val userId: String? = null,
+    @SerialName("google_email") val googleEmail: String? = null,
+    @SerialName("is_existing_account") val isExistingAccount: Boolean? = null,
+    @SerialName("ai_credits") val aiCredits: Int? = null,
+    @SerialName("is_premium") val isPremium: Boolean? = null,
+    @SerialName("bonus_credits_granted") val bonusCreditsGranted: Int? = null,
 )

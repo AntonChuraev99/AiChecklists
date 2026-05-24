@@ -91,6 +91,8 @@ kotlin {
             implementation(projects.core.navigation.impl)
             implementation(projects.core.remoteconfig.api)
             implementation(projects.core.remoteconfig.impl)
+            implementation(projects.core.auth.api)
+            implementation(projects.core.auth.impl)
 
             implementation(projects.feature.splash)
             implementation(projects.feature.checklist)
