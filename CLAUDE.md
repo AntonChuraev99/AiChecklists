@@ -88,6 +88,23 @@ adb shell am start -n com.antonchuraev.aichecklists/com.antonchuraev.homesearchc
 
 Available emulators: `Pixel_9`, `Medium_Phone_API_36.1`
 
+### ⛔ ABSOLUTE RULE: NEVER `adb uninstall` before installing — data loss
+
+**Why this rule exists:** On 2026-05-24 an agent did `adb uninstall` + `adb install` "for a clean state" before smoke-testing the new APK on a physical device. This wiped the user's local Room database — **all their saved checklists, fills, and reminders were permanently lost**. Auto-Backup did not save them: `backup_rules.xml` only includes `files/user/` (DataStore preferences), it does **NOT** include the Room database. Any uninstall = permanent data loss.
+
+**Rules:**
+
+- ❌ **NEVER** run `adb uninstall com.antonchuraev.aichecklists` (or `pm uninstall`) on any device that holds real user data.
+- ❌ **NEVER** wipe app data via `adb shell pm clear com.antonchuraev.aichecklists`.
+- ❌ **NEVER** factory-reset / wipe a connected device without explicit user permission.
+- ✅ For re-install on the same device with the same signing key, **always** use `adb install -r <apk>` (reinstall, keep data). This is what `./gradlew installDebug` and the project's `/install-device` skill do by default.
+- ✅ Uninstall is allowed **only** when ADB returns a specific error that requires it (`INSTALL_FAILED_VERSION_DOWNGRADE`, `INSTALL_FAILED_UPDATE_INCOMPATIBLE` = signature mismatch). Even then, **first ask the user via `AskUserQuestion`** — never pre-emptively, never "to make sure it's clean".
+- ✅ Before any potentially destructive ADB command, name the side effect: "this will wipe checklists / reminders / chat history — proceed?"
+
+This rule overrides any "clean state" intuition. A "dirty" device with the user's real data is **always** preferable to a clean device with their data wiped. If you need a clean state for testing, use an emulator (`Pixel_9`, `Medium_Phone_API_36.1`) — never the user's personal device.
+
+**Backup gap to fix (P0 product issue, not blocker for this rule):** `androidApp/src/main/res/xml/backup_rules.xml` and `backup_rules_legacy.xml` currently include only `files/user/`. The Room database (`databases/`) is excluded, so even Google Auto-Backup cannot save users' checklists. Until backup_rules is widened to include `databases/checklist_database`, this absolute rule is the only safeguard against catastrophic data loss.
+
 ### Deploying Web (Cloudflare Workers)
 
 Production site: <https://checklists.gisti.workers.dev/>
