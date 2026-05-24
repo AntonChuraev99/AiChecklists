@@ -256,14 +256,14 @@ class ToolCallDispatcherImpl(
     // ─── CreateChecklistFromAttachment ───────────────────────────────────────
 
     /**
-     * Routes attachment(s) through [GeminiAiAnalyzer] (same path as "Create via AI")
+     * Routes attachment(s) through the [AiAnalyzer] service (same path as "Create via AI")
      * and creates a new checklist from the extracted items.
      *
      * Premium gate: same as [handleCreateChecklist] — free users are limited to
      * [FREE_CHECKLIST_LIMIT] total checklists (RC-driven; hardcoded here as fallback).
-     * Credits gate: [AiAnalyzer] consumes credits through the normal Cloud Function path.
-     * Currently GeminiAiAnalyzer calls the API directly (no credit deduction at this layer);
-     * Phase 3 will add credit validation via UserDataRepository before calling.
+     * Credits gate: server-side. The Cloud Function (analyze_and_fill_checklist /
+     * generate_checklist) atomically deducts credits inside a Firestore transaction
+     * and returns the updated balance in the response.
      */
     private suspend fun handleCreateChecklistFromAttachment(
         toolCall: ToolCall.CreateChecklistFromAttachment,
@@ -288,7 +288,7 @@ class ToolCallDispatcherImpl(
         val inputData = chatAttachmentToAnalyzeInput(primary)
             ?: return DispatchOutcome.NotFound("chat_attach_unsupported_type", listOf(primary.mimeType))
 
-        logger.debug(TAG, "CreateChecklistFromAttachment: analyzing ${primary.fileName} via GeminiAiAnalyzer")
+        logger.debug(TAG, "CreateChecklistFromAttachment: analyzing ${primary.fileName} via AiAnalyzer service")
         val result = aiAnalyzer.analyze(inputData, targetChecklist = null)
 
         return result.fold(

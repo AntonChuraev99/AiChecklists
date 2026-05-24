@@ -50,7 +50,8 @@ sealed interface ToolCall {
 
     /**
      * Attachment(s) with no accompanying item text: create a new checklist from the
-     * attachment content via [GeminiAiAnalyzer]. Identical UX to "Create via AI".
+     * attachment content via the AiAnalyzer service (Cloud Function path). Identical UX
+     * to "Create via AI".
      *
      * [attachments] is non-empty by construction (the dispatcher should reject empty lists).
      */

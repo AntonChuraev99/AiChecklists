@@ -12,7 +12,7 @@ import kotlinx.coroutines.delay
  * Stub implementation of AiAnalyzer for development and testing.
  * Returns mock data simulating AI analysis results.
  *
- * Production implementation: [GeminiAiAnalyzer]
+ * Production implementation: [FirebaseAiAnalyzerAdapter].
  */
 class StubAiAnalyzer : AiAnalyzer {
 

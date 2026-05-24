@@ -16,7 +16,7 @@ import org.koin.dsl.module
  * tests see a fully-loaded paywall instead of an "Unable to load" error dialog.
  *
  * Extends GistiAndroidApplication (not GistiApplication directly) so that
- * androidAppModule (GeminiConfig, widget, reminder bindings) is also loaded.
+ * androidAppModule (widget, reminder bindings) is also loaded.
  */
 class TestApplication : GistiAndroidApplication() {
 

@@ -33,9 +33,9 @@ android {
         // Test Orchestrator - isolate tests with clearPackageData
         testInstrumentationRunnerArguments["clearPackageData"] = "true"
 
-        // BuildConfig fields — these are the source of truth for API keys in the app
-        buildConfigField("String", "GEMINI_API_KEY", "\"${localProps.getProperty("GEMINI_API_KEY", "")}\"")
-        // Amplitude key set per build type below
+        // BuildConfig fields — Amplitude key set per build type below.
+        // NOTE: Gemini API key intentionally NOT here. AI calls go through Cloud Functions
+        // (server holds the key in Secret Manager), so the APK never ships a key.
     }
 
     testOptions {
@@ -103,8 +103,8 @@ dependencies {
 
     // Direct deps on core+feature modules — needed because composeApp uses `implementation`
     // (non-transitive). androidApp references types from these modules directly in
-    // GistiAndroidApplication (AnalyticsTracker), AndroidAppModule (GeminiConfig,
-    // ChecklistReminderScheduler, ChecklistRepository), and the moved widget code.
+    // GistiAndroidApplication (AnalyticsTracker), AndroidAppModule (ChecklistReminderScheduler,
+    // ChecklistRepository), and the moved widget code.
     implementation(projects.core.common.api)
     implementation(projects.core.common.impl)
     implementation(projects.core.datastore.api)

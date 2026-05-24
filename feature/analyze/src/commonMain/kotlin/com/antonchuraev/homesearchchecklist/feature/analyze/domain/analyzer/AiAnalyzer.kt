@@ -6,11 +6,12 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Check
 import kotlin.reflect.KClass
 
 /**
- * Interface for AI-powered analysis of property data.
- * This interface defines the contract for analyzing various input types
- * and extracting relevant information to fill checklist items.
+ * Interface for AI-powered analysis of attachment / text input.
  *
- * Production implementation: [GeminiAiAnalyzer]
+ * Production implementation: [com.antonchuraev.homesearchchecklist.feature.analyze.data.analyzer.FirebaseAiAnalyzerAdapter]
+ * — delegates to [com.antonchuraev.homesearchchecklist.feature.analyze.domain.repository.AnalyzeRepository],
+ * which calls Firebase Cloud Functions. The Gemini API key lives server-side
+ * (Secret Manager) and never ships in the client binary.
  */
 interface AiAnalyzer {
 

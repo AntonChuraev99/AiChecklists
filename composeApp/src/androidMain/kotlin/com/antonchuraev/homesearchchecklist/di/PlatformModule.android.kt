@@ -20,15 +20,9 @@ import org.koin.dsl.module
 /**
  * Platform-level Koin bindings for composeApp KMP library.
  *
- * NOTE: GeminiConfig, widgetModule, and ReminderScheduler are intentionally
- * NOT included here. They depend on BuildConfig (generated only in androidApp)
- * or on classes that live in androidApp to avoid circular dependency.
- *
- * androidApp/GistiApplication.startKoin{} adds an additional Koin module
- * that provides:
- *   - GeminiConfig (reads BuildConfig.GEMINI_API_KEY from androidApp)
- *   - widgetModule (WidgetRepository, WidgetStateManager)
- *   - ChecklistReminderScheduler binding → ReminderScheduler
+ * NOTE: widgetModule and ReminderScheduler are intentionally NOT included here —
+ * they live in :androidApp to avoid circular dependency. GistiAndroidApplication's
+ * startKoin{} loads an additional androidAppModule providing those bindings.
  */
 actual fun platformModule(): Module = module {
     single { AppContextHolder.context }

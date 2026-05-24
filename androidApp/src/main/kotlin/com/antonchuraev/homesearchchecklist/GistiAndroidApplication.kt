@@ -12,9 +12,7 @@ import org.koin.core.context.startKoin
  * Android-specific Application subclass for the :androidApp module.
  *
  * Extends [GistiApplication] (which lives in :composeApp's androidMain) and
- * adds androidApp-specific Koin bindings that require BuildConfig values
- * available only in this module:
- *   - GeminiConfig (GEMINI_API_KEY from BuildConfig)
+ * adds androidApp-specific Koin bindings:
  *   - widgetModule (WidgetRepository, WidgetStateManager)
  *   - ChecklistReminderScheduler → ReminderScheduler binding
  *

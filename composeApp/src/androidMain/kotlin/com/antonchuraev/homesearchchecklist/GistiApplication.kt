@@ -49,8 +49,8 @@ open class GistiApplication : Application() {
      * Initialize and start Koin with the base appModule.
      *
      * Override in subclasses (e.g. GistiAndroidApplication in :androidApp) to
-     * provide additional modules that depend on androidApp-specific BuildConfig
-     * values (GeminiConfig, widgetModule, etc.) or to change startKoin parameters.
+     * provide additional modules that depend on androidApp-specific bindings
+     * (widget, reminder scheduler) or to change startKoin parameters.
      *
      * Default implementation loads only appModule — suitable for widget process,
      * test overrides, or standalone library usage.

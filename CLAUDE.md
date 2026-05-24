@@ -16,9 +16,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 > **Web release strategy**: web target uses Compose Multiplatform's wasmJs renderer (Skiko canvas), Room 3.0 with the SQLite OPFS Web Worker driver for persistence, and the Firebase JS SDK (loaded as ESM modules) for Auth/Remote Config/Analytics. AI flow goes through CORS-enabled Cloud Functions; direct Gemini calls from the browser are not allowed.
 
-### Public Repository
+### Repository Visibility
 
-This is an **open-source public repository**. All code, commits, and PR history are visible to everyone.
+This repository is **private** (switched from public on 2026-05-24 after a Gemini API key leak incident). External secret scanners no longer index the history, but old leaked secrets stay in git history forever — treat **everything that has ever been committed** as if it could be public again.
 
 **NEVER commit:**
 - API keys, tokens, passwords, or secrets of any kind
@@ -34,12 +34,12 @@ This is an **open-source public repository**. All code, commits, and PR history 
 - `SECURITY.md`, `SECURITY_DELIVERY_SUMMARY.txt` — security docs with real keys
 - `hosting/.firebase/` — Firebase cache
 
-**Safe to commit** (not secrets):
-- Firebase project ID (`aichecklists-40230`) — public by design, visible in every Firebase URL and in the APK
+**Safe to commit** (not secrets, public by design):
+- Firebase project ID (`aichecklists-40230`) — visible in every Firebase URL and in the APK
 - `.firebaserc` — project alias mapping
 - `firebase.json` — hosting/functions config (no keys)
 
-Before committing any new file, verify it does not contain patterns like `AIzaSy*`, hardcoded tokens, or credentials.
+Before committing any new file, verify it does not contain patterns like `AIzaSy*`, hardcoded tokens, or credentials. `.gitleaks.toml` is configured for the project; wire it into a pre-commit hook before re-opening the repo to the public.
 
 ### Product Concept
 
@@ -467,9 +467,155 @@ Widget: WidgetConfigActivity -> select checklist -> toggle items / deep-link to 
 - Do: "Create Checklist", "Fill via AI", "Save", "Get Started"
 - Don't: "Add New", "AI Analyze", "Submit", "Continue"
 
+## Cloud Functions Diagnostics
+
+All AI inference goes through Cloud Functions in `aichecklists-40230` (`analyze_and_fill_checklist`, `generate_checklist`, `chat_completion`, `classify_chat_intent`, `transcribe_audio`). When users report "AI не смог ответить" / "AI processing failed", follow this runbook instead of patching the client.
+
+### Step 1 — Read logs first
+
+```bash
+gcloud functions logs read <fn> --region=us-central1 --project=aichecklists-40230 --gen2 --limit=30
+```
+
+Where `<fn>` is one of the 5 above. The function that the user hit is identifiable from the error context: short commands → `classify_chat_intent`; free-form chat → `chat_completion`; "Create via AI" → `generate_checklist`; "Fill via AI" → `analyze_and_fill_checklist`; voice mic → `transcribe_audio`.
+
+### Step 2 — If logs are silent, force them
+
+`main.py` swallows exceptions with bare `except Exception:` blocks (lines ~708, ~843). Real Gemini errors never reach logs. To unmask:
+
+```python
+except Exception as e:
+    import traceback
+    print(f"GEMINI_ERROR: {type(e).__name__}: {e}", flush=True)
+    print(traceback.format_exc(), flush=True)
+    return create_error_response("AI processing failed. Please try again.", 500)
+```
+
+Redeploy ONE function with this patch, retest, read logs, then **revert the patch before commit**. The traceback prints the actual gRPC status code that points at the real cause.
+
+### Step 3 — End-to-end smoke test (PowerShell)
+
+Register a throwaway user, then call a Gemini-using endpoint with the returned `user_id`:
+
+```powershell
+# 1. Register throwaway user (no Gemini call — tests CF infra)
+$r1 = Invoke-RestMethod -Uri "https://us-central1-aichecklists-40230.cloudfunctions.net/register_user" `
+    -Method Post -ContentType "application/json" `
+    -Body '{"device_id":"smoke-test","app_version":"1.15.0","platform":"test"}'
+$userId = $r1.user_id  # save for next call
+
+# 2. Call Gemini-using endpoint
+$body = @{ user_id = $userId; is_premium = $false; text = "добавь молоко"; locale = "ru" } | ConvertTo-Json
+Invoke-RestMethod -Uri "https://us-central1-aichecklists-40230.cloudfunctions.net/classify_chat_intent" `
+    -Method Post -ContentType "application/json" -Body $body -TimeoutSec 60
+```
+
+`success: true` means Gemini key + Secret Manager + CF wiring all work end-to-end. The `test-firebase-function` skill automates this curl-based pattern.
+
+### Step 4 — Diagnose by symptom
+
+| Symptom in logs / response | Root cause | Fix |
+|---|---|---|
+| `Illegal header value` (gRPC) | Secret Manager value has trailing CRLF or whitespace | Re-add secret with `printf '%s' '<key>' \| gcloud secrets versions add gemini-api-key --data-file=- --project=aichecklists-40230` (use `printf`, NOT PowerShell `echo` which adds CRLF) |
+| `Consumer 'api_key:...' has been suspended` | Key was created in a suspended GCP project (e.g. `gen-lang-client-*` auto-provisioned by AI Studio) | Create key in `aichecklists-40230` directly: `gcloud services api-keys create --display-name=... --api-target=service=generativelanguage.googleapis.com --project=aichecklists-40230`. Never create production keys via AI Studio UI. |
+| `API_KEY_INVALID` | Key revoked or wrong format | Verify key exists in `aichecklists-40230` (`gcloud services api-keys list`) and Generative Language API is enabled (`gcloud services list --enabled --project=aichecklists-40230 \| grep generativelanguage`) |
+| `QUOTA_EXCEEDED` | User out of credits or hit per-key quota | For user: refill in Firestore `users/{userId}` → `ai_credits`. For project: check quota in Cloud Console |
+| HTTP 402 "insufficient credits" | Pre-Gemini credit gate failed (user has 0 credits) | This is correct behavior, not a bug. User needs credits |
+| HTTP timeout (60s) | Container stuck retrying Gemini with bad key | Same as `Illegal header value` — fix secret + redeploy |
+
+### Step 5 — Force CF cold restart after secret change
+
+`--set-secrets="...:latest"` reads the new value only on container startup. Existing warm containers keep the old value until they scale down (~15 min idle). To force immediate re-read, redeploy:
+
+```bash
+gcloud functions deploy <fn> --region=us-central1 --gen2 --project=aichecklists-40230 \
+    --source=firebase-functions \
+    --set-secrets="GEMINI_API_KEY=gemini-api-key:latest" \
+    --runtime=python312 --trigger-http --allow-unauthenticated
+```
+
+For all 5 Gemini-using CFs at once, wrap in a `for` loop in bash (each deploy ~60-90s, ~5 min total serial). See `firebase-functions/deploy.sh` for the canonical script.
+
+### Architectural invariants (preserve these)
+
+- **Gemini API key lives in Secret Manager `gemini-api-key:latest` only.** Never in env vars (`--set-env-vars`), never in `local.properties`, never in `BuildConfig`, never in client code.
+- **The key is owned by `aichecklists-40230`** (same project as CFs, Firestore, Crashlytics). No shadow `gen-lang-client-*` projects.
+- **Client code holds zero Gemini credentials.** Android/iOS/wasmJs all call Cloud Functions via Ktor; no `GenerativeModel(apiKey = ...)` anywhere in the codebase.
+- **Old broken secret versions are `disabled`** (not destroyed) for audit trail. Only `:latest` is enabled at any time.
+
+## Client Diagnostics (Android / iOS / wasmJs)
+
+When the user reports "AI не отвечает" but Cloud Functions are confirmed healthy (smoke tests above pass), the bug is in the **client HTTP layer**, not the backend. Symptoms that point here: request never leaves the device (no entry in CF logs), response shape mismatch on a working CF (`KotlinxSerializationException` in logcat), short-circuit `catch` swallowing a network exception, wrong Content-Type, missing field.
+
+### How to tell CF vs Client side
+
+| Sanity check | If yes → | If no → |
+|---|---|---|
+| Run the PowerShell smoke test in "Cloud Functions Diagnostics" — does the same endpoint succeed? | Backend works. **Client side.** Reproduce with logcat-level Ktor logging | **Server side.** Follow Step 4 table above |
+| Does the request show up in `gcloud functions logs read` for the function the app called? | Reached server. Look at response parsing on client | Never left device. Look at HttpClient config, baseUrl, headers, body serialization |
+| Does logcat show `HttpRequestTimeoutException` / `HttpRequestException`? | Network / DNS / firewall on device. Test wifi vs mobile | Different bug — read full stacktrace |
+
+### Current test inventory (as of 2026-05-24)
+
+| Component | Test coverage |
+|---|---|
+| `LocalIntentRouterImpl` (Layer 1 parser) | ✅ `LocalIntentRouterImplTest` (130+ cases, all 7 intents + collisions) |
+| `ChatViewModel` state machine | ✅ `ChatViewModelTest` (18 tests; 1 pre-existing failure: `onFeedbackSubmit_blankText_emitsHintSnackbar`) |
+| `AiChatRepositoryImpl` (Layer 1→2→3 routing) | ✅ `AiChatRepositoryImplTest` |
+| `ChecklistHintExtractor` | ✅ |
+| **`FirebaseAiServiceImpl` (HTTP layer)** | ❌ **NONE — gap.** No tests verify request body shape, response parsing, error mapping, or timeout behavior. This is the layer that broke today's incident debug; without tests the next CF-protocol drift will go unnoticed |
+| `AnalyzeRepositoryImpl` | ❌ NONE |
+
+### Scaffold pattern for `FirebaseAiServiceImpl` tests
+
+Use Ktor `MockEngine` — no real network, deterministic, runs on JVM via `commonTest`. To enable in `feature/analyze/build.gradle.kts`, add `commonTest.dependencies` block with `libs.ktor.client.mock`, `libs.kotlinx.coroutines.test`, `libs.kotlin.test`, and `withHostTest {}` on the Android target.
+
+Example test shape:
+
+```kotlin
+class FirebaseAiServiceImplTest {
+
+    @Test
+    fun classify_serializesRequestCorrectly() = runTest {
+        val mockEngine = MockEngine { request ->
+            // Assertions on outgoing request
+            assertEquals("POST", request.method.value)
+            assertEquals("application/json", request.body.contentType.toString())
+            assertContains(request.url.encodedPath, "/classify_chat_intent")
+            respond(
+                content = """{"success":true,"intent":"create_item","confidence":1.0}""",
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json"),
+            )
+        }
+        val client = HttpClient(mockEngine) { install(ContentNegotiation) { json() } }
+        val service = FirebaseAiServiceImpl(logger = NoopLogger, httpClient = client)
+
+        val result = service.classifyChatIntent(userId = "u1", isPremium = false, text = "test")
+
+        assertTrue(result.isSuccess)
+        assertEquals("create_item", result.getOrThrow().data?.intent)
+    }
+
+    @Test
+    fun classify_mapsHttp402ToInsufficientCredits() = runTest { /* ... */ }
+
+    @Test
+    fun classify_handlesTimeout() = runTest { /* ... */ }
+}
+```
+
+**Refactor required first:** `FirebaseAiServiceImpl` currently creates its own `HttpClient` internally — inject it via constructor so `MockEngine` can be substituted. Tracked as backlog when first new test is added.
+
+### Integration test option (slower, optional)
+
+For full E2E confidence, write an `androidTest` (instrumented) that calls a real deployed CF against a throwaway user. Slow (~5s per test, hits prod billing for ~1 credit per call), but proves end-to-end the way the PowerShell smoke does — just from the Android device's network stack. Place under `feature/analyze/src/androidTest/...`. Skip in PR-blocking CI; run nightly or on-demand.
+
 ## Dependencies
 
-Versions managed in `gradle/libs.versions.toml`. Key: Kotlin 2.3.0, Compose Multiplatform 1.9.3, Koin 4.1.1, Room 2.8.4, RevenueCat 2.2.17, Firebase BOM 33.7.0, Generative AI KMP 0.9.0-1.1.0.
+Versions managed in `gradle/libs.versions.toml`. Key: Kotlin 2.3.0, Compose Multiplatform 1.9.3, Koin 4.1.1, Room 2.8.4, RevenueCat 2.2.17, Firebase BOM 33.7.0.
+
+**Note:** Gemini SDK is intentionally NOT a client dependency. All AI inference is server-side via Cloud Functions; the client (Android/iOS/wasmJs) holds no Gemini credentials. See "Cloud Functions Diagnostics" below.
 
 ## Security
 

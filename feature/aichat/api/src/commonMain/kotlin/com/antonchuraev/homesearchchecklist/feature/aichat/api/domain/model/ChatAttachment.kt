@@ -11,7 +11,7 @@ import kotlinx.serialization.Serializable
  *
  * [mimeType] examples: "image/jpeg", "image/png", "application/pdf",
  * "text/plain", "audio/m4a". Used to pick the correct [AttachmentSource] and
- * to pass the right [AnalyzeInputData] variant to [GeminiAiAnalyzer].
+ * to pass the right [AnalyzeInputData] variant to the AiAnalyzer service.
  *
  * [fileName] is the human-readable display name (shown in the chip strip).
  * [sizeBytes] is optional; used for size-limit checks in the dispatcher.
@@ -26,7 +26,7 @@ data class ChatAttachment(
 
 /**
  * Broad category of a [ChatAttachment], used to select the correct
- * [AnalyzeInputData] variant when routing to [GeminiAiAnalyzer].
+ * [AnalyzeInputData] variant when routing to the AiAnalyzer service.
  */
 enum class AttachmentSource {
     Image,
