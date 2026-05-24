@@ -4,6 +4,7 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
 import com.antonchuraev.homesearchchecklist.core.common.api.formatExpirationDate
+import com.antonchuraev.homesearchchecklist.core.datastore.api.HintsRepository
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetSubscriptionStatusUseCase
@@ -28,6 +29,7 @@ class MainScreenViewModel(
     private val userDataRepository: UserDataRepository,
     private val getUserLimitsUseCase: GetUserLimitsUseCase,
     private val analyticsTracker: AnalyticsTracker,
+    private val hintsRepository: HintsRepository,
 ) : AppViewModel<MainScreenState, MainScreenIntent, Nothing>() {
 
     private val _showLimitDialog = MutableStateFlow(false)
@@ -55,12 +57,21 @@ class MainScreenViewModel(
     }
 
     override val screenState: StateFlow<MainScreenState> = combine(
-        checklistsWithProgress,
-        getSubscriptionStatusUseCase(),
-        userDataRepository.getUserDataFlow().map { it.aiCredits },
-        getUserLimitsUseCase(),
-        _showLimitDialog
-    ) { checklists, subscriptionStatus, aiCredits, userLimits, showLimitDialog ->
+        combine(
+            checklistsWithProgress,
+            getSubscriptionStatusUseCase(),
+            userDataRepository.getUserDataFlow().map { it.aiCredits },
+        ) { checklists, subscriptionStatus, aiCredits ->
+            Triple(checklists, subscriptionStatus, aiCredits)
+        },
+        combine(
+            getUserLimitsUseCase(),
+            _showLimitDialog,
+            hintsRepository.hamburgerHintShown,
+        ) { userLimits, showLimitDialog, hintShown ->
+            Triple(userLimits, showLimitDialog, hintShown)
+        }
+    ) { (checklists, subscriptionStatus, aiCredits), (userLimits, showLimitDialog, hintShown) ->
         MainScreenState.Success(
             checklists = checklists,
             subscriptionStatus = subscriptionStatus,
@@ -69,7 +80,8 @@ class MainScreenViewModel(
             },
             aiCredits = aiCredits,
             userLimits = userLimits,
-            showLimitReachedDialog = showLimitDialog
+            showLimitReachedDialog = showLimitDialog,
+            showHamburgerHint = !hintShown,
         )
     }.defaultStateIn(MainScreenState.Loading)
 
@@ -90,6 +102,9 @@ class MainScreenViewModel(
                 viewModelScope.launch { repository.reorderChecklists(intent.orderedIds) }
             }
             MainScreenIntent.OnUpdateFeedClick -> appNavigator.navigateToUpdateFeed()
+            MainScreenIntent.OnHamburgerHintCompleted -> {
+                viewModelScope.launch { hintsRepository.markHamburgerHintShown() }
+            }
         }
     }
 

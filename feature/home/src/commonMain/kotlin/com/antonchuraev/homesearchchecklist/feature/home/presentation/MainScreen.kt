@@ -1,5 +1,8 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -27,9 +30,11 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -75,6 +80,35 @@ fun MainScreen(
     val screenState: MainScreenState by viewModel.screenState.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
+    val showHamburgerHint = (screenState as? MainScreenState.Success)?.showHamburgerHint ?: false
+    val hamburgerScale = remember { Animatable(1f) }
+
+    // Infinite bounce while hint is active. The loop is broken only by the
+    // drawer-open watcher below (which flips showHamburgerHint to false via
+    // OnHamburgerHintCompleted intent → DataStore flag → state re-emit →
+    // LaunchedEffect restarts in the else branch and snaps back to 1f).
+    // Scale 1.0 → 1.20 (more visible than 1.15) and 400ms per leg (slower
+    // so the eye reliably catches it — earlier 1.15/300ms × 3 cycles was
+    // missed in real-device testing: user saw "one vibration" and didn't
+    // recognize it as a hint).
+    LaunchedEffect(showHamburgerHint) {
+        if (showHamburgerHint) {
+            while (true) {
+                hamburgerScale.animateTo(1.20f, tween(400, easing = FastOutSlowInEasing))
+                hamburgerScale.animateTo(1f, tween(400, easing = FastOutSlowInEasing))
+            }
+        } else {
+            hamburgerScale.snapTo(1f)
+        }
+    }
+
+    // Stop hint early if user opens the drawer before cycles finish.
+    LaunchedEffect(drawerState.isOpen) {
+        if (drawerState.isOpen && showHamburgerHint) {
+            viewModel.sendIntent(MainScreenIntent.OnHamburgerHintCompleted)
+        }
+    }
+
     AppScaffold(
         title = "",
         navigationIcon = if (!isEditMode) {
@@ -83,7 +117,11 @@ fun MainScreen(
                     Icon(
                         imageVector = Icons.Filled.Menu,
                         contentDescription = stringResource(Res.string.main_menu),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.graphicsLayer {
+                            scaleX = hamburgerScale.value
+                            scaleY = hamburgerScale.value
+                        },
                     )
                 }
             }

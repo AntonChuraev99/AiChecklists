@@ -31,7 +31,9 @@ sealed interface MainScreenState : State {
         val formattedExpirationDate: String? = null,
         val aiCredits: Int = 0,
         val showLimitReachedDialog: Boolean = false,
-        override val userLimits: UserLimits?
+        override val userLimits: UserLimits?,
+        /** True while the hamburger-pulse onboarding hint should animate. */
+        val showHamburgerHint: Boolean = false,
     ) : MainScreenState
 }
 
@@ -56,4 +58,8 @@ sealed interface MainScreenIntent : Intent {
     data class OnReorderChecklists(val orderedIds: List<Long>) : MainScreenIntent
 
     data object OnUpdateFeedClick : MainScreenIntent
+
+    /** Emitted when the hamburger-pulse animation finishes (3 cycles) or
+     *  the user opens the drawer before animation ends. Persists the flag. */
+    data object OnHamburgerHintCompleted : MainScreenIntent
 }
