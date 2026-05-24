@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.checklist.di
 
 import com.antonchuraev.homesearchchecklist.core.auth.api.GoogleAuthRepository
+import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePort
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChatHistoryDao
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.FirestoreSyncDataSource
@@ -28,6 +29,7 @@ val checklistFeatureModule = module {
             firestoreDataSource = get<FirestoreSyncDataSource>(),
             authRepository = get<GoogleAuthRepository>(),
             scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+            logger = get<AppLogger>(),
         )
     }
 }
