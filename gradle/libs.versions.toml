@@ -40,6 +40,8 @@ kotlinxDatetimeWasm = "0.8.0"
 amplitude = "1.22.4"
 reorderable = "3.1.0"
 coil3 = "3.4.0"
+composeAdaptive = "1.3.0-alpha02"
+androidxWindow = "1.4.0"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -123,6 +125,17 @@ reorderable = { module = "sh.calvin.reorderable:reorderable", version.ref = "reo
 
 # Coil 3 — image loading for Android and Compose Multiplatform
 coil3-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil3" }
+
+# Compose Multiplatform adaptive (JetBrains fork — KMP support including wasmJs)
+compose-adaptive = { module = "org.jetbrains.compose.material3.adaptive:adaptive", version.ref = "composeAdaptive" }
+compose-adaptive-navigation-suite = { module = "org.jetbrains.compose.material3.adaptive:adaptive-navigation-suite", version.ref = "composeAdaptive" }
+compose-adaptive-navigation3 = { module = "org.jetbrains.compose.material3.adaptive:adaptive-navigation3", version.ref = "composeAdaptive" }
+
+# AndroidX Window — Android-only WindowSizeClass.compute backing
+androidx-window = { module = "androidx.window:window", version.ref = "androidxWindow" }
+
+# Compose Multiplatform UI tooling preview — @Preview annotation in commonMain (CMP 1.10+)
+compose-ui-tooling-preview = { module = "org.jetbrains.compose.ui:ui-tooling-preview", version.ref = "composeMultiplatform" }
 
 [bundles]
 koin-feature = [

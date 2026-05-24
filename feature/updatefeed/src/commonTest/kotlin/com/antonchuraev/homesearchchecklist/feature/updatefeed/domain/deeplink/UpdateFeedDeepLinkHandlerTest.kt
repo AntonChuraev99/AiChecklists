@@ -1,11 +1,14 @@
 package com.antonchuraev.homesearchchecklist.feature.updatefeed.domain.deeplink
 
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
+import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavRoute
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.core.navigation.api.NavCommand
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -29,6 +32,7 @@ class UpdateFeedDeepLinkHandlerTest {
 
         override val commands: Flow<NavCommand> = emptyFlow()
         override val events: SharedFlow<AppNavEvent> = MutableSharedFlow()
+        override val backStack: StateFlow<List<AppNavRoute>> = MutableStateFlow(emptyList())
 
         var requestCreateWeeklyChecklistCount = 0
 

@@ -3,6 +3,7 @@ package com.antonchuraev.homesearchchecklist.feature.splash.presentation
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
+import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavRoute
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.core.navigation.api.NavCommand
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigKeys
@@ -379,6 +380,7 @@ class SplashViewModelTest {
     private class NoOpNavigator : AppNavigator {
         override val commands: Flow<NavCommand> = emptyFlow()
         override val events: SharedFlow<AppNavEvent> = MutableSharedFlow()
+        override val backStack: StateFlow<List<AppNavRoute>> = MutableStateFlow(emptyList())
         override fun showWidgetInstruction() {}
         override fun requestCreateWeeklyChecklist() {}
         override fun onBack() {}
@@ -418,6 +420,7 @@ class SplashViewModelTest {
 
         override val commands: Flow<NavCommand> = emptyFlow()
         override val events: SharedFlow<AppNavEvent> = MutableSharedFlow()
+        override val backStack: StateFlow<List<AppNavRoute>> = MutableStateFlow(emptyList())
         override fun showWidgetInstruction() {}
         override fun requestCreateWeeklyChecklist() {}
         override fun onBack() {}

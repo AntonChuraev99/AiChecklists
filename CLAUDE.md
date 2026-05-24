@@ -628,6 +628,10 @@ class FirebaseAiServiceImplTest {
 
 For full E2E confidence, write an `androidTest` (instrumented) that calls a real deployed CF against a throwaway user. Slow (~5s per test, hits prod billing for ~1 credit per call), but proves end-to-end the way the PowerShell smoke does — just from the Android device's network stack. Place under `feature/analyze/src/androidTest/...`. Skip in PR-blocking CI; run nightly or on-demand.
 
+## Web (wasmJs) Reference Project
+
+For any wasmJs-related questions — Firebase JS SDK interop, `globalThis` bridges, `Promise<JsAny>` handling, `@JsFun` field extraction, COOP/COEP headers, OPFS WebWorker setup — **use `C:\Users\Admin\StudioProjects\swapfaceandroid` as the reference project**. It has a production-grade implementation of Google/Apple/Email Firebase Auth with `signInWithPopup` on wasmJs, JS→Kotlin Promise bridging (raw JS objects + `@JsFun` extractors, NOT `JSON.stringify`), and `onAuthStateChanged` state sync. When facing wasmJs interop issues, **read the swapfaceandroid implementation first**.
+
 ## Dependencies
 
 Versions managed in `gradle/libs.versions.toml`. Key: Kotlin 2.3.0, Compose Multiplatform 1.9.3, Koin 4.1.1, Room 2.8.4, RevenueCat 2.2.17, Firebase BOM 33.7.0.

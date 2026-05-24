@@ -2,6 +2,7 @@ package com.antonchuraev.homesearchchecklist.feature.create.presentation.create
 
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
+import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavRoute
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.core.navigation.api.NavCommand
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDefaults
@@ -388,6 +389,7 @@ class CreateChecklistViewModelTest {
         var paywallSource: String? = null
 
         override val commands: Flow<NavCommand> = emptyFlow()
+        override val backStack: StateFlow<List<AppNavRoute>> = MutableStateFlow(emptyList())
 
         private val _events = MutableSharedFlow<AppNavEvent>()
         override val events: SharedFlow<AppNavEvent> = _events.asSharedFlow()

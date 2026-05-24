@@ -2,6 +2,7 @@ package com.antonchuraev.homesearchchecklist.feature.onboarding.presentation
 
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
+import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavRoute
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.core.navigation.api.NavCommand
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.RegistrationData
@@ -154,6 +155,7 @@ class OnboardingViewModelTest {
 
         override val commands: Flow<NavCommand> = emptyFlow()
         override val events: SharedFlow<AppNavEvent> = MutableSharedFlow()
+        override val backStack: StateFlow<List<AppNavRoute>> = MutableStateFlow(emptyList())
         override fun showWidgetInstruction() {}
         override fun requestCreateWeeklyChecklist() {}
         override fun onBack() {}

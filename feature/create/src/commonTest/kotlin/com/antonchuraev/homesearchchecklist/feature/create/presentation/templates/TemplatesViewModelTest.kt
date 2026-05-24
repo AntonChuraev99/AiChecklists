@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.create.presentation.templates
 
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
+import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavRoute
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.core.navigation.api.NavCommand
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDefaults
@@ -168,6 +169,7 @@ class TemplatesViewModelTest {
 
         override val commands: Flow<NavCommand> = emptyFlow()
         override val events: SharedFlow<AppNavEvent> = MutableSharedFlow()
+        override val backStack: StateFlow<List<AppNavRoute>> = MutableStateFlow(emptyList())
         override fun onBack() { backInvoked = true }
         override fun navigateToOnboarding() {}
         override fun navigateToInteractiveOnboarding() {}

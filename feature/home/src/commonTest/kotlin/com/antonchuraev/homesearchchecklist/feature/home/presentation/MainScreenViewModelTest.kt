@@ -2,6 +2,7 @@ package com.antonchuraev.homesearchchecklist.feature.home.presentation
 
 import com.antonchuraev.homesearchchecklist.core.datastore.api.HintsRepository
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
+import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavRoute
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.core.navigation.api.NavCommand
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDefaults
@@ -64,6 +65,7 @@ private class FakeHintsRepository(initialShown: Boolean = false) : HintsReposito
 private class FakeNavigator : AppNavigator {
     override val commands: Flow<NavCommand> = flowOf()
     override val events: SharedFlow<AppNavEvent> = MutableSharedFlow()
+    override val backStack: StateFlow<List<AppNavRoute>> = MutableStateFlow(emptyList())
     override fun showWidgetInstruction() {}
     override fun requestCreateWeeklyChecklist() {}
     override fun onBack() {}

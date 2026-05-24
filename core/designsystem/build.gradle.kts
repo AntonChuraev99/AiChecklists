@@ -45,6 +45,11 @@ androidResources {
             implementation(compose.materialIconsExtended)
             implementation(compose.ui)
             implementation(compose.components.resources)
+            implementation(libs.compose.adaptive)
+            implementation(libs.compose.ui.tooling.preview)
+        }
+        androidMain.dependencies {
+            implementation(libs.androidx.window)
         }
     }
 }

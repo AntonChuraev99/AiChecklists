@@ -1,30 +1,41 @@
 package com.antonchuraev.homesearchchecklist.core.navigation.impl
 
+import androidx.navigation3.runtime.NavBackStack
+import androidx.navigation3.runtime.NavKey
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
+import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavRoute
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
-import com.antonchuraev.homesearchchecklist.core.navigation.api.NavCommand
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.receiveAsFlow
 
 /**
- * Channel-based AppNavigator implementation.
+ * Direct NavBackStack mutation — no async Channel, no NavController.handle() translation.
  *
- * NavController stays entirely in the Compose layer (App.kt). This class only
- * emits [NavCommand] values; App.kt translates them into NavController calls.
+ * State changes are synchronous and observable by NavDisplay on the next Compose frame.
+ * The Splash race condition is eliminated architecturally: ViewModel.init mutations land
+ * before App.kt's first composition reads backStack.
  *
- * Channel.BUFFERED guarantees that commands emitted by ViewModel.init before
- * App.kt's LaunchedEffect starts collecting are queued and delivered in order —
- * the root cause of the Splash infinite-loader race condition is eliminated
- * architecturally rather than with a tactical queue workaround.
+ * Stage 2: replaces Stage 1's StateFlow<List<AppNavRoute>> + Channel.BUFFERED with
+ * Nav3 SnapshotStateList<NavKey> wrapped as NavBackStack.
  */
 class AppNavigatorImpl : AppNavigator {
 
-    private val _commands = Channel<NavCommand>(Channel.BUFFERED)
-    override val commands: Flow<NavCommand> = _commands.receiveAsFlow()
+    /**
+     * Nav3 back stack. NavDisplay observes this as a SnapshotStateList<NavKey> and
+     * re-renders on each mutation (add/remove/clear).
+     *
+     * Seeded with [AppNavRoute.Splash] in [init] because NavDisplay requires a
+     * non-empty stack at first composition — a LaunchedEffect-based seed runs
+     * AFTER composition and triggers `IllegalArgumentException: NavDisplay backstack
+     * cannot be empty`. DI-time init guarantees Splash is present before any
+     * Composable reads the stack.
+     */
+    override val backStack: NavBackStack<NavKey> = NavBackStack()
+
+    init {
+        backStack.add(AppNavRoute.Splash)
+    }
 
     private val _events = MutableSharedFlow<AppNavEvent>(replay = 0, extraBufferCapacity = 1)
     override val events: SharedFlow<AppNavEvent> = _events.asSharedFlow()
@@ -37,73 +48,119 @@ class AppNavigatorImpl : AppNavigator {
         _events.tryEmit(AppNavEvent.CreateWeeklyChecklistRequested)
     }
 
-    private fun emit(command: NavCommand) {
-        _commands.trySend(command)
+    override fun onBack() {
+        if (backStack.isNotEmpty()) backStack.removeAt(backStack.size - 1)
     }
 
-    override fun onBack() = emit(NavCommand.Back)
+    override fun navigateToOnboarding() {
+        // popUpTo<Splash> inclusive — reset stack with only Onboarding
+        backStack.clear()
+        backStack.add(AppNavRoute.Onboarding)
+    }
 
-    override fun navigateToOnboarding() = emit(NavCommand.ToOnboarding)
+    override fun navigateToInteractiveOnboarding() {
+        backStack.clear()
+        backStack.add(AppNavRoute.InteractiveOnboarding)
+    }
 
-    override fun navigateToInteractiveOnboarding() = emit(NavCommand.ToInteractiveOnboarding)
+    override fun navigateToMainScreen(clearBackStack: Boolean) {
+        if (clearBackStack) backStack.clear()
+        backStack.add(AppNavRoute.Main)
+    }
 
-    override fun navigateToMainScreen(clearBackStack: Boolean) =
-        emit(NavCommand.ToMainScreen(clearBackStack))
+    override fun navigateToDebugMenu() = push(AppNavRoute.Debug)
 
-    override fun navigateToDebugMenu() = emit(NavCommand.ToDebugMenu)
-
-    override fun navigateToStoreScreenshot() = emit(NavCommand.ToStoreScreenshot)
+    override fun navigateToStoreScreenshot() = push(AppNavRoute.StoreScreenshot)
 
     override fun navigateToCreateChecklistScreen(templateId: Int?) =
-        emit(NavCommand.ToCreateChecklistScreen(templateId))
+        push(AppNavRoute.CreateChecklistRoute.CreateChecklist(templateId = templateId))
 
     override fun navigateToEditChecklist(checklistId: Long) =
-        emit(NavCommand.ToEditChecklist(checklistId))
+        push(AppNavRoute.CreateChecklistRoute.CreateChecklist(editChecklistId = checklistId))
 
-    override fun navigateToTemplatesScreen() = emit(NavCommand.ToTemplatesScreen)
+    override fun navigateToTemplatesScreen() = push(AppNavRoute.CreateChecklistRoute.Templates)
 
     override fun navigateToTemplatePreview(templateId: String) =
-        emit(NavCommand.ToTemplatePreview(templateId))
+        push(AppNavRoute.CreateChecklistRoute.TemplatePreview(templateId))
 
     override fun navigateToAnalyzeScreen(checklistId: Long?, fillDefault: Boolean) =
-        emit(NavCommand.ToAnalyzeScreen(checklistId, fillDefault))
+        push(AppNavRoute.Analyze(checklistId, fillDefault))
 
-    override fun navigateToAnalyzeResultPreview() = emit(NavCommand.ToAnalyzeResultPreview)
+    override fun navigateToAnalyzeResultPreview() = push(AppNavRoute.AnalyzeResultPreview)
 
     override fun navigateToChecklistDetail(
         checklistId: Long,
         focusItemId: String?,
         clearBackStack: Boolean,
-    ) = emit(NavCommand.ToChecklistDetail(checklistId, focusItemId, clearBackStack))
+    ) {
+        val route = AppNavRoute.ChecklistDetail(checklistId, focusItemId)
+        if (clearBackStack) {
+            // Mirrors Nav2: popUpTo(Main, inclusive = false) — keep Main, drop above, then push
+            val mainIdx = backStack.indexOfFirst { it is AppNavRoute.Main }
+            if (mainIdx >= 0) {
+                while (backStack.size > mainIdx + 1) backStack.removeAt(backStack.size - 1)
+            } else {
+                backStack.clear()
+            }
+        }
+        backStack.add(route)
+    }
 
-    override fun navigateToFillDetail(fillId: Long, clearBackStack: Boolean) =
-        emit(NavCommand.ToFillDetail(fillId, clearBackStack))
+    override fun navigateToFillDetail(fillId: Long, clearBackStack: Boolean) {
+        val route = AppNavRoute.FillDetail(fillId)
+        if (clearBackStack) {
+            val mainIdx = backStack.indexOfFirst { it is AppNavRoute.Main }
+            if (mainIdx >= 0) {
+                while (backStack.size > mainIdx + 1) backStack.removeAt(backStack.size - 1)
+            } else {
+                backStack.clear()
+            }
+        }
+        backStack.add(route)
+    }
 
-    override fun navigateToFillsList(checklistId: Long) =
-        emit(NavCommand.ToFillsList(checklistId))
+    override fun navigateToFillsList(checklistId: Long) = push(AppNavRoute.FillsList(checklistId))
 
-    override fun navigateToPaywall(source: String) = emit(NavCommand.ToPaywall(source))
+    override fun navigateToPaywall(source: String) = push(AppNavRoute.Paywall(source))
 
     override fun navigateToPaywallVariant(source: String, forceVariant: String) =
-        emit(NavCommand.ToPaywallVariant(source, forceVariant))
+        push(AppNavRoute.Paywall(source = source, forceVariant = forceVariant))
 
-    override fun navigateToSubscriptionStatus(showSuccessMessage: Boolean) =
-        emit(NavCommand.ToSubscriptionStatus(showSuccessMessage))
+    override fun navigateToSubscriptionStatus(showSuccessMessage: Boolean) {
+        // Mirrors Nav2: popUpTo<Paywall> inclusive — removes all Paywall entries
+        backStack.removeAll { it is AppNavRoute.Paywall }
+        backStack.add(AppNavRoute.SubscriptionStatus(showSuccessMessage))
+    }
 
     override fun navigateToShareChecklist(checklistId: Long) =
-        emit(NavCommand.ToShareChecklist(checklistId))
+        push(AppNavRoute.ShareChecklist(checklistId))
 
-    override fun navigateToUpdateFeed() = emit(NavCommand.ToUpdateFeed)
+    override fun navigateToUpdateFeed() = pushLaunchSingleTop(AppNavRoute.UpdateFeed)
 
-    override fun navigateToSettings() = emit(NavCommand.ToSettings)
+    override fun navigateToSettings() = pushLaunchSingleTop(AppNavRoute.Settings)
 
-    override fun navigateToToday() = emit(NavCommand.ToToday)
+    override fun navigateToToday() = pushLaunchSingleTop(AppNavRoute.Today)
 
-    override fun navigateToCalendar() = emit(NavCommand.ToCalendar)
+    override fun navigateToCalendar() = pushLaunchSingleTop(AppNavRoute.Calendar)
 
-    override fun navigateToAiChat() = emit(NavCommand.ToAiChat)
+    override fun navigateToAiChat() = pushLaunchSingleTop(AppNavRoute.AiChat)
 
-    override fun navigateToScreenCatalog() = emit(NavCommand.ToScreenCatalog)
+    override fun navigateToScreenCatalog() = push(AppNavRoute.ScreenCatalog)
 
-    override fun navigateToOnboardings() = emit(NavCommand.ToOnboardings)
+    override fun navigateToOnboardings() = push(AppNavRoute.Onboardings)
+
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    private fun push(route: AppNavRoute) {
+        backStack.add(route)
+    }
+
+    /**
+     * Mirrors launchSingleTop — if the same route is already on top, do not duplicate it.
+     */
+    private fun pushLaunchSingleTop(route: AppNavRoute) {
+        if (backStack.lastOrNull() != route) backStack.add(route)
+    }
 }

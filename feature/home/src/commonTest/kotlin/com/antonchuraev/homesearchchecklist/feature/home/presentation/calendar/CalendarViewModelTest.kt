@@ -2,8 +2,11 @@ package com.antonchuraev.homesearchchecklist.feature.home.presentation.calendar
 
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
+import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavRoute
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.core.navigation.api.NavCommand
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistRepeatInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
@@ -132,6 +135,7 @@ private class FakeNavigator : AppNavigator {
 
     override val commands: Flow<NavCommand> = emptyFlow()
     override val events: SharedFlow<AppNavEvent> = MutableSharedFlow()
+    override val backStack: StateFlow<List<AppNavRoute>> = MutableStateFlow(emptyList())
     override fun showWidgetInstruction() {}
     override fun requestCreateWeeklyChecklist() {}
     override fun onBack() {}

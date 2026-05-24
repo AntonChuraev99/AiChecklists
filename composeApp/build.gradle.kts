@@ -116,7 +116,11 @@ kotlin {
             implementation(compose.components.uiToolingPreview)
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.androidx.lifecycle.runtimeCompose)
-            implementation(libs.androidx.navigation.compose)
+            // Navigation 3 — NavDisplay + entryProvider DSL + NavBackStack for App.kt.
+            // Replaces androidx.navigation.compose (Nav 2). NavDisplay lives in
+            // navigation3-ui which is pulled transitively; adaptive-navigation3 is the
+            // KMP umbrella artifact with wasmJs target verified at 1.3.0-alpha02.
+            implementation(libs.compose.adaptive.navigation3)
             implementation(libs.kotlinx.serialization.core)
             implementation(libs.koin.core)
             implementation(libs.koin.compose)

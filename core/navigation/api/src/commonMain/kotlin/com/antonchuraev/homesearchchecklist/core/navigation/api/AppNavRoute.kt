@@ -1,9 +1,21 @@
 package com.antonchuraev.homesearchchecklist.core.navigation.api
 
+import androidx.navigation3.runtime.NavKey
 import kotlinx.serialization.Serializable
 
+/**
+ * All navigation destinations in the app.
+ *
+ * Implements [NavKey] so that NavDisplay (Navigation 3) can use each route
+ * directly as a back-stack entry without an additional serialization step.
+ * The [Serializable] annotation is retained for argument passing consistency.
+ *
+ * Stage 2: sealed interface now extends NavKey directly.
+ * Previous Nav 2 approach used @Serializable routes consumed by NavController;
+ * Nav 3 NavDisplay renders entries based on type identity.
+ */
 @Serializable
-sealed interface AppNavRoute {
+sealed interface AppNavRoute : NavKey {
     @Serializable
     data object Splash : AppNavRoute
 

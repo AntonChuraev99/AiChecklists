@@ -1,24 +1,27 @@
 package com.antonchuraev.homesearchchecklist.core.navigation.api
 
-import kotlinx.coroutines.flow.Flow
+import androidx.navigation3.runtime.NavBackStack
+import androidx.navigation3.runtime.NavKey
 import kotlinx.coroutines.flow.SharedFlow
 
 interface AppNavigator {
 
     /**
-     * Cold flow of one-shot navigation commands. App.kt collects this and
-     * translates each command into a NavController call. NavController never
-     * leaves the Compose layer.
+     * Single source of truth for navigation state.
      *
-     * Backed by a Channel.BUFFERED so commands emitted before collection starts
-     * are queued and delivered in order — no race between ViewModel.init and
-     * the Compose LaunchedEffect that sets up the collector.
+     * NavDisplay observes this SnapshotStateList<NavKey> and renders the top entry
+     * as the current screen. Mutations are synchronous — NavDisplay re-renders on
+     * the next frame after any add/remove/clear operation.
+     *
+     * Stage 2: replaces Stage 1's StateFlow<List<AppNavRoute>> with Nav3 NavBackStack
+     * (SnapshotStateList<NavKey>). The async Channel.BUFFERED race between ViewModel.init
+     * and the Compose collector is eliminated — mutable state is visible immediately.
      */
-    val commands: Flow<NavCommand>
+    val backStack: NavBackStack<NavKey>
 
     /**
      * One-shot UI events (replay=0). App.kt collects these to open
-     * global overlays that cannot be triggered via NavController.
+     * global overlays that cannot be triggered via NavDisplay.
      */
     val events: SharedFlow<AppNavEvent>
 

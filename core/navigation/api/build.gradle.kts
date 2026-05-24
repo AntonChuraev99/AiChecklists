@@ -30,7 +30,10 @@ kotlin {
         commonMain.dependencies {
             implementation(libs.kotlinx.serialization.core)
             implementation(libs.kotlinx.coroutines.core)
-            implementation(libs.androidx.navigation.compose)
+            // Navigation 3 — NavKey is part of AppNavRoute's public API (sealed interface AppNavRoute : NavKey).
+            // Must be `api` so consumers of :core:navigation:api can see NavKey without adding
+            // compose-adaptive-navigation3 to their own dependencies.
+            api(libs.compose.adaptive.navigation3)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

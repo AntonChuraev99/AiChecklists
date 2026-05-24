@@ -31,7 +31,10 @@ kotlin {
             implementation(projects.core.navigation.api)
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.bundles.koin.library)
-            implementation(libs.androidx.navigation.compose)
+            // Navigation 3 — NavBackStack mutableStateListOf wrapper; pulled transitively
+            // via compose-adaptive-navigation3 in navigation api module but declared here
+            // explicitly so impl has direct access to NavBackStack/toNavBackStack().
+            implementation(libs.compose.adaptive.navigation3)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
