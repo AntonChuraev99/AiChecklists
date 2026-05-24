@@ -1,0 +1,22 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // User-scoped data: only owner can read/write
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      match /checklists/{checklistId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+
+    // Existing collections used by Cloud Functions (server-side access via Admin SDK)
+    // usage, credits_restore_log, credits_refill_log, premium_events_log,
+    // rc_customers, rc_events — accessed only by Admin SDK, default deny is correct.
+  }
+}

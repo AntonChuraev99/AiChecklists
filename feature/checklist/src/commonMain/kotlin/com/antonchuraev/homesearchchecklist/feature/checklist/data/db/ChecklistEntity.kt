@@ -20,7 +20,12 @@ data class ChecklistEntity(
     val separateCompleted: Boolean = false,
     val position: Int = 0,
     val autoDeleteCompleted: Boolean = false,
-    val viewMode: ChecklistViewMode = ChecklistViewMode.Standard
+    val viewMode: ChecklistViewMode = ChecklistViewMode.Standard,
+    val cloudId: String? = null,
+    val userId: String? = null,
+    val updatedAt: Long = 0L,
+    val syncStatus: Int = 0,
+    val isDeleted: Boolean = false,
 )
 
 fun ChecklistEntity.toDomain() = Checklist(
@@ -35,7 +40,12 @@ fun ChecklistEntity.toDomain() = Checklist(
     separateCompleted = separateCompleted,
     position = position,
     autoDeleteCompleted = autoDeleteCompleted,
-    viewMode = viewMode
+    viewMode = viewMode,
+    cloudId = cloudId,
+    userId = userId,
+    updatedAt = updatedAt,
+    syncStatus = syncStatus,
+    isDeleted = isDeleted,
 )
 
 fun Checklist.toEntity() = ChecklistEntity(
@@ -50,5 +60,10 @@ fun Checklist.toEntity() = ChecklistEntity(
     separateCompleted = separateCompleted,
     position = position,
     autoDeleteCompleted = autoDeleteCompleted,
-    viewMode = viewMode
+    viewMode = viewMode,
+    cloudId = cloudId,
+    userId = userId,
+    updatedAt = updatedAt,
+    syncStatus = syncStatus,
+    isDeleted = isDeleted,
 )

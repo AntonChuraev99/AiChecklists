@@ -26,7 +26,12 @@ data class ChecklistFillEntity(
     val coverImagePath: String?,
     val items: List<ChecklistFillItem>,
     val createdAt: Long,
-    val isDefault: Boolean = false
+    val isDefault: Boolean = false,
+    val cloudId: String? = null,
+    val userId: String? = null,
+    val updatedAt: Long = 0L,
+    val syncStatus: Int = 0,
+    val isDeleted: Boolean = false,
 )
 
 fun ChecklistFillEntity.toDomain() = ChecklistFill(
@@ -36,7 +41,12 @@ fun ChecklistFillEntity.toDomain() = ChecklistFill(
     coverImagePath = coverImagePath,
     items = items,
     createdAt = createdAt,
-    isDefault = isDefault
+    isDefault = isDefault,
+    cloudId = cloudId,
+    userId = userId,
+    updatedAt = updatedAt,
+    syncStatus = syncStatus,
+    isDeleted = isDeleted,
 )
 
 fun ChecklistFill.toEntity() = ChecklistFillEntity(
@@ -46,5 +56,10 @@ fun ChecklistFill.toEntity() = ChecklistFillEntity(
     coverImagePath = coverImagePath,
     items = items,
     createdAt = createdAt,
-    isDefault = isDefault
+    isDefault = isDefault,
+    cloudId = cloudId,
+    userId = userId,
+    updatedAt = updatedAt,
+    syncStatus = syncStatus,
+    isDeleted = isDeleted,
 )

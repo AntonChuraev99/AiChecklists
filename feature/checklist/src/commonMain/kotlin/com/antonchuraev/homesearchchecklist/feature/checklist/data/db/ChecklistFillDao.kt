@@ -45,4 +45,24 @@ interface ChecklistFillDao {
 
     @Query("DELETE FROM checklist_fills WHERE checklistId = :checklistId")
     suspend fun deleteByChecklistId(checklistId: Long)
+
+    // ─── Sync ───
+
+    @Query("SELECT * FROM checklist_fills WHERE syncStatus != 0")
+    suspend fun getPendingSync(): List<ChecklistFillEntity>
+
+    @Query("SELECT * FROM checklist_fills WHERE cloudId = :cloudId")
+    suspend fun getByCloudId(cloudId: String): ChecklistFillEntity?
+
+    @Query("UPDATE checklist_fills SET syncStatus = :status WHERE id = :id")
+    suspend fun updateSyncStatus(id: Long, status: Int)
+
+    @Query("UPDATE checklist_fills SET syncStatus = :status, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun markSynced(id: Long, status: Int = 0, updatedAt: Long)
+
+    @Query("UPDATE checklist_fills SET userId = :userId WHERE userId IS NULL")
+    suspend fun assignUserIdToAll(userId: String)
+
+    @Query("SELECT * FROM checklist_fills WHERE checklistId = :checklistId AND isDeleted = 0")
+    suspend fun getActiveFillsByChecklistId(checklistId: Long): List<ChecklistFillEntity>
 }

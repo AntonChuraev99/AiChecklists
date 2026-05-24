@@ -70,6 +70,13 @@ interface UserDataRepository {
         idToken: String,
         platform: String,
     ): Result<LinkGoogleAccountResult> = Result.failure(UnsupportedOperationException("Not implemented"))
+
+    /**
+     * Clears all Google account data from local DataStore.
+     * Called on sign-out so that the app returns to a non-linked state
+     * without requiring a full app restart.
+     */
+    suspend fun clearGoogleAccountData() {}
 }
 
 data class LinkGoogleAccountResult(

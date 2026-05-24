@@ -34,6 +34,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(projects.core.common.api)
+            implementation(projects.core.auth.api)
             implementation(projects.core.designsystem)
 
             implementation(libs.bundles.koin.library)

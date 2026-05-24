@@ -2,6 +2,7 @@ package com.antonchuraev.homesearchchecklist.feature.checklist.data.repository
 
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePort
 import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.SyncStatus
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistDao
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistEntity
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistFillDao
@@ -21,6 +22,8 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.expan
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import kotlinx.coroutines.flow.Flow
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
@@ -38,11 +41,16 @@ class ChecklistRepositoryImpl(
     }
 
     override suspend fun addChecklist(checklist: Checklist): Long {
-        // Shift all existing checklists down so the new one appears at the top
         checklistDao.incrementAllPositions()
-        val checklistId = checklistDao.insert(checklist.toEntity().copy(position = 0))
+        val now = currentTimeMillis()
+        val entity = checklist.toEntity().copy(
+            position = 0,
+            cloudId = checklist.cloudId ?: generateCloudId(),
+            updatedAt = now,
+            syncStatus = SyncStatus.PENDING_UPLOAD.value,
+        )
+        val checklistId = checklistDao.insert(entity)
 
-        // Create default fill automatically
         val defaultFill = ChecklistFill(
             checklistId = checklistId,
             name = "",
@@ -53,8 +61,11 @@ class ChecklistRepositoryImpl(
                     note = null
                 )
             },
-            createdAt = currentTimeMillis(),
-            isDefault = true
+            createdAt = now,
+            isDefault = true,
+            cloudId = generateCloudId(),
+            updatedAt = now,
+            syncStatus = SyncStatus.PENDING_UPLOAD.value,
         )
         fillDao.insert(defaultFill.toEntity())
 
@@ -62,7 +73,10 @@ class ChecklistRepositoryImpl(
     }
 
     override suspend fun updateChecklist(checklist: Checklist) {
-        checklistDao.update(checklist.toEntity())
+        checklistDao.update(checklist.toEntity().copy(
+            updatedAt = currentTimeMillis(),
+            syncStatus = SyncStatus.PENDING_UPLOAD.value,
+        ))
 
         // Sync default fill items with updated checklist items
         val defaultFillEntity = fillDao.getDefaultFillByChecklistId(checklist.id)
@@ -81,19 +95,19 @@ class ChecklistRepositoryImpl(
     }
 
     override suspend fun updateChecklistTemplate(checklist: Checklist) {
-        checklistDao.update(checklist.toEntity())
+        checklistDao.update(checklist.toEntity().copy(
+            updatedAt = currentTimeMillis(),
+            syncStatus = SyncStatus.PENDING_UPLOAD.value,
+        ))
     }
 
     override suspend fun deleteChecklist(checklist: Checklist) {
-        // Enumerate all fills before the DB delete so we know which attachment directories to clean.
-        // Room's ForeignKey.CASCADE will delete fill rows automatically when the checklist row is
-        // removed — but file cleanup must happen first to avoid orphaned files on disk.
         val fillsForChecklist = fillDao.getAllFillsByChecklistId(checklist.id)
         for (fill in fillsForChecklist) {
             attachmentStorage.deleteAttachmentsForFill(fill.id)
         }
 
-        checklistDao.deleteById(checklist.id)
+        checklistDao.softDelete(checklist.id, currentTimeMillis())
         reindexPositions()
     }
 
@@ -314,11 +328,19 @@ class ChecklistRepositoryImpl(
     }
 
     override suspend fun addFill(fill: ChecklistFill): Long {
-        return fillDao.insert(fill.toEntity())
+        val entity = fill.toEntity().copy(
+            cloudId = fill.cloudId ?: generateCloudId(),
+            updatedAt = currentTimeMillis(),
+            syncStatus = SyncStatus.PENDING_UPLOAD.value,
+        )
+        return fillDao.insert(entity)
     }
 
     override suspend fun updateFill(fill: ChecklistFill) {
-        fillDao.insert(fill.toEntity())
+        fillDao.insert(fill.toEntity().copy(
+            updatedAt = currentTimeMillis(),
+            syncStatus = SyncStatus.PENDING_UPLOAD.value,
+        ))
     }
 
     override suspend fun deleteFill(fill: ChecklistFill) {
@@ -372,6 +394,11 @@ class ChecklistRepositoryImpl(
      * A fill entity is keyed by checklistId — we resolve the checklist name via the entities list
      * rather than a separate DB query.
      */
+    companion object {
+        @OptIn(ExperimentalUuidApi::class)
+        fun generateCloudId(): String = Uuid.random().toString()
+    }
+
     private fun buildRemindersInRange(
         checklistEntities: List<ChecklistEntity>,
         fillEntities: List<ChecklistFillEntity>,

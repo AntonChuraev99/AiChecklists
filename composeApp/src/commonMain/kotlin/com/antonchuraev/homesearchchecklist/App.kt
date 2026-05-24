@@ -153,6 +153,13 @@ fun App() {
             }
         }
 
+        val handleSignOut: () -> Unit = {
+            scope.launch {
+                googleAuthRepository.signOut()
+                userDataRepository.clearGoogleAccountData()
+            }
+        }
+
         val csatViewModel: CsatViewModel = koinInject()
         val csatState by csatViewModel.screenState.collectAsState()
 
@@ -282,9 +289,7 @@ fun App() {
                                     googleEmail = userData.googleEmail,
                                     googleDisplayName = userData.googleDisplayName,
                                     onSignInClick = handleSignIn,
-                                    onSignOutClick = {
-                                        scope.launch { googleAuthRepository.signOut() }
-                                    },
+                                    onSignOutClick = handleSignOut,
                                 )
                             }
                         }
@@ -441,9 +446,7 @@ fun App() {
                                     googleEmail = userData.googleEmail,
                                     googleDisplayName = userData.googleDisplayName,
                                     onSignInClick = handleSignIn,
-                                    onSignOutClick = {
-                                        scope.launch { googleAuthRepository.signOut() }
-                                    },
+                                    onSignOutClick = handleSignOut,
                                 )
                             }
                         }
@@ -521,9 +524,7 @@ fun App() {
                                     googleEmail = userData.googleEmail,
                                     googleDisplayName = userData.googleDisplayName,
                                     onSignInClick = handleSignIn,
-                                    onSignOutClick = {
-                                        scope.launch { googleAuthRepository.signOut() }
-                                    },
+                                    onSignOutClick = handleSignOut,
                                 )
                             }
                         }
@@ -601,9 +602,7 @@ fun App() {
                                     googleEmail = userData.googleEmail,
                                     googleDisplayName = userData.googleDisplayName,
                                     onSignInClick = handleSignIn,
-                                    onSignOutClick = {
-                                        scope.launch { googleAuthRepository.signOut() }
-                                    },
+                                    onSignOutClick = handleSignOut,
                                 )
                             }
                         }
@@ -683,9 +682,7 @@ fun App() {
                                     googleEmail = userData.googleEmail,
                                     googleDisplayName = userData.googleDisplayName,
                                     onSignInClick = handleSignIn,
-                                    onSignOutClick = {
-                                        scope.launch { googleAuthRepository.signOut() }
-                                    },
+                                    onSignOutClick = handleSignOut,
                                 )
                             }
                         }
@@ -765,9 +762,7 @@ fun App() {
                                     googleEmail = userData.googleEmail,
                                     googleDisplayName = userData.googleDisplayName,
                                     onSignInClick = handleSignIn,
-                                    onSignOutClick = {
-                                        scope.launch { googleAuthRepository.signOut() }
-                                    },
+                                    onSignOutClick = handleSignOut,
                                 )
                             }
                         }

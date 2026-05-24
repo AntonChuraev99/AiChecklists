@@ -80,6 +80,7 @@ kotlin {
             implementation(libs.firebase.analytics)
             implementation(libs.firebase.crashlytics)
             implementation(libs.firebase.config)
+            implementation(libs.firebase.firestore)
         }
         commonMain.dependencies {
             implementation(projects.core.common.api)
@@ -120,6 +121,7 @@ kotlin {
             implementation(libs.androidx.lifecycle.runtimeCompose)
             implementation(libs.androidx.navigation.compose)
             implementation(libs.kotlinx.serialization.core)
+            implementation(libs.kotlinx.serialization.json)
             implementation(libs.koin.core)
             implementation(libs.koin.compose)
             implementation(libs.koin.compose.viewmodel)

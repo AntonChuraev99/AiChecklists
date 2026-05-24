@@ -96,6 +96,7 @@ firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
 firebase-crashlytics = { module = "com.google.firebase:firebase-crashlytics" }
 firebase-config = { module = "com.google.firebase:firebase-config" }
 firebase-auth = { module = "com.google.firebase:firebase-auth" }
+firebase-firestore = { module = "com.google.firebase:firebase-firestore" }
 
 # Credential Manager (Google Sign-In)
 credentials = { module = "androidx.credentials:credentials", version.ref = "credentialManager" }

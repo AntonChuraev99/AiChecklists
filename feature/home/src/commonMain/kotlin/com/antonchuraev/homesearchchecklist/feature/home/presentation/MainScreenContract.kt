@@ -64,8 +64,11 @@ sealed interface MainScreenIntent : Intent {
     data object OnSignInClick : MainScreenIntent
 
     data object OnSignOutClick : MainScreenIntent
+
+    data object OnAiChatClick : MainScreenIntent
 }
 
 sealed interface MainScreenSideEffect : SideEffect {
     data class ShowSnackbar(val messageKey: String) : MainScreenSideEffect
+    data object NavigateToAiChat : MainScreenSideEffect
 }
