@@ -1,6 +1,8 @@
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
 
 let sqlite3 = null;
+let poolUtil = null;
+let initError = null;
 
 // Maps to track of active database connections and prepared statements by their unique IDs.
 const databases = new Map(); // stores databaseId -> SQLiteDbObject
@@ -12,8 +14,12 @@ let nextStatementId = 0;
 
 function openRequest(id, requestData) {
     try {
+        if (!poolUtil) {
+            postMessage({'id': id, error: initError || 'SAH Pool not initialized'});
+            return;
+        }
         const newDatabaseId = nextDatabaseId++;
-        const newDatabase = new sqlite3.oo1.OpfsDb(requestData.fileName);
+        const newDatabase = new poolUtil.OpfsSAHPoolDb(requestData.fileName);
         databases.set(newDatabaseId, newDatabase);
         postMessage({'id': id, data: {'databaseId': newDatabaseId}});
     } catch (error) {
@@ -141,16 +147,35 @@ function handleMessage(e) {
 
 const messageQueue = [];
 onmessage = (e) => {
-    if (!sqlite3) {
+    if (!poolUtil) {
         messageQueue.push(e);
     } else {
         handleMessage(e);
     }
 };
 
-sqlite3InitModule().then(instance => {
-    sqlite3 = instance;
-    while (messageQueue.length > 0) {
-        handleMessage(messageQueue.shift());
-    }
-});
+// SAH Pool VFS: no SharedArrayBuffer, no COOP/COEP required.
+// Firebase Auth signInWithPopup and third-party scripts work freely.
+sqlite3InitModule()
+    .then(instance => {
+        sqlite3 = instance;
+        return sqlite3.installOpfsSAHPoolVfs({
+            name: 'opfs-sahpool',
+            initialCapacity: 8,
+        });
+    })
+    .then(util => {
+        poolUtil = util;
+        while (messageQueue.length > 0) {
+            handleMessage(messageQueue.shift());
+        }
+    })
+    .catch(err => {
+        const msg = err && err.message ? err.message : String(err);
+        initError = 'OPFS SAH Pool init failed: ' + msg;
+        console.error('[sqlite-worker] ' + initError);
+        while (messageQueue.length > 0) {
+            const e = messageQueue.shift();
+            postMessage({ id: e.data && e.data.id, error: initError });
+        }
+    });

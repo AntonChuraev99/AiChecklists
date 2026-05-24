@@ -2,15 +2,14 @@
 # Docs: https://developers.cloudflare.com/workers/static-assets/headers/
 #
 # Strategy:
-#   - Cross-origin isolation (REQUIRED for Room 3.0 OPFS + SharedArrayBuffer).
+#   - NO COOP/COEP — Room 3.0 OPFS uses OpfsSAHPoolDb (SAH Pool VFS) which
+#     does not require SharedArrayBuffer. Firebase Auth signInWithPopup and
+#     third-party scripts (Stripe, analytics) work without restrictions.
 #   - Hashed assets (wasm, chunk JS) → 1 year, immutable.
 #   - Entry points (index.html, composeApp.js, init.js) → always revalidate.
 #   - Compose resources (fixed names) → 1 day with revalidation.
 
 /*
-  Cross-Origin-Opener-Policy: same-origin-allow-popups
-  Cross-Origin-Embedder-Policy: require-corp
-  Cross-Origin-Resource-Policy: cross-origin
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
 
