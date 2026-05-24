@@ -87,6 +87,28 @@ dependencies {
     add("kspWasmJs", libs.room3.compiler)
 }
 
+// Sync sqlite-wasm-worker sources into webpack node_modules.
+// npm() copies on initial install but never re-syncs — edits to worker.js
+// are silently ignored without this task.
+val syncSqliteWasmWorker = tasks.register<Copy>("syncSqliteWasmWorker") {
+    group = "build"
+    from(rootProject.layout.projectDirectory.dir("sqlite-wasm-worker")) {
+        include("worker.js", "package.json")
+    }
+    into(rootProject.layout.buildDirectory.dir("wasm/node_modules/sqlite-wasm-worker"))
+}
+
+rootProject.allprojects.forEach { project ->
+    project.tasks.matching { task ->
+        task.name.startsWith("wasmJsBrowser") || task.name == "wasmJsBrowserDevelopmentRun"
+    }.configureEach {
+        dependsOn(syncSqliteWasmWorker)
+    }
+}
+syncSqliteWasmWorker.configure {
+    mustRunAfter(rootProject.tasks.matching { it.name == "kotlinNpmInstall" })
+}
+
 room3 {
     schemaDirectory(layout.projectDirectory.dir("schemas"))
 }
