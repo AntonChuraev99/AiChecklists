@@ -2,7 +2,8 @@
 Firebase Cloud Functions for AI Checklists App.
 
 Functions:
-1. register_user - Register or retrieve user by device ID
+1. register_user - Register or retrieve user by device ID (web: 0 credits, mobile: 100)
+1b. link_google_account - Link Google account to existing user (web: grants starter pack)
 2. analyze_and_fill_checklist - Auto-fill existing checklist based on user data
 3. generate_checklist - Create new checklist from prompt + user data
 4. get_usage_stats - Get user's AI usage statistics
@@ -22,7 +23,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import firebase_admin
-from firebase_admin import credentials, firestore
+from firebase_admin import auth as firebase_auth, credentials, firestore
 from flask import Request, jsonify, make_response
 import google.generativeai as genai
 import functions_framework
@@ -148,7 +149,7 @@ def create_success_response(data: dict):
 _CORS_HEADERS = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "Access-Control-Max-Age": "3600",
 }
 
@@ -163,6 +164,63 @@ def add_cors_headers(response):
 def cors_preflight_ok():
     """Return 204 No Content for CORS preflight OPTIONS requests."""
     return add_cors_headers(make_response("", 204))
+
+
+# ============================================================================
+# Firebase Auth token verification
+# ============================================================================
+
+def verify_firebase_token(request: Request) -> tuple[dict | None, tuple | None]:
+    """
+    Extract and verify Firebase ID token from Authorization header.
+    Returns (decoded_token, None) on success, (None, None) when no token
+    is present (fall through to legacy auth), or (None, (message, status))
+    on invalid token.
+    """
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return None, None
+
+    id_token = auth_header[7:]
+    try:
+        decoded = firebase_auth.verify_id_token(id_token)
+        return decoded, None
+    except (firebase_auth.RevokedIdTokenError,
+            firebase_auth.ExpiredIdTokenError,
+            firebase_auth.InvalidIdTokenError):
+        return None, ("Invalid or expired authentication token", 401)
+    except firebase_auth.UserDisabledError:
+        return None, ("User account is disabled", 403)
+    except Exception:
+        return None, ("Authentication verification failed", 500)
+
+
+def get_authenticated_user_id(request: Request, data: dict) -> tuple[str | None, tuple | None]:
+    """
+    Resolve user_id from either Firebase token (new) or user_id body field (legacy).
+    Firebase token takes precedence when present.
+    Returns (user_id, None) on success or (None, (message, status)) on failure.
+    """
+    decoded_token, error = verify_firebase_token(request)
+    if error:
+        return None, error
+
+    if decoded_token:
+        firebase_uid = decoded_token["uid"]
+        users = db.collection("users").where("google_uid", "==", firebase_uid).limit(1).get()
+        for user_doc in users:
+            return user_doc.id, None
+        return None, ("No linked user found. Please sign in first.", 404)
+
+    user_id = data.get("user_id")
+    if not user_id:
+        return None, ("Authentication required", 401)
+
+    user_doc = db.document(f"users/{user_id}").get()
+    if not user_doc.exists:
+        return None, ("User not found", 404)
+
+    return user_id, None
 
 
 # ============================================================================
@@ -526,7 +584,16 @@ def register_user(request: Request):
     try:
         # Get credits config (allows remote configuration)
         config = get_credits_config()
-        initial_credits = config["initial_credits"]
+        platform = data.get("platform", "")
+
+        # Web users start with 0 credits — they unlock the starter pack
+        # (same 100 credits as mobile) by signing in with Google.
+        # Mobile users get credits immediately at install (implicit trust
+        # via Play Store account).
+        if platform == "web":
+            initial_credits = 0
+        else:
+            initial_credits = config["initial_credits"]
 
         # Check if user with this device_id already exists
         users_ref = db.collection("users")
@@ -572,6 +639,109 @@ def register_user(request: Request):
         return add_cors_headers(make_response(
             jsonify({"success": False, "error": f"Failed to register user: {str(e)}"}), 500
         ))
+
+
+# ============================================================================
+# FUNCTION 1b: Link Google account to existing device-based user
+# ============================================================================
+
+@functions_framework.http
+def link_google_account(request: Request):
+    """
+    Link a Google account to an existing device-based user.
+    Grants starter credits on web (same pack as Android install).
+
+    Request:
+      Headers: Authorization: Bearer <firebase_id_token>
+      Body: { "user_id": "existing device-based user_id", "platform": "web"|"android" }
+
+    Response:
+      { "success": true, "user_id": "...", "google_email": "...",
+        "is_existing_account": false, "ai_credits": 100,
+        "is_premium": false, "bonus_credits_granted": 100 }
+    """
+    if request.method == "OPTIONS":
+        return cors_preflight_ok()
+
+    if request.method != "POST":
+        return create_error_response("Only POST method is allowed", 405)
+
+    decoded_token, error = verify_firebase_token(request)
+    if error:
+        return create_error_response(error[0], error[1])
+    if not decoded_token:
+        return create_error_response("Firebase ID token required in Authorization header", 401)
+
+    try:
+        data = request.get_json() or {}
+    except Exception:
+        return create_error_response("Invalid JSON body", 400)
+
+    user_id = data.get("user_id")
+    if not user_id:
+        return create_error_response("user_id is required", 400)
+
+    platform = data.get("platform", "")
+    firebase_uid = decoded_token["uid"]
+    google_email = decoded_token.get("email", "")
+    google_name = decoded_token.get("name", "")
+    google_photo = decoded_token.get("picture", "")
+
+    try:
+        # Check if this Google account is already linked to another user
+        existing = db.collection("users").where("google_uid", "==", firebase_uid).limit(1).get()
+        for doc in existing:
+            if doc.id != user_id:
+                existing_data = doc.to_dict()
+                return create_success_response({
+                    "user_id": doc.id,
+                    "google_email": google_email,
+                    "is_existing_account": True,
+                    "ai_credits": existing_data.get("ai_credits", 0),
+                    "is_premium": existing_data.get("is_premium", False),
+                    "bonus_credits_granted": 0,
+                })
+
+        user_ref = db.document(f"users/{user_id}")
+        user_doc = user_ref.get()
+
+        if not user_doc.exists:
+            return create_error_response("User not found", 404)
+
+        user_data = user_doc.to_dict()
+
+        # Grant starter pack credits on web (one-time, same as Android install)
+        config = get_credits_config()
+        bonus = 0
+        already_granted = user_data.get("google_bonus_credits_granted", False)
+        if platform == "web" and not already_granted:
+            bonus = config["initial_credits"]
+
+        update_data = {
+            "google_uid": firebase_uid,
+            "google_email": google_email,
+            "google_display_name": google_name,
+            "google_photo_url": google_photo,
+            "google_linked_at": firestore.SERVER_TIMESTAMP,
+            "updated_at": datetime.utcnow().isoformat(),
+        }
+        if bonus > 0:
+            update_data["ai_credits"] = user_data.get("ai_credits", 0) + bonus
+            update_data["google_bonus_credits_granted"] = True
+
+        user_ref.update(update_data)
+
+        return create_success_response({
+            "user_id": user_id,
+            "google_email": google_email,
+            "is_existing_account": False,
+            "ai_credits": user_data.get("ai_credits", 0) + bonus,
+            "is_premium": user_data.get("is_premium", False),
+            "bonus_credits_granted": bonus,
+        })
+
+    except Exception as e:
+        return create_error_response(f"Failed to link Google account: {str(e)}", 500)
 
 
 # ============================================================================

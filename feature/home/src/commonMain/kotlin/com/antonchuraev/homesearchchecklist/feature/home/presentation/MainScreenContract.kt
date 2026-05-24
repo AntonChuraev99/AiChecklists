@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation
 
 import com.antonchuraev.homesearchchecklist.core.common.api.Intent
+import com.antonchuraev.homesearchchecklist.core.common.api.SideEffect
 import com.antonchuraev.homesearchchecklist.core.common.api.State
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.SubscriptionStatus
@@ -31,7 +32,10 @@ sealed interface MainScreenState : State {
         val formattedExpirationDate: String? = null,
         val aiCredits: Int = 0,
         val showLimitReachedDialog: Boolean = false,
-        override val userLimits: UserLimits?
+        override val userLimits: UserLimits?,
+        val isGoogleLinked: Boolean = false,
+        val googleEmail: String? = null,
+        val googleDisplayName: String? = null,
     ) : MainScreenState
 }
 
@@ -56,4 +60,12 @@ sealed interface MainScreenIntent : Intent {
     data class OnReorderChecklists(val orderedIds: List<Long>) : MainScreenIntent
 
     data object OnUpdateFeedClick : MainScreenIntent
+
+    data object OnSignInClick : MainScreenIntent
+
+    data object OnSignOutClick : MainScreenIntent
+}
+
+sealed interface MainScreenSideEffect : SideEffect {
+    data class ShowSnackbar(val messageKey: String) : MainScreenSideEffect
 }

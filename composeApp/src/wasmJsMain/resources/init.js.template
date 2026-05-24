@@ -18,6 +18,13 @@ import {
 } from 'https://www.gstatic.com/firebasejs/12.11.0/firebase-remote-config.js';
 import { getFunctions, httpsCallable }
     from 'https://www.gstatic.com/firebasejs/12.11.0/firebase-functions.js';
+import {
+    getAuth,
+    signInWithPopup,
+    GoogleAuthProvider as JsGoogleAuthProvider,
+    onAuthStateChanged,
+    signOut as jsFirebaseSignOut,
+} from 'https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js';
 
 const firebaseConfig = {
     apiKey: "__FIREBASE_API_KEY__",
@@ -93,6 +100,68 @@ globalThis.__functionsCall = async (name, dataJson) => {
         });
     }
 };
+
+// === Firebase Auth bridge ===
+const auth = getAuth(app);
+const googleProvider = new JsGoogleAuthProvider();
+
+globalThis.__googleSignIn = () => new Promise((resolve) => {
+    signInWithPopup(auth, googleProvider)
+        .then(async (result) => {
+            const user = result.user;
+            const idToken = await user.getIdToken();
+            resolve(JSON.stringify({
+                ok: true,
+                uid: user.uid,
+                email: user.email || '',
+                displayName: user.displayName || '',
+                photoURL: user.photoURL || '',
+                idToken: idToken,
+            }));
+        })
+        .catch((error) => {
+            resolve(JSON.stringify({
+                ok: false,
+                uid: '', email: '', displayName: '', photoURL: '', idToken: '',
+                error: error.code + ': ' + error.message,
+            }));
+        });
+});
+
+globalThis.__getCurrentFirebaseUser = async () => {
+    const user = auth.currentUser;
+    if (!user) return null;
+    const idToken = await user.getIdToken();
+    return JSON.stringify({
+        uid: user.uid,
+        email: user.email || '',
+        displayName: user.displayName || '',
+        photoURL: user.photoURL || '',
+        idToken: idToken,
+    });
+};
+
+globalThis.__firebaseSignOut = () => jsFirebaseSignOut(auth);
+
+globalThis.__authReadyPromise = new Promise((resolve) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+        unsubscribe();
+        if (user) {
+            user.getIdToken().then((token) => {
+                resolve(JSON.stringify({
+                    ok: true,
+                    uid: user.uid,
+                    email: user.email || '',
+                    displayName: user.displayName || '',
+                    photoURL: user.photoURL || '',
+                    idToken: token,
+                }));
+            });
+        } else {
+            resolve(null);
+        }
+    });
+});
 
 // === File Picker bridge ===
 // Staging map: key = "wasm-blob://<uuid>", value = ArrayBuffer

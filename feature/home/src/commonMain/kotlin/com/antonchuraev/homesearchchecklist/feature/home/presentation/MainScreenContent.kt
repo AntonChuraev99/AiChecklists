@@ -46,6 +46,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
+import com.antonchuraev.homesearchchecklist.desingsystem.components.SyncAccountBanner
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
 import com.antonchuraev.homesearchchecklist.desingsystem.components.PremiumBanner
@@ -66,7 +67,8 @@ fun MainScreenContent(
     onPremiumBannerClick: () -> Unit,
     onEnterEditMode: () -> Unit,
     onExitEditMode: () -> Unit,
-    onReorderChecklists: (List<Long>) -> Unit = {}
+    onReorderChecklists: (List<Long>) -> Unit = {},
+    onSignInClick: () -> Unit = {},
 ) {
     val hapticFeedback = LocalHapticFeedback.current
 
@@ -76,10 +78,14 @@ fun MainScreenContent(
     }
 
     val lazyListState = rememberLazyListState()
+    // Header items before the checklist rows: premium_banner always present (index 0),
+    // sync_banner present when Google is not linked (index 1 when visible).
+    val headerItemCount = if (screenState.isGoogleLinked) 1 else 2
+
     val reorderableState = rememberReorderableLazyListState(lazyListState) { from, to ->
-        // Offset by 1 because premium_banner item occupies index 0
-        val fromIndex = from.index - 1
-        val toIndex = to.index - 1
+        // Offset by headerItemCount because banner items occupy the first indices
+        val fromIndex = from.index - headerItemCount
+        val toIndex = to.index - headerItemCount
         if (fromIndex >= 0 && toIndex >= 0 && fromIndex < localList.size && toIndex < localList.size) {
             localList = localList.toMutableList().apply {
                 add(toIndex, removeAt(fromIndex))
@@ -118,6 +124,12 @@ fun MainScreenContent(
                 onUpgradeClick = onPremiumBannerClick,
                 onSubscriptionClick = onPremiumBannerClick
             )
+        }
+
+        if (!screenState.isGoogleLinked) {
+            item(key = "sync_banner") {
+                SyncAccountBanner(onSignInClick = onSignInClick)
+            }
         }
 
         if (localList.isEmpty()) {

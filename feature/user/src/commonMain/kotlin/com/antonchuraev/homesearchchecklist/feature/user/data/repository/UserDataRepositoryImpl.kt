@@ -10,6 +10,7 @@ import com.antonchuraev.homesearchchecklist.feature.user.data.remote.RegisterUse
 import com.antonchuraev.homesearchchecklist.feature.user.data.remote.UserApiService
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.RegistrationData
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.UserData
+import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.LinkGoogleAccountResult
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -39,6 +40,10 @@ class UserDataRepositoryImpl(
         private const val AI_CREDITS_KEY = "ai_credits"
         internal const val IS_PAYWALL_LINKED_KEY = "is_paywall_linked"
         private const val FIRST_LAUNCH_AT_KEY = "first_launch_at"
+        private const val GOOGLE_EMAIL_KEY = "google_email"
+        private const val GOOGLE_DISPLAY_NAME_KEY = "google_display_name"
+        private const val GOOGLE_PHOTO_URL_KEY = "google_photo_url"
+        private const val IS_GOOGLE_LINKED_KEY = "is_google_linked"
 
         private const val MAX_RESTORE_RETRIES = 3
         private const val RESTORE_RETRY_BASE_DELAY_MS = 2000L
@@ -51,7 +56,7 @@ class UserDataRepositoryImpl(
         )
     }
 
-    private val userDataFlow = combine(
+    private val baseUserFlow = combine(
         appDatastore.observeString(USER_ID_KEY, ""),
         appDatastore.observeBoolean(IS_ONBOARDING_PASSED_KEY, false),
         appDatastore.observeBoolean(IS_PREMIUM_KEY, false),
@@ -61,7 +66,23 @@ class UserDataRepositoryImpl(
             userId = userId,
             isOnboardingPassed = isOnboardingPassed,
             isPremium = isPremium,
-            aiCredits = aiCredits
+            aiCredits = aiCredits,
+        )
+    }
+
+    private val googleFlow = combine(
+        appDatastore.observeString(GOOGLE_EMAIL_KEY, ""),
+        appDatastore.observeString(GOOGLE_DISPLAY_NAME_KEY, ""),
+        appDatastore.observeBoolean(IS_GOOGLE_LINKED_KEY, false),
+    ) { email, displayName, isLinked ->
+        Triple(email.ifBlank { null }, displayName.ifBlank { null }, isLinked)
+    }
+
+    private val userDataFlow = combine(baseUserFlow, googleFlow) { base, (email, name, linked) ->
+        base.copy(
+            googleEmail = email,
+            googleDisplayName = name,
+            isGoogleLinked = linked,
         )
     }.stateIn(
         appScope,
@@ -178,6 +199,38 @@ class UserDataRepositoryImpl(
             "attempts" to MAX_RESTORE_RETRIES
         ))
         return Result.failure(lastError ?: IllegalStateException("All retries failed"))
+    }
+
+    override suspend fun linkGoogleAccount(
+        idToken: String,
+        platform: String,
+    ): Result<LinkGoogleAccountResult> {
+        val userId = appDatastore.observeString(USER_ID_KEY, "").first()
+        if (userId.isBlank()) {
+            return Result.failure(IllegalStateException("User not registered"))
+        }
+
+        return userApiService.linkGoogleAccount(
+            userId = userId,
+            idToken = idToken,
+            platform = platform,
+        ).map { apiResult ->
+            appDatastore.saveInt(AI_CREDITS_KEY, apiResult.aiCredits)
+            appDatastore.saveBoolean(IS_PREMIUM_KEY, apiResult.isPremium)
+            appDatastore.saveString(GOOGLE_EMAIL_KEY, apiResult.googleEmail)
+            appDatastore.saveBoolean(IS_GOOGLE_LINKED_KEY, true)
+            if (apiResult.userId != userId) {
+                appDatastore.saveString(USER_ID_KEY, apiResult.userId)
+            }
+
+            LinkGoogleAccountResult(
+                googleEmail = apiResult.googleEmail,
+                aiCredits = apiResult.aiCredits,
+                isPremium = apiResult.isPremium,
+                bonusCreditsGranted = apiResult.bonusCreditsGranted,
+                isExistingAccount = apiResult.isExistingAccount,
+            )
+        }
     }
 
     override suspend fun getFirstLaunchAtMillis(): Long {

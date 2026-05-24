@@ -1074,4 +1074,16 @@
     <string name="chat_message_thumb_down">Bad response</string>
     <string name="chat_day_divider_today">Today</string>
     <string name="chat_thumb_up_thanks">Thanks for the feedback</string>
+
+    <!-- Google Auth / Sync -->
+    <string name="sync_banner_title">Sync your checklists</string>
+    <string name="sync_banner_description">Sign in with Google to access your lists from any device</string>
+    <string name="web_credits_banner_title">Get 100 free AI credits</string>
+    <string name="web_credits_banner_description">Sign in with Google to unlock AI features</string>
+    <string name="drawer_sign_in">Sign In</string>
+    <string name="drawer_account">Account</string>
+    <string name="drawer_sign_out">Sign out</string>
+    <string name="google_sign_in_success">Signed in successfully</string>
+    <string name="google_sign_in_failed">Sign-in failed. Please try again.</string>
+    <string name="google_sign_in_required">Sign in with Google to use AI features</string>
 </resources>
