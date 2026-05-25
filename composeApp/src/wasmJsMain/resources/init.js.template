@@ -693,98 +693,16 @@ globalThis.__firestoreUnsubscribe = (listenerId) => {
     }
 };
 
-// === Coroutine dispatcher isolation ===
-// Kotlin/WASM coroutine dispatcher uses window.postMessage('dispatchCoroutine')
-// for scheduling. Browser extensions (TronLink, MetaMask) flood the message queue
-// with their own IPC, causing race conditions in Compose rendering that crash
-// Base64 resource decoding. Fix: redirect the dispatcher to a private MessageChannel
-// that extensions cannot interfere with.
-//
-// DIAGNOSTIC: ?no-isolate disables isolation to test if it causes the splash hang.
-// ?diag shows on-screen diagnostics panel.
-(function() {
-    const params = new URLSearchParams(location.search);
-    const isolate = !params.has('no-isolate');
-    const diag = params.has('diag');
-
-    // On-screen diagnostic overlay (visible with ?diag)
-    const diagLog = [];
-    function logDiag(msg) {
-        const ts = (performance.now() / 1000).toFixed(3);
-        const line = '[' + ts + 's] ' + msg;
-        console.log('[Gisti:diag] ' + line);
-        diagLog.push(line);
-        if (diag) {
-            let el = document.getElementById('gisti-diag');
-            if (!el) {
-                el = document.createElement('pre');
-                el.id = 'gisti-diag';
-                el.style.cssText = 'position:fixed;bottom:0;left:0;right:0;max-height:40vh;overflow:auto;background:rgba(0,0,0,0.85);color:#0f0;font:11px/1.4 monospace;padding:8px;z-index:99999;pointer-events:auto;';
-                document.body.appendChild(el);
-            }
-            el.textContent = diagLog.join('\n');
-            el.scrollTop = el.scrollHeight;
-        }
-    }
-
-    logDiag('isolate=' + isolate + ', diag=' + diag);
-
-    if (!isolate) {
-        logDiag('Coroutine isolation DISABLED (?no-isolate). Using native postMessage.');
-        return;
-    }
-
-    const channel = new MessageChannel();
-    const origAddEventListener = window.addEventListener.bind(window);
-    let dispatchHandler = null;
-    let captureCount = 0;
-
-    window.addEventListener = function(type, listener, options) {
-        if (type === 'message' && options === true) {
-            captureCount++;
-            if (!dispatchHandler) {
-                dispatchHandler = listener;
-                channel.port1.onmessage = function() {
-                    dispatchHandler({
-                        source: window,
-                        data: 'dispatchCoroutine',
-                        stopPropagation: function() {},
-                        preventDefault: function() {}
-                    });
-                };
-                logDiag('Captured handler #' + captureCount + ' as coroutine dispatcher (capture-phase message listener)');
-                try { logDiag('Handler source: ' + (listener.toString().slice(0, 120))); } catch(_) {}
-                return;
-            } else {
-                logDiag('SKIPPED handler #' + captureCount + ' (dispatchHandler already set)');
-            }
-        }
-        return origAddEventListener.call(window, type, listener, options);
-    };
-
-    const origPostMessage = window.postMessage.bind(window);
-    let dispatchCount = 0;
-    window.postMessage = function(data, targetOrigin) {
-        if (data === 'dispatchCoroutine') {
-            dispatchCount++;
-            channel.port2.postMessage(null);
-            if (dispatchCount <= 3 || dispatchCount % 100 === 0) {
-                logDiag('dispatchCoroutine #' + dispatchCount + ' → channel');
-            }
-            return;
-        }
-        return origPostMessage.call(window, data, targetOrigin);
-    };
-
-    // Watchdog: if after 8s no dispatches happened, the handler is likely wrong
-    setTimeout(function() {
-        logDiag('=== 8s watchdog: dispatchCount=' + dispatchCount + ', captureCount=' + captureCount + ', hasHandler=' + !!dispatchHandler);
-        if (dispatchCount === 0 && dispatchHandler) {
-            logDiag('WARNING: Handler was captured but zero dispatches! Likely captured wrong handler (Firebase Auth?).');
-            logDiag('Handler preview: ' + (dispatchHandler.toString().slice(0, 200)));
-        }
-    }, 8000);
-})();
+// === Coroutine dispatcher — NO isolation ===
+// The Kotlin/WASM coroutine dispatcher uses window.postMessage('dispatchCoroutine').
+// A previous attempt to isolate it via MessageChannel (commits 913193b2..e21f261c)
+// broke the dispatch chain: only ~6 dispatches got through before the channel
+// stalled, freezing the app on splash. Root cause: MessageChannel delivers
+// asynchronously via a separate task queue, which starves Compose's frame-synchronous
+// coroutine scheduling. Native postMessage works because the browser delivers
+// same-origin self-postMessages with higher priority.
+// The isolation was meant to shield against extension message floods (TronLink,
+// MetaMask), but the cure was worse than the disease. Reverted 2026-05-25.
 
 // === Global error catchers ===
 window.addEventListener('error', function(event) {
