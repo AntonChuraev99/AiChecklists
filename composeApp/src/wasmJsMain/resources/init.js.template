@@ -699,39 +699,91 @@ globalThis.__firestoreUnsubscribe = (listenerId) => {
 // with their own IPC, causing race conditions in Compose rendering that crash
 // Base64 resource decoding. Fix: redirect the dispatcher to a private MessageChannel
 // that extensions cannot interfere with.
+//
+// DIAGNOSTIC: ?no-isolate disables isolation to test if it causes the splash hang.
+// ?diag shows on-screen diagnostics panel.
 (function() {
+    const params = new URLSearchParams(location.search);
+    const isolate = !params.has('no-isolate');
+    const diag = params.has('diag');
+
+    // On-screen diagnostic overlay (visible with ?diag)
+    const diagLog = [];
+    function logDiag(msg) {
+        const ts = (performance.now() / 1000).toFixed(3);
+        const line = '[' + ts + 's] ' + msg;
+        console.log('[Gisti:diag] ' + line);
+        diagLog.push(line);
+        if (diag) {
+            let el = document.getElementById('gisti-diag');
+            if (!el) {
+                el = document.createElement('pre');
+                el.id = 'gisti-diag';
+                el.style.cssText = 'position:fixed;bottom:0;left:0;right:0;max-height:40vh;overflow:auto;background:rgba(0,0,0,0.85);color:#0f0;font:11px/1.4 monospace;padding:8px;z-index:99999;pointer-events:auto;';
+                document.body.appendChild(el);
+            }
+            el.textContent = diagLog.join('\n');
+            el.scrollTop = el.scrollHeight;
+        }
+    }
+
+    logDiag('isolate=' + isolate + ', diag=' + diag);
+
+    if (!isolate) {
+        logDiag('Coroutine isolation DISABLED (?no-isolate). Using native postMessage.');
+        return;
+    }
+
     const channel = new MessageChannel();
-    const origPostMessage = window.postMessage.bind(window);
     const origAddEventListener = window.addEventListener.bind(window);
     let dispatchHandler = null;
+    let captureCount = 0;
 
     window.addEventListener = function(type, listener, options) {
-        // Intercept the Kotlin coroutine dispatcher's message handler
-        // (capture-phase listener for 'message' that checks for 'dispatchCoroutine')
-        if (type === 'message' && options === true && !dispatchHandler) {
-            dispatchHandler = listener;
-            channel.port1.onmessage = function() {
-                dispatchHandler({
-                    source: window,
-                    data: 'dispatchCoroutine',
-                    stopPropagation: function() {},
-                    preventDefault: function() {}
-                });
-            };
-            console.debug('[Gisti] Coroutine dispatcher isolated via MessageChannel');
-            return;
+        if (type === 'message' && options === true) {
+            captureCount++;
+            if (!dispatchHandler) {
+                dispatchHandler = listener;
+                channel.port1.onmessage = function() {
+                    dispatchHandler({
+                        source: window,
+                        data: 'dispatchCoroutine',
+                        stopPropagation: function() {},
+                        preventDefault: function() {}
+                    });
+                };
+                logDiag('Captured handler #' + captureCount + ' as coroutine dispatcher (capture-phase message listener)');
+                try { logDiag('Handler source: ' + (listener.toString().slice(0, 120))); } catch(_) {}
+                return;
+            } else {
+                logDiag('SKIPPED handler #' + captureCount + ' (dispatchHandler already set)');
+            }
         }
         return origAddEventListener.call(window, type, listener, options);
     };
 
-    const _origPostMessage = window.postMessage;
+    const origPostMessage = window.postMessage.bind(window);
+    let dispatchCount = 0;
     window.postMessage = function(data, targetOrigin) {
         if (data === 'dispatchCoroutine') {
+            dispatchCount++;
             channel.port2.postMessage(null);
+            if (dispatchCount <= 3 || dispatchCount % 100 === 0) {
+                logDiag('dispatchCoroutine #' + dispatchCount + ' → channel');
+            }
             return;
         }
-        return _origPostMessage.call(window, data, targetOrigin);
+        return origPostMessage.call(window, data, targetOrigin);
     };
+
+    // Watchdog: if after 8s no dispatches happened, the handler is likely wrong
+    setTimeout(function() {
+        logDiag('=== 8s watchdog: dispatchCount=' + dispatchCount + ', captureCount=' + captureCount + ', hasHandler=' + !!dispatchHandler);
+        if (dispatchCount === 0 && dispatchHandler) {
+            logDiag('WARNING: Handler was captured but zero dispatches! Likely captured wrong handler (Firebase Auth?).');
+            logDiag('Handler preview: ' + (dispatchHandler.toString().slice(0, 200)));
+        }
+    }, 8000);
 })();
 
 // === Global error catchers ===
