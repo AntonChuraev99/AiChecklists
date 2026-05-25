@@ -693,11 +693,42 @@ globalThis.__firestoreUnsubscribe = (listenerId) => {
     }
 };
 
-// === SES Lockdown compatibility ===
+// === SES Lockdown diagnostics ===
 // Crypto wallet extensions (MetaMask, TronLink) inject SES lockdown that
-// freezes JS intrinsics before WASM loads, causing a non-fatal Base64
-// padding error in Compose's rendering coroutine. Hide it from console
-// without blocking error propagation (Compose needs it for recovery).
+// freezes JS intrinsics and breaks Kotlin/WASM + Skiko rendering.
+// Log which critical APIs are affected so we can build targeted workarounds.
+(function() {
+    const isSES = Object.isFrozen(Object.prototype);
+    if (!isSES) return;
+    console.warn('[Gisti:SES] SES lockdown detected. Checking critical APIs...');
+    const checks = {
+        'Object.prototype frozen': Object.isFrozen(Object.prototype),
+        'Array.prototype frozen': Object.isFrozen(Array.prototype),
+        'Math.random type': typeof Math.random,
+        'Math.random()': (() => { try { return Math.random(); } catch(e) { return 'ERROR: '+e.message; } })(),
+        'Math.random() again': (() => { try { return Math.random(); } catch(e) { return 'ERROR: '+e.message; } })(),
+        'Date.now()': (() => { try { return Date.now(); } catch(e) { return 'ERROR: '+e.message; } })(),
+        'performance exists': typeof performance,
+        'performance.now()': (() => { try { return performance.now(); } catch(e) { return 'ERROR: '+e.message; } })(),
+        'Uint8Array.prototype frozen': Object.isFrozen(Uint8Array.prototype),
+        'ArrayBuffer.prototype frozen': Object.isFrozen(ArrayBuffer.prototype),
+        'TextEncoder exists': typeof TextEncoder,
+        'TextDecoder exists': typeof TextDecoder,
+        'navigator frozen': Object.isFrozen(navigator),
+        'navigator.languages': (() => { try { return JSON.stringify(navigator.languages); } catch(e) { return 'ERROR: '+e.message; } })(),
+        'globalThis.crypto': typeof globalThis.crypto,
+        'crypto.getRandomValues': typeof globalThis.crypto?.getRandomValues,
+        'requestAnimationFrame': typeof requestAnimationFrame,
+        'postMessage': typeof postMessage,
+        'canvas getContext': (() => { try { var c = document.createElement('canvas'); var g = c.getContext('2d'); return g ? 'OK' : 'null'; } catch(e) { return 'ERROR: '+e.message; } })(),
+        'WebGL getContext': (() => { try { var c = document.createElement('canvas'); var g = c.getContext('webgl2') || c.getContext('webgl'); return g ? 'OK' : 'null'; } catch(e) { return 'ERROR: '+e.message; } })(),
+        'Function.prototype.toString frozen': (() => { try { return Object.getOwnPropertyDescriptor(Function.prototype, 'toString')?.configurable; } catch(e) { return 'ERROR'; } })(),
+        'eval available': (() => { try { eval('1'); return true; } catch(e) { return 'BLOCKED: '+e.message; } })(),
+    };
+    console.warn('[Gisti:SES] API check results:', JSON.stringify(checks, null, 2));
+})();
+
+// Suppress Base64 padding error from console (non-fatal, SES-induced).
 window.addEventListener('error', function(event) {
     if (event.message && event.message.includes('padding option is set to PRESENT')) {
         event.preventDefault();
