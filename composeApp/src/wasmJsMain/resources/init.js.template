@@ -693,6 +693,30 @@ globalThis.__firestoreUnsubscribe = (listenerId) => {
     }
 };
 
+// === Base64 crash diagnostic ===
+// Intercepts the Kotlin coroutine async error reporter to capture full context
+// when the known Base64 padding crash fires. Remove after root cause is found.
+const _origReportError = globalThis.reportError;
+globalThis.reportError = function(error) {
+    if (error && error.message && (error.message.includes('padding') || error.message.includes('Base64'))) {
+        const lsSnapshot = {};
+        try {
+            for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i);
+                if (k) lsSnapshot[k] = (localStorage.getItem(k) || '').substring(0, 300);
+            }
+        } catch (_) {}
+        console.error('[BASE64_DIAG] ====== PADDING CRASH CAUGHT ======');
+        console.error('[BASE64_DIAG] message:', error.message);
+        console.error('[BASE64_DIAG] stack:', error.stack);
+        console.error('[BASE64_DIAG] localStorage:', JSON.stringify(lsSnapshot, null, 2));
+        console.error('[BASE64_DIAG] timestamp:', new Date().toISOString());
+        console.error('[BASE64_DIAG] userAgent:', navigator.userAgent);
+        console.error('[BASE64_DIAG] ================================');
+    }
+    if (_origReportError) _origReportError.call(globalThis, error);
+};
+
 // Load composeApp.js AFTER all globalThis.__* are set
 // so Kotlin starts with the full bridge already in place.
 const script = document.createElement('script');
