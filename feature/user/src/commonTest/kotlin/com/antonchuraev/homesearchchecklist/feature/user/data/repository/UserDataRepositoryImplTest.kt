@@ -15,10 +15,12 @@ import com.antonchuraev.homesearchchecklist.feature.user.data.remote.RegisterUse
 import com.antonchuraev.homesearchchecklist.feature.user.data.remote.RestoreCreditsResult
 import com.antonchuraev.homesearchchecklist.feature.user.data.remote.UserApiService
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.UserData
+import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.LinkGoogleAccountResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
@@ -395,6 +397,148 @@ class UserDataRepositoryImplTest {
     }
 
     // ============================================
+    // linkGoogleAccount() tests
+    // ============================================
+
+    @Test
+    fun linkGoogleAccount_success_updatesDataStoreAndReturnsResult() = runTest {
+        val apiResult = LinkGoogleAccountApiResult(
+            userId = "user-123",
+            googleEmail = "test@gmail.com",
+            isExistingAccount = false,
+            aiCredits = 100,
+            isPremium = false,
+            bonusCreditsGranted = 100,
+        )
+        val apiService = FakeUserApiService(
+            linkResults = listOf(Result.success(apiResult))
+        )
+        val datastore = createStubDatastore(
+            strings = mapOf("user_id" to "user-123"),
+            booleans = mapOf("is_google_linked" to false),
+            ints = mapOf("ai_credits" to 0)
+        )
+        val repo = createRepositoryWith(datastore, apiService, NoOpAnalyticsTracker())
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val result = repo.linkGoogleAccount(idToken = "id-token", platform = "android")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Assert: result is success with correct fields
+        assertTrue(result.isSuccess)
+        val linked = result.getOrThrow()
+        assertEquals("test@gmail.com", linked.googleEmail)
+        assertEquals(100, linked.aiCredits)
+        assertEquals(false, linked.isPremium)
+        assertEquals(100, linked.bonusCreditsGranted)
+        assertEquals(false, linked.isExistingAccount)
+
+        // Assert: DataStore updated with google_email, is_google_linked=true, ai_credits=100
+        val userData = repo.getUserData()
+        assertEquals("test@gmail.com", userData.googleEmail)
+        assertTrue(userData.isGoogleLinked)
+        assertEquals(100, userData.aiCredits)
+    }
+
+    @Test
+    fun linkGoogleAccount_existingAccount_switchesUserId() = runTest {
+        val apiResult = LinkGoogleAccountApiResult(
+            userId = "existing-user-456",
+            googleEmail = "existing@gmail.com",
+            isExistingAccount = true,
+            aiCredits = 300,
+            isPremium = true,
+            bonusCreditsGranted = 0,
+        )
+        val apiService = FakeUserApiService(
+            linkResults = listOf(Result.success(apiResult))
+        )
+        val datastore = createStubDatastore(
+            strings = mapOf("user_id" to "original-user-123")
+        )
+        val repo = createRepositoryWith(datastore, apiService, NoOpAnalyticsTracker())
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val result = repo.linkGoogleAccount(idToken = "id-token", platform = "android")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Assert: result is success and isExistingAccount=true
+        assertTrue(result.isSuccess)
+        assertTrue(result.getOrThrow().isExistingAccount)
+
+        // Assert: DataStore user_id switched to the existing account's userId
+        val userData = repo.getUserData()
+        assertEquals("existing-user-456", userData.userId)
+    }
+
+    @Test
+    fun linkGoogleAccount_noUserId_returnsFailure() = runTest {
+        val apiService = FakeUserApiService(linkResults = emptyList())
+        val datastore = createStubDatastore() // no user_id
+        val repo = createRepositoryWith(datastore, apiService, NoOpAnalyticsTracker())
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val result = repo.linkGoogleAccount(idToken = "id-token", platform = "android")
+
+        // Assert: returns failure with "User not registered"
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull()?.message?.contains("User not registered") == true)
+
+        // Assert: API was never called
+        assertEquals(0, apiService.linkCallCount)
+    }
+
+    @Test
+    fun linkGoogleAccount_apiFailure_propagatesError() = runTest {
+        val apiService = FakeUserApiService(
+            linkResults = listOf(Result.failure(Exception("Network error")))
+        )
+        val datastore = createStubDatastore(
+            strings = mapOf("user_id" to "user-123"),
+            booleans = mapOf("is_google_linked" to false)
+        )
+        val repo = createRepositoryWith(datastore, apiService, NoOpAnalyticsTracker())
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val result = repo.linkGoogleAccount(idToken = "id-token", platform = "android")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Assert: result is failure
+        assertTrue(result.isFailure)
+
+        // Assert: DataStore NOT updated — no google_email, is_google_linked stays false
+        val userData = repo.getUserData()
+        assertEquals("", userData.googleEmail ?: "")
+        assertEquals(false, userData.isGoogleLinked)
+    }
+
+    @Test
+    fun clearGoogleAccountData_clearsAllGoogleFields() = runTest {
+        val datastore = createStubDatastore(
+            strings = mapOf("user_id" to "u1", "google_email" to "old@test.com"),
+            booleans = mapOf("is_google_linked" to true)
+        )
+        val repo = createRepositoryWith(datastore, NoOpUserApiService(), NoOpAnalyticsTracker())
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Pre-condition: google data is set
+        val before = repo.getUserData()
+        assertEquals("old@test.com", before.googleEmail)
+        assertTrue(before.isGoogleLinked)
+
+        // Act
+        repo.clearGoogleAccountData()
+
+        // Assert via DataStore directly — stateIn(Eagerly) propagation across
+        // mismatched dispatchers (Unconfined vs StandardTestDispatcher) is unreliable,
+        // so we verify the write went through at the storage level
+        val email = datastore.observeString("google_email", "NOT_SET").first()
+        val linked = datastore.observeBoolean("is_google_linked", true).first()
+        assertEquals("", email)
+        assertEquals(false, linked)
+    }
+
+    // ============================================
     // Helper Functions
     // ============================================
 
@@ -504,14 +648,21 @@ class UserDataRepositoryImplTest {
     }
 
     /**
-     * Configurable fake API service that returns sequential results for restoreCreditsAfterPurchase.
+     * Configurable fake API service that returns sequential results for
+     * restoreCreditsAfterPurchase and linkGoogleAccount.
      */
     private class FakeUserApiService(
-        private val restoreResults: List<Result<RestoreCreditsResult>>
+        private val restoreResults: List<Result<RestoreCreditsResult>> = emptyList(),
+        private val linkResults: List<Result<LinkGoogleAccountApiResult>> = emptyList(),
     ) : UserApiService {
         var restoreCallCount = 0
             private set
         var lastRestoreUserId: String? = null
+            private set
+
+        var linkCallCount = 0
+            private set
+        var lastLinkUserId: String? = null
             private set
 
         override suspend fun registerUser(
@@ -531,8 +682,15 @@ class UserDataRepositoryImplTest {
 
         override suspend fun linkGoogleAccount(
             userId: String, idToken: String, platform: String,
-        ): Result<LinkGoogleAccountApiResult> =
-            Result.failure(Exception("Not implemented in test"))
+        ): Result<LinkGoogleAccountApiResult> {
+            lastLinkUserId = userId
+            val index = linkCallCount++
+            return if (index < linkResults.size) {
+                linkResults[index]
+            } else {
+                Result.failure(Exception("No more link stub results (call #$index)"))
+            }
+        }
     }
 
     private class NoOpUserApiService : UserApiService {
