@@ -267,6 +267,46 @@ Column(
 )
 ```
 
+## Adaptive UI Architecture
+
+The app renders correctly on phone (Compact), tablet (Medium), and desktop/foldable (Expanded) using a single `AdaptiveNavigationShell` composable that picks the navigation chrome — ModalDrawer, NavigationRail, or PermanentDrawer — based on `WindowSizeClass`. Navigation uses Navigation 3 (`NavDisplay` + `NavBackStack`) instead of the former Nav 2 `NavController`; there is no async channel, and all stack mutations are synchronous. `ListDetailSceneStrategy` enables two-pane layouts on Expanded for four screen pairs. Full details: `docs/adaptive-architecture.md`.
+
+### WindowSizeClass Breakpoints
+
+| Class | Width | Navigation chrome | Layout |
+|---|---|---|---|
+| Compact | < 600dp | ModalNavigationDrawer (hamburger) | Single column |
+| Medium | 600–839dp | NavigationRail (left rail) | 2-column grid on grid screens |
+| Expanded | ≥ 840dp | PermanentNavigationDrawer | 3-col grid + two-pane list/detail |
+
+### Navigation Model
+
+Navigation 3 alpha. No `NavController`. The back stack is `NavBackStack` (`SnapshotStateList<NavKey>`), mutated directly by `AppNavigatorImpl`. `NavDisplay` recomposes synchronously on every mutation — no Channel race, no `LaunchedEffect` timing issues.
+
+Migration guide and before/after concept table: `docs/navigation3-migration.md`.
+
+### Key Adaptive Composables
+
+| Composable | Location | Purpose |
+|---|---|---|
+| `AdaptiveNavigationShell` | `composeApp/.../navigation/` | Selects Compact / Medium / Expanded chrome |
+| `AppScaffold` | `core/designsystem/.../containers/` | `CenterAlignedTopAppBar` on Compact, `MediumTopAppBar` on Medium/Expanded + `exitUntilCollapsedScrollBehavior` |
+| `AdaptiveContentWidth` | `core/designsystem/.../containers/` | `Modifier.adaptiveContentWidth(maxWidthDp=720)` — clamps single-column content on wide screens |
+| `AdaptiveSheetOrDialog` | `core/designsystem/.../containers/` | `ModalBottomSheet` on Compact, `AlertDialog` on Expanded |
+| `AppWindowSizeClass` | `core/designsystem/.../adaptive/` | `expect/actual` — `androidx.window` (Android), `window.innerWidth` (wasmJs), `LocalWindowInfo` (iOS) |
+
+### Rule: Adding a New Top-Level Destination
+
+When adding a new drawer destination, update **all three** of the following or the shell will not render it:
+
+1. `DrawerDestination` sealed class — add the new entry
+2. `AdaptiveNavigationShell` — add it to the destination list for all three layout variants (Compact/Medium/Expanded)
+3. `App.kt` `entryProvider { }` — add the `entry<NewRoute> { }` block
+
+Failure to update all three results in the destination being unreachable from the navigation shell even if the route is defined.
+
+---
+
 ## Key Patterns
 
 - **API/impl split**: Core modules expose interfaces in `api`, implementations in `impl`
