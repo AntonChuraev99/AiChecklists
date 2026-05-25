@@ -693,26 +693,16 @@ globalThis.__firestoreUnsubscribe = (listenerId) => {
     }
 };
 
-// === Base64 crash diagnostic ===
-// Intercepts the Kotlin coroutine async error reporter to capture full context
-// when the known Base64 padding crash fires. Remove after root cause is found.
+// === SES Lockdown compatibility ===
+// Browser extensions (MetaMask, TronLink) inject SES lockdown that freezes JS
+// intrinsics before WASM loads, causing Kotlin Base64 decoder to crash with
+// "padding option is set to PRESENT" in a non-fatal Compose coroutine.
+// Suppress this specific error so the app runs cleanly with crypto wallets.
 const _origReportError = globalThis.reportError;
 globalThis.reportError = function(error) {
-    if (error && error.message && (error.message.includes('padding') || error.message.includes('Base64'))) {
-        const lsSnapshot = {};
-        try {
-            for (let i = 0; i < localStorage.length; i++) {
-                const k = localStorage.key(i);
-                if (k) lsSnapshot[k] = (localStorage.getItem(k) || '').substring(0, 300);
-            }
-        } catch (_) {}
-        console.error('[BASE64_DIAG] ====== PADDING CRASH CAUGHT ======');
-        console.error('[BASE64_DIAG] message:', error.message);
-        console.error('[BASE64_DIAG] stack:', error.stack);
-        console.error('[BASE64_DIAG] localStorage:', JSON.stringify(lsSnapshot, null, 2));
-        console.error('[BASE64_DIAG] timestamp:', new Date().toISOString());
-        console.error('[BASE64_DIAG] userAgent:', navigator.userAgent);
-        console.error('[BASE64_DIAG] ================================');
+    if (error && error.message && error.message.includes('padding option is set to PRESENT')) {
+        console.debug('[Gisti] Suppressed SES-induced Base64 padding error (non-fatal)');
+        return;
     }
     if (_origReportError) _origReportError.call(globalThis, error);
 };
