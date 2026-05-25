@@ -25,6 +25,8 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -46,6 +48,9 @@ import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.done
+import aichecklists.core.designsystem.generated.resources.google_sign_in_failed
+import aichecklists.core.designsystem.generated.resources.google_sign_in_required
+import aichecklists.core.designsystem.generated.resources.google_sign_in_success
 import aichecklists.core.designsystem.generated.resources.main_action_ai_chat
 import aichecklists.core.designsystem.generated.resources.main_create_checklist
 import aichecklists.core.designsystem.generated.resources.main_create_checklist_locked
@@ -89,16 +94,31 @@ fun MainScreen(
     val showHamburgerHint = (screenState as? MainScreenState.Success)?.showHamburgerHint ?: false
     val hamburgerScale = remember { Animatable(1f) }
 
-    // Pulse hint: only active on Compact where drawerState != null (hamburger is rendered).
-    // On Medium/Expanded the rail/permanent drawer is always visible — no hamburger, no hint.
-    // Infinite bounce while hint is active. The loop is broken only by the
-    // drawer-open watcher below (which flips showHamburgerHint to false via
-    // OnHamburgerHintCompleted intent → DataStore flag → state re-emit →
-    // LaunchedEffect restarts in the else branch and snaps back to 1f).
-    // Scale 1.0 → 1.20 (more visible than 1.15) and 400ms per leg (slower
-    // so the eye reliably catches it — earlier 1.15/300ms × 3 cycles was
-    // missed in real-device testing: user saw "one vibration" and didn't
-    // recognize it as a hint).
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    val msgSignInSuccess = stringResource(Res.string.google_sign_in_success)
+    val msgSignInFailed = stringResource(Res.string.google_sign_in_failed)
+    val msgSignInRequired = stringResource(Res.string.google_sign_in_required)
+
+    LaunchedEffect(viewModel) {
+        viewModel.sideEffect.collect { effect ->
+            when (effect) {
+                is MainScreenSideEffect.ShowSnackbar -> {
+                    val text = when (effect.messageKey) {
+                        "google_sign_in_success" -> msgSignInSuccess
+                        "google_sign_in_failed" -> msgSignInFailed
+                        "google_sign_in_required" -> msgSignInRequired
+                        else -> effect.messageKey
+                    }
+                    snackbarHostState.showSnackbar(text)
+                }
+                MainScreenSideEffect.NavigateToAiChat -> {
+                    onNavigateToAiChat?.invoke()
+                }
+            }
+        }
+    }
+
     LaunchedEffect(showHamburgerHint, drawerState) {
         if (showHamburgerHint && drawerState != null) {
             while (true) {
@@ -110,8 +130,6 @@ fun MainScreen(
         }
     }
 
-    // Stop hint early if user opens the drawer before cycles finish.
-    // drawerState is null on Medium/Expanded — safe no-op when null.
     LaunchedEffect(drawerState?.isOpen) {
         if (drawerState?.isOpen == true && showHamburgerHint) {
             viewModel.sendIntent(MainScreenIntent.OnHamburgerHintCompleted)
@@ -119,6 +137,12 @@ fun MainScreen(
     }
 
     AppScaffold(
+        snackbarHost = {
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier.navigationBarsPadding(),
+            )
+        },
         title = "",
         navigationIcon = if (!isEditMode && drawerState != null) {
             {
@@ -190,7 +214,7 @@ fun MainScreen(
                     // вертикально расположены а не в ряду»).
                     if (onNavigateToAiChat != null) {
                         FilledTonalButton(
-                            onClick = onNavigateToAiChat,
+                            onClick = { viewModel.sendIntent(MainScreenIntent.OnAiChatClick) },
                             modifier = Modifier.fillMaxWidth(),
                             shape = MaterialTheme.shapes.small,
                             colors = ButtonDefaults.filledTonalButtonColors(
@@ -249,7 +273,10 @@ fun MainScreen(
                         onExitEditMode = { onEditModeChange(false) },
                         onReorderChecklists = { orderedIds ->
                             viewModel.sendIntent(MainScreenIntent.OnReorderChecklists(orderedIds))
-                        }
+                        },
+                        onSignInClick = {
+                            viewModel.sendIntent(MainScreenIntent.OnSignInClick)
+                        },
                     )
                 }
             }

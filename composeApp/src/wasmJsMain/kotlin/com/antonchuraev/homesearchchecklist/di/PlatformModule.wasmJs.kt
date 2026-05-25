@@ -6,8 +6,10 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStorage
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePort
 import com.antonchuraev.homesearchchecklist.csat.ObservableAnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.datastore.api.UserAppDatastoreProvider
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.FirestoreSyncDataSource
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
 import com.antonchuraev.homesearchchecklist.feature.user.data.device.DeviceIdProvider
+import com.antonchuraev.homesearchchecklist.sync.WasmFirestoreSyncDataSource
 import org.koin.core.module.Module
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
@@ -46,4 +48,7 @@ actual fun platformModule(): Module = module {
 
     // wasmJs builds are always production (no debug menu), so isDebugBuild = false.
     single(named("isDebugBuild")) { false }
+
+    // Firestore sync data source backed by globalThis.__firestore* bridges in init.js.
+    single<FirestoreSyncDataSource> { WasmFirestoreSyncDataSource() }
 }

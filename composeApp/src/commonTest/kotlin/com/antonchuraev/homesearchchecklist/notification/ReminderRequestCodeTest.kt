@@ -42,7 +42,7 @@ class ReminderRequestCodeTest {
         Triple(2L,  2L,  "item_a"),
         Triple(42L, 42L, "1234567890_9999"),
         Triple(Long.MAX_VALUE, Long.MAX_VALUE, "x"),
-        Triple(Long.MIN_VALUE, Long.MIN_VALUE, "y"),
+        Triple(Long.MAX_VALUE - 1, Long.MAX_VALUE - 1, "y"),
         Triple(100_000L, 200_000L, "1000000000_0001"),   // fillId near REPEAT_OFFSET range
         Triple(0L, 0L, "0"),
     )

@@ -1053,4 +1053,16 @@
     <string name="chat_day_divider_today">Сегодня</string>
     <string name="chat_thumb_up_thanks">Спасибо за отзыв</string>
     <string name="detail_pane_placeholder">Выберите чек-лист, чтобы увидеть детали</string>
+
+    <!-- Google Auth / Sync -->
+    <string name="sync_banner_title">Синхронизируйте чеклисты</string>
+    <string name="sync_banner_description">Войдите через Google, чтобы открывать списки с любого устройства</string>
+    <string name="web_credits_banner_title">Получите 100 бесплатных AI-кредитов</string>
+    <string name="web_credits_banner_description">Войдите через Google, чтобы использовать AI</string>
+    <string name="drawer_sign_in">Войти</string>
+    <string name="drawer_account">Аккаунт</string>
+    <string name="drawer_sign_out">Выйти</string>
+    <string name="google_sign_in_success">Вход выполнен</string>
+    <string name="google_sign_in_failed">Не удалось войти. Попробуйте снова.</string>
+    <string name="google_sign_in_required">Войдите через Google для использования AI</string>
 </resources>

@@ -80,6 +80,7 @@ kotlin {
             implementation(libs.firebase.analytics)
             implementation(libs.firebase.crashlytics)
             implementation(libs.firebase.config)
+            implementation(libs.firebase.firestore)
         }
         commonMain.dependencies {
             implementation(projects.core.common.api)
@@ -91,6 +92,8 @@ kotlin {
             implementation(projects.core.navigation.impl)
             implementation(projects.core.remoteconfig.api)
             implementation(projects.core.remoteconfig.impl)
+            implementation(projects.core.auth.api)
+            implementation(projects.core.auth.impl)
 
             implementation(projects.feature.splash)
             implementation(projects.feature.checklist)
@@ -122,6 +125,7 @@ kotlin {
             // KMP umbrella artifact with wasmJs target verified at 1.3.0-alpha02.
             implementation(libs.compose.adaptive.navigation3)
             implementation(libs.kotlinx.serialization.core)
+            implementation(libs.kotlinx.serialization.json)
             implementation(libs.koin.core)
             implementation(libs.koin.compose)
             implementation(libs.koin.compose.viewmodel)

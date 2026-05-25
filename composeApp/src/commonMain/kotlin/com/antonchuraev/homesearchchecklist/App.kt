@@ -6,6 +6,7 @@ import androidx.compose.material3.adaptive.navigation3.rememberListDetailSceneSt
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
+import com.antonchuraev.homesearchchecklist.core.auth.api.GoogleAuthRepository
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
 import com.antonchuraev.homesearchchecklist.feature.create.domain.usecase.CreateWeeklyChecklistUseCase
 import com.antonchuraev.homesearchchecklist.csat.CsatBottomSheet
@@ -19,6 +20,9 @@ import com.antonchuraev.homesearchchecklist.core.datastore.api.ThemeRepository
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppLocaleEnvironment
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppTheme
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.customAppLocale
+import com.antonchuraev.homesearchchecklist.feature.user.data.device.getPlatformName
+import com.antonchuraev.homesearchchecklist.feature.user.domain.model.UserData
+import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import com.antonchuraev.homesearchchecklist.settings.presentation.SettingsScreen
 import com.antonchuraev.homesearchchecklist.feature.updatefeed.presentation.components.WidgetInstructionOverlay
 import com.antonchuraev.homesearchchecklist.navigation.AdaptiveNavigationShell
@@ -41,7 +45,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -115,6 +121,32 @@ fun App() {
         val languageRepository: LanguageRepository = remember { koin.get<LanguageRepository>() }
         val language by languageRepository.language.collectAsStateWithLifecycle(initialValue = AppLanguage.System)
         LaunchedEffect(language) { customAppLocale = language.tag }
+
+        val googleAuthRepository: GoogleAuthRepository = remember { koin.get<GoogleAuthRepository>() }
+        val userDataRepository: UserDataRepository = remember { koin.get<UserDataRepository>() }
+        val userData by userDataRepository.getUserDataFlow()
+            .collectAsStateWithLifecycle(initialValue = UserData())
+
+        val scope = rememberCoroutineScope()
+
+        val handleSignIn: () -> Unit = {
+            scope.launch {
+                googleAuthRepository.signInWithGoogle().onSuccess { user ->
+                    val idToken = googleAuthRepository.getIdToken() ?: return@launch
+                    userDataRepository.linkGoogleAccount(
+                        idToken = idToken,
+                        platform = getPlatformName(),
+                    )
+                }
+            }
+        }
+
+        val handleSignOut: () -> Unit = {
+            scope.launch {
+                googleAuthRepository.signOut()
+                userDataRepository.clearGoogleAccountData()
+            }
+        }
 
         val csatViewModel: CsatViewModel = koinInject()
         val csatState by csatViewModel.screenState.collectAsState()

@@ -315,6 +315,15 @@ Failure to update all three results in the destination being unreachable from th
 - **Typesafe project accessors**: Reference modules as `projects.core.common.api`
 - **AppBuildConfig**: Debug/release build detection via expect/actual pattern
 
+### Error Logging — Mandatory for New Features
+
+All error paths in new code **MUST** use `AppLogger.error(tag, message, throwable)` — never silent catch, never `println`. On Android this feeds Crashlytics non-fatal exceptions (`recordException`); on wasmJs it goes to `console.error`. Key rules:
+
+- **Catch blocks:** always `logger.error(TAG, "context: ${e.message}", e)` — the `throwable` param triggers `recordException` on Android
+- **Failed network/sync results:** log with the original exception from `AppResult.Error`
+- **Silent fallbacks:** if returning a default value on error, log `warning` with the reason
+- Tag convention: class name or feature area (e.g. `"Sync"`, `"UserApi"`, `"Analyze"`)
+
 ### Checklist Template vs Fill
 
 `Checklist` (template) defines items; `ChecklistFill` stores checked/note state per session. The default fill mirrors the template. `ChecklistFill` also supports `coverImagePath` for fill cover images.

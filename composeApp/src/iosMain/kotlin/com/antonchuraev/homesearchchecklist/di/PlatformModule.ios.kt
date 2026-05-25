@@ -5,6 +5,8 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentOpener
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStorage
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePort
 import com.antonchuraev.homesearchchecklist.csat.ObservableAnalyticsTracker
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.FirestoreSyncDataSource
+import com.antonchuraev.homesearchchecklist.sync.IosFirestoreSyncDataSource
 import com.antonchuraev.homesearchchecklist.core.datastore.api.UserAppDatastoreProvider
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
 import com.antonchuraev.homesearchchecklist.feature.user.data.device.DeviceIdProvider
@@ -46,4 +48,6 @@ actual fun platformModule(): Module = module {
 
     // iOS builds are always production (no debug menu), so isDebugBuild = false.
     single(named("isDebugBuild")) { false }
+
+    single<FirestoreSyncDataSource> { IosFirestoreSyncDataSource() }
 }

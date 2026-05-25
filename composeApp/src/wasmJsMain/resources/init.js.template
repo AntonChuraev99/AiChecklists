@@ -18,6 +18,28 @@ import {
 } from 'https://www.gstatic.com/firebasejs/12.11.0/firebase-remote-config.js';
 import { getFunctions, httpsCallable }
     from 'https://www.gstatic.com/firebasejs/12.11.0/firebase-functions.js';
+import {
+    getAuth,
+    signInWithPopup,
+    signInAnonymously,
+    GoogleAuthProvider as JsGoogleAuthProvider,
+    onAuthStateChanged,
+    signOut as jsFirebaseSignOut,
+} from 'https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js';
+import {
+    getFirestore,
+    collection,
+    doc,
+    setDoc,
+    getDoc,
+    getDocs,
+    deleteDoc,
+    query,
+    where,
+    onSnapshot,
+    serverTimestamp,
+    writeBatch,
+} from 'https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js';
 
 const firebaseConfig = {
     apiKey: "__FIREBASE_API_KEY__",
@@ -29,6 +51,9 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+
+// === Firestore database instance ===
+const firestoreDb = getFirestore(app);
 
 // === Firebase Remote Config ===
 const rc = getRemoteConfig(app);
@@ -93,6 +118,78 @@ globalThis.__functionsCall = async (name, dataJson) => {
         });
     }
 };
+
+// === Firebase Auth bridge ===
+// Returns raw JS objects — Kotlin extracts fields via @JsFun helpers.
+// Pattern from swapfaceandroid (production-proven wasmJs auth).
+const auth = getAuth(app);
+const googleProvider = new JsGoogleAuthProvider();
+
+globalThis.__googleSignIn = () =>
+    signInWithPopup(auth, googleProvider).then(async (result) => {
+        const user = result.user;
+        const idToken = await user.getIdToken();
+        return {
+            ok: true,
+            uid: user.uid,
+            email: user.email || '',
+            displayName: user.displayName || '',
+            photoURL: user.photoURL || '',
+            idToken: idToken,
+        };
+    }).catch((error) => ({
+        ok: false,
+        uid: '', email: '', displayName: '', photoURL: '', idToken: '',
+        error: error.code + ': ' + error.message,
+    }));
+
+// Anonymous sign-in — for Playwright E2E tests (no Google popup needed).
+// Returns {ok, uid, idToken} or {ok: false, error}.
+globalThis.__signInAnonymously = async () => {
+    try {
+        const result = await signInAnonymously(auth);
+        const user = result.user;
+        const idToken = await user.getIdToken();
+        return { ok: true, uid: user.uid, idToken: idToken };
+    } catch (error) {
+        return { ok: false, uid: '', idToken: '', error: error.code + ': ' + error.message };
+    }
+};
+
+globalThis.__getCurrentFirebaseUser = async () => {
+    const user = auth.currentUser;
+    if (!user) return null;
+    const idToken = await user.getIdToken();
+    return {
+        uid: user.uid,
+        email: user.email || '',
+        displayName: user.displayName || '',
+        photoURL: user.photoURL || '',
+        idToken: idToken,
+    };
+};
+
+globalThis.__firebaseSignOut = () => jsFirebaseSignOut(auth);
+
+globalThis.__authReadyPromise = new Promise((resolve) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+        unsubscribe();
+        if (user) {
+            user.getIdToken().then((token) => {
+                resolve({
+                    ok: true,
+                    uid: user.uid,
+                    email: user.email || '',
+                    displayName: user.displayName || '',
+                    photoURL: user.photoURL || '',
+                    idToken: token,
+                });
+            });
+        } else {
+            resolve(null);
+        }
+    });
+});
 
 // === File Picker bridge ===
 // Staging map: key = "wasm-blob://<uuid>", value = ArrayBuffer
@@ -390,6 +487,209 @@ globalThis.__printHtml = (html) => {
         iframe.srcdoc = html;
     } catch (err) {
         console.error('[Print] __printHtml error:', err);
+    }
+};
+
+// === Firestore bridges ===
+// Active real-time listener unsubscribe functions keyed by listenerId.
+globalThis.__firestoreListeners = new Map();
+
+// Snapshot callbacks registry — Kotlin registers its handler here via
+// globalThis.__firestoreSnapshotCallbacks.set(callbackId, fn).
+globalThis.__firestoreSnapshotCallbacks = new Map();
+
+// Helper: serialize a Firestore document snapshot to a plain JSON-safe object.
+// Converts Firestore Timestamps (toMillis()) and removes server-sentinel fields.
+function _firestoreDocToJson(data) {
+    if (!data) return null;
+    const out = {};
+    for (const [k, v] of Object.entries(data)) {
+        if (v === null || v === undefined) {
+            out[k] = null;
+        } else if (typeof v === 'object' && typeof v.toMillis === 'function') {
+            // Firestore Timestamp → epoch ms
+            out[k] = v.toMillis();
+        } else if (Array.isArray(v)) {
+            out[k] = v.map((item) =>
+                (item && typeof item === 'object' && typeof item.toMillis !== 'function')
+                    ? _firestoreDocToJson(item)
+                    : (item && typeof item.toMillis === 'function' ? item.toMillis() : item)
+            );
+        } else {
+            out[k] = v;
+        }
+    }
+    return out;
+}
+
+// Set (create or overwrite) a single document.
+// collectionPath: e.g. "users/uid/checklists"
+// docId: document ID
+// dataJson: JSON string of document fields
+// Returns: JSON string {ok: true} | {ok: false, error: "..."}
+globalThis.__firestoreSetDoc = async (collectionPath, docId, dataJson) => {
+    try {
+        const data = JSON.parse(dataJson);
+        data.updatedAt = serverTimestamp();
+        const ref = doc(firestoreDb, collectionPath, docId);
+        await setDoc(ref, data);
+        return JSON.stringify({ ok: true });
+    } catch (err) {
+        console.error('[Firestore] __firestoreSetDoc error:', err);
+        return JSON.stringify({ ok: false, error: err?.message ?? String(err) });
+    }
+};
+
+// Get a single document by collectionPath + docId.
+// Returns: JSON string {ok: true, data: {...}} | {ok: false, error: "..."} | {ok: true, data: null} when not found
+globalThis.__firestoreGetDoc = async (collectionPath, docId) => {
+    try {
+        const ref = doc(firestoreDb, collectionPath, docId);
+        const snap = await getDoc(ref);
+        if (!snap.exists()) {
+            return JSON.stringify({ ok: true, data: null });
+        }
+        return JSON.stringify({ ok: true, data: _firestoreDocToJson(snap.data()) });
+    } catch (err) {
+        console.error('[Firestore] __firestoreGetDoc error:', err);
+        return JSON.stringify({ ok: false, error: err?.message ?? String(err) });
+    }
+};
+
+// Get all documents in a collection.
+// Returns: JSON string {ok: true, data: [{id, ...fields}, ...]} | {ok: false, error: "..."}
+globalThis.__firestoreGetDocs = async (collectionPath) => {
+    try {
+        const ref = collection(firestoreDb, collectionPath);
+        const snap = await getDocs(ref);
+        const docs = [];
+        snap.forEach((d) => {
+            const fields = _firestoreDocToJson(d.data());
+            if (fields) docs.push({ ...fields, cloudId: d.id });
+        });
+        return JSON.stringify({ ok: true, data: docs });
+    } catch (err) {
+        console.error('[Firestore] __firestoreGetDocs error:', err);
+        return JSON.stringify({ ok: false, error: err?.message ?? String(err) });
+    }
+};
+
+// Delete a single document.
+// Returns: JSON string {ok: true} | {ok: false, error: "..."}
+globalThis.__firestoreDeleteDoc = async (collectionPath, docId) => {
+    try {
+        const ref = doc(firestoreDb, collectionPath, docId);
+        await deleteDoc(ref);
+        return JSON.stringify({ ok: true });
+    } catch (err) {
+        console.error('[Firestore] __firestoreDeleteDoc error:', err);
+        return JSON.stringify({ ok: false, error: err?.message ?? String(err) });
+    }
+};
+
+// Batch write multiple set-doc operations atomically.
+// operationsJson: JSON array of {collectionPath, docId, data} objects.
+// Returns: JSON string {ok: true} | {ok: false, error: "..."}
+globalThis.__firestoreBatchWrite = async (operationsJson) => {
+    try {
+        const operations = JSON.parse(operationsJson);
+        const batch = writeBatch(firestoreDb);
+        for (const op of operations) {
+            const data = (typeof op.data === 'string') ? JSON.parse(op.data) : op.data;
+            data.updatedAt = serverTimestamp();
+            const ref = doc(firestoreDb, op.collectionPath, op.docId);
+            batch.set(ref, data);
+        }
+        await batch.commit();
+        return JSON.stringify({ ok: true });
+    } catch (err) {
+        console.error('[Firestore] __firestoreBatchWrite error:', err);
+        return JSON.stringify({ ok: false, error: err?.message ?? String(err) });
+    }
+};
+
+// Subscribe to real-time updates on all documents in a collection.
+// callbackId: unique string; Kotlin registers a handler under this ID in
+//             globalThis.__firestoreSnapshotCallbacks.
+// Returns: listenerId string that can be passed to __firestoreUnsubscribe.
+globalThis.__firestoreOnSnapshot = (collectionPath, callbackId) => {
+    const listenerId = callbackId + ':' + Date.now();
+    try {
+        const ref = collection(firestoreDb, collectionPath);
+        const unsubscribe = onSnapshot(ref,
+            (snap) => {
+                try {
+                    const docs = [];
+                    snap.forEach((d) => {
+                        const fields = _firestoreDocToJson(d.data());
+                        if (fields) docs.push({ ...fields, cloudId: d.id });
+                    });
+                    const payload = JSON.stringify({ ok: true, data: docs });
+                    const cb = globalThis.__firestoreSnapshotCallbacks.get(callbackId);
+                    if (cb) cb(callbackId, payload);
+                } catch (e) {
+                    console.error('[Firestore] onSnapshot callback error:', e);
+                }
+            },
+            (err) => {
+                console.error('[Firestore] __firestoreOnSnapshot listener error:', err);
+                try {
+                    const payload = JSON.stringify({ ok: false, error: err?.message ?? String(err) });
+                    const cb = globalThis.__firestoreSnapshotCallbacks.get(callbackId);
+                    if (cb) cb(callbackId, payload);
+                } catch (_) {}
+            }
+        );
+        globalThis.__firestoreListeners.set(listenerId, unsubscribe);
+    } catch (err) {
+        console.error('[Firestore] __firestoreOnSnapshot setup error:', err);
+    }
+    return listenerId;
+};
+
+// Subscribe to real-time updates on a single document.
+// Returns: listenerId string.
+globalThis.__firestoreOnDocSnapshot = (collectionPath, docId, callbackId) => {
+    const listenerId = callbackId + ':' + Date.now();
+    try {
+        const ref = doc(firestoreDb, collectionPath, docId);
+        const unsubscribe = onSnapshot(ref,
+            (snap) => {
+                try {
+                    const data = snap.exists() ? _firestoreDocToJson(snap.data()) : null;
+                    const payload = JSON.stringify({ ok: true, data: data });
+                    const cb = globalThis.__firestoreSnapshotCallbacks.get(callbackId);
+                    if (cb) cb(callbackId, payload);
+                } catch (e) {
+                    console.error('[Firestore] onDocSnapshot callback error:', e);
+                }
+            },
+            (err) => {
+                console.error('[Firestore] __firestoreOnDocSnapshot listener error:', err);
+                try {
+                    const payload = JSON.stringify({ ok: false, error: err?.message ?? String(err) });
+                    const cb = globalThis.__firestoreSnapshotCallbacks.get(callbackId);
+                    if (cb) cb(callbackId, payload);
+                } catch (_) {}
+            }
+        );
+        globalThis.__firestoreListeners.set(listenerId, unsubscribe);
+    } catch (err) {
+        console.error('[Firestore] __firestoreOnDocSnapshot setup error:', err);
+    }
+    return listenerId;
+};
+
+// Unsubscribe from a real-time listener.
+globalThis.__firestoreUnsubscribe = (listenerId) => {
+    try {
+        const unsubscribe = globalThis.__firestoreListeners.get(listenerId);
+        if (unsubscribe) {
+            unsubscribe();
+            globalThis.__firestoreListeners.delete(listenerId);
+        }
+    } catch (err) {
+        console.error('[Firestore] __firestoreUnsubscribe error:', err);
     }
 };
 

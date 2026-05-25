@@ -36,6 +36,7 @@ android {
         // BuildConfig fields — Amplitude key set per build type below.
         // NOTE: Gemini API key intentionally NOT here. AI calls go through Cloud Functions
         // (server holds the key in Secret Manager), so the APK never ships a key.
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${localProps.getProperty("GOOGLE_WEB_CLIENT_ID", "")}\"")
     }
 
     testOptions {

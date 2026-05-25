@@ -12,7 +12,9 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePor
 import com.antonchuraev.homesearchchecklist.core.common.impl.AndroidAppLogger
 import com.antonchuraev.homesearchchecklist.csat.ObservableAnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.datastore.api.UserAppDatastoreProvider
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.FirestoreSyncDataSource
 import com.antonchuraev.homesearchchecklist.feature.user.data.device.DeviceIdProvider
+import com.antonchuraev.homesearchchecklist.sync.AndroidFirestoreSyncDataSource
 import org.koin.core.module.Module
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
@@ -45,4 +47,7 @@ actual fun platformModule(): Module = module {
     // Used by OnboardingViewModel / InteractiveOnboardingViewModel to suppress
     // analytics events when launched from the debug menu.
     single(named("isDebugBuild")) { AppBuildConfig.isDebug }
+
+    // Firestore sync data source — Android implementation using the Firebase Android SDK.
+    single<FirestoreSyncDataSource> { AndroidFirestoreSyncDataSource() }
 }

@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation
 
 import com.antonchuraev.homesearchchecklist.core.common.api.Intent
+import com.antonchuraev.homesearchchecklist.core.common.api.SideEffect
 import com.antonchuraev.homesearchchecklist.core.common.api.State
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.SubscriptionStatus
@@ -34,6 +35,9 @@ sealed interface MainScreenState : State {
         override val userLimits: UserLimits?,
         /** True while the hamburger-pulse onboarding hint should animate. */
         val showHamburgerHint: Boolean = false,
+        val isGoogleLinked: Boolean = false,
+        val googleEmail: String? = null,
+        val googleDisplayName: String? = null,
     ) : MainScreenState
 }
 
@@ -62,4 +66,15 @@ sealed interface MainScreenIntent : Intent {
     /** Emitted when the hamburger-pulse animation finishes (3 cycles) or
      *  the user opens the drawer before animation ends. Persists the flag. */
     data object OnHamburgerHintCompleted : MainScreenIntent
+
+    data object OnSignInClick : MainScreenIntent
+
+    data object OnSignOutClick : MainScreenIntent
+
+    data object OnAiChatClick : MainScreenIntent
+}
+
+sealed interface MainScreenSideEffect : SideEffect {
+    data class ShowSnackbar(val messageKey: String) : MainScreenSideEffect
+    data object NavigateToAiChat : MainScreenSideEffect
 }

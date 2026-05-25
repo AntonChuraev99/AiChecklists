@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.navigation
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,12 +16,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Article
+import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Campaign
 import androidx.compose.material.icons.outlined.Feedback
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Login
 import androidx.compose.material.icons.outlined.MailOutline
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Star
@@ -34,6 +37,7 @@ import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalUriHandler
@@ -43,7 +47,10 @@ import com.antonchuraev.homesearchchecklist.feature.paywall.data.PaywallConfig
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.calendar_nav_label
 import aichecklists.core.designsystem.generated.resources.nav_ai_chat
+import aichecklists.core.designsystem.generated.resources.drawer_account
 import aichecklists.core.designsystem.generated.resources.drawer_item_home
+import aichecklists.core.designsystem.generated.resources.drawer_sign_in
+import aichecklists.core.designsystem.generated.resources.drawer_sign_out
 import aichecklists.core.designsystem.generated.resources.today_title
 import aichecklists.core.designsystem.generated.resources.drawer_logo_content_description
 import aichecklists.core.designsystem.generated.resources.drawer_section_about
@@ -92,6 +99,11 @@ fun AppNavigationDrawerContent(
     onRateAppClick: () -> Unit,
     onLeaveFeedbackClick: () -> Unit,
     versionName: String,
+    isGoogleLinked: Boolean = false,
+    googleEmail: String? = null,
+    googleDisplayName: String? = null,
+    onSignInClick: () -> Unit = {},
+    onSignOutClick: () -> Unit = {},
 ) {
     val uriHandler = LocalUriHandler.current
     val drawerItemColors = NavigationDrawerItemDefaults.colors(
@@ -110,6 +122,17 @@ fun AppNavigationDrawerContent(
             .verticalScroll(rememberScrollState())
     ) {
         DrawerBrandHeader()
+
+        if (isGoogleLinked && googleEmail != null) {
+            GoogleProfileSection(
+                displayName = googleDisplayName,
+                email = googleEmail,
+                onSignOutClick = {
+                    onCloseDrawer()
+                    onSignOutClick()
+                },
+            )
+        }
 
         HorizontalDivider(
             modifier = Modifier.padding(horizontal = AppDimens.SpacingLg)
@@ -172,6 +195,31 @@ fun AppNavigationDrawerContent(
             colors = drawerItemColors,
             modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
         )
+        if (isGoogleLinked) {
+            NavigationDrawerItem(
+                label = { Text(stringResource(Res.string.drawer_account)) },
+                icon = { Icon(Icons.Outlined.AccountCircle, contentDescription = null) },
+                selected = false,
+                onClick = {
+                    onCloseDrawer()
+                    onSignInClick()
+                },
+                colors = drawerItemColors,
+                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+            )
+        } else {
+            NavigationDrawerItem(
+                label = { Text(stringResource(Res.string.drawer_sign_in)) },
+                icon = { Icon(Icons.Outlined.Login, contentDescription = null) },
+                selected = false,
+                onClick = {
+                    onCloseDrawer()
+                    onSignInClick()
+                },
+                colors = drawerItemColors,
+                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+            )
+        }
 
         Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
         DrawerSectionLabel(stringResource(Res.string.drawer_section_help))
@@ -307,5 +355,57 @@ private fun DrawerFooter(versionName: String) {
             modifier = Modifier
                 .padding(horizontal = AppDimens.SpacingLg, vertical = AppDimens.SpacingMd)
         )
+    }
+}
+
+@Composable
+private fun GoogleProfileSection(
+    displayName: String?,
+    email: String,
+    onSignOutClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = AppDimens.SpacingLg, vertical = AppDimens.SpacingMd),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd),
+    ) {
+        // Avatar circle with first letter of display name (or email initial)
+        val initial = (displayName?.firstOrNull() ?: email.firstOrNull())
+            ?.uppercaseChar()
+            ?.toString()
+            ?: "?"
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(MaterialTheme.shapes.extraLarge)
+                .background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = initial,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+        }
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
+        ) {
+            Text(
+                text = email,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = stringResource(Res.string.drawer_sign_out),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.clickable(onClick = onSignOutClick),
+            )
+        }
     }
 }
