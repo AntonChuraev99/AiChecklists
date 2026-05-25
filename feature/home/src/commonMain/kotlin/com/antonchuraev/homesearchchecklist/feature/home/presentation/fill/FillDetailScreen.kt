@@ -46,11 +46,14 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TopAppBarDefaults
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonText
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppTextField
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
+import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
@@ -89,6 +92,7 @@ private fun LoadingContent() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NotFoundContent(onBack: () -> Unit) {
     AppScaffold(
@@ -108,14 +112,18 @@ private fun NotFoundContent(onBack: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FillDetailContent(
     state: FillDetailState.Content,
     onIntent: (FillDetailIntent) -> Unit
 ) {
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+
     AppScaffold(
         title = if (state.isEditing) stringResource(Res.string.fill_edit_title) else state.fill.name,
         onBackButtonClick = { onIntent(FillDetailIntent.OnBackClick) },
+        scrollBehavior = scrollBehavior,
         actions = {
             if (state.isEditing) {
                 IconButton(onClick = { onIntent(FillDetailIntent.OnCancelEditClick) }) {
@@ -141,6 +149,7 @@ private fun FillDetailContent(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
+                .adaptiveContentWidth()
                 .padding(horizontal = AppDimens.ScreenPaddingHorizontal),
             verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
         ) {

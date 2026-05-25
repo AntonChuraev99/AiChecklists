@@ -49,7 +49,12 @@ class AppNavigatorImpl : AppNavigator {
     }
 
     override fun onBack() {
-        if (backStack.isNotEmpty()) backStack.removeAt(backStack.size - 1)
+        // Guard size > 1 (not isNotEmpty) — NavDisplay requires non-empty stack at all
+        // times, not just first composition. Dropping the last entry crashes NavDisplay
+        // on next recomposition with "backstack cannot be empty". When on root,
+        // browser/OS back should be no-op (Compose handles app-exit on Android, browser
+        // navigates above on wasmJs).
+        if (backStack.size > 1) backStack.removeAt(backStack.size - 1)
     }
 
     override fun navigateToOnboarding() {

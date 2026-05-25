@@ -22,7 +22,7 @@ import org.koin.compose.viewmodel.koinViewModel
  */
 @Composable
 fun CalendarRoute(
-    drawerState: DrawerState,
+    drawerState: DrawerState?,
     onCreateChecklistClick: () -> Unit,
     todayViewModel: TodayViewModel = koinViewModel(),
     calendarViewModel: CalendarViewModel = koinViewModel(),

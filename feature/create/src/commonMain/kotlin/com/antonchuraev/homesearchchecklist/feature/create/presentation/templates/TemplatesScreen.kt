@@ -100,11 +100,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TopAppBarDefaults
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonSecondary
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppTextField
 import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
+import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.feature.create.domain.model.ChecklistTemplate
 import com.antonchuraev.homesearchchecklist.feature.create.domain.model.TemplateCategory
@@ -115,6 +118,7 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TemplatesScreen(
     viewModel: TemplatesViewModel = koinViewModel()
@@ -125,6 +129,7 @@ fun TemplatesScreen(
     val state by viewModel.screenState.collectAsState()
 
     val searchFocusRequester = remember { FocusRequester() }
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     LaunchedEffect(state.isSearchActive) {
         if (state.isSearchActive) {
@@ -135,6 +140,7 @@ fun TemplatesScreen(
     AppScaffold(
         title = stringResource(Res.string.create_title),
         onBackButtonClick = { viewModel.sendIntent(TemplatesScreenIntent.OnBackClick) },
+        scrollBehavior = scrollBehavior,
         actions = {
             IconButton(
                 onClick = { viewModel.sendIntent(TemplatesScreenIntent.OnToggleSearch) }
@@ -301,7 +307,7 @@ private fun TemplatesContent(
     onTemplateClick: (ChecklistTemplate) -> Unit
 ) {
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().adaptiveContentWidth(),
         contentPadding = PaddingValues(
             top = AppDimens.SpacingLg,
             bottom = BottomButtonsSectionHeight

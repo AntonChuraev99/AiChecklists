@@ -62,11 +62,15 @@ import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.recorde
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TopAppBarDefaults
+import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AnalyzeScreen(
     checklistId: Long? = null,
@@ -84,9 +88,12 @@ fun AnalyzeScreen(
         stringResource(Res.string.analyze_title)
     }
 
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+
     AppScaffold(
         title = title,
         onBackButtonClick = { viewModel.sendIntent(AnalyzeScreenIntent.OnBackClick) },
+        scrollBehavior = scrollBehavior,
         bottomBar = {
             if (screenState.selectedInputType != null && !screenState.isAnalyzing) {
                 Column(
@@ -219,6 +226,7 @@ private fun AnalyzeContent(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
+            .adaptiveContentWidth()
             .padding(horizontal = AppDimens.ScreenPaddingHorizontal),
         verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
     ) {

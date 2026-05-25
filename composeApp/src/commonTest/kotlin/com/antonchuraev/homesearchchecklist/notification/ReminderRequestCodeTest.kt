@@ -8,7 +8,7 @@ import kotlin.test.assertTrue
 /**
  * Verifies that the four request-code namespaces for AlarmManager PendingIntents never collide:
  *
- *   1. Checklist one-shot  : (checklistId xor (checklistId ushr 32)).toInt()
+ *   1. Checklist one-shot  : ((checklistId ushr 32) + (checklistId and 0xFFFFFFFFL)).toInt()
  *   2. Checklist repeat    : above + 100_000
  *   3. Item one-shot       : abs("fillId:itemId".hashCode()) + 200_000
  *   4. Item repeat         : abs("fillId:itemId".hashCode()) + 300_000
@@ -23,7 +23,7 @@ class ReminderRequestCodeTest {
     // ── Replicated helpers (mirror ReminderScheduler companion) ──
 
     private fun reminderCode(checklistId: Long): Int =
-        (checklistId xor (checklistId ushr 32)).toInt()
+        ((checklistId ushr 32) + (checklistId and 0xFFFFFFFFL)).toInt()
 
     private fun repeatCode(checklistId: Long): Int =
         reminderCode(checklistId) + 100_000

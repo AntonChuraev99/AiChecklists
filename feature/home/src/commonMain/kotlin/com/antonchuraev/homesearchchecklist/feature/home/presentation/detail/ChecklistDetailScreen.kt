@@ -85,10 +85,9 @@ import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.Tab
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
@@ -150,7 +149,9 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonTex
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppItemMetaChip
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppTextField
+import com.antonchuraev.homesearchchecklist.desingsystem.containers.AdaptiveSheetOrDialog
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
+import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
@@ -228,6 +229,7 @@ private fun LoadingContent() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NotFoundContent(onBack: () -> Unit) {
     AppScaffold(
@@ -247,6 +249,7 @@ private fun NotFoundContent(onBack: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ChecklistDetailContent(
     state: ChecklistDetailState.Content,
@@ -374,6 +377,7 @@ private fun ChecklistDetailContent(
     var addItemActive by remember { mutableStateOf(false) }
     var isEditMode by rememberSaveable { mutableStateOf(false) }
     val listState = rememberLazyListState()
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val hapticFeedback = LocalHapticFeedback.current
     // coroutineScope declared above (shared with attachment open-externally handler)
 
@@ -462,6 +466,7 @@ private fun ChecklistDetailContent(
                 onIntent(ChecklistDetailIntent.OnBackClick)
             }
         },
+        scrollBehavior = scrollBehavior,
         snackbarHost = {
             SnackbarHost(
                 hostState = snackbarHostState,
@@ -633,6 +638,7 @@ private fun ChecklistDetailContent(
                 state = listState,
                 modifier = Modifier
                     .fillMaxSize()
+                    .adaptiveContentWidth()
                     .padding(horizontal = AppDimens.ScreenPaddingHorizontal),
                 verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
             ) {
@@ -1403,11 +1409,9 @@ internal fun ItemDetailsSheet(
     onAddFileClick: () -> Unit = {},
     canAddAttachment: Boolean = true,
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface,
+    AdaptiveSheetOrDialog(
+        onDismiss = onDismiss,
+        title = { Text(item.text, style = MaterialTheme.typography.titleMedium) },
     ) {
         Column(
             modifier = Modifier
@@ -1916,16 +1920,15 @@ private fun DeleteConfirmationDialog(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FillTargetBottomSheet(
     onFillMainChecklist: () -> Unit,
     onCreateNewFill: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surface
+    AdaptiveSheetOrDialog(
+        onDismiss = onDismiss,
+        title = { Text(stringResource(Res.string.fill_target_title)) },
     ) {
         Column(
             modifier = Modifier
@@ -1934,11 +1937,6 @@ private fun FillTargetBottomSheet(
                 .padding(bottom = AppDimens.SpacingXxl),
             verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
         ) {
-            Text(
-                text = stringResource(Res.string.fill_target_title),
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(bottom = AppDimens.SpacingSm)
-            )
 
             AppCard(onClick = onFillMainChecklist) {
                 Row(
@@ -2024,18 +2022,15 @@ private fun FillLimitDialog(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NotificationPermissionSheet(
     onEnableClick: () -> Unit,
     onSkip: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface
+    AdaptiveSheetOrDialog(
+        onDismiss = onDismiss,
+        title = { Text(stringResource(Res.string.reminder_notification_permission_title)) },
     ) {
         Column(
             modifier = Modifier
@@ -2062,16 +2057,6 @@ private fun NotificationPermissionSheet(
             }
 
             Spacer(modifier = Modifier.height(AppDimens.SpacingLg))
-
-            // Title
-            Text(
-                text = stringResource(Res.string.reminder_notification_permission_title),
-                style = MaterialTheme.typography.titleLarge,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
 
             // Description
             Text(
@@ -2153,7 +2138,6 @@ private fun NotificationFeatureRow(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ExactAlarmInstructionSheet(
     dontShowAgain: Boolean,
@@ -2162,11 +2146,9 @@ private fun ExactAlarmInstructionSheet(
     onSkip: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface
+    AdaptiveSheetOrDialog(
+        onDismiss = onDismiss,
+        title = { Text(stringResource(Res.string.reminder_exact_alarm_title)) },
     ) {
         Column(
             modifier = Modifier
@@ -2177,22 +2159,6 @@ private fun ExactAlarmInstructionSheet(
                 .padding(bottom = AppDimens.SpacingXxl),
             verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
         ) {
-            // Title
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Notifications,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(28.dp)
-                )
-                Text(
-                    text = stringResource(Res.string.reminder_exact_alarm_title),
-                    style = MaterialTheme.typography.titleLarge
-                )
-            }
 
             Spacer(modifier = Modifier.height(AppDimens.SpacingXs))
 
@@ -2268,7 +2234,6 @@ private fun StepRow(number: Int, text: String) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun OverflowMenuSheet(
     separateCompleted: Boolean,
@@ -2280,9 +2245,9 @@ private fun OverflowMenuSheet(
     onDeleteClick: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surface
+    AdaptiveSheetOrDialog(
+        onDismiss = onDismiss,
+        title = { Text(stringResource(Res.string.more_options)) },
     ) {
         Column(
             modifier = Modifier

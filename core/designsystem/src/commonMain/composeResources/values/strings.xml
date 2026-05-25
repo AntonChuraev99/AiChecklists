@@ -1083,4 +1083,5 @@
     <string name="chat_message_thumb_down">Bad response</string>
     <string name="chat_day_divider_today">Today</string>
     <string name="chat_thumb_up_thanks">Thanks for the feedback</string>
+    <string name="detail_pane_placeholder">Select a checklist to view details</string>
 </resources>

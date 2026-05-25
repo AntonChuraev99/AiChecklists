@@ -37,11 +37,14 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TopAppBarDefaults
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AddItemInputField
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppTextField
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
+import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
@@ -51,6 +54,7 @@ import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreateChecklistScreen(
     editChecklistId: Long? = null,
@@ -67,9 +71,12 @@ fun CreateChecklistScreen(
         stringResource(Res.string.create_title)
     }
 
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+
     AppScaffold(
         title = title,
         onBackButtonClick = { viewModel.sendIntent(CreateChecklistIntent.OnBackClick) },
+        scrollBehavior = scrollBehavior,
         bottomBar = {
             Box(
                 modifier = Modifier
@@ -93,6 +100,7 @@ fun CreateChecklistScreen(
         }
     ) {
         LazyColumn(
+            modifier = Modifier.adaptiveContentWidth(),
             contentPadding = PaddingValues(
                 start = AppDimens.ScreenPaddingHorizontal,
                 end = AppDimens.ScreenPaddingHorizontal,

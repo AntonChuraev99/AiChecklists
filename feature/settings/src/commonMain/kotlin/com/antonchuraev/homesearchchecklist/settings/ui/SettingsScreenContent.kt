@@ -35,8 +35,11 @@ import aichecklists.core.designsystem.generated.resources.settings_theme_dark
 import aichecklists.core.designsystem.generated.resources.settings_theme_light
 import aichecklists.core.designsystem.generated.resources.settings_theme_system
 import aichecklists.core.designsystem.generated.resources.settings_title
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TopAppBarDefaults
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppSwitch
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
+import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.settings.domain.AppLanguage
 import com.antonchuraev.homesearchchecklist.settings.domain.AppThemeMode
@@ -78,6 +81,7 @@ import org.jetbrains.compose.resources.stringResource
  * @param onBackClick Called when the user taps the back navigation icon.
  * @param modifier Optional modifier applied to the root scaffold.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreenContent(
     selectedTheme: AppThemeMode,
@@ -92,6 +96,7 @@ fun SettingsScreenContent(
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     AppScaffold(
         title = stringResource(Res.string.settings_title),
         navigationIcon = if (drawerState != null) {
@@ -106,10 +111,12 @@ fun SettingsScreenContent(
             }
         } else null,
         onBackButtonClick = if (drawerState == null) onBackClick else null,
+        scrollBehavior = scrollBehavior,
     ) {
         Column(
             modifier = modifier
                 .fillMaxSize()
+                .adaptiveContentWidth()
                 .padding(top = AppDimens.SpacingMd),
         ) {
             // ----------------------------------------------------------------

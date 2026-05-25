@@ -1,5 +1,9 @@
 package com.antonchuraev.homesearchchecklist
 
+import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
+import androidx.compose.material3.adaptive.navigation3.ListDetailSceneStrategy
+import androidx.compose.material3.adaptive.navigation3.rememberListDetailSceneStrategy
+import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
@@ -17,19 +21,15 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppTheme
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.customAppLocale
 import com.antonchuraev.homesearchchecklist.settings.presentation.SettingsScreen
 import com.antonchuraev.homesearchchecklist.feature.updatefeed.presentation.components.WidgetInstructionOverlay
-import com.antonchuraev.homesearchchecklist.navigation.AppNavigationDrawerContent
+import com.antonchuraev.homesearchchecklist.navigation.AdaptiveNavigationShell
 import com.antonchuraev.homesearchchecklist.navigation.DrawerDestination
+import com.antonchuraev.homesearchchecklist.navigation.EmptyDetailPlaceholder
 import com.antonchuraev.homesearchchecklist.gestures.ApplyEdgeSwipeExclusion
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.material3.DrawerState
-import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.ModalDrawerSheet
-import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -41,13 +41,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.feedback_thanks_message
 import org.jetbrains.compose.resources.stringResource
@@ -82,7 +79,7 @@ import org.koin.compose.KoinContext
 import org.koin.compose.koinInject
 import org.koin.core.context.GlobalContext
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3AdaptiveApi::class)
 @Composable
 @Preview
 fun App() {
@@ -160,13 +157,20 @@ fun App() {
             // ----------------------------------------------------------------
             // Navigation 3: NavDisplay renders the top NavKey in backStack.
             // Each entry<T> lambda receives the typed route as its receiver.
-            // Drawer blocks are kept identical to the old composable<T> bodies —
-            // only navController.navigate/popBackStack calls are replaced with
-            // navigator.navigateToX() / navigator.onBack().
+            // Top-level destinations (Main/Today/Calendar/AiChat/UpdateFeed/Settings)
+            // are wrapped in AdaptiveNavigationShell — a single composable that
+            // switches between ModalNavigationDrawer (Compact), NavigationRail (Medium)
+            // and PermanentNavigationDrawer (Expanded) based on window size class.
+            //
+            // Stage 5 — Adaptive list-detail: ListDetailSceneStrategy shows list and
+            // detail panes side-by-side on Medium/Expanded screens. On Compact it
+            // falls back to single-pane push navigation (identical to prior behavior).
             // ----------------------------------------------------------------
+            val sceneStrategy = rememberListDetailSceneStrategy<NavKey>()
             NavDisplay(
                 backStack = navigator.backStack,
                 onBack = { navigator.onBack() },
+                sceneStrategy = sceneStrategy,
                 entryProvider = entryProvider {
 
                     entry<AppNavRoute.Splash> {
@@ -181,88 +185,42 @@ fun App() {
                         InteractiveOnboardingScreen()
                     }
 
-                    entry<AppNavRoute.Main> {
-                        // Use plain `remember` instead of `rememberDrawerState` to avoid
-                        // the Saver restoring an Open state after back navigation — a fresh
-                        // Closed state on every composition is the correct UX contract.
-                        val drawerState = remember { DrawerState(initialValue = DrawerValue.Closed) }
-                        val scope = rememberCoroutineScope()
+                    entry<AppNavRoute.Main>(
+                        metadata = ListDetailSceneStrategy.listPane(
+                            detailPlaceholder = { EmptyDetailPlaceholder() }
+                        )
+                    ) {
                         var isEditMode by rememberSaveable { mutableStateOf(false) }
-                        // Debounce guard: rapid drawer clicks can double-navigate and flash an
-                        // empty screen while Koin rebinds the second entry. See memory
-                        // feedback_rapid_click_vs_di_race.md.
-                        var navConsumed by remember { mutableStateOf(false) }
-                        LaunchedEffect(navConsumed) {
-                            if (navConsumed) {
-                                delay(500)
-                                navConsumed = false
-                            }
-                        }
-
-                        ModalNavigationDrawer(
-                            drawerState = drawerState,
-                            // Disable swipe-to-open while in edit mode (drag-reorder conflict)
-                            gesturesEnabled = !isEditMode,
-                            drawerContent = {
-                                ModalDrawerSheet(
-                                    drawerContainerColor = MaterialTheme.colorScheme.surface
-                                ) {
-                                    AppNavigationDrawerContent(
-                                        selectedItemId = DrawerDestination.Main,
-                                        onCloseDrawer = { scope.launch { drawerState.close() } },
-                                        onHomeClick = { /* already on Main; drawer close is enough */ },
-                                        onTodayClick = {
-                                            if (navConsumed) return@AppNavigationDrawerContent
-                                            navConsumed = true
-                                            navigator.navigateToToday()
-                                        },
-                                        onCalendarClick = {
-                                            if (navConsumed) return@AppNavigationDrawerContent
-                                            navConsumed = true
-                                            navigator.navigateToCalendar()
-                                        },
-                                        onAiChatClick = {
-                                            if (navConsumed) return@AppNavigationDrawerContent
-                                            navConsumed = true
-                                            navigator.navigateToAiChat()
-                                        },
-                                        onUpdateFeedClick = {
-                                            if (navConsumed) return@AppNavigationDrawerContent
-                                            navConsumed = true
-                                            navigator.navigateToUpdateFeed()
-                                        },
-                                        onSettingsClick = {
-                                            if (navConsumed) return@AppNavigationDrawerContent
-                                            navConsumed = true
-                                            navigator.navigateToSettings()
-                                        },
-                                        onRateAppClick = {
-                                            csatViewModel.sendIntent(CsatIntent.ForceShow)
-                                        },
-                                        onLeaveFeedbackClick = {
-                                            csatViewModel.sendIntent(CsatIntent.ForceShowFeedback)
-                                        },
-                                        versionName = AppBuildConfig.versionName,
-                                    )
+                        AdaptiveNavigationShell(
+                            selectedDestination = DrawerDestination.Main,
+                            onNavigate = { dest ->
+                                when (dest) {
+                                    DrawerDestination.Main -> { /* already here */ }
+                                    DrawerDestination.Today -> navigator.navigateToToday()
+                                    DrawerDestination.Calendar -> navigator.navigateToCalendar()
+                                    DrawerDestination.AiChat -> navigator.navigateToAiChat()
+                                    DrawerDestination.UpdateFeed -> navigator.navigateToUpdateFeed()
+                                    DrawerDestination.Settings -> navigator.navigateToSettings()
                                 }
-                            }
-                        ) {
+                            },
+                            onRateApp = { csatViewModel.sendIntent(CsatIntent.ForceShow) },
+                            onLeaveFeedback = { csatViewModel.sendIntent(CsatIntent.ForceShowFeedback) },
+                            versionName = AppBuildConfig.versionName,
+                        ) { drawerState ->
                             // Reserve the left ~48dp as our own gesture area so
                             // Android's edge swipe-back doesn't steal swipes meant
                             // for opening the ModalNavigationDrawer.
+                            // drawerState == null on Medium/Expanded — edge exclusion off
+                            // (rail/permanent drawer handles navigation without swipe).
                             ApplyEdgeSwipeExclusion(
-                                enabled = drawerState.isClosed && !isEditMode
+                                enabled = drawerState != null && drawerState.isClosed && !isEditMode
                             )
                             Box(modifier = Modifier.fillMaxSize()) {
                                 MainScreen(
                                     drawerState = drawerState,
                                     isEditMode = isEditMode,
                                     onEditModeChange = { isEditMode = it },
-                                    onNavigateToAiChat = {
-                                        if (navConsumed) return@MainScreen
-                                        navConsumed = true
-                                        navigator.navigateToAiChat()
-                                    },
+                                    onNavigateToAiChat = { navigator.navigateToAiChat() },
                                 )
                             }
                         }
@@ -272,11 +230,17 @@ fun App() {
                         CreateChecklistScreen(editChecklistId = route.editChecklistId)
                     }
 
-                    entry<AppNavRoute.CreateChecklistRoute.Templates> {
+                    entry<AppNavRoute.CreateChecklistRoute.Templates>(
+                        metadata = ListDetailSceneStrategy.listPane(
+                            detailPlaceholder = { EmptyDetailPlaceholder() }
+                        )
+                    ) {
                         TemplatesScreen()
                     }
 
-                    entry<AppNavRoute.CreateChecklistRoute.TemplatePreview> { route ->
+                    entry<AppNavRoute.CreateChecklistRoute.TemplatePreview>(
+                        metadata = ListDetailSceneStrategy.detailPane()
+                    ) { route ->
                         TemplatePreviewScreen(templateId = route.templateId)
                     }
 
@@ -309,18 +273,24 @@ fun App() {
                         AnalyzeResultPreviewScreen()
                     }
 
-                    entry<AppNavRoute.ChecklistDetail> { route ->
+                    entry<AppNavRoute.ChecklistDetail>(
+                        metadata = ListDetailSceneStrategy.detailPane()
+                    ) { route ->
                         ChecklistDetailScreen(
                             checklistId = route.checklistId,
                             focusItemId = route.focusItemId,
                         )
                     }
 
-                    entry<AppNavRoute.FillDetail> { route ->
+                    entry<AppNavRoute.FillDetail>(
+                        metadata = ListDetailSceneStrategy.detailPane()
+                    ) { route ->
                         FillDetailScreen(fillId = route.fillId)
                     }
 
-                    entry<AppNavRoute.FillsList> { route ->
+                    entry<AppNavRoute.FillsList>(
+                        metadata = ListDetailSceneStrategy.detailPane()
+                    ) { route ->
                         FillsListScreen(checklistId = route.checklistId)
                     }
 
@@ -337,70 +307,29 @@ fun App() {
                     }
 
                     entry<AppNavRoute.Settings> {
-                        val drawerState = remember { DrawerState(initialValue = DrawerValue.Closed) }
-                        val scope = rememberCoroutineScope()
-                        var navConsumed by remember { mutableStateOf(false) }
-                        LaunchedEffect(navConsumed) {
-                            if (navConsumed) {
-                                delay(500)
-                                navConsumed = false
-                            }
-                        }
-
-                        ModalNavigationDrawer(
-                            drawerState = drawerState,
-                            drawerContent = {
-                                ModalDrawerSheet(
-                                    drawerContainerColor = MaterialTheme.colorScheme.surface
-                                ) {
-                                    AppNavigationDrawerContent(
-                                        selectedItemId = DrawerDestination.Settings,
-                                        onCloseDrawer = { scope.launch { drawerState.close() } },
-                                        onHomeClick = {
-                                            if (navConsumed) return@AppNavigationDrawerContent
-                                            navConsumed = true
-                                            // popUpTo(Main, inclusive = false) — pop back to Main
-                                            val mainIdx = navigator.backStack.indexOfFirst { it is AppNavRoute.Main }
-                                            if (mainIdx >= 0) {
-                                                while (navigator.backStack.size > mainIdx + 1) {
-                                                    navigator.backStack.removeAt(navigator.backStack.size - 1)
-                                                }
-                                            } else {
-                                                navigator.onBack()
+                        AdaptiveNavigationShell(
+                            selectedDestination = DrawerDestination.Settings,
+                            onNavigate = { dest ->
+                                when (dest) {
+                                    DrawerDestination.Main -> {
+                                        val mainIdx = navigator.backStack.indexOfFirst { it is AppNavRoute.Main }
+                                        if (mainIdx >= 0) {
+                                            while (navigator.backStack.size > mainIdx + 1) {
+                                                navigator.backStack.removeAt(navigator.backStack.size - 1)
                                             }
-                                        },
-                                        onTodayClick = {
-                                            if (navConsumed) return@AppNavigationDrawerContent
-                                            navConsumed = true
-                                            navigator.navigateToToday()
-                                        },
-                                        onCalendarClick = {
-                                            if (navConsumed) return@AppNavigationDrawerContent
-                                            navConsumed = true
-                                            navigator.navigateToCalendar()
-                                        },
-                                        onAiChatClick = {
-                                            if (navConsumed) return@AppNavigationDrawerContent
-                                            navConsumed = true
-                                            navigator.navigateToAiChat()
-                                        },
-                                        onUpdateFeedClick = {
-                                            if (navConsumed) return@AppNavigationDrawerContent
-                                            navConsumed = true
-                                            navigator.navigateToUpdateFeed()
-                                        },
-                                        onSettingsClick = { /* already here */ },
-                                        onRateAppClick = {
-                                            csatViewModel.sendIntent(CsatIntent.ForceShow)
-                                        },
-                                        onLeaveFeedbackClick = {
-                                            csatViewModel.sendIntent(CsatIntent.ForceShowFeedback)
-                                        },
-                                        versionName = AppBuildConfig.versionName,
-                                    )
+                                        } else navigator.onBack()
+                                    }
+                                    DrawerDestination.Today -> navigator.navigateToToday()
+                                    DrawerDestination.Calendar -> navigator.navigateToCalendar()
+                                    DrawerDestination.AiChat -> navigator.navigateToAiChat()
+                                    DrawerDestination.UpdateFeed -> navigator.navigateToUpdateFeed()
+                                    DrawerDestination.Settings -> { /* already here */ }
                                 }
-                            }
-                        ) {
+                            },
+                            onRateApp = { csatViewModel.sendIntent(CsatIntent.ForceShow) },
+                            onLeaveFeedback = { csatViewModel.sendIntent(CsatIntent.ForceShowFeedback) },
+                            versionName = AppBuildConfig.versionName,
+                        ) { drawerState ->
                             SettingsScreen(
                                 onBackClick = { navigator.onBack() },
                                 drawerState = drawerState,
@@ -409,63 +338,22 @@ fun App() {
                     }
 
                     entry<AppNavRoute.UpdateFeed> {
-                        // Fresh Closed DrawerState per entry — same rationale as Main route.
-                        val drawerState = remember { DrawerState(initialValue = DrawerValue.Closed) }
-                        val scope = rememberCoroutineScope()
-                        var navConsumed by remember { mutableStateOf(false) }
-                        LaunchedEffect(navConsumed) {
-                            if (navConsumed) {
-                                delay(500)
-                                navConsumed = false
-                            }
-                        }
-
-                        ModalNavigationDrawer(
-                            drawerState = drawerState,
-                            drawerContent = {
-                                ModalDrawerSheet(
-                                    drawerContainerColor = MaterialTheme.colorScheme.surface
-                                ) {
-                                    AppNavigationDrawerContent(
-                                        selectedItemId = DrawerDestination.UpdateFeed,
-                                        onCloseDrawer = { scope.launch { drawerState.close() } },
-                                        onHomeClick = {
-                                            if (navConsumed) return@AppNavigationDrawerContent
-                                            navConsumed = true
-                                            navigator.onBack()
-                                        },
-                                        onTodayClick = {
-                                            if (navConsumed) return@AppNavigationDrawerContent
-                                            navConsumed = true
-                                            navigator.navigateToToday()
-                                        },
-                                        onCalendarClick = {
-                                            if (navConsumed) return@AppNavigationDrawerContent
-                                            navConsumed = true
-                                            navigator.navigateToCalendar()
-                                        },
-                                        onAiChatClick = {
-                                            if (navConsumed) return@AppNavigationDrawerContent
-                                            navConsumed = true
-                                            navigator.navigateToAiChat()
-                                        },
-                                        onUpdateFeedClick = { /* already here */ },
-                                        onSettingsClick = {
-                                            if (navConsumed) return@AppNavigationDrawerContent
-                                            navConsumed = true
-                                            navigator.navigateToSettings()
-                                        },
-                                        onRateAppClick = {
-                                            csatViewModel.sendIntent(CsatIntent.ForceShow)
-                                        },
-                                        onLeaveFeedbackClick = {
-                                            csatViewModel.sendIntent(CsatIntent.ForceShowFeedback)
-                                        },
-                                        versionName = AppBuildConfig.versionName,
-                                    )
+                        AdaptiveNavigationShell(
+                            selectedDestination = DrawerDestination.UpdateFeed,
+                            onNavigate = { dest ->
+                                when (dest) {
+                                    DrawerDestination.Main -> navigator.onBack()
+                                    DrawerDestination.Today -> navigator.navigateToToday()
+                                    DrawerDestination.Calendar -> navigator.navigateToCalendar()
+                                    DrawerDestination.AiChat -> navigator.navigateToAiChat()
+                                    DrawerDestination.UpdateFeed -> { /* already here */ }
+                                    DrawerDestination.Settings -> navigator.navigateToSettings()
                                 }
-                            }
-                        ) {
+                            },
+                            onRateApp = { csatViewModel.sendIntent(CsatIntent.ForceShow) },
+                            onLeaveFeedback = { csatViewModel.sendIntent(CsatIntent.ForceShowFeedback) },
+                            versionName = AppBuildConfig.versionName,
+                        ) { drawerState ->
                             UpdateFeedScreen(
                                 onBackClick = { navigator.onBack() },
                                 drawerState = drawerState,
@@ -473,219 +361,100 @@ fun App() {
                         }
                     }
 
-                    entry<AppNavRoute.Today> {
-                        // Fresh Closed DrawerState per entry — same rationale as Main route.
-                        val drawerState = remember { DrawerState(initialValue = DrawerValue.Closed) }
-                        val scope = rememberCoroutineScope()
-                        var navConsumed by remember { mutableStateOf(false) }
-                        LaunchedEffect(navConsumed) {
-                            if (navConsumed) {
-                                delay(500)
-                                navConsumed = false
-                            }
-                        }
-
-                        ModalNavigationDrawer(
-                            drawerState = drawerState,
-                            drawerContent = {
-                                ModalDrawerSheet(
-                                    drawerContainerColor = MaterialTheme.colorScheme.surface
-                                ) {
-                                    AppNavigationDrawerContent(
-                                        selectedItemId = DrawerDestination.Today,
-                                        onCloseDrawer = { scope.launch { drawerState.close() } },
-                                        onHomeClick = {
-                                            if (navConsumed) return@AppNavigationDrawerContent
-                                            navConsumed = true
-                                            val mainIdx = navigator.backStack.indexOfFirst { it is AppNavRoute.Main }
-                                            if (mainIdx >= 0) {
-                                                while (navigator.backStack.size > mainIdx + 1) {
-                                                    navigator.backStack.removeAt(navigator.backStack.size - 1)
-                                                }
-                                            } else {
-                                                navigator.onBack()
+                    entry<AppNavRoute.Today>(
+                        metadata = ListDetailSceneStrategy.listPane(
+                            detailPlaceholder = { EmptyDetailPlaceholder() }
+                        )
+                    ) {
+                        AdaptiveNavigationShell(
+                            selectedDestination = DrawerDestination.Today,
+                            onNavigate = { dest ->
+                                when (dest) {
+                                    DrawerDestination.Main -> {
+                                        val mainIdx = navigator.backStack.indexOfFirst { it is AppNavRoute.Main }
+                                        if (mainIdx >= 0) {
+                                            while (navigator.backStack.size > mainIdx + 1) {
+                                                navigator.backStack.removeAt(navigator.backStack.size - 1)
                                             }
-                                        },
-                                        onTodayClick = { /* already here */ },
-                                        onCalendarClick = {
-                                            if (navConsumed) return@AppNavigationDrawerContent
-                                            navConsumed = true
-                                            navigator.navigateToCalendar()
-                                        },
-                                        onAiChatClick = {
-                                            if (navConsumed) return@AppNavigationDrawerContent
-                                            navConsumed = true
-                                            navigator.navigateToAiChat()
-                                        },
-                                        onUpdateFeedClick = {
-                                            if (navConsumed) return@AppNavigationDrawerContent
-                                            navConsumed = true
-                                            navigator.navigateToUpdateFeed()
-                                        },
-                                        onSettingsClick = {
-                                            if (navConsumed) return@AppNavigationDrawerContent
-                                            navConsumed = true
-                                            navigator.navigateToSettings()
-                                        },
-                                        onRateAppClick = {
-                                            csatViewModel.sendIntent(CsatIntent.ForceShow)
-                                        },
-                                        onLeaveFeedbackClick = {
-                                            csatViewModel.sendIntent(CsatIntent.ForceShowFeedback)
-                                        },
-                                        versionName = AppBuildConfig.versionName,
-                                    )
+                                        } else navigator.onBack()
+                                    }
+                                    DrawerDestination.Today -> { /* already here */ }
+                                    DrawerDestination.Calendar -> navigator.navigateToCalendar()
+                                    DrawerDestination.AiChat -> navigator.navigateToAiChat()
+                                    DrawerDestination.UpdateFeed -> navigator.navigateToUpdateFeed()
+                                    DrawerDestination.Settings -> navigator.navigateToSettings()
                                 }
-                            }
-                        ) {
+                            },
+                            onRateApp = { csatViewModel.sendIntent(CsatIntent.ForceShow) },
+                            onLeaveFeedback = { csatViewModel.sendIntent(CsatIntent.ForceShowFeedback) },
+                            versionName = AppBuildConfig.versionName,
+                        ) { drawerState ->
                             TodayRoute(
                                 drawerState = drawerState,
-                                onCreateChecklistClick = {
-                                    navigator.navigateToTemplatesScreen()
-                                },
+                                onCreateChecklistClick = { navigator.navigateToTemplatesScreen() },
                             )
                         }
                     }
 
-                    entry<AppNavRoute.Calendar> {
-                        // Fresh Closed DrawerState per entry — same rationale as Main/Today routes.
-                        val drawerState = remember { DrawerState(initialValue = DrawerValue.Closed) }
-                        val scope = rememberCoroutineScope()
-                        var navConsumed by remember { mutableStateOf(false) }
-                        LaunchedEffect(navConsumed) {
-                            if (navConsumed) {
-                                delay(500)
-                                navConsumed = false
-                            }
-                        }
-
-                        ModalNavigationDrawer(
-                            drawerState = drawerState,
-                            drawerContent = {
-                                ModalDrawerSheet(
-                                    drawerContainerColor = MaterialTheme.colorScheme.surface
-                                ) {
-                                    AppNavigationDrawerContent(
-                                        selectedItemId = DrawerDestination.Calendar,
-                                        onCloseDrawer = { scope.launch { drawerState.close() } },
-                                        onHomeClick = {
-                                            if (navConsumed) return@AppNavigationDrawerContent
-                                            navConsumed = true
-                                            val mainIdx = navigator.backStack.indexOfFirst { it is AppNavRoute.Main }
-                                            if (mainIdx >= 0) {
-                                                while (navigator.backStack.size > mainIdx + 1) {
-                                                    navigator.backStack.removeAt(navigator.backStack.size - 1)
-                                                }
-                                            } else {
-                                                navigator.onBack()
+                    entry<AppNavRoute.Calendar>(
+                        metadata = ListDetailSceneStrategy.listPane(
+                            detailPlaceholder = { EmptyDetailPlaceholder() }
+                        )
+                    ) {
+                        AdaptiveNavigationShell(
+                            selectedDestination = DrawerDestination.Calendar,
+                            onNavigate = { dest ->
+                                when (dest) {
+                                    DrawerDestination.Main -> {
+                                        val mainIdx = navigator.backStack.indexOfFirst { it is AppNavRoute.Main }
+                                        if (mainIdx >= 0) {
+                                            while (navigator.backStack.size > mainIdx + 1) {
+                                                navigator.backStack.removeAt(navigator.backStack.size - 1)
                                             }
-                                        },
-                                        onTodayClick = {
-                                            if (navConsumed) return@AppNavigationDrawerContent
-                                            navConsumed = true
-                                            navigator.navigateToToday()
-                                        },
-                                        onCalendarClick = { /* already here */ },
-                                        onAiChatClick = {
-                                            if (navConsumed) return@AppNavigationDrawerContent
-                                            navConsumed = true
-                                            navigator.navigateToAiChat()
-                                        },
-                                        onUpdateFeedClick = {
-                                            if (navConsumed) return@AppNavigationDrawerContent
-                                            navConsumed = true
-                                            navigator.navigateToUpdateFeed()
-                                        },
-                                        onSettingsClick = {
-                                            if (navConsumed) return@AppNavigationDrawerContent
-                                            navConsumed = true
-                                            navigator.navigateToSettings()
-                                        },
-                                        onRateAppClick = {
-                                            csatViewModel.sendIntent(CsatIntent.ForceShow)
-                                        },
-                                        onLeaveFeedbackClick = {
-                                            csatViewModel.sendIntent(CsatIntent.ForceShowFeedback)
-                                        },
-                                        versionName = AppBuildConfig.versionName,
-                                    )
+                                        } else navigator.onBack()
+                                    }
+                                    DrawerDestination.Today -> navigator.navigateToToday()
+                                    DrawerDestination.Calendar -> { /* already here */ }
+                                    DrawerDestination.AiChat -> navigator.navigateToAiChat()
+                                    DrawerDestination.UpdateFeed -> navigator.navigateToUpdateFeed()
+                                    DrawerDestination.Settings -> navigator.navigateToSettings()
                                 }
-                            }
-                        ) {
+                            },
+                            onRateApp = { csatViewModel.sendIntent(CsatIntent.ForceShow) },
+                            onLeaveFeedback = { csatViewModel.sendIntent(CsatIntent.ForceShowFeedback) },
+                            versionName = AppBuildConfig.versionName,
+                        ) { drawerState ->
                             CalendarRoute(
                                 drawerState = drawerState,
-                                onCreateChecklistClick = {
-                                    navigator.navigateToTemplatesScreen()
-                                },
+                                onCreateChecklistClick = { navigator.navigateToTemplatesScreen() },
                             )
                         }
                     }
 
                     entry<AppNavRoute.AiChat> {
-                        // Fresh Closed DrawerState per entry — same rationale as Main/Today/Calendar.
-                        val drawerState = remember { DrawerState(initialValue = DrawerValue.Closed) }
-                        val scope = rememberCoroutineScope()
-                        var navConsumed by remember { mutableStateOf(false) }
-                        LaunchedEffect(navConsumed) {
-                            if (navConsumed) {
-                                delay(500)
-                                navConsumed = false
-                            }
-                        }
-
-                        ModalNavigationDrawer(
-                            drawerState = drawerState,
-                            drawerContent = {
-                                ModalDrawerSheet(
-                                    drawerContainerColor = MaterialTheme.colorScheme.surface
-                                ) {
-                                    AppNavigationDrawerContent(
-                                        selectedItemId = DrawerDestination.AiChat,
-                                        onCloseDrawer = { scope.launch { drawerState.close() } },
-                                        onHomeClick = {
-                                            if (navConsumed) return@AppNavigationDrawerContent
-                                            navConsumed = true
-                                            val mainIdx = navigator.backStack.indexOfFirst { it is AppNavRoute.Main }
-                                            if (mainIdx >= 0) {
-                                                while (navigator.backStack.size > mainIdx + 1) {
-                                                    navigator.backStack.removeAt(navigator.backStack.size - 1)
-                                                }
-                                            } else {
-                                                navigator.onBack()
+                        AdaptiveNavigationShell(
+                            selectedDestination = DrawerDestination.AiChat,
+                            onNavigate = { dest ->
+                                when (dest) {
+                                    DrawerDestination.Main -> {
+                                        val mainIdx = navigator.backStack.indexOfFirst { it is AppNavRoute.Main }
+                                        if (mainIdx >= 0) {
+                                            while (navigator.backStack.size > mainIdx + 1) {
+                                                navigator.backStack.removeAt(navigator.backStack.size - 1)
                                             }
-                                        },
-                                        onTodayClick = {
-                                            if (navConsumed) return@AppNavigationDrawerContent
-                                            navConsumed = true
-                                            navigator.navigateToToday()
-                                        },
-                                        onCalendarClick = {
-                                            if (navConsumed) return@AppNavigationDrawerContent
-                                            navConsumed = true
-                                            navigator.navigateToCalendar()
-                                        },
-                                        onAiChatClick = { /* already here */ },
-                                        onUpdateFeedClick = {
-                                            if (navConsumed) return@AppNavigationDrawerContent
-                                            navConsumed = true
-                                            navigator.navigateToUpdateFeed()
-                                        },
-                                        onSettingsClick = {
-                                            if (navConsumed) return@AppNavigationDrawerContent
-                                            navConsumed = true
-                                            navigator.navigateToSettings()
-                                        },
-                                        onRateAppClick = {
-                                            csatViewModel.sendIntent(CsatIntent.ForceShow)
-                                        },
-                                        onLeaveFeedbackClick = {
-                                            csatViewModel.sendIntent(CsatIntent.ForceShowFeedback)
-                                        },
-                                        versionName = AppBuildConfig.versionName,
-                                    )
+                                        } else navigator.onBack()
+                                    }
+                                    DrawerDestination.Today -> navigator.navigateToToday()
+                                    DrawerDestination.Calendar -> navigator.navigateToCalendar()
+                                    DrawerDestination.AiChat -> { /* already here */ }
+                                    DrawerDestination.UpdateFeed -> navigator.navigateToUpdateFeed()
+                                    DrawerDestination.Settings -> navigator.navigateToSettings()
                                 }
-                            }
-                        ) {
+                            },
+                            onRateApp = { csatViewModel.sendIntent(CsatIntent.ForceShow) },
+                            onLeaveFeedback = { csatViewModel.sendIntent(CsatIntent.ForceShowFeedback) },
+                            versionName = AppBuildConfig.versionName,
+                        ) { drawerState ->
                             ChatRoute(
                                 drawerState = drawerState,
                                 snackbarHostState = snackbarHostState,

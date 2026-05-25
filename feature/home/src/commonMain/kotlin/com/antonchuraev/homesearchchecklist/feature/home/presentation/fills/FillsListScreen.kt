@@ -3,6 +3,7 @@ package com.antonchuraev.homesearchchecklist.feature.home.presentation.fills
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,6 +14,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Star
@@ -30,10 +35,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TopAppBarDefaults
+import com.antonchuraev.homesearchchecklist.desingsystem.adaptive.AppWindowSizeClass
+import com.antonchuraev.homesearchchecklist.desingsystem.adaptive.rememberAppWindowSizeClass
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonText
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
+import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
 import aichecklists.core.designsystem.generated.resources.Res
@@ -71,6 +81,7 @@ private fun LoadingContent() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NotFoundContent(onBack: () -> Unit) {
     AppScaffold(
@@ -90,44 +101,90 @@ private fun NotFoundContent(onBack: () -> Unit) {
     }
 }
 
+/** Minimum column width for fill cards in grid mode (Medium/Expanded). */
+private val FillGridMinColumnSize = 320.dp
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FillsListContent(
     state: FillsListState.Content,
     onIntent: (FillsListIntent) -> Unit
 ) {
+    val windowSizeClass = rememberAppWindowSizeClass()
+    val isCompact = windowSizeClass == AppWindowSizeClass.Compact
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+
     AppScaffold(
         title = stringResource(Res.string.fills_list_title),
-        onBackButtonClick = { onIntent(FillsListIntent.OnBackClick) }
+        onBackButtonClick = { onIntent(FillsListIntent.OnBackClick) },
+        scrollBehavior = scrollBehavior,
     ) {
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = AppDimens.ScreenPaddingHorizontal),
-            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
-        ) {
-            item {
-                Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
-            }
+        if (isCompact) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .adaptiveContentWidth()
+                    .padding(horizontal = AppDimens.ScreenPaddingHorizontal),
+                verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
+            ) {
+                item {
+                    Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
+                }
 
-            item {
-                Text(
-                    text = state.checklist.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
-            }
+                item {
+                    Text(
+                        text = state.checklist.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
+                }
 
-            items(state.fills, key = { it.id }) { fill ->
-                FillCard(
-                    fill = fill,
-                    onClick = { onIntent(FillsListIntent.OnFillClick(fill)) },
-                    onDeleteClick = { onIntent(FillsListIntent.OnDeleteFillClick(fill)) }
-                )
-            }
+                items(state.fills, key = { it.id }) { fill ->
+                    FillCard(
+                        fill = fill,
+                        onClick = { onIntent(FillsListIntent.OnFillClick(fill)) },
+                        onDeleteClick = { onIntent(FillsListIntent.OnDeleteFillClick(fill)) }
+                    )
+                }
 
-            item {
-                Spacer(modifier = Modifier.height(AppDimens.SpacingXxl))
+                item {
+                    Spacer(modifier = Modifier.height(AppDimens.SpacingXxl))
+                }
+            }
+        } else {
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = FillGridMinColumnSize),
+                modifier = Modifier.fillMaxSize().adaptiveContentWidth(maxWidthDp = 1200),
+                contentPadding = PaddingValues(
+                    start = AppDimens.ScreenPaddingHorizontal,
+                    end = AppDimens.ScreenPaddingHorizontal,
+                    top = AppDimens.SpacingMd,
+                    bottom = AppDimens.SpacingXxl,
+                ),
+                horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
+                verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
+            ) {
+                // Checklist name header — full-width across all columns
+                item(
+                    key = "checklist_name",
+                    span = { GridItemSpan(maxLineSpan) },
+                ) {
+                    Text(
+                        text = state.checklist.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.padding(bottom = AppDimens.SpacingXs),
+                    )
+                }
+
+                items(state.fills, key = { it.id }) { fill ->
+                    FillCard(
+                        fill = fill,
+                        onClick = { onIntent(FillsListIntent.OnFillClick(fill)) },
+                        onDeleteClick = { onIntent(FillsListIntent.OnDeleteFillClick(fill)) }
+                    )
+                }
             }
         }
     }

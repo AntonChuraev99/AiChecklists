@@ -32,6 +32,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.Modifier
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.chat_assistant_welcome
+import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AttachmentSource
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
@@ -88,7 +89,7 @@ import kotlinx.datetime.toLocalDateTime
 fun ChatScreen(
     state: ChatScreenState,
     onIntent: (ChatScreenIntent) -> Unit,
-    drawerState: DrawerState = DrawerState(DrawerValue.Closed),
+    drawerState: DrawerState? = null,
     onNavigateToPaywall: (() -> Unit)? = null,
     onAttachmentSourcePicked: ((AttachmentSource) -> Unit)? = null,
     onVoiceRecordingStarted: (() -> Unit)? = null,
@@ -188,7 +189,9 @@ fun ChatScreen(
                 onSettingsClick = { onIntent(ChatScreenIntent.OnSettingsClick) },
                 onBackClick = { onIntent(ChatScreenIntent.OnBackClick) },
                 onCreditsClick = onNavigateToPaywall,
-                onMenuClick = { scope.launch { drawerState.open() } },
+                onMenuClick = if (drawerState != null) {
+                    { scope.launch { drawerState.open() } }
+                } else null,
             )
         },
     ) { scaffoldPadding ->
@@ -209,7 +212,8 @@ fun ChatScreen(
             LazyColumn(
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .adaptiveContentWidth(),
                 state = listState,
                 // reverseLayout = items are laid out bottom-up (newest at the bottom,
                 // oldest at the top). This is the standard chat pattern (Telegram /

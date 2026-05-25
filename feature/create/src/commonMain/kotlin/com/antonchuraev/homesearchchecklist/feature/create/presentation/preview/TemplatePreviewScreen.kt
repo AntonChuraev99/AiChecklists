@@ -40,9 +40,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TopAppBarDefaults
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AddItemInputField
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
+import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
 import com.antonchuraev.homesearchchecklist.feature.create.domain.model.ChecklistTemplate
@@ -52,16 +55,19 @@ import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TemplatePreviewScreen(
     templateId: String,
     viewModel: TemplatePreviewViewModel = koinViewModel { parametersOf(templateId) }
 ) {
     val state by viewModel.screenState.collectAsState()
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     AppScaffold(
         title = state.template?.name ?: stringResource(Res.string.template_preview_title),
         onBackButtonClick = { viewModel.sendIntent(TemplatePreviewScreenIntent.OnBackClick) },
+        scrollBehavior = scrollBehavior,
         bottomBar = {
             if (!state.isLoading && state.template != null) {
                 Surface(
@@ -138,7 +144,7 @@ private fun TemplatePreviewContent(
     onAddItem: () -> Unit
 ) {
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().adaptiveContentWidth(),
         contentPadding = PaddingValues(
             horizontal = AppDimens.ScreenPaddingHorizontal,
             vertical = AppDimens.SpacingLg

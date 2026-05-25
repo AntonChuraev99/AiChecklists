@@ -32,19 +32,24 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TopAppBarDefaults
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonSecondary
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
+import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SubscriptionStatusScreen(
     showSuccessMessage: Boolean = false,
     viewModel: SubscriptionStatusViewModel = koinViewModel()
 ) {
     val state by viewModel.screenState.collectAsState()
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     // Show success message from nav param and auto-dismiss after 3s
     LaunchedEffect(showSuccessMessage) {
@@ -57,7 +62,8 @@ fun SubscriptionStatusScreen(
 
     AppScaffold(
         title = stringResource(Res.string.subscription_status_title),
-        onBackButtonClick = { viewModel.sendIntent(SubscriptionStatusIntent.OnBackClick) }
+        onBackButtonClick = { viewModel.sendIntent(SubscriptionStatusIntent.OnBackClick) },
+        scrollBehavior = scrollBehavior,
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             if (state.isLoading) {
@@ -108,6 +114,7 @@ private fun SubscriptionStatusContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .adaptiveContentWidth()
             .padding(horizontal = AppDimens.ScreenPaddingHorizontal),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center

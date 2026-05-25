@@ -34,9 +34,12 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TopAppBarDefaults
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
+import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
 import com.antonchuraev.homesearchchecklist.feature.sharing.domain.model.ShareFormat
@@ -74,14 +77,18 @@ fun ShareScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ShareScreenContent(
     state: ShareScreenState,
     onIntent: (ShareScreenIntent) -> Unit
 ) {
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+
     AppScaffold(
         title = stringResource(Res.string.share_screen_title),
         onBackButtonClick = { onIntent(ShareScreenIntent.OnBackClick) },
+        scrollBehavior = scrollBehavior,
         bottomBar = {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
@@ -136,6 +143,7 @@ private fun ShareScreenContent(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
+                        .adaptiveContentWidth()
                         .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
                         .padding(top = AppDimens.SpacingLg)
                 ) {

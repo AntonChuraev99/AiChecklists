@@ -30,6 +30,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -55,6 +56,7 @@ import aichecklists.core.designsystem.generated.resources.today_title
 import com.antonchuraev.homesearchchecklist.core.common.api.State
 import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
+import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
@@ -143,6 +145,8 @@ sealed interface TodayScreenState : State {
  *
  * @param state Current screen state (Loading / Empty / AllDone / NoChecklists / Success).
  * @param drawerState Lifted [DrawerState] from App.kt — hamburger opens it.
+ *   Null on Medium/Expanded where NavigationRail/PermanentDrawer is always visible —
+ *   in that case the hamburger icon is omitted from the TopAppBar.
  * @param onReminderClick Navigation callback. Receives checklistId and optional fillId.
  *        - If fillId != null → navigate to FillDetail(fillId)
  *        - If fillId == null → navigate to ChecklistDetail(checklistId)
@@ -153,24 +157,28 @@ sealed interface TodayScreenState : State {
 @Composable
 fun TodayScreen(
     state: TodayScreenState,
-    drawerState: DrawerState,
+    drawerState: DrawerState?,
     onReminderClick: (checklistId: Long, fillId: Long?) -> Unit,
     onCreateChecklistClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     AppScaffold(
         title = stringResource(Res.string.today_title),
-        navigationIcon = {
-            IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                Icon(
-                    imageVector = Icons.Filled.Menu,
-                    contentDescription = stringResource(Res.string.today_open_menu),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+        navigationIcon = if (drawerState != null) {
+            {
+                IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                    Icon(
+                        imageVector = Icons.Filled.Menu,
+                        contentDescription = stringResource(Res.string.today_open_menu),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
-        },
+        } else null,
+        scrollBehavior = scrollBehavior,
     ) {
         TodayBody(
             state = state,
@@ -255,7 +263,7 @@ private fun TodaySuccessContent(
     onReminderClick: (checklistId: Long, fillId: Long?) -> Unit,
 ) {
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().adaptiveContentWidth(),
         contentPadding = PaddingValues(bottom = AppDimens.SpacingXl),
     ) {
         // ---- Date header ----

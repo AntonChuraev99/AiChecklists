@@ -38,6 +38,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.antonchuraev.homesearchchecklist.desingsystem.adaptive.AppWindowSizeClass
+import com.antonchuraev.homesearchchecklist.desingsystem.adaptive.rememberAppWindowSizeClass
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCreditsChip
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
@@ -62,9 +64,10 @@ import org.koin.compose.viewmodel.koinViewModel
  * parent ModalNavigationDrawer can disable swipe gestures while the user is
  * dragging checklist items (gesturesEnabled = !isEditMode).
  */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
-    drawerState: DrawerState,
+    drawerState: DrawerState?,
     isEditMode: Boolean,
     onEditModeChange: (Boolean) -> Unit,
     viewModel: MainScreenViewModel = koinViewModel(),
@@ -80,9 +83,14 @@ fun MainScreen(
     val screenState: MainScreenState by viewModel.screenState.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
+    val windowSizeClass = rememberAppWindowSizeClass()
+    val isCompact = windowSizeClass == AppWindowSizeClass.Compact
+
     val showHamburgerHint = (screenState as? MainScreenState.Success)?.showHamburgerHint ?: false
     val hamburgerScale = remember { Animatable(1f) }
 
+    // Pulse hint: only active on Compact where drawerState != null (hamburger is rendered).
+    // On Medium/Expanded the rail/permanent drawer is always visible — no hamburger, no hint.
     // Infinite bounce while hint is active. The loop is broken only by the
     // drawer-open watcher below (which flips showHamburgerHint to false via
     // OnHamburgerHintCompleted intent → DataStore flag → state re-emit →
@@ -91,8 +99,8 @@ fun MainScreen(
     // so the eye reliably catches it — earlier 1.15/300ms × 3 cycles was
     // missed in real-device testing: user saw "one vibration" and didn't
     // recognize it as a hint).
-    LaunchedEffect(showHamburgerHint) {
-        if (showHamburgerHint) {
+    LaunchedEffect(showHamburgerHint, drawerState) {
+        if (showHamburgerHint && drawerState != null) {
             while (true) {
                 hamburgerScale.animateTo(1.20f, tween(400, easing = FastOutSlowInEasing))
                 hamburgerScale.animateTo(1f, tween(400, easing = FastOutSlowInEasing))
@@ -103,15 +111,16 @@ fun MainScreen(
     }
 
     // Stop hint early if user opens the drawer before cycles finish.
-    LaunchedEffect(drawerState.isOpen) {
-        if (drawerState.isOpen && showHamburgerHint) {
+    // drawerState is null on Medium/Expanded — safe no-op when null.
+    LaunchedEffect(drawerState?.isOpen) {
+        if (drawerState?.isOpen == true && showHamburgerHint) {
             viewModel.sendIntent(MainScreenIntent.OnHamburgerHintCompleted)
         }
     }
 
     AppScaffold(
         title = "",
-        navigationIcon = if (!isEditMode) {
+        navigationIcon = if (!isEditMode && drawerState != null) {
             {
                 IconButton(onClick = { scope.launch { drawerState.open() } }) {
                     Icon(
@@ -127,7 +136,10 @@ fun MainScreen(
             }
         } else null,
         actions = {
-            if (isEditMode) {
+            // "Done" button exits edit/reorder mode — only meaningful on Compact
+            // where LazyColumn + reorderable is active. Hidden on Medium/Expanded
+            // (grid path) since drag-drop is not supported on LazyVerticalGrid.
+            if (isEditMode && isCompact) {
                 TextButton(onClick = { onEditModeChange(false) }) {
                     Text(
                         text = stringResource(Res.string.done),

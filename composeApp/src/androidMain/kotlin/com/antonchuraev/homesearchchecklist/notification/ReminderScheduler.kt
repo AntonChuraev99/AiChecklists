@@ -232,7 +232,9 @@ class ReminderScheduler(
         //   Item one-shot : abs("fillId:itemId".hashCode()) + 200_000
         //   Item repeat   : abs("fillId:itemId".hashCode()) + 300_000
         //
-        // Checklist codes land near 0..Int.MAX_INT (from checklistId.toInt() fold).
+        // Checklist codes: high-32 + low-32 addition fold — injective over the realistic
+        // Room-ID range (positive sequential longs). Addition avoids the XOR collision where
+        // Long.MAX_VALUE and Long.MIN_VALUE would both fold to 0x80000000.
         // Checklist repeat adds only +100_000, so still in the same vicinity.
         // Item codes are pushed to +200_000 / +300_000 which creates a dedicated
         // namespace far enough from the checklist range for practical collision safety.
@@ -242,7 +244,9 @@ class ReminderScheduler(
         private const val ITEM_REPEAT_OFFSET = 300_000
 
         fun reminderRequestCode(checklistId: Long): Int {
-            return (checklistId xor (checklistId ushr 32)).toInt()
+            // Fold high and low 32-bit halves via addition (not XOR) so that Long.MAX_VALUE
+            // and Long.MIN_VALUE — which XOR-fold to the same lower 32 bits — stay distinct.
+            return ((checklistId ushr 32) + (checklistId and 0xFFFFFFFFL)).toInt()
         }
 
         fun repeatRequestCode(checklistId: Long): Int {

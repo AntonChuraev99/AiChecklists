@@ -86,7 +86,7 @@ import org.koin.compose.viewmodel.koinViewModel
  */
 @Composable
 fun ChatRoute(
-    drawerState: DrawerState,
+    drawerState: DrawerState?,
     snackbarHostState: SnackbarHostState,
     onBack: () -> Unit,
     onNavigateToChecklist: ((Long) -> Unit)? = null,

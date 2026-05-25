@@ -17,7 +17,7 @@ import org.koin.compose.viewmodel.koinViewModel
  */
 @Composable
 fun TodayRoute(
-    drawerState: DrawerState,
+    drawerState: DrawerState?,
     onCreateChecklistClick: () -> Unit,
     viewModel: TodayViewModel = koinViewModel(),
 ) {

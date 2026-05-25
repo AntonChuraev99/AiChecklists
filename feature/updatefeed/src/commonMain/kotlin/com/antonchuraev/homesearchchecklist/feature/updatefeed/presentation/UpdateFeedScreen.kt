@@ -25,10 +25,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import kotlinx.coroutines.launch
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TopAppBarDefaults
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
 import com.antonchuraev.homesearchchecklist.desingsystem.components.PremiumBanner
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
+import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.feature.updatefeed.presentation.components.ReleaseCard
 import aichecklists.core.designsystem.generated.resources.Res
@@ -56,6 +59,7 @@ fun UpdateFeedScreen(
     UpdateFeedScreenContent(onBackClick = onBackClick, drawerState = drawerState)
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun UpdateFeedScreenContent(
     onBackClick: () -> Unit,
@@ -67,6 +71,7 @@ private fun UpdateFeedScreenContent(
 
     val state by viewModel.screenState.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     // Double-back guard: rapid double-tap на back иногда выполняет popBackStack
     // дважды — второй pop выскакивает за Main в destination, которого уже нет
@@ -95,7 +100,8 @@ private fun UpdateFeedScreenContent(
                     onBackClick()
                 }
             }
-        } else null
+        } else null,
+        scrollBehavior = scrollBehavior,
     ) {
         when (val currentState = state) {
             UpdateFeedScreenState.Loading -> {
@@ -117,6 +123,7 @@ private fun UpdateFeedScreenContent(
 
             is UpdateFeedScreenState.Success -> {
                 LazyColumn(
+                    modifier = Modifier.fillMaxSize().adaptiveContentWidth(),
                     verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd),
                     contentPadding = PaddingValues(
                         horizontal = AppDimens.ScreenPaddingHorizontal,

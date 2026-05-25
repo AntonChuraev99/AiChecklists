@@ -81,11 +81,13 @@ import aichecklists.core.designsystem.generated.resources.calendar_next_week
 import aichecklists.core.designsystem.generated.resources.calendar_prev_week
 import aichecklists.core.designsystem.generated.resources.calendar_title
 import aichecklists.core.designsystem.generated.resources.today_open_menu
+import androidx.compose.material3.TopAppBarDefaults
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonText
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
 import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
+import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo
@@ -135,25 +137,29 @@ import org.jetbrains.compose.resources.stringResource
 fun CalendarScreen(
     todayState: TodayScreenState,
     calendarState: CalendarState,
-    drawerState: DrawerState,
+    drawerState: DrawerState?,
     onTodayReminderClick: (checklistId: Long, fillId: Long?) -> Unit,
     onTodayCreateChecklistClick: () -> Unit,
     onCalendarIntent: (CalendarIntent) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState(initialPage = 0, pageCount = { 2 })
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     AppScaffold(
         title = stringResource(Res.string.calendar_title),
-        navigationIcon = {
-            IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                Icon(
-                    imageVector = Icons.Filled.Menu,
-                    contentDescription = stringResource(Res.string.today_open_menu),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+        navigationIcon = if (drawerState != null) {
+            {
+                IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                    Icon(
+                        imageVector = Icons.Filled.Menu,
+                        contentDescription = stringResource(Res.string.today_open_menu),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
-        },
+        } else null,
+        scrollBehavior = scrollBehavior,
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             PrimaryTabRow(
@@ -350,7 +356,7 @@ private fun AgendaListContent(
 ) {
     LazyColumn(
         state = listState,
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize().adaptiveContentWidth(),
         contentPadding = PaddingValues(bottom = AppDimens.SpacingXl),
     ) {
         // Render each AgendaItem — DateHeaders as stickyHeader, ReminderRows as items.
