@@ -693,46 +693,61 @@ globalThis.__firestoreUnsubscribe = (listenerId) => {
     }
 };
 
-// === SES Lockdown diagnostics ===
-// Crypto wallet extensions (MetaMask, TronLink) inject SES lockdown that
-// freezes JS intrinsics and breaks Kotlin/WASM + Skiko rendering.
-// Log which critical APIs are affected so we can build targeted workarounds.
+// === Coroutine dispatcher isolation ===
+// Kotlin/WASM coroutine dispatcher uses window.postMessage('dispatchCoroutine')
+// for scheduling. Browser extensions (TronLink, MetaMask) flood the message queue
+// with their own IPC, causing race conditions in Compose rendering that crash
+// Base64 resource decoding. Fix: redirect the dispatcher to a private MessageChannel
+// that extensions cannot interfere with.
 (function() {
-    const isSES = Object.isFrozen(Object.prototype);
-    if (!isSES) return;
-    console.warn('[Gisti:SES] SES lockdown detected. Checking critical APIs...');
-    const checks = {
-        'Object.prototype frozen': Object.isFrozen(Object.prototype),
-        'Array.prototype frozen': Object.isFrozen(Array.prototype),
-        'Math.random type': typeof Math.random,
-        'Math.random()': (() => { try { return Math.random(); } catch(e) { return 'ERROR: '+e.message; } })(),
-        'Math.random() again': (() => { try { return Math.random(); } catch(e) { return 'ERROR: '+e.message; } })(),
-        'Date.now()': (() => { try { return Date.now(); } catch(e) { return 'ERROR: '+e.message; } })(),
-        'performance exists': typeof performance,
-        'performance.now()': (() => { try { return performance.now(); } catch(e) { return 'ERROR: '+e.message; } })(),
-        'Uint8Array.prototype frozen': Object.isFrozen(Uint8Array.prototype),
-        'ArrayBuffer.prototype frozen': Object.isFrozen(ArrayBuffer.prototype),
-        'TextEncoder exists': typeof TextEncoder,
-        'TextDecoder exists': typeof TextDecoder,
-        'navigator frozen': Object.isFrozen(navigator),
-        'navigator.languages': (() => { try { return JSON.stringify(navigator.languages); } catch(e) { return 'ERROR: '+e.message; } })(),
-        'globalThis.crypto': typeof globalThis.crypto,
-        'crypto.getRandomValues': typeof globalThis.crypto?.getRandomValues,
-        'requestAnimationFrame': typeof requestAnimationFrame,
-        'postMessage': typeof postMessage,
-        'canvas getContext': (() => { try { var c = document.createElement('canvas'); var g = c.getContext('2d'); return g ? 'OK' : 'null'; } catch(e) { return 'ERROR: '+e.message; } })(),
-        'WebGL getContext': (() => { try { var c = document.createElement('canvas'); var g = c.getContext('webgl2') || c.getContext('webgl'); return g ? 'OK' : 'null'; } catch(e) { return 'ERROR: '+e.message; } })(),
-        'Function.prototype.toString frozen': (() => { try { return Object.getOwnPropertyDescriptor(Function.prototype, 'toString')?.configurable; } catch(e) { return 'ERROR'; } })(),
-        'eval available': (() => { try { eval('1'); return true; } catch(e) { return 'BLOCKED: '+e.message; } })(),
+    const channel = new MessageChannel();
+    const origPostMessage = window.postMessage.bind(window);
+    const origAddEventListener = window.addEventListener.bind(window);
+    let dispatchHandler = null;
+
+    window.addEventListener = function(type, listener, options) {
+        // Intercept the Kotlin coroutine dispatcher's message handler
+        // (capture-phase listener for 'message' that checks for 'dispatchCoroutine')
+        if (type === 'message' && options === true && !dispatchHandler) {
+            dispatchHandler = listener;
+            channel.port1.onmessage = function() {
+                dispatchHandler({
+                    source: window,
+                    data: 'dispatchCoroutine',
+                    stopPropagation: function() {},
+                    preventDefault: function() {}
+                });
+            };
+            console.debug('[Gisti] Coroutine dispatcher isolated via MessageChannel');
+            return;
+        }
+        return origAddEventListener.call(window, type, listener, options);
     };
-    console.warn('[Gisti:SES] API check results:', JSON.stringify(checks, null, 2));
+
+    const _origPostMessage = window.postMessage;
+    window.postMessage = function(data, targetOrigin) {
+        if (data === 'dispatchCoroutine') {
+            channel.port2.postMessage(null);
+            return;
+        }
+        return _origPostMessage.call(window, data, targetOrigin);
+    };
 })();
 
-// Suppress Base64 padding error from console (non-fatal, SES-induced).
+// === Global error catchers ===
 window.addEventListener('error', function(event) {
     if (event.message && event.message.includes('padding option is set to PRESENT')) {
+        console.warn('[Gisti] Suppressed non-fatal Base64 error');
         event.preventDefault();
+        return;
     }
+    console.error('%c[CRASH] ' + (event.message || 'Unknown error'), 'color:red;font-size:16px;font-weight:bold');
+    if (event.error && event.error.stack) console.error('[CRASH] stack:', event.error.stack);
+});
+window.addEventListener('unhandledrejection', function(event) {
+    var msg = event.reason ? (event.reason.message || String(event.reason)) : 'Unknown rejection';
+    console.error('%c[PROMISE CRASH] ' + msg, 'color:orange;font-size:16px;font-weight:bold');
+    if (event.reason && event.reason.stack) console.error('[PROMISE CRASH] stack:', event.reason.stack);
 });
 
 // Load composeApp.js AFTER all globalThis.__* are set

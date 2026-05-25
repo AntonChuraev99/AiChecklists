@@ -58,19 +58,19 @@ class AppNavigatorImpl : AppNavigator {
     }
 
     override fun navigateToOnboarding() {
-        // popUpTo<Splash> inclusive — reset stack with only Onboarding
-        backStack.clear()
-        backStack.add(AppNavRoute.Onboarding)
+        replaceStack(AppNavRoute.Onboarding)
     }
 
     override fun navigateToInteractiveOnboarding() {
-        backStack.clear()
-        backStack.add(AppNavRoute.InteractiveOnboarding)
+        replaceStack(AppNavRoute.InteractiveOnboarding)
     }
 
     override fun navigateToMainScreen(clearBackStack: Boolean) {
-        if (clearBackStack) backStack.clear()
-        backStack.add(AppNavRoute.Main)
+        if (clearBackStack) {
+            replaceStack(AppNavRoute.Main)
+        } else {
+            backStack.add(AppNavRoute.Main)
+        }
     }
 
     override fun navigateToDebugMenu() = push(AppNavRoute.Debug)
@@ -100,28 +100,19 @@ class AppNavigatorImpl : AppNavigator {
     ) {
         val route = AppNavRoute.ChecklistDetail(checklistId, focusItemId)
         if (clearBackStack) {
-            // Mirrors Nav2: popUpTo(Main, inclusive = false) — keep Main, drop above, then push
-            val mainIdx = backStack.indexOfFirst { it is AppNavRoute.Main }
-            if (mainIdx >= 0) {
-                while (backStack.size > mainIdx + 1) backStack.removeAt(backStack.size - 1)
-            } else {
-                backStack.clear()
-            }
+            popToMainThenPush(route)
+        } else {
+            backStack.add(route)
         }
-        backStack.add(route)
     }
 
     override fun navigateToFillDetail(fillId: Long, clearBackStack: Boolean) {
         val route = AppNavRoute.FillDetail(fillId)
         if (clearBackStack) {
-            val mainIdx = backStack.indexOfFirst { it is AppNavRoute.Main }
-            if (mainIdx >= 0) {
-                while (backStack.size > mainIdx + 1) backStack.removeAt(backStack.size - 1)
-            } else {
-                backStack.clear()
-            }
+            popToMainThenPush(route)
+        } else {
+            backStack.add(route)
         }
-        backStack.add(route)
     }
 
     override fun navigateToFillsList(checklistId: Long) = push(AppNavRoute.FillsList(checklistId))
@@ -132,8 +123,8 @@ class AppNavigatorImpl : AppNavigator {
         push(AppNavRoute.Paywall(source = source, forceVariant = forceVariant))
 
     override fun navigateToSubscriptionStatus(showSuccessMessage: Boolean) {
-        // Mirrors Nav2: popUpTo<Paywall> inclusive — removes all Paywall entries
         backStack.removeAll { it is AppNavRoute.Paywall }
+        if (backStack.isEmpty()) backStack.add(AppNavRoute.Main)
         backStack.add(AppNavRoute.SubscriptionStatus(showSuccessMessage))
     }
 
@@ -157,6 +148,27 @@ class AppNavigatorImpl : AppNavigator {
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
+
+    /**
+     * Atomically replace the entire stack with a single route.
+     * Never leaves the stack empty — sets [0] first, then trims.
+     * Fixes race where NavDisplay sees empty stack between clear() and add().
+     */
+    private fun replaceStack(route: AppNavRoute) {
+        backStack[0] = route
+        while (backStack.size > 1) backStack.removeAt(backStack.size - 1)
+    }
+
+    private fun popToMainThenPush(route: AppNavRoute) {
+        val mainIdx = backStack.indexOfFirst { it is AppNavRoute.Main }
+        if (mainIdx >= 0) {
+            while (backStack.size > mainIdx + 1) backStack.removeAt(backStack.size - 1)
+        } else {
+            replaceStack(route)
+            return
+        }
+        backStack.add(route)
+    }
 
     private fun push(route: AppNavRoute) {
         backStack.add(route)
