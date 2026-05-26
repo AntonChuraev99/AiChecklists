@@ -108,9 +108,6 @@ fun AdaptiveNavigationShell(
         }
 
         AppWindowSizeClass.Medium -> {
-            // NavigationRail: 5 primary destinations only.
-            // Help/About/footer omitted — MD3 guidance: rail = compact icon+label nav,
-            // not a catch-all action list. drawerState = null, screens hide hamburger.
             AdaptiveShellRail(
                 selectedDestination = selectedDestination,
                 onNavigate = ::guardedNavigate,
@@ -119,8 +116,6 @@ fun AdaptiveNavigationShell(
         }
 
         AppWindowSizeClass.Expanded -> {
-            // PermanentNavigationDrawer: full AppNavigationDrawerContent always visible.
-            // drawerState = null, screens hide hamburger.
             AdaptiveShellPermanent(
                 selectedDestination = selectedDestination,
                 onNavigate = ::guardedNavigate,
