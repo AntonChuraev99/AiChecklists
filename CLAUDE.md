@@ -14,7 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 > **iOS release strategy**: iOS version will be published after Android revenue covers the Apple Developer Program fee ($99/year). Until then, iOS target exists in code but is not actively released.
 
-> **Web release strategy**: web target uses Compose Multiplatform's wasmJs renderer (Skiko canvas), Room 3.0 with the SQLite OPFS Web Worker driver for persistence, and the Firebase JS SDK (loaded as ESM modules) for Auth/Remote Config/Analytics. AI flow goes through CORS-enabled Cloud Functions; direct Gemini calls from the browser are not allowed.
+> **Web platform**: Full production platform developed in parallel with Android. Uses Compose Multiplatform wasmJs renderer (Skiko canvas), Room 3.0 with SQLite OPFS Web Worker driver for persistence, and Firebase JS SDK (ESM modules) for Auth/Remote Config/Analytics. AI flow goes through CORS-enabled Cloud Functions; direct Gemini calls from the browser are not allowed. Deployed to Cloudflare Workers Static Assets.
 
 ### Repository Visibility
 
@@ -43,19 +43,41 @@ Before committing any new file, verify it does not contain patterns like `AIzaSy
 
 ### Product Concept
 
-Gisti transforms any content into actionable checklists using AI. **The AI Chat Assistant is the flagship interaction layer** — users converse naturally and the app reasons over their lists.
+Gisti turns anything into a checklist with AI. It works on **Android** and **in the browser** (web) — same features, same data. Web is a full platform developed in parallel with Android, not a companion or lite version.
 
-| Feature | Description | Input Formats |
-|---------|-------------|---------------|
-| **1. AI Chat Assistant** | Natural-language assistant — add/edit/find items, set reminders, plan your week through conversation. Tiered routing: free local commands (0 credits), cheap classifier (1 credit), full reasoning (3 credits). Persists conversation history across sessions. | Text (multi-turn dialogue) |
-| **2. Create via AI** | Generate a new checklist from any content | Photo, PDF, Text, Link, Voice |
-| **3. Fill via AI** | Auto-fill an existing checklist based on new content | Photo, PDF, Text, Link, Voice |
-| **4. Export** | Share your checklist in convenient formats | PDF, Plain Text |
+**The AI Chat Assistant is the flagship interaction layer** — users converse naturally and the app manages their lists, reminders, and schedule. Secondary AI flows (Create/Fill) transform any content into structured checklists.
+
+> Full product feature catalog with tier details, platform parity matrix, and gap analysis: `docs/product-features.md`
+
+#### Killer Features (Tier 1 — lead with these in onboarding & marketing)
+
+| Feature | Description | Tier |
+|---------|-------------|------|
+| **AI Chat Assistant** | Natural-language assistant — add/edit/find items, set reminders, plan your week through conversation. Text + voice input. Three-tier routing: free local commands (0 credits), cloud classifier (1 credit), full reasoning (3 credits). | Free (limited) / Premium |
+| **Create via AI** | Generate a checklist from any content: Photo, PDF, Text, Link, Voice. AI detects content language. | Free (limited) / Premium |
+| **Reminders & Smart Scheduling** | Per-checklist and per-item reminders. One-time or recurring (daily/weekly/weekdays/monthly/custom). Smart date parsing in AI Chat. Today view for daily focus. | Free (1 recurring) / Premium |
+| **Works Everywhere** | Android + Web (browser). Google Sign-In syncs data across devices. Web unlocks 100 free AI credits on sign-in. | Free / Premium |
+
+#### Strong Features (Tier 2 — drive retention)
+
+| Feature | Description | Tier |
+|---------|-------------|------|
+| **Calendar View** | Day grid with all checklists and reminders. Tap a day to expand, swipe between weeks. | Premium |
+| **Weekly Mode** | Any checklist as weekly planner — items grouped by weekday. | Premium |
+| **Fill via AI** | Auto-fill existing checklist from new content (Photo, PDF, Text, Link, Voice). | Free (limited) / Premium |
+| **47 Templates** | Ready-made checklists by category: travel, work, health, cooking, fitness, study. | Free |
+| **Item Attachments** | Attach photos to any item — receipts, labels, references. | Free (3/item) / Premium |
+| **Home Screen Widget** | Pin any checklist to Android home screen, tick items without opening app. | Free (Android only) |
+| **Dark Theme & Material You** | Light/dark/system. Dynamic Color on Android 12+. | Free |
+
+#### Utility Features (Tier 3 — table stakes)
+
+Inline input & rename, drag-to-reorder, swipe-to-delete, priority stars, auto-delete completed, bulk delete, export (PDF/text), language switcher (EN/RU/System), cross-device sync, interactive onboarding.
 
 ### Business Model
 
-- **Free tier**: Limited checklists and fills, daily AI credits
-- **Premium** ($1.99/mo): Unlimited checklists/fills, 300 AI credits daily, priority support
+- **Free tier**: 4 checklists, 5 fills/checklist, 10 AI credits/day, 1 recurring reminder
+- **Premium** ($1.99/mo): Unlimited checklists/fills/reminders, 300 AI credits/day, Calendar, Weekly mode
 - 3-day free trial for new users
 
 ## Project Language
