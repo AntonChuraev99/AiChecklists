@@ -51,7 +51,6 @@ class SplashViewModel(
                 analyticsTracker.setUserId(cached.userId)
                 cached
             } else {
-                // New user (first launch only): must wait for registration.
                 val result = userDataRepository.ensureUserRegistered()
                 val newUserData = result.getOrNull()?.userData ?: cached
 
@@ -62,17 +61,6 @@ class SplashViewModel(
                 newUserData
             }
 
-            // Step 2: whenever onboarding still needs to be shown, BLOCK
-            // navigation until Remote Config is activated. Without this gate
-            // the A/B variant resolver reads stale defaults and every user
-            // collapses into the same client-side fallback variant — exactly
-            // the bug we are fixing here (see Amplitude 14d distribution:
-            // interactive_onboarding=47 uniques vs slides=0).
-            //
-            // Returning users who already passed onboarding skip the wait —
-            // their variant no longer matters and a 3s gate would only delay
-            // the first frame for no benefit. RC refresh still happens via
-            // startBackgroundSync so other RC-driven features stay fresh.
             if (!userData.isOnboardingPassed) {
                 val activated = withTimeoutOrNull(REMOTE_CONFIG_FETCH_TIMEOUT) {
                     runCatching { remoteConfigProvider.fetchAndActivate() }.getOrDefault(false)

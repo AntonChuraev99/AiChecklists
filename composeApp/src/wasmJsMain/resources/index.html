@@ -65,25 +65,128 @@
         <div class="hint">Loading...</div>
     </div>
     <script type="application/javascript">
+        // === Nuclear reset: clear corrupted Compose Resources CacheStorage ===
+        // Compose Multiplatform caches .cvr (string) and .png (drawable) files
+        // in a persistent CacheStorage named compose_web_resources_cache.
+        // Once corrupted (bad bytes, stale SW, Base64 padding mismatch), the
+        // cache persists through refreshes → Base64 decode crash → UI freeze.
+        // One-time clear for all users; version bump forces re-clear.
+        (function() {
+            var RESET_KEY = '__gistiCacheClearV1';
+            if (typeof caches !== 'undefined' && !localStorage.getItem(RESET_KEY)) {
+                window.__clearingData = true;
+                caches.keys().then(function(names) {
+                    return Promise.all(names.map(function(n) { return caches.delete(n); }));
+                }).then(function() {
+                    localStorage.setItem(RESET_KEY, '1');
+                    location.reload();
+                }).catch(function() {
+                    localStorage.setItem(RESET_KEY, '1');
+                    location.reload();
+                });
+                return;
+            }
+        })();
+    </script>
+    <script type="application/javascript">
+        // === Fetch cache-bust for Compose Resources (.cvr) ===
+        // Browser HTTP disk cache may hold corrupted .cvr bytes (Base64 padding
+        // mismatch → IllegalArgumentException → Compose rendering coroutine dies
+        // → UI frozen on splash). CacheStorage clear doesn't fix this — it's the
+        // browser's built-in HTTP cache that serves stale 304 responses.
+        // One-time intercept: force `cache: 'reload'` for .cvr / composeResources
+        // fetches, then set flag so future loads use normal caching.
+        (function() {
+            var BUST_KEY = '__gistiFetchBustV2';
+            if (!localStorage.getItem(BUST_KEY)) {
+                var _origFetch = window.fetch;
+                window.fetch = function(input, init) {
+                    var url = typeof input === 'string' ? input : (input && input.url) || '';
+                    if (url.indexOf('.cvr') !== -1 || url.indexOf('composeResources') !== -1) {
+                        init = Object.assign({}, init || {}, { cache: 'reload' });
+                        console.log('[FETCH-BUST] Bypassing HTTP cache for:', url);
+                    }
+                    return _origFetch.call(this, input, init);
+                };
+                setTimeout(function() { localStorage.setItem(BUST_KEY, '1'); }, 15000);
+            }
+        })();
+    </script>
+    <script type="application/javascript">
+        // === Recovery: ?clear-data wipes all browser storage and reloads ===
+        (function() {
+            var params = new URLSearchParams(location.search);
+            if (params.has('clear-data')) {
+                window.__clearingData = true;
+                var hint = document.querySelector('.hint');
+                if (hint) hint.textContent = 'Clearing data...';
+
+                (async function() {
+                    try { localStorage.clear(); } catch(e) {}
+                    try { sessionStorage.clear(); } catch(e) {}
+                    try {
+                        if (typeof indexedDB !== 'undefined' && indexedDB.databases) {
+                            var dbs = await indexedDB.databases();
+                            await Promise.all(dbs.map(function(db) {
+                                return new Promise(function(ok) {
+                                    var r = indexedDB.deleteDatabase(db.name);
+                                    r.onsuccess = r.onerror = ok;
+                                });
+                            }));
+                        }
+                    } catch(e) {}
+                    try {
+                        if (navigator.storage && navigator.storage.getDirectory) {
+                            var root = await navigator.storage.getDirectory();
+                            for await (var name of root.keys()) {
+                                await root.removeEntry(name, { recursive: true });
+                            }
+                        }
+                    } catch(e) {}
+                    try {
+                        if (typeof caches !== 'undefined') {
+                            var names = await caches.keys();
+                            await Promise.all(names.map(function(n) { return caches.delete(n); }));
+                        }
+                    } catch(e) {}
+                    var url = new URL(location);
+                    url.searchParams.delete('clear-data');
+                    location.replace(url.toString());
+                })();
+                return;
+            }
+        })();
+    </script>
+    <script type="application/javascript">
         // Hide loader once the Compose canvas mounts. Poll-based to avoid races
         // with synchronous canvas creation during WASM init.
         (function () {
-            const tryHide = () => {
-                const c = document.querySelector('canvas');
+            var tryHide = function() {
+                var c = document.querySelector('canvas');
                 if (c && c.width > 0) {
-                    document.getElementById('loading')?.classList.add('hidden');
+                    var el = document.getElementById('loading');
+                    if (el) el.classList.add('hidden');
                     return true;
                 }
                 return false;
             };
             if (!tryHide()) {
-                const interval = setInterval(() => {
+                var interval = setInterval(function() {
                     if (tryHide()) clearInterval(interval);
                 }, 100);
+                // Show recovery hint after 12 seconds of loading
+                setTimeout(function() {
+                    var loading = document.getElementById('loading');
+                    if (loading && !loading.classList.contains('hidden')) {
+                        var hint = loading.querySelector('.hint');
+                        if (hint) hint.innerHTML = 'Taking too long? <a href="?clear-data" style="color:#2196F3;text-decoration:underline">Clear site data</a> · <a href="javascript:void(0)" onclick="location.reload(true)" style="color:#2196F3;text-decoration:underline">Hard refresh</a>';
+                    }
+                }, 12000);
                 // Safety timeout — drop loader after 60s regardless
-                setTimeout(() => {
+                setTimeout(function() {
                     clearInterval(interval);
-                    document.getElementById('loading')?.classList.add('hidden');
+                    var el = document.getElementById('loading');
+                    if (el) el.classList.add('hidden');
                 }, 60000);
             }
         })();

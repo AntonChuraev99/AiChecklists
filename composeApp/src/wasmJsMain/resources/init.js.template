@@ -41,6 +41,11 @@ import {
     writeBatch,
 } from 'https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js';
 
+// If ?clear-data is active, the page is reloading — don't start the app
+if (window.__clearingData) {
+    throw new Error('[Gisti] Clearing data — reload in progress');
+}
+
 const firebaseConfig = {
     apiKey: "__FIREBASE_API_KEY__",
     authDomain: "__FIREBASE_AUTH_DOMAIN__",
@@ -693,22 +698,103 @@ globalThis.__firestoreUnsubscribe = (listenerId) => {
     }
 };
 
-// === Coroutine dispatcher — NO isolation ===
-// The Kotlin/WASM coroutine dispatcher uses window.postMessage('dispatchCoroutine').
-// A previous attempt to isolate it via MessageChannel (commits 913193b2..e21f261c)
-// broke the dispatch chain: only ~6 dispatches got through before the channel
-// stalled, freezing the app on splash. Root cause: MessageChannel delivers
-// asynchronously via a separate task queue, which starves Compose's frame-synchronous
-// coroutine scheduling. Native postMessage works because the browser delivers
-// same-origin self-postMessages with higher priority.
-// The isolation was meant to shield against extension message floods (TronLink,
-// MetaMask), but the cure was worse than the disease. Reverted 2026-05-25.
+// === Coroutine dispatcher bypass ===
+// Problem: browser extensions (TronLink SES, MetaMask, ad blockers) add
+// message event listeners to `window`. The Kotlin/WASM coroutine dispatcher
+// uses window.postMessage('dispatchCoroutine') — every dispatch triggers ALL
+// message listeners, including extensions'. Measured: 5 dispatches/sec instead
+// of 50+ needed for Compose frame scheduling → app freezes on splash.
+//
+// Previous attempt: MessageChannel isolation (commits 913193b2..e21f261c) —
+// worse: MessageChannel has lower browser priority → only ~6 dispatches total.
+//
+// This fix: capture 'message' handlers registered AFTER this point (= Kotlin
+// runtime, not extensions) and call them DIRECTLY, completely bypassing the
+// window message queue and extension interference.
+//
+// Scheduling: queueMicrotask (not setTimeout — extensions/Chrome can throttle
+// timers to ~6/sec; microtasks are engine-internal, un-throttleable).
+// Coalescing: multiple postMessage calls per tick → one handler invocation.
+// The Kotlin handler internally drains its queue, so coalescing is safe.
+(function() {
+    var capturedHandlers = [];
+    var origAEL = window.addEventListener.bind(window);
+    var origPM = window.postMessage.bind(window);
+    var scheduled = false;
+    var diagCount = 0;
+    var diagMode = new URLSearchParams(location.search).has('diag');
+
+    window.addEventListener = function(type, fn, opts) {
+        origAEL(type, fn, opts);
+        if (type === 'message') capturedHandlers.push(fn);
+    };
+
+    function fireHandlers() {
+        scheduled = false;
+        var t0 = diagMode ? performance.now() : 0;
+        var evt = new MessageEvent('message', {
+            data: 'dispatchCoroutine',
+            source: window,
+            origin: location.origin
+        });
+        for (var i = 0; i < capturedHandlers.length; i++) {
+            try { capturedHandlers[i](evt); } catch(e) {}
+        }
+        if (diagMode) {
+            var dt = performance.now() - t0;
+            if (dt > 50) console.warn('[DIAG] handler took', dt.toFixed(0), 'ms (>50ms = blocking)');
+        }
+    }
+
+    window.postMessage = function(msg) {
+        if (msg === 'dispatchCoroutine' && capturedHandlers.length > 0) {
+            if (diagMode) diagCount++;
+            if (!scheduled) {
+                scheduled = true;
+                Promise.resolve().then(fireHandlers);
+            }
+            return;
+        }
+        return origPM.apply(window, arguments);
+    };
+
+    if (diagMode) {
+        setInterval(function() {
+            if (diagCount > 0) {
+                console.log('[DIAG] dispatches/sec:', diagCount, '| captured handlers:', capturedHandlers.length);
+                diagCount = 0;
+            }
+        }, 1000);
+        console.log('[DIAG] Dispatcher bypass active (microtask) — monitoring throughput');
+    }
+})();
+
+// === Worker lifecycle: terminate on page unload ===
+// SAH Pool VFS holds exclusive OPFS file handles for the worker's lifetime.
+// Without termination, page refresh → handle conflict → SQLiteException → hang.
+(function() {
+    var _OrigWorker = window.Worker;
+    window.Worker = function(scriptURL, options) {
+        var w = new _OrigWorker(scriptURL, options);
+        globalThis.__sqliteWorker = w;
+        return w;
+    };
+    window.Worker.prototype = _OrigWorker.prototype;
+})();
+window.addEventListener('pagehide', function() {
+    if (globalThis.__sqliteWorker) {
+        globalThis.__sqliteWorker.terminate();
+        globalThis.__sqliteWorker = null;
+    }
+});
 
 // === Global error catchers ===
 window.addEventListener('error', function(event) {
     if (event.message && event.message.includes('padding option is set to PRESENT')) {
-        console.warn('[Gisti] Suppressed non-fatal Base64 error');
-        event.preventDefault();
+        console.error('%c[BASE64 CRASH] ' + event.message, 'color:red;font-size:14px;font-weight:bold');
+        if (event.error && event.error.stack) console.error('[BASE64 CRASH] stack:', event.error.stack);
+        if (event.filename) console.error('[BASE64 CRASH] source:', event.filename + ':' + event.lineno + ':' + event.colno);
+        // DO NOT suppress — let it propagate so we see the real impact
         return;
     }
     console.error('%c[CRASH] ' + (event.message || 'Unknown error'), 'color:red;font-size:16px;font-weight:bold');
