@@ -129,7 +129,9 @@ internal class LocalIntentRouterImpl(
         // CreateChecklist triggers ("создай", "create", "new") would otherwise swallow
         // "создай напоминание" and "create reminder" phrases that belong to SetReminder.
         tryMoveReminders(normalized, lower, locale)?.let { return it }
-        trySetReminder(normalized, lower, locale)?.let { return it }
+        // SetReminder skipped in Layer 1 — date/entity extraction is too complex for local
+        // parsing. Falls through to Layer 2 (classifier) or Layer 3 (full chat) which handle
+        // natural language dates and checklist/item resolution correctly.
         tryCreateChecklist(normalized, lower, locale)?.let { return it }
         tryCreateItem(normalized, lower, locale)?.let { return it }
         tryDeleteItem(normalized, lower, locale)?.let { return it }

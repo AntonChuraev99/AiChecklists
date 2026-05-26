@@ -17,17 +17,24 @@
     <!-- Onboarding -->
     <string name="onboarding_skip">Skip</string>
     <string name="onboarding_continue">Continue</string>
-    <!-- Onboarding Page 1 - Create via AI -->
-    <string name="onboarding_page1_title">Create via AI</string>
-    <string name="onboarding_page1_description">Photo, PDF, link, text, or voice — AI instantly turns any content into a clear checklist.</string>
+    <!-- Onboarding Page 1 - AI Chat -->
+    <string name="onboarding_page1_title">Just tell Gisti what you need</string>
+    <string name="onboarding_page1_description">Add items, set reminders, plan your week — all through chat.</string>
 
-    <!-- Onboarding Page 2 - Fill via AI -->
-    <string name="onboarding_page2_title">Fill via AI</string>
-    <string name="onboarding_page2_description">Got new content? Drop a photo, link, or file — AI checks off matching items in your checklist automatically.</string>
+    <!-- Onboarding Page 2 - Create from Anything -->
+    <string name="onboarding_page2_title">Any content → checklist</string>
+    <string name="onboarding_page2_description">Photo, PDF, voice, text, or link — AI turns it into a clear checklist.</string>
 
-    <!-- Onboarding Page 3 - Export & Share -->
-    <string name="onboarding_page3_title">Export &amp; Share</string>
-    <string name="onboarding_page3_description">Share your progress as PDF or text. Perfect for reports, clients, or just keeping records.</string>
+    <!-- Onboarding Page 3 - Reminders & Calendar -->
+    <string name="onboarding_page3_title">Never miss a thing</string>
+    <string name="onboarding_page3_description">Per-item reminders, recurring schedules, and a calendar view.</string>
+
+    <!-- Onboarding Page 4 - Works Everywhere -->
+    <string name="onboarding_page4_title">Your lists follow you</string>
+    <string name="onboarding_page4_description">Phone, tablet, or browser — same checklists, same AI.</string>
+
+    <!-- Onboarding Get Started (last feature page CTA) -->
+    <string name="onboarding_get_started">Get Started</string>
 
     <!-- Interactive Onboarding -->
     <string name="onboarding_interactive_category_title">What do you want to organize?</string>
@@ -984,6 +991,7 @@
     <string name="chat_settings_get_more">Get more</string>
     <string name="chat_settings_deep_thinking_title">Deep Thinking</string>
     <string name="chat_settings_deep_thinking_subtitle">All queries skip the local router and go straight to the advanced model (3 credits per reply).</string>
+    <string name="chat_settings_clear_chat">Clear Chat History</string>
 
     <!-- AI Chat navigation / snackbar messages -->
     <string name="nav_ai_chat">AI Chat</string>

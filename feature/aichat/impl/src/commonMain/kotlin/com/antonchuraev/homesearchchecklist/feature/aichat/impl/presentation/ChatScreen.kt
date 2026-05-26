@@ -366,6 +366,7 @@ fun ChatScreen(
                 onIntent(ChatScreenIntent.OnSettingsDismiss)
                 onNavigateToPaywall?.invoke()
             },
+            onClearChat = { onIntent(ChatScreenIntent.OnClearChat) },
             onDismiss = { onIntent(ChatScreenIntent.OnSettingsDismiss) },
         )
     }

@@ -48,9 +48,10 @@ import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
 import androidx.compose.foundation.layout.fillMaxHeight
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
-import com.antonchuraev.homesearchchecklist.desingsystem.illustrations.CreateViaAiIllustration
-import com.antonchuraev.homesearchchecklist.desingsystem.illustrations.FillViaAiIllustration
-import com.antonchuraev.homesearchchecklist.desingsystem.illustrations.ExportShareIllustration
+import com.antonchuraev.homesearchchecklist.desingsystem.illustrations.AiChatHeroIllustration
+import com.antonchuraev.homesearchchecklist.desingsystem.illustrations.CreateFromAnythingIllustration
+import com.antonchuraev.homesearchchecklist.desingsystem.illustrations.RemindersCalendarIllustration
+import com.antonchuraev.homesearchchecklist.desingsystem.illustrations.WorksEverywhereIllustration
 import com.antonchuraev.homesearchchecklist.desingsystem.illustrations.PremiumBenefitsIllustration
 import com.antonchuraev.homesearchchecklist.desingsystem.sharedUI.TrialTimeline
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
@@ -72,9 +73,9 @@ data class OnboardingPage(
     val illustration: @Composable () -> Unit
 )
 
-// Total pages: 3 feature pages + 1 paywall page
-private const val TOTAL_PAGES = 4
-private const val PAYWALL_PAGE_INDEX = 3
+// Total pages: 4 feature pages + 1 paywall page
+private const val TOTAL_PAGES = 5
+private const val PAYWALL_PAGE_INDEX = 4
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -95,17 +96,22 @@ fun OnboardingScreen(
         OnboardingPage(
             titleRes = Res.string.onboarding_page1_title,
             descriptionRes = Res.string.onboarding_page1_description,
-            illustration = { CreateViaAiIllustration() }
+            illustration = { AiChatHeroIllustration() }
         ),
         OnboardingPage(
             titleRes = Res.string.onboarding_page2_title,
             descriptionRes = Res.string.onboarding_page2_description,
-            illustration = { FillViaAiIllustration() }
+            illustration = { CreateFromAnythingIllustration() }
         ),
         OnboardingPage(
             titleRes = Res.string.onboarding_page3_title,
             descriptionRes = Res.string.onboarding_page3_description,
-            illustration = { ExportShareIllustration() }
+            illustration = { RemindersCalendarIllustration() }
+        ),
+        OnboardingPage(
+            titleRes = Res.string.onboarding_page4_title,
+            descriptionRes = Res.string.onboarding_page4_description,
+            illustration = { WorksEverywhereIllustration() }
         )
     )
 
@@ -235,8 +241,12 @@ fun OnboardingScreen(
                     }
                 }
             } else {
+                val isLastFeaturePage = state.currentPage == PAYWALL_PAGE_INDEX - 1
                 AppButton(
-                    text = stringResource(Res.string.onboarding_continue),
+                    text = stringResource(
+                        if (isLastFeaturePage) Res.string.onboarding_get_started
+                        else Res.string.onboarding_continue
+                    ),
                     onClick = { viewModel.sendIntent(OnboardingIntent.OnNextPage) },
                     modifier = Modifier.fillMaxWidth()
                 )

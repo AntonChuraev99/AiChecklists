@@ -17,17 +17,24 @@
     <!-- Онбординг -->
     <string name="onboarding_skip">Пропустить</string>
     <string name="onboarding_continue">Продолжить</string>
-    <!-- Страница 1 — Создание с ИИ -->
-    <string name="onboarding_page1_title">Создание с ИИ</string>
-    <string name="onboarding_page1_description">Фото, PDF, ссылка, текст или голос — ИИ мгновенно превращает любой контент в чёткий чек-лист.</string>
+    <!-- Страница 1 — AI Чат -->
+    <string name="onboarding_page1_title">Просто скажи Gisti, что нужно</string>
+    <string name="onboarding_page1_description">Добавляй пункты, ставь напоминания, планируй неделю — всё через чат.</string>
 
-    <!-- Страница 2 — Заполнение с ИИ -->
-    <string name="onboarding_page2_title">Заполнение с ИИ</string>
-    <string name="onboarding_page2_description">Есть новый контент? Загрузите фото, ссылку или файл — ИИ автоматически отметит подходящие пункты в вашем чек-листе.</string>
+    <!-- Страница 2 — Создание из любого контента -->
+    <string name="onboarding_page2_title">Любой контент → чек-лист</string>
+    <string name="onboarding_page2_description">Фото, PDF, голос, текст или ссылка — ИИ превращает в чёткий чек-лист.</string>
 
-    <!-- Страница 3 — Экспорт и поделиться -->
-    <string name="onboarding_page3_title">Экспорт &amp; Поделиться</string>
-    <string name="onboarding_page3_description">Делитесь прогрессом в формате PDF или текста. Удобно для отчётов, клиентов или личных записей.</string>
+    <!-- Страница 3 — Напоминания и календарь -->
+    <string name="onboarding_page3_title">Ничего не забудешь</string>
+    <string name="onboarding_page3_description">Напоминания на каждый пункт, повторяющееся расписание и календарь.</string>
+
+    <!-- Страница 4 — Везде -->
+    <string name="onboarding_page4_title">Твои списки всегда с тобой</string>
+    <string name="onboarding_page4_description">Телефон, планшет или браузер — те же чек-листы, тот же ИИ.</string>
+
+    <!-- Кнопка «Начать» (последняя страница фич) -->
+    <string name="onboarding_get_started">Начать</string>
 
     <!-- Интерактивный онбординг -->
     <string name="onboarding_interactive_category_title">Что хотите организовать?</string>
@@ -954,6 +961,7 @@
     <string name="chat_settings_get_more">Получить больше</string>
     <string name="chat_settings_deep_thinking_title">Глубокое мышление</string>
     <string name="chat_settings_deep_thinking_subtitle">Все запросы идут сразу к продвинутой модели (3 кредита за ответ). Без локального роутинга.</string>
+    <string name="chat_settings_clear_chat">Очистить историю чата</string>
 
     <!-- AI-чат: навигация и snackbar-сообщения -->
     <string name="nav_ai_chat">AI-чат</string>

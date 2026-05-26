@@ -178,6 +178,16 @@ class ChatViewModel(
                 }
             }
 
+            is ChatScreenIntent.OnClearChat -> {
+                viewModelScope.launch {
+                    chatHistoryRepository.clear()
+                    _screenState.value = _screenState.value.copy(
+                        messages = emptyList(),
+                        showSettingsSheet = false,
+                    )
+                }
+            }
+
             is ChatScreenIntent.OnOpenChecklist -> {
                 viewModelScope.launch {
                     _sideEffect.emit(ChatScreenSideEffect.NavigateToChecklist(intent.checklistId))
@@ -403,12 +413,13 @@ class ChatViewModel(
                     is ChatIntent.CreateChecklist,
                     ChatIntent.SetReminder,
                     ChatIntent.MoveReminders -> {
-                        // Layer 2 (Classifier) pre-builds the ToolCall with server-extracted entities.
-                        // Prefer that over re-running local text extraction from raw text.
                         val toolCall = classification.preBuiltToolCall ?: buildToolCall(intent, text, locale)
                         if (toolCall == null) {
-                            _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_extract_fail"))
-                            _screenState.value = _screenState.value.copy(isProcessing = false)
+                            // Entity extraction failed (e.g. "remind me tomorrow" without item context).
+                            // Escalate to Layer 3 (full chat) which has conversation history and can
+                            // understand what the user is referring to from previous messages.
+                            logger.info(TAG, "ToolCall null for ${intent::class.simpleName} — escalating to Layer 3")
+                            handleFreeForm(locale)
                             return@runCatching
                         }
                         val humanReadable = previewRenderer.render(toolCall)
@@ -943,16 +954,12 @@ class ChatViewModel(
             }
 
             ChatIntent.SetReminder -> {
-                // For MVP: itemText = anything after reminder keyword, at = now + 1 day (placeholder)
-                // SmartDateParser is in LocalIntentRouterImpl scope; we cannot reuse it here
-                // without a new dependency. Phase B will inject SmartDateParser into ViewModel.
-                // Pending: docs/todos/2026-05-13-ai-chat-assistant.md (Phase B date extraction)
                 val itemText = extractPayloadAfterReminderKeyword(lower, locale)
                 if (itemText.isNullOrBlank()) null
                 else ToolCall.SetItemReminder(
                     checklistHint = null,
                     itemText = itemText,
-                    at = nowMillis() + 24 * 60 * 60 * 1000L, // placeholder: tomorrow same time
+                    at = nowMillis() + 24 * 60 * 60 * 1000L,
                 )
             }
 

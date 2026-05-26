@@ -162,6 +162,8 @@ sealed interface ChatScreenIntent : Intent {
     /** User toggled the "Deep Thinking" switch in the settings sheet. */
     data class OnDeepThinkingToggle(val enabled: Boolean) : ChatScreenIntent
 
+    data object OnClearChat : ChatScreenIntent
+
     /** User tapped the feedback icon on an assistant bubble — opens the feedback sheet. */
     data class OnFeedbackOpen(val message: ChatMessage) : ChatScreenIntent
 

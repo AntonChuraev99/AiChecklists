@@ -373,7 +373,11 @@ private fun AgendaListContent(
                     }
                 }
                 is AgendaItem.ReminderRow -> {
-                    item(key = "reminder:${agendaItem.info.reminderAt}:${agendaItem.info.checklistId}") {
+                    val reminderKey = when (val info = agendaItem.info) {
+                        is TodayReminderInfo.ItemLevel -> "reminder:${info.reminderAt}:${info.checklistId}:${info.itemId}"
+                        is TodayReminderInfo.ChecklistLevel -> "reminder:${info.reminderAt}:${info.checklistId}"
+                    }
+                    item(key = reminderKey) {
                         CalendarReminderRow(
                             info = agendaItem.info,
                             onClick = { onReminderClick(agendaItem.info) },

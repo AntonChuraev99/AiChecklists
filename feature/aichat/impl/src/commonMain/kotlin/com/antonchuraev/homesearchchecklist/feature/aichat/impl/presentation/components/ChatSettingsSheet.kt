@@ -25,6 +25,7 @@ import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.chat_settings_balance_label
 import aichecklists.core.designsystem.generated.resources.chat_settings_deep_thinking_subtitle
 import aichecklists.core.designsystem.generated.resources.chat_settings_deep_thinking_title
+import aichecklists.core.designsystem.generated.resources.chat_settings_clear_chat
 import aichecklists.core.designsystem.generated.resources.chat_settings_title
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCreditsChip
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppSwitch
@@ -57,6 +58,7 @@ fun ChatSettingsSheet(
     deepThinkingEnabled: Boolean,
     onDeepThinkingToggle: (Boolean) -> Unit,
     onGetMoreClick: () -> Unit,
+    onClearChat: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
     sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -132,6 +134,27 @@ fun ChatSettingsSheet(
                     // null — Row handles the click; switch is visual-only per AppSwitch pattern
                     onCheckedChange = null,
                     modifier = Modifier.padding(start = AppDimens.SpacingLg),
+                )
+            }
+
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = AppDimens.SpacingLg),
+                color = MaterialTheme.colorScheme.outlineVariant,
+            )
+
+            // Clear chat button
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onClearChat)
+                    .padding(vertical = AppDimens.SpacingSm),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(Res.string.chat_settings_clear_chat),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.error,
                 )
             }
 

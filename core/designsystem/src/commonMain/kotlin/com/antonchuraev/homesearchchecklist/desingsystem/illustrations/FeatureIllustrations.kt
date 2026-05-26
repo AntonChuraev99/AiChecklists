@@ -5,294 +5,380 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Done
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.outlined.Circle
-import androidx.compose.material.icons.outlined.Description
-import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Mic
-import androidx.compose.material.icons.outlined.PhotoCamera
-import androidx.compose.material.icons.outlined.PictureAsPdf
-import androidx.compose.material.icons.outlined.Share
-import androidx.compose.material.icons.automirrored.outlined.TextSnippet
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
-import aichecklists.core.designsystem.generated.resources.Res
-import aichecklists.core.designsystem.generated.resources.*
-import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.*
+import org.jetbrains.compose.resources.painterResource
 
 /**
  * Shared illustrations for onboarding and paywall screens.
  * Located in designsystem to avoid circular dependencies between feature modules.
+ *
+ * Brand-critical surfaces (gradient backgrounds, hero UI) use hardcoded colors to prevent
+ * Material You dynamic color from overriding brand identity on API 31+.
  */
+
+// Brand colors — hardcoded to prevent Material You dynamic color drift on brand surfaces
+private val BrandBlue = Color(0xFF2196F3)
+private val BrandIndigo = Color(0xFF6366F1)
+private val BrandPurple = Color(0xFFA855F7)
+private val BrandText = Color(0xFF212121)
+private val BrandTextSecondary = Color(0xFF757575)
+private val BrandWhite = Color(0xFFFFFFFF)
+private val BrandCheckBlue = Color(0xFF1976D2)
+private val BrandBezel = Color(0xFF1A1A1A)
+private val BgPrimaryContainer = Color(0xFFE3F2FD)
+private val BgWarm = Color(0xFFFFE0B2)
+private val SurfaceLight = Color(0xFFF5F5F5)
+private val Outline = Color(0xFFE0E0E0)
+private val GradientHero = Brush.linearGradient(
+    colorStops = arrayOf(0f to BrandBlue, 1f to BrandIndigo),
+    start = Offset(0f, Float.POSITIVE_INFINITY),
+    end = Offset(Float.POSITIVE_INFINITY, 0f)
+)
+private val GradientEverywhere = Brush.linearGradient(
+    colorStops = arrayOf(0f to BrandBlue, 0.6f to BrandIndigo, 1f to BrandPurple),
+    start = Offset(0f, Float.POSITIVE_INFINITY),
+    end = Offset(Float.POSITIVE_INFINITY, 0f)
+)
 
 /**
- * Page 1: Create via AI
- * Shows input formats (Photo, PDF, Text, Link, Voice) → AI → Checklist
+ * Page 1: AI Chat Hero
+ * Gradient background (brand-critical) + phone frame mockup with chat bubbles.
+ * The illustration itself IS the gradient — fills the 24dp-rounded illustration box.
  */
 @Composable
-fun CreateViaAiIllustration() {
-    Column(
+fun AiChatHeroIllustration() {
+    Box(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+            .fillMaxSize()
+            .background(GradientHero),
+        contentAlignment = Alignment.Center
     ) {
-        // Input types - 5 icons showing all supported formats
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            InputIcon(Icons.Outlined.PhotoCamera, stringResource(Res.string.illustration_photo))
-            InputIcon(Icons.Outlined.Description, stringResource(Res.string.illustration_pdf))
-            InputIcon(Icons.AutoMirrored.Outlined.TextSnippet, stringResource(Res.string.illustration_text))
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(0.7f),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            InputIcon(Icons.Outlined.Link, stringResource(Res.string.illustration_link))
-            InputIcon(Icons.Outlined.Mic, stringResource(Res.string.illustration_voice))
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // Arrow down with dots
-        ArrowDots()
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // AI processing badge
-        AiBadge()
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Arrow down with dots
-        ArrowDots()
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Result: Checklist
-        ChecklistPreview(
-            items = listOf(
-                stringResource(Res.string.illustration_task_extracted) to false,
-                stringResource(Res.string.illustration_another_item) to false,
-                stringResource(Res.string.illustration_ai_generated) to false
-            )
+        // Soft blur blobs via semi-transparent circles
+        Box(
+            modifier = Modifier
+                .size(140.dp)
+                .align(Alignment.TopEnd)
+                .offset(x = 20.dp, y = (-20).dp)
+                .background(BrandWhite.copy(alpha = 0.15f), CircleShape)
         )
+        Box(
+            modifier = Modifier
+                .size(120.dp)
+                .align(Alignment.BottomStart)
+                .offset(x = (-16).dp, y = 16.dp)
+                .background(BrandPurple.copy(alpha = 0.35f), CircleShape)
+        )
+
+        // Phone frame with real screenshot
+        PhoneFrameIllustration(
+            modifier = Modifier
+                .fillMaxWidth(0.72f)
+                .fillMaxHeight(0.82f)
+        ) {
+            Image(
+                painter = painterResource(Res.drawable.ob_screen_1_chat),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
     }
 }
 
 /**
- * Page 2: Fill via AI
- * Shows existing checklist + new content → AI → filled checklist
+ * Page 2: Create from Anything
+ * Light blue gradient background + 5 input chips + phone frame with generated checklist.
  */
 @Composable
-fun FillViaAiIllustration() {
+fun CreateFromAnythingIllustration() {
+    val bgGradient = Brush.verticalGradient(
+        colorStops = arrayOf(
+            0f to BgPrimaryContainer,
+            1f to BgPrimaryContainer.copy(alpha = 0.4f)
+        )
+    )
+
     Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(24.dp),
+            .fillMaxSize()
+            .background(bgGradient)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // Existing checklist (template)
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(0.85f)
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surface)
-                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
-                .padding(12.dp)
+        // 5 input chips row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)
         ) {
-            Column {
-                Text(
-                    text = stringResource(Res.string.illustration_apartment_check),
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+            InputChip(icon = "📷", label = "Photo")
+            InputChip(icon = "📄", label = "PDF")
+            InputChip(icon = "✏️", label = "Text")
+            InputChip(icon = "🔗", label = "Link")
+            InputChip(icon = "🎙️", label = "Voice")
+        }
+
+        // Sparkle circle + arrow
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(BrandWhite)
+                    .border(1.dp, Outline, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(text = "✨", fontSize = 16.sp)
+            }
+            // Dotted arrow downward
+            repeat(3) {
+                Box(
+                    modifier = Modifier
+                        .size(4.dp)
+                        .background(BrandBlue.copy(alpha = 0.5f), CircleShape)
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-                ChecklistItemRow(stringResource(Res.string.illustration_kitchen), false)
-                ChecklistItemRow(stringResource(Res.string.illustration_windows), false)
-                ChecklistItemRow(stringResource(Res.string.illustration_plumbing), false)
+                Spacer(modifier = Modifier.height(2.dp))
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Plus sign + photo icon
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
+        // Phone frame with real screenshot
+        PhoneFrameIllustration(
+            modifier = Modifier
+                .fillMaxWidth(0.70f)
+                .weight(1f)
         ) {
-            Text(
-                text = "+",
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.primary
+            Image(
+                painter = painterResource(Res.drawable.ob_screen_2_checklist),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
             )
-            Spacer(modifier = Modifier.width(12.dp))
+        }
+    }
+}
+
+/**
+ * Page 3: Reminders & Calendar
+ * Warm orange background + notification toast + phone frame with mini calendar.
+ */
+@Composable
+fun RemindersCalendarIllustration() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(BgWarm.copy(alpha = 0.55f))
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        // Notification toast
+        Row(
+            modifier = Modifier
+                .fillMaxWidth(0.90f)
+                .clip(RoundedCornerShape(14.dp))
+                .background(BrandText.copy(alpha = 0.92f))
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Bell icon in circle
             Box(
                 modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.primaryContainer),
+                    .size(30.dp)
+                    .clip(CircleShape)
+                    .background(BrandWhite.copy(alpha = 0.15f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Outlined.PhotoCamera,
+                    imageVector = Icons.Filled.Notifications,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp)
+                    tint = BrandWhite,
+                    modifier = Modifier.size(16.dp)
                 )
             }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Grocery List",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = BrandWhite
+                )
+                Text(
+                    text = "Buy eggs — due now",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = BrandWhite.copy(alpha = 0.75f)
+                )
+            }
+            Text(
+                text = "now",
+                style = MaterialTheme.typography.labelSmall,
+                color = BrandWhite.copy(alpha = 0.55f)
+            )
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Arrow down
-        ArrowDots()
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Result: Filled checklist
-        Box(
+        // Phone frame with real calendar screenshot
+        PhoneFrameIllustration(
             modifier = Modifier
-                .fillMaxWidth(0.85f)
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surface)
-                .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp))
-                .padding(12.dp)
+                .fillMaxWidth(0.72f)
+                .weight(1f)
         ) {
-            Column {
-                Text(
-                    text = stringResource(Res.string.illustration_main_street),
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                ChecklistItemRow(stringResource(Res.string.illustration_kitchen), true)
-                ChecklistItemRow(stringResource(Res.string.illustration_windows), true)
-                ChecklistItemRow(stringResource(Res.string.illustration_plumbing), false)
-            }
+            Image(
+                painter = painterResource(Res.drawable.ob_screen_3_calendar),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
+        // Schedule chips
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)
+        ) {
+            ScheduleChip("🔁 Daily")
+            ScheduleChip("📅 Weekly")
+            ScheduleChip("📌 Mon–Fri")
         }
     }
 }
 
 /**
- * Page 3: Export & Share
- * Shows checklist → PDF/Text → share
+ * Page 4: Works Everywhere
+ * Gradient background (brand-critical) + browser window + phone frame overlapping.
  */
 @Composable
-fun ExportShareIllustration() {
-    Column(
+fun WorksEverywhereIllustration() {
+    Box(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+            .fillMaxSize()
+            .background(GradientEverywhere),
+        contentAlignment = Alignment.Center
     ) {
-        // Completed checklist
+        // Soft blur blobs
         Box(
             modifier = Modifier
-                .fillMaxWidth(0.85f)
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surface)
-                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
-                .padding(12.dp)
+                .size(130.dp)
+                .align(Alignment.TopStart)
+                .offset(x = (-16).dp, y = (-16).dp)
+                .background(BrandWhite.copy(alpha = 0.18f), CircleShape)
+        )
+        Box(
+            modifier = Modifier
+                .size(140.dp)
+                .align(Alignment.BottomEnd)
+                .offset(x = 16.dp, y = 16.dp)
+                .background(BrandPurple.copy(alpha = 0.40f), CircleShape)
+        )
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp, vertical = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Column {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
+            // Two overlapping devices
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                // Browser window — slightly behind, rotated +2deg
+                BrowserWindow(
+                    modifier = Modifier
+                        .fillMaxWidth(0.78f)
+                        .fillMaxHeight(0.85f)
+                        .offset(x = 10.dp, y = 4.dp)
+                        .rotate(2f)
+                )
+
+                // Phone frame — in front, rotated -3deg, real screenshot
+                PhoneFrameIllustration(
+                    modifier = Modifier
+                        .fillMaxWidth(0.44f)
+                        .fillMaxHeight(0.88f)
+                        .offset(x = (-14).dp, y = 0.dp)
+                        .rotate(-3f)
                 ) {
-                    Text(
-                        text = stringResource(Res.string.illustration_project_review),
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = stringResource(Res.string.illustration_progress),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary
+                    Image(
+                        painter = painterResource(Res.drawable.ob_screen_4_phone),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
                     )
                 }
-                Spacer(modifier = Modifier.height(8.dp))
-                ChecklistItemRow(stringResource(Res.string.illustration_review_document), true)
-                ChecklistItemRow(stringResource(Res.string.illustration_send_email), true)
-                ChecklistItemRow(stringResource(Res.string.illustration_final_approval), true)
             }
-        }
 
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // Arrow down
-        ArrowDots()
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Export options
-        Row(
-            modifier = Modifier.fillMaxWidth(0.8f),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            ExportOption(
-                icon = Icons.Outlined.PictureAsPdf,
-                label = stringResource(Res.string.illustration_pdf)
-            )
-            ExportOption(
-                icon = Icons.AutoMirrored.Outlined.TextSnippet,
-                label = stringResource(Res.string.illustration_text)
-            )
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // Share button
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(24.dp))
-                .background(MaterialTheme.colorScheme.primary)
-                .padding(horizontal = 32.dp, vertical = 12.dp)
-        ) {
+            // Sync pill
             Row(
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(BrandWhite)
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.Share,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
+                Box(
+                    modifier = Modifier
+                        .size(20.dp)
+                        .clip(CircleShape)
+                        .background(GradientHero),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Done,
+                        contentDescription = null,
+                        tint = BrandWhite,
+                        modifier = Modifier.size(12.dp)
+                    )
+                }
                 Text(
-                    text = stringResource(Res.string.illustration_share),
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimary
+                    text = "Synced to your account",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = BrandText,
+                    fontWeight = FontWeight.Medium
                 )
             }
         }
@@ -300,8 +386,9 @@ fun ExportShareIllustration() {
 }
 
 /**
- * Page 4: Paywall Preview
- * Shows premium benefits: Unlimited AI, Export, Credits
+ * Page 5: Paywall Preview
+ * Shows premium benefits: Unlimited AI, Export, Credits.
+ * Uses theme colors (non-brand surface, Material You OK here).
  */
 @Composable
 fun PremiumBenefitsIllustration() {
@@ -321,127 +408,208 @@ fun PremiumBenefitsIllustration() {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            PremiumBenefitRow("✨", stringResource(Res.string.illustration_unlimited_create))
-            PremiumBenefitRow("🔄", stringResource(Res.string.illustration_unlimited_fill))
-            PremiumBenefitRow("📄", stringResource(Res.string.illustration_pdf_text_export))
-            PremiumBenefitRow("⚡", stringResource(Res.string.illustration_credits_daily))
+            PremiumBenefitRow("✨", "Unlimited checklist creation")
+            PremiumBenefitRow("🔄", "Unlimited AI fills")
+            PremiumBenefitRow("📄", "PDF & text export")
+            PremiumBenefitRow("⚡", "300 AI credits daily")
         }
     }
 }
 
-// Private helper composables
+// ---------------------------------------------------------------------------
+// Private shared helper composables
+// ---------------------------------------------------------------------------
 
+/**
+ * Phone frame mockup — thin bezel, rounded corners, white interior.
+ * Brand-critical: bezel color hardcoded (not theme-derived).
+ */
 @Composable
-private fun InputIcon(icon: ImageVector, label: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(
+private fun PhoneFrameIllustration(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(28.dp))
+            .border(3.dp, BrandBezel, RoundedCornerShape(28.dp))
+            .background(BrandWhite)
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            content()
+        }
+    }
+}
+
+/**
+ * Browser window mockup for WorksEverywhere illustration.
+ */
+@Composable
+private fun BrowserWindow(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .border(2.dp, BrandBezel, RoundedCornerShape(12.dp))
+            .background(BrandWhite)
+    ) {
+        // Chrome bar
+        Row(
             modifier = Modifier
-                .size(52.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(MaterialTheme.colorScheme.surface)
-                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), RoundedCornerShape(14.dp)),
-            contentAlignment = Alignment.Center
+                .fillMaxWidth()
+                .background(SurfaceLight)
+                .padding(horizontal = 8.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                modifier = Modifier.size(26.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
-        }
-    }
-}
-
-@Composable
-private fun ArrowDots() {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        repeat(3) {
+            // Traffic lights
+            Box(modifier = Modifier.size(6.dp).background(Color(0xFFFF5F57), CircleShape))
+            Box(modifier = Modifier.size(6.dp).background(Color(0xFFFFBD2E), CircleShape))
+            Box(modifier = Modifier.size(6.dp).background(Color(0xFF28C840), CircleShape))
+            Spacer(modifier = Modifier.width(4.dp))
+            // URL bar
             Box(
                 modifier = Modifier
-                    .size(4.dp)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.5f), CircleShape)
+                    .weight(1f)
+                    .height(12.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(BrandWhite)
+                    .border(0.5.dp, Outline, RoundedCornerShape(4.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "checklists.gisti.app",
+                    fontSize = 6.sp,
+                    color = BrandTextSecondary
+                )
+            }
+        }
+        // Browser body — real screenshot
+        Image(
+            painter = painterResource(Res.drawable.ob_screen_4_browser),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+        )
+    }
+}
+
+@Composable
+private fun ChatBubbleUser(text: String) {
+    Box(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = Alignment.CenterEnd
+    ) {
+        Box(
+            modifier = Modifier
+                .wrapContentWidth()
+                .fillMaxWidth(0.80f)
+                .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 4.dp, bottomStart = 12.dp, bottomEnd = 12.dp))
+                .background(BrandBlue)
+                .padding(horizontal = 8.dp, vertical = 5.dp)
+        ) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelSmall,
+                color = BrandWhite,
+                fontSize = 8.sp
             )
-            Spacer(modifier = Modifier.height(4.dp))
         }
     }
 }
 
 @Composable
-private fun AiBadge() {
+private fun ChatBubbleAssistant(text: String, actionText: String?) {
+    Box(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = Alignment.CenterStart
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth(0.82f)
+                .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 12.dp, bottomStart = 12.dp, bottomEnd = 12.dp))
+                .background(SurfaceLight)
+                .padding(horizontal = 8.dp, vertical = 5.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelSmall,
+                color = BrandText,
+                fontSize = 8.sp
+            )
+            if (actionText != null) {
+                Text(
+                    text = actionText,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = BrandBlue,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 7.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun InputChip(icon: String, label: String) {
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(BrandWhite)
+            .border(0.5.dp, Outline, RoundedCornerShape(12.dp))
+            .padding(horizontal = 6.dp, vertical = 5.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Text(text = icon, fontSize = 14.sp)
+        Text(
+            text = label,
+            fontSize = 7.sp,
+            color = BrandText,
+            fontWeight = FontWeight.Medium
+        )
+    }
+}
+
+@Composable
+private fun ScheduleChip(text: String) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.primaryContainer)
-            .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp))
-            .padding(horizontal = 24.dp, vertical = 8.dp),
+            .background(BrandWhite)
+            .border(0.5.dp, Outline, RoundedCornerShape(12.dp))
+            .padding(horizontal = 8.dp, vertical = 4.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text = stringResource(Res.string.illustration_ai_badge),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
+            text = text,
+            fontSize = 9.sp,
+            color = BrandText,
+            fontWeight = FontWeight.Medium
         )
     }
 }
 
 @Composable
-private fun ChecklistPreview(items: List<Pair<String, Boolean>>) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth(0.9f)
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+private fun IllustrationChecklistItem(
+    text: String,
+    checked: Boolean,
+    compact: Boolean = false
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 6.dp)
     ) {
-        items.forEach { (text, checked) ->
-            ChecklistItemRow(text, checked)
-        }
-    }
-}
-
-@Composable
-private fun ChecklistItemRow(text: String, checked: Boolean) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(
             imageVector = if (checked) Icons.Filled.CheckCircle else Icons.Outlined.Circle,
             contentDescription = null,
-            modifier = Modifier.size(18.dp),
-            tint = if (checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+            modifier = Modifier.size(if (compact) 10.dp else 14.dp),
+            tint = if (checked) BrandCheckBlue else Outline
         )
-        Spacer(modifier = Modifier.width(8.dp))
         Text(
             text = text,
-            style = MaterialTheme.typography.bodySmall,
-            color = if (checked) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
-        )
-    }
-}
-
-@Composable
-private fun ExportOption(icon: ImageVector, label: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(
-            modifier = Modifier
-                .size(64.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(MaterialTheme.colorScheme.surface)
-                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), RoundedCornerShape(16.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                modifier = Modifier.size(32.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
-        }
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            fontSize = if (compact) 7.sp else 9.sp,
+            color = if (checked) BrandTextSecondary else BrandText
         )
     }
 }
