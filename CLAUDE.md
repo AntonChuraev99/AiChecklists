@@ -555,6 +555,10 @@ Widget: WidgetConfigActivity -> select checklist -> toggle items / deep-link to 
 - Do: "Create Checklist", "Fill via AI", "Save", "Get Started"
 - Don't: "Add New", "AI Analyze", "Submit", "Continue"
 
+### Google Play Store Listing
+
+App title, short description, and full description for Google Play Console: `docs/store-screenshots/store-listing-en.md`. Keep in sync with actual product features and pricing when shipping new versions.
+
 ## Cloud Functions Diagnostics
 
 All AI inference goes through Cloud Functions in `aichecklists-40230` (`analyze_and_fill_checklist`, `generate_checklist`, `chat_completion`, `classify_chat_intent`, `transcribe_audio`). When users report "AI не смог ответить" / "AI processing failed", follow this runbook instead of patching the client.
