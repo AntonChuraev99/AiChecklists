@@ -23,10 +23,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Check
 
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -44,6 +46,8 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.text.TextAutoSize
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -52,14 +56,16 @@ import com.antonchuraev.homesearchchecklist.desingsystem.illustrations.AiChatHer
 import com.antonchuraev.homesearchchecklist.desingsystem.illustrations.CreateFromAnythingIllustration
 import com.antonchuraev.homesearchchecklist.desingsystem.illustrations.RemindersCalendarIllustration
 import com.antonchuraev.homesearchchecklist.desingsystem.illustrations.WorksEverywhereIllustration
-import com.antonchuraev.homesearchchecklist.desingsystem.illustrations.PremiumBenefitsIllustration
-import com.antonchuraev.homesearchchecklist.desingsystem.sharedUI.TrialTimeline
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.feature.paywall.data.PaywallConfig
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallProduct
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.PaywallIntent
+import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.PaywallPlan
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.PaywallState
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.PaywallViewModel
+import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.components.PlanRow
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
@@ -194,6 +200,7 @@ fun OnboardingScreen(
                 PaywallPageContent(
                     product = paywallState.products.firstOrNull(),
                     paywallState = paywallState,
+                    onPlanSelected = { paywallViewModel.sendIntent(PaywallIntent.SelectPlan(it)) },
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -241,12 +248,8 @@ fun OnboardingScreen(
                     }
                 }
             } else {
-                val isLastFeaturePage = state.currentPage == PAYWALL_PAGE_INDEX - 1
                 AppButton(
-                    text = stringResource(
-                        if (isLastFeaturePage) Res.string.onboarding_get_started
-                        else Res.string.onboarding_continue
-                    ),
+                    text = stringResource(Res.string.onboarding_continue),
                     onClick = { viewModel.sendIntent(OnboardingIntent.OnNextPage) },
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -260,7 +263,8 @@ fun OnboardingScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = AppDimens.SpacingLg),
-            horizontalArrangement = Arrangement.Center
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
         ) {
             repeat(TOTAL_PAGES) { index ->
                 PageIndicator(
@@ -328,7 +332,7 @@ private fun PageIndicator(
 ) {
     Box(
         modifier = modifier
-            .size(if (isSelected) 10.dp else 8.dp)
+            .size(8.dp)
             .clip(CircleShape)
             .background(
                 if (isSelected) {
@@ -344,101 +348,138 @@ private fun PageIndicator(
 private fun PaywallPageContent(
     modifier: Modifier = Modifier,
     product: PaywallProduct?,
-    paywallState: PaywallState
+    paywallState: PaywallState,
+    onPlanSelected: (PaywallPlan) -> Unit = {},
 ) {
     val uriHandler = LocalUriHandler.current
+    val products = paywallState.products
+    val yearlyProduct = products.find {
+        it.id.contains("year", ignoreCase = true) || it.id.contains("annual", ignoreCase = true)
+    }
+    val monthlyProduct = products.find {
+        it.id.contains("month", ignoreCase = true)
+    }
 
     Column(
-        modifier = modifier.padding(vertical = AppDimens.SpacingLg),
+        modifier = modifier
+            .padding(vertical = AppDimens.SpacingMd)
+            .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Illustration with preview items
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(24.dp))
-                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)),
-            contentAlignment = Alignment.Center
-        ) {
-            PremiumBenefitsIllustration()
+        // Headline
+        Text(
+            text = stringResource(Res.string.paywall_v1_features_headline, product?.freeTrialDays ?: 3),
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
+        Text(
+            text = stringResource(Res.string.paywall_v1_features_body),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(AppDimens.SpacingXl))
+
+        // Plan rows
+        if (!paywallState.isLoading && products.isNotEmpty()) {
+            Column(verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)) {
+                if (yearlyProduct != null) {
+                    PlanRow(
+                        label = stringResource(Res.string.paywall_v1_yearly_label),
+                        price = yearlyProduct.priceString,
+                        sub = stringResource(Res.string.paywall_v1_billed_annually_subtitle,
+                            formatMonthlyFromYearly(yearlyProduct.priceAmount, yearlyProduct.priceString)),
+                        badge = stringResource(Res.string.paywall_v1_best_value_badge),
+                        savings = computeSavings(yearlyProduct, monthlyProduct),
+                        selected = paywallState.selectedPlan == PaywallPlan.Yearly,
+                        onClick = { onPlanSelected(PaywallPlan.Yearly) },
+                    )
+                }
+                if (monthlyProduct != null) {
+                    PlanRow(
+                        label = stringResource(Res.string.paywall_v1_monthly_label),
+                        price = monthlyProduct.priceString,
+                        sub = stringResource(Res.string.paywall_v1_billed_monthly),
+                        badge = if (monthlyProduct.hasFreeTrial) stringResource(
+                            Res.string.paywall_v1_timeline_days_free, monthlyProduct.freeTrialDays
+                        ) else null,
+                        selected = paywallState.selectedPlan == PaywallPlan.Monthly,
+                        onClick = { onPlanSelected(PaywallPlan.Monthly) },
+                    )
+                }
+            }
+        } else if (paywallState.isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(32.dp),
+                color = MaterialTheme.colorScheme.primary
+            )
         }
 
         Spacer(modifier = Modifier.height(AppDimens.SpacingXl))
 
+        // Benefit list
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
+        ) {
+            BenefitCheckRow(stringResource(Res.string.ob_benefit_unlimited_ai))
+            BenefitCheckRow(stringResource(Res.string.ob_benefit_calendar))
+            BenefitCheckRow(stringResource(Res.string.ob_benefit_reminders))
+            BenefitCheckRow(stringResource(Res.string.ob_benefit_credits))
+        }
+
+        Spacer(modifier = Modifier.height(AppDimens.SpacingXl))
+
+        // Legal links
         PaywallLegalLinks(
             onTermsClick = { uriHandler.openUri(PaywallConfig.TERMS_OF_USE_URL) },
             onPrivacyClick = { uriHandler.openUri(PaywallConfig.PRIVACY_POLICY_URL) }
-        )
-
-        Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
-
-        // Price info section
-        PaywallPriceInfo(
-            product = product,
-            isLoading = paywallState.isLoading
         )
     }
 }
 
 @Composable
-private fun PaywallPriceInfo(
-    product: PaywallProduct?,
-    isLoading: Boolean
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally
+private fun BenefitCheckRow(text: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
     ) {
-        if (isLoading) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(32.dp),
-                color = MaterialTheme.colorScheme.primary
-            )
-        } else if (product != null) {
-            // Price headline
-            if (product.hasFreeTrial) {
-                Text(
-                    text = stringResource(Res.string.paywall_days_free, product.freeTrialDays),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-            }
-
-            // Price details
-            Text(
-                text = stringResource(Res.string.paywall_then_price, product.priceString),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            // Subscription disclosure (required by Google Play policy)
-            if (product.hasFreeTrial) {
-                Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
-                Text(
-                    text = stringResource(
-                        Res.string.paywall_trial_terms,
-                        product.freeTrialDays,
-                        product.priceString
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
-
-                TrialTimeline(
-                    trialDays = product.freeTrialDays,
-                    priceString = product.priceString,
-                    primaryColor = MaterialTheme.colorScheme.primary
-                )
-            }
-        }
+        Icon(
+            imageVector = Icons.Filled.Check,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(20.dp)
+        )
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
+
+private fun formatMonthlyFromYearly(yearlyAmount: Double, yearlyPriceString: String): String {
+    if (yearlyAmount <= 0) return yearlyPriceString
+    val monthly = yearlyAmount / 12
+    val formatted = "%.0f".format(monthly)
+    val currencySymbol = yearlyPriceString.filter { !it.isDigit() && it != '.' && it != ',' && it != ' ' }.trim()
+    return if (currencySymbol.isNotEmpty()) "$formatted $currencySymbol" else formatted
+}
+
+private fun computeSavings(yearly: PaywallProduct?, monthly: PaywallProduct?): String? {
+    if (yearly == null || monthly == null) return null
+    if (yearly.priceAmount <= 0 || monthly.priceAmount <= 0) return null
+    val yearlyMonthly = yearly.priceAmount / 12
+    val savingsPercent = ((1 - yearlyMonthly / monthly.priceAmount) * 100).toInt()
+    return if (savingsPercent > 0) "-$savingsPercent%" else null
+}
+
 
 @Composable
 private fun PaywallLegalLinks(
@@ -471,7 +512,13 @@ private fun PaywallLegalLinks(
             Text(
                 text = stringResource(Res.string.paywall_privacy),
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                textAlign = TextAlign.Center,
+                autoSize = TextAutoSize.StepBased(
+                    minFontSize = 8.sp,
+                    maxFontSize = MaterialTheme.typography.labelSmall.fontSize,
+                ),
             )
         }
     }

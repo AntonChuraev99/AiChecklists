@@ -5,7 +5,7 @@ import aichecklists.core.designsystem.generated.resources.paywall_start_free_tri
 import aichecklists.core.designsystem.generated.resources.paywall_subscribe_now
 import aichecklists.core.designsystem.generated.resources.paywall_days_free
 import aichecklists.core.designsystem.generated.resources.paywall_then_price
-import aichecklists.core.designsystem.generated.resources.paywall_trial_terms
+import aichecklists.core.designsystem.generated.resources.paywall_auto_renew_notice
 import aichecklists.core.designsystem.generated.resources.paywall_terms
 import aichecklists.core.designsystem.generated.resources.paywall_privacy
 import androidx.compose.foundation.background
@@ -37,6 +37,8 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.text.TextAutoSize
 import com.antonchuraev.homesearchchecklist.desingsystem.illustrations.PremiumBenefitsIllustration
 import com.antonchuraev.homesearchchecklist.desingsystem.sharedUI.TrialTimeline
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
@@ -104,7 +106,13 @@ fun PaywallStep(
                 Text(
                     text = stringResource(Res.string.paywall_privacy),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    textAlign = TextAlign.Center,
+                    autoSize = TextAutoSize.StepBased(
+                        minFontSize = 8.sp,
+                        maxFontSize = MaterialTheme.typography.labelSmall.fontSize,
+                    ),
                 )
             }
         }
@@ -135,7 +143,7 @@ fun PaywallStep(
             if (product.hasFreeTrial) {
                 Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
                 Text(
-                    text = stringResource(Res.string.paywall_trial_terms, product.freeTrialDays, product.priceString),
+                    text = stringResource(Res.string.paywall_auto_renew_notice),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,

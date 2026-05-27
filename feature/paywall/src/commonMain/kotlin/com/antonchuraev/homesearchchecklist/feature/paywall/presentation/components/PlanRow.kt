@@ -38,7 +38,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
  * announces the element correctly.
  */
 @Composable
-internal fun PlanRow(
+fun PlanRow(
     label: String,
     price: String,
     sub: String,

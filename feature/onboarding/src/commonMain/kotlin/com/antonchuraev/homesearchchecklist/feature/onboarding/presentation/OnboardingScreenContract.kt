@@ -5,7 +5,7 @@ import com.antonchuraev.homesearchchecklist.core.common.api.State
 
 data class OnboardingState(
     val currentPage: Int = 0,
-    val totalPages: Int = 4  // 3 feature pages + 1 paywall page
+    val totalPages: Int = 5  // 4 feature pages + 1 paywall page
 ) : State
 
 sealed interface OnboardingIntent : Intent {

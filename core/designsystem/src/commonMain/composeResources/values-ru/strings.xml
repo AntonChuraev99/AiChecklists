@@ -19,7 +19,7 @@
     <string name="onboarding_continue">Продолжить</string>
     <!-- Страница 1 — AI Чат -->
     <string name="onboarding_page1_title">Просто скажи Gisti, что нужно</string>
-    <string name="onboarding_page1_description">Добавляй пункты, ставь напоминания, планируй неделю — всё через чат.</string>
+    <string name="onboarding_page1_description">Добавляй пункты, ставь напоминания, планируй неделю — всё через ИИ-чат.</string>
 
     <!-- Страница 2 — Создание из любого контента -->
     <string name="onboarding_page2_title">Любой контент → чек-лист</string>
@@ -377,6 +377,7 @@
     <string name="paywall_load_error">Не удалось загрузить варианты подписки.\nПроверьте соединение и попробуйте снова.</string>
     <string name="paywall_no_payment_now">Оплата сейчас не требуется</string>
     <string name="paywall_cancel_anytime">Отмена в любое время</string>
+    <string name="paywall_auto_renew_notice">Автопродление. Отмена в любое время.</string>
     <string name="paywall_timeline_today">Сегодня</string>
     <string name="paywall_timeline_due">%1$s</string>
     <string name="paywall_timeline_free">Пробный период</string>
@@ -603,6 +604,12 @@
     <string name="illustration_pdf_text_export">Экспорт PDF &amp; текста</string>
     <string name="illustration_credits_daily">300 кредитов ИИ ежедневно</string>
 
+    <!-- Карточка преимуществ Premium (онбординг слайд 5) — суммирует слайды 1-4 -->
+    <string name="ob_benefit_unlimited_ai">ИИ-чат и создание — без ограничений</string>
+    <string name="ob_benefit_calendar">Календарь и недельный планер</string>
+    <string name="ob_benefit_reminders">Напоминания без ограничений</string>
+    <string name="ob_benefit_credits">300 кредитов ИИ каждый день</string>
+
     <!-- Экран настроек -->
     <string name="settings_title">Настройки</string>
     <string name="settings_theme">Тема</string>
@@ -762,7 +769,7 @@
 
     <!-- Вариант B: заголовок и текст Features -->
     <string name="paywall_v1_features_headline">Всё от Про,\nбесплатно %1$d дней</string>
-    <string name="paywall_v1_features_body">Без дневных лимитов, без ограничений по чек-листам, без ограничений по напоминаниям. Отмена в любое время.</string>
+    <string name="paywall_v1_features_body">Создавайте из фото, голоса и PDF. Планируйте неделю. ИИ без дневных лимитов. Отмена в любое время.</string>
 
     <!-- Вариант B: строки функций — реальные преимущества Про. -->
     <!-- УСТАРЕЛО (сохранено для совместимости переводов, больше не отображается):

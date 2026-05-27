@@ -19,7 +19,7 @@
     <string name="onboarding_continue">Continue</string>
     <!-- Onboarding Page 1 - AI Chat -->
     <string name="onboarding_page1_title">Just tell Gisti what you need</string>
-    <string name="onboarding_page1_description">Add items, set reminders, plan your week — all through chat.</string>
+    <string name="onboarding_page1_description">Add items, set reminders, plan your week — all through AI chat.</string>
 
     <!-- Onboarding Page 2 - Create from Anything -->
     <string name="onboarding_page2_title">Any content → checklist</string>
@@ -395,6 +395,7 @@
     <string name="paywall_load_error">Unable to load subscription options.\nPlease check your connection and try again.</string>
     <string name="paywall_no_payment_now">No payment due now</string>
     <string name="paywall_cancel_anytime">Cancel anytime</string>
+    <string name="paywall_auto_renew_notice">Auto-renews. Cancel anytime.</string>
     <string name="paywall_timeline_today">Today</string>
     <string name="paywall_timeline_due">Due %1$s</string>
     <string name="paywall_timeline_free">Free trial</string>
@@ -619,6 +620,12 @@
     <string name="illustration_pdf_text_export">PDF &amp; Text Export</string>
     <string name="illustration_credits_daily">300 AI credits daily</string>
 
+    <!-- Premium benefits card (onboarding slide 5) — summarizes slides 1-4 -->
+    <string name="ob_benefit_unlimited_ai">AI chat &amp; creation — no limits</string>
+    <string name="ob_benefit_calendar">Calendar &amp; weekly planner</string>
+    <string name="ob_benefit_reminders">Reminders without limits</string>
+    <string name="ob_benefit_credits">300 AI credits every day</string>
+
     <!-- Settings Screen -->
     <string name="settings_title">Settings</string>
     <string name="settings_theme">Theme</string>
@@ -807,7 +814,7 @@
 
     <!-- Variant B: Features headline/body -->
     <string name="paywall_v1_features_headline">Everything Pro,\nfree for %1$d days</string>
-    <string name="paywall_v1_features_body">No daily caps, no checklist limits, no reminder cap. Cancel anytime.</string>
+    <string name="paywall_v1_features_body">Create from photos, voice &amp; PDF. Plan your week. AI without daily limits. Cancel anytime.</string>
 
     <!-- Variant B: Feature rows — truthful Pro benefits (NOT exclusive features). -->
     <!-- DEPRECATED (kept for translation continuity, no longer rendered):

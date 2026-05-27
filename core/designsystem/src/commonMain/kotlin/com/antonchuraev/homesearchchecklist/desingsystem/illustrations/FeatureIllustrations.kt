@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.sp
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * Shared illustrations for onboarding and paywall screens.
@@ -63,6 +64,7 @@ private val BrandTextSecondary = Color(0xFF757575)
 private val BrandWhite = Color(0xFFFFFFFF)
 private val BrandCheckBlue = Color(0xFF1976D2)
 private val BrandBezel = Color(0xFF1A1A1A)
+private val ScreenshotBg = Color(0xFFFEF7FF)
 private val BgPrimaryContainer = Color(0xFFE3F2FD)
 private val BgWarm = Color(0xFFFFE0B2)
 private val SurfaceLight = Color(0xFFF5F5F5)
@@ -111,13 +113,16 @@ fun AiChatHeroIllustration() {
         PhoneFrameIllustration(
             modifier = Modifier
                 .fillMaxWidth(0.72f)
-                .fillMaxHeight(0.82f)
+                .fillMaxHeight(0.90f)
         ) {
             Image(
                 painter = painterResource(Res.drawable.ob_screen_1_chat),
                 contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
+                contentScale = ContentScale.Fit,
+                alignment = Alignment.Center,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
             )
         }
     }
@@ -156,32 +161,6 @@ fun CreateFromAnythingIllustration() {
             InputChip(icon = "🎙️", label = "Voice")
         }
 
-        // Sparkle circle + arrow
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(BrandWhite)
-                    .border(1.dp, Outline, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(text = "✨", fontSize = 16.sp)
-            }
-            // Dotted arrow downward
-            repeat(3) {
-                Box(
-                    modifier = Modifier
-                        .size(4.dp)
-                        .background(BrandBlue.copy(alpha = 0.5f), CircleShape)
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-            }
-        }
-
         // Phone frame with real screenshot
         PhoneFrameIllustration(
             modifier = Modifier
@@ -191,8 +170,11 @@ fun CreateFromAnythingIllustration() {
             Image(
                 painter = painterResource(Res.drawable.ob_screen_2_checklist),
                 contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
+                contentScale = ContentScale.Fit,
+                alignment = Alignment.Center,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
             )
         }
     }
@@ -260,14 +242,17 @@ fun RemindersCalendarIllustration() {
         // Phone frame with real calendar screenshot
         PhoneFrameIllustration(
             modifier = Modifier
-                .fillMaxWidth(0.72f)
+                .fillMaxWidth(0.78f)
                 .weight(1f)
         ) {
             Image(
                 painter = painterResource(Res.drawable.ob_screen_3_calendar),
                 contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
+                contentScale = ContentScale.Fit,
+                alignment = Alignment.Center,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
             )
         }
 
@@ -318,35 +303,26 @@ fun WorksEverywhereIllustration() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Two overlapping devices
+            // Single phone, centered
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
                 contentAlignment = Alignment.Center
             ) {
-                // Browser window — slightly behind, rotated +2deg
-                BrowserWindow(
-                    modifier = Modifier
-                        .fillMaxWidth(0.78f)
-                        .fillMaxHeight(0.85f)
-                        .offset(x = 10.dp, y = 4.dp)
-                        .rotate(2f)
-                )
-
-                // Phone frame — in front, rotated -3deg, real screenshot
                 PhoneFrameIllustration(
                     modifier = Modifier
-                        .fillMaxWidth(0.44f)
-                        .fillMaxHeight(0.88f)
-                        .offset(x = (-14).dp, y = 0.dp)
-                        .rotate(-3f)
+                        .fillMaxWidth(0.62f)
+                        .fillMaxHeight(0.90f)
                 ) {
                     Image(
                         painter = painterResource(Res.drawable.ob_screen_4_phone),
                         contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
+                        contentScale = ContentScale.Fit,
+                        alignment = Alignment.Center,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
                     )
                 }
             }
@@ -408,10 +384,10 @@ fun PremiumBenefitsIllustration() {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            PremiumBenefitRow("✨", "Unlimited checklist creation")
-            PremiumBenefitRow("🔄", "Unlimited AI fills")
-            PremiumBenefitRow("📄", "PDF & text export")
-            PremiumBenefitRow("⚡", "300 AI credits daily")
+            PremiumBenefitRow("✨", stringResource(Res.string.ob_benefit_unlimited_ai))
+            PremiumBenefitRow("📅", stringResource(Res.string.ob_benefit_calendar))
+            PremiumBenefitRow("🔔", stringResource(Res.string.ob_benefit_reminders))
+            PremiumBenefitRow("⚡", stringResource(Res.string.ob_benefit_credits))
         }
     }
 }
@@ -427,13 +403,14 @@ fun PremiumBenefitsIllustration() {
 @Composable
 private fun PhoneFrameIllustration(
     modifier: Modifier = Modifier,
+    backgroundColor: Color = ScreenshotBg,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(28.dp))
             .border(3.dp, BrandBezel, RoundedCornerShape(28.dp))
-            .background(BrandWhite)
+            .background(backgroundColor)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             content()
@@ -483,11 +460,12 @@ private fun BrowserWindow(modifier: Modifier = Modifier) {
                 )
             }
         }
-        // Browser body — real screenshot
+        // Browser body — real screenshot (landscape image cropped to fill portrait frame)
         Image(
             painter = painterResource(Res.drawable.ob_screen_4_browser),
             contentDescription = null,
             contentScale = ContentScale.Crop,
+            alignment = Alignment.TopStart,
             modifier = Modifier.fillMaxSize()
         )
     }
