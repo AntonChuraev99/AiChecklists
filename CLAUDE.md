@@ -84,6 +84,10 @@ Inline input & rename, drag-to-reorder, swipe-to-delete, priority stars, auto-de
 
 **All code comments, documentation, and commit messages must be in English.**
 
+### Marketing & Localization Priority
+
+**Primary language: English only.** All marketing copy, ad texts, store listings, onboarding copy, and feature descriptions — produce in English only. Russian localization is NOT a default task — do it only when explicitly requested by the user, or when fixing bugs in existing RU strings.
+
 ## Build Commands
 
 > **AGP 9 module split (since 2026-05-10):** `composeApp` is now a **KMP library** (commonMain + androidMain + iosMain + wasmJsMain). The Android **application** lives in `:androidApp`. Use `:androidApp` for any `assemble*` / `bundle*` / `install*` / `connectedAndroidTest` task. KMP/iOS/wasmJs tasks stay on `:composeApp`. See `docs/solutions/build-system/agp-9-migration-2026-05-10.md`.
