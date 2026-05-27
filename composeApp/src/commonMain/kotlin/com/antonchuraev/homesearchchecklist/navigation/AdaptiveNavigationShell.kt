@@ -78,6 +78,11 @@ fun AdaptiveNavigationShell(
     onRateApp: () -> Unit,
     onLeaveFeedback: () -> Unit,
     versionName: String,
+    isGoogleLinked: Boolean = false,
+    googleEmail: String? = null,
+    googleDisplayName: String? = null,
+    onSignInClick: () -> Unit = {},
+    onSignOutClick: () -> Unit = {},
     content: @Composable (drawerState: DrawerState?) -> Unit,
 ) {
     // Single debounce guard for all layout variants — prevents Koin DI race on
@@ -103,6 +108,11 @@ fun AdaptiveNavigationShell(
                 onRateApp = onRateApp,
                 onLeaveFeedback = onLeaveFeedback,
                 versionName = versionName,
+                isGoogleLinked = isGoogleLinked,
+                googleEmail = googleEmail,
+                googleDisplayName = googleDisplayName,
+                onSignInClick = onSignInClick,
+                onSignOutClick = onSignOutClick,
                 content = content,
             )
         }
@@ -122,6 +132,11 @@ fun AdaptiveNavigationShell(
                 onRateApp = onRateApp,
                 onLeaveFeedback = onLeaveFeedback,
                 versionName = versionName,
+                isGoogleLinked = isGoogleLinked,
+                googleEmail = googleEmail,
+                googleDisplayName = googleDisplayName,
+                onSignInClick = onSignInClick,
+                onSignOutClick = onSignOutClick,
                 content = content,
             )
         }
@@ -140,6 +155,11 @@ private fun AdaptiveShellCompactModal(
     onRateApp: () -> Unit,
     onLeaveFeedback: () -> Unit,
     versionName: String,
+    isGoogleLinked: Boolean,
+    googleEmail: String?,
+    googleDisplayName: String?,
+    onSignInClick: () -> Unit,
+    onSignOutClick: () -> Unit,
     content: @Composable (DrawerState?) -> Unit,
 ) {
     // Fresh Closed DrawerState — plain remember, not rememberDrawerState, so that
@@ -166,6 +186,14 @@ private fun AdaptiveShellCompactModal(
                     onRateAppClick = onRateApp,
                     onLeaveFeedbackClick = onLeaveFeedback,
                     versionName = versionName,
+                    isGoogleLinked = isGoogleLinked,
+                    googleEmail = googleEmail,
+                    googleDisplayName = googleDisplayName,
+                    onSignInClick = {
+                        scope.launch { drawerState.close() }
+                        onSignInClick()
+                    },
+                    onSignOutClick = onSignOutClick,
                 )
             }
         },
@@ -257,6 +285,11 @@ private fun AdaptiveShellPermanent(
     onRateApp: () -> Unit,
     onLeaveFeedback: () -> Unit,
     versionName: String,
+    isGoogleLinked: Boolean,
+    googleEmail: String?,
+    googleDisplayName: String?,
+    onSignInClick: () -> Unit,
+    onSignOutClick: () -> Unit,
     content: @Composable (DrawerState?) -> Unit,
 ) {
     PermanentNavigationDrawer(
@@ -277,6 +310,11 @@ private fun AdaptiveShellPermanent(
                     onRateAppClick = onRateApp,
                     onLeaveFeedbackClick = onLeaveFeedback,
                     versionName = versionName,
+                    isGoogleLinked = isGoogleLinked,
+                    googleEmail = googleEmail,
+                    googleDisplayName = googleDisplayName,
+                    onSignInClick = onSignInClick,
+                    onSignOutClick = onSignOutClick,
                 )
             }
         },

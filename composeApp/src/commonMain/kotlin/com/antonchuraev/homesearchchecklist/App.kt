@@ -407,6 +407,11 @@ fun App() {
                     onRateApp = { csatViewModel.sendIntent(CsatIntent.ForceShow) },
                     onLeaveFeedback = { csatViewModel.sendIntent(CsatIntent.ForceShowFeedback) },
                     versionName = AppBuildConfig.versionName,
+                    isGoogleLinked = userData.isGoogleLinked,
+                    googleEmail = userData.googleEmail,
+                    googleDisplayName = userData.googleDisplayName,
+                    onSignInClick = handleSignIn,
+                    onSignOutClick = handleSignOut,
                     content = renderNav,
                 )
             } else {
