@@ -24,7 +24,6 @@ import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.credits_display
 import aichecklists.core.designsystem.generated.resources.credits_get_more
-import aichecklists.core.designsystem.generated.resources.credits_premium_unlimited
 import org.jetbrains.compose.resources.stringResource
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 
@@ -36,10 +35,13 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
  * | credits | isPremium | onClick | Visual |
  * |---------|-----------|---------|--------|
  * | > 0     | false     | any     | AutoAwesome + count (primaryContainer bg) |
- * | > 0     | true      | any     | AutoAwesome + ∞ (primaryContainer bg) |
+ * | > 0     | true      | any     | AutoAwesome + count (primaryContainer bg) |
  * | ≤ 0     | false     | non-null| "Get More" label (primary bg, onPrimary text) — clickable CTA |
  * | ≤ 0     | false     | null    | Hidden — caller is responsible for not rendering |
- * | ≤ 0     | true      | any     | AutoAwesome + ∞ (premium users never run out on a free tier) |
+ * | ≤ 0     | true      | any     | AutoAwesome + 0 (refills next day) |
+ *
+ * Premium tier has a **300 credits/day** quota, not unlimited — showing ∞ would
+ * mislead users into thinking refills are free of any cap.
  *
  * ## Usage
  *
@@ -62,8 +64,9 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
  * - CTA "Get More": container = `primary`, content = `onPrimary`
  *
  * @param credits   Current AI credit balance. Negative values are treated as 0.
- * @param isPremium When true the chip always shows ∞ regardless of [credits].
- *                  Premium users have daily auto-refill — showing 0 would be misleading.
+ * @param isPremium When true the chip suppresses the "Get More" CTA (premium users
+ *                  cannot upgrade further) but still shows the actual credit count —
+ *                  premium has a daily 300 credits cap, not unlimited.
  * @param onClick   Navigation/action callback. `null` = chip has no ripple and is not announced
  *                  as a button by TalkBack (read-only display). Pass a lambda to make it tappable.
  * @param modifier  Standard Compose modifier.
@@ -99,20 +102,19 @@ fun AppCreditsChip(
         MaterialTheme.colorScheme.primary           // AutoAwesome uses primary on container bg
     }
 
-    // Visual label — terse: bare digit or ∞ symbol. The chip's icon already
+    // Visual label — terse: bare digit or "Get More" CTA. The chip's icon already
     // signals "AI credits"; repeating the word in text is redundant.
+    // Premium has a 300/day quota — show the real count, not ∞.
     val visualLabel = when {
-        isPremium -> "∞"
-        showCta   -> stringResource(Res.string.credits_get_more)
-        else      -> credits.toString()
+        showCta -> stringResource(Res.string.credits_get_more)
+        else    -> credits.coerceAtLeast(0).toString()
     }
 
     // Full accessibility label for TalkBack — keeps the noun ("5 credits" /
-    // "Unlimited credits") so screen readers announce meaning, not bare digits.
+    // "Get more") so screen readers announce meaning, not bare digits.
     val a11yLabel = when {
-        isPremium -> stringResource(Res.string.credits_premium_unlimited)
-        showCta   -> stringResource(Res.string.credits_get_more)
-        else      -> stringResource(Res.string.credits_display, credits)
+        showCta -> stringResource(Res.string.credits_get_more)
+        else    -> stringResource(Res.string.credits_display, credits.coerceAtLeast(0))
     }
 
     val chipModifier = modifier

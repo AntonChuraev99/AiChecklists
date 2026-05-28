@@ -353,7 +353,6 @@
     <!-- AI Credits -->
     <string name="credits_display">%1$d credits</string>
     <string name="credits_get_more">Get More Credits</string>
-    <string name="credits_premium_unlimited">∞ credits</string>
     <string name="credits_your_credits">Your AI Credits</string>
     <string name="credits_refill_info">Refills daily at 12:00 CET</string>
     <string name="credits_refill_to">up to %1$d</string>

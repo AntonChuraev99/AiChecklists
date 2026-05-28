@@ -1,5 +1,6 @@
 package com.antonchuraev.homesearchchecklist.feature.paywall.di
 
+import com.antonchuraev.homesearchchecklist.feature.paywall.data.billing.BillingPlatformPreCheck
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.repository.PaywallRepository
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetOfferingsUseCase
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetSubscriptionStatusUseCase
@@ -17,7 +18,11 @@ import org.koin.dsl.module
 /** Platform-specific factory — returns the correct PaywallRepository implementation. */
 expect fun createPaywallRepository(): PaywallRepository
 
+/** Platform-specific factory — returns the correct BillingPlatformPreCheck implementation. */
+expect fun createBillingPlatformPreCheck(): BillingPlatformPreCheck
+
 val paywallFeatureModule = module {
+    single<BillingPlatformPreCheck> { createBillingPlatformPreCheck() }
     single<PaywallRepository> { createPaywallRepository() }
 
     // Use cases

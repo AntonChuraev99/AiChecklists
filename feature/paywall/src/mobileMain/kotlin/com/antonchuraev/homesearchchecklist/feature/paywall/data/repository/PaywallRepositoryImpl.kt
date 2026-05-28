@@ -2,6 +2,9 @@ package com.antonchuraev.homesearchchecklist.feature.paywall.data.repository
 
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.feature.paywall.data.PaywallConfig
+import com.antonchuraev.homesearchchecklist.feature.paywall.data.billing.BillingPlatformPreCheck
+import com.antonchuraev.homesearchchecklist.feature.paywall.data.billing.PreCheckResult
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.toPaywallErrorCode
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.Entitlements
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.LoginResult
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallErrorCode
@@ -33,6 +36,7 @@ private const val TAG = "PaywallRepository"
 
 class PaywallRepositoryImpl(
     private val logger: AppLogger? = null,
+    private val preCheck: BillingPlatformPreCheck,
 ) : PaywallRepository {
 
     private val _subscriptionStatus = MutableStateFlow(SubscriptionStatus.FREE)
@@ -83,6 +87,18 @@ class PaywallRepositoryImpl(
     }
 
     override suspend fun getOfferings(): Result<PaywallOffering?> {
+        val preCheckResult = preCheck.check()
+        if (preCheckResult is PreCheckResult.Failed) {
+            logger?.warning(TAG, "[PAYWALL] Pre-flight failed: ${preCheckResult.reason.name} — ${preCheckResult.debugMessage}")
+            return Result.failure(
+                PaywallException(
+                    errorCode = preCheckResult.reason.toPaywallErrorCode(),
+                    billingWasReady = false,
+                    message = preCheckResult.debugMessage
+                )
+            )
+        }
+
         if (!awaitPurchasesReady()) {
             logger?.warning(TAG, "[PAYWALL] getOfferings() aborted — Purchases not initialized after retries")
             return Result.failure(

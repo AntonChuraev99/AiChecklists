@@ -66,6 +66,10 @@ kotlin {
             dependsOn(mobileMain)
             dependencies {
                 implementation(libs.androidx.activity.compose)
+                // BillingClient for AndroidBillingPlatformPreCheck pre-flight check.
+                // Transitive via RevenueCat 3.x (purchases-android 10.4.0 → billing 8.3.0),
+                // but androidMain compile needs explicit decl. Keep in sync with RC transitive.
+                implementation("com.android.billingclient:billing:8.3.0")
             }
         }
         val iosMain by creating {

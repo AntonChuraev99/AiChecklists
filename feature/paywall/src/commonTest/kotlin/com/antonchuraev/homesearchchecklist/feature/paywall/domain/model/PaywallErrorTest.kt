@@ -45,7 +45,7 @@ class PaywallErrorTest {
     @Test
     fun paywallErrorCode_has_all_expected_values() {
         val codes = PaywallErrorCode.entries
-        assertEquals(10, codes.size)
+        assertEquals(12, codes.size)
         assertTrue(codes.contains(PaywallErrorCode.NETWORK_ERROR))
         assertTrue(codes.contains(PaywallErrorCode.OFFLINE))
         assertTrue(codes.contains(PaywallErrorCode.STORE_PROBLEM))
@@ -55,6 +55,8 @@ class PaywallErrorTest {
         assertTrue(codes.contains(PaywallErrorCode.PRODUCT_NOT_AVAILABLE))
         assertTrue(codes.contains(PaywallErrorCode.NOT_CONFIGURED))
         assertTrue(codes.contains(PaywallErrorCode.BILLING_NOT_INITIALIZED))
+        assertTrue(codes.contains(PaywallErrorCode.GMS_UNAVAILABLE))
+        assertTrue(codes.contains(PaywallErrorCode.PRODUCT_DETAILS_UNSUPPORTED))
         assertTrue(codes.contains(PaywallErrorCode.UNKNOWN))
     }
 
