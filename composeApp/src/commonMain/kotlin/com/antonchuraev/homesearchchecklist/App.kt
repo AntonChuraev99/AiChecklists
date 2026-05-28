@@ -335,8 +335,8 @@ fun App() {
                         FillsListScreen(checklistId = route.checklistId)
                     }
 
-                    entry<AppNavRoute.Paywall> {
-                        PaywallRoute()
+                    entry<AppNavRoute.Paywall> { route ->
+                        PaywallRoute(sourceOverride = route.source)
                     }
 
                     entry<AppNavRoute.SubscriptionStatus> { route ->

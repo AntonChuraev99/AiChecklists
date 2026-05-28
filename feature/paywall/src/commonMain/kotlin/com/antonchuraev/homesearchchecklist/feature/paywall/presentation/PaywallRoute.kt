@@ -17,6 +17,7 @@ import kotlin.math.round
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
+import org.koin.core.parameter.parametersOf
 
 /**
  * Format the monthly equivalent of a yearly subscription price by replacing the
@@ -58,6 +59,7 @@ private fun monthlyEquivalent(yearlyPriceString: String, yearlyPriceAmount: Doub
  */
 @Composable
 fun PaywallRoute(
+    sourceOverride: String? = null,
     onPurchaseSuccess: () -> Unit = {},
 ) {
     val analyticsTracker: AnalyticsTracker = koinInject()
@@ -92,7 +94,7 @@ fun PaywallRoute(
 
     LaunchedEffect(Unit) { analyticsTracker.screenView("paywall") }
 
-    val viewModel: PaywallViewModel = koinViewModel()
+    val viewModel: PaywallViewModel = koinViewModel { parametersOf(sourceOverride) }
     val state by viewModel.screenState.collectAsStateWithLifecycle()
 
     // Navigate away on purchase success (handled by ViewModel in Phase 2)
