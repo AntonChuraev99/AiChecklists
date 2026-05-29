@@ -467,7 +467,8 @@ private fun BenefitCheckRow(text: String) {
 private fun formatMonthlyFromYearly(yearlyAmount: Double, yearlyPriceString: String): String {
     if (yearlyAmount <= 0) return yearlyPriceString
     val monthly = yearlyAmount / 12
-    val formatted = "%.0f".format(monthly)
+    // KMP-safe: String.format is JVM-only and breaks wasmJs/iOS compilation.
+    val formatted = kotlin.math.round(monthly).toLong().toString()
     val currencySymbol = yearlyPriceString.filter { !it.isDigit() && it != '.' && it != ',' && it != ' ' }.trim()
     return if (currencySymbol.isNotEmpty()) "$formatted $currencySymbol" else formatted
 }
