@@ -43,6 +43,10 @@ private external fun getResultIdToken(r: JsAny): String?
 @JsFun("(r) => (r && r.error) ? r.error : null")
 private external fun getResultError(r: JsAny): String?
 
+// [AuthDiag] TEMP — remove after web Google-login fix is verified
+@JsFun("(msg) => console.log('[AuthDiag] ' + msg)")
+private external fun authDiagLog(msg: String)
+
 internal class WasmGoogleAuthProvider : AuthProvider {
 
     private val _authState = MutableStateFlow<GoogleAuthState>(GoogleAuthState.NotAuthenticated)
@@ -51,10 +55,22 @@ internal class WasmGoogleAuthProvider : AuthProvider {
     private var cachedIdToken: String? = null
 
     override suspend fun restoreSession() {
+        authDiagLog("restoreSession: awaiting __authReadyPromise (onAuthStateChanged)...")
         val result: JsAny? = authReadyPromise().await()
-        if (result == null) return
-        val uid = getResultUid(result) ?: return
+        if (result == null) {
+            authDiagLog("restoreSession: __authReadyPromise -> NULL (Firebase NOT logged in in this browser)")
+            return
+        }
+        val uid = getResultUid(result)
+        if (uid == null) {
+            authDiagLog("restoreSession: result present but uid is NULL")
+            return
+        }
         cachedIdToken = getResultIdToken(result)
+        authDiagLog(
+            "restoreSession: Firebase session RESTORED uid=" + uid.take(6) +
+                " email=" + getResultEmail(result) + " -> authState=Authenticated",
+        )
         _authState.value = GoogleAuthState.Authenticated(
             GoogleUser(
                 firebaseUid = uid,
@@ -67,8 +83,10 @@ internal class WasmGoogleAuthProvider : AuthProvider {
 
     override suspend fun signIn(): Result<GoogleUser> {
         _authState.value = GoogleAuthState.Loading
+        authDiagLog("signIn: calling globalThis.__googleSignIn() (signInWithPopup)...")
         return runCatching {
             val result: JsAny = signInWithGooglePromise().await()
+            authDiagLog("signIn: __googleSignIn resolved ok=" + getResultOk(result) + " error=" + (getResultError(result) ?: "none"))
 
             if (getResultOk(result)) {
                 val uid = getResultUid(result)

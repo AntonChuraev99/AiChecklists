@@ -7,6 +7,7 @@ import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
 import com.antonchuraev.homesearchchecklist.core.auth.api.GoogleAuthRepository
+import com.antonchuraev.homesearchchecklist.core.auth.api.GoogleAuthState
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
 import com.antonchuraev.homesearchchecklist.feature.create.domain.usecase.CreateWeeklyChecklistUseCase
 import com.antonchuraev.homesearchchecklist.csat.CsatBottomSheet
@@ -125,20 +126,69 @@ fun App() {
 
         val googleAuthRepository: GoogleAuthRepository = remember { koin.get<GoogleAuthRepository>() }
         val userDataRepository: UserDataRepository = remember { koin.get<UserDataRepository>() }
+        // [AuthDiag] TEMP — remove after web Google-login fix is verified
+        val authDiagLogger: AppLogger = remember { koin.get<AppLogger>() }
         val userData by userDataRepository.getUserDataFlow()
             .collectAsStateWithLifecycle(initialValue = UserData())
+        val googleAuthState by googleAuthRepository.authState
+            .collectAsStateWithLifecycle(initialValue = GoogleAuthState.NotAuthenticated)
+
+        // [AuthDiag] TEMP — exposes whether the Firebase auth state and the
+        // DataStore-backed userData.isGoogleLinked (what the drawer reads) are in
+        // sync. If firebaseAuthState=Authenticated but isGoogleLinked=false, the
+        // drawer shows "Sign in" despite being logged in. Remove after fix.
+        LaunchedEffect(googleAuthState, userData.isGoogleLinked, userData.googleEmail) {
+            authDiagLogger.debug(
+                "AuthDiag",
+                "STATE firebaseAuthState=" + googleAuthState::class.simpleName +
+                    " | userData.isGoogleLinked=" + userData.isGoogleLinked +
+                    " | userData.googleEmail=" + (userData.googleEmail ?: "null"),
+            )
+        }
 
         val scope = rememberCoroutineScope()
 
         val handleSignIn: () -> Unit = {
             scope.launch {
-                googleAuthRepository.signInWithGoogle().onSuccess { user ->
-                    val idToken = googleAuthRepository.getIdToken() ?: return@launch
-                    userDataRepository.linkGoogleAccount(
-                        idToken = idToken,
-                        platform = getPlatformName(),
-                    )
-                }
+                authDiagLogger.debug("AuthDiag", "handleSignIn: click -> calling signInWithGoogle()")
+                googleAuthRepository.signInWithGoogle()
+                    .onSuccess { user ->
+                        authDiagLogger.debug(
+                            "AuthDiag",
+                            "handleSignIn: signInWithGoogle SUCCESS uid=" + user.firebaseUid.take(6) +
+                                " email=" + user.email,
+                        )
+                        val idToken = googleAuthRepository.getIdToken()
+                        if (idToken == null) {
+                            authDiagLogger.error(
+                                "AuthDiag",
+                                "handleSignIn: getIdToken() returned NULL -> linkGoogleAccount SKIPPED, drawer will NOT update",
+                            )
+                            return@launch
+                        }
+                        userDataRepository.linkGoogleAccount(
+                            idToken = idToken,
+                            platform = getPlatformName(),
+                        )
+                            .onSuccess {
+                                authDiagLogger.debug(
+                                    "AuthDiag",
+                                    "handleSignIn: linkGoogleAccount SUCCESS email=" + it.googleEmail +
+                                        " -> isGoogleLinked should now be true",
+                                )
+                            }
+                            .onFailure {
+                                authDiagLogger.error(
+                                    "AuthDiag",
+                                    "handleSignIn: linkGoogleAccount FAILED (" + it.message +
+                                        ") -> Firebase signed in but drawer stays 'Sign in'",
+                                    it,
+                                )
+                            }
+                    }
+                    .onFailure { e ->
+                        authDiagLogger.error("AuthDiag", "handleSignIn: signInWithGoogle FAILED (" + e.message + ")", e)
+                    }
             }
         }
 
