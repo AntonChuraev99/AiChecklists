@@ -6,6 +6,7 @@ import androidx.compose.material3.adaptive.navigation3.rememberListDetailSceneSt
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
+import androidx.navigation3.scene.SinglePaneSceneStrategy
 import com.antonchuraev.homesearchchecklist.core.auth.api.GoogleAuthRepository
 import com.antonchuraev.homesearchchecklist.core.auth.api.GoogleAuthState
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
@@ -29,6 +30,7 @@ import com.antonchuraev.homesearchchecklist.feature.updatefeed.presentation.comp
 import com.antonchuraev.homesearchchecklist.navigation.AdaptiveNavigationShell
 import com.antonchuraev.homesearchchecklist.navigation.DrawerDestination
 import com.antonchuraev.homesearchchecklist.navigation.EmptyDetailPlaceholder
+import com.antonchuraev.homesearchchecklist.navigation.shouldUseSinglePaneLayout
 import com.antonchuraev.homesearchchecklist.gestures.ApplyEdgeSwipeExclusion
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -237,7 +239,18 @@ fun App() {
 
             Box(modifier = Modifier.fillMaxSize()) {
 
-            val sceneStrategy = rememberListDetailSceneStrategy<NavKey>()
+            // Scene strategy is platform-dependent so the web layout differs from Android/iOS:
+            // - Android / iOS: list-detail two-pane on Medium/Expanded windows (unchanged).
+            // - Web (wasmJs): single-pane — the checklist list fills the whole content area
+            //   and a tapped checklist replaces it in place instead of opening a second
+            //   detail pane beside it. The listPane()/detailPane() entry metadata below is
+            //   simply ignored by SinglePaneSceneStrategy, so no entry changes are needed.
+            val platformName = remember { getPlatformName() }
+            val sceneStrategy = if (shouldUseSinglePaneLayout(platformName)) {
+                remember { SinglePaneSceneStrategy<NavKey>() }
+            } else {
+                rememberListDetailSceneStrategy<NavKey>()
+            }
 
             val selectedDestination = remember(navigator.backStack.toList()) {
                 val topLevel = navigator.backStack.findLast { key ->
