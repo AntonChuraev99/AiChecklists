@@ -29,6 +29,16 @@ interface ChecklistDao {
     @Query("SELECT * FROM checklists WHERE cloudId = :cloudId")
     suspend fun getByCloudId(cloudId: String): ChecklistEntity?
 
+    /**
+     * Cloud IDs of all locally-synced checklists (syncStatus == SYNCED).
+     * Used by pull reconciliation to detect rows that were hard-deleted in
+     * Firestore on another device: SYNCED locally but absent from the cloud
+     * fetch => stale => remove locally. Deliberately excludes PENDING_UPLOAD(1)
+     * and PENDING_DELETE(2) so local-only changes are never reconciled away.
+     */
+    @Query("SELECT cloudId FROM checklists WHERE syncStatus = 0 AND cloudId IS NOT NULL")
+    suspend fun getSyncedCloudIds(): List<String>
+
     @Query("UPDATE checklists SET syncStatus = :status WHERE id = :id")
     suspend fun updateSyncStatus(id: Long, status: Int)
 

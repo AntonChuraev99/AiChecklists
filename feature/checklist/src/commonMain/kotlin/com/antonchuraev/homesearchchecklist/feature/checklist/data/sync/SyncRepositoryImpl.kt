@@ -35,6 +35,7 @@ class SyncRepositoryImpl(
     private val fillDao: ChecklistFillDao,
     private val firestoreDataSource: FirestoreSyncDataSource,
     private val authRepository: GoogleAuthRepository,
+    private val initialUploadGate: InitialUploadGate,
     private val scope: CoroutineScope,
     private val logger: AppLogger,
 ) : SyncRepository {
@@ -158,13 +159,22 @@ class SyncRepositoryImpl(
 
             if (syncDataList.isNotEmpty()) {
                 log("initialUpload: batch uploading ${syncDataList.size} checklists")
-                val result = firestoreDataSource.uploadBatch(uid, syncDataList)
-                if (result is AppResult.Success) {
-                    val now = currentTimeMillis()
-                    allChecklists.forEach { checklistDao.markSynced(it.id, updatedAt = now) }
-                    logInfo("initialUpload: batch OK, all marked synced")
-                } else if (result is AppResult.Error) {
-                    logError("initialUpload: batch FAILED: ${result.exception.message}", result.exception)
+                when (val result = firestoreDataSource.uploadBatch(uid, syncDataList)) {
+                    is AppResult.Success -> {
+                        val now = currentTimeMillis()
+                        allChecklists.forEach { checklistDao.markSynced(it.id, updatedAt = now) }
+                        logInfo("initialUpload: batch OK, all marked synced")
+                    }
+                    is AppResult.Error -> {
+                        // Propagate the failure so the caller (onUserAuthenticated) does NOT
+                        // mark the one-time gate — the upload must retry on the next start
+                        // instead of being silently skipped forever (which would strand
+                        // pre-login local data off the cloud).
+                        logError("initialUpload: batch FAILED: ${result.exception.message}", result.exception)
+                        _syncState.value = SyncState.Error(result.exception.message ?: "Initial upload failed")
+                        return AppResult.Error(result.exception)
+                    }
+                    is AppResult.Loading -> Unit
                 }
             } else {
                 log("initialUpload: no checklists to upload")
@@ -190,6 +200,10 @@ class SyncRepositoryImpl(
                     for (remote in result.data) {
                         mergeRemoteChecklist(remote)
                     }
+                    // Reconciliation runs ONLY on a full successful fetch (this branch).
+                    // A partial/failed fetch (Error/Loading) must NOT delete anything,
+                    // otherwise a transient network error would wipe local data.
+                    reconcileDeletedRemotely(result.data)
                     _syncState.value = SyncState.Idle
                     log("pull: merge complete")
                     AppResult.Success(Unit)
@@ -232,9 +246,34 @@ class SyncRepositoryImpl(
 
     private suspend fun onUserAuthenticated(userId: String) {
         logInfo("onAuth: starting sync pipeline for uid=$userId")
+        // Claim any local "guest" rows (created before login) for this uid.
+        // Idempotent (WHERE userId IS NULL) — safe to run on every start.
         checklistDao.assignUserIdToAll(userId)
         fillDao.assignUserIdToAll(userId)
-        initialUpload()
+
+        // One-time bulk upload of pre-existing local data — ONLY on the first link
+        // of this uid. On subsequent starts this is skipped so that checklists
+        // deleted on another device are not resurrected by re-uploading the full
+        // local set. Firestore is the source of truth from here on.
+        if (!initialUploadGate.isInitialUploadDone(userId)) {
+            logInfo("onAuth: first link for uid=$userId — running initialUpload()")
+            val result = initialUpload()
+            if (result is AppResult.Success) {
+                initialUploadGate.markInitialUploadDone(userId)
+                logInfo("onAuth: initialUpload done, gate marked for uid=$userId")
+            } else {
+                // Do NOT mark the gate on failure — retry the one-time upload on the
+                // next start rather than silently skipping it forever.
+                logError("onAuth: initialUpload failed — gate NOT marked, will retry next start")
+            }
+        } else {
+            log("onAuth: initialUpload already done for uid=$userId — skipping")
+        }
+
+        // Push local pending changes (PENDING_UPLOAD -> upload, PENDING_DELETE ->
+        // hard-delete in cloud) BEFORE pulling, so reconciliation sees an up-to-date
+        // cloud and our just-pushed rows are present in the remote set.
+        pushPendingChanges()
         pullAndMerge()
         startListening()
         logInfo("onAuth: sync pipeline started")
@@ -253,6 +292,12 @@ class SyncRepositoryImpl(
             log("merge: UPDATE '${remote.name}' remote=${remote.updatedAt} > local=${local.updatedAt}")
             val updated = remote.toDomain().toUpdateEntity(localId = local.id)
             checklistDao.update(updated)
+            // Fills are merged by cloudId (insert new / update newer) but NOT
+            // reconciled: a fill deleted on another device is not removed locally.
+            // Checklist-level reconciliation (the reported data-loss bug) is fully
+            // handled by reconcileDeletedRemotely(). Per-fill deletion is a rarer,
+            // lower-impact case and is deferred — see
+            // Pending: docs/todos/2026-05-30-sync-fill-reconciliation.md
             for (fillData in remote.fills) {
                 val existingFill = fillDao.getByCloudId(fillData.cloudId)
                 if (existingFill == null) {
@@ -263,6 +308,35 @@ class SyncRepositoryImpl(
             }
         } else {
             log("merge: SKIP '${remote.name}' (local is newer or equal)")
+        }
+    }
+
+    /**
+     * Removes local SYNCED checklists that are absent from the cloud fetch — i.e.
+     * they were hard-deleted on another device. Firestore is the source of truth:
+     * "document gone" == "deleted everywhere".
+     *
+     * SAFETY:
+     * - Only touches SYNCED rows ([ChecklistDao.getSyncedCloudIds] filters on
+     *   syncStatus == 0). PENDING_UPLOAD(1) (e.g. a checklist just created locally,
+     *   not yet in the cloud) and PENDING_DELETE(2) are NEVER reconciled away.
+     * - Caller guarantees this runs only on a full successful fetch.
+     *
+     * Idempotent: a second pass finds no stale ids (the rows are already gone), so
+     * the per-snapshot listener can call it repeatedly without harm.
+     */
+    private suspend fun reconcileDeletedRemotely(remoteChecklists: List<ChecklistSyncData>) {
+        val remoteCloudIds = remoteChecklists.map { it.cloudId }.toSet()
+        val staleCloudIds = checklistDao.getSyncedCloudIds().toSet() - remoteCloudIds
+        if (staleCloudIds.isEmpty()) return
+        log("reconcile: ${staleCloudIds.size} local SYNCED checklist(s) absent from cloud — removing")
+        for (cid in staleCloudIds) {
+            val entity = checklistDao.getByCloudId(cid) ?: continue
+            // Remove the checklist's fills first, then the checklist itself (hard
+            // local delete — no PENDING_DELETE, the cloud already has none).
+            fillDao.deleteByChecklistId(entity.id)
+            checklistDao.deleteById(entity.id)
+            logInfo("reconcile: removed local '${entity.name}' (absent from cloud)")
         }
     }
 

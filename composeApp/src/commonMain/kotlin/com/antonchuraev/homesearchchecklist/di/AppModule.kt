@@ -23,6 +23,8 @@ import com.antonchuraev.homesearchchecklist.settings.di.settingsModule
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.impl.di.remoteConfigModule
 import com.antonchuraev.homesearchchecklist.core.auth.impl.googleAuthModule
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.di.aiChatFeatureModule
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.InitialUploadGate
+import com.antonchuraev.homesearchchecklist.sync.InitialUploadGateImpl
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
@@ -51,6 +53,10 @@ val appModule = module {
         platformModule()
     )
     single<AppDatastore> { UserAppDatastoreProvider.instance }
+    // Gate for the one-time initial upload step of the sync pipeline.
+    // Interface lives in :feature:checklist; impl is here so the feature module
+    // stays free of any DataStore dependency (same boundary as FirestoreSyncDataSource).
+    single<InitialUploadGate> { InitialUploadGateImpl(get<AppDatastore>()) }
     single { CsatManager(get()) }
     viewModelOf(::AppViewModel)
     // CsatViewModel as singleton — accessed from App.kt and DebugScreen

@@ -5,6 +5,7 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePort
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChatHistoryDao
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.FirestoreSyncDataSource
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.InitialUploadGate
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.SyncRepositoryImpl
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.parser.SmartDateParser
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.parser.SmartDateParserImpl
@@ -28,6 +29,7 @@ val checklistFeatureModule = module {
             fillDao = db.checklistFillDao(),
             firestoreDataSource = get<FirestoreSyncDataSource>(),
             authRepository = get<GoogleAuthRepository>(),
+            initialUploadGate = get<InitialUploadGate>(),
             scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
             logger = get<AppLogger>(),
         )
