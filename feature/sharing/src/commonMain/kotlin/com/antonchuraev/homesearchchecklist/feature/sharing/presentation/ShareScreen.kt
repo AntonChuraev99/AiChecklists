@@ -55,7 +55,7 @@ import org.koin.core.parameter.parametersOf
 @Composable
 fun ShareScreen(
     checklistId: Long,
-    viewModel: ShareViewModel = koinViewModel { parametersOf(checklistId) }
+    viewModel: ShareViewModel = koinViewModel(key = "share_$checklistId") { parametersOf(checklistId) }
 ) {
     val analyticsTracker: AnalyticsTracker = koinInject()
     LaunchedEffect(Unit) { analyticsTracker.screenView("share") }

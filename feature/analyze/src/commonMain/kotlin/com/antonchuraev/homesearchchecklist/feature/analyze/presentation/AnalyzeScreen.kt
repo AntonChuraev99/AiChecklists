@@ -75,7 +75,7 @@ import org.koin.core.parameter.parametersOf
 fun AnalyzeScreen(
     checklistId: Long? = null,
     fillDefault: Boolean = false,
-    viewModel: AnalyzeViewModel = koinViewModel { parametersOf(checklistId, fillDefault) }
+    viewModel: AnalyzeViewModel = koinViewModel(key = "analyze_${checklistId}_$fillDefault") { parametersOf(checklistId, fillDefault) }
 ) {
     val analyticsTracker: AnalyticsTracker = koinInject()
     LaunchedEffect(Unit) { analyticsTracker.screenView("analyze") }

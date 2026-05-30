@@ -59,7 +59,7 @@ import org.koin.core.parameter.parametersOf
 @Composable
 fun TemplatePreviewScreen(
     templateId: String,
-    viewModel: TemplatePreviewViewModel = koinViewModel { parametersOf(templateId) }
+    viewModel: TemplatePreviewViewModel = koinViewModel(key = "template_preview_$templateId") { parametersOf(templateId) }
 ) {
     val state by viewModel.screenState.collectAsState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()

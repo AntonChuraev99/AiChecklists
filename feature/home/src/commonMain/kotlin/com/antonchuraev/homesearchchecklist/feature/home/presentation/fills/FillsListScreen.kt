@@ -55,7 +55,7 @@ import org.koin.core.parameter.parametersOf
 @Composable
 fun FillsListScreen(
     checklistId: Long,
-    viewModel: FillsListViewModel = koinViewModel { parametersOf(checklistId) }
+    viewModel: FillsListViewModel = koinViewModel(key = "fills_list_$checklistId") { parametersOf(checklistId) }
 ) {
     val state by viewModel.screenState.collectAsStateWithLifecycle()
 

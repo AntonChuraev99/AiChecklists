@@ -66,7 +66,7 @@ import org.koin.core.parameter.parametersOf
 @Composable
 fun FillDetailScreen(
     fillId: Long,
-    viewModel: FillDetailViewModel = koinViewModel { parametersOf(fillId) }
+    viewModel: FillDetailViewModel = koinViewModel(key = "fill_detail_$fillId") { parametersOf(fillId) }
 ) {
     val state by viewModel.screenState.collectAsStateWithLifecycle()
 

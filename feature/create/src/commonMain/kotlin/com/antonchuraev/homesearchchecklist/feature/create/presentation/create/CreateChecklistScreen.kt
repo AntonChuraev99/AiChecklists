@@ -58,7 +58,7 @@ import org.koin.core.parameter.parametersOf
 @Composable
 fun CreateChecklistScreen(
     editChecklistId: Long? = null,
-    viewModel: CreateChecklistViewModel = koinViewModel { parametersOf(editChecklistId) }
+    viewModel: CreateChecklistViewModel = koinViewModel(key = "create_checklist_$editChecklistId") { parametersOf(editChecklistId) }
 ) {
     val analyticsTracker: AnalyticsTracker = koinInject()
     LaunchedEffect(Unit) { analyticsTracker.screenView("create_checklist") }

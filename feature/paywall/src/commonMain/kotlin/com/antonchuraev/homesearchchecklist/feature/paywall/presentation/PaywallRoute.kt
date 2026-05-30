@@ -94,7 +94,7 @@ fun PaywallRoute(
 
     LaunchedEffect(Unit) { analyticsTracker.screenView("paywall") }
 
-    val viewModel: PaywallViewModel = koinViewModel { parametersOf(sourceOverride) }
+    val viewModel: PaywallViewModel = koinViewModel(key = "paywall_$sourceOverride") { parametersOf(sourceOverride) }
     val state by viewModel.screenState.collectAsStateWithLifecycle()
 
     // Navigate away on purchase success (handled by ViewModel in Phase 2)

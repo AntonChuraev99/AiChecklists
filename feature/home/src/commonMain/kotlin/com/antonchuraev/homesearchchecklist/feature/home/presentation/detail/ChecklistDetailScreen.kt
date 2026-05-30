@@ -194,7 +194,7 @@ import org.koin.core.parameter.parametersOf
 fun ChecklistDetailScreen(
     checklistId: Long,
     focusItemId: String? = null,
-    viewModel: ChecklistDetailViewModel = koinViewModel { parametersOf(checklistId) }
+    viewModel: ChecklistDetailViewModel = koinViewModel(key = "checklist_detail_$checklistId") { parametersOf(checklistId) }
 ) {
     val analyticsTracker: AnalyticsTracker = koinInject()
     LaunchedEffect(Unit) { analyticsTracker.screenView("checklist_detail") }
