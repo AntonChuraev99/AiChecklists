@@ -292,12 +292,8 @@ class SyncRepositoryImpl(
             log("merge: UPDATE '${remote.name}' remote=${remote.updatedAt} > local=${local.updatedAt}")
             val updated = remote.toDomain().toUpdateEntity(localId = local.id)
             checklistDao.update(updated)
-            // Fills are merged by cloudId (insert new / update newer) but NOT
-            // reconciled: a fill deleted on another device is not removed locally.
-            // Checklist-level reconciliation (the reported data-loss bug) is fully
-            // handled by reconcileDeletedRemotely(). Per-fill deletion is a rarer,
-            // lower-impact case and is deferred — see
-            // Pending: docs/todos/2026-05-30-sync-fill-reconciliation.md
+            // Merge fills by cloudId: insert ones the cloud has but we don't, and
+            // overwrite local fills with a newer remote version.
             for (fillData in remote.fills) {
                 val existingFill = fillDao.getByCloudId(fillData.cloudId)
                 if (existingFill == null) {
@@ -306,6 +302,9 @@ class SyncRepositoryImpl(
                     fillDao.insert(fillData.toUpdateEntity(localId = existingFill.id, checklistId = local.id))
                 }
             }
+            // ...then reconcile per-fill deletions: a fill SYNCED locally but absent
+            // from this (newer) remote snapshot was deleted on another device.
+            reconcileDeletedFills(localChecklistId = local.id, remoteFills = remote.fills)
         } else {
             log("merge: SKIP '${remote.name}' (local is newer or equal)")
         }
@@ -337,6 +336,39 @@ class SyncRepositoryImpl(
             fillDao.deleteByChecklistId(entity.id)
             checklistDao.deleteById(entity.id)
             logInfo("reconcile: removed local '${entity.name}' (absent from cloud)")
+        }
+    }
+
+    /**
+     * Per-fill analogue of [reconcileDeletedRemotely], scoped to one checklist.
+     * After the UPDATE branch has merged [remoteFills], any local fill that is
+     * SYNCED but whose cloudId is absent from [remoteFills] was hard-deleted on
+     * another device => remove it locally.
+     *
+     * Called ONLY from the UPDATE branch of [mergeRemoteChecklist] — i.e. when the
+     * remote checklist is newer and therefore authoritative for this checklist's
+     * fills. The SKIP branch (local newer) intentionally leaves fills untouched:
+     * reconciling there could wipe a local fill edit against a stale snapshot.
+     *
+     * SAFETY (mirror of the checklist-level rules):
+     * - Only SYNCED fills are considered ([ChecklistFillDao.getSyncedFillCloudIds]
+     *   filters on syncStatus == 0). A PENDING_UPLOAD(1) fill just created locally
+     *   is not yet in the cloud and must survive; PENDING_DELETE(2) is pushed by
+     *   pushPendingChanges, not reconciled here.
+     * - The caller runs this only on a full successful fetch.
+     *
+     * Idempotent: a second merge finds no stale ids (the rows are already gone).
+     */
+    private suspend fun reconcileDeletedFills(localChecklistId: Long, remoteFills: List<FillSyncData>) {
+        val remoteFillCloudIds = remoteFills.map { it.cloudId }.toSet()
+        val staleFillCloudIds =
+            fillDao.getSyncedFillCloudIds(localChecklistId).toSet() - remoteFillCloudIds
+        if (staleFillCloudIds.isEmpty()) return
+        log("reconcile: ${staleFillCloudIds.size} local SYNCED fill(s) absent from cloud — removing")
+        for (cid in staleFillCloudIds) {
+            val fill = fillDao.getByCloudId(cid) ?: continue
+            fillDao.deleteById(fill.id)
+            logInfo("reconcile: removed local fill cloudId=$cid (absent from cloud)")
         }
     }
 

@@ -47,10 +47,24 @@ class SyncRepositoryImplTest {
 
     // ─── Sync-data builders ──────────────────────────────────────────────
 
-    private fun remote(cloudId: String, name: String, updatedAt: Long = 100L) =
+    private fun remote(
+        cloudId: String,
+        name: String,
+        updatedAt: Long = 100L,
+        fills: List<FillSyncData> = emptyList(),
+    ) =
         ChecklistSyncData(
             cloudId = cloudId,
             name = name,
+            itemsJson = "[]",
+            updatedAt = updatedAt,
+            fills = fills,
+        )
+
+    private fun remoteFill(cloudId: String, updatedAt: Long = 100L) =
+        FillSyncData(
+            cloudId = cloudId,
+            name = "",
             itemsJson = "[]",
             updatedAt = updatedAt,
         )
@@ -192,6 +206,126 @@ class SyncRepositoryImplTest {
         assertEquals(setOf("c1"), dao.checklists.map { it.cloudId }.toSet())
     }
 
+    // ─── Tests: per-fill reconciliation (the deferred follow-up) ─────────
+
+    @Test
+    fun reconcileFills_removesSyncedAbsentFromCloud() = runTest {
+        // Checklist c1 survives; on another device two of its three fills were
+        // deleted. Remote is newer (UPDATE branch) and carries only surviving f1.
+        dao.checklists.add(localSynced(1L, "c1", "List", updatedAt = 100L))
+        fillDao.fills.addAll(
+            listOf(
+                fillEntity(id = 10L, checklistId = 1L, cloudId = "f1"),
+                fillEntity(id = 11L, checklistId = 1L, cloudId = "f2"),
+                fillEntity(id = 12L, checklistId = 1L, cloudId = "f3"),
+            )
+        )
+        firestore.fetchResult = AppResult.Success(
+            listOf(remote("c1", "List", updatedAt = 200L, fills = listOf(remoteFill("f1")))),
+        )
+
+        val repo = newRepo()
+        auth.currentUserOverride = testUser
+
+        repo.pullAndMerge()
+
+        assertEquals(
+            setOf("f1"),
+            fillDao.fills.map { it.cloudId }.toSet(),
+            "stale fills f2/f3 absent from the newer cloud snapshot must be removed",
+        )
+    }
+
+    @Test
+    fun reconcileFills_keepsPendingUploadFill() = runTest {
+        // f2 was just created locally (PENDING_UPLOAD) and is not yet in the cloud.
+        // It must survive reconciliation despite being absent from remote.fills.
+        dao.checklists.add(localSynced(1L, "c1", "List", updatedAt = 100L))
+        fillDao.fills.addAll(
+            listOf(
+                fillEntity(id = 10L, checklistId = 1L, cloudId = "f1"),
+                fillEntity(
+                    id = 11L,
+                    checklistId = 1L,
+                    cloudId = "f2",
+                    syncStatus = SyncStatus.PENDING_UPLOAD.value,
+                ),
+            )
+        )
+        firestore.fetchResult = AppResult.Success(
+            listOf(remote("c1", "List", updatedAt = 200L, fills = listOf(remoteFill("f1")))),
+        )
+
+        val repo = newRepo()
+        auth.currentUserOverride = testUser
+
+        repo.pullAndMerge()
+
+        val remaining = fillDao.fills.map { it.cloudId }.toSet()
+        assertTrue("f2" in remaining, "PENDING_UPLOAD fill must survive reconciliation")
+        assertTrue("f1" in remaining)
+    }
+
+    @Test
+    fun reconcileFills_skippedWhenChecklistSkipped() = runTest {
+        // Local checklist is NEWER than remote (SKIP branch). Fills must be left
+        // untouched — reconciling against a stale snapshot would wipe a local fill.
+        dao.checklists.add(localSynced(1L, "c1", "LocalWins", updatedAt = 300L))
+        fillDao.fills.addAll(
+            listOf(
+                fillEntity(id = 10L, checklistId = 1L, cloudId = "f1"),
+                fillEntity(id = 11L, checklistId = 1L, cloudId = "f2"),
+            )
+        )
+        firestore.fetchResult = AppResult.Success(
+            listOf(remote("c1", "CloudOlder", updatedAt = 200L, fills = listOf(remoteFill("f1")))),
+        )
+
+        val repo = newRepo()
+        auth.currentUserOverride = testUser
+
+        repo.pullAndMerge()
+
+        assertEquals(
+            setOf("f1", "f2"),
+            fillDao.fills.map { it.cloudId }.toSet(),
+            "SKIP branch must not reconcile fills (local checklist is authoritative)",
+        )
+    }
+
+    @Test
+    fun reconcileFills_scopedToOwningChecklist() = runTest {
+        // c1 gets an UPDATE that drops all its fills; c2 is a different checklist.
+        // c2's fill must never be considered by c1's per-checklist reconciliation.
+        dao.checklists.addAll(
+            listOf(
+                localSynced(1L, "c1", "Updated", updatedAt = 100L),
+                localSynced(2L, "c2", "Other", updatedAt = 100L),
+            )
+        )
+        fillDao.fills.addAll(
+            listOf(
+                fillEntity(id = 10L, checklistId = 1L, cloudId = "f1"),
+                fillEntity(id = 20L, checklistId = 2L, cloudId = "g1"),
+            )
+        )
+        firestore.fetchResult = AppResult.Success(
+            listOf(
+                remote("c1", "Updated", updatedAt = 200L, fills = emptyList()),
+                remote("c2", "Other", updatedAt = 100L, fills = listOf(remoteFill("g1"))),
+            ),
+        )
+
+        val repo = newRepo()
+        auth.currentUserOverride = testUser
+
+        repo.pullAndMerge()
+
+        val remaining = fillDao.fills.map { it.cloudId }.toSet()
+        assertFalse("f1" in remaining, "c1's own UPDATE reconciliation drops its absent fill")
+        assertTrue("g1" in remaining, "c2's fill must not be touched by c1 reconciliation")
+    }
+
     // ─── Tests: merge correctness (must not regress) ─────────────────────
 
     @Test
@@ -305,7 +439,13 @@ class SyncRepositoryImplTest {
     private val gate = FakeGate()
     private val auth = FakeAuth()
 
-    private fun fillEntity(id: Long, checklistId: Long, cloudId: String) =
+    private fun fillEntity(
+        id: Long,
+        checklistId: Long,
+        cloudId: String?,
+        syncStatus: Int = SyncStatus.SYNCED.value,
+        updatedAt: Long = 100L,
+    ) =
         ChecklistFillEntity(
             id = id,
             checklistId = checklistId,
@@ -315,8 +455,8 @@ class SyncRepositoryImplTest {
             createdAt = 0L,
             cloudId = cloudId,
             userId = uid,
-            updatedAt = 100L,
-            syncStatus = SyncStatus.SYNCED.value,
+            updatedAt = updatedAt,
+            syncStatus = syncStatus,
             isDeleted = false,
         )
 
@@ -407,6 +547,13 @@ class SyncRepositoryImplTest {
 
         override suspend fun getByCloudId(cloudId: String): ChecklistFillEntity? =
             fills.firstOrNull { it.cloudId == cloudId }
+
+        override suspend fun getSyncedFillCloudIds(checklistId: Long): List<String> =
+            fills.filter {
+                it.checklistId == checklistId &&
+                    it.syncStatus == SyncStatus.SYNCED.value &&
+                    it.cloudId != null
+            }.mapNotNull { it.cloudId }
 
         override suspend fun assignUserIdToAll(userId: String) {
             replaceWith { if (it.userId == null) it.copy(userId = userId) else it }

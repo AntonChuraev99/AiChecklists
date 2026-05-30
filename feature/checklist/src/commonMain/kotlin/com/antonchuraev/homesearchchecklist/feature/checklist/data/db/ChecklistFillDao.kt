@@ -54,6 +54,17 @@ interface ChecklistFillDao {
     @Query("SELECT * FROM checklist_fills WHERE cloudId = :cloudId")
     suspend fun getByCloudId(cloudId: String): ChecklistFillEntity?
 
+    /**
+     * Cloud IDs of the SYNCED fills of one checklist. Mirror of
+     * [ChecklistDao.getSyncedCloudIds] scoped to a single checklist, used by the
+     * per-fill pull reconciliation: a fill that is SYNCED locally but absent from
+     * the newer remote.fills was deleted on another device => stale => remove it.
+     * Deliberately excludes PENDING_UPLOAD(1) and PENDING_DELETE(2) so a fill just
+     * created locally (not yet in the cloud) is never reconciled away.
+     */
+    @Query("SELECT cloudId FROM checklist_fills WHERE checklistId = :checklistId AND syncStatus = 0 AND cloudId IS NOT NULL")
+    suspend fun getSyncedFillCloudIds(checklistId: Long): List<String>
+
     @Query("UPDATE checklist_fills SET syncStatus = :status WHERE id = :id")
     suspend fun updateSyncStatus(id: Long, status: Int)
 
