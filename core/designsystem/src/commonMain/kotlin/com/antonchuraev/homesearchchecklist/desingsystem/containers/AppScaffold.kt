@@ -1,8 +1,14 @@
 package com.antonchuraev.homesearchchecklist.desingsystem.containers
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBackIos
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -71,8 +77,28 @@ fun AppScaffold(
         titleContentColor = MaterialTheme.colorScheme.onBackground
     )
 
+    // Wrap the caller's bottomBar so that it always sits above both the navigation
+    // bar and the software keyboard. The wrapper applies
+    // windowInsetsPadding(ime ∪ navigationBars) which equals max(ime, navBar) per
+    // side — never a sum. Because the wrapper consumes navigationBars before the
+    // caller's content sees them, any existing .navigationBarsPadding() inside
+    // the bottomBar slot resolves to 0 and does not double-up.
+    val wrappedBottomBar: @Composable () -> Unit = {
+        Box(modifier = Modifier.windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))) {
+            bottomBar()
+        }
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        // Keep the status-bar inset for the content area (screens that render NO
+        // top bar — e.g. MainScreen — rely on it so their content starts below the
+        // status bar), but drop the bottom (navigation-bar) inset: that side is
+        // managed by wrappedBottomBar (ime ∪ navigationBars). Using the default
+        // systemBars here would double up the navbar against wrappedBottomBar;
+        // using WindowInsets(0) would let content slide under the status bar on
+        // top-bar-less screens. statusBars (top only, bottom = 0) is the safe middle.
+        contentWindowInsets = WindowInsets.statusBars,
         snackbarHost = snackbarHost,
         topBar = {
             if (title != null || onBackButtonClick != null || navigationIcon != null) {
@@ -115,7 +141,7 @@ fun AppScaffold(
                 }
             }
         },
-        bottomBar = bottomBar
+        bottomBar = wrappedBottomBar
     ) {
         Box(
             modifier = Modifier
