@@ -30,4 +30,14 @@ data class ChatMessage(
      * Empty list for assistant messages and legacy messages from before v13.
      */
     val attachments: List<ChatAttachment> = emptyList(),
+    /**
+     * The original user input text that produced this [ChatIntent.Unknown] response.
+     * When non-null on an assistant message, [ChatMessageBubble] renders an "Ask AI"
+     * TextButton that dispatches [OnAskAiFallback] → Layer 3 escalation (3 credits).
+     *
+     * TRANSIENT — NOT persisted to Room. The "Ask AI" button disappears on app restart;
+     * this is intentional and avoids a Room migration. The field defaults to null on
+     * the [ChatHistoryRepositoryImpl.toChatMessage] path (it maps only persisted columns).
+     */
+    val askAiForText: String? = null,
 )

@@ -114,6 +114,13 @@
     <string name="main_create_checklist_locked">Become Premium to Unlock More</string>
     <string name="main_ai_analysis">AI Analysis</string>
     <string name="main_no_items">Empty</string>
+    <string name="main_my_lists">My lists</string>
+    <string name="main_ask_gisti_placeholder">Ask Gisti to add, remind, or plan…</string>
+    <string name="main_ask_gisti_mic">Voice input</string>
+    <string name="main_prompt_photo">Photo → list</string>
+    <string name="main_prompt_add">Add tasks</string>
+    <string name="main_prompt_remind">Remind me…</string>
+    <string name="main_free_lists_used">%1$d of %2$d free lists used</string>
     <string name="main_menu">Menu</string>
     <string name="main_menu_support">Support</string>
     <string name="main_menu_rate_app">Rate App</string>
@@ -978,6 +985,7 @@
     <string name="chat_preview_item_label">Item</string>
     <string name="chat_preview_new_list_label">List name</string>
     <string name="chat_unknown_intent_hint">I didn\'t catch that. Try «add milk to shopping» or «remind me on Friday at 6pm».</string>
+    <string name="chat_ask_ai_fallback">Ask AI</string>
 
     <!-- AI Chat Pricing Help Sheet -->
     <string name="chat_pricing_sheet_title">How AI Chat charges credits</string>

@@ -266,6 +266,9 @@ fun ChatScreen(
                         onOpenChecklist = message.linkedChecklistId?.let { id ->
                             { onIntent(ChatScreenIntent.OnOpenChecklist(id)) }
                         },
+                        onAskAiFallback = message.askAiForText?.let { text ->
+                            { onIntent(ChatScreenIntent.OnAskAiFallback(text)) }
+                        },
                         showSenderLabel = message.role == com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatRole.Assistant,
                     )
                 }

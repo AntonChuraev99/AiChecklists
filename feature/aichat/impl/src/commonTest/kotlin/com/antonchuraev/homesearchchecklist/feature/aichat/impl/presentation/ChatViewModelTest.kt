@@ -969,4 +969,105 @@ class ChatViewModelTest {
         assertEquals(0, repo.transcribeCallCount, "transcribeAudio must NOT be called when path is null")
         assertFalse(vm.screenState.value.isTranscribing, "isTranscribing must remain false on cancel")
     }
+
+    // ── 32. Unknown intent → ShowAssistantMessage carries askAiForText == original input ──
+    // RED: ChatMessage.askAiForText field doesn't exist yet; Unknown branch doesn't set it.
+
+    @Test
+    fun sendClick_unknownIntent_assistantMessageHasAskAiForText() = runTest {
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.Unknown("это штука что ты"),
+                confidence = 0f,
+                layer = RoutingLayer.Local,
+            )
+        )
+        val vm = makeVm(repo = repo)
+
+        // Collect both sideEffect and the resulting AppendAssistantMessage round-trip
+        val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            vm.sideEffect.first()
+        }
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("это штука что ты"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+
+        val effect = effectDeferred.await()
+        assertIs<ChatScreenSideEffect.ShowAssistantMessage>(effect)
+        assertEquals("chat_unknown_intent_hint", effect.messageKey)
+        // The ShowAssistantMessage must carry the original input text so ChatRoute
+        // can embed it in the AppendAssistantMessage round-trip → ChatMessage.askAiForText
+        assertEquals("это штука что ты", effect.askAiForText,
+            "ShowAssistantMessage for Unknown intent must carry askAiForText == original input")
+    }
+
+    // ── 33. AppendAssistantMessage with askAiForText → preserved on ChatMessage in state ──
+    // RED: ChatMessage.askAiForText field doesn't exist yet; AppendAssistantMessage doesn't forward it.
+
+    @Test
+    fun appendAssistantMessage_withAskAiForText_preservedOnChatMessage() = runTest {
+        val vm = makeVm()
+
+        vm.sendIntent(
+            ChatScreenIntent.AppendAssistantMessage(
+                text = "I didn't catch that. Try...",
+                askAiForText = "это штука что ты",
+            )
+        )
+
+        val messages = vm.screenState.value.messages
+        assertEquals(1, messages.size)
+        assertEquals("это штука что ты", messages.first().askAiForText,
+            "askAiForText must be forwarded from AppendAssistantMessage to ChatMessage")
+    }
+
+    // ── 34. OnAskAiFallback → completeFreeForm called with the original text ──
+    // RED: OnAskAiFallback intent doesn't exist yet.
+
+    @Test
+    fun onAskAiFallback_callsCompleteFreeFormWithOriginalText() = runTest {
+        // Use ServiceError so handleFreeForm emits a ShowAssistantMessage sideEffect
+        // (Success path calls addAndPersistAssistantMessage directly without a sideeffect,
+        // so there is nothing to drain — UncompletedCoroutinesError would result).
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.Unknown("это штука что ты"),
+                confidence = 0f,
+                layer = RoutingLayer.Local,
+            ),
+            completionResult = RemoteCompletionResult.ServiceError,
+        )
+        val vm = makeVm(repo = repo)
+
+        // First send to get Unknown response — drains the ShowAssistantMessage effect from handleSend
+        val unknownEffectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            vm.sideEffect.first()
+        }
+        vm.sendIntent(ChatScreenIntent.OnInputChange("это штука что ты"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        unknownEffectDeferred.await() // drain chat_unknown_intent_hint ShowAssistantMessage
+        assertEquals(0, repo.completeFreeFormCallCount, "completeFreeForm must NOT be called on Unknown classification")
+
+        // Set up deferred for the ServiceError effect emitted by handleFreeForm
+        val fallbackEffectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            vm.sideEffect.first()
+        }
+
+        // User taps "Ask AI" fallback button
+        vm.sendIntent(ChatScreenIntent.OnAskAiFallback("это штука что ты"))
+
+        // completeFreeForm must be called exactly once (Layer 3 escalation)
+        assertEquals(1, repo.completeFreeFormCallCount,
+            "OnAskAiFallback must escalate to Layer 3 via completeFreeForm")
+
+        // State must reflect processing complete (UnconfinedTestDispatcher runs eagerly)
+        assertFalse(vm.screenState.value.isProcessing,
+            "isProcessing must be false after completeFreeForm completes")
+
+        // Drain the chat_completion_error ShowAssistantMessage from ServiceError path
+        val fallbackEffect = fallbackEffectDeferred.await()
+        assertIs<ChatScreenSideEffect.ShowAssistantMessage>(fallbackEffect)
+        assertEquals("chat_completion_error", fallbackEffect.messageKey,
+            "ServiceError from completeFreeForm must emit chat_completion_error")
+    }
 }

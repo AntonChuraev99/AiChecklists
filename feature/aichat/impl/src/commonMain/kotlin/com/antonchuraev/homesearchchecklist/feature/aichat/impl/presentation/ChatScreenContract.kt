@@ -127,10 +127,13 @@ sealed interface ChatScreenIntent : Intent {
      * sends it back here so the message lands in the chat history.
      * [linkedChecklistId] is preserved through the round-trip so the bubble
      * can show an "Open checklist" button for successful write-intent outcomes.
+     * [askAiForText] is preserved so the bubble can show an "Ask AI" button
+     * for Unknown-intent responses that should offer Layer 3 escalation.
      */
     data class AppendAssistantMessage(
         val text: String,
         val linkedChecklistId: Long? = null,
+        val askAiForText: String? = null,
     ) : ChatScreenIntent
 
     /** User approved the pending write-intent preview. */
@@ -181,6 +184,13 @@ sealed interface ChatScreenIntent : Intent {
 
     /** User tapped the "Open checklist" deeplink button on an assistant bubble. */
     data class OnOpenChecklist(val checklistId: Long) : ChatScreenIntent
+
+    /**
+     * User tapped the "Ask AI" button on an Unknown-intent assistant bubble.
+     * Escalates [text] (the original user input) to Layer 3 via [completeFreeForm].
+     * This is an explicit opt-in to spend 3 credits — we never auto-burn on Unknown.
+     */
+    data class OnAskAiFallback(val text: String) : ChatScreenIntent
 
     // ── Attachment intents (Phase 1: VM domain logic; picker UI lives in Phase 3) ──
 
@@ -245,11 +255,14 @@ sealed interface ChatScreenSideEffect : SideEffect {
      * Optional [args] support `%1$s` / `%2$s` etc. placeholder substitution.
      * [linkedChecklistId] is forwarded to [ChatMessage] so the bubble can show an "Open
      * checklist" deeplink button for successful write-intent dispatch outcomes.
+     * [askAiForText] is forwarded when the assistant message is an Unknown-intent response;
+     * the bubble shows an "Ask AI" TextButton that escalates to Layer 3 explicitly.
      */
     data class ShowAssistantMessage(
         val messageKey: String,
         val args: List<String> = emptyList(),
         val linkedChecklistId: Long? = null,
+        val askAiForText: String? = null,
     ) : ChatScreenSideEffect
 
     /** Navigate back (handled by the host NavController). */

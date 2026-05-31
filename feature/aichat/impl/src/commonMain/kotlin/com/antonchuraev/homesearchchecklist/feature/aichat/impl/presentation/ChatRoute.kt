@@ -328,6 +328,7 @@ fun ChatRoute(
                         ChatScreenIntent.AppendAssistantMessage(
                             text = resolved,
                             linkedChecklistId = effect.linkedChecklistId,
+                            askAiForText = effect.askAiForText,
                         )
                     )
                 }

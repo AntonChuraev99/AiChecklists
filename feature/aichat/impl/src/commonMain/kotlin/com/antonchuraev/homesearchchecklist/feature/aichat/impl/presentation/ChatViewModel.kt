@@ -125,9 +125,13 @@ class ChatViewModel(
             is ChatScreenIntent.AppendAssistantMessage -> {
                 // ChatRoute resolved a localised messageKey and is round-tripping
                 // the final text back so it lands in chat history with correct locale.
-                // linkedChecklistId is preserved from the original ShowAssistantMessage
-                // side effect so the bubble can render the "Open checklist" button.
-                addAssistantMessage(intent.text, linkedChecklistId = intent.linkedChecklistId)
+                // linkedChecklistId is preserved for the "Open checklist" button.
+                // askAiForText is preserved for the "Ask AI" fallback button on Unknown responses.
+                addAssistantMessage(
+                    intent.text,
+                    linkedChecklistId = intent.linkedChecklistId,
+                    askAiForText = intent.askAiForText,
+                )
             }
 
             ChatScreenIntent.OnPreviewApply -> handlePreviewApply()
@@ -193,6 +197,8 @@ class ChatViewModel(
                     _sideEffect.emit(ChatScreenSideEffect.NavigateToChecklist(intent.checklistId))
                 }
             }
+
+            is ChatScreenIntent.OnAskAiFallback -> handleAskAiFallback(intent.text)
 
             // ── Attachment intents ────────────────────────────────────────────
 
@@ -389,7 +395,16 @@ class ChatViewModel(
 
                 when (val intent = classification.intent) {
                     is ChatIntent.Unknown -> {
-                        _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_unknown_intent_hint"))
+                        // Emit the Unknown hint WITH the original text so ChatRoute can
+                        // round-trip it as askAiForText on the AppendAssistantMessage intent.
+                        // The "Ask AI" button in ChatMessageBubble lets the user opt-in to
+                        // Layer 3 (3 credits) without auto-burning on gibberish.
+                        _sideEffect.emit(
+                            ChatScreenSideEffect.ShowAssistantMessage(
+                                messageKey = "chat_unknown_intent_hint",
+                                askAiForText = text,
+                            )
+                        )
                         _screenState.value = _screenState.value.copy(isProcessing = false)
                     }
 
@@ -1090,7 +1105,11 @@ class ChatViewModel(
 
     // ─── State helpers ────────────────────────────────────────────────────────
 
-    private fun addAssistantMessage(content: String, linkedChecklistId: Long? = null) {
+    private fun addAssistantMessage(
+        content: String,
+        linkedChecklistId: Long? = null,
+        askAiForText: String? = null,
+    ) {
         val msg = ChatMessage(
             id = generateId(),
             role = ChatRole.Assistant,
@@ -1098,6 +1117,9 @@ class ChatViewModel(
             timestamp = nowMillis(),
             costCredits = 0,
             linkedChecklistId = linkedChecklistId,
+            // askAiForText is transient: NOT persisted to Room (toEntry() ignores it).
+            // The "Ask AI" button disappears on app restart — intentional to avoid migration.
+            askAiForText = askAiForText,
         )
         updateMessages { it + msg }
         // Persist every assistant message regardless of routing layer.
@@ -1107,6 +1129,34 @@ class ChatViewModel(
             withContext(NonCancellable) {
                 runCatching { chatHistoryRepository.append(msg) }
                     .onFailure { e -> logger.error(TAG, "addAssistantMessage: persist failed — ${e.message}", e) }
+            }
+        }
+    }
+
+    /**
+     * Handles the "Ask AI" fallback button tap on an Unknown-intent response.
+     *
+     * Escalates [text] (the original user input that produced the Unknown response) to
+     * Layer 3 via [handleFreeForm]. This is an explicit user opt-in — credits are only
+     * spent when the user taps the button, never automatically on Unknown classification.
+     *
+     * The user message is NOT re-added (it already exists in history from [handleSend]).
+     * We set [isProcessing] to match the UX of any other Layer 3 call.
+     */
+    private fun handleAskAiFallback(text: String) {
+        _screenState.value = _screenState.value.copy(isProcessing = true)
+        viewModelScope.launch {
+            runCatching {
+                val locale = localeProvider.current()
+                // Temporarily push the fallback text into messages so Layer 3 has
+                // conversation context. It's already in history (persisted from handleSend),
+                // so we only need to make it available for the completeFreeForm call —
+                // the existing _screenState.value.messages list already contains it.
+                handleFreeForm(locale)
+            }.onFailure { e ->
+                logger.error(TAG, "handleAskAiFallback failed", e)
+                _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_generic_error"))
+                _screenState.value = _screenState.value.copy(isProcessing = false)
             }
         }
     }

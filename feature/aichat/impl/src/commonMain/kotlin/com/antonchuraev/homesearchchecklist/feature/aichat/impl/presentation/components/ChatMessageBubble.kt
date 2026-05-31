@@ -31,6 +31,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.chat_ask_ai_fallback
 import aichecklists.core.designsystem.generated.resources.chat_assistant_label
 import aichecklists.core.designsystem.generated.resources.chat_feedback_open
 import aichecklists.core.designsystem.generated.resources.chat_message_copy
@@ -71,6 +72,7 @@ fun ChatMessageBubble(
     onFeedbackClick: ((ChatMessage) -> Unit)? = null,
     onThumbUpClick: ((ChatMessage) -> Unit)? = null,
     onOpenChecklist: (() -> Unit)? = null,
+    onAskAiFallback: (() -> Unit)? = null,
     showSenderLabel: Boolean = false,
 ) {
     val isUser = message.role == ChatRole.User
@@ -162,7 +164,7 @@ fun ChatMessageBubble(
             // Action row for assistant messages (M3 chat actions): Copy · ThumbUp · ThumbDown.
             // ThumbUp = analytics-only fire-and-forget (no sheet). ThumbDown = opens feedback sheet.
             // Optional "Open checklist" TextButton when the message has a linkedChecklistId.
-            if (!isUser && (onFeedbackClick != null || onThumbUpClick != null || onOpenChecklist != null)) {
+            if (!isUser && (onFeedbackClick != null || onThumbUpClick != null || onOpenChecklist != null || onAskAiFallback != null)) {
                 // offset(x = -6.dp) — Compose equivalent of CSS `marginLeft: -6` (from design).
                 // Visually aligns the first action button with the bubble's text left edge,
                 // compensating for the 32dp IconButton hit-area. NOTE: must use offset, not
@@ -205,6 +207,26 @@ fun ChatMessageBubble(
                             )
                             Text(
                                 text = stringResource(Res.string.chat_open_checklist),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(start = AppDimens.SpacingXxs),
+                            )
+                        }
+                    }
+                    // "Ask AI" fallback button — shown only when the assistant message
+                    // carries askAiForText (i.e. it is an Unknown-intent dead-end).
+                    // Tapping it escalates the original text to Layer 3 (3 credits),
+                    // which is an explicit user opt-in — credits are never auto-burned.
+                    if (onAskAiFallback != null) {
+                        TextButton(onClick = onAskAiFallback) {
+                            Icon(
+                                imageVector = Icons.Outlined.AutoAwesome,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                            Text(
+                                text = stringResource(Res.string.chat_ask_ai_fallback),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.padding(start = AppDimens.SpacingXxs),

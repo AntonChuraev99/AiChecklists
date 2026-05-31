@@ -114,6 +114,13 @@
     <string name="main_create_checklist_locked">Откройте больше с Премиум</string>
     <string name="main_ai_analysis">ИИ-анализ</string>
     <string name="main_no_items">Пусто</string>
+    <string name="main_my_lists">Мои списки</string>
+    <string name="main_ask_gisti_placeholder">Спросите Gisti — добавить, напомнить, спланировать…</string>
+    <string name="main_ask_gisti_mic">Голосовой ввод</string>
+    <string name="main_prompt_photo">Фото → список</string>
+    <string name="main_prompt_add">Добавить задачи</string>
+    <string name="main_prompt_remind">Напомнить…</string>
+    <string name="main_free_lists_used">%1$d из %2$d бесплатных списков</string>
     <string name="main_menu">Меню</string>
     <string name="main_menu_support">Поддержка</string>
     <string name="main_menu_rate_app">Оценить приложение</string>
@@ -948,6 +955,7 @@
 
     <!-- AI-чат: подсказки и сообщения -->
     <string name="chat_unknown_intent_hint">Не понял запрос. Попробуйте «добавь молоко в покупки» или «напомни в пятницу в 18».</string>
+    <string name="chat_ask_ai_fallback">Спросить AI</string>
 
     <!-- AI-чат: pricing bottom sheet -->
     <string name="chat_pricing_sheet_title">Как AI-чат списывает кредиты</string>
