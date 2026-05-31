@@ -337,7 +337,7 @@
     <string name="attachment_fullscreen_delete_cd">Delete attachment</string>
     <string name="attachment_fullscreen_counter">%1$d of %2$d</string>
     <string name="attachment_premium_limit_reached_snackbar">Free plan: 3 attachments per item. Upgrade to Premium for unlimited.</string>
-    <string name="attachment_load_error">Couldn\'t load attachment</string>
+    <string name="attachment_load_error">Couldn't load attachment</string>
     <string name="attachment_size_too_large_snackbar">Attachment too large (max 10 MB)</string>
     <string name="attachment_deleted_snackbar">Attachment deleted</string>
 
@@ -945,7 +945,7 @@
     <string name="calendar_empty_title">No reminders coming up</string>
     <string name="calendar_empty_description">Create a checklist with reminders to see your week here.</string>
     <string name="calendar_empty_cta">Create Checklist</string>
-    <string name="calendar_error_title">Couldn\'t load your calendar</string>
+    <string name="calendar_error_title">Couldn't load your calendar</string>
     <string name="calendar_error_retry">Retry</string>
     <string name="calendar_section_past_due">Past due</string>
     <string name="calendar_grid_week_label">This Week</string>
@@ -984,7 +984,7 @@
     <string name="chat_preview_no_checklist_hint">No checklist specified — will use the first one.</string>
     <string name="chat_preview_item_label">Item</string>
     <string name="chat_preview_new_list_label">List name</string>
-    <string name="chat_unknown_intent_hint">I didn\'t catch that. Try «add milk to shopping» or «remind me on Friday at 6pm».</string>
+    <string name="chat_unknown_intent_hint">I didn't catch that. Try «add milk to shopping» or «remind me on Friday at 6pm».</string>
     <string name="chat_ask_ai_fallback">Ask AI</string>
 
     <!-- AI Chat Pricing Help Sheet -->
@@ -1018,7 +1018,7 @@
     <!-- Inline assistant error messages — surfaced when ViewModel hits a recoverable failure -->
     <string name="chat_generic_error">Something went wrong. Please try again.</string>
     <string name="chat_apply_error">Something went wrong applying the change. Please try again.</string>
-    <string name="chat_extract_fail">I understood your intent but couldn\'t extract the details. Please try again with more specifics.</string>
+    <string name="chat_extract_fail">I understood your intent but couldn't extract the details. Please try again with more specifics.</string>
     <!-- AI Chat dispatch outcomes (C.1 i18n) -->
     <string name="chat_dispatch_added">Added «%1$s».</string>
     <string name="chat_dispatch_added_to">Added «%1$s» to %2$s.</string>
@@ -1041,11 +1041,11 @@
     <string name="chat_dispatch_no_checklist_match">No checklist matching «%1$s» found.</string>
     <string name="chat_dispatch_fill_load_failed">Could not load fill for checklist «%1$s».</string>
     <string name="chat_insufficient_credits">Not enough credits for AI assist. Refill or upgrade to Premium.</string>
-    <string name="chat_completion_error">AI couldn\'t respond. Please try again.</string>
-    <string name="chat_history_load_error">Couldn\'t load chat history.</string>
+    <string name="chat_completion_error">AI couldn't respond. Please try again.</string>
+    <string name="chat_history_load_error">Couldn't load chat history.</string>
     <string name="chat_feedback_open">Leave feedback</string>
     <string name="chat_feedback_title">Leave Feedback</string>
-    <string name="chat_feedback_subtitle">Helps improve future answers. We\'ll send this question + reply along with your feedback.</string>
+    <string name="chat_feedback_subtitle">Helps improve future answers. We'll send this question + reply along with your feedback.</string>
     <string name="chat_feedback_question_label">Question</string>
     <string name="chat_feedback_answer_label">AI reply</string>
     <string name="chat_feedback_placeholder">What went wrong? What was missing?</string>
@@ -1074,8 +1074,8 @@
     <string name="chat_voice_too_short">Recording too short. Hold the mic button longer.</string>
     <string name="chat_recording_in_progress">Recording…</string>
     <string name="chat_transcribing">Transcribing…</string>
-    <string name="chat_transcribe_empty">Couldn\'t hear anything in the recording. Try again.</string>
-    <string name="chat_transcribe_error">Couldn\'t transcribe the recording. Check connection and try again.</string>
+    <string name="chat_transcribe_empty">Couldn't hear anything in the recording. Try again.</string>
+    <string name="chat_transcribe_error">Couldn't transcribe the recording. Check connection and try again.</string>
     <string name="chat_attachment_remove">Remove attachment</string>
     <string name="chat_attachment_source_chooser_title">Attach</string>
     <string name="chat_attachment_source_image">Image</string>
