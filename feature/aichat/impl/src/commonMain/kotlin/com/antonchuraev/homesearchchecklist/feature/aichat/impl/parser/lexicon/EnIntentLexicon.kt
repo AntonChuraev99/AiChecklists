@@ -139,4 +139,18 @@ internal object EnIntentLexicon {
 
     // ─── Hint prepositions (for ChecklistHintExtractor) ───────────────────────
     val hintPrepositions: Set<String> = setOf("in", "to", "for", "from", "into", "on")
+
+    // ─── Referential payloads (context-dependent confirmations) ───────────────
+    // Bare quantifiers/pronouns that point at previously-suggested items rather than
+    // naming a real one. When a command verb's object reduces to only these, Layer 1
+    // cannot resolve it locally and must escalate to Layer 3 (which has the chat
+    // history). Prevents "yes add all" → CreateItem("all").
+    val referentialPayloads: Set<String> = setOf(
+        "all", "them", "it", "this", "that", "everything",
+        "them all", "all of them", "all of it", "all of that",
+    )
+
+    // Completion markers stripped from the tail of a payload before the referential
+    // check, so "mark all done" still reduces to a bare referent.
+    val completionMarkers: Set<String> = setOf("done", "complete", "completed", "finished")
 }

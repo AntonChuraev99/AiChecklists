@@ -347,6 +347,7 @@ internal class LocalIntentRouterImpl(
             ChatLocale.En -> ChecklistHintExtractor.extractEn(lower, endIdx)
         }
         val payload = lower.substring(endIdx).trim()
+        if (isReferentialPayload(payload, locale)) return freeFormEscalation()
         val hasItemText = payload.isNotBlank() && payload != hint
 
         val confidence = when {
@@ -375,6 +376,7 @@ internal class LocalIntentRouterImpl(
 
         val endIdx = firstMatchEnd(lower, keywords)
         val payload = lower.substring(endIdx).trim()
+        if (isReferentialPayload(payload, locale)) return freeFormEscalation()
         val isAtStart = keywords.sortedByDescending { it.length }
             .any { startsWithKeyword(lower, it) }
 
@@ -404,6 +406,7 @@ internal class LocalIntentRouterImpl(
 
         val endIdx = firstMatchEnd(lower, keywords)
         val payload = lower.substring(endIdx).trim()
+        if (isReferentialPayload(payload, locale)) return freeFormEscalation()
         val isAtStart = keywords.sortedByDescending { it.length }
             .any { startsWithKeyword(lower, it) }
 
@@ -453,6 +456,60 @@ internal class LocalIntentRouterImpl(
             confidence = CONF_NONE,
             layer = RoutingLayer.Local,
         )
+
+    /**
+     * Escalation result for a command Layer 1 recognised but cannot resolve locally
+     * (a context-dependent confirmation). Routed to Layer 3 (full chat), which has the
+     * conversation history needed to resolve "all"/«все» against previously-suggested items.
+     */
+    private fun freeFormEscalation(): IntentClassification =
+        IntentClassification(
+            intent = ChatIntent.FreeForm,
+            confidence = CONF_FULL,
+            layer = RoutingLayer.FullChat,
+        )
+
+    /**
+     * True when [payload] (the text after a command verb) is a bare quantifier/pronoun
+     * referring to previously-suggested items — «все», «их», "all", "them" — optionally
+     * followed by a checklist hint ("все в покупки") or a completion marker ("all done").
+     * Such a payload carries no real item text, so the command must escalate to Layer 3
+     * instead of building a junk ToolCall like AddItem("все").
+     *
+     * A quantifier followed by a real noun («все продукты» / "all groceries") is NOT
+     * referential — only the quantifier alone (or quantifier + hint/marker) qualifies.
+     */
+    private fun isReferentialPayload(payload: String, locale: ChatLocale): Boolean {
+        val referents: Set<String>
+        val hintPreps: Set<String>
+        val completionMarkers: Set<String>
+        when (locale) {
+            ChatLocale.Ru -> {
+                referents = RuIntentLexicon.referentialPayloads
+                hintPreps = RuIntentLexicon.hintPrepositions
+                completionMarkers = RuIntentLexicon.completionMarkers
+            }
+            ChatLocale.En -> {
+                referents = EnIntentLexicon.referentialPayloads
+                hintPreps = EnIntentLexicon.hintPrepositions
+                completionMarkers = EnIntentLexicon.completionMarkers
+            }
+        }
+        val tokens = payload.trim().split(' ').filter { it.isNotBlank() }
+        if (tokens.isEmpty()) return false
+        // Core = tokens before the first checklist-hint preposition ("все в покупки" → ["все"]).
+        val core = mutableListOf<String>()
+        for (t in tokens) {
+            if (t in hintPreps) break
+            core += t
+        }
+        // Drop trailing completion markers ("all done" → ["all"]).
+        while (core.isNotEmpty() && core.last() in completionMarkers) {
+            core.removeAt(core.lastIndex)
+        }
+        if (core.isEmpty()) return false
+        return core.joinToString(" ") in referents || core.all { it in referents }
+    }
 
     /**
      * Strips leading stop-words/prepositions from a hint candidate.

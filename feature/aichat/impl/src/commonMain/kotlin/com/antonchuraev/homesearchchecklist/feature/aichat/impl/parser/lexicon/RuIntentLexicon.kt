@@ -133,4 +133,17 @@ internal object RuIntentLexicon {
 
     // ─── Hint prepositions (for ChecklistHintExtractor) ───────────────────────
     val hintPrepositions: Set<String> = setOf("в", "к", "для", "из", "со", "с")
+
+    // ─── Referential payloads (context-dependent confirmations) ───────────────
+    // Bare quantifiers/pronouns that point at previously-suggested items rather than
+    // naming a real one. When a command verb's object reduces to only these, Layer 1
+    // cannot resolve it locally and must escalate to Layer 3 (which has the chat
+    // history). Prevents «да добавь все» → CreateItem("все").
+    val referentialPayloads: Set<String> = setOf(
+        "все", "всё", "их", "это", "этого", "всё это", "все это", "вот это",
+    )
+
+    // Completion markers stripped from the tail of a payload before the referential
+    // check, so «отметь все выполнено» still reduces to a bare referent.
+    val completionMarkers: Set<String> = setOf("выполнено", "сделано", "готово")
 }

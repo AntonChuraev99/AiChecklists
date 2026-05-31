@@ -1061,4 +1061,193 @@ class LocalIntentRouterImplTest {
             "Expected confidence >= 0.7 for named EN create, got ${result.confidence}",
         )
     }
+
+    // ─── Confirmation misfire (referential payload escalation) ────────────────
+    //
+    // Real Amplitude bad-feedback case: after the assistant proposes a list of items,
+    // the user says «да добавь все» ("yes, add all"). The bare quantifier/pronoun
+    // payload (все / всё / их / all / them all) references the previously-proposed
+    // items — it is NOT a real item name. Misfiring into CreateItem / DeleteItem /
+    // CompleteItem produces a junk entry (e.g. item text = "все") and loses context.
+    //
+    // Correct behaviour: return ChatIntent.FreeForm so Layer 2/3 can handle it with
+    // full conversation context.
+
+    @Test
+    fun freeForm_ru_yesAddAll_escalates() = runTest {
+        val result = router.route("да добавь все", ChatLocale.Ru)
+        assertIs<ChatIntent.FreeForm>(result.intent)
+    }
+
+    @Test
+    fun freeForm_ru_yesAddAllYo_escalates() = runTest {
+        val result = router.route("да добавь всё", ChatLocale.Ru)
+        assertIs<ChatIntent.FreeForm>(result.intent)
+    }
+
+    @Test
+    fun freeForm_ru_davayAddThem_escalates() = runTest {
+        val result = router.route("давай добавь их", ChatLocale.Ru)
+        assertIs<ChatIntent.FreeForm>(result.intent)
+    }
+
+    @Test
+    fun freeForm_ru_addAll_bareNoun_escalates() = runTest {
+        val result = router.route("добавь все", ChatLocale.Ru)
+        assertIs<ChatIntent.FreeForm>(result.intent)
+    }
+
+    @Test
+    fun freeForm_ru_addAllWithHint_escalates() = runTest {
+        // "все" is the only payload even when a checklist hint follows — still referential
+        val result = router.route("добавь все в покупки", ChatLocale.Ru)
+        assertIs<ChatIntent.FreeForm>(result.intent)
+    }
+
+    @Test
+    fun freeForm_ru_deleteAll_escalates() = runTest {
+        val result = router.route("удали все", ChatLocale.Ru)
+        assertIs<ChatIntent.FreeForm>(result.intent)
+    }
+
+    @Test
+    fun freeForm_ru_markAll_escalates() = runTest {
+        val result = router.route("отметь все", ChatLocale.Ru)
+        assertIs<ChatIntent.FreeForm>(result.intent)
+    }
+
+    @Test
+    fun freeForm_en_addThemAll_escalates() = runTest {
+        val result = router.route("add them all", ChatLocale.En)
+        assertIs<ChatIntent.FreeForm>(result.intent)
+    }
+
+    @Test
+    fun freeForm_en_yesAddAll_escalates() = runTest {
+        val result = router.route("yes add all", ChatLocale.En)
+        assertIs<ChatIntent.FreeForm>(result.intent)
+    }
+
+    @Test
+    fun freeForm_en_addAll_bare_escalates() = runTest {
+        val result = router.route("add all", ChatLocale.En)
+        assertIs<ChatIntent.FreeForm>(result.intent)
+    }
+
+    @Test
+    fun freeForm_en_removeAll_escalates() = runTest {
+        val result = router.route("remove all", ChatLocale.En)
+        assertIs<ChatIntent.FreeForm>(result.intent)
+    }
+
+    @Test
+    fun freeForm_en_markAllDone_escalates() = runTest {
+        val result = router.route("mark all done", ChatLocale.En)
+        assertIs<ChatIntent.FreeForm>(result.intent)
+    }
+
+    // ─── Regression: real items must NOT be treated as referential ────────────
+    //
+    // A quantifier followed by a concrete noun ("все продукты", "all groceries") is
+    // a REAL item, not a bare referential. These must keep their command intent
+    // and must NOT be escalated to FreeForm.
+
+    @Test
+    fun createItem_ru_addWithoutHint_regression() = runTest {
+        val result = router.route("добавь молоко", ChatLocale.Ru)
+        assertIs<ChatIntent.CreateItem>(result.intent)
+        assertTrue(result.confidence >= 0.6f)
+    }
+
+    @Test
+    fun createItem_ru_addWithHint_regression() = runTest {
+        val result = router.route("добавь молоко в покупки", ChatLocale.Ru)
+        assertIs<ChatIntent.CreateItem>(result.intent)
+        assertTrue(result.confidence >= 0.6f)
+    }
+
+    @Test
+    fun createItem_ru_yesAddWithHint_regression() = runTest {
+        val result = router.route("да, добавь молоко в покупки", ChatLocale.Ru)
+        assertIs<ChatIntent.CreateItem>(result.intent)
+        assertTrue(result.confidence >= 0.6f)
+    }
+
+    @Test
+    fun createItem_ru_quantifierPlusNoun_notReferential_regression() = runTest {
+        // «добавь все продукты» — "все" + concrete noun "продукты" = real item, NOT referential
+        val result = router.route("добавь все продукты", ChatLocale.Ru)
+        assertIs<ChatIntent.CreateItem>(result.intent)
+        assertTrue(result.confidence >= 0.6f)
+    }
+
+    @Test
+    fun createItem_ru_buy_regression() = runTest {
+        val result = router.route("купить яйца", ChatLocale.Ru)
+        assertIs<ChatIntent.CreateItem>(result.intent)
+        assertTrue(result.confidence >= 0.6f)
+    }
+
+    @Test
+    fun deleteItem_ru_deleteConcreteItem_regression() = runTest {
+        val result = router.route("удали хлеб", ChatLocale.Ru)
+        assertIs<ChatIntent.DeleteItem>(result.intent)
+        assertTrue(result.confidence >= 0.6f)
+    }
+
+    @Test
+    fun completeItem_ru_markConcreteItem_regression() = runTest {
+        val result = router.route("отметь молоко", ChatLocale.Ru)
+        assertIs<ChatIntent.CompleteItem>(result.intent)
+        assertTrue(result.confidence >= 0.6f)
+    }
+
+    @Test
+    fun createChecklist_ru_createConcreteList_regression() = runTest {
+        val result = router.route("создай список покупки", ChatLocale.Ru)
+        assertIs<ChatIntent.CreateChecklist>(result.intent)
+        assertTrue(result.confidence >= 0.6f)
+    }
+
+    @Test
+    fun createItem_en_addConcrete_regression() = runTest {
+        val result = router.route("add milk", ChatLocale.En)
+        assertIs<ChatIntent.CreateItem>(result.intent)
+        assertTrue(result.confidence >= 0.6f)
+    }
+
+    @Test
+    fun createItem_en_addConcreteWithHint_regression() = runTest {
+        val result = router.route("add milk to shopping", ChatLocale.En)
+        assertIs<ChatIntent.CreateItem>(result.intent)
+        assertTrue(result.confidence >= 0.6f)
+    }
+
+    @Test
+    fun createItem_en_buyConcrete_regression() = runTest {
+        val result = router.route("buy bread", ChatLocale.En)
+        assertIs<ChatIntent.CreateItem>(result.intent)
+        assertTrue(result.confidence >= 0.6f)
+    }
+
+    @Test
+    fun deleteItem_en_removeConcrete_regression() = runTest {
+        val result = router.route("remove eggs", ChatLocale.En)
+        assertIs<ChatIntent.DeleteItem>(result.intent)
+        assertTrue(result.confidence >= 0.6f)
+    }
+
+    @Test
+    fun completeItem_en_markConcreteDone_regression() = runTest {
+        val result = router.route("mark milk done", ChatLocale.En)
+        assertIs<ChatIntent.CompleteItem>(result.intent)
+        assertTrue(result.confidence >= 0.6f)
+    }
+
+    @Test
+    fun createChecklist_en_createConcreteList_regression() = runTest {
+        val result = router.route("create shopping list", ChatLocale.En)
+        assertIs<ChatIntent.CreateChecklist>(result.intent)
+        assertTrue(result.confidence >= 0.6f)
+    }
 }
