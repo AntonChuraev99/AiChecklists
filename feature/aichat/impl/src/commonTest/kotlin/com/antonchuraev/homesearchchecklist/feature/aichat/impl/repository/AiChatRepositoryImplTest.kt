@@ -3,12 +3,13 @@ package com.antonchuraev.homesearchchecklist.feature.aichat.impl.repository
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AiChatPreferencesRepository
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatIntent
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatRole
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.IntentClassification
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.RoutingLayer
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ToolCall
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.ChatLocale
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.LocalIntentRouter
-import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatClassifierApiService
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatCompletionApiService
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChecklistContext
@@ -63,6 +64,10 @@ private class FakeChatCompletionApiService(
     private val result: RemoteCompletionResult = RemoteCompletionResult.ServiceError,
 ) : ChatCompletionApiService {
     var callCount = 0
+    var lastUserId: String? = null
+    var lastMessages: List<ChatMessage>? = null
+    var lastLocale: ChatLocale? = null
+    var lastChecklistsSummary: List<ChecklistContext>? = null
 
     override suspend fun complete(
         userId: String,
@@ -71,6 +76,10 @@ private class FakeChatCompletionApiService(
         checklistsSummary: List<ChecklistContext>,
     ): RemoteCompletionResult {
         callCount++
+        lastUserId = userId
+        lastMessages = messages
+        lastLocale = locale
+        lastChecklistsSummary = checklistsSummary
         return result
     }
 }
@@ -156,6 +165,29 @@ private fun makeRepo(
         logger = NoOpLogger,
     )
     return Triple(repo, router, classifier)
+}
+
+/** Variant that exposes the [FakeChatCompletionApiService] for argument-capture assertions. */
+private data class RepoWithCompletion(
+    val repo: AiChatRepositoryImpl,
+    val completion: FakeChatCompletionApiService,
+)
+
+private fun makeRepoWithCompletion(
+    completionResult: RemoteCompletionResult,
+    userId: String = "user-123",
+): RepoWithCompletion {
+    val completion = FakeChatCompletionApiService(completionResult)
+    val repo = AiChatRepositoryImpl(
+        router = FakeLocalIntentRouter(highConfidenceLayer1()),
+        classifierApi = FakeChatClassifierApiService(RemoteClassificationResult.ServiceError),
+        completionApi = completion,
+        transcribeApi = FakeTranscribeAudioApiService(),
+        userDataRepository = FakeUserDataRepository(userId),
+        aiChatPreferencesRepository = FakeAiChatPreferencesRepository(),
+        logger = NoOpLogger,
+    )
+    return RepoWithCompletion(repo, completion)
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -495,6 +527,58 @@ class AiChatRepositoryImplTest {
         assertEquals(1, classifier.callCount)
         assertIs<ChatIntent.FreeForm>(result.intent)
         assertEquals(RoutingLayer.FullChat, result.layer)
+    }
+
+    // ── 15. completeFreeForm: delegates messages/locale/checklists to completion API ─
+
+    @Test
+    fun completeFreeForm_nonBlankUserId_delegatesAllArgsToCompletionApi() = runTest {
+        val messages = listOf(
+            ChatMessage(id = "1", role = ChatRole.User, content = "plan my week", timestamp = 1L),
+        )
+        val checklists = listOf(ChecklistContext("Shopping", 5, 2))
+        val (repo, completion) = makeRepoWithCompletion(
+            completionResult = RemoteCompletionResult.Success("Sure!", 280),
+            userId = "delegate-user",
+        )
+
+        repo.completeFreeForm(messages = messages, locale = ChatLocale.En, checklistsSummary = checklists)
+
+        assertEquals(1, completion.callCount, "completionApi.complete() must be called once")
+        assertEquals("delegate-user", completion.lastUserId)
+        assertEquals(messages, completion.lastMessages)
+        assertEquals(ChatLocale.En, completion.lastLocale)
+        assertEquals(checklists, completion.lastChecklistsSummary)
+    }
+
+    // ── 16. completeFreeForm: blank userId → ServiceError, zero API calls ──────
+
+    @Test
+    fun completeFreeForm_blankUserId_returnsServiceErrorWithoutApiCall() = runTest {
+        val (repo, completion) = makeRepoWithCompletion(
+            completionResult = RemoteCompletionResult.Success("unreachable", 0),
+            userId = "",
+        )
+
+        val result = repo.completeFreeForm(
+            messages = emptyList(),
+            locale = ChatLocale.Ru,
+            checklistsSummary = emptyList(),
+        )
+
+        assertEquals(0, completion.callCount, "API must NOT be called when userId is blank")
+        assertIs<RemoteCompletionResult.ServiceError>(result)
+    }
+
+    // ── 17. completeFreeForm: NetworkError propagated unchanged ───────────────
+
+    @Test
+    fun completeFreeForm_networkError_propagated() = runTest {
+        val (repo, _) = makeRepoWithCompletion(RemoteCompletionResult.NetworkError)
+
+        val result = repo.completeFreeForm(emptyList(), ChatLocale.En, emptyList())
+
+        assertIs<RemoteCompletionResult.NetworkError>(result)
     }
 
     // ── 13. Deep Thinking + Layer 1 command-intent: Layer 1 wins ───────────────

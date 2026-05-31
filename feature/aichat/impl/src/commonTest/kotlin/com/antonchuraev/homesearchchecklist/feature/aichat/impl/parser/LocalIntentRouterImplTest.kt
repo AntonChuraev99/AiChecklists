@@ -1002,4 +1002,63 @@ class LocalIntentRouterImplTest {
         val result = router.route("add milk to shopping", ChatLocale.En)
         assertIs<ChatIntent.CreateItem>(result.intent)
     }
+
+    // ─── Regression: nameless create trigger must NOT be high-confidence ──────
+    //
+    // Real Amplitude bad-feedback case (2026-05-31): user typed «да создай» and the
+    // app fired a confident CreateChecklist preview with name=null.
+    // Root cause: tryCreateChecklist sets CONF_PARTIAL (0.8) when name is blank,
+    // which is still ≥ LAYER_1_CONFIDENCE_THRESHOLD (0.7) → Layer 2 is never
+    // consulted for clarification.
+    // Fix: nameless create → CONF_FUZZY (0.6) so it escalates to Layer 2.
+
+    @Test
+    fun createChecklist_ru_triggerOnlyNoName_confidenceBelowThreshold() = runTest {
+        // «да создай» — affirmative + bare create verb, NO list name.
+        // Must escalate: confidence < 0.7 so Layer 2 can ask for a name.
+        val result = router.route("да создай", ChatLocale.Ru)
+        assertTrue(
+            result.confidence < 0.7f,
+            "Expected confidence < 0.7 for nameless create 'да создай', got ${result.confidence}",
+        )
+    }
+
+    @Test
+    fun createChecklist_ru_bareCreateTrigger_confidenceBelowThreshold() = runTest {
+        // Bare «создай» alone, no name → should not be high-confidence.
+        val result = router.route("создай", ChatLocale.Ru)
+        assertTrue(
+            result.confidence < 0.7f,
+            "Expected confidence < 0.7 for bare 'создай', got ${result.confidence}",
+        )
+    }
+
+    // ─── Guard: named create must stay high-confidence ────────────────────────
+
+    @Test
+    fun createChecklist_ru_withName_confidenceFullOrPartial() = runTest {
+        // Named create must stay high-confidence so the preview fires instantly.
+        // «создай список» is the matched trigger; remainder «покупок» becomes the name.
+        val result = router.route("создай список покупок", ChatLocale.Ru)
+        assertIs<ChatIntent.CreateChecklist>(result.intent)
+        val name = (result.intent as ChatIntent.CreateChecklist).name
+        assertTrue(name != null && name.isNotBlank(), "Expected non-blank name, got '$name'")
+        assertTrue(
+            result.confidence >= 0.7f,
+            "Expected confidence >= 0.7 for named create, got ${result.confidence}",
+        )
+    }
+
+    @Test
+    fun createChecklist_en_withName_confidenceFullOrPartial() = runTest {
+        // «create» triggers CreateChecklist; remainder «shopping list» becomes the name.
+        val result = router.route("create shopping list", ChatLocale.En)
+        assertIs<ChatIntent.CreateChecklist>(result.intent)
+        val name = (result.intent as ChatIntent.CreateChecklist).name
+        assertTrue(name != null && name.isNotBlank(), "Expected non-blank name, got '$name'")
+        assertTrue(
+            result.confidence >= 0.7f,
+            "Expected confidence >= 0.7 for named EN create, got ${result.confidence}",
+        )
+    }
 }

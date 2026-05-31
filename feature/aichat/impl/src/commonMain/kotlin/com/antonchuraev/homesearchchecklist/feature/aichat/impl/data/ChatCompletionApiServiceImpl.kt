@@ -37,33 +37,39 @@ import kotlin.time.Clock
  *
  * Message history: send all available messages (server caps at 12).
  * Checklist summary: names + counts only, no item text (privacy by design).
+ *
+ * [httpClient] is injected to allow [MockEngine] substitution in tests.
+ * Production code uses [defaultHttpClient] which preserves the original config.
  */
 internal class ChatCompletionApiServiceImpl(
     private val logger: AppLogger,
+    private val httpClient: HttpClient = defaultHttpClient(),
 ) : ChatCompletionApiService {
 
     companion object {
-        private const val TAG = "ChatCompletionApi"
-        private const val COMPLETION_URL =
+        internal const val TAG = "ChatCompletionApi"
+        internal const val COMPLETION_URL =
             "https://us-central1-aichecklists-40230.cloudfunctions.net/chat_completion"
+
+        private val sharedJson = Json {
+            ignoreUnknownKeys = true
+            isLenient = true
+            encodeDefaults = true
+        }
+
+        fun defaultHttpClient(): HttpClient = HttpClient {
+            install(ContentNegotiation) {
+                json(sharedJson)
+            }
+            install(HttpTimeout) {
+                requestTimeoutMillis = 60_000  // 60s — full Gemini completion takes longer than classify
+                connectTimeoutMillis = 15_000
+                socketTimeoutMillis = 60_000
+            }
+        }
     }
 
-    private val json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        encodeDefaults = true
-    }
-
-    private val httpClient = HttpClient {
-        install(ContentNegotiation) {
-            json(json)
-        }
-        install(HttpTimeout) {
-            requestTimeoutMillis = 60_000  // 60s — full Gemini completion takes longer than classify
-            connectTimeoutMillis = 15_000
-            socketTimeoutMillis = 60_000
-        }
-    }
+    private val json = sharedJson
 
     override suspend fun complete(
         userId: String,

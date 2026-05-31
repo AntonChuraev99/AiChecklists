@@ -261,7 +261,11 @@ internal class LocalIntentRouterImpl(
         // not from `lower`, so the user sees their original casing in the preview.
         val rawName = normalized.substring(endIdx).trim().removeLeadingPrepsCaseAware(locale)
         val name = rawName.ifBlank { null }
-        val confidence = if (name != null) CONF_FULL else CONF_PARTIAL
+        // CONF_FUZZY (0.6) when no name was extracted — keeps confidence BELOW the
+        // LAYER_1_CONFIDENCE_THRESHOLD (0.7) so Layer 2 can ask the user for a name.
+        // Real incident (2026-05-31): «да создай» fired a confident nameless preview
+        // because CONF_PARTIAL (0.8) is ≥ threshold. Fix: nameless → escalate.
+        val confidence = if (name != null) CONF_FULL else CONF_FUZZY
 
         logger.debug(TAG, "CreateChecklist matched='$matched' name='${name?.take(40)}' conf=$confidence")
         return IntentClassification(ChatIntent.CreateChecklist(name), confidence, RoutingLayer.Local)
