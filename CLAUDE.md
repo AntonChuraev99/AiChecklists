@@ -444,6 +444,12 @@ Natural-language assistant with tiered routing: Layer 1 (local parser, 0 credits
 
 Full enforcement guide (catalog rules, deploy steps, format-test, anti-patterns): **`docs/guidelines/ai-chat-feature-coverage.md`**.
 
+**Hard rule — fix bad chat answers test-first.** Every bad AI-chat answer found in Amplitude `ai_chat_feedback` (thumbs-down) or reported by the user MUST be fixed TDD-style: write a **RED test that reproduces the exact bad behaviour first**, confirm it fails, then fix the responsible layer to green. This locks progress and stops the chat from oscillating (a lexicon tweak that fixes one phrase silently re-breaks another). Pick the test type by layer:
+- **Client layer** (Layer 1 parser, routing in `AiChatRepositoryImpl`, ViewModel) → Kotlin unit test in `feature/aichat/impl/src/commonTest`, run `./gradlew :feature:aichat:impl:testAndroidHostTest`.
+- **Cloud Function layer** (Layer 2/3 prompts in `firebase-functions/main.py`, where Gemini output can't be Kotlin-unit-tested) → a **Python API test** that hits the deployed function (register a throwaway user → call the endpoint → assert the answer logic, e.g. "must NOT claim it added items without a tool_call"). Keep these under `firebase-functions/tests/` and run them after each redeploy.
+
+Use the project skill **`/ai-chat-feedback-fixer`** — it encodes this mine-feedback → red-test → fix loop for both layers.
+
 ### AI Analyze (`feature/analyze/`)
 Generates checklist items from various inputs (Photo, PDF, Text, WebLink, Voice) using Gemini AI. Key classes: `GeminiAiAnalyzer`, `AnalyzeViewModel`, `AnalyzeResultPreviewScreen`. API key via `GeminiConfig` injected from app module.
 
