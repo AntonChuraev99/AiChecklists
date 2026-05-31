@@ -9,8 +9,6 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.LocalInten
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.parser.lexicon.ChecklistHintExtractor
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.parser.lexicon.EnIntentLexicon
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.parser.lexicon.RuIntentLexicon
-import com.antonchuraev.homesearchchecklist.feature.checklist.domain.parser.SmartDateParser
-import kotlinx.datetime.TimeZone
 
 /**
  * Layer 1 local intent router.
@@ -27,7 +25,6 @@ import kotlinx.datetime.TimeZone
  * [SmartDateParser] is reused for date extraction in SetReminder intent.
  */
 internal class LocalIntentRouterImpl(
-    private val dateParser: SmartDateParser,
     private val logger: AppLogger,
 ) : LocalIntentRouter {
 
@@ -129,9 +126,11 @@ internal class LocalIntentRouterImpl(
         // CreateChecklist triggers ("создай", "create", "new") would otherwise swallow
         // "создай напоминание" and "create reminder" phrases that belong to SetReminder.
         tryMoveReminders(normalized, lower, locale)?.let { return it }
-        // SetReminder skipped in Layer 1 — date/entity extraction is too complex for local
-        // parsing. Falls through to Layer 2 (classifier) or Layer 3 (full chat) which handle
-        // natural language dates and checklist/item resolution correctly.
+        // SetReminder is detected here only to ESCALATE (see trySetReminder): Layer 1 cannot
+        // resolve natural-language dates, so reminders go to Layer 2 for date extraction.
+        // Running before create/add stops reminder phrases from misfiring into CreateItem
+        // («напомни купить хлеб») or CreateChecklist («создай напоминание»).
+        trySetReminder(normalized, lower, locale)?.let { return it }
         tryCreateChecklist(normalized, lower, locale)?.let { return it }
         tryCreateItem(normalized, lower, locale)?.let { return it }
         tryDeleteItem(normalized, lower, locale)?.let { return it }
@@ -310,18 +309,13 @@ internal class LocalIntentRouterImpl(
         val matched = keywords.sortedByDescending { it.length }
             .firstOrNull { containsAtBoundary(lower, it) } ?: return null
 
-        // Reuse SmartDateParser to check if a date/time is present in the input
-        val dateToken = runCatching {
-            dateParser.parse(normalized, nowMillis(), TimeZone.currentSystemDefault())
-        }.getOrNull()
-
-        val confidence = when {
-            dateToken != null -> CONF_FULL
-            else -> CONF_PARTIAL  // keyword matched but no date found yet
-        }
-
-        logger.debug(TAG, "SetReminder matched='$matched' hasDate=${dateToken != null} conf=$confidence")
-        return IntentClassification(ChatIntent.SetReminder, confidence, RoutingLayer.Local)
+        // Escalate, do NOT build a tool call. Layer 1 cannot resolve natural-language dates
+        // ("завтра в 9", "in 30 minutes") and the ViewModel would otherwise apply a placeholder
+        // time, producing wrong reminders. Returning Unknown routes the phrase to Layer 2
+        // (classify_chat_intent), which extracts the date server-side and returns a properly
+        // dated SetReminder tool call.
+        logger.debug(TAG, "SetReminder keyword '$matched' → escalating to Layer 2 for date parsing")
+        return unknown(normalized)
     }
 
     // ─── CreateItem ───────────────────────────────────────────────────────────
@@ -556,8 +550,4 @@ internal class LocalIntentRouterImpl(
         }
         return result
     }
-
-    /** Returns current epoch millis. Platform-neutral via kotlin.time.Clock (Kotlin 2.1+). */
-    private fun nowMillis(): Long =
-        kotlin.time.Clock.System.now().toEpochMilliseconds()
 }

@@ -562,10 +562,10 @@ class ChatViewModelTest {
         assertEquals(false, state.isSubmittingFeedback)
     }
 
-    // ── 14. OnFeedbackSubmit with blank text → emits hint snackbar, no dismiss ──
+    // ── 14. OnFeedbackSubmit with blank text → submits as a bare thumbs-down signal ──
 
     @Test
-    fun onFeedbackSubmit_blankText_emitsHintSnackbar() = runTest {
+    fun onFeedbackSubmit_blankText_submitsBareSignal() = runTest {
         val vm = makeVm()
         val assistantMsg = ChatMessage(
             id = "asst_2",
@@ -583,10 +583,11 @@ class ChatViewModelTest {
         vm.sendIntent(ChatScreenIntent.OnFeedbackSubmit)
 
         val effect = effectDeferred.await()
+        // Blank feedback is a valid bare thumbs-down signal — it submits, not blocks.
         assertIs<ChatScreenSideEffect.ShowSnackbar>(effect)
-        assertEquals("chat_feedback_blank_hint", effect.messageKey)
-        // Sheet must remain open — target is not cleared
-        assertNotNull(vm.screenState.value.feedbackTarget)
+        assertEquals("chat_feedback_submitted", effect.messageKey)
+        // Sheet closes — target cleared after submit.
+        assertEquals(null, vm.screenState.value.feedbackTarget)
     }
 
     // ── 15. OnFeedbackSubmit with non-blank text → logs, emits submitted snackbar, clears ──

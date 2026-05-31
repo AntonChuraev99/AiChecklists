@@ -38,7 +38,6 @@ import org.koin.dsl.module
 val aiChatFeatureModule = module {
     single<LocalIntentRouter> {
         LocalIntentRouterImpl(
-            dateParser = get(),
             logger = get(),
         )
     }

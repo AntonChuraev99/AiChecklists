@@ -4,8 +4,6 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatIntent
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.RoutingLayer
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.ChatLocale
-import com.antonchuraev.homesearchchecklist.feature.checklist.domain.parser.SmartDateParser
-import com.antonchuraev.homesearchchecklist.feature.checklist.domain.parser.SmartDateParserImpl
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.TimeZone
 import kotlin.test.Test
@@ -35,10 +33,7 @@ class LocalIntentRouterImplTest {
         override fun error(tag: String, message: String, throwable: Throwable?) = Unit
     }
 
-    private val dateParser: SmartDateParser = SmartDateParserImpl(noOpLogger)
-
     private val router = LocalIntentRouterImpl(
-        dateParser = dateParser,
         logger = noOpLogger,
     )
 
@@ -361,50 +356,50 @@ class LocalIntentRouterImplTest {
     @Test
     fun setReminder_ru_withDate() = runTest {
         val result = router.route("напомни мне завтра в 9:00", ChatLocale.Ru)
-        assertIs<ChatIntent.SetReminder>(result.intent)
-        assertTrue(result.confidence >= 0.6f)
+        // Reminders escalate to Layer 2 for date parsing — Layer 1 returns Unknown.
+        assertIs<ChatIntent.Unknown>(result.intent)
     }
 
     @Test
     fun setReminder_ru_basicRemind() = runTest {
         val result = router.route("напомни купить хлеб", ChatLocale.Ru)
-        assertIs<ChatIntent.SetReminder>(result.intent)
-        assertTrue(result.confidence >= 0.6f)
+        // Reminders escalate to Layer 2 for date parsing — Layer 1 returns Unknown.
+        assertIs<ChatIntent.Unknown>(result.intent)
     }
 
     @Test
     fun setReminder_ru_withTomorrow() = runTest {
         val result = router.route("поставь напоминание завтра утром", ChatLocale.Ru)
-        assertIs<ChatIntent.SetReminder>(result.intent)
-        assertTrue(result.confidence >= 0.6f)
+        // Reminders escalate to Layer 2 for date parsing — Layer 1 returns Unknown.
+        assertIs<ChatIntent.Unknown>(result.intent)
     }
 
     @Test
     fun setReminder_ru_createReminder() = runTest {
         val result = router.route("создай напоминание на покупки", ChatLocale.Ru)
-        assertIs<ChatIntent.SetReminder>(result.intent)
-        assertTrue(result.confidence >= 0.6f)
+        // Reminders escalate to Layer 2 for date parsing — Layer 1 returns Unknown.
+        assertIs<ChatIntent.Unknown>(result.intent)
     }
 
     @Test
     fun setReminder_ru_remind() = runTest {
         val result = router.route("напомни о встрече через 2 часа", ChatLocale.Ru)
-        assertIs<ChatIntent.SetReminder>(result.intent)
-        assertTrue(result.confidence >= 0.6f)
+        // Reminders escalate to Layer 2 for date parsing — Layer 1 returns Unknown.
+        assertIs<ChatIntent.Unknown>(result.intent)
     }
 
     @Test
     fun setReminder_ru_remindNoDate() = runTest {
         val result = router.route("напоминание про молоко", ChatLocale.Ru)
-        assertIs<ChatIntent.SetReminder>(result.intent)
-        assertTrue(result.confidence >= 0.6f)
+        // Reminders escalate to Layer 2 for date parsing — Layer 1 returns Unknown.
+        assertIs<ChatIntent.Unknown>(result.intent)
     }
 
     @Test
     fun setReminder_ru_remindEvening() = runTest {
         val result = router.route("напомни мне вечером позвонить маме", ChatLocale.Ru)
-        assertIs<ChatIntent.SetReminder>(result.intent)
-        assertTrue(result.confidence >= 0.6f)
+        // Reminders escalate to Layer 2 for date parsing — Layer 1 returns Unknown.
+        assertIs<ChatIntent.Unknown>(result.intent)
     }
 
     // ─── SetReminder — EN ────────────────────────────────────────────────────
@@ -412,50 +407,50 @@ class LocalIntentRouterImplTest {
     @Test
     fun setReminder_en_remindTomorrow() = runTest {
         val result = router.route("remind me tomorrow at 9am", ChatLocale.En)
-        assertIs<ChatIntent.SetReminder>(result.intent)
-        assertTrue(result.confidence >= 0.6f)
+        // Reminders escalate to Layer 2 for date parsing — Layer 1 returns Unknown.
+        assertIs<ChatIntent.Unknown>(result.intent)
     }
 
     @Test
     fun setReminder_en_setReminder() = runTest {
         val result = router.route("set a reminder for the meeting", ChatLocale.En)
-        assertIs<ChatIntent.SetReminder>(result.intent)
-        assertTrue(result.confidence >= 0.6f)
+        // Reminders escalate to Layer 2 for date parsing — Layer 1 returns Unknown.
+        assertIs<ChatIntent.Unknown>(result.intent)
     }
 
     @Test
     fun setReminder_en_remind() = runTest {
         val result = router.route("remind me to buy milk", ChatLocale.En)
-        assertIs<ChatIntent.SetReminder>(result.intent)
-        assertTrue(result.confidence >= 0.6f)
+        // Reminders escalate to Layer 2 for date parsing — Layer 1 returns Unknown.
+        assertIs<ChatIntent.Unknown>(result.intent)
     }
 
     @Test
     fun setReminder_en_alert() = runTest {
         val result = router.route("alert me in 30 minutes", ChatLocale.En)
-        assertIs<ChatIntent.SetReminder>(result.intent)
-        assertTrue(result.confidence >= 0.6f)
+        // Reminders escalate to Layer 2 for date parsing — Layer 1 returns Unknown.
+        assertIs<ChatIntent.Unknown>(result.intent)
     }
 
     @Test
     fun setReminder_en_notify() = runTest {
         val result = router.route("notify me tomorrow morning", ChatLocale.En)
-        assertIs<ChatIntent.SetReminder>(result.intent)
-        assertTrue(result.confidence >= 0.6f)
+        // Reminders escalate to Layer 2 for date parsing — Layer 1 returns Unknown.
+        assertIs<ChatIntent.Unknown>(result.intent)
     }
 
     @Test
     fun setReminder_en_createReminder() = runTest {
         val result = router.route("create reminder for dentist", ChatLocale.En)
-        assertIs<ChatIntent.SetReminder>(result.intent)
-        assertTrue(result.confidence >= 0.6f)
+        // Reminders escalate to Layer 2 for date parsing — Layer 1 returns Unknown.
+        assertIs<ChatIntent.Unknown>(result.intent)
     }
 
     @Test
     fun setReminder_en_reminderKeyword() = runTest {
         val result = router.route("reminder for meeting on monday", ChatLocale.En)
-        assertIs<ChatIntent.SetReminder>(result.intent)
-        assertTrue(result.confidence >= 0.6f)
+        // Reminders escalate to Layer 2 for date parsing — Layer 1 returns Unknown.
+        assertIs<ChatIntent.Unknown>(result.intent)
     }
 
     // ─── FindItems — RU ──────────────────────────────────────────────────────
