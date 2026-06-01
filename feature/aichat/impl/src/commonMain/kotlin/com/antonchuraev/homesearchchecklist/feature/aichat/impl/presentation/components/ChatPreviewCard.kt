@@ -221,4 +221,8 @@ private fun ToolCall.iconAndHeader(): Pair<ImageVector, StringResource> = when (
     is ToolCall.FindItemsQuery -> Icons.Outlined.Add to Res.string.chat_preview_will_create_one
     is ToolCall.CreateChecklistFromAttachment -> Icons.AutoMirrored.Outlined.List to Res.string.chat_preview_will_create_from_attachment
     is ToolCall.AttachToItem -> Icons.Outlined.Add to Res.string.chat_preview_will_attach_to_item
+    // Agent-only variants: treated like AddItem/List operations for any accidental preview
+    is ToolCall.AddItems -> Icons.Outlined.Add to Res.string.chat_preview_will_create_one
+    is ToolCall.ReadChecklist -> Icons.AutoMirrored.Outlined.List to Res.string.chat_preview_will_create_checklist
+    is ToolCall.RenameChecklist -> Icons.AutoMirrored.Outlined.List to Res.string.chat_preview_will_create_checklist
 }

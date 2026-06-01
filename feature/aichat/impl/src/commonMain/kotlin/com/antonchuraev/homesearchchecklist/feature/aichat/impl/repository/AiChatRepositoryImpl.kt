@@ -2,13 +2,19 @@ package com.antonchuraev.homesearchchecklist.feature.aichat.impl.repository
 
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AiChatPreferencesRepository
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDefaults
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigKeys
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AgentTranscriptEntry
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatIntent
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.IntentClassification
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.RoutingLayer
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.ChatLocale
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.LocalIntentRouter
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AgentStepResult
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AiChatRepository
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatAgentApiService
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatClassifierApiService
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatCompletionApiService
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChecklistContext
@@ -43,6 +49,8 @@ internal class AiChatRepositoryImpl(
     private val classifierApi: ChatClassifierApiService,
     private val completionApi: ChatCompletionApiService,
     private val transcribeApi: TranscribeAudioApiService,
+    private val chatAgentApi: ChatAgentApiService,
+    private val remoteConfig: RemoteConfigProvider,
     private val userDataRepository: UserDataRepository,
     private val aiChatPreferencesRepository: AiChatPreferencesRepository,
     private val logger: AppLogger,
@@ -217,6 +225,31 @@ internal class AiChatRepositoryImpl(
                 )
             }
         }
+    }
+
+    override fun isAgenticChatEnabled(): Boolean =
+        remoteConfig.getBoolean(
+            RemoteConfigKeys.AI_CHAT_AGENTIC_ENABLED,
+            RemoteConfigDefaults.AI_CHAT_AGENTIC_ENABLED,
+        )
+
+    override suspend fun agentStep(
+        transcript: List<AgentTranscriptEntry>,
+        locale: ChatLocale,
+        checklistsSummary: List<ChecklistContext>,
+    ): AgentStepResult {
+        val userId = userDataRepository.getUserData().userId
+        if (userId.isBlank()) {
+            logger.warning(TAG, "agentStep skipped: userId blank (user not registered yet)")
+            return AgentStepResult.ServiceError
+        }
+        logger.debug(TAG, "agentStep: transcript=${transcript.size} entries locale=$locale checklists=${checklistsSummary.size}")
+        return chatAgentApi.step(
+            userId = userId,
+            transcript = transcript,
+            locale = locale,
+            checklistsSummary = checklistsSummary,
+        )
     }
 
     override suspend fun completeFreeForm(

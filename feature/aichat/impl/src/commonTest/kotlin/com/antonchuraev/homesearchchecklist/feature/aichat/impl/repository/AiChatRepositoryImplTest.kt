@@ -10,6 +10,10 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Rout
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ToolCall
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.ChatLocale
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.LocalIntentRouter
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AgentTranscriptEntry
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AgentStepResult
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatAgentApiService
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatClassifierApiService
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatCompletionApiService
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChecklistContext
@@ -117,6 +121,22 @@ private class FakeUserDataRepository(
     override suspend fun getFirstLaunchAtMillis() = 0L
 }
 
+private class FakeChatAgentApiService : ChatAgentApiService {
+    override suspend fun step(
+        userId: String,
+        transcript: List<AgentTranscriptEntry>,
+        locale: ChatLocale,
+        checklistsSummary: List<ChecklistContext>,
+    ): AgentStepResult = AgentStepResult.ServiceError
+}
+
+private class FakeRemoteConfigProvider : RemoteConfigProvider {
+    override suspend fun fetchAndActivate(): Boolean = true
+    override fun getBoolean(key: String, defaultValue: Boolean): Boolean = defaultValue
+    override fun getString(key: String, defaultValue: String): String = defaultValue
+    override fun getLong(key: String, defaultValue: Long): Long = defaultValue
+}
+
 private object NoOpLogger : AppLogger {
     override fun debug(tag: String, message: String) = Unit
     override fun info(tag: String, message: String) = Unit
@@ -160,6 +180,8 @@ private fun makeRepo(
         classifierApi = classifier,
         completionApi = FakeChatCompletionApiService(completionResult),
         transcribeApi = FakeTranscribeAudioApiService(),
+        chatAgentApi = FakeChatAgentApiService(),
+        remoteConfig = FakeRemoteConfigProvider(),
         userDataRepository = FakeUserDataRepository(userId),
         aiChatPreferencesRepository = FakeAiChatPreferencesRepository(deepThinking),
         logger = NoOpLogger,
@@ -183,6 +205,8 @@ private fun makeRepoWithCompletion(
         classifierApi = FakeChatClassifierApiService(RemoteClassificationResult.ServiceError),
         completionApi = completion,
         transcribeApi = FakeTranscribeAudioApiService(),
+        chatAgentApi = FakeChatAgentApiService(),
+        remoteConfig = FakeRemoteConfigProvider(),
         userDataRepository = FakeUserDataRepository(userId),
         aiChatPreferencesRepository = FakeAiChatPreferencesRepository(),
         logger = NoOpLogger,
@@ -306,6 +330,8 @@ class AiChatRepositoryImplTest {
             completionApi = FakeChatCompletionApiService(),
             transcribeApi = FakeTranscribeAudioApiService(),
             userDataRepository = FakeUserDataRepository(userId = ""),
+            chatAgentApi = FakeChatAgentApiService(),
+            remoteConfig = FakeRemoteConfigProvider(),
             aiChatPreferencesRepository = FakeAiChatPreferencesRepository(),
             logger = NoOpLogger,
         )
@@ -368,6 +394,8 @@ class AiChatRepositoryImplTest {
             completionApi = completionApi,
             transcribeApi = FakeTranscribeAudioApiService(),
             userDataRepository = FakeUserDataRepository("user-xyz"),
+            chatAgentApi = FakeChatAgentApiService(),
+            remoteConfig = FakeRemoteConfigProvider(),
             aiChatPreferencesRepository = FakeAiChatPreferencesRepository(),
             logger = NoOpLogger,
         )
@@ -395,6 +423,8 @@ class AiChatRepositoryImplTest {
             completionApi = completionApi,
             transcribeApi = FakeTranscribeAudioApiService(),
             userDataRepository = FakeUserDataRepository(userId = ""),
+            chatAgentApi = FakeChatAgentApiService(),
+            remoteConfig = FakeRemoteConfigProvider(),
             aiChatPreferencesRepository = FakeAiChatPreferencesRepository(),
             logger = NoOpLogger,
         )
@@ -420,6 +450,8 @@ class AiChatRepositoryImplTest {
             completionApi = completionApi,
             transcribeApi = FakeTranscribeAudioApiService(),
             userDataRepository = FakeUserDataRepository("user-abc"),
+            chatAgentApi = FakeChatAgentApiService(),
+            remoteConfig = FakeRemoteConfigProvider(),
             aiChatPreferencesRepository = FakeAiChatPreferencesRepository(),
             logger = NoOpLogger,
         )
@@ -448,6 +480,8 @@ class AiChatRepositoryImplTest {
             completionApi = FakeChatCompletionApiService(),
             transcribeApi = FakeTranscribeAudioApiService(),
             userDataRepository = FakeUserDataRepository("user-deep"),
+            chatAgentApi = FakeChatAgentApiService(),
+            remoteConfig = FakeRemoteConfigProvider(),
             aiChatPreferencesRepository = FakeAiChatPreferencesRepository(initial = true),
             logger = NoOpLogger,
         )
@@ -598,6 +632,8 @@ class AiChatRepositoryImplTest {
             completionApi = FakeChatCompletionApiService(),
             transcribeApi = FakeTranscribeAudioApiService(),
             userDataRepository = FakeUserDataRepository("user-deep"),
+            chatAgentApi = FakeChatAgentApiService(),
+            remoteConfig = FakeRemoteConfigProvider(),
             aiChatPreferencesRepository = FakeAiChatPreferencesRepository(initial = true),
             logger = NoOpLogger,
         )

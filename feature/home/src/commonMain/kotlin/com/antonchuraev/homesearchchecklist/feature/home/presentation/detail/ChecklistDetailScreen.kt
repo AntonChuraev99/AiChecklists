@@ -146,6 +146,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonSecondary
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonText
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.AppGradientButton
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.ChecklistDetailBottomBar
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppItemMetaChip
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppTextField
@@ -194,6 +196,12 @@ import org.koin.core.parameter.parametersOf
 fun ChecklistDetailScreen(
     checklistId: Long,
     focusItemId: String? = null,
+    /**
+     * Opens the AI-chat sheet pre-anchored to this checklist.
+     * Called with (checklistId, checklistName) so App.kt can display the context label.
+     * Wired by App.kt.
+     */
+    onOpenChatSheet: ((Long, String) -> Unit)? = null,
     viewModel: ChecklistDetailViewModel = koinViewModel(key = "checklist_detail_$checklistId") { parametersOf(checklistId) }
 ) {
     val analyticsTracker: AnalyticsTracker = koinInject()
@@ -215,6 +223,9 @@ fun ChecklistDetailScreen(
             state = currentState,
             onIntent = viewModel::sendIntent,
             focusItemId = focusItemId,
+            onOpenChatSheet = onOpenChatSheet?.let { cb ->
+                { cb(currentState.checklist.id, currentState.checklist.name) }
+            },
         )
     }
 }
@@ -255,6 +266,7 @@ private fun ChecklistDetailContent(
     state: ChecklistDetailState.Content,
     onIntent: (ChecklistDetailIntent) -> Unit,
     focusItemId: String? = null,
+    onOpenChatSheet: (() -> Unit)? = null,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val smartAddHintActive = remember { mutableStateOf(false) }
@@ -536,31 +548,48 @@ private fun ChecklistDetailContent(
         bottomBar = {
             // Hide bottom bar in edit mode
             if (!isEditMode) {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shadowElevation = 8.dp,
-                    color = MaterialTheme.colorScheme.surface
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
-                            .padding(top = AppDimens.SpacingMd, bottom = AppDimens.SpacingLg)
-                            .navigationBarsPadding(),
-                        verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
+                // When onOpenChatSheet is wired (App.kt context), show the new
+                // ChecklistDetailBottomBar (dock + 50/50 fill buttons).
+                // Fallback to the previous two-button layout when not wired.
+                if (onOpenChatSheet != null) {
+                    ChecklistDetailBottomBar(
+                        checklistName = state.checklist.name,
+                        onChatClick = onOpenChatSheet,
+                        onMicClick = onOpenChatSheet, // same sheet, mic activates on open
+                        onFillManuallyClick = { onIntent(ChecklistDetailIntent.OnAddFillClick) },
+                        onFillWithAiClick = { onIntent(ChecklistDetailIntent.OnAddFillViaAiClick) },
+                        chatPlaceholder = stringResource(Res.string.main_ask_gisti_placeholder),
+                        fillManuallyLabel = stringResource(Res.string.checklist_new_fill),
+                        fillWithAiLabel = stringResource(Res.string.checklist_add_fill_ai),
+                        micContentDescription = stringResource(Res.string.main_ask_gisti_mic),
+                        modifier = Modifier.navigationBarsPadding(),
+                    )
+                } else {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shadowElevation = 8.dp,
+                        color = MaterialTheme.colorScheme.surface
                     ) {
-                        AppButtonSecondary(
-                            text = stringResource(Res.string.checklist_new_fill),
-                            onClick = { onIntent(ChecklistDetailIntent.OnAddFillClick) },
-                            icon = Icons.Outlined.ContentCopy,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        AppButton(
-                            text = stringResource(Res.string.checklist_add_fill_ai),
-                            onClick = { onIntent(ChecklistDetailIntent.OnAddFillViaAiClick) },
-                            icon = Icons.Outlined.AutoAwesome,
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
+                                .padding(top = AppDimens.SpacingMd, bottom = AppDimens.SpacingLg)
+                                .navigationBarsPadding(),
+                            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
+                        ) {
+                            AppButtonSecondary(
+                                text = stringResource(Res.string.checklist_new_fill),
+                                onClick = { onIntent(ChecklistDetailIntent.OnAddFillClick) },
+                                icon = Icons.Outlined.ContentCopy,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            AppGradientButton(
+                                text = stringResource(Res.string.checklist_add_fill_ai),
+                                onClick = { onIntent(ChecklistDetailIntent.OnAddFillViaAiClick) },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                     }
                 }
             }

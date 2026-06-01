@@ -112,6 +112,7 @@
     <string name="main_empty_description">Create your first checklist or let AI build one from any text, photo, or document.</string>
     <string name="main_create_checklist">Create Checklist</string>
     <string name="main_create_checklist_locked">Become Premium to Unlock More</string>
+    <string name="main_create_checklist_action">New checklist</string>
     <string name="main_ai_analysis">AI Analysis</string>
     <string name="main_no_items">Empty</string>
     <string name="main_my_lists">My lists</string>
@@ -120,6 +121,7 @@
     <string name="main_prompt_photo">Photo → list</string>
     <string name="main_prompt_add">Add tasks</string>
     <string name="main_prompt_remind">Remind me…</string>
+    <string name="main_prompt_new_list">New list</string>
     <string name="main_free_lists_used">%1$d of %2$d free lists used</string>
     <string name="main_menu">Menu</string>
     <string name="main_menu_support">Support</string>
@@ -1066,6 +1068,9 @@
     <string name="chat_dispatch_created_from_attachment">Created «%1$s» with %2$s items.</string>
     <string name="chat_dispatch_attached_one">«%1$s» attached to «%2$s» in %3$s.</string>
     <string name="chat_dispatch_attached_many">%1$s files attached to «%2$s» in %3$s.</string>
+    <string name="chat_dispatch_added_many_to">Added %1$s items to %2$s.</string>
+    <string name="chat_dispatch_renamed">Renamed «%1$s» to «%2$s».</string>
+    <string name="chat_dispatch_add_empty">No items to add.</string>
     <!-- Phase 3 UI strings: attachment + voice input -->
     <string name="chat_attach_file_action">Attach file</string>
     <string name="chat_record_voice">Record voice message</string>
@@ -1118,4 +1123,23 @@
     <string name="google_sign_in_success">Signed in successfully</string>
     <string name="google_sign_in_failed">Sign-in failed. Please try again.</string>
     <string name="google_sign_in_required">Sign in with Google to use AI features</string>
+
+    <!-- Agent plan-card (Phase 2d: agentic loop) -->
+    <string name="chat_agent_plan_header">Apply these actions?</string>
+    <string name="chat_agent_plan_apply">Apply all</string>
+    <string name="chat_agent_round_limit">I completed several steps but hit the per-request limit. Tell me what else you need.</string>
+
+    <!-- Chat dock / expandable sheet (App-level sheet host) -->
+    <string name="chat_dock_ask_about">Ask about &#8220;%1$s&#8221;…</string>
+    <string name="chat_sheet_open_full">Open full chat screen</string>
+    <string name="chat_sheet_close">Close chat</string>
+    <string name="chat_dock_placeholder">Ask Gisti…</string>
+    <string name="chat_dock_mic_description">Voice input</string>
+
+    <!-- Inline chat panel (replaces modal sheet) -->
+    <string name="chat_panel_open_full">Open full screen</string>
+    <string name="chat_panel_help_description">Chat help</string>
+    <string name="chat_panel_collapse">Collapse chat</string>
+    <string name="chat_panel_greeting">Hi! I\'m Gisti. Ask me anything about your lists.</string>
+    <string name="chat_panel_scrim_description">Tap to close chat</string>
 </resources>

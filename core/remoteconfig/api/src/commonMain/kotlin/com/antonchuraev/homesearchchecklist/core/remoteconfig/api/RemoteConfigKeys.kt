@@ -32,6 +32,11 @@ object RemoteConfigKeys {
     // Default is "monthly" so users in low-tier countries see $1.99 instead of $20/yr.
     // Remotely switchable to "yearly" via Firebase RC for markets where yearly converts better.
     const val PAYWALL_DEFAULT_PLAN = "paywall_default_plan"
+
+    // Agentic chat bridge (Phase 2d): routes FreeForm turns through the stateless
+    // chat_agent Cloud Function instead of the legacy chat_completion path.
+    // Default OFF — flip to true in Firebase RC when the CF is deployed + stable.
+    const val AI_CHAT_AGENTIC_ENABLED = "ai_chat_agentic_enabled"
 }
 
 /**
@@ -71,4 +76,7 @@ object RemoteConfigDefaults {
 
     // Paywall default plan — "monthly" so low-tier markets see affordable price first.
     const val PAYWALL_DEFAULT_PLAN = "monthly"
+
+    // Agentic chat bridge (Phase 2d): default OFF until CF is deployed + stable.
+    const val AI_CHAT_AGENTIC_ENABLED = false
 }

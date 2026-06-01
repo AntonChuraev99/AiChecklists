@@ -92,6 +92,66 @@ gcloud functions deploy refill_premium_credits \
     --memory=256MB \
     --timeout=300s
 
+# ── AI Chat functions (all use GEMINI_API_KEY) ──────────────────────────────
+# NOTE: register_user / link_google_account / get_credits_info are infra
+# functions (no Gemini) deployed separately; not folded in here yet.
+
+# Deploy classify_chat_intent (Layer 2 — cheap classifier)
+echo "Deploying classify_chat_intent..."
+gcloud functions deploy classify_chat_intent \
+    --gen2 \
+    --runtime=python312 \
+    --region=$REGION \
+    --source=. \
+    --entry-point=classify_chat_intent \
+    --trigger-http \
+    --allow-unauthenticated \
+    --set-secrets="GEMINI_API_KEY=gemini-api-key:latest" \
+    --memory=256MB \
+    --timeout=60s
+
+# Deploy chat_completion (Layer 3 — text-only fallback; kept as kill-switch path)
+echo "Deploying chat_completion..."
+gcloud functions deploy chat_completion \
+    --gen2 \
+    --runtime=python312 \
+    --region=$REGION \
+    --source=. \
+    --entry-point=chat_completion \
+    --trigger-http \
+    --allow-unauthenticated \
+    --set-secrets="GEMINI_API_KEY=gemini-api-key:latest" \
+    --memory=512MB \
+    --timeout=60s
+
+# Deploy chat_agent (Layer 3 AGENT — the agentic bridge / next-step oracle)
+echo "Deploying chat_agent..."
+gcloud functions deploy chat_agent \
+    --gen2 \
+    --runtime=python312 \
+    --region=$REGION \
+    --source=. \
+    --entry-point=chat_agent \
+    --trigger-http \
+    --allow-unauthenticated \
+    --set-secrets="GEMINI_API_KEY=gemini-api-key:latest" \
+    --memory=512MB \
+    --timeout=60s
+
+# Deploy transcribe_audio (mic voice input → text)
+echo "Deploying transcribe_audio..."
+gcloud functions deploy transcribe_audio \
+    --gen2 \
+    --runtime=python312 \
+    --region=$REGION \
+    --source=. \
+    --entry-point=transcribe_audio \
+    --trigger-http \
+    --allow-unauthenticated \
+    --set-secrets="GEMINI_API_KEY=gemini-api-key:latest" \
+    --memory=512MB \
+    --timeout=120s
+
 echo ""
 echo "Deployment complete!"
 echo ""
@@ -101,3 +161,7 @@ echo "  generate_checklist: https://$REGION-$PROJECT_ID.cloudfunctions.net/gener
 echo "  restore_credits_after_purchase: https://$REGION-$PROJECT_ID.cloudfunctions.net/restore_credits_after_purchase"
 echo "  get_usage_stats: https://$REGION-$PROJECT_ID.cloudfunctions.net/get_usage_stats"
 echo "  refill_premium_credits: https://$REGION-$PROJECT_ID.cloudfunctions.net/refill_premium_credits"
+echo "  classify_chat_intent: https://$REGION-$PROJECT_ID.cloudfunctions.net/classify_chat_intent"
+echo "  chat_completion: https://$REGION-$PROJECT_ID.cloudfunctions.net/chat_completion"
+echo "  chat_agent: https://$REGION-$PROJECT_ID.cloudfunctions.net/chat_agent"
+echo "  transcribe_audio: https://$REGION-$PROJECT_ID.cloudfunctions.net/transcribe_audio"

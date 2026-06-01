@@ -1,12 +1,15 @@
 package com.antonchuraev.homesearchchecklist.feature.aichat.impl.di
 
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AiChatPreferencesRepository
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.LocalIntentRouter
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AiChatRepository
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatAgentApiService
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatClassifierApiService
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatCompletionApiService
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatHistoryRepository
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.TranscribeAudioApiService
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.data.ChatAgentApiServiceImpl
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.data.ChatClassifierApiServiceImpl
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.data.ChatCompletionApiServiceImpl
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.data.TranscribeAudioApiServiceImpl
@@ -41,6 +44,9 @@ val aiChatFeatureModule = module {
             logger = get(),
         )
     }
+    single<ChatAgentApiService> {
+        ChatAgentApiServiceImpl(logger = get())
+    }
     single<ChatClassifierApiService> {
         ChatClassifierApiServiceImpl(logger = get())
     }
@@ -62,6 +68,8 @@ val aiChatFeatureModule = module {
             classifierApi = get(),
             completionApi = get(),
             transcribeApi = get(),
+            chatAgentApi = get(),
+            remoteConfig = get<RemoteConfigProvider>(),
             userDataRepository = get(),
             aiChatPreferencesRepository = get(),
             logger = get(),

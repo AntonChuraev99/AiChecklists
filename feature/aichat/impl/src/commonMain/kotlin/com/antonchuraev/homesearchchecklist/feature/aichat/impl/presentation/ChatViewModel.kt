@@ -16,14 +16,24 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Rout
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ToolCall
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.locale.ChatLocaleProvider
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.ChatLocale
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AgentToolCall
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AgentToolResult
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AgentTranscriptEntry
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AgentStepResult
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AiChatRepository
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChecklistContext
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatHistoryRepository
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.RemoteCompletionResult
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.TranscriptionOutcome
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.agent.AgentToolCallMapper
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.agent.AgentToolResultSerializer
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.preview.ToolCallPreviewRenderer
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
+import kotlin.concurrent.Volatile
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -70,6 +80,18 @@ class ChatViewModel(
 
     private val _sideEffect = MutableSharedFlow<ChatScreenSideEffect>(extraBufferCapacity = 16)
     val sideEffect: Flow<ChatScreenSideEffect> = _sideEffect.asSharedFlow()
+
+    /**
+     * Pause/resume mechanism for the agent loop plan-card.
+     *
+     * When the agent returns mutating tool calls, [runAgentTurn] sets this to a new
+     * [CompletableDeferred] and suspends on [await()]. The intent handlers for
+     * [ChatScreenIntent.OnAgentPlanApply] and [ChatScreenIntent.OnAgentPlanCancel]
+     * complete it with true/false respectively. The loop resumes after the user decides.
+     * Cleared to null at the start of each new turn so stale completions are ignored.
+     */
+    @Volatile
+    private var _pendingAgentDecision: CompletableDeferred<Boolean>? = null
 
     init {
         // Seed the message list from persisted history so the user sees
@@ -200,6 +222,15 @@ class ChatViewModel(
 
             is ChatScreenIntent.OnAskAiFallback -> handleAskAiFallback(intent.text)
 
+            // ── Agent plan-card intents (Phase 2d) ────────────────────────────
+            ChatScreenIntent.OnAgentPlanApply -> {
+                _pendingAgentDecision?.complete(true)
+            }
+
+            ChatScreenIntent.OnAgentPlanCancel -> {
+                _pendingAgentDecision?.complete(false)
+            }
+
             // ── Attachment intents ────────────────────────────────────────────
 
             is ChatScreenIntent.OnPickAttachment -> {
@@ -276,6 +307,13 @@ class ChatViewModel(
             }
 
             ChatScreenIntent.OnFeedbackSubmit -> handleFeedbackSubmit()
+
+            is ChatScreenIntent.OnSetContextChecklist -> {
+                _screenState.value = _screenState.value.copy(
+                    contextChecklistId = intent.checklistId,
+                )
+                logger.debug(TAG, "context checklist set: ${intent.checklistId}")
+            }
         }
     }
 
@@ -410,7 +448,11 @@ class ChatViewModel(
 
                     // Layer 3 — open-ended conversation, no tool call preview
                     ChatIntent.FreeForm -> {
-                        handleFreeForm(locale)
+                        if (aiChatRepository.isAgenticChatEnabled()) {
+                            runAgentTurn(text, locale)
+                        } else {
+                            handleFreeForm(locale)
+                        }
                     }
 
                     // Read intent — dispatch inline, no preview
@@ -434,7 +476,11 @@ class ChatViewModel(
                             // Escalate to Layer 3 (full chat) which has conversation history and can
                             // understand what the user is referring to from previous messages.
                             logger.info(TAG, "ToolCall null for ${intent::class.simpleName} — escalating to Layer 3")
-                            handleFreeForm(locale)
+                            if (aiChatRepository.isAgenticChatEnabled()) {
+                                runAgentTurn(text, locale)
+                            } else {
+                                handleFreeForm(locale)
+                            }
                             return@runCatching
                         }
                         val humanReadable = previewRenderer.render(toolCall)
@@ -562,7 +608,13 @@ class ChatViewModel(
                         when (val intent = classification.intent) {
                             // FreeForm / Unknown from Layer 2 → escalate to Layer 3
                             ChatIntent.FreeForm,
-                            is ChatIntent.Unknown -> handleFreeForm(locale)
+                            is ChatIntent.Unknown -> {
+                                if (aiChatRepository.isAgenticChatEnabled()) {
+                                    runAgentTurn(preview.originalText, locale)
+                                } else {
+                                    handleFreeForm(locale)
+                                }
+                            }
 
                             // FindItems is a read-intent inline result, no preview card
                             ChatIntent.FindItems -> {
@@ -611,7 +663,11 @@ class ChatViewModel(
                     RoutingLayer.Classifier -> {
                         // Layer 2 → Layer 3 escalation
                         logger.info(TAG, "handlePreviewReject: Classifier source → escalating to Layer3 (completeFreeForm)")
-                        handleFreeForm(locale)
+                        if (aiChatRepository.isAgenticChatEnabled()) {
+                            runAgentTurn(preview.originalText, locale)
+                        } else {
+                            handleFreeForm(locale)
+                        }
                     }
 
                     RoutingLayer.FullChat -> {
@@ -812,6 +868,208 @@ class ChatViewModel(
         emptyList()
     }
 
+    // ─── Agentic loop (Phase 2d) ──────────────────────────────────────────────
+
+    /**
+     * Runs the stateless agent loop for one user turn.
+     *
+     * Algorithm:
+     * 1. Seed [transcript] from recent chat history (same sliding window as [handleFreeForm]):
+     *    user messages → [AgentTranscriptEntry.UserText], assistant → [AgentTranscriptEntry.ModelText].
+     *    The latest user message (already persisted to history from [handleSend]) appears as
+     *    the last [UserText] — no double-add.
+     * 2. Loop up to [AGENT_MAX_ROUNDS] times:
+     *    a. Call [AiChatRepository.agentStep] with current transcript.
+     *    b. On [AgentStepResult.ToolCalls]: split into readOnly / mutating.
+     *       - Read-only (find_items, read_checklist) are dispatched immediately without a plan-card.
+     *       - Mutating calls → build [AgentPlan], show plan-card, suspend until user decides
+     *         ([OnAgentPlanApply] → dispatch; [OnAgentPlanCancel] → declined results).
+     *       - COUNT INVARIANT: allResults.size == calls.size (one result per call, in order).
+     *    c. Append [ModelToolCalls] + [ToolResults] to transcript, increment round, continue.
+     *    d. On [AgentStepResult.Final]: persist assistant message, return.
+     *    e. On error results: show appropriate snackbar/message, return.
+     * 3. If loop exits via round cap: emit fallback assistant message.
+     *
+     * [isProcessing] is true during step()/dispatch; false while the plan-card is interactive.
+     */
+    private suspend fun runAgentTurn(userInput: String, locale: ChatLocale) {
+        // ── 1. Seed transcript from history ──────────────────────────────────
+        val checklistsSummary = buildChecklistsSummary()
+        val historyMessages = _screenState.value.messages
+
+        val seedTranscript: MutableList<AgentTranscriptEntry> = mutableListOf()
+        for (msg in historyMessages) {
+            when (msg.role) {
+                ChatRole.User -> seedTranscript.add(AgentTranscriptEntry.UserText(msg.content))
+                ChatRole.Assistant -> seedTranscript.add(AgentTranscriptEntry.ModelText(msg.content))
+            }
+        }
+        // Ensure the latest user message is the final UserText (it was already added above
+        // from persisted history — if the list is up-to-date it is already there, so no
+        // double-add is needed here; the in-memory messages list reflects the just-sent user msg).
+
+        logger.debug(TAG, "runAgentTurn: seeded ${seedTranscript.size} transcript entries")
+
+        // ── 2. Agent loop ────────────────────────────────────────────────────
+        val transcript = seedTranscript
+        var round = 0
+
+        // Clear any stale deferred from a previous turn.
+        _pendingAgentDecision = null
+
+        while (round < AGENT_MAX_ROUNDS) {
+            _screenState.value = _screenState.value.copy(isProcessing = true)
+
+            val stepResult = aiChatRepository.agentStep(
+                transcript = transcript,
+                locale = locale,
+                checklistsSummary = checklistsSummary,
+            )
+
+            when (stepResult) {
+                is AgentStepResult.ToolCalls -> {
+                    val calls = stepResult.calls
+                    // Optimistic credit update from server response.
+                    _screenState.value = _screenState.value.copy(
+                        creditBalance = stepResult.creditsRemaining,
+                    )
+
+                    // Partition into read-only (no confirmation needed) and mutating (plan-card).
+                    val readOnlyNames = setOf("find_items", "read_checklist")
+                    val readOnlyCalls = calls.filter { it.name in readOnlyNames }
+                    val mutatingCalls = calls.filter { it.name !in readOnlyNames }
+
+                    // Dispatch read-only calls immediately, no plan-card.
+                    val readOnlyResults = mutableListOf<AgentToolResult>()
+                    for (call in readOnlyCalls) {
+                        val toolCall = AgentToolCallMapper.map(call)
+                        val resultJson = if (toolCall == null) {
+                            logger.warning(TAG, "runAgentTurn: unmappable read-only call '${call.name}' — sending error result")
+                            buildJsonObjectError("unknown_tool", call.name)
+                        } else {
+                            val outcome = toolCallDispatcher.dispatch(toolCall)
+                            AgentToolResultSerializer.serialize(outcome)
+                        }
+                        readOnlyResults.add(AgentToolResult(call.id, call.name, resultJson))
+                    }
+
+                    // Dispatch mutating calls — show plan-card if any.
+                    val mutatingResults = mutableListOf<AgentToolResult>()
+                    if (mutatingCalls.isNotEmpty()) {
+                        // Build plan items for the card.
+                        val planItems = mutatingCalls.map { call ->
+                            val toolCall = AgentToolCallMapper.map(call)
+                            val text = if (toolCall != null) previewRenderer.render(toolCall) else call.name
+                            AgentPlanItem(text = text, isDestructive = call.name == "delete_item")
+                        }
+                        val plan = AgentPlan(items = planItems)
+
+                        // Suspend the loop — show plan-card, wait for user.
+                        val decision = CompletableDeferred<Boolean>()
+                        _pendingAgentDecision = decision
+                        _screenState.value = _screenState.value.copy(
+                            isProcessing = false,
+                            pendingAgentPlan = plan,
+                        )
+
+                        val approved = decision.await()
+
+                        // Clear plan-card and resume processing.
+                        _pendingAgentDecision = null
+                        _screenState.value = _screenState.value.copy(
+                            pendingAgentPlan = null,
+                            isProcessing = true,
+                        )
+
+                        for (call in mutatingCalls) {
+                            val resultJson = if (!approved) {
+                                AgentToolResultSerializer.declinedResult()
+                            } else {
+                                val toolCall = AgentToolCallMapper.map(call)
+                                if (toolCall == null) {
+                                    logger.warning(TAG, "runAgentTurn: unmappable mutating call '${call.name}' — sending error result")
+                                    buildJsonObjectError("unknown_tool", call.name)
+                                } else {
+                                    val outcome = toolCallDispatcher.dispatch(toolCall)
+                                    AgentToolResultSerializer.serialize(outcome)
+                                }
+                            }
+                            mutatingResults.add(AgentToolResult(call.id, call.name, resultJson))
+                        }
+                    }
+
+                    // ── COUNT INVARIANT: assemble results in the same order as calls ──
+                    // Build a map by call.id so the merge is order-preserving regardless
+                    // of how readOnly / mutating were partitioned.
+                    val resultById = (readOnlyResults + mutatingResults)
+                        .associateBy { it.id }
+                    val allResults = calls.map { call ->
+                        resultById[call.id] ?: AgentToolResult(
+                            id = call.id,
+                            name = call.name,
+                            result = buildJsonObjectError("missing_result", call.name),
+                        )
+                    }
+                    check(allResults.size == calls.size) {
+                        "COUNT INVARIANT violated: calls=${calls.size} results=${allResults.size}"
+                    }
+
+                    // Extend transcript and continue.
+                    transcript.add(AgentTranscriptEntry.ModelToolCalls(calls))
+                    transcript.add(AgentTranscriptEntry.ToolResults(allResults))
+                    round++
+                }
+
+                is AgentStepResult.Final -> {
+                    // Persist the optimistic credit balance.
+                    _screenState.value = _screenState.value.copy(
+                        creditBalance = stepResult.creditsRemaining,
+                        isProcessing = false,
+                    )
+                    runCatching {
+                        val currentUserData = userDataRepository.getUserData()
+                        userDataRepository.update(currentUserData.copy(aiCredits = stepResult.creditsRemaining))
+                    }.onFailure { e ->
+                        logger.error(TAG, "runAgentTurn: failed to persist credit balance — ${e.message}", e)
+                    }
+                    addAndPersistAssistantMessage(
+                        content = stepResult.content,
+                        routedLayer = RoutingLayer.FullChat,
+                        costCredits = 3,
+                    )
+                    return
+                }
+
+                AgentStepResult.InsufficientCredits -> {
+                    logger.info(TAG, "runAgentTurn: InsufficientCredits")
+                    _screenState.value = _screenState.value.copy(isProcessing = false)
+                    _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_insufficient_credits"))
+                    return
+                }
+
+                AgentStepResult.NetworkError,
+                AgentStepResult.ServiceError -> {
+                    logger.warning(TAG, "runAgentTurn: ${stepResult::class.simpleName}")
+                    _screenState.value = _screenState.value.copy(isProcessing = false)
+                    _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_completion_error"))
+                    return
+                }
+            }
+        }
+
+        // Round cap reached — emit fallback message.
+        logger.warning(TAG, "runAgentTurn: hit round cap ($AGENT_MAX_ROUNDS rounds) without Final")
+        _screenState.value = _screenState.value.copy(isProcessing = false)
+        _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_agent_round_limit"))
+    }
+
+    /** Builds a minimal error JsonObject for tool results that couldn't be executed. */
+    private fun buildJsonObjectError(status: String, detail: String): kotlinx.serialization.json.JsonObject =
+        kotlinx.serialization.json.buildJsonObject {
+            put("status", status)
+            put("detail", detail)
+        }
+
     /**
      * Adds an assistant message to [_screenState] and persists it to [chatHistoryRepository].
      * Used for Layer 3 completions where the content is known at call time.
@@ -855,6 +1113,12 @@ class ChatViewModel(
             is ToolCall.AttachToItem -> original.copy(itemText = trimmed)
             // CreateChecklistFromAttachment has no user-editable text field
             is ToolCall.CreateChecklistFromAttachment -> original
+            // Agent-only: AddItems has no single editable text field in Layer-1 preview
+            is ToolCall.AddItems -> original
+            // Agent-only: RenameChecklist — no Layer-1 preview editing path
+            is ToolCall.RenameChecklist -> original
+            // Agent-only: ReadChecklist — read-only, no preview card
+            is ToolCall.ReadChecklist -> original
         }
     }
 
@@ -871,7 +1135,11 @@ class ChatViewModel(
         is ToolCall.CreateChecklist,
         is ToolCall.MoveAllReminders,
         is ToolCall.FindItemsQuery,
-        is ToolCall.CreateChecklistFromAttachment -> null
+        is ToolCall.CreateChecklistFromAttachment,
+        is ToolCall.ReadChecklist -> null
+        // Agent-only: hint present on these variants, surface it for potential preview display
+        is ToolCall.AddItems -> toolCall.checklistHint
+        is ToolCall.RenameChecklist -> toolCall.checklistHint
     }
 
     /**
@@ -886,7 +1154,11 @@ class ChatViewModel(
         is ToolCall.CreateChecklist -> toolCall.name
         is ToolCall.MoveAllReminders,
         is ToolCall.FindItemsQuery,
-        is ToolCall.CreateChecklistFromAttachment -> ""
+        is ToolCall.CreateChecklistFromAttachment,
+        // Agent-only: no single editable item text for these variants
+        is ToolCall.AddItems,
+        is ToolCall.RenameChecklist,
+        is ToolCall.ReadChecklist -> ""
     }
 
     // ─── Outcome handlers ─────────────────────────────────────────────────────
@@ -901,6 +1173,20 @@ class ChatViewModel(
                         linkedChecklistId = outcome.linkedChecklistId,
                     )
                 )
+            }
+            is DispatchOutcome.ChecklistContent -> {
+                // Agent-only read outcome: never emitted via the Layer-1 preview path.
+                // If somehow surfaced inline (e.g. agent loop hands back to handleOutcomeInline),
+                // show a summary line so the user is not left with a blank response.
+                val summary = outcome.items.take(5).joinToString(", ") { it.text }
+                val suffix = if (outcome.items.size > 5) " (+${outcome.items.size - 5} more)" else ""
+                _sideEffect.emit(
+                    ChatScreenSideEffect.ShowAssistantMessage(
+                        messageKey = "chat_generic_error",
+                        args = emptyList(),
+                    )
+                )
+                logger.debug(TAG, "ChecklistContent inline (agent): ${outcome.checklistName} — $summary$suffix")
             }
             is DispatchOutcome.AmbiguousMatch -> {
                 val candidates = outcome.candidates.take(3).joinToString(", ")
@@ -1148,11 +1434,14 @@ class ChatViewModel(
         viewModelScope.launch {
             runCatching {
                 val locale = localeProvider.current()
-                // Temporarily push the fallback text into messages so Layer 3 has
-                // conversation context. It's already in history (persisted from handleSend),
-                // so we only need to make it available for the completeFreeForm call —
-                // the existing _screenState.value.messages list already contains it.
-                handleFreeForm(locale)
+                // Text is already in chat history from handleSend.
+                // If agentic bridge is ON, route through the agent loop.
+                // Otherwise use the existing completeFreeForm (Layer 3) path.
+                if (aiChatRepository.isAgenticChatEnabled()) {
+                    runAgentTurn(text, locale)
+                } else {
+                    handleFreeForm(locale)
+                }
             }.onFailure { e ->
                 logger.error(TAG, "handleAskAiFallback failed", e)
                 _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_generic_error"))
@@ -1189,5 +1478,15 @@ class ChatViewModel(
         const val MAX_ATTACHMENTS_FREE = 3
         /** Premium users: generous cap to prevent accidental runaway picks. */
         const val MAX_ATTACHMENTS_PREMIUM = 20
+        /**
+         * Maximum agent rounds per user turn.
+         *
+         * After 5 ToolCalls rounds without a Final, the loop emits a fallback message
+         * and returns so the user can steer the conversation. This caps credits at
+         * 5 × 3 = 15 credits per turn (first round costs 3; subsequent rounds cost 0
+         * because the transcript already has tool turns — the CF only charges on the
+         * first round without a tool turn).
+         */
+        const val AGENT_MAX_ROUNDS = 5
     }
 }

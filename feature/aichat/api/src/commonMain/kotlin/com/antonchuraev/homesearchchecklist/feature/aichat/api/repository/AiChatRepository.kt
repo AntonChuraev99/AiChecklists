@@ -1,5 +1,6 @@
 package com.antonchuraev.homesearchchecklist.feature.aichat.api.repository
 
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AgentTranscriptEntry
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.IntentClassification
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.ChatLocale
@@ -47,6 +48,28 @@ interface AiChatRepository {
         locale: ChatLocale,
         checklistsSummary: List<ChecklistContext>,
     ): RemoteCompletionResult
+
+    /**
+     * Returns true when the agentic chat bridge (chat_agent CF) is enabled via Remote Config.
+     * Default is false — feature is OFF until the CF is deployed and verified stable.
+     */
+    fun isAgenticChatEnabled(): Boolean
+
+    /**
+     * One round of the stateless agent loop. Delegates to the `chat_agent` Cloud Function.
+     *
+     * The caller is responsible for building and extending the [transcript] between rounds.
+     * [checklistsSummary] provides checklist context so the agent can reason over list names
+     * without carrying item text (privacy by design — same pattern as [completeFreeForm]).
+     *
+     * Returns [AgentStepResult] — caller decides whether to continue the loop
+     * ([AgentStepResult.ToolCalls]) or stop ([AgentStepResult.Final] / errors).
+     */
+    suspend fun agentStep(
+        transcript: List<AgentTranscriptEntry>,
+        locale: ChatLocale,
+        checklistsSummary: List<ChecklistContext>,
+    ): AgentStepResult
 
     /**
      * Transcribes a voice recording to text via the `transcribe_audio` Cloud Function.

@@ -112,6 +112,7 @@
     <string name="main_empty_description">Создайте первый чек-лист или позвольте ИИ составить его из текста, фото или документа.</string>
     <string name="main_create_checklist">Создать чек-лист</string>
     <string name="main_create_checklist_locked">Откройте больше с Премиум</string>
+    <string name="main_create_checklist_action">Новый чеклист</string>
     <string name="main_ai_analysis">ИИ-анализ</string>
     <string name="main_no_items">Пусто</string>
     <string name="main_my_lists">Мои списки</string>
@@ -120,6 +121,7 @@
     <string name="main_prompt_photo">Фото → список</string>
     <string name="main_prompt_add">Добавить задачи</string>
     <string name="main_prompt_remind">Напомнить…</string>
+    <string name="main_prompt_new_list">Новый список</string>
     <string name="main_free_lists_used">%1$d из %2$d бесплатных списков</string>
     <string name="main_menu">Меню</string>
     <string name="main_menu_support">Поддержка</string>
@@ -1035,6 +1037,9 @@
     <string name="chat_dispatch_created_from_attachment">Создан чек-лист «%1$s» с %2$s пунктами.</string>
     <string name="chat_dispatch_attached_one">«%1$s» прикреплён к «%2$s» в %3$s.</string>
     <string name="chat_dispatch_attached_many">%1$s файлов прикреплено к «%2$s» в %3$s.</string>
+    <string name="chat_dispatch_added_many_to">Добавил %1$s пунктов в «%2$s».</string>
+    <string name="chat_dispatch_renamed">Переименовал «%1$s» в «%2$s».</string>
+    <string name="chat_dispatch_add_empty">Нечего добавлять.</string>
     <!-- Phase 3 UI strings: attachment + voice input -->
     <string name="chat_attach_file_action">Прикрепить файл</string>
     <string name="chat_record_voice">Записать голосовое сообщение</string>
@@ -1087,4 +1092,23 @@
     <string name="google_sign_in_success">Вход выполнен</string>
     <string name="google_sign_in_failed">Не удалось войти. Попробуйте снова.</string>
     <string name="google_sign_in_required">Войдите через Google для использования AI</string>
+
+    <!-- Agent plan-card (Phase 2d: agentic loop) -->
+    <string name="chat_agent_plan_header">Выполнить эти действия?</string>
+    <string name="chat_agent_plan_apply">Выполнить все</string>
+    <string name="chat_agent_round_limit">Я выполнил несколько шагов, но достиг лимита за один запрос. Напишите, что ещё нужно сделать.</string>
+
+    <!-- Chat dock / expandable sheet (App-level sheet host) -->
+    <string name="chat_dock_ask_about">Спросить про &#171;%1$s&#187;…</string>
+    <string name="chat_sheet_open_full">Открыть чат полностью</string>
+    <string name="chat_sheet_close">Закрыть чат</string>
+    <string name="chat_dock_placeholder">Спросить Gisti…</string>
+    <string name="chat_dock_mic_description">Голосовой ввод</string>
+
+    <!-- Inline chat panel (replaces modal sheet) -->
+    <string name="chat_panel_open_full">На весь экран</string>
+    <string name="chat_panel_help_description">Помощь по чату</string>
+    <string name="chat_panel_collapse">Свернуть чат</string>
+    <string name="chat_panel_greeting">Привет! Я Gisti. Спроси меня что угодно о своих списках.</string>
+    <string name="chat_panel_scrim_description">Нажмите, чтобы закрыть чат</string>
 </resources>

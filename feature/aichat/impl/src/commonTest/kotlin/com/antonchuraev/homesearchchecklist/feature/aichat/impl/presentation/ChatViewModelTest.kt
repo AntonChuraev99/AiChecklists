@@ -11,11 +11,16 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Tool
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.locale.ChatLocaleProvider
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.ChatLocale
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AgentToolCall
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AgentTranscriptEntry
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AgentStepResult
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AiChatRepository
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatHistoryRepository
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChecklistContext
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.RemoteCompletionResult
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.TranscriptionOutcome
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.preview.ToolCallPreviewRenderer
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
@@ -57,12 +62,31 @@ private class FakeAiChatRepository(
     private val skipLayer1Result: IntentClassification? = null,
     private val completionResult: RemoteCompletionResult = RemoteCompletionResult.ServiceError,
     private val transcribeResult: TranscriptionOutcome = TranscriptionOutcome.ServiceError,
+    /** When non-null overrides [isAgenticChatEnabled] to return true. */
+    private val agenticEnabled: Boolean = false,
+    /** Scripted step results consumed in order; last result is repeated when exhausted. */
+    private val agentStepResults: List<AgentStepResult> = emptyList(),
 ) : AiChatRepository {
     var classifyCallCount = 0
     var lastSkipLayer1: Boolean = false
     var completeFreeFormCallCount = 0
     var transcribeCallCount = 0
     var lastTranscribePath: String? = null
+    var agentStepCallCount = 0
+    val agentStepTranscripts = mutableListOf<List<AgentTranscriptEntry>>()
+
+    override fun isAgenticChatEnabled(): Boolean = agenticEnabled
+
+    override suspend fun agentStep(
+        transcript: List<AgentTranscriptEntry>,
+        locale: ChatLocale,
+        checklistsSummary: List<ChecklistContext>,
+    ): AgentStepResult {
+        agentStepCallCount++
+        agentStepTranscripts.add(transcript.toList())
+        val index = (agentStepCallCount - 1).coerceAtMost(agentStepResults.lastIndex.coerceAtLeast(0))
+        return agentStepResults.getOrElse(index) { AgentStepResult.ServiceError }
+    }
 
     override suspend fun classify(input: String, locale: ChatLocale, skipLayer1: Boolean): IntentClassification {
         classifyCallCount++
@@ -139,8 +163,10 @@ private class FakeToolCallDispatcher(
     private val outcome: DispatchOutcome = DispatchOutcome.Success("chat_dispatch_added", listOf("item")),
 ) : ToolCallDispatcher {
     var lastDispatched: ToolCall? = null
+    var dispatchCount = 0
 
     override suspend fun dispatch(toolCall: ToolCall): DispatchOutcome {
+        dispatchCount++
         lastDispatched = toolCall
         return outcome
     }
@@ -1070,5 +1096,389 @@ class ChatViewModelTest {
         assertIs<ChatScreenSideEffect.ShowAssistantMessage>(fallbackEffect)
         assertEquals("chat_completion_error", fallbackEffect.messageKey,
             "ServiceError from completeFreeForm must emit chat_completion_error")
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Phase 2d — Agentic loop tests
+    // ══════════════════════════════════════════════════════════════════════════
+
+    // ── 35. Kill-switch OFF: FreeForm uses completeFreeForm, agentStep never called ──
+
+    @Test
+    fun agentLoop_flagOff_freeFormUsesCompleteFreeForm() = runTest {
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.FreeForm,
+                confidence = 1.0f,
+                layer = RoutingLayer.FullChat,
+            ),
+            completionResult = RemoteCompletionResult.ServiceError,
+            agenticEnabled = false, // flag OFF
+        )
+        val vm = makeVm(repo = repo)
+
+        val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            vm.sideEffect.first()
+        }
+        vm.sendIntent(ChatScreenIntent.OnInputChange("plan my week"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        effectDeferred.await() // drain ServiceError ShowAssistantMessage
+
+        assertEquals(0, repo.agentStepCallCount,
+            "agentStep must NOT be called when flag is OFF")
+        assertEquals(1, repo.completeFreeFormCallCount,
+            "completeFreeForm must be called when flag is OFF and intent is FreeForm")
+        assertNull(vm.screenState.value.pendingAgentPlan,
+            "pendingAgentPlan must remain null when flag is OFF")
+    }
+
+    // ── 36. Flag ON, read-only tool call → no plan-card, assistant message rendered ──
+
+    @Test
+    fun agentLoop_flagOn_readOnlyToolCall_noPlanCard() = runTest {
+        val readChecklistCall = AgentToolCall(
+            id = "call-1",
+            name = "read_checklist",
+            args = buildJsonObject { put("name", "Shopping") },
+        )
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.FreeForm,
+                confidence = 1.0f,
+                layer = RoutingLayer.FullChat,
+            ),
+            agenticEnabled = true,
+            agentStepResults = listOf(
+                AgentStepResult.ToolCalls(
+                    calls = listOf(readChecklistCall),
+                    creditsRemaining = 297,
+                ),
+                AgentStepResult.Final(content = "Shopping has 3 items.", creditsRemaining = 297),
+            ),
+        )
+        val fakeDispatcher = FakeToolCallDispatcher(
+            outcome = DispatchOutcome.ChecklistContent(
+                checklistName = "Shopping",
+                items = emptyList(),
+            ),
+        )
+        val vm = makeVm(repo = repo, dispatcher = fakeDispatcher)
+
+        // Collect the assistant message from ShowAssistantMessage (round-limit)
+        // OR wait for the Final to be directly appended via addAndPersistAssistantMessage.
+        // With UnconfinedTestDispatcher both should complete synchronously.
+        vm.sendIntent(ChatScreenIntent.OnInputChange("what's in my shopping list?"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+
+        // Give the coroutines a chance to run.
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(2, repo.agentStepCallCount,
+            "agentStep must be called twice (ToolCalls + Final rounds)")
+        assertNull(vm.screenState.value.pendingAgentPlan,
+            "No plan-card for read-only tools")
+        assertFalse(vm.screenState.value.isProcessing,
+            "isProcessing must be false after Final")
+        // The assistant message from Final is appended directly (no ShowAssistantMessage side-effect).
+        val assistantMessages = vm.screenState.value.messages.filter { it.role == ChatRole.Assistant }
+        assertEquals(1, assistantMessages.size, "One assistant message expected")
+        assertEquals("Shopping has 3 items.", assistantMessages.first().content)
+    }
+
+    // ── 37. Flag ON, mutating tool call → plan-card shown, OnAgentPlanApply dispatches ──
+
+    @Test
+    fun agentLoop_flagOn_mutatingToolCall_planCardShownAndApplied() = runTest {
+        val addItemCall = AgentToolCall(
+            id = "call-2",
+            name = "add_item",
+            args = buildJsonObject {
+                put("item_text", "milk")
+                put("checklist_hint", "Shopping")
+            },
+        )
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.FreeForm,
+                confidence = 1.0f,
+                layer = RoutingLayer.FullChat,
+            ),
+            agenticEnabled = true,
+            agentStepResults = listOf(
+                AgentStepResult.ToolCalls(
+                    calls = listOf(addItemCall),
+                    creditsRemaining = 297,
+                ),
+                AgentStepResult.Final(content = "Done, added milk.", creditsRemaining = 297),
+            ),
+        )
+        val fakeDispatcher = FakeToolCallDispatcher(
+            outcome = DispatchOutcome.Success("chat_dispatch_added", listOf("milk")),
+        )
+        val vm = makeVm(repo = repo, dispatcher = fakeDispatcher)
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk to shopping"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+
+        // After first agentStep returns ToolCalls, the plan-card should be visible.
+        testScheduler.advanceUntilIdle()
+        val planAfterStep1 = vm.screenState.value.pendingAgentPlan
+        assertNotNull(planAfterStep1, "pendingAgentPlan must be set after ToolCalls result")
+        assertEquals(1, planAfterStep1.items.size, "One plan item expected")
+        assertFalse(vm.screenState.value.isProcessing,
+            "isProcessing must be false while plan-card is shown")
+        assertEquals(0, fakeDispatcher.dispatchCount,
+            "Dispatcher must NOT be called before user approves")
+
+        // User approves → loop resumes
+        vm.sendIntent(ChatScreenIntent.OnAgentPlanApply)
+        testScheduler.advanceUntilIdle()
+
+        // Dispatcher was called once for the approved add_item call
+        assertEquals(1, fakeDispatcher.dispatchCount,
+            "Dispatcher must be called once after approval")
+
+        // The second agentStep (Final) should have been called.
+        assertEquals(2, repo.agentStepCallCount,
+            "agentStep must be called twice (ToolCalls + Final)")
+
+        // COUNT INVARIANT: the second agentStep received transcript with ToolResults
+        // whose size equals calls.size.
+        val secondCallTranscript = repo.agentStepTranscripts[1]
+        val toolResultsEntry = secondCallTranscript.filterIsInstance<AgentTranscriptEntry.ToolResults>()
+        assertEquals(1, toolResultsEntry.size,
+            "Transcript must contain exactly one ToolResults entry")
+        assertEquals(1, toolResultsEntry.first().results.size,
+            "ToolResults.results.size must equal calls.size (COUNT INVARIANT)")
+
+        // Plan-card is cleared and Final message is persisted.
+        assertNull(vm.screenState.value.pendingAgentPlan, "Plan-card must be cleared after Final")
+        val assistantMsgs = vm.screenState.value.messages.filter { it.role == ChatRole.Assistant }
+        assertEquals(1, assistantMsgs.size)
+        assertEquals("Done, added milk.", assistantMsgs.first().content)
+    }
+
+    // ── 38. OnAgentPlanCancel → declined results sent, loop continues gracefully ──
+
+    @Test
+    fun agentLoop_flagOn_mutatingToolCall_planCardCancelled_declinedResult() = runTest {
+        val deleteCall = AgentToolCall(
+            id = "call-3",
+            name = "delete_item",
+            args = buildJsonObject {
+                put("item_text", "milk")
+                put("checklist_hint", "Shopping")
+            },
+        )
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.FreeForm,
+                confidence = 1.0f,
+                layer = RoutingLayer.FullChat,
+            ),
+            agenticEnabled = true,
+            agentStepResults = listOf(
+                AgentStepResult.ToolCalls(
+                    calls = listOf(deleteCall),
+                    creditsRemaining = 297,
+                ),
+                AgentStepResult.Final(content = "Okay, I won't delete it.", creditsRemaining = 297),
+            ),
+        )
+        val fakeDispatcher = FakeToolCallDispatcher()
+        val vm = makeVm(repo = repo, dispatcher = fakeDispatcher)
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("delete milk from shopping"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        // Plan-card visible with destructive item
+        val plan = vm.screenState.value.pendingAgentPlan
+        assertNotNull(plan)
+        assertTrue(plan.items.first().isDestructive, "delete_item must be flagged as destructive")
+
+        // User cancels
+        vm.sendIntent(ChatScreenIntent.OnAgentPlanCancel)
+        testScheduler.advanceUntilIdle()
+
+        // Dispatcher must NOT have been called (declined path)
+        assertEquals(0, fakeDispatcher.dispatchCount,
+            "Dispatcher must NOT be called when user cancels")
+
+        // COUNT INVARIANT: ToolResults in second agentStep transcript has size == 1
+        val secondCallTranscript = repo.agentStepTranscripts[1]
+        val toolResultsEntry = secondCallTranscript.filterIsInstance<AgentTranscriptEntry.ToolResults>()
+        assertEquals(1, toolResultsEntry.size)
+        assertEquals(1, toolResultsEntry.first().results.size,
+            "COUNT INVARIANT: one declined result for one declined call")
+
+        // Declined result carries status=declined
+        val resultJson = toolResultsEntry.first().results.first().result
+        assertEquals("declined", resultJson["status"]?.toString()?.trim('"'),
+            "Declined result must have status=declined")
+
+        // Final message received after cancelled plan
+        assertNull(vm.screenState.value.pendingAgentPlan)
+        val assistantMsgs = vm.screenState.value.messages.filter { it.role == ChatRole.Assistant }
+        assertEquals(1, assistantMsgs.size)
+    }
+
+    // ── 39. Round cap: agentStep always returns ToolCalls → fallback after 5 rounds ──
+
+    @Test
+    fun agentLoop_flagOn_roundCap_fallbackMessageAfter5Rounds() = runTest {
+        val infiniteCall = AgentToolCall(
+            id = "call-inf",
+            name = "find_items", // read-only so no plan-card pause
+            args = buildJsonObject { put("query", "milk") },
+        )
+        // Repeat ToolCalls indefinitely (the fake repeats last result when list is exhausted)
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.FreeForm,
+                confidence = 1.0f,
+                layer = RoutingLayer.FullChat,
+            ),
+            agenticEnabled = true,
+            agentStepResults = listOf(
+                AgentStepResult.ToolCalls(
+                    calls = listOf(infiniteCall),
+                    creditsRemaining = 290,
+                ),
+            ),
+        )
+        val fakeDispatcher = FakeToolCallDispatcher(
+            outcome = DispatchOutcome.Success("chat_dispatch_find_success", listOf("0", "")),
+        )
+
+        // Collect ShowAssistantMessage for the round-limit fallback
+        val vm = makeVm(repo = repo, dispatcher = fakeDispatcher)
+
+        val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            vm.sideEffect.first()
+        }
+        vm.sendIntent(ChatScreenIntent.OnInputChange("find milk"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        val effect = effectDeferred.await()
+        assertIs<ChatScreenSideEffect.ShowAssistantMessage>(effect)
+        assertEquals("chat_agent_round_limit", effect.messageKey,
+            "Round-cap fallback must emit chat_agent_round_limit")
+
+        assertTrue(repo.agentStepCallCount <= 5,
+            "agentStep must be called at most 5 times (AGENT_MAX_ROUNDS), was ${repo.agentStepCallCount}")
+        assertFalse(vm.screenState.value.isProcessing,
+            "isProcessing must be false after round-cap")
+        assertNull(vm.screenState.value.pendingAgentPlan,
+            "pendingAgentPlan must be null after round-cap")
+    }
+
+    // ── 40. Mixed read-only + mutating in one ToolCalls: COUNT INVARIANT holds ──
+
+    @Test
+    fun agentLoop_mixedReadOnlyAndMutating_countInvariantHolds() = runTest {
+        val readCall = AgentToolCall(
+            id = "read-1",
+            name = "read_checklist",
+            args = buildJsonObject { put("name", "Shopping") },
+        )
+        val addCall = AgentToolCall(
+            id = "add-1",
+            name = "add_item",
+            args = buildJsonObject {
+                put("item_text", "butter")
+                put("checklist_hint", "Shopping")
+            },
+        )
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.FreeForm,
+                confidence = 1.0f,
+                layer = RoutingLayer.FullChat,
+            ),
+            agenticEnabled = true,
+            agentStepResults = listOf(
+                AgentStepResult.ToolCalls(
+                    calls = listOf(readCall, addCall), // 2 calls: 1 read + 1 mutating
+                    creditsRemaining = 297,
+                ),
+                AgentStepResult.Final(content = "Done.", creditsRemaining = 297),
+            ),
+        )
+        val fakeDispatcher = FakeToolCallDispatcher(
+            outcome = DispatchOutcome.Success("chat_dispatch_added", listOf("butter")),
+        )
+        val vm = makeVm(repo = repo, dispatcher = fakeDispatcher)
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("add butter to shopping"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        // read_checklist should auto-execute, add_item should show plan-card
+        val plan = vm.screenState.value.pendingAgentPlan
+        assertNotNull(plan, "Plan-card must be shown for the mutating add_item call")
+        assertEquals(1, plan.items.size, "Only mutating calls appear in plan-card")
+
+        vm.sendIntent(ChatScreenIntent.OnAgentPlanApply)
+        testScheduler.advanceUntilIdle()
+
+        // COUNT INVARIANT: transcript ToolResults must have size == 2 (both calls)
+        val secondTranscript = repo.agentStepTranscripts[1]
+        val toolResults = secondTranscript.filterIsInstance<AgentTranscriptEntry.ToolResults>()
+        assertEquals(1, toolResults.size)
+        assertEquals(2, toolResults.first().results.size,
+            "COUNT INVARIANT: allResults.size (${toolResults.first().results.size}) must equal calls.size (2)")
+
+        // Verify result IDs match call IDs (order-preserving merge)
+        val resultIds = toolResults.first().results.map { it.id }
+        assertEquals(listOf("read-1", "add-1"), resultIds,
+            "Results must be in the same order as calls")
+    }
+
+    // ── Chat sheet context wiring ─────────────────────────────────────────────
+
+    @Test
+    fun onSetContextChecklist_withId_storesContextChecklistId() {
+        val vm = makeVm()
+        // Initially no context
+        assertNull(vm.screenState.value.contextChecklistId)
+
+        vm.sendIntent(ChatScreenIntent.OnSetContextChecklist(checklistId = 42L))
+
+        assertEquals(42L, vm.screenState.value.contextChecklistId)
+    }
+
+    @Test
+    fun onSetContextChecklist_withNull_clearsContextChecklistId() {
+        val vm = makeVm()
+        // Seed a context first
+        vm.sendIntent(ChatScreenIntent.OnSetContextChecklist(checklistId = 99L))
+        assertEquals(99L, vm.screenState.value.contextChecklistId)
+
+        // Clear it
+        vm.sendIntent(ChatScreenIntent.OnSetContextChecklist(checklistId = null))
+
+        assertNull(vm.screenState.value.contextChecklistId)
+    }
+
+    @Test
+    fun onSetContextChecklist_doesNotAffectMessages() {
+        val vm = makeVm()
+        vm.sendIntent(ChatScreenIntent.OnSetContextChecklist(checklistId = 7L))
+
+        // Message list stays untouched by context seeding
+        assertEquals(0, vm.screenState.value.messages.size)
+    }
+
+    @Test
+    fun onSetContextChecklist_updatesIdRepeatedly() {
+        val vm = makeVm()
+        vm.sendIntent(ChatScreenIntent.OnSetContextChecklist(checklistId = 1L))
+        assertEquals(1L, vm.screenState.value.contextChecklistId)
+
+        vm.sendIntent(ChatScreenIntent.OnSetContextChecklist(checklistId = 2L))
+        assertEquals(2L, vm.screenState.value.contextChecklistId,
+            "Re-opening the sheet for a different checklist must update the context ID")
     }
 }

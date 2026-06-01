@@ -1,5 +1,6 @@
 package com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -108,10 +109,20 @@ fun ChatMessageBubble(
                         bottomStart = 4.dp,
                     )
                 },
+                // User (sent) keeps the primaryContainer accent fill — it reads as "my message".
+                // Assistant (received) switches from grey `surfaceContainerHigh` to the clean
+                // `surfaceContainerLowest` (white in light) + hairline `outlineVariant` border,
+                // matching AskGistiBar. The grey tonal fill was the "страшный серый" the user
+                // reported in the dock answer field.
                 color = if (isUser) {
                     MaterialTheme.colorScheme.primaryContainer
                 } else {
-                    MaterialTheme.colorScheme.surfaceContainerHigh
+                    MaterialTheme.colorScheme.surfaceContainerLowest
+                },
+                border = if (isUser) {
+                    null
+                } else {
+                    BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 },
                 modifier = Modifier.widthIn(max = if (isUser) 320.dp else 340.dp),
             ) {

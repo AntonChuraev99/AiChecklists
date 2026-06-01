@@ -4,6 +4,7 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -43,6 +44,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -92,6 +95,12 @@ import org.jetbrains.compose.resources.stringResource
  *                                  Hides the mic/send button and shows a [CircularProgressIndicator]
  *                                  with a «Transcribing…» label. Input field is read-only in this state.
  * @param onDragCancelChanged       Reports drag-up cancel state to parent for overlay label.
+ * @param focusRequester            When non-null, attached to the center [TextField] so a
+ *                                  caller can programmatically request focus (e.g. auto-focus
+ *                                  the input when the inline chat dock expands). The caller
+ *                                  owns the [androidx.compose.runtime.LaunchedEffect] that calls
+ *                                  `focusRequester.requestFocus()`; this component only wires
+ *                                  the modifier.
  */
 @Composable
 fun ChatInputRow(
@@ -109,6 +118,7 @@ fun ChatInputRow(
     isRecording: Boolean = false,
     isTranscribing: Boolean = false,
     onDragCancelChanged: ((Boolean) -> Unit)? = null,
+    focusRequester: FocusRequester? = null,
     modifier: Modifier = Modifier,
 ) {
     // Pre-resolve strings in Composable scope (spec §10 rule 6)
@@ -138,7 +148,10 @@ fun ChatInputRow(
     val cancelThresholdDp = 80.dp
 
     // Outer column applies the surface padding (M3 chat bar — `padding: 8px 16px 12px`).
-    // Inner pill is `surfaceContainerHigh`, 28dp radius, all 4 controls live inside.
+    // Inner pill follows the AskGistiBar clean pattern: `surfaceContainerLowest` (white card
+    // in light, near-black in dark) + a hairline `outlineVariant` border so the pill stays
+    // visible on the white dock surface. Previously it was `surfaceContainerHigh` (grey tonal),
+    // which is the "страшный серый" the user reported. 28dp radius, all 4 controls live inside.
     // minHeight 56dp lets the pill grow when text wraps to multiple lines.
     Column(
         modifier = modifier
@@ -153,7 +166,8 @@ fun ChatInputRow(
     ) {
         Surface(
             shape = RoundedCornerShape(28.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            color = MaterialTheme.colorScheme.surfaceContainerLowest,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 56.dp),
@@ -198,7 +212,9 @@ fun ChatInputRow(
             singleLine = false,
             maxLines = 4,
             enabled = isEnabled && !isRecording && !isTranscribing,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .weight(1f)
+                .let { base -> focusRequester?.let { base.focusRequester(it) } ?: base },
             keyboardOptions = KeyboardOptions(
                 imeAction = if (canSend) ImeAction.Send else ImeAction.Default,
             ),

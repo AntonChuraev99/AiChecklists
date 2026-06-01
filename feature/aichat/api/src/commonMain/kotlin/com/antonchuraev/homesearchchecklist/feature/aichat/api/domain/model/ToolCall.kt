@@ -73,4 +73,31 @@ sealed interface ToolCall {
         val itemText: String,
         val attachments: List<ChatAttachment>,
     ) : ToolCall
+
+    /**
+     * Batch-add multiple items to one checklist in a single operation (agent path).
+     * Mirrors [AddItem] but updates the fill + template once with all [itemTexts].
+     * The agent uses this when adding several items at once (e.g. confirming an
+     * 8-item proposal) — see plan finding #2.
+     */
+    data class AddItems(
+        val checklistHint: String?,
+        val itemTexts: List<String>,
+    ) : ToolCall
+
+    /**
+     * READ-ONLY (agent path): return the items of one checklist by name so the
+     * model can ground an answer in real item text. This is the D3 privacy payload
+     * — item text reaches Gemini only when the model explicitly requests it.
+     * Resolves to [DispatchOutcome.ChecklistContent].
+     */
+    data class ReadChecklist(
+        val name: String,
+    ) : ToolCall
+
+    /** Rename an existing checklist (agent path). */
+    data class RenameChecklist(
+        val checklistHint: String,
+        val newName: String,
+    ) : ToolCall
 }

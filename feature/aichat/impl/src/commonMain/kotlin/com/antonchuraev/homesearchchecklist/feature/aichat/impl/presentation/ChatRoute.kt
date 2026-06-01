@@ -14,6 +14,9 @@ import aichecklists.core.designsystem.generated.resources.chat_ambiguous_match
 import aichecklists.core.designsystem.generated.resources.chat_apply_error
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_added
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_added_to
+import aichecklists.core.designsystem.generated.resources.chat_dispatch_added_many_to
+import aichecklists.core.designsystem.generated.resources.chat_dispatch_add_empty
+import aichecklists.core.designsystem.generated.resources.chat_dispatch_renamed
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_already_done
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_completed
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_created_empty
@@ -50,6 +53,7 @@ import aichecklists.core.designsystem.generated.resources.chat_transcribing
 import aichecklists.core.designsystem.generated.resources.chat_unknown_intent_hint
 import aichecklists.core.designsystem.generated.resources.chat_voice_too_short
 import aichecklists.core.designsystem.generated.resources.chat_preview_cancelled_message
+import aichecklists.core.designsystem.generated.resources.chat_agent_round_limit
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AttachmentSource
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatAttachment
 import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.picker.FilePickerType
@@ -109,6 +113,9 @@ fun ChatRoute(
     // Dispatch outcome messages (C.1 i18n)
     val dispatchAddedFmt = stringResource(Res.string.chat_dispatch_added)
     val dispatchAddedToFmt = stringResource(Res.string.chat_dispatch_added_to)
+    val dispatchAddedManyToFmt = stringResource(Res.string.chat_dispatch_added_many_to)
+    val dispatchAddEmptyText = stringResource(Res.string.chat_dispatch_add_empty)
+    val dispatchRenamedFmt = stringResource(Res.string.chat_dispatch_renamed)
     val dispatchDeletedFmt = stringResource(Res.string.chat_dispatch_deleted)
     val dispatchItemNotFoundFmt = stringResource(Res.string.chat_dispatch_item_not_found)
     val dispatchCompletedFmt = stringResource(Res.string.chat_dispatch_completed)
@@ -142,11 +149,14 @@ fun ChatRoute(
     val transcribingText = stringResource(Res.string.chat_transcribing)
     val transcribeEmptyText = stringResource(Res.string.chat_transcribe_empty)
     val transcribeErrorText = stringResource(Res.string.chat_transcribe_error)
+    // Agentic loop (Phase 2d)
+    val agentRoundLimitText = stringResource(Res.string.chat_agent_round_limit)
 
     val messages = remember(
         unknownText, genericErrorText, applyErrorText, extractFailText,
         ambiguousMatchFmt, notFoundFmt, requiresPremiumText,
-        dispatchAddedFmt, dispatchAddedToFmt, dispatchDeletedFmt, dispatchItemNotFoundFmt,
+        dispatchAddedFmt, dispatchAddedToFmt, dispatchAddedManyToFmt, dispatchAddEmptyText, dispatchRenamedFmt,
+        dispatchDeletedFmt, dispatchItemNotFoundFmt,
         dispatchCompletedFmt, dispatchAlreadyDoneFmt, dispatchCreatedEmptyFmt,
         dispatchCreatedWithOneFmt, dispatchCreatedWithManyFmt, dispatchReminderSetFmt,
         dispatchNoRemindersOnDayFmt, dispatchMovedOneFmt, dispatchMovedManyFmt,
@@ -156,6 +166,7 @@ fun ChatRoute(
         feedbackSubmittedText, feedbackBlankHintText,
         micPermissionDeniedText, voiceTooShortText, recordingCancelledText, thumbUpThanksText,
         previewCancelledText, transcribingText, transcribeEmptyText, transcribeErrorText,
+        agentRoundLimitText,
     ) {
         mapOf(
             "chat_unknown_intent_hint" to unknownText,
@@ -167,6 +178,9 @@ fun ChatRoute(
             "chat_requires_premium" to requiresPremiumText,
             "chat_dispatch_added" to dispatchAddedFmt,
             "chat_dispatch_added_to" to dispatchAddedToFmt,
+            "chat_dispatch_added_many_to" to dispatchAddedManyToFmt,
+            "chat_dispatch_add_empty" to dispatchAddEmptyText,
+            "chat_dispatch_renamed" to dispatchRenamedFmt,
             "chat_dispatch_deleted" to dispatchDeletedFmt,
             "chat_dispatch_item_not_found" to dispatchItemNotFoundFmt,
             "chat_dispatch_completed" to dispatchCompletedFmt,
@@ -198,6 +212,7 @@ fun ChatRoute(
             "chat_transcribing" to transcribingText,
             "chat_transcribe_empty" to transcribeEmptyText,
             "chat_transcribe_error" to transcribeErrorText,
+            "chat_agent_round_limit" to agentRoundLimitText,
         )
     }
 

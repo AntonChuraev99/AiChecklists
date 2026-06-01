@@ -62,10 +62,37 @@ data class ChatScreenState(
     val isRecording: Boolean = false,
     val voiceRecordingError: String? = null,
     val isTranscribing: Boolean = false,
+    /**
+     * Non-null while the agent loop has proposed a batch of mutating actions and is
+     * waiting for user approval before proceeding. Set to null on apply or cancel.
+     * [isProcessing] is false while this is shown so the card is interactive.
+     */
+    val pendingAgentPlan: AgentPlan? = null,
+    /**
+     * Checklist ID that was active when the sheet was opened from [ChecklistDetailScreen].
+     * Used to bias Layer-1/Layer-2/Layer-3 requests to this checklist by default.
+     * Null when the sheet is opened from [MainScreen] with no focus context.
+     */
+    val contextChecklistId: Long? = null,
 ) : State {
     /** True when the Send button should be active (text entered OR attachments pending). */
     val canSend: Boolean get() = inputText.isNotBlank() || pendingAttachments.isNotEmpty()
 }
+
+/**
+ * A batch of mutating actions proposed by the agent loop, awaiting user confirmation.
+ * Shown as [AgentPlanCard] — analogous to [ChatPreviewCard] for single-tool Layer-1 previews.
+ */
+data class AgentPlan(val items: List<AgentPlanItem>)
+
+/**
+ * One line in the agent plan card.
+ *
+ * @param text         Human-readable description of the action (from [ToolCallPreviewRenderer]).
+ * @param isDestructive When true (e.g. delete_item), the item is tinted red / prefixed with a
+ *                      warning icon so the user can spot irreversible operations at a glance.
+ */
+data class AgentPlanItem(val text: String, val isDestructive: Boolean = false)
 
 /**
  * A pending write-intent that has been classified and awaits user approval.
@@ -239,6 +266,34 @@ sealed interface ChatScreenIntent : Intent {
         val recordingPath: String?,
         val mimeType: String = "audio/m4a",
     ) : ChatScreenIntent
+
+    // ── Agent plan-card intents (Phase 2d: agentic loop) ──────────────────────
+
+    /**
+     * User confirmed all mutating actions in the agent plan-card.
+     * The ViewModel resumes the agent loop, dispatches all pending mutating calls,
+     * and sends the results back as [AgentTranscriptEntry.ToolResults].
+     */
+    data object OnAgentPlanApply : ChatScreenIntent
+
+    /**
+     * User cancelled the agent plan-card (tapped "Cancel").
+     * The ViewModel sends [AgentToolResultSerializer.declinedResult()] for each pending
+     * mutating call so the count-invariant is preserved, then continues the loop.
+     */
+    data object OnAgentPlanCancel : ChatScreenIntent
+
+    /**
+     * Seed the chat session with the checklist context that triggered the sheet.
+     *
+     * Called by App.kt when the user opens the sheet from [ChecklistDetailScreen]
+     * with a specific checklist in focus. The ViewModel stores [checklistId] as the
+     * "active context" so Layer-1/Layer-2/Layer-3 requests can default to this
+     * checklist instead of requiring the user to name it explicitly.
+     *
+     * Pass `null` to clear the context (sheet opened from [MainScreen] with no focus).
+     */
+    data class OnSetContextChecklist(val checklistId: Long?) : ChatScreenIntent
 }
 
 // ---------------------------------------------------------------------------

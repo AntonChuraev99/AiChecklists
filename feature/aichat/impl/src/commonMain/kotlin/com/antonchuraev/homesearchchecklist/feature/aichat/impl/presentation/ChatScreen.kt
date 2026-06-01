@@ -50,6 +50,7 @@ import org.jetbrains.compose.resources.stringResource
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatHeader
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatInputRow
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatMessageBubble
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.AgentPlanCard
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatPreviewCard
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatPricingRow
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatTypingIndicator
@@ -101,18 +102,6 @@ fun ChatScreen(
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
-    // Welcome bubble is a UI affordance, not data — kept in composable scope
-    // so the system locale drives its text without needing ViewModel locale state.
-    val welcomeText = stringResource(Res.string.chat_assistant_welcome)
-    val welcomeBubble = remember(welcomeText) {
-        ChatMessage(
-            id = "__welcome",
-            role = ChatRole.Assistant,
-            content = welcomeText,
-            timestamp = 0L,
-        )
-    }
-
     // Attachment source sheet — local UI state, not in ViewModel
     var showAttachmentSourceSheet by remember { mutableStateOf(false) }
 
@@ -135,10 +124,7 @@ fun ChatScreen(
     }
 
     // Day divider visibility: "Today" pill appears only if the most recent message
-    // is from today. Without this check the divider hangs above yesterday's session
-    // and mis-labels it. Full per-day grouping (Yesterday + dated headers between
-    // day boundaries) is a future iteration — for now the simple gate prevents the
-    // most visible bug. Computed in Composable scope so `remember` is legal here.
+    // is from today.
     val showTodayDivider = remember(state.messages) {
         val last = state.messages.lastOrNull() ?: return@remember false
         val tz = TimeZone.currentSystemDefault()
@@ -149,33 +135,11 @@ fun ChatScreen(
         last.timestamp >= startOfToday
     }
 
-    // Auto-scroll to the newest item on changes. With reverseLayout = true the
-    // newest item lives at index 0 (visually at the bottom near the input row).
-    // Count also includes the typing indicator so the list scrolls when it appears.
+    // Total item count for scroll / IME anchor fix (passed to ChatContent).
     val totalItemCount = state.messages.size +
         (if (state.pendingPreview != null) 1 else 0) +
-        (if (state.isProcessing && state.pendingPreview == null) 1 else 0)
-
-    // Auto-scroll triggers:
-    //   1. totalItemCount changes — new user/assistant message, preview appears, typing
-    //      indicator — keeps the newest item visible.
-    //   2. imeBottom changes — when the keyboard closes the viewport grows; the
-    //      previously bottom-pinned item drifts up because LazyColumn does not re-anchor
-    //      on resize. Re-running scrollToItem(0) snaps it back so a tall preview-card
-    //      stays flush above the input row with Apply visible.
-    val density = LocalDensity.current
-    val imeBottom = WindowInsets.ime.getBottom(density)
-    val hasInitializedScroll = remember { mutableStateOf(false) }
-    LaunchedEffect(totalItemCount, imeBottom) {
-        if (totalItemCount > 0) {
-            if (!hasInitializedScroll.value) {
-                listState.scrollToItem(0)
-                hasInitializedScroll.value = true
-            } else {
-                listState.animateScrollToItem(0)
-            }
-        }
-    }
+        (if (state.pendingAgentPlan != null) 1 else 0) +
+        (if (state.isProcessing && state.pendingPreview == null && state.pendingAgentPlan == null) 1 else 0)
 
     Scaffold(
         modifier = modifier
@@ -195,141 +159,25 @@ fun ChatScreen(
             )
         },
     ) { scaffoldPadding ->
-        Column(
+        ChatContent(
+            state = state,
+            onIntent = onIntent,
+            listState = listState,
+            snackbarHostState = snackbarHostState,
+            showTodayDivider = showTodayDivider,
+            totalItemCount = totalItemCount,
+            recordingDurationMs = recordingDurationMs,
+            isDragCancel = isDragCancel,
+            onDragCancelChanged = { isDragCancel = it },
+            onAttachmentSourceSheet = { showAttachmentSourceSheet = true },
+            onVoiceRecordingStarted = onVoiceRecordingStarted,
+            onVoiceRecordingStopped = onVoiceRecordingStopped,
+            onVoiceRecordingCancelled = onVoiceRecordingCancelled,
+            onNavigateToPaywall = onNavigateToPaywall,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(scaffoldPadding)
-                .imePadding(),
-        ) {
-            // Pricing info band — sits directly below the TopAppBar,
-            // above the message list. Caption + help icon; tapping help
-            // opens AiChatPricingHelpSheet via OnHelpClick intent.
-            ChatPricingRow(
-                onWhyClick = { onIntent(ChatScreenIntent.OnHelpClick) },
-            )
-
-            // Message list — occupies all remaining vertical space
-            LazyColumn(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .adaptiveContentWidth(),
-                state = listState,
-                // reverseLayout = items are laid out bottom-up (newest at the bottom,
-                // oldest at the top). This is the standard chat pattern (Telegram /
-                // WhatsApp) — items pin to the bottom by default, no gap on
-                // near-empty chat, no recomposition lag when keyboard opens.
-                reverseLayout = true,
-                contentPadding = PaddingValues(
-                    horizontal = AppDimens.ScreenPaddingHorizontal,
-                    vertical = AppDimens.SpacingMd,
-                ),
-                verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd),
-            ) {
-                // With reverseLayout = true, FIRST declared item renders at the BOTTOM
-                // of the viewport. So we declare in newest-first order:
-                //   typing indicator (shown when processing and no preview card yet)
-                //   pendingPreview (most recent action)
-                //   user/assistant messages reversed (newest first)
-                //   welcome bubble (oldest, rendered at top of viewport)
-
-                // Typing indicator — visible during Layer 1→2→3 round-trip only.
-                // Hidden once pendingPreview appears (user already sees the result card).
-                if (state.isProcessing && state.pendingPreview == null) {
-                    item(key = "__typing") {
-                        ChatTypingIndicator()
-                    }
-                }
-
-                state.pendingPreview?.let { preview ->
-                    item(key = "preview_card") {
-                        ChatPreviewCard(
-                            preview = preview,
-                            onApply = { onIntent(ChatScreenIntent.OnPreviewApply) },
-                            onCancel = { onIntent(ChatScreenIntent.OnPreviewCancel) },
-                            onReject = { onIntent(ChatScreenIntent.OnPreviewReject) },
-                            onItemTextChange = { onIntent(ChatScreenIntent.OnPreviewItemTextChange(it)) },
-                            showRejectButton = preview.toolCall !is ToolCall.CreateChecklistFromAttachment,
-                            modifier = Modifier.padding(bottom = AppDimens.SpacingSm),
-                        )
-                    }
-                }
-
-                items(
-                    items = state.messages.asReversed(),
-                    key = { it.id },
-                ) { message ->
-                    ChatMessageBubble(
-                        message = message,
-                        onFeedbackClick = { onIntent(ChatScreenIntent.OnFeedbackOpen(it)) },
-                        onThumbUpClick = { onIntent(ChatScreenIntent.OnThumbUpClick(it)) },
-                        onOpenChecklist = message.linkedChecklistId?.let { id ->
-                            { onIntent(ChatScreenIntent.OnOpenChecklist(id)) }
-                        },
-                        onAskAiFallback = message.askAiForText?.let { text ->
-                            { onIntent(ChatScreenIntent.OnAskAiFallback(text)) }
-                        },
-                        showSenderLabel = message.role == com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatRole.Assistant,
-                    )
-                }
-
-                if (showTodayDivider) {
-                    item(key = "__day_divider") {
-                        com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatDayDivider()
-                    }
-                }
-
-                // Welcome bubble — declared last, so it renders at the TOP of viewport
-                // (above all real messages). Follows system locale via stringResource.
-                // No feedback callback for the welcome bubble — it's a static affordance,
-                // not a real AI response to user input.
-                item(key = "__welcome") {
-                    ChatMessageBubble(
-                        message = welcomeBubble,
-                        showSenderLabel = false,
-                    )
-                }
-            }
-
-            // Recording overlay — slides in from bottom when mic is active.
-            // Sits above the chip strip.
-            ChatRecordingOverlay(
-                isRecording = state.isRecording,
-                durationMs = recordingDurationMs,
-                isDragCancel = isDragCancel,
-            )
-
-            // Pending attachment chips — AnimatedVisibility driven by list size.
-            ChatAttachmentChipStrip(
-                attachments = state.pendingAttachments,
-                onRemove = { path -> onIntent(ChatScreenIntent.OnRemoveAttachment(path)) },
-            )
-
-            // Input row is OUTSIDE LazyColumn — always pinned above the keyboard
-            ChatInputRow(
-                text = state.inputText,
-                onTextChange = { onIntent(ChatScreenIntent.OnInputChange(it)) },
-                onSend = { onIntent(ChatScreenIntent.OnSendClick) },
-                onAttachFileClick = { showAttachmentSourceSheet = true },
-                onVoiceRecordingStarted = {
-                    onIntent(ChatScreenIntent.OnVoiceRecordingStarted)
-                    onVoiceRecordingStarted?.invoke()
-                },
-                onVoiceRecordingStopped = {
-                    onVoiceRecordingStopped?.invoke()
-                },
-                onVoiceRecordingCancelled = {
-                    onVoiceRecordingCancelled?.invoke()
-                },
-                onHelpClick = { onIntent(ChatScreenIntent.OnFeaturesHelpClick) },
-                hasAttachments = state.pendingAttachments.isNotEmpty(),
-                isEnabled = !state.isProcessing,
-                canSend = state.canSend,
-                isRecording = state.isRecording,
-                isTranscribing = state.isTranscribing,
-                onDragCancelChanged = { isDragCancel = it },
-            )
-        }
+                .padding(scaffoldPadding),
+        )
     }
 
     // Attachment source sheet — presented above scaffold when user taps the clip icon
@@ -388,6 +236,202 @@ fun ChatScreen(
             onTextChange = { onIntent(ChatScreenIntent.OnFeedbackTextChange(it)) },
             onSubmit = { onIntent(ChatScreenIntent.OnFeedbackSubmit) },
             onDismiss = { onIntent(ChatScreenIntent.OnFeedbackDismiss) },
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ChatContent — embeddable chat body (messages + input).
+// Extracted so it can be hosted both inside ChatScreen (full-screen) and inside
+// GistiChatSheet (expandable bottom-sheet at App.kt level).
+//
+// Preserves ALL existing LaunchedEffects (reverseLayout IME scroll-anchor fix),
+// imePadding() lives on the root Column so the sheet host sets
+// contentWindowInsets = WindowInsets(0) to avoid double-inset.
+// ---------------------------------------------------------------------------
+
+/**
+ * Stateless chat body: messages list + input row + overlays.
+ *
+ * All scroll / IME / recording local state is hoisted from the caller so that
+ * [ChatScreen] (full-screen) and the App-level sheet host can share the same
+ * composable without duplicating state setup.
+ *
+ * The caller is responsible for:
+ *  - Creating [listState] via [rememberLazyListState]
+ *  - Computing [showTodayDivider] and [totalItemCount]
+ *  - Providing [recordingDurationMs] (ticked externally, driven by [state.isRecording])
+ *  - Wiring [onAttachmentSourceSheet] to show the source sheet sibling
+ */
+@Composable
+fun ChatContent(
+    state: ChatScreenState,
+    onIntent: (ChatScreenIntent) -> Unit,
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    snackbarHostState: SnackbarHostState,
+    showTodayDivider: Boolean,
+    totalItemCount: Int,
+    recordingDurationMs: Long,
+    isDragCancel: Boolean,
+    onDragCancelChanged: (Boolean) -> Unit,
+    onAttachmentSourceSheet: () -> Unit,
+    onVoiceRecordingStarted: (() -> Unit)?,
+    onVoiceRecordingStopped: (() -> Unit)?,
+    onVoiceRecordingCancelled: (() -> Unit)?,
+    onNavigateToPaywall: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
+    // Welcome bubble is a UI affordance, not data
+    val welcomeText = stringResource(Res.string.chat_assistant_welcome)
+    val welcomeBubble = remember(welcomeText) {
+        ChatMessage(
+            id = "__welcome",
+            role = ChatRole.Assistant,
+            content = welcomeText,
+            timestamp = 0L,
+        )
+    }
+
+    // IME scroll-anchor fix: re-run scrollToItem(0) when keyboard opens/closes so the
+    // reverseLayout list stays pinned to the bottom after viewport resize.
+    // MUST use imeBottom as a LaunchedEffect key — totalItemCount alone is insufficient.
+    val density = LocalDensity.current
+    val imeBottom = WindowInsets.ime.getBottom(density)
+    val hasInitializedScroll = remember { mutableStateOf(false) }
+    LaunchedEffect(totalItemCount, imeBottom) {
+        if (totalItemCount > 0) {
+            if (!hasInitializedScroll.value) {
+                listState.scrollToItem(0)
+                hasInitializedScroll.value = true
+            } else {
+                listState.animateScrollToItem(0)
+            }
+        }
+    }
+
+    Column(
+        modifier = modifier
+            .imePadding(),
+    ) {
+        // Pricing info band — sits directly below the TopAppBar / sheet header,
+        // above the message list.
+        ChatPricingRow(
+            onWhyClick = { onIntent(ChatScreenIntent.OnHelpClick) },
+        )
+
+        // Message list — occupies all remaining vertical space
+        LazyColumn(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .adaptiveContentWidth(),
+            state = listState,
+            reverseLayout = true,
+            contentPadding = PaddingValues(
+                horizontal = AppDimens.ScreenPaddingHorizontal,
+                vertical = AppDimens.SpacingMd,
+            ),
+            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd),
+        ) {
+            if (state.isProcessing && state.pendingPreview == null && state.pendingAgentPlan == null) {
+                item(key = "__typing") {
+                    ChatTypingIndicator()
+                }
+            }
+
+            state.pendingAgentPlan?.let { plan ->
+                item(key = "agent_plan_card") {
+                    AgentPlanCard(
+                        plan = plan,
+                        onApply = { onIntent(ChatScreenIntent.OnAgentPlanApply) },
+                        onCancel = { onIntent(ChatScreenIntent.OnAgentPlanCancel) },
+                        modifier = Modifier.padding(bottom = AppDimens.SpacingSm),
+                    )
+                }
+            }
+
+            state.pendingPreview?.let { preview ->
+                item(key = "preview_card") {
+                    ChatPreviewCard(
+                        preview = preview,
+                        onApply = { onIntent(ChatScreenIntent.OnPreviewApply) },
+                        onCancel = { onIntent(ChatScreenIntent.OnPreviewCancel) },
+                        onReject = { onIntent(ChatScreenIntent.OnPreviewReject) },
+                        onItemTextChange = { onIntent(ChatScreenIntent.OnPreviewItemTextChange(it)) },
+                        showRejectButton = preview.toolCall !is ToolCall.CreateChecklistFromAttachment,
+                        modifier = Modifier.padding(bottom = AppDimens.SpacingSm),
+                    )
+                }
+            }
+
+            items(
+                items = state.messages.asReversed(),
+                key = { it.id },
+            ) { message ->
+                ChatMessageBubble(
+                    message = message,
+                    onFeedbackClick = { onIntent(ChatScreenIntent.OnFeedbackOpen(it)) },
+                    onThumbUpClick = { onIntent(ChatScreenIntent.OnThumbUpClick(it)) },
+                    onOpenChecklist = message.linkedChecklistId?.let { id ->
+                        { onIntent(ChatScreenIntent.OnOpenChecklist(id)) }
+                    },
+                    onAskAiFallback = message.askAiForText?.let { text ->
+                        { onIntent(ChatScreenIntent.OnAskAiFallback(text)) }
+                    },
+                    showSenderLabel = message.role == ChatRole.Assistant,
+                )
+            }
+
+            if (showTodayDivider) {
+                item(key = "__day_divider") {
+                    com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatDayDivider()
+                }
+            }
+
+            item(key = "__welcome") {
+                ChatMessageBubble(
+                    message = welcomeBubble,
+                    showSenderLabel = false,
+                )
+            }
+        }
+
+        // Recording overlay — slides in from bottom when mic is active
+        ChatRecordingOverlay(
+            isRecording = state.isRecording,
+            durationMs = recordingDurationMs,
+            isDragCancel = isDragCancel,
+        )
+
+        // Pending attachment chips
+        ChatAttachmentChipStrip(
+            attachments = state.pendingAttachments,
+            onRemove = { path -> onIntent(ChatScreenIntent.OnRemoveAttachment(path)) },
+        )
+
+        // Input row — always pinned above the keyboard
+        ChatInputRow(
+            text = state.inputText,
+            onTextChange = { onIntent(ChatScreenIntent.OnInputChange(it)) },
+            onSend = { onIntent(ChatScreenIntent.OnSendClick) },
+            onAttachFileClick = onAttachmentSourceSheet,
+            onVoiceRecordingStarted = {
+                onIntent(ChatScreenIntent.OnVoiceRecordingStarted)
+                onVoiceRecordingStarted?.invoke()
+            },
+            onVoiceRecordingStopped = {
+                onVoiceRecordingStopped?.invoke()
+            },
+            onVoiceRecordingCancelled = {
+                onVoiceRecordingCancelled?.invoke()
+            },
+            onHelpClick = { onIntent(ChatScreenIntent.OnFeaturesHelpClick) },
+            hasAttachments = state.pendingAttachments.isNotEmpty(),
+            isEnabled = !state.isProcessing && state.pendingAgentPlan == null,
+            canSend = state.canSend,
+            isRecording = state.isRecording,
+            isTranscribing = state.isTranscribing,
+            onDragCancelChanged = onDragCancelChanged,
         )
     }
 }

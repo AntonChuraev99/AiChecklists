@@ -67,6 +67,18 @@ internal class ToolCallPreviewRendererImpl : ToolCallPreviewRenderer {
             append(" to • ${toolCall.itemText}")
             toolCall.checklistHint?.let { append(" (in $it)") }
         }
+
+        is ToolCall.AddItems -> buildString {
+            append(toolCall.itemTexts.joinToString("\n") { "• $it" })
+            toolCall.checklistHint?.let { append("\n→ $it") }
+        }
+
+        // ReadChecklist is agent-only read operation — never shown as a preview card
+        is ToolCall.ReadChecklist -> ""
+
+        is ToolCall.RenameChecklist -> buildString {
+            append("${toolCall.checklistHint} → ${toolCall.newName}")
+        }
     }
 
     // ─── Timestamp helpers (kotlinx-datetime, KMP-safe) ──────────────────────

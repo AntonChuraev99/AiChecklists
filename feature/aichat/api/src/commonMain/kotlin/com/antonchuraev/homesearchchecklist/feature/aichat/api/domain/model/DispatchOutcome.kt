@@ -25,6 +25,17 @@ sealed interface DispatchOutcome {
 
     data class AmbiguousMatch(val candidates: List<String>) : DispatchOutcome
 
+    /**
+     * Result of a [ToolCall.ReadChecklist] — the actual items of one checklist.
+     * Read-only; carries the D3 payload (item text) the agent serializes back to
+     * Gemini as a function_response so the model can reason over real list contents.
+     */
+    data class ChecklistContent(
+        val checklistName: String,
+        val items: List<ReadChecklistItem>,
+        val checklistId: Long? = null,
+    ) : DispatchOutcome
+
     data class NotFound(
         val messageKey: String,
         val args: List<String> = emptyList(),
@@ -32,3 +43,9 @@ sealed interface DispatchOutcome {
 
     data object RequiresPremium : DispatchOutcome
 }
+
+/** One item returned by [DispatchOutcome.ChecklistContent] (read-only agent payload). */
+data class ReadChecklistItem(
+    val text: String,
+    val checked: Boolean,
+)

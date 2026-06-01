@@ -5,6 +5,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -66,8 +67,11 @@ fun ChatTypingIndicator(
                 bottomEnd = 16.dp,
                 bottomStart = 4.dp,
             ),
-            // md.sys.color.surface-container-high — matches ChatMessageBubble assistant color
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            // Clean assistant bubble — matches ChatMessageBubble's received bubble:
+            // `surfaceContainerLowest` (white in light) + hairline `outlineVariant` border,
+            // instead of the previous grey `surfaceContainerHigh` tonal fill.
+            color = MaterialTheme.colorScheme.surfaceContainerLowest,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             modifier = Modifier.widthIn(max = 80.dp),
         ) {
             Row(

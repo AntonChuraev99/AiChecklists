@@ -64,6 +64,33 @@ private val NeutralVariant80 = Color(0xFFCAC4D0)
 private val NeutralVariant90 = Color(0xFFE7E0EC)
 
 // ---------------------------------------------------------------------------
+// Gisti "variant D" warm surfaces (light) — replaces the M3 violet-leaning
+// neutrals with a calm cream/beige tint so the app reads "warm & alive" instead
+// of cold-clinical. Same tone (luminance) as the originals → contrast preserved.
+// New named vals (not mutating the shared Neutral* set) keep the dark scheme intact.
+// ---------------------------------------------------------------------------
+private val WarmSurface     = Color(0xFFFBFAF8) // app surface/background — warm cream
+private val WarmCardWhite    = Color(0xFFFFFFFF) // cards — pure white (surfaceContainerLowest)
+private val WarmContainerLow = Color(0xFFF6F5F2) // cardAlt
+private val WarmContainer    = Color(0xFFF1F0ED) // neutral chips
+private val WarmContainerHigh = Color(0xFFECEAE6) // progress track / pressed
+private val WarmContainerHighest = Color(0xFFE6E4DF)
+private val WarmSurfaceDim   = Color(0xFFDEDCD6)
+private val WarmSurfaceVariant = Color(0xFFEDEBE6)
+private val WarmOutlineVariant = Color(0xFFE2E0DB) // soft card borders / dividers
+
+// Cool-neutral charcoals (dark) — de-violeted to match the design's neutral
+// near-black surfaces (#0F1115 family) instead of the M3 purple-leaning Neutral6.
+private val CoolDark4  = Color(0xFF0D0E11)
+private val CoolDark6  = Color(0xFF121317) // dark surface/background
+private val CoolDark10 = Color(0xFF1A1C20)
+private val CoolDark12 = Color(0xFF1E2025)
+private val CoolDark17 = Color(0xFF26282E)
+private val CoolDark22 = Color(0xFF2D2F35)
+private val CoolDark24 = Color(0xFF303239)
+private val CoolDarkOutlineVariant = Color(0xFF2C2F36)
+
+// ---------------------------------------------------------------------------
 // Legacy named colors (kept for backward compat / raw usage in Color.kt only)
 // ---------------------------------------------------------------------------
 
@@ -119,25 +146,25 @@ val LightColorScheme = lightColorScheme(
     onError = White,
     errorContainer = Red90,
     onErrorContainer = Red10,
-    background = Neutral98,
+    background = WarmSurface,
     onBackground = Neutral10,
-    surface = Neutral98,
+    surface = WarmSurface,
     onSurface = Neutral10,
-    surfaceVariant = NeutralVariant90,
+    surfaceVariant = WarmSurfaceVariant,
     onSurfaceVariant = NeutralVariant30,
-    surfaceContainerLowest = White,
-    surfaceContainerLow = Neutral96,
-    surfaceContainer = Neutral94,
-    surfaceContainerHigh = Neutral92,
-    surfaceContainerHighest = Neutral90,
+    surfaceContainerLowest = WarmCardWhite,
+    surfaceContainerLow = WarmContainerLow,
+    surfaceContainer = WarmContainer,
+    surfaceContainerHigh = WarmContainerHigh,
+    surfaceContainerHighest = WarmContainerHighest,
     inverseSurface = Neutral20,
     inverseOnSurface = Neutral95,
     inversePrimary = Blue80,
     outline = NeutralVariant50,
-    outlineVariant = NeutralVariant80,
+    outlineVariant = WarmOutlineVariant,
     scrim = Color.Black,
-    surfaceBright = Neutral98,
-    surfaceDim = Neutral87
+    surfaceBright = WarmSurface,
+    surfaceDim = WarmSurfaceDim
 )
 
 // ---------------------------------------------------------------------------
@@ -166,24 +193,24 @@ val DarkColorScheme = darkColorScheme(
     onError = Red10,
     errorContainer = Red30,
     onErrorContainer = Red90,
-    background = Neutral6,
+    background = CoolDark6,
     onBackground = Neutral90,
-    surface = Neutral6,
+    surface = CoolDark6,
     onSurface = Neutral90,
     surfaceVariant = NeutralVariant30,
     onSurfaceVariant = NeutralVariant80,
-    surfaceContainerLowest = Neutral4,
-    surfaceContainerLow = Neutral10,
-    surfaceContainer = Neutral12,
-    surfaceContainerHigh = Neutral17,
-    surfaceContainerHighest = Neutral22,
+    surfaceContainerLowest = CoolDark4,
+    surfaceContainerLow = CoolDark10,
+    surfaceContainer = CoolDark12,
+    surfaceContainerHigh = CoolDark17,
+    surfaceContainerHighest = CoolDark22,
     inverseSurface = Neutral90,
     inverseOnSurface = Neutral20,
     inversePrimary = Blue40,
     outline = NeutralVariant60,
-    outlineVariant = NeutralVariant30,
+    outlineVariant = CoolDarkOutlineVariant,
     scrim = Color.Black,
-    surfaceBright = Neutral24,
-    surfaceDim = Neutral6
+    surfaceBright = CoolDark24,
+    surfaceDim = CoolDark6
 )
 

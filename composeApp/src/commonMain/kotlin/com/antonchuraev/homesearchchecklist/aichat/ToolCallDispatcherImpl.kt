@@ -6,6 +6,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.dispatcher.ToolCa
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AttachmentSource
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatAttachment
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.DispatchOutcome
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ReadChecklistItem
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ToolCall
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.mimeTypeToAttachmentSource
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.analyzer.AiAnalyzer
@@ -73,6 +74,9 @@ class ToolCallDispatcherImpl(
             is ToolCall.FindItemsQuery -> handleFind(toolCall)
             is ToolCall.CreateChecklistFromAttachment -> handleCreateChecklistFromAttachment(toolCall)
             is ToolCall.AttachToItem -> handleAttachToItem(toolCall)
+            is ToolCall.AddItems -> handleAddItems(toolCall)
+            is ToolCall.ReadChecklist -> handleReadChecklist(toolCall)
+            is ToolCall.RenameChecklist -> handleRenameChecklist(toolCall)
         }
     }.getOrElse { e ->
         logger.error(TAG, "dispatch failed for ${toolCall::class.simpleName}", e)
@@ -429,6 +433,71 @@ class ToolCallDispatcherImpl(
                 linkedChecklistId = checklist.id,
             )
         }
+    }
+
+    // ─── AddItems ─────────────────────────────────────────────────────────────
+
+    private suspend fun handleAddItems(toolCall: ToolCall.AddItems): DispatchOutcome {
+        if (toolCall.itemTexts.isEmpty()) {
+            return DispatchOutcome.NotFound("chat_dispatch_add_empty", emptyList())
+        }
+
+        val (checklist, fill) = resolveChecklistAndFill(toolCall.checklistHint)
+            ?: return resolveChecklistFailure(toolCall.checklistHint)
+
+        val newFillItems = toolCall.itemTexts.map { ChecklistFillItem(text = it, checked = false) }
+        val updatedFill = fill.copy(items = fill.items + newFillItems)
+        checklistRepository.updateFill(updatedFill)
+
+        val newTemplateItems = toolCall.itemTexts.map { ChecklistItem(text = it, checked = false) }
+        val updatedChecklist = checklist.copy(items = checklist.items + newTemplateItems)
+        checklistRepository.updateChecklistTemplate(updatedChecklist)
+
+        return DispatchOutcome.Success(
+            "chat_dispatch_added_many_to",
+            listOf(toolCall.itemTexts.size.toString(), checklist.name),
+            linkedChecklistId = checklist.id,
+        )
+    }
+
+    // ─── ReadChecklist ────────────────────────────────────────────────────────
+
+    private suspend fun handleReadChecklist(toolCall: ToolCall.ReadChecklist): DispatchOutcome {
+        val (checklist, fill) = resolveChecklistAndFill(toolCall.name)
+            ?: return resolveChecklistFailure(toolCall.name)
+
+        val items = fill.items.map { item ->
+            ReadChecklistItem(text = item.text, checked = item.checked)
+        }
+        return DispatchOutcome.ChecklistContent(
+            checklistName = checklist.name,
+            items = items,
+            checklistId = checklist.id,
+        )
+    }
+
+    // ─── RenameChecklist ──────────────────────────────────────────────────────
+
+    private suspend fun handleRenameChecklist(toolCall: ToolCall.RenameChecklist): DispatchOutcome {
+        val allChecklists = checklistRepository.checklists.first()
+        val matches = allChecklists.filter { it.name.contains(toolCall.checklistHint, ignoreCase = true) }
+        val checklist = when {
+            matches.isEmpty() -> return DispatchOutcome.NotFound(
+                "chat_dispatch_no_checklist_match",
+                listOf(toolCall.checklistHint),
+            )
+            matches.size == 1 -> matches.first()
+            else -> return DispatchOutcome.AmbiguousMatch(matches.take(3).map { it.name })
+        }
+
+        val oldName = checklist.name
+        checklistRepository.updateChecklistTemplate(checklist.copy(name = toolCall.newName))
+
+        return DispatchOutcome.Success(
+            "chat_dispatch_renamed",
+            listOf(oldName, toolCall.newName),
+            linkedChecklistId = checklist.id,
+        )
     }
 
     // ─── Attachment helpers ───────────────────────────────────────────────────

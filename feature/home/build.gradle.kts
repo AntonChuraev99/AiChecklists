@@ -67,6 +67,8 @@ kotlin {
         }
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)
+            // ui-tooling provides @PreviewLightDark and other preview annotations for androidMain
+            implementation(libs.androidx.compose.ui.tooling)
         }
     }
 }
