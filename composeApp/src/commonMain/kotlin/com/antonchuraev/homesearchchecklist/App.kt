@@ -114,12 +114,23 @@ import aichecklists.core.designsystem.generated.resources.main_prompt_photo
 import aichecklists.core.designsystem.generated.resources.main_prompt_remind
 import aichecklists.core.designsystem.generated.resources.main_prompt_link
 import aichecklists.core.designsystem.generated.resources.main_prompt_plan_day
-import aichecklists.core.designsystem.generated.resources.main_prompt_pdf
 import aichecklists.core.designsystem.generated.resources.main_prompt_link_prefill
 import aichecklists.core.designsystem.generated.resources.main_prompt_remind_prefill
 import aichecklists.core.designsystem.generated.resources.main_prompt_plan_day_query
+import aichecklists.core.designsystem.generated.resources.checklist_prompt_whats_missing
+import aichecklists.core.designsystem.generated.resources.checklist_prompt_generate_ideas
+import aichecklists.core.designsystem.generated.resources.checklist_prompt_add_items
+import aichecklists.core.designsystem.generated.resources.checklist_prompt_summary
+import aichecklists.core.designsystem.generated.resources.checklist_prompt_remind
+import aichecklists.core.designsystem.generated.resources.checklist_prompt_whats_missing_query
+import aichecklists.core.designsystem.generated.resources.checklist_prompt_generate_ideas_query
+import aichecklists.core.designsystem.generated.resources.checklist_prompt_summary_query
+import aichecklists.core.designsystem.generated.resources.checklist_prompt_add_items_query
+import aichecklists.core.designsystem.generated.resources.checklist_prompt_remind_prefill
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiPromptChips
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiQuickAction
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiChecklistAction
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiChecklistPromptChips
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiDefaultPromptChips
 import org.jetbrains.compose.resources.stringResource
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavRoute
@@ -397,6 +408,16 @@ fun App() {
             val quickRemindPrefill = stringResource(Res.string.main_prompt_remind_prefill)
             val quickPlanDayQuery = stringResource(Res.string.main_prompt_plan_day_query)
 
+            // Checklist-detail contextual quick-action seeds (resolved here — @Composable scope).
+            // WHATS_MISSING / SUMMARY / ADD_ITEMS are reasoning queries sent immediately so the
+            // agent (anchored to the open checklist) answers in the dock; REMIND only prefills the
+            // input so the user completes the reminder phrase.
+            val quickWhatsMissingQuery = stringResource(Res.string.checklist_prompt_whats_missing_query)
+            val quickGenerateIdeasQuery = stringResource(Res.string.checklist_prompt_generate_ideas_query)
+            val quickSummaryQuery = stringResource(Res.string.checklist_prompt_summary_query)
+            val quickAddItemsQuery = stringResource(Res.string.checklist_prompt_add_items_query)
+            val quickChecklistRemindPrefill = stringResource(Res.string.checklist_prompt_remind_prefill)
+
             // Maps a home-screen prompt chip [GistiQuickAction] to its own chat flow.
             // All actions open the inline dock with NO checklist context (home = create-new).
             // - PHOTO / PDF: open dock + trigger the existing attachment picker; the attachment
@@ -419,6 +440,40 @@ fun App() {
                         chatViewModel.sendIntent(ChatScreenIntent.OnPrefillInput(quickRemindPrefill))
                     GistiQuickAction.PLAN_DAY ->
                         chatViewModel.sendIntent(ChatScreenIntent.OnPrefillAndSend(quickPlanDayQuery))
+                }
+            }
+
+            // Maps a checklist-detail contextual prompt chip [GistiChecklistAction] to its chat flow,
+            // anchored to a SPECIFIC checklist. Called from:
+            //  - the chips ABOVE the input on ChecklistDetailScreen (the dock isn't open yet → this
+            //    opens it with that checklist as context), and
+            //  - the chips inside the already-open dock (context is re-seeded to the same id).
+            //
+            // IMPORTANT (context-vs-send ordering): OnSetContextChecklist is sent SYNCHRONOUSLY here,
+            // immediately before OnPrefillAndSend. Both are sequential sendIntent() calls processed in
+            // order by the ViewModel, so the agent request carries the checklist context. We do NOT
+            // rely on the LaunchedEffect(chatSheetOpen, chatSheetContextId) below (it re-seeds context
+            // too, but only AFTER recomposition — too late for the synchronous send in OnPrefillAndSend).
+            val onChecklistQuickAction: (Long, String?, GistiChecklistAction) -> Unit = { checklistId, checklistName, action ->
+                chatSheetContextId = checklistId
+                chatSheetContextLabel = checklistName
+                chatSheetOpen = true
+                chatViewModel.sendIntent(ChatScreenIntent.OnSetContextChecklist(checklistId))
+                when (action) {
+                    // Reasoning chips: forceAgent=true routes straight to the reasoning agent,
+                    // bypassing Layer 1/2 which mis-classify these as FindItems → "Nothing matches"
+                    // (Amplitude bug, 2026-06-02). The agent uses read_checklist on the open list.
+                    GistiChecklistAction.WHATS_MISSING ->
+                        chatViewModel.sendIntent(ChatScreenIntent.OnPrefillAndSend(quickWhatsMissingQuery, forceAgent = true))
+                    GistiChecklistAction.GENERATE_IDEAS ->
+                        chatViewModel.sendIntent(ChatScreenIntent.OnPrefillAndSend(quickGenerateIdeasQuery, forceAgent = true))
+                    GistiChecklistAction.SUMMARY ->
+                        chatViewModel.sendIntent(ChatScreenIntent.OnPrefillAndSend(quickSummaryQuery, forceAgent = true))
+                    GistiChecklistAction.ADD_ITEMS ->
+                        chatViewModel.sendIntent(ChatScreenIntent.OnPrefillAndSend(quickAddItemsQuery, forceAgent = true))
+                    // REMIND only pre-fills the input (user picks the time), so no send/classify.
+                    GistiChecklistAction.REMIND ->
+                        chatViewModel.sendIntent(ChatScreenIntent.OnPrefillInput(quickChecklistRemindPrefill))
                 }
             }
 
@@ -827,6 +882,9 @@ fun App() {
                             onMicChatSheet = { checklistId, checklistName ->
                                 onOpenChatSheetMic(checklistId, checklistName)
                             },
+                            onChecklistQuickAction = { checklistId, checklistName, action ->
+                                onChecklistQuickAction(checklistId, checklistName, action)
+                            },
                         )
                     }
 
@@ -1044,20 +1102,40 @@ fun App() {
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.fillMaxWidth(),
                         )
-                        GistiPromptChips(
-                            chips = gistiDefaultPromptChips(
-                                photoLabel = stringResource(Res.string.main_prompt_photo),
-                                remindLabel = stringResource(Res.string.main_prompt_remind),
-                                linkLabel = stringResource(Res.string.main_prompt_link),
-                                planDayLabel = stringResource(Res.string.main_prompt_plan_day),
-                                pdfLabel = stringResource(Res.string.main_prompt_pdf),
-                            ),
-                            // In the empty dock, a chip drives the same quick-action flow
-                            // (the dock is already open, so onQuickAction just re-seeds context
-                            // null and fires the picker / prefill for the tapped action).
-                            onChipClick = onQuickAction,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
+                        // Context-aware chip set: when the dock was opened anchored to a
+                        // checklist (chatSheetContextId != null) show the contextual checklist
+                        // chips; otherwise the home/create-new chips. The contextId is captured
+                        // in a local so the smart-cast survives across the lambda.
+                        val dockContextId = chatSheetContextId
+                        if (dockContextId != null) {
+                            GistiPromptChips(
+                                chips = gistiChecklistPromptChips(
+                                    whatsMissingLabel = stringResource(Res.string.checklist_prompt_whats_missing),
+                                    generateIdeasLabel = stringResource(Res.string.checklist_prompt_generate_ideas),
+                                    addItemsLabel = stringResource(Res.string.checklist_prompt_add_items),
+                                    summaryLabel = stringResource(Res.string.checklist_prompt_summary),
+                                    remindLabel = stringResource(Res.string.checklist_prompt_remind),
+                                ),
+                                onChipClick = { action ->
+                                    onChecklistQuickAction(dockContextId, chatSheetContextLabel, action)
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        } else {
+                            GistiPromptChips(
+                                chips = gistiDefaultPromptChips(
+                                    photoLabel = stringResource(Res.string.main_prompt_photo),
+                                    remindLabel = stringResource(Res.string.main_prompt_remind),
+                                    linkLabel = stringResource(Res.string.main_prompt_link),
+                                    planDayLabel = stringResource(Res.string.main_prompt_plan_day),
+                                ),
+                                // In the empty dock, a chip drives the same quick-action flow
+                                // (the dock is already open, so onQuickAction just re-seeds context
+                                // null and fires the picker / prefill for the tapped action).
+                                onChipClick = onQuickAction,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
                     }
                 },
                 inputContent = {

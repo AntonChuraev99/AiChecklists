@@ -144,8 +144,19 @@ sealed interface ChatScreenIntent : Intent {
      * Used by the PLAN_DAY quick-action ("What should I do today?") so the answer appears in
      * the dock without the user retyping. Setting state then sending is safe because state
      * updates are synchronous and [handleSend] reads the freshly-set [ChatScreenState.inputText].
+     *
+     * @param forceAgent When true, the message bypasses Layer 1/2 classification and goes
+     *                   straight to the reasoning agent ([runAgentTurn], Layer 3). Used by the
+     *                   checklist-detail reasoning chips (What's missing? / Summary / Add items):
+     *                   their intent is already known to be a free-form question about the open
+     *                   checklist, so classifying them is not just wasteful but actively harmful —
+     *                   Layer 1/2 mis-route them to FindItems ("Nothing matches") or Unknown.
+     *                   Default false preserves the existing PLAN_DAY behaviour (normal classify).
      */
-    data class OnPrefillAndSend(val text: String) : ChatScreenIntent
+    data class OnPrefillAndSend(
+        val text: String,
+        val forceAgent: Boolean = false,
+    ) : ChatScreenIntent
 
     /** User tapped Send (or IME action) with non-blank input. */
     data object OnSendClick : ChatScreenIntent

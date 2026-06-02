@@ -128,6 +128,16 @@
     <string name="main_prompt_link_prefill">Create a list from: </string>
     <string name="main_prompt_remind_prefill">Remind me to </string>
     <string name="main_prompt_plan_day_query">What should I do today?</string>
+    <string name="checklist_prompt_whats_missing">What's missing?</string>
+    <string name="checklist_prompt_generate_ideas">Generate ideas</string>
+    <string name="checklist_prompt_add_items">Add items</string>
+    <string name="checklist_prompt_summary">Summary</string>
+    <string name="checklist_prompt_remind">Remind me</string>
+    <string name="checklist_prompt_whats_missing_query">What's missing from this checklist?</string>
+    <string name="checklist_prompt_generate_ideas_query">Generate fresh ideas for items I could add to this checklist.</string>
+    <string name="checklist_prompt_summary_query">Summarize my progress on this checklist.</string>
+    <string name="checklist_prompt_add_items_query">Suggest more items for this checklist.</string>
+    <string name="checklist_prompt_remind_prefill">Remind me </string>
     <string name="main_free_lists_used">%1$d of %2$d free lists used</string>
     <string name="main_menu">Menu</string>
     <string name="main_menu_support">Support</string>

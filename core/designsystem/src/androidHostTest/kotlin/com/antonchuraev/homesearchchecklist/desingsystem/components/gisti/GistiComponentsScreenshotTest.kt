@@ -94,6 +94,18 @@ class GistiComponentsScreenshotTest {
         composeTestRule.onRoot().captureRoboImage()
     }
 
+    @Test
+    fun gistiChecklistPromptChips_light() {
+        composeTestRule.setContent { GistiChecklistPromptChipsPreviewContent(darkTheme = false) }
+        composeTestRule.onRoot().captureRoboImage()
+    }
+
+    @Test
+    fun gistiChecklistPromptChips_dark() {
+        composeTestRule.setContent { GistiChecklistPromptChipsPreviewContent(darkTheme = true) }
+        composeTestRule.onRoot().captureRoboImage()
+    }
+
     // -------------------------------------------------------------------------
     // AppGradientButton
     // -------------------------------------------------------------------------
@@ -234,6 +246,28 @@ private fun GistiPromptChipsPreviewContent(darkTheme: Boolean) {
                     GistiPromptChip(emoji = "📷", label = "Photo → list", action = GistiQuickAction.PHOTO),
                     GistiPromptChip(emoji = "🔔", label = "Remind me…", action = GistiQuickAction.REMIND),
                     GistiPromptChip(emoji = "🔗", label = "Link → list", action = GistiQuickAction.LINK),
+                ),
+                onChipClick = {},
+            )
+        }
+    }
+}
+
+@Composable
+private fun GistiChecklistPromptChipsPreviewContent(darkTheme: Boolean) {
+    AppTheme(darkTheme = darkTheme) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(16.dp),
+        ) {
+            GistiPromptChips(
+                chips = gistiChecklistPromptChips(
+                    whatsMissingLabel = "What's missing?",
+                    addItemsLabel = "Add items",
+                    summaryLabel = "Summary",
+                    remindLabel = "Remind me",
                 ),
                 onChipClick = {},
             )

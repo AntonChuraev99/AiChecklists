@@ -146,19 +146,31 @@ fun GistiChatDock(
  * ```
  *
  * The two "Fill" actions are **no longer** in this bar — they moved to a TopAppBar action
- * that opens [FillOptionsSheet]. This bar now hosts ONLY the context-aware chat dock.
+ * that opens [FillOptionsSheet]. This bar now hosts the contextual prompt chips (optional)
+ * ABOVE the context-aware chat dock.
+ *
+ * Layout note (edge-to-edge chips): [chipsContent] is rendered OUTSIDE the horizontally-padded
+ * inner Column so the chip row keeps its own `contentPadding` edge-bleed (the last chip scrolls
+ * out from under the screen edge as a scroll affordance). Wrapping the chips in this bar's
+ * horizontal padding would stack padding and kill the bleed (see `.claude/rules/ui-card-patterns.md`).
+ * The dock pill stays inside the padded Column.
  *
  * This is a pure-UI shell. @android-expert:
  *  - Keep using this composable for `ChecklistDetailScreen.bottomBar`.
  *  - Add a TopAppBar action icon (e.g. `Icons.Outlined.PostAdd`) that toggles a
  *    `showFillSheet` flag; render [FillOptionsSheet] when true.
  *  - Pass `onChatClick` / `onMicClick` from App.kt (sheet wiring).
+ *  - Pass [chipsContent] = `{ GistiPromptChips(gistiChecklistPromptChips(...), ...) }` for the
+ *    contextual quick-action chips above the dock (no outer horizontal padding on the chips).
  *
  * @param checklistName       Current checklist name — passed as the context label.
  * @param onChatClick         Opens the chat sheet anchored to this checklist.
  * @param onMicClick          Opens the sheet in voice-input mode.
  * @param chatPlaceholder     Localised placeholder for the dock bar.
  * @param micContentDescription Accessibility label for mic.
+ * @param chipsContent        Optional slot for the contextual prompt-chip row, rendered above the
+ *                            dock pill with NO horizontal padding (the chips inset themselves).
+ *                            Pass `null` to render the dock only.
  */
 @Composable
 fun ChecklistDetailBottomBar(
@@ -168,6 +180,7 @@ fun ChecklistDetailBottomBar(
     chatPlaceholder: String = "Ask Gisti…",
     micContentDescription: String = "Voice input",
     modifier: Modifier = Modifier,
+    chipsContent: (@Composable () -> Unit)? = null,
 ) {
     Surface(
         // Flat bottom bar — NO shadow (user request 2026-06-02). The theme's `surface` and
@@ -183,18 +196,27 @@ fun ChecklistDetailBottomBar(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
                 .padding(top = AppDimens.SpacingMd, bottom = AppDimens.SpacingLg)
                 .navigationBarsPadding(),
+            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
         ) {
-            // Context-aware dock: "Ask about this list…"
+            // Contextual prompt chips — edge-to-edge (own contentPadding, NO outer horizontal
+            // padding here so the last chip bleeds past the screen edge as a scroll affordance).
+            // Vertical top/bottom padding lives on this outer Column; horizontal padding is applied
+            // only on the dock pill below so the chips can bleed past the screen edge.
+            chipsContent?.invoke()
+
+            // Context-aware dock: "Ask about this list…". Horizontal screen padding lives HERE
+            // (on the dock only) so the pill is inset normally while the chips above stay edge-to-edge.
             GistiChatDock(
                 placeholder = chatPlaceholder,
                 onClick = onChatClick,
                 onMicClick = onMicClick,
                 contextLabel = "“$checklistName”",
                 micContentDescription = micContentDescription,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = AppDimens.ScreenPaddingHorizontal),
             )
         }
     }

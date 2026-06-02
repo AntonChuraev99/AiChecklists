@@ -142,8 +142,9 @@ class ChatViewModel(
             is ChatScreenIntent.OnPrefillAndSend -> {
                 // Set text then dispatch in the same step (state updates are synchronous,
                 // so handleSend() sees the freshly-set inputText).
+                // forceAgent=true (checklist reasoning chips) bypasses classify() — see handleSend.
                 _screenState.value = _screenState.value.copy(inputText = intent.text)
-                handleSend()
+                handleSend(forceAgent = intent.forceAgent)
             }
 
             ChatScreenIntent.OnSendClick -> handleSend()
@@ -384,7 +385,18 @@ class ChatViewModel(
 
     // ─── Send flow ────────────────────────────────────────────────────────────
 
-    private fun handleSend() {
+    /**
+     * @param forceAgent When true, skip Layer 1/2 classification and route the message straight
+     *                  to the reasoning agent ([runAgentTurn]). Used by the checklist-detail
+     *                  reasoning chips (What's missing? / Summary / Add items) whose intent is
+     *                  already a free-form question about the open checklist — classifying them
+     *                  mis-routes to FindItems ("Nothing matches") or Unknown (Amplitude bug,
+     *                  2026-06-02). The user message is still appended + persisted; the agent's
+     *                  3-credit cost is attributed to the assistant reply (same as FreeForm).
+     *                  forceAgent is ignored for attachment-only sends (those have a dedicated
+     *                  CreateChecklistFromAttachment path that never reaches the agent).
+     */
+    private fun handleSend(forceAgent: Boolean = false) {
         val text = _screenState.value.inputText.trim()
         val attachments = _screenState.value.pendingAttachments
 
@@ -419,6 +431,28 @@ class ChatViewModel(
             pendingAttachments = emptyList(),
             isProcessing = true,
         )
+
+        // ── forceAgent fast-path: skip classify() and the when-block entirely ──
+        // The reasoning chips already know the intent is a free-form question, so any
+        // classification is at best wasteful and at worst harmful (Layer 1/2 mis-tag these
+        // as FindItems → "Nothing matches"). Tag the user message as FullChat (cost 0; the
+        // 3-credit charge lands on the assistant reply) and go straight to the agent loop.
+        if (forceAgent) {
+            val taggedUserMsg = userMsg.copy(routedLayer = RoutingLayer.FullChat, costCredits = 0)
+            updateMessage(userMsg.id) { taggedUserMsg }
+            viewModelScope.launch {
+                runCatching {
+                    withContext(NonCancellable) { chatHistoryRepository.append(taggedUserMsg) }
+                    val locale = localeProvider.current()
+                    runAgentTurn(text, locale)
+                }.onFailure { e ->
+                    logger.error(TAG, "handleSend(forceAgent) failed", e)
+                    _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_generic_error"))
+                    _screenState.value = _screenState.value.copy(isProcessing = false)
+                }
+            }
+            return
+        }
 
         viewModelScope.launch {
             runCatching {

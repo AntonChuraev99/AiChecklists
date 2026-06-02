@@ -147,6 +147,9 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonText
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.ChecklistDetailBottomBar
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.FillOptionsSheet
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiChecklistAction
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiPromptChips
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiChecklistPromptChips
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppItemMetaChip
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppTextField
@@ -206,6 +209,12 @@ fun ChecklistDetailScreen(
      * Called with (checklistId, checklistName). Wired by App.kt; used by the bottom-bar mic.
      */
     onMicChatSheet: ((Long, String) -> Unit)? = null,
+    /**
+     * Fires a contextual prompt-chip [GistiChecklistAction] for THIS checklist (chips above the
+     * chat input). Called with (checklistId, checklistName, action) so App.kt can set the chat
+     * context and dispatch the right prefill / send. Wired by App.kt.
+     */
+    onChecklistQuickAction: ((Long, String, GistiChecklistAction) -> Unit)? = null,
     viewModel: ChecklistDetailViewModel = koinViewModel(key = "checklist_detail_$checklistId") { parametersOf(checklistId) }
 ) {
     val analyticsTracker: AnalyticsTracker = koinInject()
@@ -232,6 +241,9 @@ fun ChecklistDetailScreen(
             },
             onMicChatSheet = onMicChatSheet?.let { cb ->
                 { cb(currentState.checklist.id, currentState.checklist.name) }
+            },
+            onChecklistQuickAction = onChecklistQuickAction?.let { cb ->
+                { action -> cb(currentState.checklist.id, currentState.checklist.name, action) }
             },
         )
     }
@@ -275,6 +287,7 @@ private fun ChecklistDetailContent(
     focusItemId: String? = null,
     onOpenChatSheet: (() -> Unit)? = null,
     onMicChatSheet: (() -> Unit)? = null,
+    onChecklistQuickAction: ((GistiChecklistAction) -> Unit)? = null,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     // Controls the FillOptionsSheet opened from the TopAppBar "Fill checklist" action.
@@ -579,6 +592,26 @@ private fun ChecklistDetailContent(
                     chatPlaceholder = stringResource(Res.string.main_ask_gisti_placeholder),
                     micContentDescription = stringResource(Res.string.main_ask_gisti_mic),
                     modifier = Modifier.fillMaxWidth(),
+                    // Contextual quick-action chips ABOVE the dock pill. They live in the same
+                    // bottom bar (so they hide in edit mode with the bar and rise with the IME),
+                    // but render edge-to-edge — the bar applies NO horizontal padding to this slot
+                    // (the chip row insets itself via its own contentPadding).
+                    chipsContent = onChecklistQuickAction?.let { onAction ->
+                        {
+                            GistiPromptChips(
+                                chips = gistiChecklistPromptChips(
+                                    whatsMissingLabel = stringResource(Res.string.checklist_prompt_whats_missing),
+                                    generateIdeasLabel = stringResource(Res.string.checklist_prompt_generate_ideas),
+                                    addItemsLabel = stringResource(Res.string.checklist_prompt_add_items),
+                                    summaryLabel = stringResource(Res.string.checklist_prompt_summary),
+                                    remindLabel = stringResource(Res.string.checklist_prompt_remind),
+                                ),
+                                onChipClick = onAction,
+                                onNewListClick = null,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    },
                 )
             }
         }

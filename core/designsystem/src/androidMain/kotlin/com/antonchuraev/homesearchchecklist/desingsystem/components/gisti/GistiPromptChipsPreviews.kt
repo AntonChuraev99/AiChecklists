@@ -28,7 +28,6 @@ private fun GistiPromptChipsDefaultPreview() {
                     remindLabel = "Remind me…",
                     linkLabel = "Link → list",
                     planDayLabel = "Plan day",
-                    pdfLabel = "PDF → list",
                 ),
                 onChipClick = {},
             )
@@ -52,6 +51,29 @@ private fun GistiPromptChipsCustomPreview() {
                     GistiPromptChip(emoji = "✈️", label = "Trip packing", action = GistiQuickAction.LINK),
                     GistiPromptChip(emoji = "💪", label = "Workout plan", action = GistiQuickAction.PLAN_DAY),
                     GistiPromptChip(emoji = "📚", label = "Study notes", action = GistiQuickAction.PDF),
+                ),
+                onChipClick = {},
+            )
+        }
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun GistiPromptChipsChecklistPreview() {
+    AppTheme(darkTheme = isSystemInDarkTheme()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(16.dp)
+        ) {
+            GistiPromptChips(
+                chips = gistiChecklistPromptChips(
+                    whatsMissingLabel = "What's missing?",
+                    addItemsLabel = "Add items",
+                    summaryLabel = "Summary",
+                    remindLabel = "Remind me",
                 ),
                 onChipClick = {},
             )

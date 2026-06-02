@@ -128,6 +128,16 @@
     <string name="main_prompt_link_prefill">Создай список из: </string>
     <string name="main_prompt_remind_prefill">Напомни мне </string>
     <string name="main_prompt_plan_day_query">Что мне сделать сегодня?</string>
+    <string name="checklist_prompt_whats_missing">Чего не хватает?</string>
+    <string name="checklist_prompt_generate_ideas">Идеи</string>
+    <string name="checklist_prompt_add_items">Добавить пункты</string>
+    <string name="checklist_prompt_summary">Итог</string>
+    <string name="checklist_prompt_remind">Напомнить</string>
+    <string name="checklist_prompt_whats_missing_query">Чего не хватает в этом чеклисте?</string>
+    <string name="checklist_prompt_generate_ideas_query">Сгенерируй свежие идеи, что можно добавить в этот чеклист.</string>
+    <string name="checklist_prompt_summary_query">Подведи итог моего прогресса по этому чеклисту.</string>
+    <string name="checklist_prompt_add_items_query">Предложи ещё пункты для этого чеклиста.</string>
+    <string name="checklist_prompt_remind_prefill">Напомни мне </string>
     <string name="main_free_lists_used">%1$d из %2$d бесплатных списков</string>
     <string name="main_menu">Меню</string>
     <string name="main_menu_support">Поддержка</string>

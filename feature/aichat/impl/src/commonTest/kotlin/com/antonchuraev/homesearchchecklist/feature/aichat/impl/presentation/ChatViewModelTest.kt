@@ -1678,4 +1678,191 @@ class ChatViewModelTest {
         assertNull(repo.agentStepContextNames.first(),
             "agentStep must receive null context name when no checklist is focused")
     }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // forceAgent — checklist reasoning chips bypass classify() (Amplitude bug fix)
+    // ══════════════════════════════════════════════════════════════════════════
+    //
+    // Context: the checklist-detail reasoning chips (What's missing? / Summary / Add items)
+    // send fixed reasoning questions whose intent is already known. Routing them through
+    // classify() mis-fires: Layer 1/2 tag them FindItems → toolCallDispatcher returns
+    // "Nothing matches", or Unknown → "I didn't catch that". Amplitude (debug 787810,
+    // 2026-06-02) shows exactly these bad answers. With forceAgent=true the ViewModel must
+    // skip classify() entirely and route straight to the reasoning agent (runAgentTurn).
+
+    /**
+     * Builds a repo that, if classify() were (wrongly) called, would mis-route to FindItems —
+     * reproducing the "Nothing matches" bug. The agent path returns a clean Final answer.
+     */
+    private fun forceAgentRepro(finalAnswer: String) = FakeAiChatRepository(
+        classifyResult = IntentClassification(
+            intent = ChatIntent.FindItems,
+            confidence = 0.9f,
+            layer = RoutingLayer.Local,
+        ),
+        agentStepResults = listOf(
+            AgentStepResult.Final(content = finalAnswer, creditsRemaining = 100),
+        ),
+    )
+
+    @Test
+    fun prefillAndSend_forceAgent_whatsMissing_routesToAgentNotFindItems() = runTest {
+        // "What's missing from this checklist?" — the WHATS_MISSING chip query.
+        val repo = forceAgentRepro("You might be missing: passport, charger.")
+        val fakeDispatcher = FakeToolCallDispatcher(
+            // If the buggy FindItems path ran, this is the "Nothing matches" outcome.
+            outcome = DispatchOutcome.Success("chat_dispatch_find_no_match", listOf("What's missing")),
+        )
+        val vm = makeVm(repo = repo, dispatcher = fakeDispatcher)
+
+        vm.sendIntent(
+            ChatScreenIntent.OnPrefillAndSend(
+                text = "What's missing from this checklist?",
+                forceAgent = true,
+            )
+        )
+        testScheduler.advanceUntilIdle()
+
+        // The reasoning agent must have handled the turn.
+        assertEquals(1, repo.agentStepCallCount,
+            "forceAgent must route the reasoning chip straight to the agent loop")
+        // classify() must NOT run — the chip's intent is already known.
+        assertEquals(0, repo.classifyCallCount,
+            "forceAgent must bypass classify() entirely (it mis-routes reasoning chips)")
+        // The FindItems dispatcher path (source of 'Nothing matches') must NOT run.
+        assertEquals(0, fakeDispatcher.dispatchCount,
+            "forceAgent must NOT dispatch FindItemsQuery — that produces 'Nothing matches'")
+        assertNull(fakeDispatcher.lastDispatched)
+        // Final reasoning answer is appended; no 'Nothing matches'.
+        val assistantMsgs = vm.screenState.value.messages.filter { it.role == ChatRole.Assistant }
+        assertEquals(1, assistantMsgs.size)
+        assertEquals("You might be missing: passport, charger.", assistantMsgs.first().content)
+        assertFalse(vm.screenState.value.isProcessing)
+    }
+
+    @Test
+    fun prefillAndSend_forceAgent_summary_routesToAgentNotFindItems() = runTest {
+        // "Give me a short summary of my progress." — the SUMMARY chip query.
+        val repo = forceAgentRepro("You're 3 of 5 done — 60% complete.")
+        val fakeDispatcher = FakeToolCallDispatcher(
+            outcome = DispatchOutcome.Success("chat_dispatch_find_no_match", listOf("Give me")),
+        )
+        val vm = makeVm(repo = repo, dispatcher = fakeDispatcher)
+
+        vm.sendIntent(
+            ChatScreenIntent.OnPrefillAndSend(
+                text = "Give me a short summary of my progress.",
+                forceAgent = true,
+            )
+        )
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(1, repo.agentStepCallCount, "Summary chip must route to the agent loop")
+        assertEquals(0, repo.classifyCallCount, "Summary chip must bypass classify()")
+        assertEquals(0, fakeDispatcher.dispatchCount, "Summary chip must NOT dispatch FindItemsQuery")
+        val assistantMsgs = vm.screenState.value.messages.filter { it.role == ChatRole.Assistant }
+        assertEquals(1, assistantMsgs.size)
+        assertEquals("You're 3 of 5 done — 60% complete.", assistantMsgs.first().content)
+    }
+
+    @Test
+    fun prefillAndSend_forceAgent_addItems_routesToAgentNotFindItems() = runTest {
+        // "What else can I add to this checklist?" — the ADD_ITEMS chip query.
+        val repo = forceAgentRepro("Consider adding: sunscreen, adapter.")
+        val fakeDispatcher = FakeToolCallDispatcher(
+            outcome = DispatchOutcome.Success("chat_dispatch_find_no_match", listOf("What else")),
+        )
+        val vm = makeVm(repo = repo, dispatcher = fakeDispatcher)
+
+        vm.sendIntent(
+            ChatScreenIntent.OnPrefillAndSend(
+                text = "What else can I add to this checklist?",
+                forceAgent = true,
+            )
+        )
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(1, repo.agentStepCallCount, "Add-items chip must route to the agent loop")
+        assertEquals(0, repo.classifyCallCount, "Add-items chip must bypass classify()")
+        assertEquals(0, fakeDispatcher.dispatchCount, "Add-items chip must NOT dispatch FindItemsQuery")
+        val assistantMsgs = vm.screenState.value.messages.filter { it.role == ChatRole.Assistant }
+        assertEquals(1, assistantMsgs.size)
+        assertEquals("Consider adding: sunscreen, adapter.", assistantMsgs.first().content)
+    }
+
+    @Test
+    fun prefillAndSend_forceAgent_appendsUserMessageAndForwardsContext() = runTest {
+        // forceAgent must still append the user message AND forward the open-checklist context
+        // (so the agent's read_checklist resolves to the right list).
+        val repo = forceAgentRepro("Looks complete to me.")
+        val checklistRepo = FakeChecklistRepository(seed = listOf(groceriesChecklist(id = 42L)))
+        val vm = makeVm(repo = repo, checklistRepo = checklistRepo)
+
+        vm.sendIntent(ChatScreenIntent.OnSetContextChecklist(checklistId = 42L))
+        vm.sendIntent(
+            ChatScreenIntent.OnPrefillAndSend(
+                text = "What's missing from this checklist?",
+                forceAgent = true,
+            )
+        )
+        testScheduler.advanceUntilIdle()
+
+        // User message is present in history.
+        val userMsgs = vm.screenState.value.messages.filter { it.role == ChatRole.User }
+        assertEquals(1, userMsgs.size, "forceAgent must still append the user message")
+        assertEquals("What's missing from this checklist?", userMsgs.first().content)
+        // Input field cleared after send.
+        assertEquals("", vm.screenState.value.inputText)
+        // Context name forwarded to the agent.
+        assertEquals(1, repo.agentStepCallCount)
+        assertEquals("Groceries", repo.agentStepContextNames.first(),
+            "forceAgent path must forward the resolved context checklist name to agentStep")
+    }
+
+    @Test
+    fun prefillAndSend_withoutForceAgent_stillClassifies_noRegression() = runTest {
+        // The PLAN_DAY chip and any other OnPrefillAndSend without forceAgent must keep the
+        // existing classify() behaviour. FreeForm → agent loop, but ONLY via classify().
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.FreeForm,
+                confidence = 1.0f,
+                layer = RoutingLayer.FullChat,
+            ),
+            agentStepResults = listOf(
+                AgentStepResult.Final(content = "Here's your day.", creditsRemaining = 100),
+            ),
+        )
+        val vm = makeVm(repo = repo)
+
+        vm.sendIntent(ChatScreenIntent.OnPrefillAndSend(text = "What should I do today?"))
+        testScheduler.advanceUntilIdle()
+
+        // classify() MUST run for the default (non-force) path — no regression.
+        assertEquals(1, repo.classifyCallCount,
+            "Default OnPrefillAndSend must still classify (PLAN_DAY behaviour unchanged)")
+        // It still reaches the agent because classify returned FreeForm.
+        assertEquals(1, repo.agentStepCallCount)
+    }
+
+    @Test
+    fun prefillAndSend_withoutForceAgent_createItem_stillShowsPreview_noRegression() = runTest {
+        // A non-force prefill that classifies to a write-intent must still show the preview card
+        // (proves forceAgent didn't short-circuit the normal classify → preview flow).
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.CreateItem,
+                confidence = 1.0f,
+                layer = RoutingLayer.Local,
+            )
+        )
+        val vm = makeVm(repo = repo)
+
+        vm.sendIntent(ChatScreenIntent.OnPrefillAndSend(text = "add milk to shopping"))
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(1, repo.classifyCallCount, "Non-force prefill must classify")
+        assertEquals(0, repo.agentStepCallCount, "CreateItem must NOT hit the agent loop")
+        assertIs<PendingPreview>(vm.screenState.value.pendingPreview)
+    }
 }

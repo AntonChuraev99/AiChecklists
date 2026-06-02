@@ -56,7 +56,6 @@ import aichecklists.core.designsystem.generated.resources.main_prompt_photo
 import aichecklists.core.designsystem.generated.resources.main_prompt_remind
 import aichecklists.core.designsystem.generated.resources.main_prompt_link
 import aichecklists.core.designsystem.generated.resources.main_prompt_plan_day
-import aichecklists.core.designsystem.generated.resources.main_prompt_pdf
 import org.jetbrains.compose.resources.stringResource
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import org.koin.compose.koinInject
@@ -248,7 +247,6 @@ fun MainScreen(
                                 remindLabel = stringResource(Res.string.main_prompt_remind),
                                 linkLabel = stringResource(Res.string.main_prompt_link),
                                 planDayLabel = stringResource(Res.string.main_prompt_plan_day),
-                                pdfLabel = stringResource(Res.string.main_prompt_pdf),
                             ),
                             // Each action drives its own chat flow (App.kt). Fall back to plainly
                             // opening the chat when the host didn't wire onQuickAction.
