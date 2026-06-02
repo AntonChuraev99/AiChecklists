@@ -254,6 +254,11 @@ class ChecklistDetailViewModel(
                     .toInstant(TimeZone.UTC).toEpochMilliseconds()
                 updateContentState {
                     it.copy(
+                        // Capture which scope opened the picker (item vs checklist) BEFORE
+                        // clearing the item sheet, so OnTimeSelected routes the save correctly.
+                        // null itemReminderSheetFor => checklist-level picker.
+                        customPickerItemId = it.itemReminderSheetFor,
+                        itemReminderSheetFor = null,
                         showReminderSheet = false,
                         showCustomPicker = true,
                         customPickerDateMillis = null,
@@ -291,12 +296,24 @@ class ChecklistDetailViewModel(
                 updateContentState { it.copy(isCustomTimeInPast = isInPast) }
             }
             is ChecklistDetailIntent.OnTimeSelected -> {
-                val dateMillis = (_screenState.value as? ChecklistDetailState.Content)?.customPickerDateMillis ?: return
+                val content = (_screenState.value as? ChecklistDetailState.Content) ?: return
+                val dateMillis = content.customPickerDateMillis ?: return
                 val triggerAt = combinePickerResults(dateMillis, intent.hour, intent.minute)
                 val now = Clock.System.now().toEpochMilliseconds()
                 if (triggerAt <= now) return
-                saveReminder(triggerAt)
-                updateContentState { it.copy(showCustomPicker = false, customPickerDateMillis = null) }
+                // Route to the scope that opened the picker: a per-item reminder when an
+                // itemId was captured, otherwise the checklist-level reminder. Without this
+                // branch a custom date+time chosen from the item sheet was saved on the whole
+                // checklist (the shared picker carries no scope of its own).
+                val itemId = content.customPickerItemId
+                if (itemId != null) {
+                    saveItemReminder(itemId, triggerAt, repeatRule = null, repeatTimeOfDayMinutes = null)
+                } else {
+                    saveReminder(triggerAt)
+                }
+                updateContentState {
+                    it.copy(showCustomPicker = false, customPickerDateMillis = null, customPickerItemId = null)
+                }
             }
             ChecklistDetailIntent.OnRemoveReminder -> {
                 removeReminder()
@@ -308,6 +325,7 @@ class ChecklistDetailViewModel(
                         showReminderSheet = false,
                         showCustomPicker = false,
                         customPickerDateMillis = null,
+                        customPickerItemId = null,
                         pendingRepeatConfig = null,
                         showEndConditionPicker = false,
                         reminderSheetLocked = false,
@@ -1002,19 +1020,31 @@ class ChecklistDetailViewModel(
     }
 
     private fun handleNotificationPermissionResult() {
-        updateContentState {
-            it.copy(showNotificationPermissionSheet = false, showReminderSheet = true)
-        }
-        if ((_screenState.value as? ChecklistDetailState.Content)?.activeReminderTab == ReminderTab.REPEAT) {
-            initRepeatTabIfNeeded()
-        }
+        reopenReminderSheetAfterPermission()
     }
 
     private fun handleNotificationPermissionSkip() {
+        reopenReminderSheetAfterPermission()
+    }
+
+    /**
+     * Re-opens the correct reminder sheet after the notification-permission sheet is
+     * dismissed (granted or skipped). The permission sheet is shared by the
+     * checklist-level flow ([handleReminderClick]) and the per-item flow
+     * ([handleItemReminderClick]); only `itemReminderSheetFor` distinguishes them.
+     *
+     * For the item flow the per-item sheet is already open via `itemReminderSheetFor`,
+     * so we must NOT also raise the checklist-level sheet — doing so would stack a second
+     * sheet and let a reminder be saved on the whole checklist instead of the item.
+     */
+    private fun reopenReminderSheetAfterPermission() {
+        val isItemFlow = (_screenState.value as? ChecklistDetailState.Content)?.itemReminderSheetFor != null
         updateContentState {
-            it.copy(showNotificationPermissionSheet = false, showReminderSheet = true)
+            it.copy(showNotificationPermissionSheet = false, showReminderSheet = !isItemFlow)
         }
-        if ((_screenState.value as? ChecklistDetailState.Content)?.activeReminderTab == ReminderTab.REPEAT) {
+        if (!isItemFlow &&
+            (_screenState.value as? ChecklistDetailState.Content)?.activeReminderTab == ReminderTab.REPEAT
+        ) {
             initRepeatTabIfNeeded()
         }
     }

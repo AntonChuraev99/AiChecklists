@@ -4,7 +4,8 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavRoute
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
-import com.antonchuraev.homesearchchecklist.core.navigation.api.NavCommand
+import androidx.navigation3.runtime.NavBackStack
+import androidx.navigation3.runtime.NavKey
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistReminderInfo
@@ -133,9 +134,8 @@ private class FakeNavigator : AppNavigator {
     /** Convenience: all checklist IDs navigated to (ignoring focusItemId). */
     val navigatedChecklistIds: List<Long> get() = checklistDetailCalls.map { it.checklistId }
 
-    override val commands: Flow<NavCommand> = emptyFlow()
     override val events: SharedFlow<AppNavEvent> = MutableSharedFlow()
-    override val backStack: StateFlow<List<AppNavRoute>> = MutableStateFlow(emptyList())
+    override val backStack: NavBackStack<NavKey> = NavBackStack()
     override fun showWidgetInstruction() {}
     override fun requestCreateWeeklyChecklist() {}
     override fun onBack() {}

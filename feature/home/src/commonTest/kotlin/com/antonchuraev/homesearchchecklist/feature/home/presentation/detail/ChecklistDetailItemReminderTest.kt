@@ -6,7 +6,8 @@ import com.antonchuraev.homesearchchecklist.core.datastore.api.AppDatastore
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavRoute
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
-import com.antonchuraev.homesearchchecklist.core.navigation.api.NavCommand
+import androidx.navigation3.runtime.NavBackStack
+import androidx.navigation3.runtime.NavKey
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistRepeatInfo
@@ -511,6 +512,124 @@ class ChecklistDetailItemReminderTest {
         assertNull(navigator.lastPaywallSource)
     }
 
+    // ── Custom date+time picker scope (bug regression) ────────────────────
+
+    @Test
+    fun onTimeSelected_afterItemCustomDatePicker_schedulesItemReminder_notChecklist() = runTest {
+        // Reproduces the reported bug: open the per-item reminder sheet, tap
+        // "Pick date & time", choose a date + time → the reminder was scheduled on
+        // the WHOLE CHECKLIST instead of the item, because the shared custom picker's
+        // OnTimeSelected fell through to the checklist-level saveReminder().
+        val vm = createViewModel()
+
+        // 1. Open the item reminder sheet for an item with no reminder
+        vm.onIntent(ChecklistDetailIntent.OnItemReminderClick(itemNoReminder.id))
+        assertEquals(itemNoReminder.id, contentState(vm).itemReminderSheetFor)
+
+        // 2. Tap "Pick date & time" → shared custom picker opens
+        vm.onIntent(ChecklistDetailIntent.OnCustomDateRequested)
+
+        // 3. Pick a date safely in the future (UTC-midnight millis, as the DatePicker yields)
+        val futureDateMillis = System.currentTimeMillis() + 7L * 24 * 60 * 60 * 1000
+        vm.onIntent(ChecklistDetailIntent.OnDateSelected(futureDateMillis))
+
+        // 4. Confirm a time
+        vm.onIntent(ChecklistDetailIntent.OnTimeSelected(hour = 10, minute = 0))
+
+        // The reminder MUST be scheduled on the ITEM …
+        assertTrue(
+            scheduler.scheduledItemReminders.any { it.itemId == itemNoReminder.id },
+            "Custom date+time on the item sheet must schedule a per-item reminder"
+        )
+        // … and NOT on the checklist
+        assertTrue(
+            scheduler.scheduledReminders.isEmpty(),
+            "Custom date+time on the item sheet must NOT schedule a checklist-level reminder"
+        )
+
+        // The fill item carries the reminder timestamp
+        val savedItem = repository.lastUpdatedFill?.items?.firstOrNull { it.id == itemNoReminder.id }
+        assertNotNull(savedItem)
+        assertNotNull(savedItem.reminderAt)
+
+        // Picker + sheet fully closed
+        assertNull(contentState(vm).itemReminderSheetFor)
+        assertFalse(contentState(vm).showCustomPicker)
+    }
+
+    @Test
+    fun onTimeSelected_afterChecklistCustomDatePicker_schedulesChecklistReminder_notItem() = runTest {
+        // Guard: the checklist-level custom picker flow must keep scheduling a
+        // whole-checklist reminder (the fix must not invert the scope).
+        val vm = createViewModel()
+
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
+        assertTrue(contentState(vm).showReminderSheet)
+
+        vm.onIntent(ChecklistDetailIntent.OnCustomDateRequested)
+        val futureDateMillis = System.currentTimeMillis() + 7L * 24 * 60 * 60 * 1000
+        vm.onIntent(ChecklistDetailIntent.OnDateSelected(futureDateMillis))
+        vm.onIntent(ChecklistDetailIntent.OnTimeSelected(hour = 10, minute = 0))
+
+        assertTrue(scheduler.scheduledReminders.any { it.first == testChecklist.id })
+        assertTrue(scheduler.scheduledItemReminders.isEmpty())
+        assertFalse(contentState(vm).showCustomPicker)
+    }
+
+    // ── Notification-permission flow scope (similar-place regression) ──────
+
+    @Test
+    fun notificationPermissionResult_duringItemFlow_keepsItemSheet_notChecklistSheet() = runTest {
+        // Same scope-leak class as the custom-picker bug: starting a per-item reminder
+        // while notification permission is missing must NOT reopen the checklist-level
+        // sheet after the permission result — that would let a checklist reminder be set
+        // instead of the item's.
+        scheduler.notificationPermissionGranted = false
+        val vm = createViewModel()
+
+        vm.onIntent(ChecklistDetailIntent.OnItemReminderClick(itemNoReminder.id))
+        assertEquals(itemNoReminder.id, contentState(vm).itemReminderSheetFor)
+        assertTrue(contentState(vm).showNotificationPermissionSheet)
+
+        vm.onIntent(ChecklistDetailIntent.OnNotificationPermissionResult(granted = true))
+
+        assertEquals(itemNoReminder.id, contentState(vm).itemReminderSheetFor)
+        assertFalse(contentState(vm).showReminderSheet)
+        assertFalse(contentState(vm).showNotificationPermissionSheet)
+    }
+
+    @Test
+    fun notificationPermissionSkip_duringItemFlow_keepsItemSheet_notChecklistSheet() = runTest {
+        scheduler.notificationPermissionGranted = false
+        val vm = createViewModel()
+
+        vm.onIntent(ChecklistDetailIntent.OnItemReminderClick(itemNoReminder.id))
+        assertTrue(contentState(vm).showNotificationPermissionSheet)
+
+        vm.onIntent(ChecklistDetailIntent.OnNotificationPermissionSkip)
+
+        assertEquals(itemNoReminder.id, contentState(vm).itemReminderSheetFor)
+        assertFalse(contentState(vm).showReminderSheet)
+        assertFalse(contentState(vm).showNotificationPermissionSheet)
+    }
+
+    @Test
+    fun notificationPermissionResult_duringChecklistFlow_opensChecklistSheet() = runTest {
+        // Guard: the checklist-level flow must still open the checklist sheet after the
+        // permission result (the fix must not break it).
+        scheduler.notificationPermissionGranted = false
+        val vm = createViewModel()
+
+        vm.onIntent(ChecklistDetailIntent.OnReminderClick)
+        assertTrue(contentState(vm).showNotificationPermissionSheet)
+        assertNull(contentState(vm).itemReminderSheetFor)
+
+        vm.onIntent(ChecklistDetailIntent.OnNotificationPermissionResult(granted = true))
+
+        assertTrue(contentState(vm).showReminderSheet)
+        assertFalse(contentState(vm).showNotificationPermissionSheet)
+    }
+
     // ─── Test doubles ─────────────────────────────────────────────────────
 
     data class ScheduledItemReminder(val checklistId: Long, val fillId: Long, val itemId: String, val triggerAtMillis: Long)
@@ -521,8 +640,17 @@ class ChecklistDetailItemReminderTest {
         val scheduledItemRepeats = mutableListOf<ScheduledItemRepeat>()
         val cancelledItemReminders = mutableListOf<String>()
         val cancelledItemRepeats = mutableListOf<String>()
+        // Checklist-level (whole-checklist) one-shot schedules — recorded so tests can
+        // assert that a per-item flow does NOT leak into the checklist scope.
+        val scheduledReminders = mutableListOf<Pair<Long, Long>>()
+        // Toggle to exercise the no-permission branch of handleItemReminderClick / handleReminderClick.
+        var notificationPermissionGranted = true
 
-        override fun scheduleReminder(checklistId: Long, triggerAtMillis: Long) {}
+        override fun hasNotificationPermission(): Boolean = notificationPermissionGranted
+
+        override fun scheduleReminder(checklistId: Long, triggerAtMillis: Long) {
+            scheduledReminders.add(checklistId to triggerAtMillis)
+        }
         override fun cancelReminder(checklistId: Long) {}
         override suspend fun rescheduleAllActiveReminders() {}
         override fun scheduleRepeat(checklistId: Long, triggerAtMillis: Long) {}
@@ -609,9 +737,8 @@ class ChecklistDetailItemReminderTest {
     }
 
     private class FakeAppNavigator : AppNavigator {
-        override val commands: Flow<NavCommand> = emptyFlow()
         override val events: SharedFlow<AppNavEvent> = MutableSharedFlow()
-        override val backStack: StateFlow<List<AppNavRoute>> = MutableStateFlow(emptyList())
+        override val backStack: NavBackStack<NavKey> = NavBackStack()
         override fun showWidgetInstruction() {}
         override fun requestCreateWeeklyChecklist() {}
         override fun onBack() {}

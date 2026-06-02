@@ -4,7 +4,14 @@ import com.antonchuraev.homesearchchecklist.core.datastore.api.HintsRepository
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavRoute
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
-import com.antonchuraev.homesearchchecklist.core.navigation.api.NavCommand
+import androidx.navigation3.runtime.NavBackStack
+import androidx.navigation3.runtime.NavKey
+import com.antonchuraev.homesearchchecklist.core.auth.api.GoogleAuthRepository
+import com.antonchuraev.homesearchchecklist.core.auth.api.GoogleAuthState
+import com.antonchuraev.homesearchchecklist.core.auth.api.GoogleUser
+import com.antonchuraev.homesearchchecklist.core.common.api.AppResult
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.SyncRepository
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.SyncState
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDefaults
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Attachment
@@ -62,10 +69,28 @@ private class FakeHintsRepository(initialShown: Boolean = false) : HintsReposito
     }
 }
 
+private class FakeGoogleAuthRepository : GoogleAuthRepository {
+    override val authState: StateFlow<GoogleAuthState> = MutableStateFlow(GoogleAuthState.NotAuthenticated)
+    override suspend fun signInWithGoogle(): Result<GoogleUser> = Result.failure(NotImplementedError())
+    override suspend fun signOut() {}
+    override suspend fun getIdToken(): String? = null
+    override suspend fun restoreSession() {}
+}
+
+private class FakeSyncRepository : SyncRepository {
+    override val syncState: StateFlow<SyncState> = MutableStateFlow(SyncState.Disabled)
+    override fun observeCloudChecklistIds(): Flow<AppResult<List<String>>> = flowOf()
+    override fun observeCloudChecklist(cloudId: String): Flow<AppResult<Checklist>> = flowOf()
+    override suspend fun pushPendingChanges(): AppResult<Unit> = AppResult.Success(Unit)
+    override suspend fun initialUpload(): AppResult<Unit> = AppResult.Success(Unit)
+    override suspend fun pullAndMerge(): AppResult<Unit> = AppResult.Success(Unit)
+    override suspend fun startListening() {}
+    override suspend fun stopListening() {}
+}
+
 private class FakeNavigator : AppNavigator {
-    override val commands: Flow<NavCommand> = flowOf()
     override val events: SharedFlow<AppNavEvent> = MutableSharedFlow()
-    override val backStack: StateFlow<List<AppNavRoute>> = MutableStateFlow(emptyList())
+    override val backStack: NavBackStack<NavKey> = NavBackStack()
     override fun showWidgetInstruction() {}
     override fun requestCreateWeeklyChecklist() {}
     override fun onBack() {}
@@ -199,6 +224,8 @@ private fun makeViewModel(hintsRepository: HintsRepository): MainScreenViewModel
         ),
         analyticsTracker = FakeAnalyticsTracker(),
         hintsRepository = hintsRepository,
+        googleAuthRepository = FakeGoogleAuthRepository(),
+        syncRepository = FakeSyncRepository(),
     )
 }
 

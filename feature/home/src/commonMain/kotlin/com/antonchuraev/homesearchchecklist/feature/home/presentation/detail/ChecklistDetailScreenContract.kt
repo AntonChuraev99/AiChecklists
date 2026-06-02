@@ -46,6 +46,9 @@ sealed interface ChecklistDetailState : State {
         val customPickerMinDateMillis: Long = 0L,
         val customPickerInitialHour: Int = 9,
         val isCustomTimeInPast: Boolean = false,
+        // Which item the shared custom date/time picker is scoped to.
+        // null = checklist-level picker; non-null = per-item picker for that itemId.
+        val customPickerItemId: String? = null,
         val showExactAlarmSheet: Boolean = false,
         val exactAlarmDontShowAgain: Boolean = false,
         val showNotificationPermissionSheet: Boolean = false,
