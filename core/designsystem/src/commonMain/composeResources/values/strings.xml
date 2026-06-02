@@ -1152,6 +1152,6 @@
     <string name="chat_panel_open_full">Open full screen</string>
     <string name="chat_panel_help_description">Chat help</string>
     <string name="chat_panel_collapse">Collapse chat</string>
-    <string name="chat_panel_greeting">Hi! I\'m Gisti. Ask me anything about your lists.</string>
+    <string name="chat_panel_greeting">Hi! I'm Gisti. Ask me anything about your lists.</string>
     <string name="chat_panel_scrim_description">Tap to close chat</string>
 </resources>
