@@ -135,6 +135,18 @@ class ChatViewModel(
                 _screenState.value = _screenState.value.copy(inputText = intent.text)
             }
 
+            is ChatScreenIntent.OnPrefillInput -> {
+                // Programmatic prefill from a quick-action chip — set text, no send.
+                _screenState.value = _screenState.value.copy(inputText = intent.text)
+            }
+
+            is ChatScreenIntent.OnPrefillAndSend -> {
+                // Set text then dispatch in the same step (state updates are synchronous,
+                // so handleSend() sees the freshly-set inputText).
+                _screenState.value = _screenState.value.copy(inputText = intent.text)
+                handleSend()
+            }
+
             ChatScreenIntent.OnSendClick -> handleSend()
 
             is ChatScreenIntent.OnPreviewItemTextChange -> {
@@ -470,8 +482,8 @@ class ChatViewModel(
                     is ChatIntent.CreateChecklist,
                     ChatIntent.SetReminder,
                     ChatIntent.MoveReminders -> {
-                        val toolCall = classification.preBuiltToolCall ?: buildToolCall(intent, text, locale)
-                        if (toolCall == null) {
+                        val builtToolCall = classification.preBuiltToolCall ?: buildToolCall(intent, text, locale)
+                        if (builtToolCall == null) {
                             // Entity extraction failed (e.g. "remind me tomorrow" without item context).
                             // Escalate to Layer 3 (full chat) which has conversation history and can
                             // understand what the user is referring to from previous messages.
@@ -483,6 +495,10 @@ class ChatViewModel(
                             }
                             return@runCatching
                         }
+                        // P5: bias list-less commands to the currently-open checklist. Resolved to
+                        // the checklist name (not id) so it flows through the dispatcher's existing
+                        // hint → name-match path. Explicit hints are preserved (user choice wins).
+                        val toolCall = biasToolCallToContext(builtToolCall)
                         val humanReadable = previewRenderer.render(toolCall)
                         _screenState.value = _screenState.value.copy(
                             pendingPreview = PendingPreview(
@@ -506,17 +522,19 @@ class ChatViewModel(
                             _screenState.value = _screenState.value.copy(isProcessing = false)
                             return@runCatching
                         }
-                        val toolCall = ToolCall.AttachToItem(
+                        val builtToolCall = ToolCall.AttachToItem(
                             checklistHint = intent.checklistHint,
                             itemText = intent.itemText,
                             attachments = currentAttachments,
                         )
+                        // P5: bias to the open checklist when the user didn't name a list.
+                        val toolCall = biasToolCallToContext(builtToolCall)
                         val humanReadable = previewRenderer.render(toolCall)
                         _screenState.value = _screenState.value.copy(
                             pendingPreview = PendingPreview(
                                 toolCall = toolCall,
                                 humanReadable = humanReadable,
-                                targetChecklistHint = intent.checklistHint,
+                                targetChecklistHint = extractHint(toolCall),
                                 editableItemText = intent.itemText,
                                 originalText = text,
                                 sourceLayer = classification.layer,
@@ -631,13 +649,16 @@ class ChatViewModel(
                             is ChatIntent.CreateChecklist,
                             ChatIntent.SetReminder,
                             ChatIntent.MoveReminders -> {
-                                val toolCall = classification.preBuiltToolCall
+                                val builtToolCall = classification.preBuiltToolCall
                                     ?: buildToolCall(intent, preview.originalText, locale)
-                                if (toolCall == null) {
+                                if (builtToolCall == null) {
                                     _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_extract_fail"))
                                     _screenState.value = _screenState.value.copy(isProcessing = false)
                                     return@runCatching
                                 }
+                                // P5: bias list-less commands to the open checklist (same as the
+                                // initial send path), so the re-classified preview stays on context.
+                                val toolCall = biasToolCallToContext(builtToolCall)
                                 val humanReadable = previewRenderer.render(toolCall)
                                 _screenState.value = _screenState.value.copy(
                                     pendingPreview = PendingPreview(
@@ -895,6 +916,9 @@ class ChatViewModel(
     private suspend fun runAgentTurn(userInput: String, locale: ChatLocale) {
         // ── 1. Seed transcript from history ──────────────────────────────────
         val checklistsSummary = buildChecklistsSummary()
+        // P5: resolve the open checklist once for the whole turn so the agent biases
+        // list-less commands toward it. Null when the dock was opened from the home screen.
+        val contextChecklistName = resolveContextChecklistName()
         val historyMessages = _screenState.value.messages
 
         val seedTranscript: MutableList<AgentTranscriptEntry> = mutableListOf()
@@ -924,6 +948,7 @@ class ChatViewModel(
                 transcript = transcript,
                 locale = locale,
                 checklistsSummary = checklistsSummary,
+                contextChecklistName = contextChecklistName,
             )
 
             when (stepResult) {
@@ -1120,6 +1145,78 @@ class ChatViewModel(
             // Agent-only: ReadChecklist — read-only, no preview card
             is ToolCall.ReadChecklist -> original
         }
+    }
+
+    // ─── Context-checklist bias (P5) ─────────────────────────────────────────
+
+    /**
+     * Resolves [ChatScreenState.contextChecklistId] to the checklist's display name.
+     *
+     * Returns null when there is no active context, or when the context checklist was
+     * deleted between opening the dock and sending the command (logged as a warning so
+     * the silent fallback to the default-resolution path is traceable).
+     *
+     * The resolved name is used to bias list-less commands (e.g. "add milk") toward the
+     * checklist the user currently has open, instead of the dispatcher's "first checklist"
+     * fallback. Name-based (not id-based) so it flows through the existing hint → name-match
+     * resolution in [ToolCallDispatcher] with zero dispatcher changes.
+     */
+    private suspend fun resolveContextChecklistName(): String? {
+        val contextId = _screenState.value.contextChecklistId ?: return null
+        val checklist = runCatching { checklistRepository.getChecklistById(contextId) }
+            .getOrElse { e ->
+                logger.error(TAG, "resolveContextChecklistName: lookup failed for id=$contextId — ${e.message}", e)
+                null
+            }
+        if (checklist == null) {
+            logger.warning(TAG, "resolveContextChecklistName: context checklist id=$contextId not found — falling back to default resolution")
+            return null
+        }
+        return checklist.name
+    }
+
+    /**
+     * Applies the active context checklist to a list-less command [toolCall].
+     *
+     * For command variants that target an existing checklist (AddItem, AddItems, CompleteItem,
+     * DeleteItem, SetItemReminder, AttachToItem) whose [checklistHint] is null, returns a copy
+     * with the hint set to [contextName]. An explicit hint is NEVER overwritten — the user
+     * naming a list always wins over the open-screen context.
+     *
+     * CreateChecklist / RenameChecklist are intentionally excluded: there the "list" is the
+     * target/output of the action, not the context to operate within. CreateChecklistFromAttachment,
+     * MoveAllReminders, FindItemsQuery and ReadChecklist carry no per-list hint either.
+     */
+    private fun applyContextChecklist(toolCall: ToolCall, contextName: String): ToolCall = when (toolCall) {
+        is ToolCall.AddItem ->
+            if (toolCall.checklistHint == null) toolCall.copy(checklistHint = contextName) else toolCall
+        is ToolCall.AddItems ->
+            if (toolCall.checklistHint == null) toolCall.copy(checklistHint = contextName) else toolCall
+        is ToolCall.CompleteItem ->
+            if (toolCall.checklistHint == null) toolCall.copy(checklistHint = contextName) else toolCall
+        is ToolCall.DeleteItem ->
+            if (toolCall.checklistHint == null) toolCall.copy(checklistHint = contextName) else toolCall
+        is ToolCall.SetItemReminder ->
+            if (toolCall.checklistHint == null) toolCall.copy(checklistHint = contextName) else toolCall
+        is ToolCall.AttachToItem ->
+            if (toolCall.checklistHint == null) toolCall.copy(checklistHint = contextName) else toolCall
+        // Excluded by design — list is the target, not the context, or no hint field.
+        is ToolCall.CreateChecklist,
+        is ToolCall.RenameChecklist,
+        is ToolCall.CreateChecklistFromAttachment,
+        is ToolCall.MoveAllReminders,
+        is ToolCall.FindItemsQuery,
+        is ToolCall.ReadChecklist -> toolCall
+    }
+
+    /**
+     * Convenience wrapper: resolves the context checklist name (if any) and applies it to
+     * [toolCall] when the hint is null. No-op when there is no context or the command already
+     * carries an explicit hint. Used on the Layer-1/Layer-2 preview-build path.
+     */
+    private suspend fun biasToolCallToContext(toolCall: ToolCall): ToolCall {
+        val contextName = resolveContextChecklistName() ?: return toolCall
+        return applyContextChecklist(toolCall, contextName)
     }
 
     /**

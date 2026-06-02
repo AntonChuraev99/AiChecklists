@@ -111,9 +111,15 @@ import aichecklists.core.designsystem.generated.resources.chat_preview_cancelled
 import aichecklists.core.designsystem.generated.resources.chat_agent_round_limit
 import aichecklists.core.designsystem.generated.resources.chat_panel_greeting
 import aichecklists.core.designsystem.generated.resources.main_prompt_photo
-import aichecklists.core.designsystem.generated.resources.main_prompt_add
 import aichecklists.core.designsystem.generated.resources.main_prompt_remind
+import aichecklists.core.designsystem.generated.resources.main_prompt_link
+import aichecklists.core.designsystem.generated.resources.main_prompt_plan_day
+import aichecklists.core.designsystem.generated.resources.main_prompt_pdf
+import aichecklists.core.designsystem.generated.resources.main_prompt_link_prefill
+import aichecklists.core.designsystem.generated.resources.main_prompt_remind_prefill
+import aichecklists.core.designsystem.generated.resources.main_prompt_plan_day_query
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiPromptChips
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiQuickAction
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiDefaultPromptChips
 import org.jetbrains.compose.resources.stringResource
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavRoute
@@ -135,6 +141,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.com
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatMessageBubble
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatPreviewCard
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatTypingIndicator
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatRecordingOverlay
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatRole
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiInlineChatPanel
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatAttachmentSourceSheet
@@ -374,6 +381,47 @@ fun App() {
             val chatViewModel: ChatViewModel = koinViewModel()
             val chatUiState by chatViewModel.screenState.collectAsStateWithLifecycle()
 
+            // Open the dock anchored to a checklist (or null) AND start voice recording.
+            // Used by the mic button on the MainScreen / ChecklistDetail bottom bars: the dock
+            // expands and OnVoiceRecordingStarted flows to the VM, which emits
+            // RequestRecordAudioPermission → the collector calls sheetAudioRecorder.start().
+            val onOpenChatSheetMic: (Long?, String?) -> Unit = { checklistId, checklistName ->
+                chatSheetContextId = checklistId
+                chatSheetContextLabel = checklistName
+                chatSheetOpen = true
+                chatViewModel.sendIntent(ChatScreenIntent.OnVoiceRecordingStarted)
+            }
+
+            // Quick-action prefill seeds (resolved in Composable scope — stringResource is @Composable).
+            val quickLinkPrefill = stringResource(Res.string.main_prompt_link_prefill)
+            val quickRemindPrefill = stringResource(Res.string.main_prompt_remind_prefill)
+            val quickPlanDayQuery = stringResource(Res.string.main_prompt_plan_day_query)
+
+            // Maps a home-screen prompt chip [GistiQuickAction] to its own chat flow.
+            // All actions open the inline dock with NO checklist context (home = create-new).
+            // - PHOTO / PDF: open dock + trigger the existing attachment picker; the attachment
+            //   flow creates a checklist from the picked file (CreateChecklistFromAttachment).
+            // - LINK / REMIND: open dock + prefill the input so the user completes the phrase.
+            // - PLAN_DAY: open dock + prefill AND send immediately so the answer lands in the dock.
+            val onQuickAction: (GistiQuickAction) -> Unit = { action ->
+                chatViewModel.sendIntent(ChatScreenIntent.OnSetContextChecklist(null))
+                chatSheetContextId = null
+                chatSheetContextLabel = null
+                chatSheetOpen = true
+                when (action) {
+                    GistiQuickAction.PHOTO ->
+                        chatViewModel.sendIntent(ChatScreenIntent.OnPickAttachment(AttachmentSource.Image))
+                    GistiQuickAction.PDF ->
+                        chatViewModel.sendIntent(ChatScreenIntent.OnPickAttachment(AttachmentSource.Pdf))
+                    GistiQuickAction.LINK ->
+                        chatViewModel.sendIntent(ChatScreenIntent.OnPrefillInput(quickLinkPrefill))
+                    GistiQuickAction.REMIND ->
+                        chatViewModel.sendIntent(ChatScreenIntent.OnPrefillInput(quickRemindPrefill))
+                    GistiQuickAction.PLAN_DAY ->
+                        chatViewModel.sendIntent(ChatScreenIntent.OnPrefillAndSend(quickPlanDayQuery))
+                }
+            }
+
             // Context label for the sheet header: "Ask about «Grocery list»…"
             val chatDockAskAboutFmt = stringResource(Res.string.chat_dock_ask_about)
 
@@ -476,6 +524,19 @@ fun App() {
             }
 
             // Sheet side-effect handler — mirrors ChatRoute logic exactly.
+            // Audio recorder for the inline dock — declared BEFORE the SideEffect collector
+            // so the RequestRecordAudioPermission handler below can call .start() directly
+            // (mirrors ChatRoute). onResult/onError feed OnVoiceRecordingStopped back to the VM.
+            val sheetAudioRecorder = rememberAudioRecorderLauncher(
+                onResult = { result ->
+                    chatViewModel.sendIntent(ChatScreenIntent.OnVoiceRecordingStopped(
+                        recordingPath = result?.filePath,
+                        mimeType = result?.mimeType ?: "audio/m4a",
+                    ))
+                },
+                onError = { chatViewModel.sendIntent(ChatScreenIntent.OnVoiceRecordingStopped(recordingPath = null)) },
+            )
+
             LaunchedEffect(chatViewModel) {
                 chatViewModel.sideEffect.collect { effect ->
                     when (effect) {
@@ -506,8 +567,12 @@ fun App() {
                             navigator.navigateToPaywall(source = "chat_sheet_credits")
                         }
                         ChatScreenSideEffect.RequestRecordAudioPermission -> {
-                            // No-op in sheet host — AudioRecorder is only wired in ChatRoute.
-                            // Voice input in the sheet reuses the same trigger-flag path.
+                            // Mic tapped on a bottom bar (MainScreen / ChecklistDetail) opens the
+                            // dock and sends OnVoiceRecordingStarted; the VM emits this side-effect.
+                            // AudioRecorderLauncher handles the permission request internally —
+                            // starting it here requests permission if needed; on denial onError
+                            // fires → OnVoiceRecordingStopped(null) → cancelled snackbar.
+                            sheetAudioRecorder.start()
                         }
                         is ChatScreenSideEffect.OpenFilePicker -> Unit // handled via trigger-flag
                     }
@@ -581,15 +646,8 @@ fun App() {
                 }
                 chatViewModel.sendIntent(ChatScreenIntent.OnAttachmentPickerTriggered)
             }
-            val sheetAudioRecorder = rememberAudioRecorderLauncher(
-                onResult = { result ->
-                    chatViewModel.sendIntent(ChatScreenIntent.OnVoiceRecordingStopped(
-                        recordingPath = result?.filePath,
-                        mimeType = result?.mimeType ?: "audio/m4a",
-                    ))
-                },
-                onError = { chatViewModel.sendIntent(ChatScreenIntent.OnVoiceRecordingStopped(recordingPath = null)) },
-            )
+            // sheetAudioRecorder is declared above the SideEffect collector (needed by the
+            // RequestRecordAudioPermission handler) — do not re-declare it here.
             LaunchedEffect(chatUiState.attachmentPickerType) {
                 when (chatUiState.attachmentPickerType) {
                     AttachmentSource.Image -> sheetImagePicker.launch()
@@ -695,6 +753,13 @@ fun App() {
                                 // of navigating full-screen. Full-screen chat remains
                                 // reachable from the drawer (AppNavRoute.AiChat entry below).
                                 onNavigateToAiChat = { onOpenChatSheet(null, null) },
+                                // Each prompt chip drives its own chat flow (photo/pdf picker,
+                                // link/remind prefill, plan-day prefill+send) via the singleton
+                                // ChatViewModel + inline dock. See onQuickAction above.
+                                onQuickAction = onQuickAction,
+                                // Mic in the AskGisti bar: open the dock (no context) and start
+                                // recording immediately.
+                                onMicClick = { onOpenChatSheetMic(null, null) },
                                 // Top-bar "+" and the leading "New list" prompt chip both
                                 // route to manual checklist creation (Templates). Creation
                                 // moved to the top of the screen; the bottom is a clean chat dock.
@@ -758,6 +823,9 @@ fun App() {
                             focusItemId = route.focusItemId,
                             onOpenChatSheet = { checklistId, checklistName ->
                                 onOpenChatSheet(checklistId, checklistName)
+                            },
+                            onMicChatSheet = { checklistId, checklistName ->
+                                onOpenChatSheetMic(checklistId, checklistName)
                             },
                         )
                     }
@@ -979,10 +1047,15 @@ fun App() {
                         GistiPromptChips(
                             chips = gistiDefaultPromptChips(
                                 photoLabel = stringResource(Res.string.main_prompt_photo),
-                                addLabel = stringResource(Res.string.main_prompt_add),
                                 remindLabel = stringResource(Res.string.main_prompt_remind),
+                                linkLabel = stringResource(Res.string.main_prompt_link),
+                                planDayLabel = stringResource(Res.string.main_prompt_plan_day),
+                                pdfLabel = stringResource(Res.string.main_prompt_pdf),
                             ),
-                            onChipClick = { /* chips pre-fill the input — no-op in panel context */ },
+                            // In the empty dock, a chip drives the same quick-action flow
+                            // (the dock is already open, so onQuickAction just re-seeds context
+                            // null and fires the picker / prefill for the tapped action).
+                            onChipClick = onQuickAction,
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
@@ -1004,6 +1077,15 @@ fun App() {
                         isTranscribing = chatUiState.isTranscribing,
                         onDragCancelChanged = { chatSheetDragCancel = it },
                         focusRequester = chatInputFocusRequester,
+                    )
+                },
+                // Same pink "Recording…" surface as the full ChatScreen, hosted in the dock.
+                // The overlay animates itself in/out via isRecording — no height when idle.
+                recordingOverlay = {
+                    ChatRecordingOverlay(
+                        isRecording = chatUiState.isRecording,
+                        durationMs = chatSheetRecordingMs,
+                        isDragCancel = chatSheetDragCancel,
                     )
                 },
             )

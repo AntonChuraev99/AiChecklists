@@ -129,6 +129,24 @@ sealed interface ChatScreenIntent : Intent {
     /** User typed in the input field. */
     data class OnInputChange(val text: String) : ChatScreenIntent
 
+    /**
+     * Programmatically seed the input field with [text] (caret moved to the end by the UI).
+     * Emitted by App.kt when a home-screen quick-action chip pre-fills the dock input
+     * (e.g. LINK → "Create a list from: ", REMIND → "Remind me to "). Does NOT send —
+     * the user reviews / completes the phrase, then taps Send. Differs from [OnInputChange]
+     * only in intent/audit clarity (both set [ChatScreenState.inputText]); a distinct intent
+     * keeps quick-action prefill traceable and avoids overloading the user-typing path.
+     */
+    data class OnPrefillInput(val text: String) : ChatScreenIntent
+
+    /**
+     * Seed the input with [text] and immediately dispatch it (prefill + Send in one step).
+     * Used by the PLAN_DAY quick-action ("What should I do today?") so the answer appears in
+     * the dock without the user retyping. Setting state then sending is safe because state
+     * updates are synchronous and [handleSend] reads the freshly-set [ChatScreenState.inputText].
+     */
+    data class OnPrefillAndSend(val text: String) : ChatScreenIntent
+
     /** User tapped Send (or IME action) with non-blank input. */
     data object OnSendClick : ChatScreenIntent
 

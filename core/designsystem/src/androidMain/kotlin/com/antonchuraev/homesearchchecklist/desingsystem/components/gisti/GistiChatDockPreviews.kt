@@ -45,8 +45,6 @@ private fun ChecklistDetailBottomBarPreview() {
             checklistName = "Grocery list",
             onChatClick = {},
             onMicClick = {},
-            onFillManuallyClick = {},
-            onFillWithAiClick = {},
         )
     }
 }

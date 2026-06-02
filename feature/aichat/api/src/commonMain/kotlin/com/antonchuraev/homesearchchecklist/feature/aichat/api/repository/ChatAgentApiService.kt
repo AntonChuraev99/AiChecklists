@@ -10,11 +10,19 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.ChatLocale
  * round of a turn (transcript has no tool turn yet).
  */
 interface ChatAgentApiService {
+    /**
+     * @param contextChecklistName Name of the checklist the user currently has open
+     *   (e.g. the dock was launched from [ChecklistDetailScreen]). When non-null it is sent
+     *   to the server as a top-level `context_checklist.name` field so the agent biases
+     *   ambiguous, list-less commands toward this checklist instead of guessing the first one.
+     *   Null → omit the field entirely (server treats absence as "home screen, no focus").
+     */
     suspend fun step(
         userId: String,
         transcript: List<AgentTranscriptEntry>,
         locale: ChatLocale,
         checklistsSummary: List<ChecklistContext>,   // reuse type from ChatCompletionApiService.kt
+        contextChecklistName: String? = null,
     ): AgentStepResult
 }
 

@@ -12,13 +12,18 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandMore
@@ -83,6 +88,10 @@ import org.jetbrains.compose.resources.stringResource
  *   cards never rendered in the dock.
  * - [emptyStateContent] — shown when [hasLastAnswer] is false (greeting + prompt chips).
  * - [inputContent] — the input row slot (App.kt passes ChatInputRow; it owns its own imePadding).
+ * - [recordingOverlay] — optional slot rendered directly above the input row while a voice
+ *   recording is in progress. App.kt passes `ChatRecordingOverlay` (from feature/aichat) here,
+ *   so the same pink "Recording…" surface that the full ChatScreen shows also appears in the
+ *   dock. designsystem stays decoupled — it never imports the overlay, only hosts the slot.
  *
  * @param isVisible         Whether the panel is visible. Controls [AnimatedVisibility].
  * @param hasLastAnswer     When true, [lastAnswerContent] is shown; when false,
@@ -95,7 +104,12 @@ import org.jetbrains.compose.resources.stringResource
  * @param lastAnswerContent Slot rendering the latest assistant turn (bubble / preview / plan).
  * @param emptyStateContent Slot shown when [hasLastAnswer] is false.
  * @param inputContent      Slot for the chat input row (must own its own imePadding).
+ * @param modifier          Layout modifier for the anchor Box.
  * @param contextLabel      Optional context hint shown in the banner (e.g. "Grocery list").
+ * @param recordingOverlay  Optional slot shown above the input row during voice recording.
+ *                          The slot itself controls its own visibility (App.kt passes a
+ *                          ChatRecordingOverlay that animates in/out via `isRecording`), so
+ *                          this can always be supplied; it renders nothing when not recording.
  */
 @Composable
 fun GistiInlineChatPanel(
@@ -109,6 +123,7 @@ fun GistiInlineChatPanel(
     inputContent: @Composable () -> Unit,
     modifier: Modifier = Modifier,
     contextLabel: String? = null,
+    recordingOverlay: (@Composable () -> Unit)? = null,
 ) {
     val isDark = LocalIsDarkTheme.current
     // Layout-anchor Box only: no background, no clickable → taps outside the panel
@@ -153,7 +168,16 @@ fun GistiInlineChatPanel(
                         null
                     },
                 ) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
+                    // Bottom inset (keyboard + system-nav) is owned HERE, applied exactly once via
+                    // ime.union(navigationBars): when the keyboard is open the padding equals the IME
+                    // height; when closed it equals the nav-bar height. This keeps the input row clear
+                    // of the gesture pill at the screen bottom (the small gap the user reported) with
+                    // no double-inset while typing. ChatInputRow deliberately drops its own imePadding.
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars)),
+                    ) {
                         // ── Banner row ──────────────────────────────────────────────
                         GistiInlinePanelBanner(
                             contextLabel = contextLabel,
@@ -184,6 +208,12 @@ fun GistiInlineChatPanel(
                                 emptyStateContent()
                             }
                         }
+
+                        // ── Recording overlay slot ─────────────────────────────────
+                        // Rendered directly above the input row, mirroring the full
+                        // ChatScreen layout. The slot animates its own visibility, so it
+                        // takes zero height when not recording.
+                        recordingOverlay?.invoke()
 
                         // ── Input row slot ─────────────────────────────────────────
                         // ChatInputRow owns its own .imePadding() — do NOT wrap here.

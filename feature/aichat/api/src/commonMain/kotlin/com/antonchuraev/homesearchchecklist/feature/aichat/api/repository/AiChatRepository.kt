@@ -62,6 +62,10 @@ interface AiChatRepository {
      * [checklistsSummary] provides checklist context so the agent can reason over list names
      * without carrying item text (privacy by design — same pattern as [completeFreeForm]).
      *
+     * [contextChecklistName] is the name of the checklist the user currently has open
+     * (the dock was launched from [ChecklistDetailScreen]). When non-null it is forwarded to
+     * the agent so list-less commands ("add milk") bias toward this checklist. Null → no focus.
+     *
      * Returns [AgentStepResult] — caller decides whether to continue the loop
      * ([AgentStepResult.ToolCalls]) or stop ([AgentStepResult.Final] / errors).
      */
@@ -69,6 +73,7 @@ interface AiChatRepository {
         transcript: List<AgentTranscriptEntry>,
         locale: ChatLocale,
         checklistsSummary: List<ChecklistContext>,
+        contextChecklistName: String? = null,
     ): AgentStepResult
 
     /**

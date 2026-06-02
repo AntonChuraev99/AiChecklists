@@ -121,7 +121,13 @@
     <string name="main_prompt_photo">Фото → список</string>
     <string name="main_prompt_add">Добавить задачи</string>
     <string name="main_prompt_remind">Напомнить…</string>
+    <string name="main_prompt_link">Ссылка → список</string>
+    <string name="main_prompt_plan_day">План на день</string>
+    <string name="main_prompt_pdf">PDF → список</string>
     <string name="main_prompt_new_list">Новый список</string>
+    <string name="main_prompt_link_prefill">Создай список из: </string>
+    <string name="main_prompt_remind_prefill">Напомни мне </string>
+    <string name="main_prompt_plan_day_query">Что мне сделать сегодня?</string>
     <string name="main_free_lists_used">%1$d из %2$d бесплатных списков</string>
     <string name="main_menu">Меню</string>
     <string name="main_menu_support">Поддержка</string>
@@ -271,6 +277,12 @@
     <string name="checklist_add_fill">Новое заполнение</string>
     <string name="checklist_add_fill_ai">Заполнить с ИИ</string>
     <string name="checklist_new_fill">Создать новое заполнение</string>
+    <string name="fill_options_open">Заполнить чек-лист</string>
+    <string name="fill_options_title">Заполнить чек-лист</string>
+    <string name="fill_manually_title">Заполнить вручную</string>
+    <string name="fill_manually_desc">Создать пустое заполнение</string>
+    <string name="fill_via_ai_title">Заполнить с ИИ</string>
+    <string name="fill_via_ai_desc">Фото, PDF, ссылка или текст → ИИ заполнит</string>
     <string name="checklist_view_all_fills">Все заполнения</string>
     <string name="checklist_fills_count">ещё %1$d заполнений</string>
     <string name="fills_list_title">Все заполнения</string>

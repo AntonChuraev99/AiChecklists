@@ -144,10 +144,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
-import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonSecondary
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonText
-import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.AppGradientButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.ChecklistDetailBottomBar
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.FillOptionsSheet
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppItemMetaChip
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppTextField
@@ -202,6 +201,11 @@ fun ChecklistDetailScreen(
      * Wired by App.kt.
      */
     onOpenChatSheet: ((Long, String) -> Unit)? = null,
+    /**
+     * Opens the AI-chat sheet pre-anchored to this checklist AND starts voice recording.
+     * Called with (checklistId, checklistName). Wired by App.kt; used by the bottom-bar mic.
+     */
+    onMicChatSheet: ((Long, String) -> Unit)? = null,
     viewModel: ChecklistDetailViewModel = koinViewModel(key = "checklist_detail_$checklistId") { parametersOf(checklistId) }
 ) {
     val analyticsTracker: AnalyticsTracker = koinInject()
@@ -224,6 +228,9 @@ fun ChecklistDetailScreen(
             onIntent = viewModel::sendIntent,
             focusItemId = focusItemId,
             onOpenChatSheet = onOpenChatSheet?.let { cb ->
+                { cb(currentState.checklist.id, currentState.checklist.name) }
+            },
+            onMicChatSheet = onMicChatSheet?.let { cb ->
                 { cb(currentState.checklist.id, currentState.checklist.name) }
             },
         )
@@ -267,8 +274,12 @@ private fun ChecklistDetailContent(
     onIntent: (ChecklistDetailIntent) -> Unit,
     focusItemId: String? = null,
     onOpenChatSheet: (() -> Unit)? = null,
+    onMicChatSheet: (() -> Unit)? = null,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
+    // Controls the FillOptionsSheet opened from the TopAppBar "Fill checklist" action.
+    // The two Fill buttons used to live in the bottom bar; they now live in this sheet.
+    var showFillSheet by remember { mutableStateOf(false) }
     val smartAddHintActive = remember { mutableStateOf(false) }
     // Normalized snapshot of the input at the moment the hint snackbar was shown.
     // We dismiss the snackbar only when the user makes a meaningful change
@@ -516,6 +527,12 @@ private fun ChecklistDetailContent(
                         contentDescription = stringResource(Res.string.add_item)
                     )
                 }
+                IconButton(onClick = { showFillSheet = true }) {
+                    Icon(
+                        Icons.Outlined.NoteAdd,
+                        contentDescription = stringResource(Res.string.fill_options_open)
+                    )
+                }
                 IconButton(onClick = { onIntent(ChecklistDetailIntent.OnReminderClick) }) {
                     val hasActiveSchedule = state.checklist.reminderAt != null
                             || state.checklist.repeatRule != null
@@ -547,51 +564,22 @@ private fun ChecklistDetailContent(
         },
         bottomBar = {
             // Hide bottom bar in edit mode
-            if (!isEditMode) {
-                // When onOpenChatSheet is wired (App.kt context), show the new
-                // ChecklistDetailBottomBar (dock + 50/50 fill buttons).
-                // Fallback to the previous two-button layout when not wired.
-                if (onOpenChatSheet != null) {
-                    ChecklistDetailBottomBar(
-                        checklistName = state.checklist.name,
-                        onChatClick = onOpenChatSheet,
-                        onMicClick = onOpenChatSheet, // same sheet, mic activates on open
-                        onFillManuallyClick = { onIntent(ChecklistDetailIntent.OnAddFillClick) },
-                        onFillWithAiClick = { onIntent(ChecklistDetailIntent.OnAddFillViaAiClick) },
-                        chatPlaceholder = stringResource(Res.string.main_ask_gisti_placeholder),
-                        fillManuallyLabel = stringResource(Res.string.checklist_new_fill),
-                        fillWithAiLabel = stringResource(Res.string.checklist_add_fill_ai),
-                        micContentDescription = stringResource(Res.string.main_ask_gisti_mic),
-                        modifier = Modifier.navigationBarsPadding(),
-                    )
-                } else {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shadowElevation = 8.dp,
-                        color = MaterialTheme.colorScheme.surface
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
-                                .padding(top = AppDimens.SpacingMd, bottom = AppDimens.SpacingLg)
-                                .navigationBarsPadding(),
-                            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
-                        ) {
-                            AppButtonSecondary(
-                                text = stringResource(Res.string.checklist_new_fill),
-                                onClick = { onIntent(ChecklistDetailIntent.OnAddFillClick) },
-                                icon = Icons.Outlined.ContentCopy,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            AppGradientButton(
-                                text = stringResource(Res.string.checklist_add_fill_ai),
-                                onClick = { onIntent(ChecklistDetailIntent.OnAddFillViaAiClick) },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                    }
-                }
+            if (!isEditMode && onOpenChatSheet != null) {
+                // Context-aware chat dock only. The two Fill actions moved to a TopAppBar
+                // action that opens FillOptionsSheet (see actions block + showFillSheet).
+                // navigationBarsPadding is applied INSIDE the bar's Surface (component owns it),
+                // so the Surface background + shadow reach the very bottom of the screen instead
+                // of leaving a gap in the system-nav zone (edge-to-edge bottom-bar pattern).
+                ChecklistDetailBottomBar(
+                    checklistName = state.checklist.name,
+                    onChatClick = onOpenChatSheet,
+                    // Mic opens the dock AND starts recording. Falls back to the plain
+                    // chat-open callback when the mic variant isn't wired.
+                    onMicClick = onMicChatSheet ?: onOpenChatSheet,
+                    chatPlaceholder = stringResource(Res.string.main_ask_gisti_placeholder),
+                    micContentDescription = stringResource(Res.string.main_ask_gisti_mic),
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
     ) {
@@ -1061,6 +1049,27 @@ private fun ChecklistDetailContent(
                 onIntent(ChecklistDetailIntent.OnDeleteChecklistClick)
             },
             onDismiss = { onIntent(ChecklistDetailIntent.OnDismissOverflowSheet) }
+        )
+    }
+
+    // Fill options sheet — opened from the TopAppBar "Fill checklist" action.
+    // Hosts the two Fill actions (manual / via AI) that previously lived in the bottom bar.
+    if (showFillSheet) {
+        FillOptionsSheet(
+            onFillManually = {
+                showFillSheet = false
+                onIntent(ChecklistDetailIntent.OnAddFillClick)
+            },
+            onFillViaAi = {
+                showFillSheet = false
+                onIntent(ChecklistDetailIntent.OnAddFillViaAiClick)
+            },
+            onDismiss = { showFillSheet = false },
+            title = stringResource(Res.string.fill_options_title),
+            fillManuallyLabel = stringResource(Res.string.fill_manually_title),
+            fillManuallyDescription = stringResource(Res.string.fill_manually_desc),
+            fillViaAiLabel = stringResource(Res.string.fill_via_ai_title),
+            fillViaAiDescription = stringResource(Res.string.fill_via_ai_desc),
         )
     }
 }

@@ -73,8 +73,9 @@ internal class ChatAgentApiServiceImpl(
         transcript: List<AgentTranscriptEntry>,
         locale: ChatLocale,
         checklistsSummary: List<ChecklistContext>,
+        contextChecklistName: String?,
     ): AgentStepResult = runCatching {
-        logger.debug(TAG, "step: userId=${userId.take(8)}... transcript=${transcript.size} entries locale=$locale checklists=${checklistsSummary.size}")
+        logger.debug(TAG, "step: userId=${userId.take(8)}... transcript=${transcript.size} entries locale=$locale checklists=${checklistsSummary.size} context=${contextChecklistName ?: "none"}")
 
         val response: HttpResponse = httpClient.post(AGENT_URL) {
             contentType(ContentType.Application.Json)
@@ -87,6 +88,10 @@ internal class ChatAgentApiServiceImpl(
                     checklistsSummary = checklistsSummary.map {
                         ChecklistSummaryDto(name = it.name, totalItems = it.totalItems, doneItems = it.doneItems)
                     },
+                    // Only send the context object when a checklist is actually focused.
+                    // explicitNulls=false drops the field entirely when null, so the server
+                    // sees no `context_checklist` key (treated as "home screen, no focus").
+                    contextChecklist = contextChecklistName?.let { ContextChecklistDto(name = it) },
                 )
             )
         }
@@ -176,6 +181,14 @@ internal class ChatAgentApiServiceImpl(
         val locale: String,
         @SerialName("timezone_offset_minutes") val timezoneOffsetMinutes: Int,
         @SerialName("checklists_summary") val checklistsSummary: List<ChecklistSummaryDto>,
+        // Optional: present only when the dock was opened with a checklist in focus.
+        // Server contract: top-level `context_checklist: { name: "<name>" }`.
+        @SerialName("context_checklist") val contextChecklist: ContextChecklistDto? = null,
+    )
+
+    @Serializable
+    private data class ContextChecklistDto(
+        val name: String,
     )
 
     @Serializable

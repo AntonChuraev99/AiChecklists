@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -24,14 +24,40 @@ import androidx.compose.ui.unit.sp
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 
 /**
+ * The distinct quick-action a prompt chip triggers.
+ *
+ * The chip itself is pure UI; it only carries this enum so the host screen
+ * (@android-expert wiring) can map each action to its own intent/flow:
+ *  - [PHOTO]    → create a checklist from a photo (image picker → AI).
+ *  - [REMIND]   → open the reminder flow.
+ *  - [LINK]     → create a checklist from a URL.
+ *  - [PLAN_DAY] → open the "plan my day" flow.
+ *  - [PDF]      → create a checklist from a PDF document.
+ *
+ * The leading "➕ New list" chip is NOT part of this enum — it is a separate
+ * parameter ([GistiPromptChips.onNewListClick]) with its own distinct destination
+ * (Templates, not chat).
+ */
+enum class GistiQuickAction {
+    PHOTO,
+    REMIND,
+    LINK,
+    PLAN_DAY,
+    PDF,
+}
+
+/**
  * Data class for a single prompt-starter chip displayed in [GistiPromptChips].
  *
  * @param emoji Lead emoji rendered at 15sp (slightly larger than label for visual hierarchy).
  * @param label Short action text shown next to the emoji (e.g. "Photo → list").
+ * @param action The [GistiQuickAction] this chip triggers. Surfaced to the caller via
+ *               [GistiPromptChips.onChipClick] so each chip drives a DIFFERENT flow.
  */
 data class GistiPromptChip(
     val emoji: String,
     val label: String,
+    val action: GistiQuickAction,
 )
 
 /**
@@ -57,11 +83,12 @@ data class GistiPromptChip(
  * - Label: `colorScheme.onSurface`, `labelLarge`
  *
  * @param chips        List of [GistiPromptChip] items to display.
- * @param onChipClick  Called with the 0-based index of the tapped chip (index into [chips],
- *                     NOT affected by the optional leading "New list" chip).
+ * @param onChipClick  Called with the [GistiQuickAction] of the tapped chip. The host maps
+ *                     each action to its own intent (NOT affected by the optional leading
+ *                     "New list" chip, which has its own callback).
  * @param onNewListClick When non-null, a leading "➕ New list" chip is prepended before
  *                     [chips]. It has a DISTINCT destination (Templates, not chat) and its
- *                     own callback, so the [chips] indices stay stable. When null, no leading
+ *                     own callback, so the action chips stay independent. When null, no leading
  *                     chip is shown.
  * @param newListLabel Label for the leading "New list" chip (localized by the caller).
  * @param contentPadding Inner padding applied to the scroll content. Defaults to the screen
@@ -70,7 +97,7 @@ data class GistiPromptChip(
 @Composable
 fun GistiPromptChips(
     chips: List<GistiPromptChip>,
-    onChipClick: (Int) -> Unit,
+    onChipClick: (GistiQuickAction) -> Unit,
     modifier: Modifier = Modifier,
     onNewListClick: (() -> Unit)? = null,
     newListLabel: String = "New list",
@@ -86,15 +113,20 @@ fun GistiPromptChips(
         if (onNewListClick != null) {
             item(key = "gisti_prompt_chip_new_list") {
                 PromptChipItem(
-                    chip = GistiPromptChip(emoji = "➕", label = newListLabel),
+                    emoji = "➕",
+                    label = newListLabel,
                     onClick = onNewListClick,
                 )
             }
         }
-        itemsIndexed(chips) { index, chip ->
+        items(
+            items = chips,
+            key = { chip -> "gisti_prompt_chip_${chip.action.name}" },
+        ) { chip ->
             PromptChipItem(
-                chip = chip,
-                onClick = { onChipClick(index) },
+                emoji = chip.emoji,
+                label = chip.label,
+                onClick = { onChipClick(chip.action) },
             )
         }
     }
@@ -102,7 +134,8 @@ fun GistiPromptChips(
 
 @Composable
 private fun PromptChipItem(
-    chip: GistiPromptChip,
+    emoji: String,
+    label: String,
     onClick: () -> Unit,
 ) {
     val shape = RoundedCornerShape(19.dp) // full pill for height=38
@@ -121,12 +154,12 @@ private fun PromptChipItem(
             modifier = Modifier.padding(horizontal = 14.dp),
         ) {
             Text(
-                text = chip.emoji,
+                text = emoji,
                 fontSize = 15.sp,
                 lineHeight = 18.sp,
             )
             Text(
-                text = chip.label,
+                text = label,
                 style = MaterialTheme.typography.labelLarge.copy(
                     fontSize = 13.5.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -141,16 +174,26 @@ private fun PromptChipItem(
 /**
  * Factory for the standard home-screen prompt chips.
  *
- * @param photoLabel Label for the photo chip (e.g. "Photo → list").
- * @param addLabel Label for the add-tasks chip (e.g. "Add tasks").
- * @param remindLabel Label for the reminder chip (e.g. "Remind me…").
+ * Order is by popularity (product-confirmed): Photo, Remind, Link, Plan day, PDF.
+ * The leading "➕ New list" chip is rendered separately via
+ * [GistiPromptChips.onNewListClick] and is NOT part of this list.
+ *
+ * @param photoLabel   Label for the photo chip (e.g. "Photo → list").
+ * @param remindLabel  Label for the reminder chip (e.g. "Remind me…").
+ * @param linkLabel    Label for the link chip (e.g. "Link → list").
+ * @param planDayLabel Label for the plan-day chip (e.g. "Plan day").
+ * @param pdfLabel     Label for the PDF chip (e.g. "PDF → list").
  */
 fun gistiDefaultPromptChips(
     photoLabel: String = "Photo → list",
-    addLabel: String = "Add tasks",
     remindLabel: String = "Remind me…",
+    linkLabel: String = "Link → list",
+    planDayLabel: String = "Plan day",
+    pdfLabel: String = "PDF → list",
 ): List<GistiPromptChip> = listOf(
-    GistiPromptChip(emoji = "📷", label = photoLabel),
-    GistiPromptChip(emoji = "➕", label = addLabel),
-    GistiPromptChip(emoji = "🔔", label = remindLabel),
+    GistiPromptChip(emoji = "📷", label = photoLabel, action = GistiQuickAction.PHOTO),
+    GistiPromptChip(emoji = "🔔", label = remindLabel, action = GistiQuickAction.REMIND),
+    GistiPromptChip(emoji = "🔗", label = linkLabel, action = GistiQuickAction.LINK),
+    GistiPromptChip(emoji = "📅", label = planDayLabel, action = GistiQuickAction.PLAN_DAY),
+    GistiPromptChip(emoji = "📄", label = pdfLabel, action = GistiQuickAction.PDF),
 )

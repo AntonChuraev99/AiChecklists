@@ -237,18 +237,20 @@ internal class AiChatRepositoryImpl(
         transcript: List<AgentTranscriptEntry>,
         locale: ChatLocale,
         checklistsSummary: List<ChecklistContext>,
+        contextChecklistName: String?,
     ): AgentStepResult {
         val userId = userDataRepository.getUserData().userId
         if (userId.isBlank()) {
             logger.warning(TAG, "agentStep skipped: userId blank (user not registered yet)")
             return AgentStepResult.ServiceError
         }
-        logger.debug(TAG, "agentStep: transcript=${transcript.size} entries locale=$locale checklists=${checklistsSummary.size}")
+        logger.debug(TAG, "agentStep: transcript=${transcript.size} entries locale=$locale checklists=${checklistsSummary.size} context=${contextChecklistName ?: "none"}")
         return chatAgentApi.step(
             userId = userId,
             transcript = transcript,
             locale = locale,
             checklistsSummary = checklistsSummary,
+            contextChecklistName = contextChecklistName,
         )
     }
 

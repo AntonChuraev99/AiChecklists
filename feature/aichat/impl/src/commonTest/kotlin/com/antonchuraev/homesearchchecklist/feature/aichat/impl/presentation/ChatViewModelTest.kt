@@ -74,6 +74,8 @@ private class FakeAiChatRepository(
     var lastTranscribePath: String? = null
     var agentStepCallCount = 0
     val agentStepTranscripts = mutableListOf<List<AgentTranscriptEntry>>()
+    /** Captures the contextChecklistName forwarded to each agentStep call (P5 bias). */
+    val agentStepContextNames = mutableListOf<String?>()
 
     override fun isAgenticChatEnabled(): Boolean = agenticEnabled
 
@@ -81,9 +83,11 @@ private class FakeAiChatRepository(
         transcript: List<AgentTranscriptEntry>,
         locale: ChatLocale,
         checklistsSummary: List<ChecklistContext>,
+        contextChecklistName: String?,
     ): AgentStepResult {
         agentStepCallCount++
         agentStepTranscripts.add(transcript.toList())
+        agentStepContextNames.add(contextChecklistName)
         val index = (agentStepCallCount - 1).coerceAtMost(agentStepResults.lastIndex.coerceAtLeast(0))
         return agentStepResults.getOrElse(index) { AgentStepResult.ServiceError }
     }
@@ -118,15 +122,18 @@ private class FakeChatHistoryRepository : ChatHistoryRepository {
     override suspend fun count(): Int = stored.size
 }
 
-private class FakeChecklistRepository : ChecklistRepository {
-    override val checklists: Flow<List<Checklist>> = MutableStateFlow(emptyList())
+private class FakeChecklistRepository(
+    /** Seed checklists used by [getChecklistById] / [checklists] for the P5 context-bias tests. */
+    private val seed: List<Checklist> = emptyList(),
+) : ChecklistRepository {
+    override val checklists: Flow<List<Checklist>> = MutableStateFlow(seed)
     override val weeklyChecklistCount: Flow<Int> = MutableStateFlow(0)
     override suspend fun addChecklist(checklist: Checklist): Long = throw UnsupportedOperationException()
     override suspend fun updateChecklist(checklist: Checklist) = Unit
     override suspend fun updateChecklistTemplate(checklist: Checklist) = Unit
     override suspend fun deleteChecklist(checklist: Checklist) = Unit
-    override suspend fun getChecklistById(id: Long): Checklist? = null
-    override fun observeChecklistById(id: Long): Flow<Checklist?> = flowOf(null)
+    override suspend fun getChecklistById(id: Long): Checklist? = seed.firstOrNull { it.id == id }
+    override fun observeChecklistById(id: Long): Flow<Checklist?> = flowOf(seed.firstOrNull { it.id == id })
     override suspend fun reorderChecklists(orderedIds: List<Long>) = Unit
     override suspend fun setSeparateCompleted(checklistId: Long, value: Boolean) = Unit
     override suspend fun setAutoDeleteCompleted(checklistId: Long, value: Boolean) = Unit
@@ -1480,5 +1487,202 @@ class ChatViewModelTest {
         vm.sendIntent(ChatScreenIntent.OnSetContextChecklist(checklistId = 2L))
         assertEquals(2L, vm.screenState.value.contextChecklistId,
             "Re-opening the sheet for a different checklist must update the context ID")
+    }
+
+    // ── P5: context-checklist bias for list-less commands ─────────────────────
+
+    private fun groceriesChecklist(id: Long = 42L) = Checklist(
+        id = id,
+        name = "Groceries",
+        items = emptyList(),
+    )
+
+    @Test
+    fun createItem_nullHint_withContextChecklist_biasesHintToContextName() = runTest {
+        // AddItem extracted with no explicit list ("add milk") while the dock is focused on
+        // checklist id=42 ("Groceries") → the preview's toolCall hint must become "Groceries".
+        val preBuilt = ToolCall.AddItem(checklistHint = null, itemText = "milk")
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.CreateItem,
+                confidence = 1.0f,
+                layer = RoutingLayer.Classifier,
+                preBuiltToolCall = preBuilt,
+            )
+        )
+        val checklistRepo = FakeChecklistRepository(seed = listOf(groceriesChecklist(id = 42L)))
+        val vm = makeVm(repo = repo, checklistRepo = checklistRepo)
+
+        // Focus the dock on Groceries, then send a list-less command.
+        vm.sendIntent(ChatScreenIntent.OnSetContextChecklist(checklistId = 42L))
+        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+
+        val preview = vm.screenState.value.pendingPreview
+        assertNotNull(preview, "Preview must be shown for CreateItem")
+        val toolCall = preview.toolCall
+        assertIs<ToolCall.AddItem>(toolCall)
+        assertEquals("Groceries", toolCall.checklistHint,
+            "Null-hint AddItem must be biased to the open checklist name")
+        assertEquals("Groceries", preview.targetChecklistHint,
+            "Preview card must reflect the biased context list")
+    }
+
+    @Test
+    fun createItem_explicitHint_withContextChecklist_doesNotOverwriteHint() = runTest {
+        // User explicitly named "shopping" → context ("Groceries") must NOT override it.
+        val preBuilt = ToolCall.AddItem(checklistHint = "shopping", itemText = "milk")
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.CreateItem,
+                confidence = 1.0f,
+                layer = RoutingLayer.Classifier,
+                preBuiltToolCall = preBuilt,
+            )
+        )
+        val checklistRepo = FakeChecklistRepository(seed = listOf(groceriesChecklist(id = 42L)))
+        val vm = makeVm(repo = repo, checklistRepo = checklistRepo)
+
+        vm.sendIntent(ChatScreenIntent.OnSetContextChecklist(checklistId = 42L))
+        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk to shopping"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+
+        val toolCall = vm.screenState.value.pendingPreview?.toolCall
+        assertIs<ToolCall.AddItem>(toolCall)
+        assertEquals("shopping", toolCall.checklistHint,
+            "Explicit hint must win over the open-screen context")
+    }
+
+    @Test
+    fun createItem_nullHint_noContextChecklist_leavesHintNull() = runTest {
+        // No context set → behaviour is unchanged (hint stays null, dispatcher uses default).
+        val preBuilt = ToolCall.AddItem(checklistHint = null, itemText = "milk")
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.CreateItem,
+                confidence = 1.0f,
+                layer = RoutingLayer.Classifier,
+                preBuiltToolCall = preBuilt,
+            )
+        )
+        // Seed present but no OnSetContextChecklist call → contextChecklistId stays null.
+        val checklistRepo = FakeChecklistRepository(seed = listOf(groceriesChecklist(id = 42L)))
+        val vm = makeVm(repo = repo, checklistRepo = checklistRepo)
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+
+        val toolCall = vm.screenState.value.pendingPreview?.toolCall
+        assertIs<ToolCall.AddItem>(toolCall)
+        assertNull(toolCall.checklistHint,
+            "Without context, a null hint must remain null (unchanged behaviour)")
+    }
+
+    @Test
+    fun createItem_nullHint_contextChecklistDeleted_leavesHintNull() = runTest {
+        // contextChecklistId points to a checklist that no longer exists (deleted after the
+        // dock opened) → safe fallback: hint stays null instead of inventing a name.
+        val preBuilt = ToolCall.AddItem(checklistHint = null, itemText = "milk")
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.CreateItem,
+                confidence = 1.0f,
+                layer = RoutingLayer.Classifier,
+                preBuiltToolCall = preBuilt,
+            )
+        )
+        // Seed is empty → getChecklistById(99) returns null.
+        val checklistRepo = FakeChecklistRepository(seed = emptyList())
+        val vm = makeVm(repo = repo, checklistRepo = checklistRepo)
+
+        vm.sendIntent(ChatScreenIntent.OnSetContextChecklist(checklistId = 99L))
+        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+
+        val toolCall = vm.screenState.value.pendingPreview?.toolCall
+        assertIs<ToolCall.AddItem>(toolCall)
+        assertNull(toolCall.checklistHint,
+            "Deleted context checklist must fall back to null hint")
+    }
+
+    @Test
+    fun createChecklist_withContextChecklist_isNotBiased() = runTest {
+        // CreateChecklist's "name" is the target of the action, not a context to operate within —
+        // context bias must NOT touch it (the new list keeps its own name).
+        val preBuilt = ToolCall.CreateChecklist(name = "Party", initialItems = emptyList())
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.CreateChecklist(name = "Party"),
+                confidence = 1.0f,
+                layer = RoutingLayer.Classifier,
+                preBuiltToolCall = preBuilt,
+            )
+        )
+        val checklistRepo = FakeChecklistRepository(seed = listOf(groceriesChecklist(id = 42L)))
+        val vm = makeVm(repo = repo, checklistRepo = checklistRepo)
+
+        vm.sendIntent(ChatScreenIntent.OnSetContextChecklist(checklistId = 42L))
+        vm.sendIntent(ChatScreenIntent.OnInputChange("create checklist Party"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+
+        val toolCall = vm.screenState.value.pendingPreview?.toolCall
+        assertIs<ToolCall.CreateChecklist>(toolCall)
+        assertEquals("Party", toolCall.name,
+            "CreateChecklist name must not be altered by context bias")
+    }
+
+    @Test
+    fun agentTurn_withContextChecklist_forwardsContextNameToAgentStep() = runTest {
+        // Part B: agentic path must forward the resolved context checklist name to agentStep so
+        // the server can bias list-less commands toward the open checklist.
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.FreeForm,
+                confidence = 1.0f,
+                layer = RoutingLayer.FullChat,
+            ),
+            agenticEnabled = true,
+            agentStepResults = listOf(
+                AgentStepResult.Final(content = "Done.", creditsRemaining = 100),
+            ),
+        )
+        val checklistRepo = FakeChecklistRepository(seed = listOf(groceriesChecklist(id = 42L)))
+        val vm = makeVm(repo = repo, checklistRepo = checklistRepo)
+
+        vm.sendIntent(ChatScreenIntent.OnSetContextChecklist(checklistId = 42L))
+        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(1, repo.agentStepCallCount, "agentStep must be called once")
+        assertEquals("Groceries", repo.agentStepContextNames.first(),
+            "agentStep must receive the resolved context checklist name")
+    }
+
+    @Test
+    fun agentTurn_noContextChecklist_forwardsNullToAgentStep() = runTest {
+        // Part B: no focus → contextChecklistName must be null (server treats as home screen).
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.FreeForm,
+                confidence = 1.0f,
+                layer = RoutingLayer.FullChat,
+            ),
+            agenticEnabled = true,
+            agentStepResults = listOf(
+                AgentStepResult.Final(content = "Done.", creditsRemaining = 100),
+            ),
+        )
+        val checklistRepo = FakeChecklistRepository(seed = listOf(groceriesChecklist(id = 42L)))
+        val vm = makeVm(repo = repo, checklistRepo = checklistRepo)
+
+        // No OnSetContextChecklist call.
+        vm.sendIntent(ChatScreenIntent.OnInputChange("plan my week"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(1, repo.agentStepCallCount, "agentStep must be called once")
+        assertNull(repo.agentStepContextNames.first(),
+            "agentStep must receive null context name when no checklist is focused")
     }
 }

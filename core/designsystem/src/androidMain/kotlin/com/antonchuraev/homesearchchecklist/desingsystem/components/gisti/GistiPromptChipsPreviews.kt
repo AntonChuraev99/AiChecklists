@@ -25,8 +25,10 @@ private fun GistiPromptChipsDefaultPreview() {
             GistiPromptChips(
                 chips = gistiDefaultPromptChips(
                     photoLabel = "Photo → list",
-                    addLabel = "Add tasks",
                     remindLabel = "Remind me…",
+                    linkLabel = "Link → list",
+                    planDayLabel = "Plan day",
+                    pdfLabel = "PDF → list",
                 ),
                 onChipClick = {},
             )
@@ -46,10 +48,10 @@ private fun GistiPromptChipsCustomPreview() {
         ) {
             GistiPromptChips(
                 chips = listOf(
-                    GistiPromptChip(emoji = "🛒", label = "Grocery list"),
-                    GistiPromptChip(emoji = "✈️", label = "Trip packing"),
-                    GistiPromptChip(emoji = "💪", label = "Workout plan"),
-                    GistiPromptChip(emoji = "📚", label = "Study notes"),
+                    GistiPromptChip(emoji = "🛒", label = "Grocery list", action = GistiQuickAction.PHOTO),
+                    GistiPromptChip(emoji = "✈️", label = "Trip packing", action = GistiQuickAction.LINK),
+                    GistiPromptChip(emoji = "💪", label = "Workout plan", action = GistiQuickAction.PLAN_DAY),
+                    GistiPromptChip(emoji = "📚", label = "Study notes", action = GistiQuickAction.PDF),
                 ),
                 onChipClick = {},
             )

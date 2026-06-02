@@ -38,6 +38,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.adaptive.rememberAppWin
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCreditsChip
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.AskGistiBar
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiPromptChips
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiQuickAction
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiDefaultPromptChips
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
@@ -50,10 +51,12 @@ import aichecklists.core.designsystem.generated.resources.main_ask_gisti_mic
 import aichecklists.core.designsystem.generated.resources.main_ask_gisti_placeholder
 import aichecklists.core.designsystem.generated.resources.main_create_checklist_action
 import aichecklists.core.designsystem.generated.resources.main_menu
-import aichecklists.core.designsystem.generated.resources.main_prompt_add
 import aichecklists.core.designsystem.generated.resources.main_prompt_new_list
 import aichecklists.core.designsystem.generated.resources.main_prompt_photo
 import aichecklists.core.designsystem.generated.resources.main_prompt_remind
+import aichecklists.core.designsystem.generated.resources.main_prompt_link
+import aichecklists.core.designsystem.generated.resources.main_prompt_plan_day
+import aichecklists.core.designsystem.generated.resources.main_prompt_pdf
 import org.jetbrains.compose.resources.stringResource
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import org.koin.compose.koinInject
@@ -80,6 +83,18 @@ fun MainScreen(
     hideBottomBar: Boolean = false,
     /** Navigate to the AI Chat screen. Wired in App.kt NavHost. */
     onNavigateToAiChat: (() -> Unit)? = null,
+    /**
+     * Handles a prompt-chip [GistiQuickAction] (Photo / Remind / Link / Plan day / PDF).
+     * App.kt maps each action to its own chat flow (attachment picker, input prefill, or
+     * prefill+send) via the singleton ChatViewModel + inline dock. When null, the chips fall
+     * back to plainly opening the chat (legacy [MainScreenIntent.OnAiChatClick]).
+     */
+    onQuickAction: ((GistiQuickAction) -> Unit)? = null,
+    /**
+     * Mic tap in the AskGisti bar: App.kt opens the dock and starts voice recording.
+     * When null, the mic falls back to plainly opening the chat.
+     */
+    onMicClick: (() -> Unit)? = null,
     /** Navigate to the Templates screen (manual checklist creation entry).
      *  When non-null, a "+" action appears in the top bar and a "New list" chip
      *  is prepended to the prompt chips. Wired in App.kt NavHost. */
@@ -230,10 +245,20 @@ fun MainScreen(
                         GistiPromptChips(
                             chips = gistiDefaultPromptChips(
                                 photoLabel = stringResource(Res.string.main_prompt_photo),
-                                addLabel = stringResource(Res.string.main_prompt_add),
                                 remindLabel = stringResource(Res.string.main_prompt_remind),
+                                linkLabel = stringResource(Res.string.main_prompt_link),
+                                planDayLabel = stringResource(Res.string.main_prompt_plan_day),
+                                pdfLabel = stringResource(Res.string.main_prompt_pdf),
                             ),
-                            onChipClick = { viewModel.sendIntent(MainScreenIntent.OnAiChatClick) },
+                            // Each action drives its own chat flow (App.kt). Fall back to plainly
+                            // opening the chat when the host didn't wire onQuickAction.
+                            onChipClick = { action ->
+                                if (onQuickAction != null) {
+                                    onQuickAction(action)
+                                } else {
+                                    viewModel.sendIntent(MainScreenIntent.OnAiChatClick)
+                                }
+                            },
                             // Leading "➕ New list" chip → Templates (manual create), distinct
                             // from the chat-routing chips above. Shown only when wired.
                             onNewListClick = onCreateFromTemplatesClick,
@@ -243,7 +268,15 @@ fun MainScreen(
                         AskGistiBar(
                             placeholder = stringResource(Res.string.main_ask_gisti_placeholder),
                             onClick = { viewModel.sendIntent(MainScreenIntent.OnAiChatClick) },
-                            onMicClick = { viewModel.sendIntent(MainScreenIntent.OnAiChatClick) },
+                            // Mic opens the dock and starts recording (App.kt). Fall back to
+                            // plainly opening the chat when not wired.
+                            onMicClick = {
+                                if (onMicClick != null) {
+                                    onMicClick()
+                                } else {
+                                    viewModel.sendIntent(MainScreenIntent.OnAiChatClick)
+                                }
+                            },
                             micContentDescription = stringResource(Res.string.main_ask_gisti_mic),
                             modifier = Modifier.padding(horizontal = AppDimens.ScreenPaddingHorizontal),
                         )

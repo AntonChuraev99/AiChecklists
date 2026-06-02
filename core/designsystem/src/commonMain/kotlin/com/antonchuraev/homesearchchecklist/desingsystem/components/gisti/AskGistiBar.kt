@@ -26,7 +26,6 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
-import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
 
 /**
  * Persistent AI command bar shown at the bottom of the home screen.
@@ -65,9 +64,10 @@ fun AskGistiBar(
     micContentDescription: String = "",
     value: String? = null,
 ) {
-    val isDark = LocalIsDarkTheme.current
     val shape = RoundedCornerShape(16.dp)
 
+    // Flat input — no shadow (user request 2026-06-02). The 1.5dp outlineVariant
+    // border alone separates the bar from the background, keeping the home screen calm.
     Surface(
         modifier = modifier
             .fillMaxWidth()
@@ -75,7 +75,7 @@ fun AskGistiBar(
         shape = shape,
         color = MaterialTheme.colorScheme.surfaceContainerLowest,
         border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outlineVariant),
-        shadowElevation = if (isDark) 0.dp else 2.dp,
+        shadowElevation = 0.dp,
         tonalElevation = 0.dp,
     ) {
         Row(

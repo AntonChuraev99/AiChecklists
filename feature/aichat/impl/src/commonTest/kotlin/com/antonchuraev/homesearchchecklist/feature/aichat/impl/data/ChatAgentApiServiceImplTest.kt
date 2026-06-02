@@ -481,4 +481,64 @@ class ChatAgentApiServiceImplTest {
         assertContains(body, "\"added\"")
         assertContains(body, "Поход")
     }
+
+    // ── 11. context_checklist present in body when contextChecklistName is non-null ──
+
+    @Test
+    fun step_request_bodyContainsContextChecklistWhenProvided() = runTest {
+        var capturedBody: String? = null
+
+        val service = makeService { request ->
+            capturedBody = request.body.toByteArray().decodeToString()
+            respond(
+                content = """{"success":true,"type":"final","content":"ok","credits_remaining":5}""",
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+            )
+        }
+
+        service.step(
+            userId = "u1",
+            transcript = emptyList(),
+            locale = ChatLocale.En,
+            checklistsSummary = emptyList(),
+            contextChecklistName = "Groceries",
+        )
+
+        val body = capturedBody ?: ""
+        // Server contract: top-level `context_checklist: { name: "<name>" }`.
+        assertContains(body, "context_checklist")
+        assertContains(body, "Groceries")
+    }
+
+    // ── 12. context_checklist OMITTED from body when contextChecklistName is null ──
+
+    @Test
+    fun step_request_omitsContextChecklistWhenNull() = runTest {
+        var capturedBody: String? = null
+
+        val service = makeService { request ->
+            capturedBody = request.body.toByteArray().decodeToString()
+            respond(
+                content = """{"success":true,"type":"final","content":"ok","credits_remaining":5}""",
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+            )
+        }
+
+        service.step(
+            userId = "u1",
+            transcript = emptyList(),
+            locale = ChatLocale.En,
+            checklistsSummary = emptyList(),
+            // contextChecklistName defaults to null
+        )
+
+        val body = capturedBody ?: ""
+        // explicitNulls=false → the field must NOT appear at all when null.
+        assertTrue(
+            !body.contains("context_checklist"),
+            "context_checklist must be omitted when no checklist is focused, got: $body",
+        )
+    }
 }

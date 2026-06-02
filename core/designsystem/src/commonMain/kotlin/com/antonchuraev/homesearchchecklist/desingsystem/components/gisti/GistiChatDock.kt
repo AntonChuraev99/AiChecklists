@@ -1,13 +1,13 @@
 package com.antonchuraev.homesearchchecklist.desingsystem.components.gisti
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -132,39 +132,32 @@ fun GistiChatDock(
 }
 
 /**
- * The bottomBar column used on **ChecklistDetailScreen** after the chat dock is introduced.
+ * The bottomBar column used on **ChecklistDetailScreen**.
  *
- * Layout (top → bottom, inside the Surface):
+ * Layout (inside the Surface):
  *
  * ```
- * ┌─────────────────────────────────────────────────────┐  ← Surface (surfaceContainerLow,
+ * ┌─────────────────────────────────────────────────────┐  ← Surface (surface,
  * │  ┌─[GistiChatDock]──────────────────────────────┐  │      shadowElevation=8dp)
  * │  │ ✨  Ask about this list…   ↑       🎤        │  │
- * │  └──────────────────────────────────────────────┘  │  ← SpacingSm (8dp) gap
- * │  ┌─────────────────────┐  ┌──────────────────────┐ │
- * │  │ Fill Manually (sec) │  │ Fill with AI (grad)  │ │  ← side-by-side 50/50
- * │  └─────────────────────┘  └──────────────────────┘ │
+ * │  └──────────────────────────────────────────────┘  │
  * └─────────────────────────────────────────────────────┘
  *   padding: horizontal=16dp, top=12dp, bottom=16dp + navBarsPadding
  * ```
  *
- * The dock sits **above** the two fill buttons, in the same bottomBar Surface that already
- * exists in ChecklistDetailScreen. The fill buttons switch from full-width stacked to
- * **horizontal 50/50 row** to free vertical space; the dock stays full-width above them.
+ * The two "Fill" actions are **no longer** in this bar — they moved to a TopAppBar action
+ * that opens [FillOptionsSheet]. This bar now hosts ONLY the context-aware chat dock.
  *
  * This is a pure-UI shell. @android-expert:
- *  - Replace the current `Column` in `ChecklistDetailScreen.bottomBar` with this composable.
+ *  - Keep using this composable for `ChecklistDetailScreen.bottomBar`.
+ *  - Add a TopAppBar action icon (e.g. `Icons.Outlined.PostAdd`) that toggles a
+ *    `showFillSheet` flag; render [FillOptionsSheet] when true.
  *  - Pass `onChatClick` / `onMicClick` from App.kt (sheet wiring).
- *  - Pass `contextLabel = checklist.name` when available from state.
  *
  * @param checklistName       Current checklist name — passed as the context label.
  * @param onChatClick         Opens the chat sheet anchored to this checklist.
  * @param onMicClick          Opens the sheet in voice-input mode.
- * @param onFillManuallyClick Opens FillDetail (existing behaviour).
- * @param onFillWithAiClick   Opens AI fill flow (existing behaviour).
  * @param chatPlaceholder     Localised placeholder for the dock bar.
- * @param fillManuallyLabel   Localised label for the secondary button.
- * @param fillWithAiLabel     Localised label for the gradient button.
  * @param micContentDescription Accessibility label for mic.
  */
 @Composable
@@ -172,26 +165,27 @@ fun ChecklistDetailBottomBar(
     checklistName: String,
     onChatClick: () -> Unit,
     onMicClick: () -> Unit,
-    onFillManuallyClick: () -> Unit,
-    onFillWithAiClick: () -> Unit,
     chatPlaceholder: String = "Ask Gisti…",
-    fillManuallyLabel: String = "Fill Manually",
-    fillWithAiLabel: String = "Fill with AI",
     micContentDescription: String = "Voice input",
     modifier: Modifier = Modifier,
 ) {
-    val isDark = LocalIsDarkTheme.current
     Surface(
+        // Flat bottom bar — NO shadow (user request 2026-06-02). The theme's `surface` and
+        // `background` are the same warm cream (#FBFAF8), so a shadowElevation here only rendered
+        // a dirty grey line above the bar in the system-nav zone — the "broken shadow" the user
+        // saw. The dock pill inside carries its own outlineVariant border, so the bar reads as a
+        // calm flat surface, consistent with the now-flat home screen (AskGistiBar, п.1).
+        // Surface still fills width with NO bottom inset (background reaches the screen bottom);
+        // the nav-bar inset stays on the inner Column.
         modifier = modifier.fillMaxWidth(),
-        shadowElevation = 8.dp,
         color = MaterialTheme.colorScheme.surface,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
-                .padding(top = AppDimens.SpacingMd, bottom = AppDimens.SpacingLg),
-            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
+                .padding(top = AppDimens.SpacingMd, bottom = AppDimens.SpacingLg)
+                .navigationBarsPadding(),
         ) {
             // Context-aware dock: "Ask about this list…"
             GistiChatDock(
@@ -202,59 +196,6 @@ fun ChecklistDetailBottomBar(
                 micContentDescription = micContentDescription,
                 modifier = Modifier.fillMaxWidth(),
             )
-
-            // Fill buttons — horizontal 50/50 to save vertical space
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                // Fill Manually — secondary, left half
-                // @android-expert: replace with AppButtonSecondary(modifier = Modifier.weight(1f))
-                Surface(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(44.dp)
-                        .clickable(onClick = onFillManuallyClick, role = Role.Button),
-                    shape = MaterialTheme.shapes.medium,
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(
-                            text = fillManuallyLabel,
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                    }
-                }
-
-                // Fill with AI — gradient, right half
-                // @android-expert: replace with AppGradientButton(modifier = Modifier.weight(1f))
-                Surface(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(44.dp)
-                        .clickable(onClick = onFillWithAiClick, role = Role.Button),
-                    shape = MaterialTheme.shapes.medium,
-                    color = MaterialTheme.colorScheme.primary,
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(
-                            text = fillWithAiLabel,
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onPrimary,
-                        )
-                    }
-                }
-            }
         }
     }
 }

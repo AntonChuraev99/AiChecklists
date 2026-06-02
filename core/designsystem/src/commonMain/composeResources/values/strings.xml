@@ -121,7 +121,13 @@
     <string name="main_prompt_photo">Photo → list</string>
     <string name="main_prompt_add">Add tasks</string>
     <string name="main_prompt_remind">Remind me…</string>
+    <string name="main_prompt_link">Link → list</string>
+    <string name="main_prompt_plan_day">Plan day</string>
+    <string name="main_prompt_pdf">PDF → list</string>
     <string name="main_prompt_new_list">New list</string>
+    <string name="main_prompt_link_prefill">Create a list from: </string>
+    <string name="main_prompt_remind_prefill">Remind me to </string>
+    <string name="main_prompt_plan_day_query">What should I do today?</string>
     <string name="main_free_lists_used">%1$d of %2$d free lists used</string>
     <string name="main_menu">Menu</string>
     <string name="main_menu_support">Support</string>
@@ -271,6 +277,12 @@
     <string name="checklist_add_fill">New Fill</string>
     <string name="checklist_add_fill_ai">Fill via AI</string>
     <string name="checklist_new_fill">Create New Fill</string>
+    <string name="fill_options_open">Fill checklist</string>
+    <string name="fill_options_title">Fill this checklist</string>
+    <string name="fill_manually_title">Fill Manually</string>
+    <string name="fill_manually_desc">Create an empty fill</string>
+    <string name="fill_via_ai_title">Fill via AI</string>
+    <string name="fill_via_ai_desc">Photo, PDF, link or text → AI fills it</string>
     <string name="checklist_view_all_fills">View All Fills</string>
     <string name="checklist_fills_count">%1$d additional fills</string>
     <string name="fills_list_title">All Fills</string>

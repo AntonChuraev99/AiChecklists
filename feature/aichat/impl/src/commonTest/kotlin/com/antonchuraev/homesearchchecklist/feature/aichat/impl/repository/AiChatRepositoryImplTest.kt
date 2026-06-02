@@ -127,6 +127,7 @@ private class FakeChatAgentApiService : ChatAgentApiService {
         transcript: List<AgentTranscriptEntry>,
         locale: ChatLocale,
         checklistsSummary: List<ChecklistContext>,
+        contextChecklistName: String?,
     ): AgentStepResult = AgentStepResult.ServiceError
 }
 

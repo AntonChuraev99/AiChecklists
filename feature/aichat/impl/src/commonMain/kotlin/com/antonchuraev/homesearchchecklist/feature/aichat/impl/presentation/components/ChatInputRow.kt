@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -36,6 +35,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -53,7 +53,9 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.chat_attach_file_action
@@ -134,6 +136,19 @@ fun ChatInputRow(
 
     val isMic = !canSend
 
+    // The host exposes the input as a plain String, but we render with a TextFieldValue so we
+    // control the caret. Default String-valued TextField collapses the caret to position 0 when
+    // the value changes programmatically — so prompt-chip prefill ("Remind me to ") and
+    // clear-after-send would land the caret at the START. We adopt external string changes with
+    // the caret at the END. Plain typing round-trips the same string back in, so the
+    // LaunchedEffect is a no-op mid-edit and never fights the user's cursor.
+    var textFieldValue by remember { mutableStateOf(TextFieldValue(text, TextRange(text.length))) }
+    LaunchedEffect(text) {
+        if (text != textFieldValue.text) {
+            textFieldValue = TextFieldValue(text, TextRange(text.length))
+        }
+    }
+
     // Track drag-cancel locally to drive the Crossfade icon state
     var isDragCancel by remember { mutableStateOf(false) }
 
@@ -153,10 +168,14 @@ fun ChatInputRow(
     // visible on the white dock surface. Previously it was `surfaceContainerHigh` (grey tonal),
     // which is the "страшный серый" the user reported. 28dp radius, all 4 controls live inside.
     // minHeight 56dp lets the pill grow when text wraps to multiple lines.
+    // NOTE: this component does NOT apply imePadding / navigationBars itself. The bottom inset
+    // (keyboard + system-nav) is owned by the HOST so it can be applied exactly once:
+    //  - full ChatScreen: root Column already has .imePadding() + Scaffold navbar via scaffoldPadding;
+    //  - inline dock (GistiInlineChatPanel): panel Column applies ime.union(navigationBars).
+    // Applying it here too would double the inset in the full chat (Scaffold already insets navbar).
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .imePadding()
             .padding(
                 start = AppDimens.ScreenPaddingHorizontal,
                 end = AppDimens.ScreenPaddingHorizontal,
@@ -200,8 +219,11 @@ fun ChatInputRow(
         // Indicator + container colors are transparent so the field blends into the row;
         // placeholder swaps when attachments are pending.
         TextField(
-            value = text,
-            onValueChange = if (isRecording || isTranscribing) { _ -> } else onTextChange,
+            value = textFieldValue,
+            onValueChange = if (isRecording || isTranscribing) { _ -> } else { newValue ->
+                textFieldValue = newValue
+                if (newValue.text != text) onTextChange(newValue.text)
+            },
             placeholder = {
                 androidx.compose.material3.Text(
                     text = placeholder,
