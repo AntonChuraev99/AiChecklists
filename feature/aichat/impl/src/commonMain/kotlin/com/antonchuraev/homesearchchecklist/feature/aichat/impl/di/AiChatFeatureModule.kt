@@ -1,7 +1,6 @@
 package com.antonchuraev.homesearchchecklist.feature.aichat.impl.di
 
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AiChatPreferencesRepository
-import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.LocalIntentRouter
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AiChatRepository
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatAgentApiService
@@ -69,7 +68,6 @@ val aiChatFeatureModule = module {
             completionApi = get(),
             transcribeApi = get(),
             chatAgentApi = get(),
-            remoteConfig = get<RemoteConfigProvider>(),
             userDataRepository = get(),
             aiChatPreferencesRepository = get(),
             logger = get(),

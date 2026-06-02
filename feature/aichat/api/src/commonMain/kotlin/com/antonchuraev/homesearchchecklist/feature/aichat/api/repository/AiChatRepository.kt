@@ -50,12 +50,6 @@ interface AiChatRepository {
     ): RemoteCompletionResult
 
     /**
-     * Returns true when the agentic chat bridge (chat_agent CF) is enabled via Remote Config.
-     * Default is false — feature is OFF until the CF is deployed and verified stable.
-     */
-    fun isAgenticChatEnabled(): Boolean
-
-    /**
      * One round of the stateless agent loop. Delegates to the `chat_agent` Cloud Function.
      *
      * The caller is responsible for building and extending the [transcript] between rounds.

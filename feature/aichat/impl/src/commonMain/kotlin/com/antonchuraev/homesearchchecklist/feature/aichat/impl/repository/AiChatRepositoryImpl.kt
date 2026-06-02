@@ -2,9 +2,6 @@ package com.antonchuraev.homesearchchecklist.feature.aichat.impl.repository
 
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AiChatPreferencesRepository
-import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDefaults
-import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigKeys
-import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AgentTranscriptEntry
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatIntent
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
@@ -50,7 +47,6 @@ internal class AiChatRepositoryImpl(
     private val completionApi: ChatCompletionApiService,
     private val transcribeApi: TranscribeAudioApiService,
     private val chatAgentApi: ChatAgentApiService,
-    private val remoteConfig: RemoteConfigProvider,
     private val userDataRepository: UserDataRepository,
     private val aiChatPreferencesRepository: AiChatPreferencesRepository,
     private val logger: AppLogger,
@@ -226,12 +222,6 @@ internal class AiChatRepositoryImpl(
             }
         }
     }
-
-    override fun isAgenticChatEnabled(): Boolean =
-        remoteConfig.getBoolean(
-            RemoteConfigKeys.AI_CHAT_AGENTIC_ENABLED,
-            RemoteConfigDefaults.AI_CHAT_AGENTIC_ENABLED,
-        )
 
     override suspend fun agentStep(
         transcript: List<AgentTranscriptEntry>,

@@ -62,8 +62,6 @@ private class FakeAiChatRepository(
     private val skipLayer1Result: IntentClassification? = null,
     private val completionResult: RemoteCompletionResult = RemoteCompletionResult.ServiceError,
     private val transcribeResult: TranscriptionOutcome = TranscriptionOutcome.ServiceError,
-    /** When non-null overrides [isAgenticChatEnabled] to return true. */
-    private val agenticEnabled: Boolean = false,
     /** Scripted step results consumed in order; last result is repeated when exhausted. */
     private val agentStepResults: List<AgentStepResult> = emptyList(),
 ) : AiChatRepository {
@@ -76,8 +74,6 @@ private class FakeAiChatRepository(
     val agentStepTranscripts = mutableListOf<List<AgentTranscriptEntry>>()
     /** Captures the contextChecklistName forwarded to each agentStep call (P5 bias). */
     val agentStepContextNames = mutableListOf<String?>()
-
-    override fun isAgenticChatEnabled(): Boolean = agenticEnabled
 
     override suspend fun agentStep(
         transcript: List<AgentTranscriptEntry>,
@@ -808,17 +804,17 @@ class ChatViewModelTest {
             confidence = 1.0f,
             layer = RoutingLayer.Local,
         )
-        // Reject will produce FreeForm from Layer 2 → completeFreeForm called
+        // Reject will produce FreeForm from Layer 2 → agent loop runs
         val layer2RejectResult = IntentClassification(
             intent = ChatIntent.FreeForm,
             confidence = 1.0f,
             layer = RoutingLayer.FullChat,
             preBuiltToolCall = null,
         )
+        // No scripted agentStepResults → agentStep returns ServiceError → chat_completion_error.
         val repo = FakeAiChatRepository(
             classifyResult = layer1Result,
             skipLayer1Result = layer2RejectResult,
-            completionResult = RemoteCompletionResult.ServiceError,
         )
         val vm = makeVm(repo = repo)
 
@@ -843,16 +839,17 @@ class ChatViewModelTest {
         // classify must have been called with skipLayer1=true
         assertEquals(initialCallCount + 1, repo.classifyCallCount, "classify must be called once more on reject")
         assertEquals(true, repo.lastSkipLayer1, "Reject from Local source must set skipLayer1=true")
-        // Since Layer 2 returned FreeForm, completeFreeForm was called (via handleFreeForm)
-        assertTrue(repo.completeFreeFormCallCount >= 1, "completeFreeForm must be called when Layer2 returns FreeForm on reject")
+        // Since Layer 2 returned FreeForm, the agent loop runs (no legacy completeFreeForm).
+        assertTrue(repo.agentStepCallCount >= 1, "agentStep must be called when Layer2 returns FreeForm on reject")
+        assertEquals(0, repo.completeFreeFormCallCount, "completeFreeForm must NOT be called anymore")
 
         effectDeferred.await() // drain the sideEffect (ServiceError → chat_completion_error)
     }
 
-    // ── 26. OnPreviewReject from Classifier source → completeFreeForm called directly ──
+    // ── 26. OnPreviewReject from Classifier source → agent loop runs directly ──
 
     @Test
-    fun onPreviewReject_classifierSource_callsCompleteFreeFormDirectly() = runTest {
+    fun onPreviewReject_classifierSource_runsAgentLoopDirectly() = runTest {
         // Setup: produce a Classifier-layer preview
         val preBuilt = ToolCall.AddItem(checklistHint = "shopping", itemText = "milk")
         val classifierResult = IntentClassification(
@@ -861,9 +858,9 @@ class ChatViewModelTest {
             layer = RoutingLayer.Classifier,
             preBuiltToolCall = preBuilt,
         )
+        // No scripted agentStepResults → agentStep returns ServiceError → chat_completion_error.
         val repo = FakeAiChatRepository(
             classifyResult = classifierResult,
-            completionResult = RemoteCompletionResult.ServiceError,
         )
         val vm = makeVm(repo = repo)
 
@@ -884,8 +881,9 @@ class ChatViewModelTest {
         // classify must NOT be called again — Classifier source escalates directly to Layer 3
         assertEquals(initialClassifyCount, repo.classifyCallCount, "classify must NOT be called on Classifier→Layer3 escalation")
         assertEquals(false, repo.lastSkipLayer1, "skipLayer1 must not have been set for this branch")
-        // completeFreeForm must have been called (Layer 3 escalation)
-        assertEquals(1, repo.completeFreeFormCallCount, "completeFreeForm must be called for Classifier→Layer3 escalation")
+        // The agent loop must have run (Layer 3 escalation, no legacy completeFreeForm).
+        assertEquals(1, repo.agentStepCallCount, "agentStep must be called for Classifier→Layer3 escalation")
+        assertEquals(0, repo.completeFreeFormCallCount, "completeFreeForm must NOT be called anymore")
 
         effectDeferred.await()
     }
@@ -1055,21 +1053,19 @@ class ChatViewModelTest {
             "askAiForText must be forwarded from AppendAssistantMessage to ChatMessage")
     }
 
-    // ── 34. OnAskAiFallback → completeFreeForm called with the original text ──
-    // RED: OnAskAiFallback intent doesn't exist yet.
+    // ── 34. OnAskAiFallback → agent loop runs with the original text ──
 
     @Test
-    fun onAskAiFallback_callsCompleteFreeFormWithOriginalText() = runTest {
-        // Use ServiceError so handleFreeForm emits a ShowAssistantMessage sideEffect
-        // (Success path calls addAndPersistAssistantMessage directly without a sideeffect,
-        // so there is nothing to drain — UncompletedCoroutinesError would result).
+    fun onAskAiFallback_runsAgentLoopWithOriginalText() = runTest {
+        // No scripted agentStepResults → agentStep emits a ShowAssistantMessage sideEffect
+        // (ServiceError → chat_completion_error). The Final path calls addAndPersistAssistantMessage
+        // directly without a sideeffect, so there would be nothing to drain.
         val repo = FakeAiChatRepository(
             classifyResult = IntentClassification(
                 intent = ChatIntent.Unknown("это штука что ты"),
                 confidence = 0f,
                 layer = RoutingLayer.Local,
             ),
-            completionResult = RemoteCompletionResult.ServiceError,
         )
         val vm = makeVm(repo = repo)
 
@@ -1080,9 +1076,9 @@ class ChatViewModelTest {
         vm.sendIntent(ChatScreenIntent.OnInputChange("это штука что ты"))
         vm.sendIntent(ChatScreenIntent.OnSendClick)
         unknownEffectDeferred.await() // drain chat_unknown_intent_hint ShowAssistantMessage
-        assertEquals(0, repo.completeFreeFormCallCount, "completeFreeForm must NOT be called on Unknown classification")
+        assertEquals(0, repo.agentStepCallCount, "agentStep must NOT be called on Unknown classification")
 
-        // Set up deferred for the ServiceError effect emitted by handleFreeForm
+        // Set up deferred for the ServiceError effect emitted by the agent loop
         val fallbackEffectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
             vm.sideEffect.first()
         }
@@ -1090,59 +1086,63 @@ class ChatViewModelTest {
         // User taps "Ask AI" fallback button
         vm.sendIntent(ChatScreenIntent.OnAskAiFallback("это штука что ты"))
 
-        // completeFreeForm must be called exactly once (Layer 3 escalation)
-        assertEquals(1, repo.completeFreeFormCallCount,
-            "OnAskAiFallback must escalate to Layer 3 via completeFreeForm")
+        // agentStep must be called exactly once (Layer 3 escalation via the agent loop)
+        assertEquals(1, repo.agentStepCallCount,
+            "OnAskAiFallback must escalate to Layer 3 via the agent loop")
+        assertEquals(0, repo.completeFreeFormCallCount, "completeFreeForm must NOT be called anymore")
 
         // State must reflect processing complete (UnconfinedTestDispatcher runs eagerly)
         assertFalse(vm.screenState.value.isProcessing,
-            "isProcessing must be false after completeFreeForm completes")
+            "isProcessing must be false after the agent loop completes")
 
         // Drain the chat_completion_error ShowAssistantMessage from ServiceError path
         val fallbackEffect = fallbackEffectDeferred.await()
         assertIs<ChatScreenSideEffect.ShowAssistantMessage>(fallbackEffect)
         assertEquals("chat_completion_error", fallbackEffect.messageKey,
-            "ServiceError from completeFreeForm must emit chat_completion_error")
+            "ServiceError from the agent loop must emit chat_completion_error")
     }
 
     // ══════════════════════════════════════════════════════════════════════════
     // Phase 2d — Agentic loop tests
     // ══════════════════════════════════════════════════════════════════════════
 
-    // ── 35. Kill-switch OFF: FreeForm uses completeFreeForm, agentStep never called ──
+    // ── 35. FreeForm always routes through the agent loop (no legacy completeFreeForm) ──
 
     @Test
-    fun agentLoop_flagOff_freeFormUsesCompleteFreeForm() = runTest {
+    fun freeForm_alwaysRoutesThroughAgentLoop() = runTest {
+        // The agentic flag is gone — FreeForm turns ALWAYS go through the agent loop.
+        // completeFreeForm must never be invoked from the ViewModel FreeForm path.
         val repo = FakeAiChatRepository(
             classifyResult = IntentClassification(
                 intent = ChatIntent.FreeForm,
                 confidence = 1.0f,
                 layer = RoutingLayer.FullChat,
             ),
-            completionResult = RemoteCompletionResult.ServiceError,
-            agenticEnabled = false, // flag OFF
+            agentStepResults = listOf(
+                AgentStepResult.Final(content = "Here is your week.", creditsRemaining = 100),
+            ),
         )
         val vm = makeVm(repo = repo)
 
-        val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
-            vm.sideEffect.first()
-        }
         vm.sendIntent(ChatScreenIntent.OnInputChange("plan my week"))
         vm.sendIntent(ChatScreenIntent.OnSendClick)
-        effectDeferred.await() // drain ServiceError ShowAssistantMessage
+        testScheduler.advanceUntilIdle()
 
-        assertEquals(0, repo.agentStepCallCount,
-            "agentStep must NOT be called when flag is OFF")
-        assertEquals(1, repo.completeFreeFormCallCount,
-            "completeFreeForm must be called when flag is OFF and intent is FreeForm")
+        assertEquals(1, repo.agentStepCallCount,
+            "agentStep must be called — FreeForm always routes through the agent loop")
+        assertEquals(0, repo.completeFreeFormCallCount,
+            "completeFreeForm must NOT be called from the FreeForm path anymore")
         assertNull(vm.screenState.value.pendingAgentPlan,
-            "pendingAgentPlan must remain null when flag is OFF")
+            "pendingAgentPlan must be null after a Final result")
+        val assistantMsgs = vm.screenState.value.messages.filter { it.role == ChatRole.Assistant }
+        assertEquals(1, assistantMsgs.size)
+        assertEquals("Here is your week.", assistantMsgs.first().content)
     }
 
-    // ── 36. Flag ON, read-only tool call → no plan-card, assistant message rendered ──
+    // ── 36. Read-only tool call → no plan-card, assistant message rendered ──
 
     @Test
-    fun agentLoop_flagOn_readOnlyToolCall_noPlanCard() = runTest {
+    fun agentLoop_readOnlyToolCall_noPlanCard() = runTest {
         val readChecklistCall = AgentToolCall(
             id = "call-1",
             name = "read_checklist",
@@ -1154,7 +1154,6 @@ class ChatViewModelTest {
                 confidence = 1.0f,
                 layer = RoutingLayer.FullChat,
             ),
-            agenticEnabled = true,
             agentStepResults = listOf(
                 AgentStepResult.ToolCalls(
                     calls = listOf(readChecklistCall),
@@ -1192,10 +1191,10 @@ class ChatViewModelTest {
         assertEquals("Shopping has 3 items.", assistantMessages.first().content)
     }
 
-    // ── 37. Flag ON, mutating tool call → plan-card shown, OnAgentPlanApply dispatches ──
+    // ── 37. Mutating tool call → plan-card shown, OnAgentPlanApply dispatches ──
 
     @Test
-    fun agentLoop_flagOn_mutatingToolCall_planCardShownAndApplied() = runTest {
+    fun agentLoop_mutatingToolCall_planCardShownAndApplied() = runTest {
         val addItemCall = AgentToolCall(
             id = "call-2",
             name = "add_item",
@@ -1210,7 +1209,6 @@ class ChatViewModelTest {
                 confidence = 1.0f,
                 layer = RoutingLayer.FullChat,
             ),
-            agenticEnabled = true,
             agentStepResults = listOf(
                 AgentStepResult.ToolCalls(
                     calls = listOf(addItemCall),
@@ -1268,7 +1266,7 @@ class ChatViewModelTest {
     // ── 38. OnAgentPlanCancel → declined results sent, loop continues gracefully ──
 
     @Test
-    fun agentLoop_flagOn_mutatingToolCall_planCardCancelled_declinedResult() = runTest {
+    fun agentLoop_mutatingToolCall_planCardCancelled_declinedResult() = runTest {
         val deleteCall = AgentToolCall(
             id = "call-3",
             name = "delete_item",
@@ -1283,7 +1281,6 @@ class ChatViewModelTest {
                 confidence = 1.0f,
                 layer = RoutingLayer.FullChat,
             ),
-            agenticEnabled = true,
             agentStepResults = listOf(
                 AgentStepResult.ToolCalls(
                     calls = listOf(deleteCall),
@@ -1333,7 +1330,7 @@ class ChatViewModelTest {
     // ── 39. Round cap: agentStep always returns ToolCalls → fallback after 5 rounds ──
 
     @Test
-    fun agentLoop_flagOn_roundCap_fallbackMessageAfter5Rounds() = runTest {
+    fun agentLoop_roundCap_fallbackMessageAfter5Rounds() = runTest {
         val infiniteCall = AgentToolCall(
             id = "call-inf",
             name = "find_items", // read-only so no plan-card pause
@@ -1346,7 +1343,6 @@ class ChatViewModelTest {
                 confidence = 1.0f,
                 layer = RoutingLayer.FullChat,
             ),
-            agenticEnabled = true,
             agentStepResults = listOf(
                 AgentStepResult.ToolCalls(
                     calls = listOf(infiniteCall),
@@ -1404,7 +1400,6 @@ class ChatViewModelTest {
                 confidence = 1.0f,
                 layer = RoutingLayer.FullChat,
             ),
-            agenticEnabled = true,
             agentStepResults = listOf(
                 AgentStepResult.ToolCalls(
                     calls = listOf(readCall, addCall), // 2 calls: 1 read + 1 mutating
@@ -1641,7 +1636,6 @@ class ChatViewModelTest {
                 confidence = 1.0f,
                 layer = RoutingLayer.FullChat,
             ),
-            agenticEnabled = true,
             agentStepResults = listOf(
                 AgentStepResult.Final(content = "Done.", creditsRemaining = 100),
             ),
@@ -1668,7 +1662,6 @@ class ChatViewModelTest {
                 confidence = 1.0f,
                 layer = RoutingLayer.FullChat,
             ),
-            agenticEnabled = true,
             agentStepResults = listOf(
                 AgentStepResult.Final(content = "Done.", creditsRemaining = 100),
             ),

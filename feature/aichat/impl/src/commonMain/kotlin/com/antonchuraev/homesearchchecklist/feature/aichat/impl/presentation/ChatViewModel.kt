@@ -25,7 +25,6 @@ import kotlinx.serialization.json.put
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AiChatRepository
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChecklistContext
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatHistoryRepository
-import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.RemoteCompletionResult
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.TranscriptionOutcome
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.agent.AgentToolCallMapper
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.agent.AgentToolResultSerializer
@@ -55,7 +54,7 @@ import kotlin.random.Random
  *   4. OnPreviewCancel → back to idle, no snackbar
  *
  * Phase C additions:
- *   - [ChatIntent.FreeForm] → [aiChatRepository.completeFreeForm] (Layer 3, 3 credits)
+ *   - [ChatIntent.FreeForm] → [runAgentTurn] (Layer 3 via chat_agent CF)
  *   - History persistence via [chatHistoryRepository] (Room, survives restarts)
  *   - Checklist context built from [checklistRepository] for Layer 3 requests
  */
@@ -458,13 +457,10 @@ class ChatViewModel(
                         _screenState.value = _screenState.value.copy(isProcessing = false)
                     }
 
-                    // Layer 3 — open-ended conversation, no tool call preview
+                    // Layer 3 — open-ended conversation, no tool call preview.
+                    // Always routed through the stateless agent loop (chat_agent CF).
                     ChatIntent.FreeForm -> {
-                        if (aiChatRepository.isAgenticChatEnabled()) {
-                            runAgentTurn(text, locale)
-                        } else {
-                            handleFreeForm(locale)
-                        }
+                        runAgentTurn(text, locale)
                     }
 
                     // Read intent — dispatch inline, no preview
@@ -487,12 +483,8 @@ class ChatViewModel(
                             // Entity extraction failed (e.g. "remind me tomorrow" without item context).
                             // Escalate to Layer 3 (full chat) which has conversation history and can
                             // understand what the user is referring to from previous messages.
-                            logger.info(TAG, "ToolCall null for ${intent::class.simpleName} — escalating to Layer 3")
-                            if (aiChatRepository.isAgenticChatEnabled()) {
-                                runAgentTurn(text, locale)
-                            } else {
-                                handleFreeForm(locale)
-                            }
+                            logger.info(TAG, "ToolCall null for ${intent::class.simpleName} — escalating to Layer 3 (agent)")
+                            runAgentTurn(text, locale)
                             return@runCatching
                         }
                         // P5: bias list-less commands to the currently-open checklist. Resolved to
@@ -581,8 +573,8 @@ class ChatViewModel(
      * Escalation logic:
      * - Source = [RoutingLayer.Local]  → re-classify with [skipLayer1=true] (Layer 2, 1 credit).
      *   If Layer 2 returns a command-intent → show a NEW preview with [sourceLayer=Classifier].
-     *   If Layer 2 returns FreeForm / Unknown → delegate to [handleFreeForm].
-     * - Source = [RoutingLayer.Classifier] → skip straight to Layer 3 via [handleFreeForm].
+     *   If Layer 2 returns FreeForm / Unknown → delegate to [runAgentTurn].
+     * - Source = [RoutingLayer.Classifier] → skip straight to Layer 3 via [runAgentTurn].
      * - Source = [RoutingLayer.FullChat] → safety fallback: Layer 3 never produces a preview
      *   card, so this branch should not occur in practice.
      *
@@ -624,14 +616,10 @@ class ChatViewModel(
                         logger.debug(TAG, "Reject re-classify → ${classification.intent::class.simpleName} layer=${classification.layer}")
 
                         when (val intent = classification.intent) {
-                            // FreeForm / Unknown from Layer 2 → escalate to Layer 3
+                            // FreeForm / Unknown from Layer 2 → escalate to Layer 3 (agent)
                             ChatIntent.FreeForm,
                             is ChatIntent.Unknown -> {
-                                if (aiChatRepository.isAgenticChatEnabled()) {
-                                    runAgentTurn(preview.originalText, locale)
-                                } else {
-                                    handleFreeForm(locale)
-                                }
+                                runAgentTurn(preview.originalText, locale)
                             }
 
                             // FindItems is a read-intent inline result, no preview card
@@ -682,13 +670,9 @@ class ChatViewModel(
                     }
 
                     RoutingLayer.Classifier -> {
-                        // Layer 2 → Layer 3 escalation
-                        logger.info(TAG, "handlePreviewReject: Classifier source → escalating to Layer3 (completeFreeForm)")
-                        if (aiChatRepository.isAgenticChatEnabled()) {
-                            runAgentTurn(preview.originalText, locale)
-                        } else {
-                            handleFreeForm(locale)
-                        }
+                        // Layer 2 → Layer 3 escalation (agent)
+                        logger.info(TAG, "handlePreviewReject: Classifier source → escalating to Layer3 (agent)")
+                        runAgentTurn(preview.originalText, locale)
                     }
 
                     RoutingLayer.FullChat -> {
@@ -816,59 +800,7 @@ class ChatViewModel(
         }
     }
 
-    // ─── FreeForm (Layer 3) flow ───────────────────────────────────────────────
-
-    /**
-     * Invoked when classification returns [ChatIntent.FreeForm].
-     *
-     * Builds a compact checklist context summary (top [CHECKLIST_SUMMARY_LIMIT] checklists,
-     * names + counts only — no item text), then calls [AiChatRepository.completeFreeForm].
-     * The assistant response is added as an inline message (no preview card — Layer 3 is
-     * read-only conversation output, not a write action).
-     */
-    private suspend fun handleFreeForm(locale: ChatLocale) {
-        val checklistsSummary = buildChecklistsSummary()
-        val currentMessages = _screenState.value.messages
-
-        val result = aiChatRepository.completeFreeForm(
-            messages = currentMessages,
-            locale = locale,
-            checklistsSummary = checklistsSummary,
-        )
-
-        when (result) {
-            is RemoteCompletionResult.Success -> {
-                logger.info(TAG, "FreeForm success: ${result.content.take(60)} credits_remaining=${result.creditsRemaining}")
-                // Optimistic credit update from server response — shown immediately,
-                // before the next Firestore sync updates UserDataRepository cache.
-                _screenState.value = _screenState.value.copy(creditBalance = result.creditsRemaining)
-                // Persist the fresh balance to local cache so other screens see it immediately.
-                runCatching {
-                    val currentUserData = userDataRepository.getUserData()
-                    userDataRepository.update(currentUserData.copy(aiCredits = result.creditsRemaining))
-                }.onFailure { e ->
-                    logger.error(TAG, "FreeForm: failed to persist updated credit balance — ${e.message}", e)
-                    // Non-fatal: UserDataRepository flow will reconcile on next Firestore sync.
-                }
-                addAndPersistAssistantMessage(
-                    content = result.content,
-                    routedLayer = RoutingLayer.FullChat,
-                    costCredits = 3,
-                )
-            }
-            RemoteCompletionResult.InsufficientCredits -> {
-                logger.info(TAG, "FreeForm: InsufficientCredits")
-                _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_insufficient_credits"))
-            }
-            RemoteCompletionResult.NetworkError,
-            RemoteCompletionResult.ServiceError -> {
-                logger.warning(TAG, "FreeForm: ${result::class.simpleName}")
-                _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_completion_error"))
-            }
-        }
-
-        _screenState.value = _screenState.value.copy(isProcessing = false)
-    }
+    // ─── Layer 3 checklist context ─────────────────────────────────────────────
 
     /**
      * Builds a compact summary of user's top [CHECKLIST_SUMMARY_LIMIT] checklists.
@@ -895,7 +827,7 @@ class ChatViewModel(
      * Runs the stateless agent loop for one user turn.
      *
      * Algorithm:
-     * 1. Seed [transcript] from recent chat history (same sliding window as [handleFreeForm]):
+     * 1. Seed [transcript] from recent chat history:
      *    user messages → [AgentTranscriptEntry.UserText], assistant → [AgentTranscriptEntry.ModelText].
      *    The latest user message (already persisted to history from [handleSend]) appears as
      *    the last [UserText] — no double-add.
@@ -1520,7 +1452,7 @@ class ChatViewModel(
      * Handles the "Ask AI" fallback button tap on an Unknown-intent response.
      *
      * Escalates [text] (the original user input that produced the Unknown response) to
-     * Layer 3 via [handleFreeForm]. This is an explicit user opt-in — credits are only
+     * Layer 3 via [runAgentTurn]. This is an explicit user opt-in — credits are only
      * spent when the user taps the button, never automatically on Unknown classification.
      *
      * The user message is NOT re-added (it already exists in history from [handleSend]).
@@ -1532,13 +1464,8 @@ class ChatViewModel(
             runCatching {
                 val locale = localeProvider.current()
                 // Text is already in chat history from handleSend.
-                // If agentic bridge is ON, route through the agent loop.
-                // Otherwise use the existing completeFreeForm (Layer 3) path.
-                if (aiChatRepository.isAgenticChatEnabled()) {
-                    runAgentTurn(text, locale)
-                } else {
-                    handleFreeForm(locale)
-                }
+                // Always routed through the stateless agent loop (chat_agent CF).
+                runAgentTurn(text, locale)
             }.onFailure { e ->
                 logger.error(TAG, "handleAskAiFallback failed", e)
                 _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_generic_error"))
