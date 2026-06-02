@@ -127,6 +127,8 @@
     <string name="main_prompt_new_list">Новый список</string>
     <string name="main_prompt_link_prefill">Создай список из: </string>
     <string name="main_prompt_remind_prefill">Напомни мне </string>
+    <string name="main_create_with_ai_action">Создать с ИИ</string>
+    <string name="main_create_with_ai_prefill">Создай чеклист для </string>
     <string name="main_prompt_plan_day_query">Что мне сделать сегодня?</string>
     <string name="checklist_prompt_whats_missing">Чего не хватает?</string>
     <string name="checklist_prompt_generate_ideas">Идеи</string>

@@ -114,6 +114,7 @@ import aichecklists.core.designsystem.generated.resources.main_prompt_photo
 import aichecklists.core.designsystem.generated.resources.main_prompt_remind
 import aichecklists.core.designsystem.generated.resources.main_prompt_link
 import aichecklists.core.designsystem.generated.resources.main_prompt_plan_day
+import aichecklists.core.designsystem.generated.resources.main_create_with_ai_prefill
 import aichecklists.core.designsystem.generated.resources.main_prompt_link_prefill
 import aichecklists.core.designsystem.generated.resources.main_prompt_remind_prefill
 import aichecklists.core.designsystem.generated.resources.main_prompt_plan_day_query
@@ -407,6 +408,10 @@ fun App() {
             val quickLinkPrefill = stringResource(Res.string.main_prompt_link_prefill)
             val quickRemindPrefill = stringResource(Res.string.main_prompt_remind_prefill)
             val quickPlanDayQuery = stringResource(Res.string.main_prompt_plan_day_query)
+            // Seed for the "✨ Create with AI" prompt chip on MainScreen: prefill only (the user
+            // completes the topic and taps Send). "Create a checklist for …" hits the Layer-1
+            // CreateChecklist trigger, so a create-preview card is shown on send.
+            val quickCreateWithAiPrefill = stringResource(Res.string.main_create_with_ai_prefill)
 
             // Checklist-detail contextual quick-action seeds (resolved here — @Composable scope).
             // WHATS_MISSING / SUMMARY / ADD_ITEMS are reasoning queries sent immediately so the
@@ -430,6 +435,12 @@ fun App() {
                 chatSheetContextLabel = null
                 chatSheetOpen = true
                 when (action) {
+                    // "✨ Create with AI": describe-a-checklist-to-the-AI flow. Prefill only (no
+                    // attachment, no auto-send) — the dock is already opened above; the user
+                    // completes the topic after "Create a checklist for …" and taps Send, which
+                    // hits the Layer-1 CreateChecklist preview.
+                    GistiQuickAction.CREATE_WITH_AI ->
+                        chatViewModel.sendIntent(ChatScreenIntent.OnPrefillInput(quickCreateWithAiPrefill))
                     GistiQuickAction.PHOTO ->
                         chatViewModel.sendIntent(ChatScreenIntent.OnPickAttachment(AttachmentSource.Image))
                     GistiQuickAction.PDF ->

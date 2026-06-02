@@ -50,6 +50,7 @@ import aichecklists.core.designsystem.generated.resources.google_sign_in_success
 import aichecklists.core.designsystem.generated.resources.main_ask_gisti_mic
 import aichecklists.core.designsystem.generated.resources.main_ask_gisti_placeholder
 import aichecklists.core.designsystem.generated.resources.main_create_checklist_action
+import aichecklists.core.designsystem.generated.resources.main_create_with_ai_action
 import aichecklists.core.designsystem.generated.resources.main_menu
 import aichecklists.core.designsystem.generated.resources.main_prompt_new_list
 import aichecklists.core.designsystem.generated.resources.main_prompt_photo
@@ -83,7 +84,7 @@ fun MainScreen(
     /** Navigate to the AI Chat screen. Wired in App.kt NavHost. */
     onNavigateToAiChat: (() -> Unit)? = null,
     /**
-     * Handles a prompt-chip [GistiQuickAction] (Photo / Remind / Link / Plan day / PDF).
+     * Handles a prompt-chip [GistiQuickAction] (Create with AI / Photo / Remind / Link / Plan day / PDF).
      * App.kt maps each action to its own chat flow (attachment picker, input prefill, or
      * prefill+send) via the singleton ChatViewModel + inline dock. When null, the chips fall
      * back to plainly opening the chat (legacy [MainScreenIntent.OnAiChatClick]).
@@ -243,6 +244,7 @@ fun MainScreen(
                         // scroll affordance instead of being clipped at the padding boundary.
                         GistiPromptChips(
                             chips = gistiDefaultPromptChips(
+                                createAiLabel = stringResource(Res.string.main_create_with_ai_action),
                                 photoLabel = stringResource(Res.string.main_prompt_photo),
                                 remindLabel = stringResource(Res.string.main_prompt_remind),
                                 linkLabel = stringResource(Res.string.main_prompt_link),

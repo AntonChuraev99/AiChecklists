@@ -127,6 +127,8 @@
     <string name="main_prompt_new_list">New list</string>
     <string name="main_prompt_link_prefill">Create a list from: </string>
     <string name="main_prompt_remind_prefill">Remind me to </string>
+    <string name="main_create_with_ai_action">Create with AI</string>
+    <string name="main_create_with_ai_prefill">Create a checklist for </string>
     <string name="main_prompt_plan_day_query">What should I do today?</string>
     <string name="checklist_prompt_whats_missing">What's missing?</string>
     <string name="checklist_prompt_generate_ideas">Generate ideas</string>

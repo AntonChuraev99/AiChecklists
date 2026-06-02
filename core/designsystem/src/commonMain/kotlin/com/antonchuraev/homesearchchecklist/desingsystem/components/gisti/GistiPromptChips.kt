@@ -33,6 +33,8 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
  *
  * The chip itself is pure UI; it only carries this enum so the host screen
  * (@android-expert wiring) can map each action to its own intent/flow:
+ *  - [CREATE_WITH_AI] → open the chat and prefill the create-checklist trigger; the user
+ *    describes the checklist in words and the AI builds it (no picker — pure chat).
  *  - [PHOTO]    → create a checklist from a photo (image picker → AI).
  *  - [REMIND]   → open the reminder flow.
  *  - [LINK]     → create a checklist from a URL.
@@ -49,6 +51,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
  * (Templates, not chat).
  */
 enum class GistiQuickAction {
+    CREATE_WITH_AI,
     PHOTO,
     REMIND,
     LINK,
@@ -251,23 +254,25 @@ private fun PromptChipItem(
 /**
  * Factory for the standard **home-screen** prompt chips.
  *
- * Order is by popularity (product-confirmed): Photo, Remind, Link, Plan day.
- * PDF was removed from this set to keep the row at 4 verb-led chips (optimal
- * scan density); [GistiQuickAction.PDF] still exists for the document picker.
- * The leading "➕ New list" chip is rendered separately via
+ * Order: Create with AI (flagship — describe a checklist to the AI in chat), then by
+ * popularity Photo, Remind, Link, Plan day. PDF is not in this set (kept for the document
+ * picker). The leading "➕ New list" chip (→ Templates, manual) is rendered separately via
  * [GistiPromptChips.onNewListClick] and is NOT part of this list.
  *
+ * @param createAiLabel Label for the create-with-AI chip (e.g. "Create with AI").
  * @param photoLabel   Label for the photo chip (e.g. "Photo → list").
  * @param remindLabel  Label for the reminder chip (e.g. "Remind me…").
  * @param linkLabel    Label for the link chip (e.g. "Link → list").
  * @param planDayLabel Label for the plan-day chip (e.g. "Plan day").
  */
 fun gistiDefaultPromptChips(
+    createAiLabel: String = "Create with AI",
     photoLabel: String = "Photo → list",
     remindLabel: String = "Remind me…",
     linkLabel: String = "Link → list",
     planDayLabel: String = "Plan day",
 ): List<GistiPromptChip<GistiQuickAction>> = listOf(
+    GistiPromptChip(emoji = "✨", label = createAiLabel, action = GistiQuickAction.CREATE_WITH_AI),
     GistiPromptChip(emoji = "📷", label = photoLabel, action = GistiQuickAction.PHOTO),
     GistiPromptChip(emoji = "🔔", label = remindLabel, action = GistiQuickAction.REMIND),
     GistiPromptChip(emoji = "🔗", label = linkLabel, action = GistiQuickAction.LINK),
