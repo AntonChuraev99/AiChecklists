@@ -72,7 +72,7 @@
         // cache persists through refreshes → Base64 decode crash → UI freeze.
         // One-time clear for all users; version bump forces re-clear.
         (function() {
-            var RESET_KEY = '__gistiCacheClearV1';
+            var RESET_KEY = '__gistiCacheClearV2';
             if (typeof caches !== 'undefined' && !localStorage.getItem(RESET_KEY)) {
                 window.__clearingData = true;
                 caches.keys().then(function(names) {
@@ -89,26 +89,49 @@
         })();
     </script>
     <script type="application/javascript">
-        // === Fetch cache-bust for Compose Resources (.cvr) ===
+        // === Fetch cache-bust for Compose Resources ===
         // Browser HTTP disk cache may hold corrupted .cvr bytes (Base64 padding
         // mismatch → IllegalArgumentException → Compose rendering coroutine dies
         // → UI frozen on splash). CacheStorage clear doesn't fix this — it's the
         // browser's built-in HTTP cache that serves stale 304 responses.
-        // One-time intercept: force `cache: 'reload'` for .cvr / composeResources
-        // fetches, then set flag so future loads use normal caching.
+        //
+        // Two-tier strategy installed in ONE fetch wrapper:
+        //   Tier A (DURABLE, always on): every .cvr fetch forces `cache: 'reload'`,
+        //     so a poisoned/stale .cvr can never be reused across deploys. This is
+        //     the root-cause fix — it cannot be gated, or corruption would persist
+        //     until the next version-key bump. .cvr files are tiny text bundles, so
+        //     the re-download cost per load is negligible (a few KB).
+        //   Tier B (ONE-TIME sweep): also reload non-.cvr composeResources (fonts,
+        //     images) exactly once per user, to flush any already-poisoned binary
+        //     assets after a deploy. Gated by BUST_KEY so we don't re-download the
+        //     larger font/image assets on every page load.
+        // Scope is composeResources only — app/network fetches are untouched.
         (function() {
-            var BUST_KEY = '__gistiFetchBustV2';
-            if (!localStorage.getItem(BUST_KEY)) {
-                var _origFetch = window.fetch;
-                window.fetch = function(input, init) {
-                    var url = typeof input === 'string' ? input : (input && input.url) || '';
-                    if (url.indexOf('.cvr') !== -1 || url.indexOf('composeResources') !== -1) {
-                        init = Object.assign({}, init || {}, { cache: 'reload' });
-                        console.log('[FETCH-BUST] Bypassing HTTP cache for:', url);
+            var BUST_KEY = '__gistiFetchBustV3';
+            var sweepNonCvr = !localStorage.getItem(BUST_KEY);
+            var _origFetch = window.fetch;
+            window.fetch = function(input, init) {
+                var url = typeof input === 'string' ? input : (input && input.url) || '';
+                var isCvr = url.indexOf('.cvr') !== -1;
+                var isResource = isCvr || url.indexOf('composeResources') !== -1;
+                // Always bust .cvr (durable); bust other composeResources only during
+                // the one-time post-deploy sweep.
+                if (isCvr || (sweepNonCvr && isResource)) {
+                    init = Object.assign({}, init || {}, { cache: 'reload' });
+                    if (isCvr) {
+                        console.log('[FETCH-BUST] .cvr network-fresh:', url);
+                    } else {
+                        console.log('[FETCH-BUST] one-time sweep:', url);
                     }
-                    return _origFetch.call(this, input, init);
-                };
-                setTimeout(function() { localStorage.setItem(BUST_KEY, '1'); }, 15000);
+                }
+                return _origFetch.call(this, input, init);
+            };
+            // Disable only the non-.cvr sweep after first load; .cvr stays durable.
+            if (sweepNonCvr) {
+                setTimeout(function() {
+                    localStorage.setItem(BUST_KEY, '1');
+                    sweepNonCvr = false;
+                }, 15000);
             }
         })();
     </script>

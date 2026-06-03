@@ -29,5 +29,13 @@
 /init.js
   Cache-Control: public, max-age=0, must-revalidate
 
+# NOTE: .cvr (Compose Value Resources) durability is enforced in index.html,
+# NOT here. A corrupted/stale .cvr halts Compose rendering (Base64 decode crash
+# → splash hang). index.html's fetch wrapper forces `cache: 'reload'` for every
+# .cvr request, so they are always network-fresh regardless of this max-age.
+# Do NOT add a separate `.cvr` rule here: Cloudflare _headers ACCUMULATES headers
+# across all matching rules and JOINS duplicate header names with a comma, so a
+# `.cvr` file would match both rules and emit a self-contradictory
+# `Cache-Control: no-store, public, max-age=86400, ...` (unreliable in browsers).
 /composeResources/*
   Cache-Control: public, max-age=86400, must-revalidate
