@@ -118,10 +118,10 @@
     <string name="main_my_lists">My lists</string>
     <string name="main_ask_gisti_placeholder">Ask Gisti to add, remind, or plan…</string>
     <string name="main_ask_gisti_mic">Voice input</string>
-    <string name="main_prompt_photo">Photo → list</string>
+    <string name="main_prompt_photo">Photo ➡️ list</string>
     <string name="main_prompt_add">Add tasks</string>
     <string name="main_prompt_remind">Remind me…</string>
-    <string name="main_prompt_link">Link → list</string>
+    <string name="main_prompt_link">Link ➡️ list</string>
     <string name="main_prompt_plan_day">Plan day</string>
     <string name="main_prompt_pdf">PDF → list</string>
     <string name="main_prompt_new_list">New list</string>

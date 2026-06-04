@@ -44,6 +44,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
+import com.antonchuraev.homesearchchecklist.desingsystem.emoji.LocalEmojiFont
+import com.antonchuraev.homesearchchecklist.desingsystem.emoji.rememberEmojiAwareText
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
@@ -539,7 +541,8 @@ private fun InputChip(icon: String, label: String) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
-        Text(text = icon, fontSize = 14.sp)
+        // Pure-emoji icon → emoji font (no system emoji fallback on wasmJs/Skiko).
+        Text(text = icon, fontFamily = LocalEmojiFont.current, fontSize = 14.sp)
         Text(
             text = label,
             fontSize = 7.sp,
@@ -559,8 +562,12 @@ private fun ScheduleChip(text: String) {
             .padding(horizontal = 8.dp, vertical = 4.dp),
         contentAlignment = Alignment.Center
     ) {
+        // Mixed emoji + Latin ("🔁 Daily") → emoji font on the Text, Latin runs overridden to
+        // FontFamily.Default so both resolve on wasmJs/Skiko.
+        val emojiAware = rememberEmojiAwareText(text)
         Text(
-            text = text,
+            text = emojiAware.text,
+            fontFamily = emojiAware.fontFamily,
             fontSize = 9.sp,
             color = BrandText,
             fontWeight = FontWeight.Medium
@@ -600,6 +607,7 @@ private fun PremiumBenefitRow(emoji: String, text: String) {
     ) {
         Text(
             text = emoji,
+            fontFamily = LocalEmojiFont.current,
             style = MaterialTheme.typography.titleMedium
         )
         Spacer(modifier = Modifier.width(12.dp))

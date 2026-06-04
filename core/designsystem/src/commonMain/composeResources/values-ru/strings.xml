@@ -118,10 +118,10 @@
     <string name="main_my_lists">Мои списки</string>
     <string name="main_ask_gisti_placeholder">Спросите Gisti — добавить, напомнить, спланировать…</string>
     <string name="main_ask_gisti_mic">Голосовой ввод</string>
-    <string name="main_prompt_photo">Фото → список</string>
+    <string name="main_prompt_photo">Фото ➡️ список</string>
     <string name="main_prompt_add">Добавить задачи</string>
     <string name="main_prompt_remind">Напомнить…</string>
-    <string name="main_prompt_link">Ссылка → список</string>
+    <string name="main_prompt_link">Ссылка ➡️ список</string>
     <string name="main_prompt_plan_day">План на день</string>
     <string name="main_prompt_pdf">PDF → список</string>
     <string name="main_prompt_new_list">Новый список</string>

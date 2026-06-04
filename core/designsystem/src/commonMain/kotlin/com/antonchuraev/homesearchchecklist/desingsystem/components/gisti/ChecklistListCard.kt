@@ -1,7 +1,9 @@
 package com.antonchuraev.homesearchchecklist.desingsystem.components.gisti
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.antonchuraev.homesearchchecklist.desingsystem.emoji.LocalEmojiFont
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.GistiColors
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
@@ -30,9 +33,17 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
 /**
  * Rich list-card for a checklist entry on the Home screen.
  *
- * The card is **stateless and not clickable internally** — the caller applies click via
- * [modifier] (e.g. `Modifier.clickable { ... }` or wrapping in a clickable parent).
- * This follows the project pattern: whole-card click at the call site, no hit-zone split.
+ * **Click handling lives INSIDE the card.** Pass [onClick]/[onLongClick] and the whole card
+ * becomes tappable via `combinedClickable` applied to the inner content Row — which the Card
+ * clips to its 12dp corner shape, so the ripple stays inside the rounded form. (Applying
+ * `clickable` to the outer [modifier] would draw the ripple OUTSIDE the clip, bleeding a
+ * rectangle past the corners.) When [onClick] is null the card is non-interactive (e.g. while a
+ * drag/edit gesture owns the card at the call site). Whole-card click, no hit-zone split.
+ *
+ * **Drag/wiggle modifiers stay on [modifier].** Reorder handles (`longPressDraggableHandle`)
+ * and edit-mode wiggle (`graphicsLayer`) MUST be supplied by the caller via [modifier] on the
+ * OUTER Card so the elevation shadow and drag transform are not clipped — only tap/long-press
+ * moved inside.
  *
  * Structure (from gisti-screens.jsx ListCard / RxHome):
  * ```
@@ -66,7 +77,10 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
  * @param totalItems Total item count. 0 = "No items yet" placeholder.
  * @param seed Stable id used for [GistiAvatarTile] color derivation.
  * @param editedLabel Optional relative time label (e.g. "edited 2h ago"). Null hides the row.
+ * @param onClick Whole-card tap. Null = card not tappable (e.g. during drag/edit mode).
+ * @param onLongClick Whole-card long-press (e.g. enter edit mode). Null = no long-press.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ChecklistListCard(
     name: String,
@@ -75,6 +89,8 @@ fun ChecklistListCard(
     seed: Long,
     modifier: Modifier = Modifier,
     editedLabel: String? = null,
+    onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
 ) {
     val isDark = LocalIsDarkTheme.current
     val shape = MaterialTheme.shapes.medium
@@ -85,6 +101,16 @@ fun ChecklistListCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .then(
+                    if (onClick != null) {
+                        Modifier.combinedClickable(
+                            onClick = onClick,
+                            onLongClick = onLongClick,
+                        )
+                    } else {
+                        Modifier
+                    },
+                )
                 .padding(horizontal = 14.dp, vertical = 13.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -119,6 +145,7 @@ fun ChecklistListCard(
                     if (isComplete) {
                         Text(
                             text = "🎉",
+                            fontFamily = LocalEmojiFont.current,
                             style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
                         )
                     }

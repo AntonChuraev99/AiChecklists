@@ -1,7 +1,6 @@
 package com.antonchuraev.homesearchchecklist.desingsystem.components.gisti
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -14,18 +13,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.text.style.LineHeightStyle
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.antonchuraev.homesearchchecklist.desingsystem.emoji.LocalEmojiFont
+import com.antonchuraev.homesearchchecklist.desingsystem.emoji.rememberEmojiAwareText
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 
 /**
@@ -95,7 +92,7 @@ enum class GistiChecklistAction {
  * via `action.name` (see [GistiPromptChips]).
  *
  * @param emoji Lead emoji rendered at 15sp (slightly larger than label for visual hierarchy).
- * @param label Short, verb-led action text shown next to the emoji (e.g. "Photo → list").
+ * @param label Short, verb-led action text shown next to the emoji (e.g. "Photo ➡️ list").
  * @param action The action [T] this chip triggers. Surfaced to the caller via
  *               [GistiPromptChips.onChipClick] so each chip drives a DIFFERENT flow.
  */
@@ -191,20 +188,25 @@ private fun PromptChipItem(
 ) {
     val shape = RoundedCornerShape(19.dp) // full pill for height=38
 
+    // Surface(onClick=…) applies .clip(shape) BEFORE its own clickable, so the ripple is
+    // clipped to the pill shape (a bare Modifier.clickable on the outer modifier would draw a
+    // rectangular ripple bleeding past the rounded corners). minimumInteractiveComponentSize
+    // centres the 38dp pill inside a 48dp touch target without changing the visible height.
     Surface(
+        onClick = onClick,
         shape = shape,
         color = MaterialTheme.colorScheme.surfaceContainerLowest,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier
             .height(38.dp)
-            .clickable(onClick = onClick, role = Role.Button),
+            .minimumInteractiveComponentSize(),
     ) {
         // Center each glyph WITHIN its own line-box. Emoji (15sp) and label (13.5sp) have
         // different font metrics; the label inherits labelLarge's 20sp lineHeight, so its
-        // extra leading is distributed top+bottom and pushes small mid-height glyphs (the
-        // "→" in "Photo → list") off the optical centre of the Row. trim=None keeps the full
-        // line-box, alignment=Center re-centres the glyph inside it so both Texts share a
-        // common visual centre under Row's CenterVertically.
+        // extra leading is distributed top+bottom and pushes small mid-height glyphs off the
+        // optical centre of the Row. trim=None keeps the full line-box, alignment=Center
+        // re-centres the glyph inside it so both Texts share a common visual centre under
+        // Row's CenterVertically.
         val centeredLineHeight = LineHeightStyle(
             alignment = LineHeightStyle.Alignment.Center,
             trim = LineHeightStyle.Trim.None,
@@ -214,30 +216,26 @@ private fun PromptChipItem(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             modifier = Modifier.padding(horizontal = 14.dp),
         ) {
+            // Pure-emoji Text → emoji font directly (wasmJs/Skiko has no system emoji fallback;
+            // on Android/iOS LocalEmojiFont is FontFamily.Default, a no-op).
             Text(
                 text = emoji,
+                fontFamily = LocalEmojiFont.current,
                 style = MaterialTheme.typography.labelLarge.copy(
                     fontSize = 15.sp,
                     lineHeight = 18.sp,
                     lineHeightStyle = centeredLineHeight,
                 ),
             )
-            // The "→" glyph (U+2192) sits low on the text baseline by font design, so in
-            // "Photo → list" / "Link → list" it reads as bottom-anchored next to the lowercase
-            // letters. LineHeightStyle can't fix this — it moves the whole line-box, not a single
-            // glyph relative to its same-baseline neighbours. Nudge ONLY the arrow up via
-            // baselineShift so it lands on the optical centre of the row.
-            val displayLabel = buildAnnotatedString {
-                label.forEach { ch ->
-                    if (ch == '→') {
-                        withStyle(SpanStyle(baselineShift = BaselineShift(0.22f))) { append(ch) }
-                    } else {
-                        append(ch)
-                    }
-                }
-            }
+            // Label may mix Latin with an emoji arrow ("Photo ➡️ list") — rememberEmojiAwareText
+            // keeps the emoji font on the Text and overrides Latin runs with FontFamily.Default so
+            // both resolve on wasmJs. The old per-glyph baselineShift for the plain "→" (U+2192,
+            // not an emoji, absent from Twemoji) is gone: the arrow is now the emoji ➡️ which the
+            // emoji font renders at the correct optical height.
+            val labelEmojiAware = rememberEmojiAwareText(label)
             Text(
-                text = displayLabel,
+                text = labelEmojiAware.text,
+                fontFamily = labelEmojiAware.fontFamily,
                 style = MaterialTheme.typography.labelLarge.copy(
                     fontSize = 13.5.sp,
                     lineHeight = 18.sp,
@@ -260,16 +258,16 @@ private fun PromptChipItem(
  * [GistiPromptChips.onNewListClick] and is NOT part of this list.
  *
  * @param createAiLabel Label for the create-with-AI chip (e.g. "Create with AI").
- * @param photoLabel   Label for the photo chip (e.g. "Photo → list").
+ * @param photoLabel   Label for the photo chip (e.g. "Photo ➡️ list").
  * @param remindLabel  Label for the reminder chip (e.g. "Remind me…").
- * @param linkLabel    Label for the link chip (e.g. "Link → list").
+ * @param linkLabel    Label for the link chip (e.g. "Link ➡️ list").
  * @param planDayLabel Label for the plan-day chip (e.g. "Plan day").
  */
 fun gistiDefaultPromptChips(
     createAiLabel: String = "Create with AI",
-    photoLabel: String = "Photo → list",
+    photoLabel: String = "Photo ➡️ list",
     remindLabel: String = "Remind me…",
-    linkLabel: String = "Link → list",
+    linkLabel: String = "Link ➡️ list",
     planDayLabel: String = "Plan day",
 ): List<GistiPromptChip<GistiQuickAction>> = listOf(
     GistiPromptChip(emoji = "✨", label = createAiLabel, action = GistiQuickAction.CREATE_WITH_AI),

@@ -35,6 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.antonchuraev.homesearchchecklist.desingsystem.emoji.LocalEmojiFont
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
 import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive.OrganizingStyle
@@ -120,7 +121,7 @@ private fun StyleCard(
                 .padding(horizontal = AppDimens.SpacingLg, vertical = AppDimens.SpacingMd),
             verticalArrangement = Arrangement.Center
         ) {
-            Text(text = style.emoji, fontSize = 28.sp)
+            Text(text = style.emoji, fontFamily = LocalEmojiFont.current, fontSize = 28.sp)
             Spacer(modifier = Modifier.height(AppDimens.SpacingXs))
             Text(
                 text = title,

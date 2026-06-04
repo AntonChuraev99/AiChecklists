@@ -37,6 +37,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonSecondary
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
+import com.antonchuraev.homesearchchecklist.desingsystem.emoji.rememberEmojiAwareText
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.stringResource
@@ -97,7 +98,12 @@ fun SubscriptionStatusScreen(
                         }
                     }
                 ) {
-                    Text(stringResource(Res.string.subscription_purchase_success))
+                    // This Snackbar content is a real composable Text (not the string-only
+                    // SnackbarHost API), so the 🎉 can resolve via the emoji font on wasmJs.
+                    val successText = rememberEmojiAwareText(
+                        stringResource(Res.string.subscription_purchase_success),
+                    )
+                    Text(text = successText.text, fontFamily = successText.fontFamily)
                 }
             }
         }

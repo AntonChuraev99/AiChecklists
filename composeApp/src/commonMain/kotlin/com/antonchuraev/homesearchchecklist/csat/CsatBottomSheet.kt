@@ -68,6 +68,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonText
+import com.antonchuraev.homesearchchecklist.desingsystem.emoji.LocalEmojiFont
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
@@ -251,6 +252,7 @@ private fun EmojiItem(
     ) {
         Text(
             text = emoji,
+            fontFamily = LocalEmojiFont.current,
             fontSize = 40.sp,
         )
         Spacer(Modifier.height(AppDimens.SpacingXs))
@@ -424,6 +426,7 @@ private fun ThankYouContent(
     ) {
         Text(
             text = "✅",
+            fontFamily = LocalEmojiFont.current,
             fontSize = 40.sp,
         )
 

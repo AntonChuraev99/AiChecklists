@@ -243,9 +243,9 @@ private fun GistiPromptChipsPreviewContent(darkTheme: Boolean) {
         ) {
             GistiPromptChips(
                 chips = listOf(
-                    GistiPromptChip(emoji = "📷", label = "Photo → list", action = GistiQuickAction.PHOTO),
+                    GistiPromptChip(emoji = "📷", label = "Photo ➡️ list", action = GistiQuickAction.PHOTO),
                     GistiPromptChip(emoji = "🔔", label = "Remind me…", action = GistiQuickAction.REMIND),
-                    GistiPromptChip(emoji = "🔗", label = "Link → list", action = GistiQuickAction.LINK),
+                    GistiPromptChip(emoji = "🔗", label = "Link ➡️ list", action = GistiQuickAction.LINK),
                 ),
                 onChipClick = {},
             )

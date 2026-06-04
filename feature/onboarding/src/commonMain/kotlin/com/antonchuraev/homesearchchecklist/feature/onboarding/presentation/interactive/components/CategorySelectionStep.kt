@@ -38,6 +38,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
+import com.antonchuraev.homesearchchecklist.desingsystem.emoji.LocalEmojiFont
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
 import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive.OnboardingCategory
@@ -131,7 +132,7 @@ private fun CategoryCard(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Text(text = category.icon, fontSize = 28.sp)
+            Text(text = category.icon, fontFamily = LocalEmojiFont.current, fontSize = 28.sp)
             Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
             Text(
                 text = categoryTitle,

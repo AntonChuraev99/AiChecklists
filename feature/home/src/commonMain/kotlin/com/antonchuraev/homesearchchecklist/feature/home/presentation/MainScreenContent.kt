@@ -6,7 +6,6 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -207,6 +206,10 @@ private fun MainScreenContentLazyColumn(
                 ) { isDragging ->
                     val isDark = LocalIsDarkTheme.current
 
+                    // Drag/wiggle stay on the OUTER modifier (not clipped — shadow + drag
+                    // transform survive). Tap/long-press-to-edit move INSIDE the card via
+                    // onClick/onLongClick so the ripple is clipped to the rounded corners.
+                    // In edit mode the card is not tappable (the drag handle owns the gesture).
                     val cardModifier = Modifier
                         .fillMaxWidth()
                         .graphicsLayer {
@@ -226,13 +229,7 @@ private fun MainScreenContentLazyColumn(
                                     }
                                 )
                             } else {
-                                Modifier.combinedClickable(
-                                    onClick = { onChecklistClick(checklistWithProgress) },
-                                    onLongClick = {
-                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        onEnterEditMode()
-                                    }
-                                )
+                                Modifier
                             }
                         )
 
@@ -241,6 +238,15 @@ private fun MainScreenContentLazyColumn(
                         isEditMode = isEditMode,
                         isDragging = isDragging,
                         modifier = cardModifier,
+                        onClick = if (isEditMode) {
+                            null
+                        } else {
+                            { onChecklistClick(checklistWithProgress) }
+                        },
+                        onLongClick = {
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onEnterEditMode()
+                        },
                     )
                 }
             }
@@ -340,11 +346,8 @@ private fun MainScreenContentLazyGrid(
                 checklistWithProgress = checklistWithProgress,
                 isEditMode = false,
                 isDragging = false,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .combinedClickable(
-                        onClick = { onChecklistClick(checklistWithProgress) },
-                    ),
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { onChecklistClick(checklistWithProgress) },
             )
         }
 
@@ -400,10 +403,11 @@ private fun MyListsHeader(count: Int) {
  * feature/checklist domain model). The avatar tint + monogram are derived from the
  * checklist id (the model has no emoji/color field), so this is a pure UI concern.
  *
- * The gesture (click / long-press drag / edit-mode wiggle) is carried by [modifier] from
- * the caller, keeping the card free of gesture coupling. [isEditMode] / [isDragging] remain
- * in the signature for call-site compatibility; the drag-elevation bump is now handled by
- * the card's own elevation, so they are no longer read here.
+ * Tap / long-press are passed via [onClick]/[onLongClick] and handled INSIDE the card (ripple
+ * clipped to the rounded corners). Drag/wiggle modifiers (graphicsLayer, longPressDraggableHandle)
+ * stay on [modifier] so the elevation shadow + drag transform are not clipped. In edit mode the
+ * caller passes onClick = null (the drag handle owns the gesture). [isEditMode] / [isDragging]
+ * remain in the signature for call-site compatibility; they are no longer read here.
  */
 @Composable
 private fun ChecklistCard(
@@ -411,6 +415,8 @@ private fun ChecklistCard(
     @Suppress("UNUSED_PARAMETER") isEditMode: Boolean,
     @Suppress("UNUSED_PARAMETER") isDragging: Boolean,
     modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
 ) {
     ChecklistListCard(
         name = checklistWithProgress.checklist.name,
@@ -418,5 +424,7 @@ private fun ChecklistCard(
         totalItems = checklistWithProgress.totalItems,
         seed = checklistWithProgress.checklist.id,
         modifier = modifier,
+        onClick = onClick,
+        onLongClick = onLongClick,
     )
 }

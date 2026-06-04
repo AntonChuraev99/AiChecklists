@@ -19,6 +19,8 @@ import com.antonchuraev.homesearchchecklist.core.datastore.api.AppLanguage
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppThemeMode
 import com.antonchuraev.homesearchchecklist.core.datastore.api.LanguageRepository
 import com.antonchuraev.homesearchchecklist.core.datastore.api.ThemeRepository
+import com.antonchuraev.homesearchchecklist.desingsystem.emoji.LocalEmojiFont
+import com.antonchuraev.homesearchchecklist.desingsystem.emoji.rememberEmojiFont
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppLocaleEnvironment
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppTheme
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.customAppLocale
@@ -49,6 +51,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -341,6 +344,11 @@ fun App() {
             }
         }
 
+        // Emoji font is loaded once at the App root and provided via LocalEmojiFont so any
+        // composable can render emoji on wasmJs (Skiko has no system emoji fallback there).
+        // Android/iOS get FontFamily.Default (their system fonts cover emoji).
+        val emojiFont = rememberEmojiFont()
+        CompositionLocalProvider(LocalEmojiFont provides emojiFont) {
         AppTheme(darkTheme = darkTheme, dynamicColor = dynamicColor) {
             AppLocaleEnvironment {
             val snackbarHostState = remember { SnackbarHostState() }
@@ -1224,6 +1232,7 @@ fun App() {
                 onComplete = { csatViewModel.sendIntent(CsatIntent.ReviewComplete) },
             )
             } // AppLocaleEnvironment
-        }
+        } // AppTheme
+        } // CompositionLocalProvider(LocalEmojiFont)
     }
 }
