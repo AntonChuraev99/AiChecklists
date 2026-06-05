@@ -25,6 +25,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class SyncRepositoryImplTest {
@@ -413,6 +414,43 @@ class SyncRepositoryImplTest {
         )
     }
 
+    // ─── Tests: push backfills missing cloudId (Android→Web upload bug) ──
+
+    @Test
+    fun push_backfillsCloudIdForLegacyChecklistAndUploads() = runTest {
+        // A legacy checklist created before cloud sync existed: PENDING_UPLOAD but
+        // cloudId == null. It used to hit `val cid = entity.cloudId ?: continue` and be
+        // silently skipped, so it never reached the cloud (the web app showed nothing).
+        dao.checklists.add(
+            ChecklistEntity(
+                id = 1L,
+                name = "Поиск работы",
+                items = emptyList(),
+                cloudId = null,
+                userId = uid,
+                updatedAt = 100L,
+                syncStatus = SyncStatus.PENDING_UPLOAD.value,
+                isDeleted = false,
+            ),
+        )
+        val repo = newRepo()
+        auth.currentUserOverride = testUser
+
+        repo.pushPendingChanges()
+
+        val row = dao.checklists.single()
+        assertNotNull(row.cloudId, "legacy null cloudId must be backfilled, not skipped")
+        assertEquals(
+            SyncStatus.SYNCED.value,
+            row.syncStatus,
+            "checklist must be marked SYNCED after a successful upload",
+        )
+        assertTrue(
+            firestore.uploaded.any { it.cloudId == row.cloudId },
+            "the backfilled checklist must actually be uploaded to the cloud",
+        )
+    }
+
     @Test
     fun gate_isPerUid() = runTest {
         gate.doneUids.add("other-uid")
@@ -483,6 +521,10 @@ class SyncRepositoryImplTest {
 
         override suspend fun assignUserIdToAll(userId: String) {
             replaceWith { if (it.userId == null) it.copy(userId = userId) else it }
+        }
+
+        override suspend fun assignCloudId(id: Long, cloudId: String) {
+            replaceWith { if (it.id == id) it.copy(cloudId = cloudId) else it }
         }
 
         override suspend fun markSynced(id: Long, status: Int, updatedAt: Long) {
@@ -557,6 +599,10 @@ class SyncRepositoryImplTest {
 
         override suspend fun assignUserIdToAll(userId: String) {
             replaceWith { if (it.userId == null) it.copy(userId = userId) else it }
+        }
+
+        override suspend fun assignCloudId(id: Long, cloudId: String) {
+            replaceWith { if (it.id == id) it.copy(cloudId = cloudId) else it }
         }
 
         override suspend fun markSynced(id: Long, status: Int, updatedAt: Long) {

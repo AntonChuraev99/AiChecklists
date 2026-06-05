@@ -37,7 +37,6 @@ import {
     query,
     where,
     onSnapshot,
-    serverTimestamp,
     writeBatch,
 } from 'https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js';
 
@@ -535,7 +534,12 @@ function _firestoreDocToJson(data) {
 globalThis.__firestoreSetDoc = async (collectionPath, docId, dataJson) => {
     try {
         const data = JSON.parse(dataJson);
-        data.updatedAt = serverTimestamp();
+        // NOTE: do NOT overwrite updatedAt with serverTimestamp(). The cross-platform
+        // LWW sync model compares updatedAt as client-side epoch millis (Long). A
+        // Firestore Timestamp here is read back as null→0L by the Android/iOS SDKs, so
+        // every web edit looks "older than local" and gets SKIPped — web→other-device
+        // sync then silently fails. updatedAt already carries fresh client millis from
+        // the Kotlin layer (ChecklistRepository sets currentTimeMillis() on each edit).
         const ref = doc(firestoreDb, collectionPath, docId);
         await setDoc(ref, data);
         return JSON.stringify({ ok: true });
@@ -601,7 +605,7 @@ globalThis.__firestoreBatchWrite = async (operationsJson) => {
         const batch = writeBatch(firestoreDb);
         for (const op of operations) {
             const data = (typeof op.data === 'string') ? JSON.parse(op.data) : op.data;
-            data.updatedAt = serverTimestamp();
+            // NOTE: keep updatedAt as the client-side Long millis — see __firestoreSetDoc.
             const ref = doc(firestoreDb, op.collectionPath, op.docId);
             batch.set(ref, data);
         }

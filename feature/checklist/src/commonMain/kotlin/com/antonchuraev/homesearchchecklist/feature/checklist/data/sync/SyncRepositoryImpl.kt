@@ -16,6 +16,8 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Remin
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.SyncStatus
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.SyncRepository
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.SyncState
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
@@ -104,14 +106,35 @@ class SyncRepositoryImpl(
             val pendingChecklists = checklistDao.getPendingSync()
             log("push: ${pendingChecklists.size} pending checklists")
             for (entity in pendingChecklists) {
-                val cid = entity.cloudId ?: continue
                 if (entity.syncStatus == SyncStatus.PENDING_DELETE.value) {
-                    log("push: deleting '${entity.name}' cloudId=$cid")
-                    firestoreDataSource.deleteChecklist(uid, cid)
+                    val cid = entity.cloudId
+                    if (cid != null) {
+                        log("push: deleting '${entity.name}' cloudId=$cid")
+                        firestoreDataSource.deleteChecklist(uid, cid)
+                    } else {
+                        // Legacy row that never reached the cloud — nothing to delete
+                        // remotely, just drop it locally.
+                        log("push: deleting local-only '${entity.name}' (no cloudId)")
+                    }
                     checklistDao.deleteById(entity.id)
                 } else {
+                    // Backfill a cloudId for legacy checklists created before cloud sync
+                    // existed: cloudId is a nullable column, and such rows used to be
+                    // silently skipped here (`?: continue`), so they never reached the
+                    // cloud (the web app then showed nothing). Generate + persist one.
+                    val cid = entity.cloudId ?: generateCloudId().also { newId ->
+                        logInfo("push: backfilling missing cloudId for '${entity.name}' -> $newId")
+                        checklistDao.assignCloudId(entity.id, newId)
+                    }
                     val fills = fillDao.getActiveFillsByChecklistId(entity.id)
-                    val syncData = entity.toSyncData(fills.map { it.toFillSyncData() })
+                    // Same backfill for legacy fills so they merge by a stable cloudId.
+                    val fillSyncData = fills.map { fill ->
+                        val fillCid = fill.cloudId ?: generateCloudId().also { newId ->
+                            fillDao.assignCloudId(fill.id, newId)
+                        }
+                        fill.copy(cloudId = fillCid).toFillSyncData()
+                    }
+                    val syncData = entity.copy(cloudId = cid).toSyncData(fillSyncData)
                     log("push: uploading '${entity.name}' cloudId=$cid, ${fills.size} fills")
                     val result = firestoreDataSource.uploadChecklist(uid, syncData)
                     if (result is AppResult.Success) {
@@ -371,6 +394,9 @@ class SyncRepositoryImpl(
             logInfo("reconcile: removed local fill cloudId=$cid (absent from cloud)")
         }
     }
+
+    @OptIn(ExperimentalUuidApi::class)
+    private fun generateCloudId(): String = Uuid.random().toString()
 
     private fun log(msg: String) = logger.debug(TAG, msg)
     private fun logInfo(msg: String) = logger.info(TAG, msg)

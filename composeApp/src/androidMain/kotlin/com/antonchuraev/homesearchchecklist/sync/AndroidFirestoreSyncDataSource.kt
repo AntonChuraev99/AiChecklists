@@ -4,6 +4,7 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AppResult
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.ChecklistSyncData
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.FillSyncData
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.FirestoreSyncDataSource
+import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.channels.awaitClose
@@ -72,7 +73,7 @@ class AndroidFirestoreSyncDataSource : FirestoreSyncDataSource {
         coverImagePath = this["coverImagePath"] as? String,
         createdAt = (this["createdAt"] as? Long) ?: 0L,
         isDefault = (this["isDefault"] as? Boolean) ?: false,
-        updatedAt = (this["updatedAt"] as? Long) ?: 0L,
+        updatedAt = this["updatedAt"].asEpochMillis(),
         isDeleted = (this["isDeleted"] as? Boolean) ?: false,
     )
 
@@ -96,10 +97,30 @@ class AndroidFirestoreSyncDataSource : FirestoreSyncDataSource {
             position = ((this["position"] as? Long) ?: 0L).toInt(),
             autoDeleteCompleted = (this["autoDeleteCompleted"] as? Boolean) ?: false,
             viewMode = this["viewMode"] as? String ?: "Standard",
-            updatedAt = (this["updatedAt"] as? Long) ?: 0L,
+            updatedAt = this["updatedAt"].asEpochMillis(),
             isDeleted = (this["isDeleted"] as? Boolean) ?: false,
             fills = fillsList,
         )
+    }
+
+    /**
+     * Reads a millis-since-epoch value that may arrive either as a raw [Long]
+     * (written by Android/iOS, which serialize `updatedAt` as client-side millis)
+     * OR as a Firestore [Timestamp] (written by the web client, whose init.js
+     * forces `updatedAt = serverTimestamp()`).
+     *
+     * Without this normalization, `this["updatedAt"] as? Long` on a Timestamp field
+     * yields null → 0L, so [SyncRepositoryImpl.mergeRemoteChecklist] treats every
+     * web edit as older than the local copy and SKIPs it — web→Android sync then
+     * silently fails. Tolerant to both types so legacy Timestamp documents already
+     * in the cloud are read correctly too.
+     */
+    private fun Any?.asEpochMillis(): Long = when (this) {
+        is Long -> this
+        is Double -> this.toLong()
+        is Timestamp -> this.toDate().time
+        is Number -> this.toLong()
+        else -> 0L
     }
 
     // ── Interface implementation ─────────────────────────────────────────────

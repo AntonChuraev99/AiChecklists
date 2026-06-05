@@ -48,6 +48,14 @@ interface ChecklistDao {
     @Query("UPDATE checklists SET userId = :userId WHERE userId IS NULL")
     suspend fun assignUserIdToAll(userId: String)
 
+    /**
+     * Assigns a cloudId to a single row. Used by the sync push to backfill legacy
+     * checklists created before cloud sync existed: cloudId is a nullable column, and
+     * such rows were silently skipped at upload time, so they never reached Firestore.
+     */
+    @Query("UPDATE checklists SET cloudId = :cloudId WHERE id = :id")
+    suspend fun assignCloudId(id: Long, cloudId: String)
+
     @Query("SELECT * FROM checklists WHERE isDeleted = 0 ORDER BY position ASC")
     suspend fun getAllActive(): List<ChecklistEntity>
 

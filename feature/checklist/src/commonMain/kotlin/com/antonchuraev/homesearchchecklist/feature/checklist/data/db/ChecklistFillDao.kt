@@ -74,6 +74,10 @@ interface ChecklistFillDao {
     @Query("UPDATE checklist_fills SET userId = :userId WHERE userId IS NULL")
     suspend fun assignUserIdToAll(userId: String)
 
+    /** Backfills a cloudId for a legacy fill that predates cloud sync (see [ChecklistDao.assignCloudId]). */
+    @Query("UPDATE checklist_fills SET cloudId = :cloudId WHERE id = :id")
+    suspend fun assignCloudId(id: Long, cloudId: String)
+
     @Query("SELECT * FROM checklist_fills WHERE checklistId = :checklistId AND isDeleted = 0")
     suspend fun getActiveFillsByChecklistId(checklistId: Long): List<ChecklistFillEntity>
 }
