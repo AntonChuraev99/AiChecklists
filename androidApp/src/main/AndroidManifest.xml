@@ -40,6 +40,21 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <!-- FCM service for re-engagement push (class lives in :composeApp androidMain). -->
+        <service
+            android:name="com.antonchuraev.homesearchchecklist.push.GistiFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!-- Default channel for notification-payload pushes (data-only campaign uses
+             "promotions" explicitly; this only covers any future notification-payload sends). -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="promotions" />
+
         <!-- Reminder Notification Receiver (handles checklist-level and per-item reminders) -->
         <receiver
             android:name="com.antonchuraev.homesearchchecklist.notification.ReminderReceiver"

@@ -9,11 +9,13 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentOpener
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStorage
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePort
+import com.antonchuraev.homesearchchecklist.core.common.api.PushTokenRepository
 import com.antonchuraev.homesearchchecklist.core.common.impl.AndroidAppLogger
 import com.antonchuraev.homesearchchecklist.csat.ObservableAnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.datastore.api.UserAppDatastoreProvider
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.FirestoreSyncDataSource
 import com.antonchuraev.homesearchchecklist.feature.user.data.device.DeviceIdProvider
+import com.antonchuraev.homesearchchecklist.push.PushTokenRepositoryAndroid
 import com.antonchuraev.homesearchchecklist.sync.AndroidFirestoreSyncDataSource
 import org.koin.core.module.Module
 import org.koin.core.qualifier.named
@@ -50,4 +52,9 @@ actual fun platformModule(): Module = module {
 
     // Firestore sync data source — Android implementation using the Firebase Android SDK.
     single<FirestoreSyncDataSource> { AndroidFirestoreSyncDataSource() }
+
+    // FCM token + activity tracking — writes users/{uid}.fcmToken / lastActiveAt for
+    // the re-engagement campaign. Resolved by GistiFirebaseMessagingService (onNewToken)
+    // and GistiApplication (app-start registration) via GlobalContext.
+    single<PushTokenRepository> { PushTokenRepositoryAndroid(get(), get()) }
 }

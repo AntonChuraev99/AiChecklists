@@ -81,6 +81,9 @@ kotlin {
             implementation(libs.firebase.crashlytics)
             implementation(libs.firebase.config)
             implementation(libs.firebase.firestore)
+            // FCM client for re-engagement push. firebase-messaging-ktx is gone in BOM 34+ —
+            // the base artifact ships the Kotlin APIs. Version resolved by firebase-bom below.
+            implementation(libs.firebase.messaging)
         }
         commonMain.dependencies {
             implementation(projects.core.common.api)

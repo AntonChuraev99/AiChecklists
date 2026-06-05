@@ -104,7 +104,7 @@ Simple, clear, benefit-focused, action-oriented. Do: "Create Checklist", "Fill v
 
 ## Dependencies & Economics
 
-Versions in `gradle/libs.versions.toml`: Kotlin 2.3.0, Compose MP 1.9.3, Koin 4.1.1, Room 2.8.4, RevenueCat 2.2.17, Firebase BOM 33.7.0. **Gemini SDK is intentionally NOT a client dependency** — all AI inference is server-side. Unit economics: `docs/unit-economics.md` (gemini-2.5-flash-lite ~$0.0002/req, positive at max usage).
+Versions in `gradle/libs.versions.toml`: Kotlin 2.3.0, Compose MP 1.9.3, Koin 4.1.1, Room 2.8.4, RevenueCat 2.2.17, Firebase BOM 34.13.0. **Gemini SDK is intentionally NOT a client dependency** — all AI inference is server-side. Unit economics: `docs/unit-economics.md` (gemini-2.5-flash-lite ~$0.0002/req, positive at max usage).
 
 | Limit (Remote Config) | Free | Premium |
 |---|---|---|

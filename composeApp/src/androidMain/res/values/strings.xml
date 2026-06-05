@@ -24,4 +24,8 @@
         <item quantity="one">%d item remaining</item>
         <item quantity="other">%d items remaining</item>
     </plurals>
+
+    <!-- Push / Promotions Notifications (FCM re-engagement) -->
+    <string name="promotions_notification_channel">Updates &amp; Tips</string>
+    <string name="promotions_notification_channel_desc">Product updates, tips, and reminders to come back</string>
 </resources>

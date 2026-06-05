@@ -3,15 +3,20 @@ package com.antonchuraev.homesearchchecklist
 import android.app.Application
 import com.antonchuraev.homesearchchecklist.consent.ConsentManager
 import com.antonchuraev.homesearchchecklist.core.common.api.AppContextHolder
+import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
+import com.antonchuraev.homesearchchecklist.core.common.api.PushTokenRepository
 import com.antonchuraev.homesearchchecklist.di.appModule
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
 import com.antonchuraev.homesearchchecklist.feature.paywall.data.PaywallConfig
 import com.antonchuraev.homesearchchecklist.feature.paywall.data.RevenueCatInitializer
 import com.antonchuraev.homesearchchecklist.notification.ReminderReceiver
+import com.antonchuraev.homesearchchecklist.push.PushNotificationChannels
+import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
 import org.koin.core.context.GlobalContext
@@ -38,11 +43,17 @@ open class GistiApplication : Application() {
 
         initRevenueCat()
 
-        // Create notification channel for reminders (required on Android 8+)
+        // Create notification channels (required on Android 8+).
+        // Channels MUST exist before any notification is posted — creating them lazily in
+        // onMessageReceived would silently drop the first push.
         ReminderReceiver.createNotificationChannel(this)
+        PushNotificationChannels.createAll(this)
 
         // Re-schedule active reminders (survives app updates and process death)
         rescheduleReminders()
+
+        // Register the FCM token + bump lastActiveAt for the re-engagement campaign.
+        registerPushToken()
     }
 
     /**
@@ -82,6 +93,30 @@ open class GistiApplication : Application() {
                 scheduler.rescheduleAllActiveRepeats()
             } catch (_: Exception) {
                 // Non-critical — reminders will be rescheduled next launch
+            }
+        }
+    }
+
+    /**
+     * On app start, push the current FCM token and refresh lastActiveAt to Firestore so the
+     * re-engagement campaign always has a fresh token + recency signal for this user.
+     *
+     * No-ops gracefully when the user is not signed in (the repository logs a warning) — the
+     * token is re-registered on a later start once the user authenticates. Token fetch failures
+     * are non-critical: onNewToken still fires when FCM rotates the token.
+     */
+    private fun registerPushToken() {
+        applicationScope.launch {
+            val repository: PushTokenRepository =
+                GlobalContext.getOrNull()?.getOrNull() ?: return@launch
+            // Always bump activity, even if the token fetch fails.
+            repository.touchLastActive()
+            try {
+                val token = FirebaseMessaging.getInstance().token.await()
+                repository.registerToken(token)
+            } catch (e: Exception) {
+                GlobalContext.getOrNull()?.getOrNull<AppLogger>()
+                    ?.warning("PushFcm", "App-start FCM token fetch failed: ${e.message}")
             }
         }
     }
