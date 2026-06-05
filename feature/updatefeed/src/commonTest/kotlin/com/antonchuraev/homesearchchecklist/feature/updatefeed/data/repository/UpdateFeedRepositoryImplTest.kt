@@ -115,6 +115,47 @@ class UpdateFeedRepositoryImplTest {
     }
 
     @Test
+    fun `getReleases_withDefaultJson_v1_16HasNoStoreDescription_regressionAgainstDuplicateRender`() = runTest {
+        val repository = buildRepository(UpdateFeedContent.JSON)
+
+        val releases = repository.getReleases()
+        val v116 = releases.first { it.version == "1.16" }
+
+        // Regression (2026-06-04): the 1.16 release notes repeated the feature posts of the same
+        // group, so ReleaseCard rendered every feature twice (store-note text + feature row).
+        // Fix removed the 1.16 releaseNotes entry — storeDescription must stay null.
+        assertNull(v116.storeDescription, "v1.16 storeDescription must be null — lines covered by posts")
+        assertTrue(v116.posts.isNotEmpty(), "v1.16 must still have feature posts")
+    }
+
+    @Test
+    fun `getReleases_withDefaultJson_v1_15HasNoStoreDescription_regressionAgainstDuplicateRender`() = runTest {
+        val repository = buildRepository(UpdateFeedContent.JSON)
+
+        val releases = repository.getReleases()
+        val v115 = releases.first { it.version == "1.15" }
+
+        // Same duplicate-render regression as 1.16 — 1.15 release notes repeated all 5 posts.
+        assertNull(v115.storeDescription, "v1.15 storeDescription must be null — lines covered by posts")
+        assertTrue(v115.posts.isNotEmpty(), "v1.15 must still have feature posts")
+    }
+
+    @Test
+    fun `getReleases_withDefaultJson_v1_16LeadsWithAiAssistantFlagshipPostWithCta`() = runTest {
+        val repository = buildRepository(UpdateFeedContent.JSON)
+
+        val releases = repository.getReleases()
+        val v116 = releases.first { it.version == "1.16" }
+        val flagship = v116.posts.first { it.id == "ai_assistant_v1" }
+
+        // Flagship AI Assistant post leads the 1.16 group (highest publishedAtMillis) and carries
+        // the Open AI Chat CTA so returning users land in the assistant in one tap.
+        assertEquals("ai_assistant_v1", v116.posts.first().id, "AI Assistant post must lead the 1.16 group")
+        assertEquals(1, flagship.actions.size)
+        assertEquals("gisti://ai_chat", flagship.actions[0].deepLink)
+    }
+
+    @Test
     fun `getReleases_withDefaultJson_v1_9HasTwoPostsAndNoStoreDescription`() = runTest {
         val repository = buildRepository(UpdateFeedContent.JSON)
 
