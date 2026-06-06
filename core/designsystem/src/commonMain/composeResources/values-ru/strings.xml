@@ -368,6 +368,7 @@
     <!-- Кредиты ИИ -->
     <string name="credits_display">%1$d кредитов</string>
     <string name="credits_get_more">Получить кредиты</string>
+    <string name="credits_pro_badge">PRO</string>
     <string name="credits_your_credits">Ваши кредиты ИИ</string>
     <string name="credits_refill_info">Пополняются ежедневно в 12:00 CET</string>
     <string name="credits_refill_to">до %1$d</string>

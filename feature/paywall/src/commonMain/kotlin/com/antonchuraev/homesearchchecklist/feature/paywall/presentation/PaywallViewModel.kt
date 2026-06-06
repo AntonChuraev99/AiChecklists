@@ -350,13 +350,13 @@ class PaywallViewModel(
         analyticsTracker.event("restore_button_clicked", mapOf("source" to source))
 
         viewModelScope.launch {
-            _screenState.update { it.copy(isPurchasing = true, error = null) }
+            _screenState.update { it.copy(isRestoring = true, error = null) }
 
             when (val result = restorePurchasesUseCase()) {
                 is RestoreResult.Success -> {
                     analyticsTracker.event("restore_completed", mapOf("source" to source))
                     _screenState.update {
-                        it.copy(isPurchasing = false, purchaseSuccess = true)
+                        it.copy(isRestoring = false, purchaseSuccess = true)
                     }
                     // Navigate to subscription status after successful restore
                     navigator.navigateToSubscriptionStatus()
@@ -364,7 +364,7 @@ class PaywallViewModel(
                 is RestoreResult.NoActiveSubscription -> {
                     analyticsTracker.event("restore_no_subscription", mapOf("source" to source))
                     _screenState.update {
-                        it.copy(isPurchasing = false, error = getString(Res.string.paywall_no_subscription_found))
+                        it.copy(isRestoring = false, error = getString(Res.string.paywall_no_subscription_found))
                     }
                 }
                 is RestoreResult.Error -> {
@@ -375,7 +375,7 @@ class PaywallViewModel(
                         "underlying_error" to (result.underlyingError ?: "none").take(100)
                     ))
                     _screenState.update {
-                        it.copy(isPurchasing = false, error = result.message)
+                        it.copy(isRestoring = false, error = result.message)
                     }
                 }
             }

@@ -21,9 +21,11 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.font.FontWeight
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.credits_display
 import aichecklists.core.designsystem.generated.resources.credits_get_more
+import aichecklists.core.designsystem.generated.resources.credits_pro_badge
 import org.jetbrains.compose.resources.stringResource
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 
@@ -113,8 +115,10 @@ fun AppCreditsChip(
     // Full accessibility label for TalkBack — keeps the noun ("5 credits" /
     // "Get more") so screen readers announce meaning, not bare digits.
     val a11yLabel = when {
-        showCta -> stringResource(Res.string.credits_get_more)
-        else    -> stringResource(Res.string.credits_display, credits.coerceAtLeast(0))
+        showCta   -> stringResource(Res.string.credits_get_more)
+        isPremium -> stringResource(Res.string.credits_pro_badge) + ", " +
+            stringResource(Res.string.credits_display, credits.coerceAtLeast(0))
+        else      -> stringResource(Res.string.credits_display, credits.coerceAtLeast(0))
     }
 
     val chipModifier = modifier
@@ -141,6 +145,16 @@ fun AppCreditsChip(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
     ) {
+        // Premium badge — "PRO" leads the chip (before the icon + count) for premium users,
+        // when not in the Get-More CTA state. Bold + primary tint = small brand badge.
+        if (isPremium && !showCta) {
+            Text(
+                text = stringResource(Res.string.credits_pro_badge),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = iconTint,
+            )
+        }
         Icon(
             imageVector = Icons.Outlined.AutoAwesome,
             contentDescription = null, // decorative — label is the semantic content

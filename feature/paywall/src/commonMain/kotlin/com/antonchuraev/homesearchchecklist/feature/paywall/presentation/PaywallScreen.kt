@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -38,6 +39,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
+import com.antonchuraev.homesearchchecklist.desingsystem.components.PlatformBackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -124,15 +126,23 @@ internal fun PaywallScreen(
     onTermsClick: () -> Unit,
     onPrivacyClick: () -> Unit,
     onSupportClick: () -> Unit,
+    isPurchasing: Boolean = false,
+    isRestoring: Boolean = false,
     showHeroIllustration: Boolean = true,
 ) {
+    // Block navigation while a purchase/restore is in flight: swallow system back +
+    // disable the close (X). Prevents leaving mid-transaction (RevenueCat validation +
+    // credit-restore Cloud Function still running after the Google Play sheet closes).
+    val busy = isPurchasing || isRestoring
+    PlatformBackHandler(enabled = busy) { /* swallow back while busy */ }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             CenterAlignedTopAppBar(
                 title = {},
                 navigationIcon = {
-                    IconButton(onClick = onClose) {
+                    IconButton(onClick = onClose, enabled = !busy) {
                         Icon(
                             Icons.Filled.Close,
                             contentDescription = stringResource(Res.string.paywall_v1_close_cd),
@@ -140,11 +150,18 @@ internal fun PaywallScreen(
                     }
                 },
                 actions = {
-                    TextButton(onClick = onRestore) {
-                        Text(
-                            stringResource(Res.string.paywall_v1_restore_action),
-                            style = MaterialTheme.typography.labelLarge,
-                        )
+                    TextButton(onClick = onRestore, enabled = !busy) {
+                        if (isRestoring) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            Text(
+                                stringResource(Res.string.paywall_v1_restore_action),
+                                style = MaterialTheme.typography.labelLarge,
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -163,6 +180,10 @@ internal fun PaywallScreen(
             StickyCta(
                 ctaLabel = stringResource(Res.string.paywall_v1_cta_start_trial, state.trialDays),
                 sub = ctaSub,
+                loading = isPurchasing,
+                // Keep the CTA bright (not greyed) while its OWN purchase spins, so the white
+                // spinner stays visible; only grey it out when a restore is the active operation.
+                enabled = !isRestoring,
                 onClick = onStartTrial,
             )
         },
@@ -231,7 +252,13 @@ internal fun PaywallScreen(
 // ─── Sticky bottom CTA ────────────────────────────────────────────────────────
 
 @Composable
-private fun StickyCta(ctaLabel: String, sub: String, onClick: () -> Unit) {
+private fun StickyCta(
+    ctaLabel: String,
+    sub: String,
+    loading: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
     Surface(
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 0.dp,
@@ -252,6 +279,8 @@ private fun StickyCta(ctaLabel: String, sub: String, onClick: () -> Unit) {
                     onClick = onClick,
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.large,
+                    loading = loading,
+                    enabled = enabled,
                 )
                 Spacer(Modifier.height(AppDimens.SpacingSm))
                 // 1-line disclosure with auto-shrink: long localized prices

@@ -162,8 +162,10 @@ fun PaywallStep(
 
         // Purchase button
         Button(
-            onClick = { paywallViewModel?.sendIntent(PaywallIntent.Purchase) },
-            enabled = paywallState?.isPurchasing != true && product != null,
+            // Stay primary-colored while purchasing so the white spinner stays visible;
+            // taps are swallowed by the guard instead of greying the button out.
+            onClick = { if (paywallState?.isPurchasing != true) paywallViewModel?.sendIntent(PaywallIntent.Purchase) },
+            enabled = product != null,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(AppDimens.ButtonHeight),

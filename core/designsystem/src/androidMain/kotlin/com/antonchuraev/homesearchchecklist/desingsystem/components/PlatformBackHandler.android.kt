@@ -1,4 +1,4 @@
-package com.antonchuraev.homesearchchecklist.feature.onboarding
+package com.antonchuraev.homesearchchecklist.desingsystem.components
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable

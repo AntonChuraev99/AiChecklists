@@ -1,8 +1,8 @@
-package com.antonchuraev.homesearchchecklist.feature.onboarding
+package com.antonchuraev.homesearchchecklist.desingsystem.components
 
 import androidx.compose.runtime.Composable
 
 @Composable
 actual fun PlatformBackHandler(enabled: Boolean, onBack: () -> Unit) {
-    // No system back button on iOS
+    // No-op: the browser owns its own back navigation.
 }

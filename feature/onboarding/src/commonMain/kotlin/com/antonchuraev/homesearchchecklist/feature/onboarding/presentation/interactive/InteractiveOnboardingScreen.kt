@@ -32,6 +32,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppLinearProgressIndicator
+import com.antonchuraev.homesearchchecklist.desingsystem.components.PlatformBackHandler
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -40,6 +41,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
@@ -67,13 +69,6 @@ fun InteractiveOnboardingScreen(
 
     val state by viewModel.screenState.collectAsState()
 
-    // System back = same as top bar back button
-    com.antonchuraev.homesearchchecklist.feature.onboarding.PlatformBackHandler(
-        enabled = true
-    ) {
-        viewModel.sendIntent(InteractiveOnboardingIntent.OnBack)
-    }
-
     // Lazy PaywallViewModel — only instantiated at paywall step
     val paywallViewModel: PaywallViewModel? =
         if (state.currentStep == InteractiveOnboardingStep.Paywall) {
@@ -84,6 +79,19 @@ fun InteractiveOnboardingScreen(
         } else null
 
     val paywallState = paywallViewModel?.screenState?.collectAsState()?.value
+
+    // Block navigation while a purchase is in flight on the paywall step.
+    val isPaywallBusy = paywallState?.isPurchasing == true
+
+    // System back = same as top bar back button — swallowed while a purchase runs so the
+    // user can't leave mid-transaction (RevenueCat validation + credit-restore CF still running).
+    PlatformBackHandler(
+        enabled = true
+    ) {
+        if (!isPaywallBusy) {
+            viewModel.sendIntent(InteractiveOnboardingIntent.OnBack)
+        }
+    }
 
     // Handle successful purchase
     LaunchedEffect(paywallState?.purchaseSuccess) {
@@ -128,8 +136,11 @@ fun InteractiveOnboardingScreen(
             Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(AppDimens.SpacingSm))
-                    .clickable { viewModel.sendIntent(InteractiveOnboardingIntent.OnSkip) }
-                    .padding(AppDimens.SpacingSm),
+                    .clickable(enabled = !isPaywallBusy) {
+                        viewModel.sendIntent(InteractiveOnboardingIntent.OnSkip)
+                    }
+                    .padding(AppDimens.SpacingSm)
+                    .alpha(if (isPaywallBusy) 0.4f else 1f),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(

@@ -54,6 +54,8 @@ kotlin {
         }
         androidMain.dependencies {
             implementation(libs.androidx.window)
+            // BackHandler actual backing the shared PlatformBackHandler navigation-lock shim.
+            implementation(libs.androidx.activity.compose)
         }
 
         // androidHostTest source set: JVM/Robolectric screenshot tests (Roborazzi)

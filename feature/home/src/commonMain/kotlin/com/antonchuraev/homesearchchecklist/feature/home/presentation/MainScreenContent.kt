@@ -119,9 +119,9 @@ private fun MainScreenContentLazyColumn(
     // Gisti redesign: the loud premium banner is shown only to active subscribers (status);
     // free users get a calm upgrade hint below the list instead. A "My lists" section header
     // always precedes the cards when the list is non-empty.
-    val showPremiumBanner = screenState.subscriptionStatus.isActive
-    val headerItemCount = (if (showPremiumBanner) 1 else 0) +
-        (if (screenState.isGoogleLinked) 0 else 1) +
+    // The loud "Premium Member" status banner was removed — premium is now shown as a
+    // "PRO" prefix on the credits chip (top bar). Free users still get the upgrade banner below.
+    val headerItemCount = (if (screenState.isGoogleLinked) 0 else 1) +
         1 // "My lists" section header
 
     val reorderableState = rememberReorderableLazyListState(lazyListState) { from, to ->
@@ -159,19 +159,6 @@ private fun MainScreenContentLazyColumn(
         ),
         verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
     ) {
-        // Premium status banner — only for active subscribers (free users get the calm
-        // upgrade hint below the list instead of the loud upsell banner).
-        if (showPremiumBanner) {
-            item(key = "premium_banner") {
-                PremiumBanner(
-                    isActive = true,
-                    formattedExpirationDate = screenState.formattedExpirationDate,
-                    onUpgradeClick = onPremiumBannerClick,
-                    onSubscriptionClick = onPremiumBannerClick
-                )
-            }
-        }
-
         if (!screenState.isGoogleLinked) {
             item(key = "sync_banner") {
                 SyncAccountBanner(onSignInClick = onSignInClick)
@@ -316,21 +303,6 @@ private fun MainScreenContentLazyGrid(
         horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd),
         verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd),
     ) {
-        // Full-width premium status banner — active subscribers only.
-        if (screenState.subscriptionStatus.isActive) {
-            item(
-                key = "premium_banner",
-                span = { GridItemSpan(maxLineSpan) },
-            ) {
-                PremiumBanner(
-                    isActive = true,
-                    formattedExpirationDate = screenState.formattedExpirationDate,
-                    onUpgradeClick = onPremiumBannerClick,
-                    onSubscriptionClick = onPremiumBannerClick,
-                )
-            }
-        }
-
         item(
             key = "my_lists_header",
             span = { GridItemSpan(maxLineSpan) },

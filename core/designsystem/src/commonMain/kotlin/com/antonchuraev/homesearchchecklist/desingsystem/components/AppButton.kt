@@ -9,7 +9,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -29,31 +31,42 @@ fun AppButton(
     enabled: Boolean = true,
     icon: ImageVector? = null,
     shape: Shape = MaterialTheme.shapes.small,
+    loading: Boolean = false,
 ) {
     Button(
-        onClick = onClick,
+        // While loading the button keeps its primary color (not greyed) so the spinner
+        // reads as "processing", but taps are swallowed.
+        onClick = { if (!loading) onClick() },
         modifier = modifier.height(AppDimens.ButtonHeight),
         enabled = enabled,
         shape = shape,
         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
     ) {
-        if (icon != null) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(ButtonDefaults.IconSize)
+        if (loading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(ButtonDefaults.IconSize),
+                strokeWidth = 2.dp,
+                color = LocalContentColor.current,
             )
-            Spacer(modifier = Modifier.width(ButtonDefaults.IconSpacing))
+        } else {
+            if (icon != null) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(ButtonDefaults.IconSize)
+                )
+                Spacer(modifier = Modifier.width(ButtonDefaults.IconSpacing))
+            }
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelLarge,
+                maxLines = 1,
+                autoSize = TextAutoSize.StepBased(
+                    MaterialTheme.typography.labelLarge.fontSize / 2,
+                    MaterialTheme.typography.labelLarge.fontSize
+                )
+            )
         }
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelLarge,
-            maxLines = 1,
-            autoSize = TextAutoSize.StepBased(
-                MaterialTheme.typography.labelLarge.fontSize / 2,
-                MaterialTheme.typography.labelLarge.fontSize
-            )
-        )
     }
 }
 

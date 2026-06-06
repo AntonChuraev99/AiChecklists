@@ -1,22 +1,20 @@
 package com.antonchuraev.homesearchchecklist.feature.onboarding.presentation
 
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import androidx.navigation3.runtime.NavBackStack
+import androidx.navigation3.runtime.NavKey
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
-import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavRoute
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
-import com.antonchuraev.homesearchchecklist.core.navigation.api.NavCommand
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.RegistrationData
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.UserData
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.CompleteOnboardingUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -89,7 +87,8 @@ class OnboardingViewModelTest {
 
         val state = vm.screenState.value
         assertEquals(0, state.currentPage)
-        assertEquals(4, state.totalPages)
+        // 5 pages: 4 feature slides + 1 paywall page (see OnboardingState.totalPages).
+        assertEquals(5, state.totalPages)
     }
 
     // --- Page navigation ---
@@ -107,9 +106,9 @@ class OnboardingViewModelTest {
     fun onNextPage_lastPage_completesOnboarding() = runTest {
         val vm = createViewModel()
 
-        // Navigate to last page
-        repeat(3) { vm.onIntent(OnboardingIntent.OnNextPage) }
-        assertEquals(3, vm.screenState.value.currentPage)
+        // Navigate to last page (index 4 = paywall page; 5 pages total)
+        repeat(4) { vm.onIntent(OnboardingIntent.OnNextPage) }
+        assertEquals(4, vm.screenState.value.currentPage)
 
         // Next from last page completes onboarding
         vm.onIntent(OnboardingIntent.OnNextPage)
@@ -153,9 +152,8 @@ class OnboardingViewModelTest {
     private class FakeAppNavigator : AppNavigator {
         var navigatedToMainScreen = false
 
-        override val commands: Flow<NavCommand> = emptyFlow()
         override val events: SharedFlow<AppNavEvent> = MutableSharedFlow()
-        override val backStack: StateFlow<List<AppNavRoute>> = MutableStateFlow(emptyList())
+        override val backStack: NavBackStack<NavKey> = NavBackStack()
         override fun showWidgetInstruction() {}
         override fun requestCreateWeeklyChecklist() {}
         override fun onBack() {}

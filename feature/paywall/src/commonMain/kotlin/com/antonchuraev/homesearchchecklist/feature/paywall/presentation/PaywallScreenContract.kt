@@ -48,6 +48,7 @@ data class PaywallUiState(
 data class PaywallState(
     val isLoading: Boolean = true,
     val isPurchasing: Boolean = false,
+    val isRestoring: Boolean = false,
     val products: List<PaywallProduct> = emptyList(),
     val selectedProductId: String? = null,
     val error: String? = null,

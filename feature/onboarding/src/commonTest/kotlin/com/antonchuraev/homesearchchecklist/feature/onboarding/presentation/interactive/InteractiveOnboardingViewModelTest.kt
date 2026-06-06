@@ -1,10 +1,10 @@
 package com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive
 
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import androidx.navigation3.runtime.NavBackStack
+import androidx.navigation3.runtime.NavKey
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
-import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavRoute
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
-import com.antonchuraev.homesearchchecklist.core.navigation.api.NavCommand
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistRepeatInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
@@ -29,7 +29,6 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -1228,9 +1227,8 @@ class InteractiveOnboardingViewModelTest {
         var navigatedToMainScreen = false
         var lastMainClearBackStack = false
 
-        override val commands: Flow<NavCommand> = emptyFlow()
         override val events: SharedFlow<AppNavEvent> = MutableSharedFlow()
-        override val backStack: StateFlow<List<AppNavRoute>> = MutableStateFlow(emptyList())
+        override val backStack: NavBackStack<NavKey> = NavBackStack()
         override fun showWidgetInstruction() {}
         override fun requestCreateWeeklyChecklist() {}
         override fun onBack() {}

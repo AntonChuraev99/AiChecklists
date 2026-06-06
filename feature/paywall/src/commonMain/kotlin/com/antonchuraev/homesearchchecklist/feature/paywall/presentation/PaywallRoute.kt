@@ -151,6 +151,8 @@ fun PaywallRoute(
 
     PaywallScreen(
         state        = uiState,
+        isPurchasing = state.isPurchasing,
+        isRestoring  = state.isRestoring,
         onPlanSelected = { viewModel.sendIntent(PaywallIntent.SelectPlan(it)) },
         onStartTrial = { viewModel.sendIntent(PaywallIntent.Purchase) },
         onClose      = {

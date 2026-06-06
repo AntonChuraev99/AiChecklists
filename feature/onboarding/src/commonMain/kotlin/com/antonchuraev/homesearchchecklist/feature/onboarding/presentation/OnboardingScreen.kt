@@ -40,6 +40,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalUriHandler
@@ -57,6 +58,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.illustrations.CreateFro
 import com.antonchuraev.homesearchchecklist.desingsystem.illustrations.RemindersCalendarIllustration
 import com.antonchuraev.homesearchchecklist.desingsystem.illustrations.WorksEverywhereIllustration
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import com.antonchuraev.homesearchchecklist.desingsystem.components.PlatformBackHandler
 import com.antonchuraev.homesearchchecklist.feature.paywall.data.PaywallConfig
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallProduct
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.PaywallIntent
@@ -147,6 +149,12 @@ fun OnboardingScreen(
 
     val isPaywallPage = state.currentPage == PAYWALL_PAGE_INDEX
 
+    // Block navigation while a purchase is in flight on the paywall page.
+    val isPaywallBusy = isPaywallPage && paywallState.isPurchasing
+
+    // Swallow system back during purchase (no-op on every other page/state).
+    PlatformBackHandler(enabled = isPaywallBusy) { /* swallow back during purchase */ }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -164,8 +172,11 @@ fun OnboardingScreen(
             Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(AppDimens.SpacingSm))
-                    .clickable { viewModel.sendIntent(OnboardingIntent.OnSkip) }
-                    .padding(AppDimens.SpacingSm),
+                    .clickable(enabled = !isPaywallBusy) {
+                        viewModel.sendIntent(OnboardingIntent.OnSkip)
+                    }
+                    .padding(AppDimens.SpacingSm)
+                    .alpha(if (isPaywallBusy) 0.4f else 1f),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
@@ -187,6 +198,8 @@ fun OnboardingScreen(
             state = pagerState,
             contentPadding = PaddingValues(horizontal = AppDimens.ScreenPaddingHorizontal),
             pageSpacing = AppDimens.ScreenPaddingHorizontal,
+            // Lock pager swipe while a purchase runs so the user can't slide off the paywall.
+            userScrollEnabled = !isPaywallBusy,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
@@ -218,8 +231,9 @@ fun OnboardingScreen(
             if (isPaywallPage) {
                 val product = paywallState.products.firstOrNull()
                 Button(
-                    onClick = { paywallViewModel.sendIntent(PaywallIntent.Purchase) },
-                    enabled = !paywallState.isPurchasing && product != null,
+                    // Stay primary-colored while purchasing so the white spinner is clearly visible.
+                    onClick = { if (!paywallState.isPurchasing) paywallViewModel.sendIntent(PaywallIntent.Purchase) },
+                    enabled = product != null,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(AppDimens.ButtonHeight),
