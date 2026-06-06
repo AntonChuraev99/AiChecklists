@@ -31,6 +31,8 @@ Repo is **private** (was public until a 2026-05-24 Gemini key leak). Old leaked 
 
 All code comments, docs, commit messages in **English**. Marketing/store/onboarding copy: **English only** — RU localization only on explicit request or when fixing existing RU strings. Commit style: Conventional Commits (skill `git-commit-conventions`).
 
+**Strings escaping (recurring bug):** in `composeResources/**/strings.xml` write apostrophes & quotes **literally** (`can't`, `"quoted"`) — **never** Android-style `\'`. Compose Resources is parsed by `org.jetbrains.compose.resources`, not AAPT: `\'` renders the backslash on screen as `can\'t`. Only `\n` / `\t` / `\uXXXX` are real escapes; XML metachars use `&amp;` / `&lt;` / `&gt;`. Match existing strings (`don't`, `What's`, `You've`). Details: rule `compose-resources-kmp`.
+
 ## Build Commands
 
 **AGP 9 module split (since 2026-05-10):** `composeApp` is a **KMP library**; the Android **application** is `:androidApp`. Use `:androidApp` for any `assemble*`/`bundle*`/`install*`/`connectedAndroidTest`; KMP/iOS/wasmJs tasks stay on `:composeApp`. Details: `docs/solutions/build-system/agp-9-migration-2026-05-10.md`.

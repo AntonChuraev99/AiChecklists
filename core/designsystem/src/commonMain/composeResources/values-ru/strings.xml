@@ -110,6 +110,7 @@
     <string name="main_title">Мои чек-листы</string>
     <string name="main_empty_title">Готовы навести порядок?</string>
     <string name="main_empty_description">Создайте первый чек-лист или позвольте ИИ составить его из текста, фото или документа.</string>
+    <string name="main_empty_cta">Создать чеклист</string>
     <string name="main_create_checklist">Создать чек-лист</string>
     <string name="main_create_checklist_locked">Откройте больше с Премиум</string>
     <string name="main_create_checklist_action">Новый чеклист</string>
@@ -165,6 +166,7 @@
     <string name="create_item_name_label">Текст элемента</string>
     <string name="create_edit_item">Редактировать элемент</string>
     <string name="create_confirm_item_edit">Сохранить изменения</string>
+    <string name="create_choose_template">Выбрать из шаблона</string>
 
     <!-- Экран шаблонов -->
     <string name="templates_title">Шаблоны</string>
@@ -275,6 +277,8 @@
 
     <!-- Экран деталей чек-листа -->
     <string name="checklist_not_found">Чек-лист не найден</string>
+    <string name="checklist_not_found_description">Не удалось открыть чек-лист — возможно, он повреждён или загружен не полностью. Можно удалить его, чтобы убрать из списка.</string>
+    <string name="checklist_not_found_delete_message">Удалить этот чек-лист? Действие нельзя отменить.</string>
     <string name="checklist_edit_title">Редактировать чек-лист</string>
     <string name="checklist_edit">Редактировать</string>
     <string name="checklist_progress">Прогресс</string>
@@ -1136,4 +1140,10 @@
     <string name="chat_panel_collapse">Свернуть чат</string>
     <string name="chat_panel_greeting">Привет! Я Gisti. Спроси меня что угодно о своих списках.</string>
     <string name="chat_panel_scrim_description">Нажмите, чтобы закрыть чат</string>
+
+    <!-- Первый чеклист (A/B авто-создание) -->
+    <string name="first_checklist_title">Ваш первый чеклист</string>
+    <string name="first_checklist_item_1">Нажмите на кружок, чтобы отметить пункт</string>
+    <string name="first_checklist_item_2">Нажмите на пункт, чтобы изменить его</string>
+    <string name="first_checklist_item_3">Нажмите +, чтобы добавить свой пункт</string>
 </resources>

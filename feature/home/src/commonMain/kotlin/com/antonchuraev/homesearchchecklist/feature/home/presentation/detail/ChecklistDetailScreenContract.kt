@@ -111,6 +111,15 @@ sealed interface ChecklistDetailIntent : Intent {
     data object OnConfirmDeleteChecklist : ChecklistDetailIntent
     data object OnDismissDeleteConfirmation : ChecklistDetailIntent
 
+    /**
+     * Deletes the checklist directly from the [ChecklistDetailState.NotFound] error screen.
+     * Used to recover from a broken/partially-restored checklist that can't be opened (no
+     * default fill), so the normal in-screen delete is unreachable. Resolves by [checklistId]
+     * (the VM constructor param) rather than [ChecklistDetailState.Content.checklist], which
+     * doesn't exist in the NotFound state.
+     */
+    data object OnDeleteCorruptedChecklist : ChecklistDetailIntent
+
     // Item actions (for default fill) — id-based for safe partition support
     data class OnItemCheckedChange(val itemId: String, val checked: Boolean) : ChecklistDetailIntent
     data class OnAddNoteClick(val itemId: String) : ChecklistDetailIntent

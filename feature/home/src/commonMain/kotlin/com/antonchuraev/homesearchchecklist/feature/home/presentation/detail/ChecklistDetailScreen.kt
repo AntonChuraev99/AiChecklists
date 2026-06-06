@@ -144,6 +144,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonDestructive
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonText
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.ChecklistDetailBottomBar
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.FillOptionsSheet
@@ -230,7 +231,8 @@ fun ChecklistDetailScreen(
     when (val currentState = state) {
         ChecklistDetailState.Loading -> LoadingContent()
         ChecklistDetailState.NotFound -> NotFoundContent(
-            onBack = { viewModel.sendIntent(ChecklistDetailIntent.OnBackClick) }
+            onBack = { viewModel.sendIntent(ChecklistDetailIntent.OnBackClick) },
+            onDelete = { viewModel.sendIntent(ChecklistDetailIntent.OnDeleteCorruptedChecklist) },
         )
         is ChecklistDetailState.Content -> ChecklistDetailContent(
             state = currentState,
@@ -261,21 +263,71 @@ private fun LoadingContent() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun NotFoundContent(onBack: () -> Unit) {
+private fun NotFoundContent(
+    onBack: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    // Local UI flag — the NotFound state carries no fields, and a one-shot confirm here
+    // needs no ViewModel round-trip (the delete itself goes through an intent).
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
     AppScaffold(
         title = stringResource(Res.string.error),
         onBackButtonClick = onBack
     ) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = AppDimens.ScreenPaddingHorizontal),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
                 text = stringResource(Res.string.checklist_not_found),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
+            Text(
+                text = stringResource(Res.string.checklist_not_found_description),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(modifier = Modifier.height(AppDimens.SpacingXl))
+            AppButtonDestructive(
+                text = stringResource(Res.string.delete_checklist),
+                onClick = { showDeleteConfirm = true },
             )
         }
+    }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text(stringResource(Res.string.checklist_delete_title)) },
+            text = { Text(stringResource(Res.string.checklist_not_found_delete_message)) },
+            confirmButton = {
+                AppButton(
+                    text = stringResource(Res.string.delete),
+                    onClick = {
+                        showDeleteConfirm = false
+                        onDelete()
+                    }
+                )
+            },
+            dismissButton = {
+                AppButtonText(
+                    text = stringResource(Res.string.cancel),
+                    onClick = { showDeleteConfirm = false }
+                )
+            },
+            containerColor = MaterialTheme.colorScheme.surface,
+            shape = MaterialTheme.shapes.large
+        )
     }
 }
 

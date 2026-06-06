@@ -110,6 +110,7 @@
     <string name="main_title">My Checklists</string>
     <string name="main_empty_title">Ready to get organized?</string>
     <string name="main_empty_description">Create your first checklist or let AI build one from any text, photo, or document.</string>
+    <string name="main_empty_cta">Create checklist</string>
     <string name="main_create_checklist">Create Checklist</string>
     <string name="main_create_checklist_locked">Become Premium to Unlock More</string>
     <string name="main_create_checklist_action">New checklist</string>
@@ -165,6 +166,7 @@
     <string name="create_item_name_label">Item text</string>
     <string name="create_edit_item">Edit item</string>
     <string name="create_confirm_item_edit">Save item edit</string>
+    <string name="create_choose_template">Choose from template</string>
 
     <!-- Templates Screen -->
     <string name="templates_title">Templates</string>
@@ -275,6 +277,8 @@
 
     <!-- Checklist Detail Screen -->
     <string name="checklist_not_found">Checklist not found</string>
+    <string name="checklist_not_found_description">This checklist couldn't be opened — it may be incomplete or corrupted. You can delete it to remove it from your list.</string>
+    <string name="checklist_not_found_delete_message">Delete this checklist? This can't be undone.</string>
     <string name="checklist_edit_title">Edit Checklist</string>
     <string name="checklist_edit">Edit</string>
     <string name="checklist_progress">Progress</string>
@@ -1167,4 +1171,10 @@
     <string name="chat_panel_collapse">Collapse chat</string>
     <string name="chat_panel_greeting">Hi! I'm Gisti. Ask me anything about your lists.</string>
     <string name="chat_panel_scrim_description">Tap to close chat</string>
+
+    <!-- First checklist (A/B auto-create) -->
+    <string name="first_checklist_title">Your first checklist</string>
+    <string name="first_checklist_item_1">Tap the circle to check off an item</string>
+    <string name="first_checklist_item_2">Tap any item to edit it</string>
+    <string name="first_checklist_item_3">Use the + button to add your own</string>
 </resources>

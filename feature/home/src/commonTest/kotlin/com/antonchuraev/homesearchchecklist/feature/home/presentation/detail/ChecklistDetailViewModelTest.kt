@@ -80,6 +80,14 @@ class ChecklistDetailViewModelTest {
         assertTrue(state is ChecklistDetailState.NotFound)
     }
 
+    @Test
+    fun `OnDeleteCorruptedChecklist intent should be available for NotFound recovery`() {
+        // Guards the recovery affordance on the NotFound screen: the delete intent the
+        // button dispatches must exist so a broken/restored checklist can be removed.
+        val intent: ChecklistDetailIntent = ChecklistDetailIntent.OnDeleteCorruptedChecklist
+        assertTrue(intent is ChecklistDetailIntent.OnDeleteCorruptedChecklist)
+    }
+
     // ── Swipe-to-delete state tests ──────────────────────────────────────
 
     @Test

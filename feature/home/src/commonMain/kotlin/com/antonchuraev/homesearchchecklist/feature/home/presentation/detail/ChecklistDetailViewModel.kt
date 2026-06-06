@@ -197,6 +197,7 @@ class ChecklistDetailViewModel(
             ChecklistDetailIntent.OnDeleteChecklistClick -> updateContentState { it.copy(showDeleteConfirmation = true) }
             ChecklistDetailIntent.OnConfirmDeleteChecklist -> deleteChecklist()
             ChecklistDetailIntent.OnDismissDeleteConfirmation -> updateContentState { it.copy(showDeleteConfirmation = false) }
+            ChecklistDetailIntent.OnDeleteCorruptedChecklist -> deleteCorruptedChecklist()
             is ChecklistDetailIntent.OnItemCheckedChange -> updateItemChecked(intent.itemId, intent.checked)
             is ChecklistDetailIntent.OnAddNoteClick -> openNoteDialog(intent.itemId)
             is ChecklistDetailIntent.OnItemInputChanged -> handleItemInputChanged(intent.text)
@@ -898,6 +899,39 @@ class ChecklistDetailViewModel(
                 "checklist_id" to state.checklist.id.toString(),
                 "item_count" to (state.defaultFill?.items?.size ?: 0).toString(),
                 "source" to "overflow_menu"
+            ))
+            navigator.onBack()
+        }
+    }
+
+    /**
+     * Deletes a checklist straight from the [ChecklistDetailState.NotFound] error screen.
+     *
+     * Unlike [deleteChecklist] this does NOT require a loaded [ChecklistDetailState.Content] —
+     * a broken checklist (e.g. a restored row whose default fill never synced) never reaches
+     * Content, so its delete action would otherwise be unreachable. We resolve the row by
+     * [checklistId] and reuse the normal soft-delete path, so the deletion is marked
+     * PENDING_DELETE and later propagates to Firestore as a tombstone; a raw DAO delete here
+     * would let the checklist be resurrected on the next pull. If the template row itself is
+     * already gone there is nothing to soft-delete — we still cancel alarms and navigate back.
+     */
+    private fun deleteCorruptedChecklist() {
+        loadDataJob?.cancel()
+        viewModelScope.launch {
+            // Best-effort: a broken row may still have alarms scheduled against its id.
+            reminderScheduler.cancelReminder(checklistId)
+            reminderScheduler.cancelRepeat(checklistId)
+
+            val checklist = repository.getChecklistById(checklistId)
+            if (checklist != null) {
+                repository.deleteChecklist(checklist)
+            }
+            analyticsTracker.event("checklist_deleted", mapOf(
+                "checklist_id" to checklistId.toString(),
+                "source" to "not_found_screen",
+                // false surfaces the rare "template row already gone" case (possible orphaned
+                // fills) without adding an AppLogger dependency to this VM.
+                "template_found" to (checklist != null).toString()
             ))
             navigator.onBack()
         }
