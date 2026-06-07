@@ -410,6 +410,7 @@
     <string name="paywall_days_free">%1$d-дневный пробный период</string>
     <string name="paywall_go_premium">Перейти на Премиум</string>
     <string name="paywall_then_price">затем %1$s / месяц</string>
+    <string name="paywall_price_per_month">%1$s / месяц</string>
     <string name="paywall_start_free_trial">Начать бесплатный период</string>
     <string name="paywall_subscribe_now">Подписаться сейчас</string>
     <string name="paywall_retry">Попробовать снова</string>
@@ -895,6 +896,13 @@
          восстановить «Автопродление. » между %1$s/год. и Отмена. -->
     <string name="paywall_v1_cta_sub_yearly">Затем %1$s/год. Отмена в любое время.</string>
     <string name="paywall_v1_cta_sub_monthly">Затем %1$s/месяц. Отмена в любое время.</string>
+
+    <!-- No-trial variants (used when the selected offering has no free trial) -->
+    <string name="paywall_v1_timeline_headline_no_trial">Откройте Gisti Про.</string>
+    <string name="paywall_v1_features_headline_no_trial">Всё от Про,\nбез ограничений.</string>
+    <string name="paywall_v1_compare_body_no_trial">Одинаковые ИИ-инструменты — Про снимает ограничения.</string>
+    <string name="paywall_v1_cta_sub_yearly_no_trial">%1$s/год. Отмена в любое время.</string>
+    <string name="paywall_v1_cta_sub_monthly_no_trial">%1$s/месяц. Отмена в любое время.</string>
 
     <!-- Еженедельный режим («Моя неделя») -->
     <string name="templates_create_weekly">Моя неделя</string>

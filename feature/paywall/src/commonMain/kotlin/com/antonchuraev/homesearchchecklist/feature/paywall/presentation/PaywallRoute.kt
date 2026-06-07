@@ -137,15 +137,24 @@ fun PaywallRoute(
         monthlyEquivalent(yearlyProduct.priceString, yearlyProduct.priceAmount)
     } else PaywallUiState().yearlyMonthly
 
+    // Real trial length from RevenueCat — 0 means this offering has no free trial
+    // (e.g. the *NoTrial offering, whose products carry no introductoryDiscount).
+    val resolvedTrialDays = yearlyProduct?.freeTrialDays?.takeIf { it > 0 }
+        ?: monthlyProduct?.freeTrialDays?.takeIf { it > 0 }
+        ?: 0
+    // While products are still loading (empty), optimistically assume a trial so the
+    // common (trial) offering doesn't flash no-trial copy first. Once products are
+    // loaded, reflect their real trial state — driving trial vs no-trial UI copy.
+    val hasFreeTrial = state.products.isEmpty() || resolvedTrialDays > 0
+
     val uiState = PaywallUiState(
         selectedPlan  = state.selectedPlan,
         variant       = state.variant,
         yearlyPrice   = yearlyProduct?.priceString  ?: PaywallUiState().yearlyPrice,
         yearlyMonthly = yearlyMonthlyEq,
         monthlyPrice  = monthlyProduct?.priceString ?: PaywallUiState().monthlyPrice,
-        trialDays     = yearlyProduct?.freeTrialDays?.takeIf { it > 0 }
-            ?: monthlyProduct?.freeTrialDays?.takeIf { it > 0 }
-            ?: PaywallConfig.DEFAULT_FREE_TRIAL_DAYS,
+        trialDays     = resolvedTrialDays.takeIf { it > 0 } ?: PaywallConfig.DEFAULT_FREE_TRIAL_DAYS,
+        hasFreeTrial  = hasFreeTrial,
         yearlySavings = yearlySavings ?: PaywallUiState().yearlySavings,
     )
 

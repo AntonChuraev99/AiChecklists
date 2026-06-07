@@ -5,6 +5,7 @@ import aichecklists.core.designsystem.generated.resources.paywall_start_free_tri
 import aichecklists.core.designsystem.generated.resources.paywall_subscribe_now
 import aichecklists.core.designsystem.generated.resources.paywall_days_free
 import aichecklists.core.designsystem.generated.resources.paywall_then_price
+import aichecklists.core.designsystem.generated.resources.paywall_price_per_month
 import aichecklists.core.designsystem.generated.resources.paywall_auto_renew_notice
 import aichecklists.core.designsystem.generated.resources.paywall_terms
 import aichecklists.core.designsystem.generated.resources.paywall_privacy
@@ -136,7 +137,10 @@ fun PaywallStep(
                 Spacer(modifier = Modifier.height(4.dp))
             }
             Text(
-                text = stringResource(Res.string.paywall_then_price, product.priceString),
+                text = if (product.hasFreeTrial)
+                    stringResource(Res.string.paywall_then_price, product.priceString)
+                else
+                    stringResource(Res.string.paywall_price_per_month, product.priceString),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

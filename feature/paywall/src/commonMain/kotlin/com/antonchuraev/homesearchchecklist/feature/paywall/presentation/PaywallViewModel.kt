@@ -10,7 +10,6 @@ import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDefaults
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigKeys
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
-import com.antonchuraev.homesearchchecklist.feature.paywall.data.PaywallConfig
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.ConversionEventHelper
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.getDeviceCountry
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.getPlayStoreVersion
@@ -157,7 +156,7 @@ class PaywallViewModel(
 
             getOfferingsUseCase()
                 .onSuccess { offering ->
-                    var products = offering?.products ?: emptyList()
+                    val products = offering?.products ?: emptyList()
 
                     // Capture analytics context from successful offering load.
                     analyticsContext = PurchaseAnalyticsContext(
@@ -180,18 +179,12 @@ class PaywallViewModel(
                         return@launch
                     }
 
-                    // Apply default free trial if RevenueCat didn't return trial info
-                    products = products.map { product ->
-                        if (!product.hasFreeTrial && product.freeTrialDays == 0) {
-                            product.copy(
-                                hasFreeTrial = true,
-                                freeTrialDays = PaywallConfig.DEFAULT_FREE_TRIAL_DAYS
-                            )
-                        } else {
-                            product
-                        }
-                    }
-
+                    // Trust RevenueCat's trial data — do NOT fabricate a trial. A product
+                    // without an introductoryDiscount genuinely has no free trial (e.g. the
+                    // *NoTrial offering); showing trial copy for it would be deceptive
+                    // (Google Play policy) and simply wrong. The UI selects trial vs
+                    // no-trial copy via PaywallUiState.hasFreeTrial, derived from real
+                    // freeTrialDays in PaywallRoute.
                     val defaultSelected = products.find { it.isPopular }?.id
                         ?: products.firstOrNull()?.id
 

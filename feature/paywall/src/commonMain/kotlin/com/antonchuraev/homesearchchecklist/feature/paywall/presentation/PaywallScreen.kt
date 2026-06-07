@@ -76,6 +76,12 @@ import aichecklists.core.designsystem.generated.resources.paywall_v1_compare_val
 import aichecklists.core.designsystem.generated.resources.paywall_v1_cta_sub_monthly
 import aichecklists.core.designsystem.generated.resources.paywall_v1_cta_sub_yearly
 import aichecklists.core.designsystem.generated.resources.paywall_v1_cta_start_trial
+import aichecklists.core.designsystem.generated.resources.paywall_v1_cta_sub_yearly_no_trial
+import aichecklists.core.designsystem.generated.resources.paywall_v1_cta_sub_monthly_no_trial
+import aichecklists.core.designsystem.generated.resources.paywall_v1_timeline_headline_no_trial
+import aichecklists.core.designsystem.generated.resources.paywall_v1_features_headline_no_trial
+import aichecklists.core.designsystem.generated.resources.paywall_v1_compare_body_no_trial
+import aichecklists.core.designsystem.generated.resources.paywall_subscribe_now
 import aichecklists.core.designsystem.generated.resources.paywall_v1_feature_ai_runs_body
 import aichecklists.core.designsystem.generated.resources.paywall_v1_feature_ai_runs_title
 import aichecklists.core.designsystem.generated.resources.paywall_v1_feature_unlimited_fills_body
@@ -191,11 +197,20 @@ internal fun PaywallScreen(
         },
         bottomBar = {
             val ctaSub = when (state.selectedPlan) {
-                PaywallPlan.Yearly  -> stringResource(Res.string.paywall_v1_cta_sub_yearly, state.yearlyPrice)
-                PaywallPlan.Monthly -> stringResource(Res.string.paywall_v1_cta_sub_monthly, state.monthlyPrice)
+                PaywallPlan.Yearly  -> if (state.hasFreeTrial)
+                    stringResource(Res.string.paywall_v1_cta_sub_yearly, state.yearlyPrice)
+                else
+                    stringResource(Res.string.paywall_v1_cta_sub_yearly_no_trial, state.yearlyPrice)
+                PaywallPlan.Monthly -> if (state.hasFreeTrial)
+                    stringResource(Res.string.paywall_v1_cta_sub_monthly, state.monthlyPrice)
+                else
+                    stringResource(Res.string.paywall_v1_cta_sub_monthly_no_trial, state.monthlyPrice)
             }
             StickyCta(
-                ctaLabel = stringResource(Res.string.paywall_v1_cta_start_trial, state.trialDays),
+                ctaLabel = if (state.hasFreeTrial)
+                    stringResource(Res.string.paywall_v1_cta_start_trial, state.trialDays)
+                else
+                    stringResource(Res.string.paywall_subscribe_now),
                 sub = ctaSub,
                 loading = isPurchasing,
                 // Keep the CTA bright (not greyed) while its OWN purchase spins, so the white
@@ -369,34 +384,39 @@ private fun TimelineBody(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Surface(
-            shape = RoundedCornerShape(999.dp),
-            color = cs.tertiaryContainer,
-        ) {
-            Row(
-                modifier = Modifier.padding(
-                    horizontal = AppDimens.SpacingMd,
-                    vertical = AppDimens.SpacingXs,
-                ),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+        if (state.hasFreeTrial) {
+            Surface(
+                shape = RoundedCornerShape(999.dp),
+                color = cs.tertiaryContainer,
             ) {
-                Icon(
-                    Icons.Filled.Bolt,
-                    contentDescription = null,
-                    tint = cs.tertiary,
-                    modifier = Modifier.size(14.dp),
-                )
-                Text(
-                    stringResource(Res.string.paywall_v1_timeline_days_free, state.trialDays),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = cs.tertiary,
-                )
+                Row(
+                    modifier = Modifier.padding(
+                        horizontal = AppDimens.SpacingMd,
+                        vertical = AppDimens.SpacingXs,
+                    ),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Icon(
+                        Icons.Filled.Bolt,
+                        contentDescription = null,
+                        tint = cs.tertiary,
+                        modifier = Modifier.size(14.dp),
+                    )
+                    Text(
+                        stringResource(Res.string.paywall_v1_timeline_days_free, state.trialDays),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = cs.tertiary,
+                    )
+                }
             }
+            Spacer(Modifier.height(AppDimens.SpacingMd))
         }
-        Spacer(Modifier.height(AppDimens.SpacingMd))
         Text(
-            text = stringResource(Res.string.paywall_v1_timeline_headline),
+            text = if (state.hasFreeTrial)
+                stringResource(Res.string.paywall_v1_timeline_headline)
+            else
+                stringResource(Res.string.paywall_v1_timeline_headline_no_trial),
             style = MaterialTheme.typography.headlineMedium,
             color = cs.onSurface,
             textAlign = TextAlign.Center,
@@ -412,18 +432,20 @@ private fun TimelineBody(
     }
     Spacer(Modifier.height(AppDimens.SpacingXl))
 
-    AppCard {
-        Column {
-            Text(
-                text = stringResource(Res.string.paywall_v1_how_trial_works),
-                style = MaterialTheme.typography.titleSmall,
-                color = cs.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(AppDimens.SpacingMd))
-            PaywallTrialTimeline()
+    if (state.hasFreeTrial) {
+        AppCard {
+            Column {
+                Text(
+                    text = stringResource(Res.string.paywall_v1_how_trial_works),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = cs.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(AppDimens.SpacingMd))
+                PaywallTrialTimeline()
+            }
         }
+        Spacer(Modifier.height(AppDimens.SpacingLg))
     }
-    Spacer(Modifier.height(AppDimens.SpacingLg))
 
     PlansBlock(state, onPlanSelected)
 }
@@ -445,7 +467,10 @@ private fun FeaturesBody(
         if (showHero) HeroIllustration()
         Spacer(Modifier.height(AppDimens.SpacingSm))
         Text(
-            text = stringResource(Res.string.paywall_v1_features_headline, state.trialDays),
+            text = if (state.hasFreeTrial)
+                stringResource(Res.string.paywall_v1_features_headline, state.trialDays)
+            else
+                stringResource(Res.string.paywall_v1_features_headline_no_trial),
             style = MaterialTheme.typography.headlineMedium,
             color = cs.onSurface,
             textAlign = TextAlign.Center,
@@ -546,7 +571,10 @@ private fun CompareBody(
     )
     Spacer(Modifier.height(AppDimens.SpacingSm))
     Text(
-        text = stringResource(Res.string.paywall_v1_compare_body, state.trialDays),
+        text = if (state.hasFreeTrial)
+            stringResource(Res.string.paywall_v1_compare_body, state.trialDays)
+        else
+            stringResource(Res.string.paywall_v1_compare_body_no_trial),
         style = MaterialTheme.typography.bodyMedium,
         color = cs.onSurfaceVariant,
     )

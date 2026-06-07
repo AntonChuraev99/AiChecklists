@@ -38,6 +38,9 @@ data class PaywallUiState(
     val yearlySavings: String?     = "Save 16%",
     val monthlyPrice: String       = "$1.99",
     val trialDays: Int             = 3,
+    /** Whether the selected offering actually grants a free trial. Drives trial vs
+     *  no-trial copy (CTA, headlines, timeline). Computed from RevenueCat product data. */
+    val hasFreeTrial: Boolean      = true,
     val ctaSubtext: String         = "Then $20/year. Cancel anytime.",
     val selectedPlan: PaywallPlan  = PaywallPlan.Monthly,
     val variant: PaywallVariant    = PaywallVariant.Timeline,

@@ -428,6 +428,7 @@
     <string name="paywall_days_free">%1$d-Day Free Trial</string>
     <string name="paywall_go_premium">Go Premium</string>
     <string name="paywall_then_price">then %1$s / month</string>
+    <string name="paywall_price_per_month">%1$s / month</string>
     <string name="paywall_start_free_trial">Start Free Trial</string>
     <string name="paywall_subscribe_now">Subscribe Now</string>
     <string name="paywall_retry">Try Again</string>
@@ -946,6 +947,13 @@
          restore "Auto-renews. " between %1$s/year. and Cancel. -->
     <string name="paywall_v1_cta_sub_yearly">Then %1$s/year. Cancel anytime.</string>
     <string name="paywall_v1_cta_sub_monthly">Then %1$s/month. Cancel anytime.</string>
+
+    <!-- No-trial variants (used when the selected offering has no free trial) -->
+    <string name="paywall_v1_timeline_headline_no_trial">Unlock Gisti Pro.</string>
+    <string name="paywall_v1_features_headline_no_trial">Everything Pro,\nunlocked.</string>
+    <string name="paywall_v1_compare_body_no_trial">Same AI tools — Pro removes the limits.</string>
+    <string name="paywall_v1_cta_sub_yearly_no_trial">%1$s/year. Cancel anytime.</string>
+    <string name="paywall_v1_cta_sub_monthly_no_trial">%1$s/month. Cancel anytime.</string>
 
     <!-- Weekly mode ("My Week" checklist view) -->
     <string name="templates_create_weekly">My Week</string>
