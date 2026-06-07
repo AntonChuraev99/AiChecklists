@@ -23,6 +23,7 @@ import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.first_checklist_item_1
 import aichecklists.core.designsystem.generated.resources.first_checklist_item_2
 import aichecklists.core.designsystem.generated.resources.first_checklist_item_3
+import aichecklists.core.designsystem.generated.resources.first_checklist_item_4
 import aichecklists.core.designsystem.generated.resources.first_checklist_title
 import org.jetbrains.compose.resources.getString
 import kotlinx.coroutines.CoroutineScope
@@ -221,6 +222,7 @@ class SplashViewModel(
             ChecklistItem(text = getString(Res.string.first_checklist_item_1)),
             ChecklistItem(text = getString(Res.string.first_checklist_item_2)),
             ChecklistItem(text = getString(Res.string.first_checklist_item_3)),
+            ChecklistItem(text = getString(Res.string.first_checklist_item_4)),
         ),
     )
 

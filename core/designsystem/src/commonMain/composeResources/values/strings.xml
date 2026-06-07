@@ -1188,4 +1188,5 @@
     <string name="first_checklist_item_1">Tap the circle to check off an item</string>
     <string name="first_checklist_item_2">Tap any item to edit it</string>
     <string name="first_checklist_item_3">Use the + button to add your own</string>
+    <string name="first_checklist_item_4">Meet your AI assistant — the chat bar at the bottom of the screen. Ask in plain words to add items, set reminders, or build a whole checklist (try «add milk» or «remind me Friday at 6pm»), or tap the mic to speak.</string>
 </resources>
