@@ -25,8 +25,8 @@ android {
         applicationId = "com.antonchuraev.aichecklists"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 46
-        versionName = "1.16.3"
+        versionCode = 47
+        versionName = "1.16.4"
 
         testInstrumentationRunner = "com.antonchuraev.aichecklists.TestRunner"
 
