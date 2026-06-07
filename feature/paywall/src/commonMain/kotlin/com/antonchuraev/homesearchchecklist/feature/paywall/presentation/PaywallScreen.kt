@@ -79,6 +79,7 @@ import aichecklists.core.designsystem.generated.resources.paywall_v1_cta_start_t
 import aichecklists.core.designsystem.generated.resources.paywall_v1_cta_sub_yearly_no_trial
 import aichecklists.core.designsystem.generated.resources.paywall_v1_cta_sub_monthly_no_trial
 import aichecklists.core.designsystem.generated.resources.paywall_v1_timeline_headline_no_trial
+import aichecklists.core.designsystem.generated.resources.paywall_v1_pro_benefits
 import aichecklists.core.designsystem.generated.resources.paywall_v1_features_headline_no_trial
 import aichecklists.core.designsystem.generated.resources.paywall_v1_compare_body_no_trial
 import aichecklists.core.designsystem.generated.resources.paywall_subscribe_now
@@ -442,6 +443,40 @@ private fun TimelineBody(
                 )
                 Spacer(Modifier.height(AppDimens.SpacingMd))
                 PaywallTrialTimeline()
+            }
+        }
+        Spacer(Modifier.height(AppDimens.SpacingLg))
+    } else {
+        // No trial on this offering — a "how your trial works" timeline makes no sense,
+        // so show a Pro-benefits card instead. Keeps the Timeline variant from looking
+        // empty in no-trial mode (its only card used to be the trial timeline).
+        AppCard {
+            Column(verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)) {
+                Text(
+                    text = stringResource(Res.string.paywall_v1_pro_benefits),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = cs.onSurfaceVariant,
+                )
+                FeatureRow(
+                    icon = Icons.Filled.Bolt,
+                    title = stringResource(Res.string.paywall_v1_feature_ai_runs_title),
+                    body = stringResource(Res.string.paywall_v1_feature_ai_runs_body),
+                )
+                FeatureRow(
+                    icon = Icons.Filled.Checklist,
+                    title = stringResource(Res.string.paywall_v1_feature_unlimited_lists_title),
+                    body = stringResource(Res.string.paywall_v1_feature_unlimited_lists_body),
+                )
+                FeatureRow(
+                    icon = Icons.Filled.ContentCopy,
+                    title = stringResource(Res.string.paywall_v1_feature_unlimited_fills_title),
+                    body = stringResource(Res.string.paywall_v1_feature_unlimited_fills_body),
+                )
+                FeatureRow(
+                    icon = Icons.Filled.NotificationsActive,
+                    title = stringResource(Res.string.paywall_v1_feature_unlimited_reminders_title),
+                    body = stringResource(Res.string.paywall_v1_feature_unlimited_reminders_body),
+                )
             }
         }
         Spacer(Modifier.height(AppDimens.SpacingLg))

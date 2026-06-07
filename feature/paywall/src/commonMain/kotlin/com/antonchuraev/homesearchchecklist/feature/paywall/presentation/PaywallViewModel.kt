@@ -40,7 +40,8 @@ class PaywallViewModel(
     private val analyticsTracker: AnalyticsTracker,
     private val remoteConfigProvider: RemoteConfigProvider,
     private val logger: AppLogger? = null,
-    sourceOverride: String? = null
+    sourceOverride: String? = null,
+    forceVariantOverride: String? = null
 ) : AppViewModel<PaywallState, PaywallIntent, Nothing>() {
 
     private val source: String = sourceOverride
@@ -83,8 +84,14 @@ class PaywallViewModel(
     }
 
     init {
-        // Resolve variant: forceVariant nav-arg takes priority over Remote Config
-        val forceVariant = savedStateHandle[AppNavRoute.Paywall::forceVariant.name] as? String
+        // Resolve variant: forceVariant nav-arg takes priority over Remote Config.
+        // It MUST arrive via the constructor (Koin parametersOf) — reading it from
+        // savedStateHandle is unreliable in Navigation 3 alpha (returns null ~58% of
+        // opens), which silently dropped the debug variant override so every debug
+        // variant button fell back to the Remote Config variant. savedStateHandle stays
+        // as a last-resort fallback only.
+        val forceVariant = forceVariantOverride
+            ?: savedStateHandle[AppNavRoute.Paywall::forceVariant.name] as? String
         val rcVariant = remoteConfigProvider.getString(
             key = RemoteConfigKeys.PAYWALL_VARIANT,
             defaultValue = RemoteConfigDefaults.PAYWALL_VARIANT,

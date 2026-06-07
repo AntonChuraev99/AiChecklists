@@ -60,6 +60,7 @@ private fun monthlyEquivalent(yearlyPriceString: String, yearlyPriceAmount: Doub
 @Composable
 fun PaywallRoute(
     sourceOverride: String? = null,
+    forceVariant: String? = null,
     onPurchaseSuccess: () -> Unit = {},
 ) {
     val analyticsTracker: AnalyticsTracker = koinInject()
@@ -94,7 +95,7 @@ fun PaywallRoute(
 
     LaunchedEffect(Unit) { analyticsTracker.screenView("paywall") }
 
-    val viewModel: PaywallViewModel = koinViewModel(key = "paywall_$sourceOverride") { parametersOf(sourceOverride) }
+    val viewModel: PaywallViewModel = koinViewModel(key = "paywall_${sourceOverride}_$forceVariant") { parametersOf(sourceOverride, forceVariant) }
     val state by viewModel.screenState.collectAsStateWithLifecycle()
 
     // Navigate away on purchase success (handled by ViewModel in Phase 2)

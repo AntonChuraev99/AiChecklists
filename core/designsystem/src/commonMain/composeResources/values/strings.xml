@@ -950,6 +950,7 @@
 
     <!-- No-trial variants (used when the selected offering has no free trial) -->
     <string name="paywall_v1_timeline_headline_no_trial">Unlock Gisti Pro.</string>
+    <string name="paywall_v1_pro_benefits">WHAT YOU GET</string>
     <string name="paywall_v1_features_headline_no_trial">Everything Pro,\nunlocked.</string>
     <string name="paywall_v1_compare_body_no_trial">Same AI tools — Pro removes the limits.</string>
     <string name="paywall_v1_cta_sub_yearly_no_trial">%1$s/year. Cancel anytime.</string>

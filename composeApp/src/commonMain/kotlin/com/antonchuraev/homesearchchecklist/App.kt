@@ -915,7 +915,7 @@ fun App() {
                     }
 
                     entry<AppNavRoute.Paywall> { route ->
-                        PaywallRoute(sourceOverride = route.source)
+                        PaywallRoute(sourceOverride = route.source, forceVariant = route.forceVariant)
                     }
 
                     entry<AppNavRoute.SubscriptionStatus> { route ->

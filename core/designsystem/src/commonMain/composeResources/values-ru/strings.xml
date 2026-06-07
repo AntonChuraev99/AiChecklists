@@ -899,6 +899,7 @@
 
     <!-- No-trial variants (used when the selected offering has no free trial) -->
     <string name="paywall_v1_timeline_headline_no_trial">Откройте Gisti Про.</string>
+    <string name="paywall_v1_pro_benefits">ЧТО ВЫ ПОЛУЧАЕТЕ</string>
     <string name="paywall_v1_features_headline_no_trial">Всё от Про,\nбез ограничений.</string>
     <string name="paywall_v1_compare_body_no_trial">Одинаковые ИИ-инструменты — Про снимает ограничения.</string>
     <string name="paywall_v1_cta_sub_yearly_no_trial">%1$s/год. Отмена в любое время.</string>

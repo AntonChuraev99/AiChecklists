@@ -43,7 +43,10 @@ val paywallFeatureModule = module {
             analyticsTracker = get(),
             remoteConfigProvider = get(),
             logger = getOrNull(),
-            sourceOverride = params.getOrNull<String>()
+            // Positional access: params[0]=source, params[1]=forceVariant. Both forwarded
+            // explicitly from PaywallRoute (Nav3 savedStateHandle is unreliable).
+            sourceOverride = params.values.getOrNull(0) as? String,
+            forceVariantOverride = params.values.getOrNull(1) as? String,
         )
     }
     viewModelOf(::SubscriptionStatusViewModel)
