@@ -10,6 +10,9 @@ import com.antonchuraev.homesearchchecklist.feature.create.domain.model.Checklis
 import com.antonchuraev.homesearchchecklist.feature.create.domain.repository.TemplatesRepository
 import com.antonchuraev.homesearchchecklist.feature.create.domain.usecase.CreateWeeklyChecklistUseCase
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetUserLimitsUseCase
+import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.*
+import org.jetbrains.compose.resources.getString
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -145,7 +148,7 @@ class TemplatesViewModel(
                 appNavigator.navigateToChecklistDetail(checklistId, clearBackStack = true)
             } catch (e: Exception) {
                 _screenState.update {
-                    it.copy(isCreating = false, error = e.message ?: "Failed to create checklist")
+                    it.copy(isCreating = false, error = e.message ?: getString(Res.string.error_create_checklist_failed))
                 }
             }
         }
@@ -153,7 +156,7 @@ class TemplatesViewModel(
 
     private fun handleCreateWeeklyClick() {
         viewModelScope.launch {
-            when (val result = createWeeklyChecklistUseCase()) {
+            when (val result = createWeeklyChecklistUseCase(getString(Res.string.weekly_checklist_default_name))) {
                 is CreateWeeklyChecklistUseCase.Result.Created ->
                     appNavigator.navigateToChecklistDetail(result.checklistId, clearBackStack = true)
                 CreateWeeklyChecklistUseCase.Result.RequiresUpgrade ->

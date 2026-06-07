@@ -5,6 +5,9 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
+import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.*
+import org.jetbrains.compose.resources.getString
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -143,7 +146,9 @@ class FillDetailViewModel(
         if (state is FillDetailState.Content) {
             val name = state.editingName.trim()
             if (name.isEmpty()) {
-                _screenState.value = state.copy(editingNameError = "Введите название")
+                viewModelScope.launch {
+                    _screenState.value = state.copy(editingNameError = getString(Res.string.fill_error_name_required))
+                }
                 return
             }
 

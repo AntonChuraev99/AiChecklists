@@ -8,6 +8,9 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Check
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetUserLimitsUseCase
+import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.*
+import org.jetbrains.compose.resources.getString
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -144,7 +147,9 @@ class CreateChecklistViewModel(
         val latestState = _screenState.value
 
         if (latestState.name.isBlank()) {
-            _screenState.update { it.copy(nameError = "Введите название чек-листа") }
+            viewModelScope.launch {
+                _screenState.update { it.copy(nameError = getString(Res.string.create_error_name_required)) }
+            }
             return
         }
 

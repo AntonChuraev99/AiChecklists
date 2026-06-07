@@ -31,6 +31,8 @@ Repo is **private** (was public until a 2026-05-24 Gemini key leak). Old leaked 
 
 All code comments, docs, commit messages in **English**. Marketing/store/onboarding copy: **English only** — RU localization only on explicit request or when fixing existing RU strings. Commit style: Conventional Commits (skill `git-commit-conventions`).
 
+**No hardcoded user-facing strings (recurring bug, 2026-06-07):** every user-visible string MUST come from `core/designsystem` `strings.xml` — `stringResource(Res.string.x)` in a `@Composable`, `getString(Res.string.x)` (suspend) in a ViewModel/coroutine. **Never** a string literal in Kotlin: a literal hardcodes one language (this bug shipped the Russian error "Введите название чек-листа" on the English UI). Applies equally to **default names** ("New Checklist", "AI Fill") and error/snackbar text. `getString` is `suspend` — wrap a non-coroutine call site in `viewModelScope.launch { }`. The **domain layer** (UseCase) must NOT touch Compose Resources — pass the resolved string in as a parameter from presentation. NOT user-facing, leave as literals: parser lexicons (`RuIntentLexicon`, `RuDateLexicon`), regex, log tags, analytics event keys. Details: rule `compose-resources-kmp`.
+
 **Strings escaping (recurring bug):** in `composeResources/**/strings.xml` write apostrophes & quotes **literally** (`can't`, `"quoted"`) — **never** Android-style `\'`. Compose Resources is parsed by `org.jetbrains.compose.resources`, not AAPT: `\'` renders the backslash on screen as `can\'t`. Only `\n` / `\t` / `\uXXXX` are real escapes; XML metachars use `&amp;` / `&lt;` / `&gt;`. Match existing strings (`don't`, `What's`, `You've`). Details: rule `compose-resources-kmp`.
 
 ## Build Commands

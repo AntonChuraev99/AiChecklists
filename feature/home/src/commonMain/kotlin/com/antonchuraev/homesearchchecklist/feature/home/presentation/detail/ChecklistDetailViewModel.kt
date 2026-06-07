@@ -25,6 +25,9 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.combin
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.resolvePresetName
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.UserLimits
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetUserLimitsUseCase
+import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.*
+import org.jetbrains.compose.resources.getString
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlinx.coroutines.Job
@@ -854,7 +857,9 @@ class ChecklistDetailViewModel(
 
         val name = state.newFillName.trim()
         if (name.isEmpty()) {
-            updateContentState { it.copy(fillNameError = "Введите название") }
+            viewModelScope.launch {
+                updateContentState { it.copy(fillNameError = getString(Res.string.fill_error_name_required)) }
+            }
             return
         }
 

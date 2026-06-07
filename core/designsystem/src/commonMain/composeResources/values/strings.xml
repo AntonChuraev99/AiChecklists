@@ -456,6 +456,17 @@
     <string name="error_template_not_found">Template not found</string>
     <string name="error_template_load_failed">Failed to load template</string>
     <string name="error_fill_not_found">Default fill not found</string>
+    <string name="error_save_failed">Failed to save</string>
+    <string name="error_create_fill_failed">Failed to create fill</string>
+    <!-- Validation errors (used in ViewModels via getString) -->
+    <string name="create_error_name_required">Enter a checklist name</string>
+    <string name="fill_error_name_required">Enter a name</string>
+    <string name="analyze_error_select_checklist">Select a checklist</string>
+    <string name="analyze_error_analysis_failed">Failed to analyze</string>
+    <!-- Default names (used in ViewModels via getString) -->
+    <string name="default_checklist_name">New Checklist</string>
+    <string name="default_fill_name">AI Fill</string>
+    <string name="weekly_checklist_default_name">My Week</string>
 
     <!-- Share Screen -->
     <string name="share">Share</string>

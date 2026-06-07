@@ -15,11 +15,16 @@ class CreateWeeklyChecklistUseCase(
         data object RequiresUpgrade : Result
     }
 
-    suspend operator fun invoke(): Result {
+    /**
+     * Creates a weekly-mode checklist named [name]. The caller resolves the localized
+     * default name via getString, keeping Compose Resources out of the domain layer.
+     * Returns [Result.RequiresUpgrade] for free users already at the weekly limit.
+     */
+    suspend operator fun invoke(name: String): Result {
         val limits = getUserLimitsUseCase().first()
         if (!limits.canCreateWeeklyChecklist) return Result.RequiresUpgrade
         val checklist = Checklist(
-            name = "Моя неделя",
+            name = name,
             items = emptyList(),
             viewMode = ChecklistViewMode.Weekly,
         )

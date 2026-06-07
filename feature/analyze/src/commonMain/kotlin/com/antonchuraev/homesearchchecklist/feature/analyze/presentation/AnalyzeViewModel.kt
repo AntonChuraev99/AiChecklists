@@ -11,6 +11,9 @@ import com.antonchuraev.homesearchchecklist.feature.analyze.domain.repository.An
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetSubscriptionStatusUseCase
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
+import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.*
+import org.jetbrains.compose.resources.getString
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -199,7 +202,9 @@ class AnalyzeViewModel(
     private fun analyzeInput() {
         val state = _screenState.value
         val inputData = buildInputData(state) ?: run {
-            _screenState.update { it.copy(error = "Пожалуйста, введите данные для анализа") }
+            viewModelScope.launch {
+                _screenState.update { it.copy(error = getString(Res.string.analyze_error_no_input)) }
+            }
             return
         }
 
@@ -234,7 +239,7 @@ class AnalyzeViewModel(
                     // Store result in holder and navigate to preview screen
                     AnalyzeResultHolder.set(
                         items = result.suggestedItems,
-                        suggestedName = if (state.isFillMode) "AI Fill" else "New Checklist",
+                        suggestedName = if (state.isFillMode) getString(Res.string.default_fill_name) else getString(Res.string.default_checklist_name),
                         summary = result.summary,
                         isFillMode = state.isFillMode,
                         fillDefault = state.fillDefault,
@@ -252,7 +257,7 @@ class AnalyzeViewModel(
                     _screenState.update {
                         it.copy(
                             isAnalyzing = false,
-                            error = error.message ?: "Ошибка анализа"
+                            error = error.message ?: getString(Res.string.analyze_error_analysis_failed)
                         )
                     }
                 }
@@ -294,7 +299,9 @@ class AnalyzeViewModel(
     private fun applyToExistingChecklist() {
         val state = _screenState.value
         val checklistId = state.selectedChecklistId ?: run {
-            _screenState.update { it.copy(error = "Пожалуйста, выберите чек-лист") }
+            viewModelScope.launch {
+                _screenState.update { it.copy(error = getString(Res.string.analyze_error_select_checklist)) }
+            }
             return
         }
         val result = state.analyzeResult ?: return
@@ -307,7 +314,7 @@ class AnalyzeViewModel(
                 }
                 .onFailure { error ->
                     _screenState.update {
-                        it.copy(error = error.message ?: "Ошибка сохранения")
+                        it.copy(error = error.message ?: getString(Res.string.error_save_failed))
                     }
                 }
         }
@@ -315,10 +322,10 @@ class AnalyzeViewModel(
 
     private fun createNewChecklist() {
         val state = _screenState.value
-        val name = state.checklistName.takeIf { it.isNotBlank() } ?: "Новый чек-лист"
         val result = state.analyzeResult ?: return
 
         viewModelScope.launch {
+            val name = state.checklistName.takeIf { it.isNotBlank() } ?: getString(Res.string.default_checklist_name)
             analyzeRepository.createChecklistFromResult(name, result)
                 .onSuccess {
                     _screenState.update { it.copy(showResultDialog = false) }
@@ -326,7 +333,7 @@ class AnalyzeViewModel(
                 }
                 .onFailure { error ->
                     _screenState.update {
-                        it.copy(error = error.message ?: "Ошибка создания чек-листа")
+                        it.copy(error = error.message ?: getString(Res.string.error_create_checklist_failed))
                     }
                 }
         }
@@ -336,11 +343,11 @@ class AnalyzeViewModel(
         val state = _screenState.value
         val checklistId = state.selectedChecklistId ?: return
         val result = state.analyzeResult ?: return
-        val fillName = state.fillName.takeIf { it.isNotBlank() } ?: "AI Fill"
 
         if (state.isSavingFill) return
 
         viewModelScope.launch {
+            val fillName = state.fillName.takeIf { it.isNotBlank() } ?: getString(Res.string.default_fill_name)
             _screenState.update { it.copy(isSavingFill = true) }
 
             analyzeRepository.createFillFromResult(checklistId, fillName, result)
@@ -351,7 +358,7 @@ class AnalyzeViewModel(
                 .onFailure { error ->
                     _screenState.update {
                         it.copy(
-                            error = error.message ?: "Ошибка создания заполнения",
+                            error = error.message ?: getString(Res.string.error_create_fill_failed),
                             isSavingFill = false
                         )
                     }

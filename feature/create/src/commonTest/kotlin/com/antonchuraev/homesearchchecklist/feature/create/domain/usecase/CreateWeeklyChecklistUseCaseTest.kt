@@ -154,7 +154,7 @@ class CreateWeeklyChecklistUseCaseTest {
     fun invoke_whenFreeUserBelowWeeklyLimit_returnsCreatedWithCorrectId() = runTest {
         val (useCase, repository) = buildUseCase(weeklyCount = 0, isPremium = false, addChecklistResult = 77L)
 
-        val result = useCase()
+        val result = useCase("Моя неделя")
 
         assertIs<CreateWeeklyChecklistUseCase.Result.Created>(result)
         assertEquals(77L, result.checklistId)
@@ -169,7 +169,7 @@ class CreateWeeklyChecklistUseCaseTest {
         // Free limit = 1 weekly checklist (from RemoteConfigDefaults.MAX_WEEKLY_CHECKLISTS_FREE)
         val (useCase, repository) = buildUseCase(weeklyCount = 1, isPremium = false)
 
-        val result = useCase()
+        val result = useCase("Моя неделя")
 
         assertIs<CreateWeeklyChecklistUseCase.Result.RequiresUpgrade>(result)
         assertEquals(0, repository.addedChecklists.size)

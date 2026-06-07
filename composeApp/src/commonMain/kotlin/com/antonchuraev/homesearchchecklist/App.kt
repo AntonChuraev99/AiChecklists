@@ -66,6 +66,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.weekly_checklist_default_name
 import aichecklists.core.designsystem.generated.resources.feedback_thanks_message
 import aichecklists.core.designsystem.generated.resources.chat_dock_ask_about
 import aichecklists.core.designsystem.generated.resources.chat_ambiguous_match
@@ -324,6 +325,7 @@ fun App() {
 
         var showWidgetInstruction by remember { mutableStateOf(false) }
         val createWeeklyChecklistUseCase: CreateWeeklyChecklistUseCase = koinInject()
+        val weeklyDefaultName = stringResource(Res.string.weekly_checklist_default_name)
         LaunchedEffect(Unit) {
             navigator.events.collect { event ->
                 when (event) {
@@ -333,7 +335,7 @@ fun App() {
                         }
                     }
                     AppNavEvent.CreateWeeklyChecklistRequested -> {
-                        when (val result = createWeeklyChecklistUseCase()) {
+                        when (val result = createWeeklyChecklistUseCase(weeklyDefaultName)) {
                             is CreateWeeklyChecklistUseCase.Result.Created ->
                                 navigator.navigateToChecklistDetail(result.checklistId, clearBackStack = true)
                             CreateWeeklyChecklistUseCase.Result.RequiresUpgrade ->

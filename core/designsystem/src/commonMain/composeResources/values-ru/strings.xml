@@ -438,6 +438,17 @@
     <string name="error_template_not_found">Шаблон не найден</string>
     <string name="error_template_load_failed">Не удалось загрузить шаблон</string>
     <string name="error_fill_not_found">Основное заполнение не найдено</string>
+    <string name="error_save_failed">Не удалось сохранить</string>
+    <string name="error_create_fill_failed">Не удалось создать заполнение</string>
+    <!-- Ошибки валидации (используются во ViewModel) -->
+    <string name="create_error_name_required">Введите название чек-листа</string>
+    <string name="fill_error_name_required">Введите название</string>
+    <string name="analyze_error_select_checklist">Выберите чек-лист</string>
+    <string name="analyze_error_analysis_failed">Не удалось проанализировать</string>
+    <!-- Имена по умолчанию (используются во ViewModel) -->
+    <string name="default_checklist_name">Новый чек-лист</string>
+    <string name="default_fill_name">AI-заполнение</string>
+    <string name="weekly_checklist_default_name">Моя неделя</string>
 
     <!-- Экран поделиться -->
     <string name="share">Поделиться</string>
