@@ -423,6 +423,8 @@
     <string name="paywall_trial_terms_yearly">%1$d-day free trial, then %2$s/year. Auto-renews. Cancel anytime.</string>
     <string name="paywall_trial_terms_monthly">%1$d-day free trial, then %2$s/month. Auto-renews. Cancel anytime.</string>
     <string name="paywall_no_subscription_found">No active subscription found</string>
+    <string name="paywall_restore_failed">Couldn't restore purchases. Please check your connection and try again.</string>
+    <string name="paywall_purchase_failed">Couldn't complete the purchase. Please try again.</string>
     <string name="paywall_days_free">%1$d-Day Free Trial</string>
     <string name="paywall_go_premium">Go Premium</string>
     <string name="paywall_then_price">then %1$s / month</string>

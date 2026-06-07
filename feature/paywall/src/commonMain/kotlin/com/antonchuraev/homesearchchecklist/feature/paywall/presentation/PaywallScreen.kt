@@ -35,12 +35,16 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import com.antonchuraev.homesearchchecklist.desingsystem.components.PlatformBackHandler
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -126,6 +130,8 @@ internal fun PaywallScreen(
     onTermsClick: () -> Unit,
     onPrivacyClick: () -> Unit,
     onSupportClick: () -> Unit,
+    errorMessage: String? = null,
+    onErrorDismiss: () -> Unit = {},
     isPurchasing: Boolean = false,
     isRestoring: Boolean = false,
     showHeroIllustration: Boolean = true,
@@ -136,8 +142,19 @@ internal fun PaywallScreen(
     val busy = isPurchasing || isRestoring
     PlatformBackHandler(enabled = busy) { /* swallow back while busy */ }
 
+    // Result feedback (toast): surface restore / purchase / load errors as a Snackbar so
+    // the user always sees the outcome. Success is handled by navigating to
+    // SubscriptionStatusScreen, which shows its own "🎉 Welcome to Premium" message.
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(errorMessage) {
+        val message = errorMessage ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(message)
+        onErrorDismiss()
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             CenterAlignedTopAppBar(
                 title = {},

@@ -405,6 +405,8 @@
     <string name="paywall_trial_terms_yearly">%1$d-дневный пробный период, затем %2$s/год. Автопродление. Отмена в любое время.</string>
     <string name="paywall_trial_terms_monthly">%1$d-дневный пробный период, затем %2$s/месяц. Автопродление. Отмена в любое время.</string>
     <string name="paywall_no_subscription_found">Активная подписка не найдена</string>
+    <string name="paywall_restore_failed">Не удалось восстановить покупки. Проверьте соединение и попробуйте снова.</string>
+    <string name="paywall_purchase_failed">Не удалось завершить покупку. Попробуйте снова.</string>
     <string name="paywall_days_free">%1$d-дневный пробный период</string>
     <string name="paywall_go_premium">Перейти на Премиум</string>
     <string name="paywall_then_price">затем %1$s / месяц</string>

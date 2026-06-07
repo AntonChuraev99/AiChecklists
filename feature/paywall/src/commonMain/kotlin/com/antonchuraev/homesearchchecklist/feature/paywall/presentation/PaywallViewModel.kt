@@ -338,8 +338,10 @@ class PaywallViewModel(
                         put("underlying_error", (result.underlyingError ?: "none").take(100))
                         analyticsContext?.toEventParams()?.let { putAll(it) }
                     })
+                    // Friendly localized message instead of the raw RevenueCat error
+                    // (raw text preserved in the analytics event above).
                     _screenState.update {
-                        it.copy(isPurchasing = false, error = result.message)
+                        it.copy(isPurchasing = false, error = getString(Res.string.paywall_purchase_failed))
                     }
                 }
             }
@@ -358,8 +360,10 @@ class PaywallViewModel(
                     _screenState.update {
                         it.copy(isRestoring = false, purchaseSuccess = true)
                     }
-                    // Navigate to subscription status after successful restore
-                    navigator.navigateToSubscriptionStatus()
+                    // Navigate to subscription status after successful restore.
+                    // showSuccessMessage=true surfaces the "🎉 Welcome to Premium" toast on
+                    // the destination — same success feedback as a fresh purchase.
+                    navigator.navigateToSubscriptionStatus(showSuccessMessage = true)
                 }
                 is RestoreResult.NoActiveSubscription -> {
                     analyticsTracker.event("restore_no_subscription", mapOf("source" to source))
@@ -374,8 +378,10 @@ class PaywallViewModel(
                         "error_code" to (result.errorCode ?: "unknown"),
                         "underlying_error" to (result.underlyingError ?: "none").take(100)
                     ))
+                    // Show a friendly localized message — NOT the raw RevenueCat error
+                    // (English-only, sometimes a dev string). Raw text stays in analytics above.
                     _screenState.update {
-                        it.copy(isRestoring = false, error = result.message)
+                        it.copy(isRestoring = false, error = getString(Res.string.paywall_restore_failed))
                     }
                 }
             }

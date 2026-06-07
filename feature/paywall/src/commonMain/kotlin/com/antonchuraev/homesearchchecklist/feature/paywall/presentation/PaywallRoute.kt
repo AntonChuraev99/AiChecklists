@@ -174,6 +174,8 @@ fun PaywallRoute(
             analyticsTracker.event("paywall_support_clicked", mapOf("source" to state.source))
             uriHandler.openUri("mailto:${PaywallConfig.SUPPORT_EMAIL}")
         },
+        errorMessage = state.error,
+        onErrorDismiss = { viewModel.sendIntent(PaywallIntent.DismissError) },
     )
 }
 
