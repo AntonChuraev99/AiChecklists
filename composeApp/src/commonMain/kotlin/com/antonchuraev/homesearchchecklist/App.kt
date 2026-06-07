@@ -114,29 +114,17 @@ import aichecklists.core.designsystem.generated.resources.chat_voice_too_short
 import aichecklists.core.designsystem.generated.resources.chat_preview_cancelled_message
 import aichecklists.core.designsystem.generated.resources.chat_agent_round_limit
 import aichecklists.core.designsystem.generated.resources.chat_panel_greeting
-import aichecklists.core.designsystem.generated.resources.main_prompt_photo
-import aichecklists.core.designsystem.generated.resources.main_prompt_remind
-import aichecklists.core.designsystem.generated.resources.main_prompt_link
-import aichecklists.core.designsystem.generated.resources.main_prompt_plan_day
 import aichecklists.core.designsystem.generated.resources.main_create_with_ai_prefill
 import aichecklists.core.designsystem.generated.resources.main_prompt_link_prefill
 import aichecklists.core.designsystem.generated.resources.main_prompt_remind_prefill
 import aichecklists.core.designsystem.generated.resources.main_prompt_plan_day_query
-import aichecklists.core.designsystem.generated.resources.checklist_prompt_whats_missing
-import aichecklists.core.designsystem.generated.resources.checklist_prompt_generate_ideas
-import aichecklists.core.designsystem.generated.resources.checklist_prompt_add_items
-import aichecklists.core.designsystem.generated.resources.checklist_prompt_summary
-import aichecklists.core.designsystem.generated.resources.checklist_prompt_remind
 import aichecklists.core.designsystem.generated.resources.checklist_prompt_whats_missing_query
 import aichecklists.core.designsystem.generated.resources.checklist_prompt_generate_ideas_query
 import aichecklists.core.designsystem.generated.resources.checklist_prompt_summary_query
 import aichecklists.core.designsystem.generated.resources.checklist_prompt_add_items_query
 import aichecklists.core.designsystem.generated.resources.checklist_prompt_remind_prefill
-import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiPromptChips
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiQuickAction
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiChecklistAction
-import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiChecklistPromptChips
-import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiDefaultPromptChips
 import org.jetbrains.compose.resources.stringResource
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavRoute
 import com.antonchuraev.homesearchchecklist.feature.create.presentation.create.CreateChecklistScreen
@@ -1113,6 +1101,9 @@ fun App() {
                     }
                 },
                 emptyStateContent = {
+                    // Greeting only. The prompt-starter chips were removed from the OPEN chat
+                    // panel: they stay above the collapsed dock on Main/Detail as entry points,
+                    // but inside an already-open chat they duplicated the input row.
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1128,40 +1119,6 @@ fun App() {
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.fillMaxWidth(),
                         )
-                        // Context-aware chip set: when the dock was opened anchored to a
-                        // checklist (chatSheetContextId != null) show the contextual checklist
-                        // chips; otherwise the home/create-new chips. The contextId is captured
-                        // in a local so the smart-cast survives across the lambda.
-                        val dockContextId = chatSheetContextId
-                        if (dockContextId != null) {
-                            GistiPromptChips(
-                                chips = gistiChecklistPromptChips(
-                                    whatsMissingLabel = stringResource(Res.string.checklist_prompt_whats_missing),
-                                    generateIdeasLabel = stringResource(Res.string.checklist_prompt_generate_ideas),
-                                    addItemsLabel = stringResource(Res.string.checklist_prompt_add_items),
-                                    summaryLabel = stringResource(Res.string.checklist_prompt_summary),
-                                    remindLabel = stringResource(Res.string.checklist_prompt_remind),
-                                ),
-                                onChipClick = { action ->
-                                    onChecklistQuickAction(dockContextId, chatSheetContextLabel, action)
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        } else {
-                            GistiPromptChips(
-                                chips = gistiDefaultPromptChips(
-                                    photoLabel = stringResource(Res.string.main_prompt_photo),
-                                    remindLabel = stringResource(Res.string.main_prompt_remind),
-                                    linkLabel = stringResource(Res.string.main_prompt_link),
-                                    planDayLabel = stringResource(Res.string.main_prompt_plan_day),
-                                ),
-                                // In the empty dock, a chip drives the same quick-action flow
-                                // (the dock is already open, so onQuickAction just re-seeds context
-                                // null and fires the picker / prefill for the tapped action).
-                                onChipClick = onQuickAction,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        }
                     }
                 },
                 inputContent = {
