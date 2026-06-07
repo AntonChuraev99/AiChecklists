@@ -72,7 +72,7 @@ feature/     checklist · create · home · onboarding · splash · analyze · p
 
 - **API/impl split:** core modules expose interfaces in `api`, impls in `impl`. Reference modules as `projects.core.common.api`.
 - **MVI:** ViewModels extend `AppViewModel<State, Intent, SideEffect>` (`core:common:api`). Files: `*ScreenContract.kt` (State/Intent sealed), `*ViewModel.kt` (`onIntent()`), `*Screen.kt` (observes `screenState`, calls `sendIntent()`).
-- **DI:** Koin 4.1; each module has its own module, aggregated in `appModule`; ViewModels via `koinViewModel()`.
+- **DI:** Koin; each module has its own module, aggregated in `appModule`; ViewModels via `koinViewModel()`.
 - **expect/actual:** logging, database, file pickers, audio, build config (`AppBuildConfig`), reminders, in-app review.
 - **StateFlow** for all reactive state. Navigation 3 (no `NavController`) — see rule `adaptive-navigation`.
 
@@ -108,7 +108,7 @@ Simple, clear, benefit-focused, action-oriented. Do: "Create Checklist", "Fill v
 
 ## Dependencies & Economics
 
-Versions in `gradle/libs.versions.toml`: Kotlin 2.3.0, Compose MP 1.9.3, Koin 4.1.1, Room 2.8.4, RevenueCat 2.2.17, Firebase BOM 34.13.0. **Gemini SDK is intentionally NOT a client dependency** — all AI inference is server-side. Unit economics: `docs/unit-economics.md` (gemini-2.5-flash-lite ~$0.0002/req, positive at max usage).
+All dependency versions live in `gradle/libs.versions.toml` — the single source of truth; check it, don't trust a number duplicated in prose. **Gemini SDK is intentionally NOT a client dependency** — all AI inference is server-side. Unit economics: `docs/unit-economics.md` (gemini-2.5-flash-lite ~$0.0002/req, positive at max usage).
 
 | Limit (Remote Config) | Free | Premium |
 |---|---|---|
