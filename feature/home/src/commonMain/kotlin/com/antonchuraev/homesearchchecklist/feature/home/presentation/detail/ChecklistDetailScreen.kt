@@ -670,7 +670,11 @@ private fun ChecklistDetailContent(
             // the no-dock branch (edit mode) adds the navbar inset itself; when the dock is shown its
             // measured dockHeight already includes its own navigationBarsPadding.
             val listBottomPadding = when {
-                imeVisible -> imeBottom + AppDimens.SpacingSm
+                // IME open: the list's Modifier.imePadding() already shrinks the viewport above the
+                // keyboard (restoring the pre-dock adjustResize "content lifts" behaviour), so the
+                // contentPadding only needs breathing room here — adding imeBottom too would
+                // double-count and push the last item / inline add-input too far up.
+                imeVisible -> AppDimens.SpacingSm
                 showDock -> dockHeight + AppDimens.SpacingLg
                 else -> navBottom + AppDimens.SpacingLg
             }
@@ -695,8 +699,10 @@ private fun ChecklistDetailContent(
                         onItemCheckedChange = { itemId, checked -> onIntent(ChecklistDetailIntent.OnItemCheckedChange(itemId, checked)) },
                         onItemLongPress = { itemId -> onIntent(ChecklistDetailIntent.OnItemLongPressForMove(itemId)) },
                         onItemTap = { itemId -> onIntent(ChecklistDetailIntent.OnItemTapForDetails(itemId)) },
-                        modifier = Modifier.fillMaxSize(),
-                        // Clear the floating chat-dock overlay (or IME) at the bottom of the week list.
+                        // imePadding() shrinks the week list above the keyboard when adding a per-day
+                        // item (edge-to-edge: the window no longer resizes itself, so the list must).
+                        modifier = Modifier.fillMaxSize().imePadding(),
+                        // Clear the floating chat-dock overlay at the bottom of the week list.
                         contentBottomPadding = listBottomPadding,
                     )
                     // MoveToDayBottomSheet — sibling to WeeklyChecklistDetailContent, not inside it
@@ -745,11 +751,15 @@ private fun ChecklistDetailContent(
                 state = listState,
                 modifier = Modifier
                     .fillMaxSize()
+                    // Shrink the list above the keyboard. Under enableEdgeToEdge the window no longer
+                    // resizes on IME, so without this the keyboard overlaps the last item and the
+                    // inline add-input (the regression after the chat-dock floating-overlay rework).
+                    .imePadding()
                     .adaptiveContentWidth()
                     .padding(horizontal = AppDimens.ScreenPaddingHorizontal),
                 verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
-                // Bottom contentPadding (dock height OR ime) replaces the old trailing Spacer item —
-                // this is the "empty space" between the last item and the floating dock.
+                // Bottom contentPadding clears the floating dock (IME lift is handled by imePadding
+                // above) — this is the "empty space" between the last item and the floating dock.
                 contentPadding = PaddingValues(bottom = listBottomPadding),
             ) {
                 // Progress header with checklist name + completion celebration
