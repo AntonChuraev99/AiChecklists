@@ -63,6 +63,7 @@ class CreateChecklistViewModel(
         when (intent) {
             CreateChecklistIntent.OnBackClick -> appNavigator.onBack()
             CreateChecklistIntent.OnSaveClick -> onSaveClick()
+            CreateChecklistIntent.OnChooseTemplateClick -> appNavigator.navigateToTemplatesScreen()
             is CreateChecklistIntent.OnNameChange -> _screenState.update {
                 it.copy(name = intent.name, nameError = null)
             }

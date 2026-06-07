@@ -35,8 +35,8 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 /**
  * Modal bottom sheet that lets the user choose how to fill a checklist.
  *
- * Replaces the two "Fill" buttons that previously lived in the
- * [ChecklistDetailBottomBar]. It is opened from a TopAppBar action on
+ * Replaces the two "Fill" buttons that previously lived in the checklist-detail bottom bar
+ * (now the [ChecklistDetailChatDock] overlay). It is opened from a TopAppBar action on
  * ChecklistDetailScreen (suggested icon: `Icons.Outlined.NoteAdd` — already imported there).
  *
  * Two options, presented as tappable rows (ListItem-style — richer than bare buttons,

@@ -1,10 +1,10 @@
 package com.antonchuraev.homesearchchecklist.feature.create.presentation.create
 
+import androidx.navigation3.runtime.NavBackStack
+import androidx.navigation3.runtime.NavKey
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
-import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavRoute
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
-import com.antonchuraev.homesearchchecklist.core.navigation.api.NavCommand
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDefaults
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigKeys
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
@@ -388,8 +388,7 @@ class CreateChecklistViewModelTest {
         var navigatedToMainScreen = false
         var paywallSource: String? = null
 
-        override val commands: Flow<NavCommand> = emptyFlow()
-        override val backStack: StateFlow<List<AppNavRoute>> = MutableStateFlow(emptyList())
+        override val backStack: NavBackStack<NavKey> = NavBackStack()
 
         private val _events = MutableSharedFlow<AppNavEvent>()
         override val events: SharedFlow<AppNavEvent> = _events.asSharedFlow()

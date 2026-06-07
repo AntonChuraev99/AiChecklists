@@ -6,12 +6,25 @@ import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.repository.PaywallRepository
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.RestorePurchasesUseCase
+import com.antonchuraev.homesearchchecklist.feature.user.domain.model.UserData
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
+import com.antonchuraev.homesearchchecklist.core.datastore.api.FirstChecklistRepository
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.CompleteOnboardingUseCase
+import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.GetFirstChecklistVariantUseCase
+import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.GetFirstChecklistVariantUseCase.FirstChecklistVariant
 import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.GetOnboardingVariantUseCase
 import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.GetOnboardingVariantUseCase.OnboardingVariant
+import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.first_checklist_item_1
+import aichecklists.core.designsystem.generated.resources.first_checklist_item_2
+import aichecklists.core.designsystem.generated.resources.first_checklist_item_3
+import aichecklists.core.designsystem.generated.resources.first_checklist_title
+import org.jetbrains.compose.resources.getString
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -29,7 +42,10 @@ class SplashViewModel(
     private val analyticsTracker: AnalyticsTracker,
     private val getOnboardingVariant: GetOnboardingVariantUseCase,
     private val completeOnboardingUseCase: CompleteOnboardingUseCase,
-    private val remoteConfigProvider: RemoteConfigProvider
+    private val remoteConfigProvider: RemoteConfigProvider,
+    private val getFirstChecklistVariant: GetFirstChecklistVariantUseCase,
+    private val checklistRepository: ChecklistRepository,
+    private val firstChecklistRepository: FirstChecklistRepository,
 ) : ViewModel() {
 
     init {
@@ -47,6 +63,7 @@ class SplashViewModel(
 
             // Step 1: ensure we have a userId BEFORE fetching Remote Config so
             // Firebase A/B Testing can attribute the user to an experiment cohort.
+            var isNewUser = false
             val userData = if (cached.userId.isNotBlank()) {
                 analyticsTracker.setUserId(cached.userId)
                 cached
@@ -55,6 +72,7 @@ class SplashViewModel(
                 val newUserData = result.getOrNull()?.userData ?: cached
 
                 result.onSuccess { data ->
+                    isNewUser = data.isNewUser
                     analyticsTracker.setUserId(data.userData.userId)
                     appScope.launch { linkWithPaywall(data.userData.userId, isNewUser = data.isNewUser) }
                 }
@@ -67,6 +85,12 @@ class SplashViewModel(
                 }
                 log("fetchAndActivate (onboarding pending) activated=$activated, hasUserId=${userData.userId.isNotBlank()}")
             }
+
+            // First-checklist A/B experiment: cohort attribution (all users) + auto-create
+            // the starter checklist (new users only). Runs AFTER fetchAndActivate so the
+            // variant is read from fresh RC, and BEFORE navigate so the first screen_view
+            // already carries the `first_checklist_variant` user property.
+            applyFirstChecklistExperiment(userData, isNewUser)
 
             navigateTo(userData.isOnboardingPassed)
         }
@@ -156,6 +180,49 @@ class SplashViewModel(
                 logger.error(TAG, "linkWithPaywall failed: ${err.message}")
             }
     }
+
+    /**
+     * Applies the first-checklist A/B experiment.
+     *
+     * Always sets the `first_checklist_variant` user property (so analytics can split
+     * cohorts), and — only for brand-new users in the `auto_create` treatment — seeds a
+     * one-time "Your first checklist" starter template.
+     *
+     * The whole block is guarded so a failure here never blocks or crashes the splash flow.
+     */
+    private suspend fun applyFirstChecklistExperiment(userData: UserData, isNewUser: Boolean) {
+        runCatching {
+            val variant = getFirstChecklistVariant()
+            analyticsTracker.setUserProperties(mapOf("first_checklist_variant" to variant.name))
+
+            val uid = userData.userId
+            val alreadyCreated = uid.isNotBlank() && firstChecklistRepository.isFirstChecklistCreated(uid)
+
+            if (isNewUser && variant == FirstChecklistVariant.AUTO_CREATE && uid.isNotBlank() && !alreadyCreated) {
+                // New users have 0 checklists, so they are always under the Free tier limit (4).
+                // Splash has no UserLimits access; skipping the gate here is safe by construction.
+                log("auto-creating first checklist for new user uid=${uid.take(8)}")
+                checklistRepository.addChecklist(buildFirstChecklist())
+                firstChecklistRepository.markFirstChecklistCreated(uid)
+                analyticsTracker.event("first_checklist_auto_created", mapOf("variant" to variant.name))
+            }
+        }.onFailure { e ->
+            logger.error(TAG, "applyFirstChecklistExperiment failed: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Builds the localized "Your first checklist" starter template (title + 3 tip items).
+     * `addChecklist` creates the default fill automatically, so no fill is built here.
+     */
+    private suspend fun buildFirstChecklist(): Checklist = Checklist(
+        name = getString(Res.string.first_checklist_title),
+        items = listOf(
+            ChecklistItem(text = getString(Res.string.first_checklist_item_1)),
+            ChecklistItem(text = getString(Res.string.first_checklist_item_2)),
+            ChecklistItem(text = getString(Res.string.first_checklist_item_3)),
+        ),
+    )
 
     private fun log(text: String){
         logger.debug(TAG , text)

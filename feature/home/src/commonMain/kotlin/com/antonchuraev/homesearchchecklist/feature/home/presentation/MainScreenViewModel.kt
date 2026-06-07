@@ -162,7 +162,7 @@ class MainScreenViewModel(
         if (screenState.value.userLimits?.canCreateChecklist == false) {
             appNavigator.navigateToPaywall(source = "main_add_checklist_limit")
         } else {
-            appNavigator.navigateToTemplatesScreen()
+            appNavigator.navigateToCreateChecklistScreen()
         }
     }
 

@@ -835,15 +835,20 @@ fun App() {
                                 // recording immediately.
                                 onMicClick = { onOpenChatSheetMic(null, null) },
                                 // Top-bar "+" and the leading "New list" prompt chip both
-                                // route to manual checklist creation (Templates). Creation
-                                // moved to the top of the screen; the bottom is a clean chat dock.
-                                onCreateFromTemplatesClick = { navigator.navigateToTemplatesScreen() },
+                                // route to the manual create screen (CreateChecklistScreen).
+                                // From there the user can still pick a template via the
+                                // "Choose from template" button. Creation moved to the top of
+                                // the screen; the bottom is a clean chat dock.
+                                onCreateFromTemplatesClick = { navigator.navigateToCreateChecklistScreen() },
                             )
                         }
                     }
 
                     entry<AppNavRoute.CreateChecklistRoute.CreateChecklist> { route ->
-                        CreateChecklistScreen(editChecklistId = route.editChecklistId)
+                        CreateChecklistScreen(
+                            editChecklistId = route.editChecklistId,
+                            templateId = route.templateId,
+                        )
                     }
 
                     entry<AppNavRoute.CreateChecklistRoute.Templates>(
@@ -952,7 +957,7 @@ fun App() {
                     ) {
                         TodayRoute(
                             drawerState = drawerState,
-                            onCreateChecklistClick = { navigator.navigateToTemplatesScreen() },
+                            onCreateChecklistClick = { navigator.navigateToCreateChecklistScreen() },
                         )
                     }
 
@@ -963,7 +968,7 @@ fun App() {
                     ) {
                         CalendarRoute(
                             drawerState = drawerState,
-                            onCreateChecklistClick = { navigator.navigateToTemplatesScreen() },
+                            onCreateChecklistClick = { navigator.navigateToCreateChecklistScreen() },
                         )
                     }
 

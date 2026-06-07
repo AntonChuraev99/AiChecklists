@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -41,6 +42,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.TopAppBarDefaults
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AddItemInputField
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonSecondary
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppTextField
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
@@ -58,6 +60,7 @@ import org.koin.core.parameter.parametersOf
 @Composable
 fun CreateChecklistScreen(
     editChecklistId: Long? = null,
+    templateId: Int? = null,
     viewModel: CreateChecklistViewModel = koinViewModel(key = "create_checklist_$editChecklistId") { parametersOf(editChecklistId) }
 ) {
     val analyticsTracker: AnalyticsTracker = koinInject()
@@ -125,6 +128,19 @@ fun CreateChecklistScreen(
                         errorMessage = screenState.nameError,
                         showClearButton = true
                     )
+
+                    // "Choose from template" is offered only when creating a brand-new
+                    // checklist from scratch (not in edit mode and not already seeded from a
+                    // template). Templates are now reachable only from here and "Create Weekly".
+                    val showChooseTemplate = !screenState.isEditMode && templateId == null
+                    if (showChooseTemplate) {
+                        AppButtonSecondary(
+                            text = stringResource(Res.string.create_choose_template),
+                            onClick = { viewModel.sendIntent(CreateChecklistIntent.OnChooseTemplateClick) },
+                            icon = Icons.Outlined.GridView,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
             }
 

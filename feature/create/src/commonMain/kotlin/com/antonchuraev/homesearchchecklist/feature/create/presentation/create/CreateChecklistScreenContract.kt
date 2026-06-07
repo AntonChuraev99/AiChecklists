@@ -21,6 +21,7 @@ data class CreateChecklistState(
 sealed interface CreateChecklistIntent : Intent {
     data object OnBackClick : CreateChecklistIntent
     data object OnSaveClick : CreateChecklistIntent
+    data object OnChooseTemplateClick : CreateChecklistIntent
     data class OnNameChange(val name: String) : CreateChecklistIntent
     data class OnNewItemTextChange(val text: String) : CreateChecklistIntent
     data object OnAddItemFromInput : CreateChecklistIntent

@@ -54,8 +54,6 @@ class TemplatesViewModel(
             TemplatesScreenIntent.OnDismissError -> dismissError()
             is TemplatesScreenIntent.OnSearchQueryChange -> onSearchQueryChange(intent.query)
             TemplatesScreenIntent.OnToggleSearch -> toggleSearch()
-            TemplatesScreenIntent.OnCreateManuallyClick -> handleCreateManuallyClick()
-            TemplatesScreenIntent.OnCreateWithAiClick -> appNavigator.navigateToAnalyzeScreen()
             TemplatesScreenIntent.OnCreateWeeklyClick -> handleCreateWeeklyClick()
         }
     }
@@ -150,14 +148,6 @@ class TemplatesViewModel(
                     it.copy(isCreating = false, error = e.message ?: "Failed to create checklist")
                 }
             }
-        }
-    }
-
-    private fun handleCreateManuallyClick() {
-        if (!_screenState.value.canCreateChecklist) {
-            appNavigator.navigateToPaywall(source = "checklist_limit")
-        } else {
-            appNavigator.navigateToCreateChecklistScreen(null)
         }
     }
 

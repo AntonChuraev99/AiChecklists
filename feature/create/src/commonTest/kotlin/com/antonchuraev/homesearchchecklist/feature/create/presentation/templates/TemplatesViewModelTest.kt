@@ -1,9 +1,9 @@
 package com.antonchuraev.homesearchchecklist.feature.create.presentation.templates
 
+import androidx.navigation3.runtime.NavBackStack
+import androidx.navigation3.runtime.NavKey
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
-import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavRoute
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
-import com.antonchuraev.homesearchchecklist.core.navigation.api.NavCommand
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDefaults
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigKeys
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
@@ -167,9 +167,8 @@ class TemplatesViewModelTest {
         var navigatedToCreateChecklist = false
         var backInvoked = false
 
-        override val commands: Flow<NavCommand> = emptyFlow()
         override val events: SharedFlow<AppNavEvent> = MutableSharedFlow()
-        override val backStack: StateFlow<List<AppNavRoute>> = MutableStateFlow(emptyList())
+        override val backStack: NavBackStack<NavKey> = NavBackStack()
         override fun onBack() { backInvoked = true }
         override fun navigateToOnboarding() {}
         override fun navigateToInteractiveOnboarding() {}
@@ -263,34 +262,4 @@ class TemplatesViewModelTest {
         )
     }
 
-    // ─── OnCreateManuallyClick routing ────────────────────────────────────────
-
-    @Test
-    fun `OnCreateManuallyClick_whenLocked_navigatesToPaywall_skipsCreate`() = runTest {
-        val maxFree = RemoteConfigDefaults.MAX_CHECKLISTS_FREE.toInt()
-        val (viewModel, navigator) = buildViewModel(checklistCount = maxFree, isPremium = false)
-        advanceUntilIdle()
-
-        viewModel.sendIntent(TemplatesScreenIntent.OnCreateManuallyClick)
-        advanceUntilIdle()
-
-        assertEquals("checklist_limit", navigator.paywallSource,
-            "Expected paywall navigation with source='checklist_limit'")
-        assertFalse(navigator.navigatedToCreateChecklist,
-            "Expected no navigation to create screen when locked")
-    }
-
-    @Test
-    fun `OnCreateManuallyClick_whenUnlocked_navigatesToCreateScreen_skipsPaywall`() = runTest {
-        val (viewModel, navigator) = buildViewModel(checklistCount = 0, isPremium = false)
-        advanceUntilIdle()
-
-        viewModel.sendIntent(TemplatesScreenIntent.OnCreateManuallyClick)
-        advanceUntilIdle()
-
-        assertTrue(navigator.navigatedToCreateChecklist,
-            "Expected navigation to create screen when not locked")
-        assertNull(navigator.paywallSource,
-            "Expected no paywall navigation when not locked")
-    }
 }

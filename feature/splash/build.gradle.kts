@@ -33,8 +33,10 @@ kotlin {
             implementation(projects.core.navigation.api)
             implementation(projects.core.designsystem)
             implementation(projects.core.common.api)
+            implementation(projects.core.datastore.api)
             implementation(projects.core.remoteconfig.api)
             implementation(projects.feature.user)
+            implementation(projects.feature.checklist)
             implementation(projects.feature.paywall)
 
             implementation(compose.runtime)

@@ -40,7 +40,6 @@ import androidx.compose.material.icons.filled.Computer
 import androidx.compose.material.icons.filled.Countertops
 import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.DirectionsCar
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FitnessCenter
@@ -72,7 +71,6 @@ import androidx.compose.material.icons.automirrored.filled.DirectionsRun
 import androidx.compose.material.icons.automirrored.filled.EventNote
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
-import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Lock
@@ -102,7 +100,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.TopAppBarDefaults
-import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonSecondary
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppTextField
 import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
@@ -237,10 +234,7 @@ fun TemplatesScreen(
 
             // Bottom action buttons
             BottomActionButtons(
-                canCreateChecklist = state.canCreateChecklist,
                 canCreateWeeklyChecklist = state.canCreateWeeklyChecklist,
-                onCreateManually = { viewModel.sendIntent(TemplatesScreenIntent.OnCreateManuallyClick) },
-                onCreateWithAi = { viewModel.sendIntent(TemplatesScreenIntent.OnCreateWithAiClick) },
                 onCreateWeekly = { viewModel.sendIntent(TemplatesScreenIntent.OnCreateWeeklyClick) },
             )
         }
@@ -249,10 +243,7 @@ fun TemplatesScreen(
 
 @Composable
 private fun BottomActionButtons(
-    canCreateChecklist: Boolean,
     canCreateWeeklyChecklist: Boolean,
-    onCreateManually: () -> Unit,
-    onCreateWithAi: () -> Unit,
     onCreateWeekly: () -> Unit,
 ) {
     Column(
@@ -264,26 +255,6 @@ private fun BottomActionButtons(
             .padding(top = AppDimens.SpacingLg, bottom = AppDimens.SpacingLg),
         verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
     ) {
-        // Create manually button — shows lock CTA when free user is at checklist limit
-        AppButton(
-            text = if (canCreateChecklist) {
-                stringResource(Res.string.templates_create_manually)
-            } else {
-                stringResource(Res.string.unlock_more_with_premium)
-            },
-            onClick = onCreateManually,
-            icon = if (canCreateChecklist) Icons.Default.Edit else Icons.Outlined.Lock,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        // Create with AI button
-        AppButtonSecondary(
-            text = stringResource(Res.string.templates_create_with_ai),
-            onClick = onCreateWithAi,
-            icon = Icons.Outlined.AutoAwesome,
-            modifier = Modifier.fillMaxWidth()
-        )
-
         // My Week button — shows lock CTA when free user is at the weekly limit
         AppButtonSecondary(
             text = if (canCreateWeeklyChecklist) {

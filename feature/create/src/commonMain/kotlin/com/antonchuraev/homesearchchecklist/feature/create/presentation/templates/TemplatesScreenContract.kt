@@ -32,7 +32,5 @@ sealed interface TemplatesScreenIntent : Intent {
     data object OnToggleSearch : TemplatesScreenIntent
 
     // Bottom action buttons
-    data object OnCreateManuallyClick : TemplatesScreenIntent
-    data object OnCreateWithAiClick : TemplatesScreenIntent
     data object OnCreateWeeklyClick : TemplatesScreenIntent
 }

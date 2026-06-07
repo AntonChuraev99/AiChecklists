@@ -49,7 +49,7 @@ interface AppNavigator {
     /**
      * todo change templateId to template class
      */
-    fun navigateToCreateChecklistScreen(templateId: Int?)
+    fun navigateToCreateChecklistScreen(templateId: Int? = null)
 
     fun navigateToEditChecklist(checklistId: Long)
 

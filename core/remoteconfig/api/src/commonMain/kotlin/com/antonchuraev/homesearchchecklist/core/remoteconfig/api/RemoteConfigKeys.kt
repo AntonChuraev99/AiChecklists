@@ -32,6 +32,11 @@ object RemoteConfigKeys {
     // Default is "monthly" so users in low-tier countries see $1.99 instead of $20/yr.
     // Remotely switchable to "yearly" via Firebase RC for markets where yearly converts better.
     const val PAYWALL_DEFAULT_PLAN = "paywall_default_plan"
+
+    // First-checklist A/B variant: "auto_create" | "current" (empty = "current").
+    // "auto_create" seeds a "Your first checklist" template on first launch for new users;
+    // anything else keeps the existing empty-state flow.
+    const val FIRST_CHECKLIST_VARIANT = "first_checklist_variant"
 }
 
 /**
@@ -71,4 +76,14 @@ object RemoteConfigDefaults {
 
     // Paywall default plan — "monthly" so low-tier markets see affordable price first.
     const val PAYWALL_DEFAULT_PLAN = "monthly"
+
+    // First-checklist A/B variant default.
+    //
+    // Empty client default is intentional (same rationale as ONBOARDING): any non-empty
+    // value MUST come from Firebase Remote Config so we can distinguish "RC returned a
+    // variant" from "fetch failed / not yet assigned". Empty falls back to CURRENT
+    // (control / no auto-create) inside GetFirstChecklistVariantUseCase. Without this
+    // guard every user with stale RC would silently land in the auto_create treatment,
+    // collapsing the A/B distribution.
+    const val FIRST_CHECKLIST_VARIANT = ""
 }
