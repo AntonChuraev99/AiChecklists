@@ -36,10 +36,12 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.antonchuraev.homesearchchecklist.desingsystem.adaptive.AppWindowSizeClass
 import com.antonchuraev.homesearchchecklist.desingsystem.adaptive.rememberAppWindowSizeClass
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
 import com.antonchuraev.homesearchchecklist.desingsystem.components.SyncAccountBanner
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
@@ -68,6 +70,10 @@ fun MainScreenContent(
     onExitEditMode: () -> Unit,
     onReorderChecklists: (List<Long>) -> Unit = {},
     onSignInClick: () -> Unit = {},
+    // Bottom contentPadding for the list/grid so the last item scrolls clear of the floating
+    // chat-dock overlay (the host measures the dock height and passes it here). Defaults to the
+    // plain bottom spacing when no dock is shown.
+    contentBottomPadding: Dp = AppDimens.SpacingXxl,
 ) {
     val windowSizeClass = rememberAppWindowSizeClass()
     val isCompact = windowSizeClass == AppWindowSizeClass.Compact
@@ -77,16 +83,20 @@ fun MainScreenContent(
             screenState = screenState,
             isEditMode = isEditMode,
             onChecklistClick = onChecklistClick,
+            onAddChecklistClick = onAddChecklistClick,
             onPremiumBannerClick = onPremiumBannerClick,
             onEnterEditMode = onEnterEditMode,
             onReorderChecklists = onReorderChecklists,
             onSignInClick = onSignInClick,
+            contentBottomPadding = contentBottomPadding,
         )
     } else {
         MainScreenContentLazyGrid(
             screenState = screenState,
             onChecklistClick = onChecklistClick,
+            onAddChecklistClick = onAddChecklistClick,
             onPremiumBannerClick = onPremiumBannerClick,
+            contentBottomPadding = contentBottomPadding,
         )
     }
 }
@@ -102,10 +112,12 @@ private fun MainScreenContentLazyColumn(
     screenState: MainScreenState.Success,
     isEditMode: Boolean,
     onChecklistClick: (ChecklistWithProgress) -> Unit,
+    onAddChecklistClick: () -> Unit,
     onPremiumBannerClick: () -> Unit,
     onEnterEditMode: () -> Unit,
     onReorderChecklists: (List<Long>) -> Unit,
     onSignInClick: () -> Unit = {},
+    contentBottomPadding: Dp = AppDimens.SpacingXxl,
 ) {
     val hapticFeedback = LocalHapticFeedback.current
 
@@ -155,7 +167,7 @@ private fun MainScreenContentLazyColumn(
             start = AppDimens.ScreenPaddingHorizontal,
             end = AppDimens.ScreenPaddingHorizontal,
             top = AppDimens.SpacingLg,
-            bottom = AppDimens.SpacingXxl
+            bottom = contentBottomPadding
         ),
         verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
     ) {
@@ -174,7 +186,13 @@ private fun MainScreenContentLazyColumn(
                     EmptyState(
                         icon = Icons.Outlined.Checklist,
                         title = stringResource(Res.string.main_empty_title),
-                        description = stringResource(Res.string.main_empty_description)
+                        description = stringResource(Res.string.main_empty_description),
+                        action = {
+                            AppButton(
+                                text = stringResource(Res.string.main_empty_cta),
+                                onClick = onAddChecklistClick,
+                            )
+                        }
                     )
                 }
             }
@@ -274,7 +292,9 @@ private fun MainScreenContentLazyColumn(
 private fun MainScreenContentLazyGrid(
     screenState: MainScreenState.Success,
     onChecklistClick: (ChecklistWithProgress) -> Unit,
+    onAddChecklistClick: () -> Unit,
     onPremiumBannerClick: () -> Unit,
+    contentBottomPadding: Dp = AppDimens.SpacingXxl,
 ) {
     if (screenState.checklists.isEmpty()) {
         // Empty state — center it, no grid needed
@@ -286,6 +306,12 @@ private fun MainScreenContentLazyGrid(
                 icon = Icons.Outlined.Checklist,
                 title = stringResource(Res.string.main_empty_title),
                 description = stringResource(Res.string.main_empty_description),
+                action = {
+                    AppButton(
+                        text = stringResource(Res.string.main_empty_cta),
+                        onClick = onAddChecklistClick,
+                    )
+                }
             )
         }
         return
@@ -298,7 +324,7 @@ private fun MainScreenContentLazyGrid(
             start = AppDimens.ScreenPaddingHorizontal,
             end = AppDimens.ScreenPaddingHorizontal,
             top = AppDimens.SpacingLg,
-            bottom = AppDimens.SpacingXxl,
+            bottom = contentBottomPadding,
         ),
         horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd),
         verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd),

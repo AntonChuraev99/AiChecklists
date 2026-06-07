@@ -57,6 +57,8 @@ kotlin {
             implementation(libs.kotlinx.datetime)
             implementation(libs.reorderable)
             implementation(libs.coil3.compose)
+            // Haze — rememberHazeState + hazeSource for the ChecklistDetail backdrop captured by the chat dock.
+            implementation(libs.haze)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

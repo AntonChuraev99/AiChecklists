@@ -51,6 +51,15 @@ fun AppScaffold(
     bottomBar: @Composable () -> Unit = {},
     snackbarHost: @Composable () -> Unit = {},
     scrollBehavior: TopAppBarScrollBehavior? = null,
+    /**
+     * When true, the content area extends edge-to-edge to the PHYSICAL bottom of the screen
+     * (behind the navigation bar) instead of being inset above it. Use for screens that render their
+     * own bottom overlay which must paint INTO the navbar zone — e.g. MainScreen's glassmorphism
+     * chat dock, whose backdrop blur must cover the navbar so it doesn't stand out as an un-blurred
+     * strip. The overlay is then responsible for its own navigationBarsPadding(). Default false
+     * keeps the safe inset-above-navbar behaviour for ordinary screens.
+     */
+    contentExtendsBehindNavBar: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val windowSizeClass = rememberAppWindowSizeClass()
@@ -83,9 +92,17 @@ fun AppScaffold(
     // side — never a sum. Because the wrapper consumes navigationBars before the
     // caller's content sees them, any existing .navigationBarsPadding() inside
     // the bottomBar slot resolves to 0 and does not double-up.
+    //
+    // EXCEPTION — contentExtendsBehindNavBar: the slot adds NO navbar height, so the content area
+    // reaches the physical screen bottom (behind the navbar). The screen's own bottom overlay is then
+    // responsible for painting the navbar zone and applying its own navigationBarsPadding().
     val wrappedBottomBar: @Composable () -> Unit = {
-        Box(modifier = Modifier.windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))) {
+        if (contentExtendsBehindNavBar) {
             bottomBar()
+        } else {
+            Box(modifier = Modifier.windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))) {
+                bottomBar()
+            }
         }
     }
 

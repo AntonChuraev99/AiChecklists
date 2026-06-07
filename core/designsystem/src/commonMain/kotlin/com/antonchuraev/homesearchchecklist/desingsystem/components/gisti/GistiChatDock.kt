@@ -3,6 +3,7 @@ package com.antonchuraev.homesearchchecklist.desingsystem.components.gisti
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,13 +23,19 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.HazeStyle
+import dev.chrisbanes.haze.HazeTint
+import dev.chrisbanes.haze.hazeEffect
 
 /**
  * Collapsed AI-chat dock bar used on both MainScreen and ChecklistDetailScreen bottomBar.
@@ -132,82 +139,144 @@ fun GistiChatDock(
 }
 
 /**
- * The bottomBar column used on **ChecklistDetailScreen**.
+ * Generic floating glassmorphism chat-dock shell shared by **MainScreen** and
+ * **ChecklistDetailScreen**.
  *
- * Layout (inside the Surface):
+ * Place this as a **sibling overlay** (e.g. `Box` with `Modifier.align(BottomCenter)`) ON TOP of the
+ * scrolling content. The host MUST mark that scrolling content with `Modifier.hazeSource(hazeState)`
+ * as a SIBLING of this dock (never a parent — that would cause self-sampling). The strip's backdrop
+ * is a live blur of whatever scrolls behind it, sampled from [hazeState] via [Modifier.hazeEffect].
+ *
+ * Layout (inside the clipped, blurred strip):
  *
  * ```
- * ┌─────────────────────────────────────────────────────┐  ← Surface (surface,
- * │  ┌─[GistiChatDock]──────────────────────────────┐  │      shadowElevation=8dp)
- * │  │ ✨  Ask about this list…   ↑       🎤        │  │
- * │  └──────────────────────────────────────────────┘  │
+ * ┌─────────────────────────────────────────────────────┐  ← full-width strip, top corners 28dp,
+ * │  ▁▁▁▁▁▁ frosted glass strip (blurred backdrop) ▁▁▁▁  │     full-width strip, top corners 28dp
+ * │  [optional chipsContent — edge-to-edge]             │
+ * │  ┌─[pillContent]───────────────────────────────┐    │
+ * │  │ ✨  Ask Gisti…            ↑          🎤       │    │
+ * │  └──────────────────────────────────────────────┘   │
  * └─────────────────────────────────────────────────────┘
- *   padding: horizontal=16dp, top=12dp, bottom=16dp + navBarsPadding
+ *   padding: top=24dp (frost strip), bottom=16dp + navigationBarsPadding; pill inset by the caller
  * ```
  *
- * The two "Fill" actions are **no longer** in this bar — they moved to a TopAppBar action
- * that opens [FillOptionsSheet]. This bar now hosts the contextual prompt chips (optional)
- * ABOVE the context-aware chat dock.
+ * Why a single shared shell: the blur wiring (clip → hazeEffect(style) → padded Column with
+ * navigationBarsPadding) must stay identical on both screens. Duplicating it would let
+ * the two docks drift (one renders the blur, the other a flat tint — exactly the bug this dock
+ * recovered from when the project sat on the 2.0-alpha `haze-blur` `blurEffect{}` API whose backdrop
+ * never rendered). Both screens supply their own [pillContent] (command bar) and optional
+ * [chipsContent]; only the glass strip is shared.
  *
- * Layout note (edge-to-edge chips): [chipsContent] is rendered OUTSIDE the horizontally-padded
- * inner Column so the chip row keeps its own `contentPadding` edge-bleed (the last chip scrolls
- * out from under the screen edge as a scroll affordance). Wrapping the chips in this bar's
- * horizontal padding would stack padding and kill the bleed (see `.claude/rules/ui-card-patterns.md`).
- * The dock pill stays inside the padded Column.
+ * Visible-blur tuning (the app background is near-white #FBFAF8, so a naive glass is invisible):
+ *  - `blurRadius = 16.dp` — a moderate blur; content under the strip stays recognisable (silhouettes
+ *    and colours read through) rather than smeared into an opaque wash.
+ *  - `tint` is **translucent** (alpha 0.4): a high-alpha tint masks the blur and reads as a flat
+ *    solid plate; keeping it < 0.5 lets the blurred content show through as frosted glass.
+ *  - The Column adds top padding so a strip of pure frosted glass sits ABOVE the (opaque) chips/pill
+ *    where the blur is directly perceivable.
  *
- * This is a pure-UI shell. @android-expert:
- *  - Keep using this composable for `ChecklistDetailScreen.bottomBar`.
- *  - Add a TopAppBar action icon (e.g. `Icons.Outlined.PostAdd`) that toggles a
- *    `showFillSheet` flag; render [FillOptionsSheet] when true.
- *  - Pass `onChatClick` / `onMicClick` from App.kt (sheet wiring).
- *  - Pass [chipsContent] = `{ GistiPromptChips(gistiChecklistPromptChips(...), ...) }` for the
- *    contextual quick-action chips above the dock (no outer horizontal padding on the chips).
+ * Layout note (edge-to-edge chips): [chipsContent] is rendered OUTSIDE any horizontal padding so the
+ * chip row keeps its own `contentPadding` edge-bleed (the last chip scrolls out from under the screen
+ * edge as a scroll affordance). The caller insets [pillContent] horizontally instead (see
+ * `.claude/rules/ui-card-patterns.md`).
  *
- * @param checklistName       Current checklist name — passed as the context label.
+ * @param hazeState     Shared [HazeState] whose source is the scrolling content behind this dock.
+ * @param bottomPadding Gap below the pill, ABOVE the navigation-bar inset (default [AppDimens.SpacingLg]).
+ *                      MainScreen passes a smaller value to sit the bar closer to the screen bottom.
+ * @param chipsContent  Optional slot for a prompt-chip row, rendered above the pill with NO outer
+ *                      horizontal padding (the chips inset themselves). Pass `null` for pill only.
+ * @param pillContent   The command bar (e.g. [AskGistiBar] / [GistiChatDock]); the caller insets it
+ *                      horizontally so the pill stays padded while the chips above stay edge-to-edge.
+ */
+@Composable
+fun GistiGlassChatDock(
+    hazeState: HazeState,
+    modifier: Modifier = Modifier,
+    bottomPadding: Dp = AppDimens.SpacingLg,
+    chipsContent: (@Composable () -> Unit)? = null,
+    pillContent: @Composable () -> Unit,
+) {
+    val dockShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    // Frost tint pulled toward surfaceContainerHighest (a warm grey clearly darker than the
+    // near-white #FBFAF8 background) at partial alpha: this makes the strip read as a visible glass
+    // panel over the light content while still letting the blurred list show through. A frost tinted
+    // toward the background colour would be invisible on this white UI.
+    // Tint kept near-white (surfaceContainerLowest = the lightest surface, ~white) so the frosted
+    // strip reads as light glass rather than a grey panel. Alpha < 0.65 keeps the blurred backdrop
+    // showing through instead of masking it with a flat plate.
+    val dockTint = MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.6f)
+    val backgroundColor = MaterialTheme.colorScheme.surface
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            // Working order from the production swapfaceandroid bottom-nav (Haze 1.7.2): clip the
+            // rounded corners FIRST, then hazeEffect. hazeEffect(state, style) samples the live
+            // backdrop; HazeStyle carries the blur radius + translucent tint. (No blurEffect{} lambda —
+            // that was the 2.0-alpha haze-blur API whose backdrop never rendered in this project.)
+            // No top hairline: it read as a dark line over the near-white content; the blur + tint
+            // alone are enough to separate the strip from the list.
+            .clip(dockShape)
+            .hazeEffect(
+                state = hazeState,
+                style = HazeStyle(
+                    blurRadius = 16.dp,
+                    backgroundColor = backgroundColor,
+                    tint = HazeTint(dockTint),
+                ),
+            ),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                // Extra top padding leaves a visible frosted-glass strip above the chips so the blur
+                // is perceivable even though the chips/pill below it are opaque cards.
+                .padding(top = AppDimens.SpacingXl, bottom = bottomPadding)
+                .navigationBarsPadding(),
+            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
+        ) {
+            // Contextual prompt chips — edge-to-edge (own contentPadding, NO outer horizontal
+            // padding here so the last chip bleeds past the screen edge as a scroll affordance).
+            chipsContent?.invoke()
+            pillContent()
+        }
+    }
+}
+
+/**
+ * Floating glassmorphism chat dock for **ChecklistDetailScreen** — a thin wrapper over
+ * [GistiGlassChatDock] that supplies the context-aware [GistiChatDock] pill (placeholder replaced by
+ * the quoted [checklistName]). All blur/strip mechanics live in [GistiGlassChatDock]; see its KDoc
+ * for the hazeSource sibling contract.
+ *
+ * @param hazeState           Shared [HazeState] whose source is the scrolling content behind this dock.
+ * @param checklistName       Current checklist name — shown (quoted) as the context label.
  * @param onChatClick         Opens the chat sheet anchored to this checklist.
  * @param onMicClick          Opens the sheet in voice-input mode.
  * @param chatPlaceholder     Localised placeholder for the dock bar.
  * @param micContentDescription Accessibility label for mic.
- * @param chipsContent        Optional slot for the contextual prompt-chip row, rendered above the
- *                            dock pill with NO horizontal padding (the chips inset themselves).
- *                            Pass `null` to render the dock only.
+ * @param chipsContent        Optional contextual prompt-chip row rendered above the dock pill.
  */
 @Composable
-fun ChecklistDetailBottomBar(
+fun ChecklistDetailChatDock(
+    hazeState: HazeState,
     checklistName: String,
     onChatClick: () -> Unit,
     onMicClick: () -> Unit,
     chatPlaceholder: String = "Ask Gisti…",
     micContentDescription: String = "Voice input",
     modifier: Modifier = Modifier,
+    bottomPadding: Dp = AppDimens.SpacingLg,
     chipsContent: (@Composable () -> Unit)? = null,
 ) {
-    Surface(
-        // Flat bottom bar — NO shadow (user request 2026-06-02). The theme's `surface` and
-        // `background` are the same warm cream (#FBFAF8), so a shadowElevation here only rendered
-        // a dirty grey line above the bar in the system-nav zone — the "broken shadow" the user
-        // saw. The dock pill inside carries its own outlineVariant border, so the bar reads as a
-        // calm flat surface, consistent with the now-flat home screen (AskGistiBar, п.1).
-        // Surface still fills width with NO bottom inset (background reaches the screen bottom);
-        // the nav-bar inset stays on the inner Column.
-        modifier = modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surface,
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = AppDimens.SpacingMd, bottom = AppDimens.SpacingLg)
-                .navigationBarsPadding(),
-            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
-        ) {
-            // Contextual prompt chips — edge-to-edge (own contentPadding, NO outer horizontal
-            // padding here so the last chip bleeds past the screen edge as a scroll affordance).
-            // Vertical top/bottom padding lives on this outer Column; horizontal padding is applied
-            // only on the dock pill below so the chips can bleed past the screen edge.
-            chipsContent?.invoke()
-
-            // Context-aware dock: "Ask about this list…". Horizontal screen padding lives HERE
-            // (on the dock only) so the pill is inset normally while the chips above stay edge-to-edge.
+    GistiGlassChatDock(
+        hazeState = hazeState,
+        modifier = modifier,
+        bottomPadding = bottomPadding,
+        chipsContent = chipsContent,
+        pillContent = {
+            // Context-aware dock: "“<name>”". Horizontal screen padding lives HERE (on the pill only)
+            // so it is inset normally while the chips above stay edge-to-edge.
             GistiChatDock(
                 placeholder = chatPlaceholder,
                 onClick = onChatClick,
@@ -218,6 +287,6 @@ fun ChecklistDetailBottomBar(
                     .fillMaxWidth()
                     .padding(horizontal = AppDimens.ScreenPaddingHorizontal),
             )
-        }
-    }
+        },
+    )
 }

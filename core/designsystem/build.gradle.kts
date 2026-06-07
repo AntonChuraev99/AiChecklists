@@ -51,6 +51,10 @@ kotlin {
             implementation(compose.components.resources)
             implementation(libs.compose.adaptive)
             implementation(libs.compose.ui.tooling.preview)
+            // Haze 1.7.2 (stable) — backdrop blur for the glass chat dock (Android + wasmJs/Skiko, KMP, no
+            // expect/actual). Single module: blur + HazeStyle/HazeTint live in core `haze`. (2.0-alpha split
+            // blur into haze-blur + blurEffect{} but did not render the backdrop in this project — reverted.)
+            implementation(libs.haze)
         }
         androidMain.dependencies {
             implementation(libs.androidx.window)

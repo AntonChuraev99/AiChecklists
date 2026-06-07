@@ -3,12 +3,15 @@ package com.antonchuraev.homesearchchecklist.feature.home.presentation
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -26,22 +29,29 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import kotlinx.coroutines.launch
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.antonchuraev.homesearchchecklist.desingsystem.adaptive.AppWindowSizeClass
 import com.antonchuraev.homesearchchecklist.desingsystem.adaptive.rememberAppWindowSizeClass
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCreditsChip
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.AskGistiBar
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiGlassChatDock
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiPromptChips
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiQuickAction
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiDefaultPromptChips
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.done
 import aichecklists.core.designsystem.generated.resources.google_sign_in_failed
@@ -217,73 +227,15 @@ fun MainScreen(
                 }
             }
         },
-        bottomBar = {
-            // When the caller provides a FAB (hideBottomBar = true), suppress this bar
-            // to avoid double bottom UI on the Lists tab.
-            if (!hideBottomBar && !isEditMode && screenState is MainScreenState.Success) {
-                // Bottom area is now a clean chat dock: prompt-starter chips + the
-                // persistent "Ask Gisti" command bar. Manual checklist creation moved to
-                // the top bar "+" and the leading "New list" prompt chip (both →
-                // onCreateFromTemplatesClick). Upsell at the free limit lives on the
-                // in-list Premium banner + paywall, not a bottom button.
-                //
-                // Outer column owns ONLY the bottom + navigation-bar insets.
-                // Horizontal padding is applied per-child below, so the prompt chips can
-                // run edge-to-edge (LazyRow contentPadding) while the bar stays inset.
-                if (onNavigateToAiChat != null) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = AppDimens.SpacingLg)
-                            .navigationBarsPadding(),
-                        verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
-                    ) {
-                        // Edge-to-edge: NO outer horizontal padding here. The LazyRow insets
-                        // its content via contentPadding (= ScreenPaddingHorizontal by default),
-                        // so the last chip ("🔔 Remind me…") bleeds past the screen edge as a
-                        // scroll affordance instead of being clipped at the padding boundary.
-                        GistiPromptChips(
-                            chips = gistiDefaultPromptChips(
-                                createAiLabel = stringResource(Res.string.main_create_with_ai_action),
-                                photoLabel = stringResource(Res.string.main_prompt_photo),
-                                remindLabel = stringResource(Res.string.main_prompt_remind),
-                                linkLabel = stringResource(Res.string.main_prompt_link),
-                                planDayLabel = stringResource(Res.string.main_prompt_plan_day),
-                            ),
-                            // Each action drives its own chat flow (App.kt). Fall back to plainly
-                            // opening the chat when the host didn't wire onQuickAction.
-                            onChipClick = { action ->
-                                if (onQuickAction != null) {
-                                    onQuickAction(action)
-                                } else {
-                                    viewModel.sendIntent(MainScreenIntent.OnAiChatClick)
-                                }
-                            },
-                            // Leading "➕ New list" chip → Templates (manual create), distinct
-                            // from the chat-routing chips above. Shown only when wired.
-                            onNewListClick = onCreateFromTemplatesClick,
-                            newListLabel = stringResource(Res.string.main_prompt_new_list),
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        AskGistiBar(
-                            placeholder = stringResource(Res.string.main_ask_gisti_placeholder),
-                            onClick = { viewModel.sendIntent(MainScreenIntent.OnAiChatClick) },
-                            // Mic opens the dock and starts recording (App.kt). Fall back to
-                            // plainly opening the chat when not wired.
-                            onMicClick = {
-                                if (onMicClick != null) {
-                                    onMicClick()
-                                } else {
-                                    viewModel.sendIntent(MainScreenIntent.OnAiChatClick)
-                                }
-                            },
-                            micContentDescription = stringResource(Res.string.main_ask_gisti_mic),
-                            modifier = Modifier.padding(horizontal = AppDimens.ScreenPaddingHorizontal),
-                        )
-                    }
-                }
-            }
-        }
+        // No bottomBar slot: the AI-chat dock is now a floating glassmorphism overlay rendered
+        // inside the content Box (Success branch) so its backdrop can blur the scrolling list.
+        // An opaque Scaffold bottomBar can never show a backdrop blur.
+        //
+        // Content extends edge-to-edge to the physical bottom (behind the navbar) so the dock's
+        // blurred backdrop covers the navbar zone (no un-blurred strip) and the bar sits a clean
+        // navbar + 8dp from the edge — not 2×navbar (the old double-inset: Scaffold reserved the
+        // navbar AND the dock added its own navigationBarsPadding).
+        contentExtendsBehindNavBar = true,
     ) {
         when (val state = screenState) {
             MainScreenState.Loading -> {
@@ -295,31 +247,128 @@ fun MainScreen(
                 }
             }
             is MainScreenState.Success -> {
+                // Floating glassmorphism chat-dock overlay (mirrors ChecklistDetailScreen). The dock
+                // is NOT a Scaffold bottomBar so its backdrop can be a live blur of the scrolling
+                // list: the list is marked hazeSource, the dock (sibling, BottomCenter) samples it via
+                // hazeEffect. dockHeight is measured so the list gets exactly enough bottom
+                // contentPadding to scroll clear of the dock (single owner of the bottom inset — the
+                // dock carries its own navigationBarsPadding, the list never does).
+                val hazeState = rememberHazeState()
+                val density = LocalDensity.current
+                var dockHeightPx by remember { mutableStateOf(0) }
+                val dockHeight = with(density) { dockHeightPx.toDp() }
+                // Same visibility as the old bottomBar (we are already inside the Success branch).
+                val showDock = onNavigateToAiChat != null && !hideBottomBar && !isEditMode
+                // Content runs edge-to-edge behind the navbar (contentExtendsBehindNavBar). When the
+                // dock is shown, dockHeight already includes the navbar inset (the dock carries its own
+                // navigationBarsPadding), so the list clears both. When hidden (edit mode), add the
+                // navbar inset explicitly so the last row isn't swallowed by the navigation bar.
+                val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                val contentBottomPadding = if (showDock) {
+                    dockHeight + AppDimens.SpacingLg
+                } else {
+                    navBottom + AppDimens.SpacingXxl
+                }
+
                 Box(modifier = Modifier.fillMaxSize()) {
-                    MainScreenContent(
-                        screenState = state,
-                        isEditMode = isEditMode,
-                        onChecklistClick = { checklistWithProgress ->
-                            viewModel.sendIntent(MainScreenIntent.OnChecklistClick(checklistWithProgress))
-                        },
-                        onAddChecklistClick = {
-                            viewModel.sendIntent(MainScreenIntent.OnAddChecklistClick)
-                        },
-                        onAiAnalyzeClick = {
-                            viewModel.sendIntent(MainScreenIntent.OnAiAnalyzeClick)
-                        },
-                        onPremiumBannerClick = {
-                            viewModel.sendIntent(MainScreenIntent.OnPremiumBannerClick)
-                        },
-                        onEnterEditMode = { onEditModeChange(true) },
-                        onExitEditMode = { onEditModeChange(false) },
-                        onReorderChecklists = { orderedIds ->
-                            viewModel.sendIntent(MainScreenIntent.OnReorderChecklists(orderedIds))
-                        },
-                        onSignInClick = {
-                            viewModel.sendIntent(MainScreenIntent.OnSignInClick)
-                        },
-                    )
+                    // hazeSource on the CONTAINER (not the LazyColumn items — Haze #865 only blurs
+                    // centre cells when the source is on items). The opaque background gives the blur
+                    // something to sample over the near-white surface.
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.background)
+                            .hazeSource(hazeState),
+                    ) {
+                        MainScreenContent(
+                            screenState = state,
+                            isEditMode = isEditMode,
+                            onChecklistClick = { checklistWithProgress ->
+                                viewModel.sendIntent(MainScreenIntent.OnChecklistClick(checklistWithProgress))
+                            },
+                            onAddChecklistClick = {
+                                viewModel.sendIntent(MainScreenIntent.OnAddChecklistClick)
+                            },
+                            onAiAnalyzeClick = {
+                                viewModel.sendIntent(MainScreenIntent.OnAiAnalyzeClick)
+                            },
+                            onPremiumBannerClick = {
+                                viewModel.sendIntent(MainScreenIntent.OnPremiumBannerClick)
+                            },
+                            onEnterEditMode = { onEditModeChange(true) },
+                            onExitEditMode = { onEditModeChange(false) },
+                            onReorderChecklists = { orderedIds ->
+                                viewModel.sendIntent(MainScreenIntent.OnReorderChecklists(orderedIds))
+                            },
+                            onSignInClick = {
+                                viewModel.sendIntent(MainScreenIntent.OnSignInClick)
+                            },
+                            contentBottomPadding = contentBottomPadding,
+                        )
+                    }
+
+                    // Floating dock — a DIRECT child of the anchor Box (the hazeEffect node must sit
+                    // directly over the hazeSource; wrapping it in AnimatedVisibility would put the
+                    // effect in a separate graphicsLayer and stop Haze sampling the backdrop).
+                    if (showDock) {
+                        GistiGlassChatDock(
+                            hazeState = hazeState,
+                            // 8dp gap above the navbar inset. Content extends behind the navbar (see
+                            // AppScaffold contentExtendsBehindNavBar) so there is no second navbar inset
+                            // from the Scaffold — the bar sits a clean navbar + 8dp from the screen edge.
+                            bottomPadding = AppDimens.SpacingSm,
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .fillMaxWidth()
+                                .onSizeChanged { dockHeightPx = it.height },
+                            // Prompt-starter chips above the bar — edge-to-edge (own contentPadding,
+                            // last chip bleeds past the screen edge as a scroll affordance).
+                            chipsContent = {
+                                GistiPromptChips(
+                                    chips = gistiDefaultPromptChips(
+                                        createAiLabel = stringResource(Res.string.main_create_with_ai_action),
+                                        photoLabel = stringResource(Res.string.main_prompt_photo),
+                                        remindLabel = stringResource(Res.string.main_prompt_remind),
+                                        linkLabel = stringResource(Res.string.main_prompt_link),
+                                        planDayLabel = stringResource(Res.string.main_prompt_plan_day),
+                                    ),
+                                    // Each action drives its own chat flow (App.kt). Fall back to
+                                    // plainly opening the chat when the host didn't wire onQuickAction.
+                                    onChipClick = { action ->
+                                        if (onQuickAction != null) {
+                                            onQuickAction(action)
+                                        } else {
+                                            viewModel.sendIntent(MainScreenIntent.OnAiChatClick)
+                                        }
+                                    },
+                                    // Leading "➕ New list" chip → Templates (manual create).
+                                    onNewListClick = onCreateFromTemplatesClick,
+                                    newListLabel = stringResource(Res.string.main_prompt_new_list),
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            },
+                            // Persistent "Ask Gisti" command bar — inset horizontally (chips stay edge-to-edge).
+                            pillContent = {
+                                AskGistiBar(
+                                    placeholder = stringResource(Res.string.main_ask_gisti_placeholder),
+                                    onClick = { viewModel.sendIntent(MainScreenIntent.OnAiChatClick) },
+                                    // Mic opens the dock and starts recording (App.kt). Fall back to
+                                    // plainly opening the chat when not wired.
+                                    onMicClick = {
+                                        if (onMicClick != null) {
+                                            onMicClick()
+                                        } else {
+                                            viewModel.sendIntent(MainScreenIntent.OnAiChatClick)
+                                        }
+                                    },
+                                    micContentDescription = stringResource(Res.string.main_ask_gisti_mic),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = AppDimens.ScreenPaddingHorizontal),
+                                )
+                            },
+                        )
+                    }
                 }
             }
         }

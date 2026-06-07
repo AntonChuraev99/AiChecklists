@@ -30,6 +30,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.unit.Dp
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.weekly_add_for_day
 import aichecklists.core.designsystem.generated.resources.weekly_overdue_section_title
@@ -70,6 +71,7 @@ internal fun WeeklyChecklistDetailContent(
     onItemLongPress: (itemId: String) -> Unit,
     onItemTap: (itemId: String) -> Unit,
     modifier: Modifier = Modifier,
+    contentBottomPadding: Dp = AppDimens.SpacingXxl,
 ) {
     val items = state.defaultFill?.items.orEmpty()
     val overdueItems = remember(items, todayWeekday) { getOverdueItems(items, todayWeekday) }
@@ -105,7 +107,9 @@ internal fun WeeklyChecklistDetailContent(
     LazyColumn(
         state = listState,
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = AppDimens.SpacingXxl),
+        // Bottom padding clears the floating chat-dock overlay (host passes the measured dock
+        // height); falls back to SpacingXxl when rendered standalone.
+        contentPadding = PaddingValues(bottom = contentBottomPadding),
     ) {
         item(key = "title") {
             Text(
