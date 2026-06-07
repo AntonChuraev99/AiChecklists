@@ -33,9 +33,9 @@ object RemoteConfigKeys {
     // Remotely switchable to "yearly" via Firebase RC for markets where yearly converts better.
     const val PAYWALL_DEFAULT_PLAN = "paywall_default_plan"
 
-    // First-checklist A/B variant: "auto_create" | "current" (empty = "current").
-    // "auto_create" seeds a "Your first checklist" template on first launch for new users;
-    // anything else keeps the existing empty-state flow.
+    // First-checklist A/B variant: "auto_create" | "current".
+    // "auto_create" (the default) seeds a "Your first checklist" template on first launch
+    // for new users; "current" keeps the existing empty-state flow.
     const val FIRST_CHECKLIST_VARIANT = "first_checklist_variant"
 }
 
@@ -77,13 +77,13 @@ object RemoteConfigDefaults {
     // Paywall default plan — "monthly" so low-tier markets see affordable price first.
     const val PAYWALL_DEFAULT_PLAN = "monthly"
 
-    // First-checklist A/B variant default.
+    // First-checklist A/B variant default: "auto_create".
     //
-    // Empty client default is intentional (same rationale as ONBOARDING): any non-empty
-    // value MUST come from Firebase Remote Config so we can distinguish "RC returned a
-    // variant" from "fetch failed / not yet assigned". Empty falls back to CURRENT
-    // (control / no auto-create) inside GetFirstChecklistVariantUseCase. Without this
-    // guard every user with stale RC would silently land in the auto_create treatment,
-    // collapsing the A/B distribution.
-    const val FIRST_CHECKLIST_VARIANT = ""
+    // Auto-creating the starter checklist is the desired baseline product behavior, so the
+    // client default is "auto_create" rather than empty: a brand-new user gets the "Your
+    // first checklist" seed even on the very first cold start, before the first successful
+    // Remote Config fetch (getString falls back to this value via `ifEmpty`). Remote Config
+    // can still override per-cohort — set the parameter to "current" to opt a control group
+    // out of auto-create. Keep this in sync with the Firebase Console parameter default.
+    const val FIRST_CHECKLIST_VARIANT = "auto_create"
 }

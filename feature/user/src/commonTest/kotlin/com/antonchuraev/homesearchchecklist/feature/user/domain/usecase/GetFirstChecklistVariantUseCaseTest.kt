@@ -46,12 +46,13 @@ class GetFirstChecklistVariantUseCaseTest {
     }
 
     /**
-     * Guards the A/B distribution: the empty client default must resolve to CURRENT
-     * (control), so a stale/empty Remote Config never silently funnels every user into
-     * the auto_create treatment. If someone flips the default to "auto_create", this fails.
+     * Locks in the baseline: the client default resolves to AUTO_CREATE, so a brand-new user
+     * gets the starter checklist even before the first Remote Config fetch (or when a fetch
+     * fails). If someone reverts the default to "" / "current", this fails on purpose — change
+     * it only with an explicit product decision and update the Console parameter default too.
      */
     @Test
-    fun invoke_clientDefaultIsEmpty_resolvesToCurrent() {
+    fun invoke_clientDefaultIsAutoCreate_resolvesToAutoCreate() {
         val useCase = GetFirstChecklistVariantUseCase(
             remoteConfigProvider = PassThroughDefaultProvider(),
             logger = NoOpLogger(),
@@ -59,11 +60,11 @@ class GetFirstChecklistVariantUseCaseTest {
 
         val result = useCase()
 
-        assertEquals(FirstChecklistVariant.CURRENT, result)
+        assertEquals(FirstChecklistVariant.AUTO_CREATE, result)
         assertEquals(
-            "",
+            "auto_create",
             RemoteConfigDefaults.FIRST_CHECKLIST_VARIANT,
-            "Client default for FIRST_CHECKLIST_VARIANT must stay empty to keep A/B distribution honest"
+            "Client default for FIRST_CHECKLIST_VARIANT must stay 'auto_create' so new users get the starter checklist by default"
         )
     }
 

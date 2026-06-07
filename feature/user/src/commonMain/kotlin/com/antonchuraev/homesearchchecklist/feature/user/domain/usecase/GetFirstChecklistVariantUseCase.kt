@@ -8,14 +8,16 @@ import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigPr
 /**
  * Resolves the first-checklist A/B variant from Remote Config.
  *
- * - [FirstChecklistVariant.AUTO_CREATE] (RC value "auto_create"): seed a "Your first
- *   checklist" template on first launch for new users.
- * - [FirstChecklistVariant.CURRENT] (RC value "current" or empty / unknown): keep the
- *   existing empty-state flow.
+ * - [FirstChecklistVariant.AUTO_CREATE] (RC value "auto_create", and the client default):
+ *   seed a "Your first checklist" template on first launch for new users.
+ * - [FirstChecklistVariant.CURRENT] (RC value "current"): keep the existing empty-state flow.
  *
- * Mirrors [GetOnboardingVariantUseCase]: any non-"auto_create" value (including the empty
- * client default) maps to the control variant so a stale/empty RC never collapses the A/B
- * distribution into the treatment cohort.
+ * Auto-create is the baseline: the client default ([RemoteConfigDefaults.FIRST_CHECKLIST_VARIANT])
+ * is "auto_create", so a brand-new user gets the starter checklist even before the first RC
+ * fetch resolves (or when a fetch fails). Remote Config — or an A/B experiment — overrides
+ * this to "current" to opt a control cohort out. An empty or unknown RC value still maps to
+ * CURRENT defensively, but in practice `getString` already substitutes the "auto_create"
+ * client default for an empty value before it reaches this mapping.
  */
 class GetFirstChecklistVariantUseCase(
     private val remoteConfigProvider: RemoteConfigProvider,
