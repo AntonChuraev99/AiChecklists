@@ -79,6 +79,7 @@ import aichecklists.core.designsystem.generated.resources.chat_dispatch_renamed
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_already_done
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_completed
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_created_empty
+import aichecklists.core.designsystem.generated.resources.chat_dispatch_created_from_attachment
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_created_with_many
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_created_with_one
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_deleted
@@ -509,6 +510,7 @@ fun App() {
             val sm_dispatchCompleted = stringResource(Res.string.chat_dispatch_completed)
             val sm_dispatchAlreadyDone = stringResource(Res.string.chat_dispatch_already_done)
             val sm_dispatchCreatedEmpty = stringResource(Res.string.chat_dispatch_created_empty)
+            val sm_dispatchCreatedFromAttachment = stringResource(Res.string.chat_dispatch_created_from_attachment)
             val sm_dispatchCreatedWithOne = stringResource(Res.string.chat_dispatch_created_with_one)
             val sm_dispatchCreatedWithMany = stringResource(Res.string.chat_dispatch_created_with_many)
             val sm_dispatchReminderSet = stringResource(Res.string.chat_dispatch_reminder_set)
@@ -557,6 +559,7 @@ fun App() {
                     "chat_dispatch_completed" to sm_dispatchCompleted,
                     "chat_dispatch_already_done" to sm_dispatchAlreadyDone,
                     "chat_dispatch_created_empty" to sm_dispatchCreatedEmpty,
+                    "chat_dispatch_created_from_attachment" to sm_dispatchCreatedFromAttachment,
                     "chat_dispatch_created_with_one" to sm_dispatchCreatedWithOne,
                     "chat_dispatch_created_with_many" to sm_dispatchCreatedWithMany,
                     "chat_dispatch_reminder_set" to sm_dispatchReminderSet,

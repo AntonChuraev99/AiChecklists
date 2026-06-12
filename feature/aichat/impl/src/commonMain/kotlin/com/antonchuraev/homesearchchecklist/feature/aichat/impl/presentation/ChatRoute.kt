@@ -20,6 +20,7 @@ import aichecklists.core.designsystem.generated.resources.chat_dispatch_renamed
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_already_done
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_completed
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_created_empty
+import aichecklists.core.designsystem.generated.resources.chat_dispatch_created_from_attachment
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_created_with_many
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_created_with_one
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_deleted
@@ -121,6 +122,7 @@ fun ChatRoute(
     val dispatchCompletedFmt = stringResource(Res.string.chat_dispatch_completed)
     val dispatchAlreadyDoneFmt = stringResource(Res.string.chat_dispatch_already_done)
     val dispatchCreatedEmptyFmt = stringResource(Res.string.chat_dispatch_created_empty)
+    val dispatchCreatedFromAttachmentFmt = stringResource(Res.string.chat_dispatch_created_from_attachment)
     val dispatchCreatedWithOneFmt = stringResource(Res.string.chat_dispatch_created_with_one)
     val dispatchCreatedWithManyFmt = stringResource(Res.string.chat_dispatch_created_with_many)
     val dispatchReminderSetFmt = stringResource(Res.string.chat_dispatch_reminder_set)
@@ -186,6 +188,7 @@ fun ChatRoute(
             "chat_dispatch_completed" to dispatchCompletedFmt,
             "chat_dispatch_already_done" to dispatchAlreadyDoneFmt,
             "chat_dispatch_created_empty" to dispatchCreatedEmptyFmt,
+            "chat_dispatch_created_from_attachment" to dispatchCreatedFromAttachmentFmt,
             "chat_dispatch_created_with_one" to dispatchCreatedWithOneFmt,
             "chat_dispatch_created_with_many" to dispatchCreatedWithManyFmt,
             "chat_dispatch_reminder_set" to dispatchReminderSetFmt,
