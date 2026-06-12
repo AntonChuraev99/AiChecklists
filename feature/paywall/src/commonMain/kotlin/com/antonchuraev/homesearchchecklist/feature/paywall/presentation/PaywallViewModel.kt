@@ -388,7 +388,7 @@ class PaywallViewModel(
         }
     }
 
-    private val conversionEventHelper = ConversionEventHelper(analyticsTracker)
+    private val conversionEventHelper = ConversionEventHelper(analyticsTracker, logger)
 
     private fun dismissError() {
         _screenState.update { it.copy(error = null) }

@@ -41,6 +41,36 @@ class ConversionEventHelperTest {
         freeTrialDays = 0
     )
 
+    // Real store values, deliberately NOT 1.99 / USD so the GA4 purchase tests
+    // prove value/currency come from the product, not the hardcoded in_app_purchase.
+    private val paidProduct = PaywallProduct(
+        id = "premium_yearly",
+        title = "Premium Yearly",
+        description = "Premium Yearly",
+        priceString = "€49.99",
+        priceAmount = 49.99,
+        priceCurrencyCode = "EUR",
+        periodString = "1 year",
+        packageId = "\$rc_annual",
+        hasFreeTrial = false,
+        freeTrialDays = 0
+    )
+
+    // Real price but no currency code — GA4 drops revenue for value-without-currency,
+    // so the purchase event must be skipped for this product.
+    private val paidProductBlankCurrency = PaywallProduct(
+        id = "premium_yearly",
+        title = "Premium Yearly",
+        description = "Premium Yearly",
+        priceString = "49.99",
+        priceAmount = 49.99,
+        priceCurrencyCode = "",
+        periodString = "1 year",
+        packageId = "\$rc_annual",
+        hasFreeTrial = false,
+        freeTrialDays = 0
+    )
+
     // --- free_trial_start event ---
 
     @Test
@@ -163,6 +193,111 @@ class ConversionEventHelperTest {
         helper.logConversionEvent(result, noTrialProduct)
 
         assertTrue(fakeTracker.events.none { it.first == "free_trial_start" })
+    }
+
+    // --- GA4 standard `purchase` event (revenue / Google Ads ROAS) ---
+
+    @Test
+    fun directPurchase_firesGa4PurchaseEvent() {
+        val result = PurchaseResult.Success(
+            subscriptionStatus = premiumStatus,
+            transactionId = "GPA.1111-2222",
+            hasFreeTrial = false
+        )
+
+        helper.logConversionEvent(result, paidProduct)
+
+        assertTrue(fakeTracker.events.any { it.first == "purchase" })
+    }
+
+    @Test
+    fun directPurchase_firesBothInAppPurchaseAndGa4Purchase() {
+        val result = PurchaseResult.Success(
+            subscriptionStatus = premiumStatus,
+            transactionId = "GPA.1111-2222",
+            hasFreeTrial = false
+        )
+
+        helper.logConversionEvent(result, paidProduct)
+
+        // in_app_purchase (existing Google Ads conversion) is additive with the new
+        // GA4-standard purchase event — both fire for a real payment, no double revenue
+        // because GA4 only aggregates revenue from the reserved `purchase` event.
+        assertTrue(fakeTracker.events.any { it.first == "in_app_purchase" })
+        assertTrue(fakeTracker.events.any { it.first == "purchase" })
+    }
+
+    @Test
+    fun ga4Purchase_usesRealValueAndCurrency_notHardcoded() {
+        val result = PurchaseResult.Success(
+            subscriptionStatus = premiumStatus,
+            transactionId = "GPA.1111-2222",
+            hasFreeTrial = false
+        )
+
+        helper.logConversionEvent(result, paidProduct)
+
+        val purchase = fakeTracker.events.first { it.first == "purchase" }.second
+        assertEquals(49.99, purchase["value"])
+        assertEquals("EUR", purchase["currency"])
+        assertEquals("GPA.1111-2222", purchase["transaction_id"])
+    }
+
+    @Test
+    fun ga4Purchase_valueIsNumericDouble_notString() {
+        val result = PurchaseResult.Success(
+            subscriptionStatus = premiumStatus,
+            transactionId = "GPA.1111-2222",
+            hasFreeTrial = false
+        )
+
+        helper.logConversionEvent(result, paidProduct)
+
+        // GA4 silently drops revenue if `value` is a String — it must stay Double.
+        val purchase = fakeTracker.events.first { it.first == "purchase" }.second
+        assertTrue(purchase["value"] is Double)
+    }
+
+    @Test
+    fun ga4Purchase_notFiredForTrialProduct() {
+        val result = PurchaseResult.Success(
+            subscriptionStatus = premiumStatus,
+            hasFreeTrial = true
+        )
+
+        helper.logConversionEvent(result, trialProduct)
+
+        // Trial start = no payment today → no revenue event (free_trial_start covers it).
+        assertTrue(fakeTracker.events.none { it.first == "purchase" })
+    }
+
+    @Test
+    fun ga4Purchase_skippedWhenTransactionIdNull() {
+        val result = PurchaseResult.Success(
+            subscriptionStatus = premiumStatus,
+            transactionId = null,
+            hasFreeTrial = false
+        )
+
+        helper.logConversionEvent(result, paidProduct)
+
+        // Null transaction_id (sandbox) → skip GA4 purchase; in_app_purchase still fires.
+        assertTrue(fakeTracker.events.none { it.first == "purchase" })
+        assertTrue(fakeTracker.events.any { it.first == "in_app_purchase" })
+    }
+
+    @Test
+    fun ga4Purchase_skippedWhenCurrencyBlank() {
+        val result = PurchaseResult.Success(
+            subscriptionStatus = premiumStatus,
+            transactionId = "GPA.1111-2222",
+            hasFreeTrial = false
+        )
+
+        helper.logConversionEvent(result, paidProductBlankCurrency)
+
+        // value-without-currency → GA4 drops revenue, so the event must not be sent.
+        assertTrue(fakeTracker.events.none { it.first == "purchase" })
     }
 }
 

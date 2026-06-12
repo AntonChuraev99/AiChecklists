@@ -23,7 +23,15 @@ object Analytics : AnalyticsTracker {
 
     private val firebase by lazy {
         FirebaseAnalytics.getInstance(AppContextHolder.context).apply {
-            setAnalyticsCollectionEnabled(!AppBuildConfig.isDebug)
+            // Collection is ON for ALL build types, including debug, so debug /
+            // internal-testing builds can validate purchase & conversion events
+            // (e.g. the GA4 `purchase` revenue event) end-to-end on a real device
+            // via Firebase DebugView. Trade-off: debug builds now send to the
+            // production Firebase/GA4 project. Keep dev noise out of reports with
+            // GA4 → Admin → Data Settings → "Filter out developer traffic"
+            // (debug_mode). Amplitude debug already routes to a separate project
+            // via AMPLITUDE_DEBUG_KEY, so only Firebase/GA4 is affected here.
+            setAnalyticsCollectionEnabled(true)
         }
     }
 
