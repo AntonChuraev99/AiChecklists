@@ -473,7 +473,12 @@ private fun ChecklistDetailContent(
     var addItemActive by remember { mutableStateOf(false) }
     var isEditMode by rememberSaveable { mutableStateOf(false) }
     val listState = rememberLazyListState()
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    // Pinned (not exitUntilCollapsed): the toolbar action icons (add / fill / reminder / share /
+    // edit / overflow) must stay reachable while the list scrolls. exitUntilCollapsed on the
+    // single-row CenterAlignedTopAppBar (Compact) treats the whole bar height as collapsible and
+    // scrolls it fully off-screen ("collapses"). Pinned keeps it fixed while still swapping in the
+    // scrolledContainerColor as content passes under it.
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val hapticFeedback = LocalHapticFeedback.current
     // coroutineScope declared above (shared with attachment open-externally handler)
 
