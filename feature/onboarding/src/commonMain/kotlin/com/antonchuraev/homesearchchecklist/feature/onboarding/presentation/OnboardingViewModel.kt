@@ -2,6 +2,8 @@ package com.antonchuraev.homesearchchecklist.feature.onboarding.presentation
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
@@ -29,12 +31,12 @@ class OnboardingViewModel(
         if (!isDebugBuild) {
             val alreadyTracked = savedStateHandle.get<Boolean>(KEY_STARTED_TRACKED) == true
             if (!alreadyTracked) {
-                analyticsTracker.event("onboarding_started", mapOf("variant" to "slides"))
+                analyticsTracker.event(AnalyticsEvents.Onboarding.STARTED, mapOf(AnalyticsParams.VARIANT to "slides"))
                 savedStateHandle[KEY_STARTED_TRACKED] = true
             }
             // Always track ViewModel creation for diagnostics (helps identify process death)
-            analyticsTracker.event("onboarding_vm_created", mapOf(
-                "variant" to "slides",
+            analyticsTracker.event(AnalyticsEvents.Onboarding.VM_CREATED, mapOf(
+                AnalyticsParams.VARIANT to "slides",
                 "is_restored" to alreadyTracked.toString()
             ))
         }
@@ -59,7 +61,7 @@ class OnboardingViewModel(
 
     private fun updatePage(page: Int) {
         _screenState.update { it.copy(currentPage = page) }
-        analyticsTracker.event("onboarding_page_viewed", mapOf("page" to page.toString()))
+        analyticsTracker.event(AnalyticsEvents.Onboarding.PAGE_VIEWED, mapOf(AnalyticsParams.PAGE to page.toString()))
     }
 
     private fun completeOnboarding() {
@@ -70,12 +72,12 @@ class OnboardingViewModel(
         viewModelScope.launch {
             if (!isDebugBuild) {
                 if (wasSkipped) {
-                    analyticsTracker.event("onboarding_skipped", mapOf(
-                        "variant" to "slides",
-                        "page" to currentPage.toString()
+                    analyticsTracker.event(AnalyticsEvents.Onboarding.SKIPPED, mapOf(
+                        AnalyticsParams.VARIANT to "slides",
+                        AnalyticsParams.PAGE to currentPage.toString()
                     ))
                 }
-                analyticsTracker.event("onboarding_completed", mapOf("variant" to "slides"))
+                analyticsTracker.event(AnalyticsEvents.Onboarding.COMPLETED, mapOf(AnalyticsParams.VARIANT to "slides"))
             }
             completeOnboardingUseCase()
             navigator.navigateToMainScreen(clearBackStack = true)

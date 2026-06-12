@@ -1,5 +1,6 @@
 package com.antonchuraev.homesearchchecklist.di
 
+import com.antonchuraev.homesearchchecklist.analytics.WasmAnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentOpener
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStorage
@@ -13,13 +14,6 @@ import com.antonchuraev.homesearchchecklist.sync.WasmFirestoreSyncDataSource
 import org.koin.core.module.Module
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
-
-private object StubAnalyticsTracker : AnalyticsTracker {
-    override fun setUserId(userId: String) = Unit
-    override fun setUserProperties(properties: Map<String, Any>) = Unit
-    override fun screenView(name: String) = Unit
-    override fun event(name: String, params: Map<String, Any>) = Unit
-}
 
 private object StubReminderScheduler : ChecklistReminderScheduler {
     override fun scheduleReminder(checklistId: Long, triggerAtMillis: Long) = Unit
@@ -36,7 +30,7 @@ private object StubReminderScheduler : ChecklistReminderScheduler {
 
 actual fun platformModule(): Module = module {
     single { DeviceIdProvider(UserAppDatastoreProvider.instance) }
-    single<AnalyticsTracker> { ObservableAnalyticsTracker(StubAnalyticsTracker) }
+    single<AnalyticsTracker> { ObservableAnalyticsTracker(WasmAnalyticsTracker()) }
     single<ChecklistReminderScheduler> { StubReminderScheduler }
 
     // AttachmentStorage: wasmJs stub — all methods are no-op / return null.

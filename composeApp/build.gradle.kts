@@ -180,6 +180,9 @@ val firebaseWebProps: Map<String, String> = run {
         "FIREBASE_STORAGE_BUCKET" to props.getProperty("FIREBASE_WEB_STORAGE_BUCKET", "aichecklists-40230.firebasestorage.app"),
         "FIREBASE_MESSAGING_SENDER_ID" to props.getProperty("FIREBASE_WEB_MESSAGING_SENDER_ID", "27698629989"),
         "FIREBASE_APP_ID" to props.getProperty("FIREBASE_WEB_APP_ID", "MISSING_FIREBASE_WEB_APP_ID"),
+        // GA4 measurementId (G-XXXXXXX). Empty string when unset → Analytics inits but
+        // sends nothing to GA4 (graceful: no throw, just no data). Required for web analytics.
+        "FIREBASE_MEASUREMENT_ID" to props.getProperty("FIREBASE_WEB_MEASUREMENT_ID", ""),
     )
 }
 

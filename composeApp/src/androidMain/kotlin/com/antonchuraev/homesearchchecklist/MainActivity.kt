@@ -21,6 +21,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.antonchuraev.homesearchchecklist.consent.ConsentDialog
 import com.antonchuraev.homesearchchecklist.core.auth.api.GoogleAuthRepository
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppContextHolder
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppThemeMode
@@ -165,7 +166,7 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(Unit) {
                 consumePendingChecklistId()?.let { id ->
                     appNavigator.navigateToChecklistDetail(id)
-                    analyticsTracker.event("reminder_notification_tapped", mapOf(
+                    analyticsTracker.event(AnalyticsEvents.Reminder.NOTIFICATION_TAPPED, mapOf(
                         "checklist_id" to id.toString()
                     ))
                 }
@@ -184,7 +185,7 @@ class MainActivity : ComponentActivity() {
         // Warm start — NavController is already ready
         extractDeepLinkChecklistId(intent)?.let { id ->
             appNavigator.navigateToChecklistDetail(id)
-            analyticsTracker.event("reminder_notification_tapped", mapOf(
+            analyticsTracker.event(AnalyticsEvents.Reminder.NOTIFICATION_TAPPED, mapOf(
                 "checklist_id" to id.toString()
             ))
         }

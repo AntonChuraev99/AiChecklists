@@ -120,59 +120,28 @@ class ConversionEventHelperTest {
         assertEquals("3_days", fakeTracker.events[0].second["trial_duration"])
     }
 
-    // --- in_app_purchase event ---
+    // --- in_app_purchase REMOVED (2026-06-12, GA4 dedup) ---
+    // The legacy manual `in_app_purchase` event duplicated Firebase's auto-collected
+    // in_app_purchase and risked GA4 double-counting. It is no longer emitted — direct
+    // purchases now fire ONLY the GA4-reserved `purchase` revenue event.
 
     @Test
-    fun directPurchase_firesPurchaseEvent() {
+    fun directPurchase_neverFiresLegacyInAppPurchaseEvent() {
         val result = PurchaseResult.Success(
             subscriptionStatus = premiumStatus,
             transactionId = "GPA.1234-5678",
             hasFreeTrial = false
         )
 
-        helper.logConversionEvent(result, noTrialProduct)
+        helper.logConversionEvent(result, paidProduct)
 
-        assertEquals(1, fakeTracker.events.size)
-        assertEquals("in_app_purchase", fakeTracker.events[0].first)
-    }
-
-    @Test
-    fun directPurchase_hasCorrectParams() {
-        val result = PurchaseResult.Success(
-            subscriptionStatus = premiumStatus,
-            transactionId = "GPA.1234-5678",
-            hasFreeTrial = false
-        )
-
-        helper.logConversionEvent(result, noTrialProduct)
-
-        val params = fakeTracker.events[0].second
-        assertEquals("premium_monthly", params["item_id"])
-        assertEquals("Premium Monthly", params["item_name"])
-        assertEquals("USD", params["currency"])
-        assertEquals(1.99, params["value"])
-        assertEquals("GPA.1234-5678", params["transaction_id"])
-    }
-
-    @Test
-    fun directPurchase_nullTransactionId_excludedFromParams() {
-        val result = PurchaseResult.Success(
-            subscriptionStatus = premiumStatus,
-            transactionId = null,
-            hasFreeTrial = false
-        )
-
-        helper.logConversionEvent(result, noTrialProduct)
-
-        val params = fakeTracker.events[0].second
-        assertFalse(params.containsKey("transaction_id"))
-        assertEquals("in_app_purchase", fakeTracker.events[0].first)
+        assertTrue(fakeTracker.events.none { it.first == "in_app_purchase" })
     }
 
     // --- event selection ---
 
     @Test
-    fun trialProduct_neverFiresPurchaseEvent() {
+    fun trialProduct_neverFiresInAppPurchaseEvent() {
         val result = PurchaseResult.Success(
             subscriptionStatus = premiumStatus,
             hasFreeTrial = true
@@ -211,7 +180,7 @@ class ConversionEventHelperTest {
     }
 
     @Test
-    fun directPurchase_firesBothInAppPurchaseAndGa4Purchase() {
+    fun directPurchase_firesOnlyGa4Purchase_notInAppPurchase() {
         val result = PurchaseResult.Success(
             subscriptionStatus = premiumStatus,
             transactionId = "GPA.1111-2222",
@@ -220,11 +189,11 @@ class ConversionEventHelperTest {
 
         helper.logConversionEvent(result, paidProduct)
 
-        // in_app_purchase (existing Google Ads conversion) is additive with the new
-        // GA4-standard purchase event — both fire for a real payment, no double revenue
-        // because GA4 only aggregates revenue from the reserved `purchase` event.
-        assertTrue(fakeTracker.events.any { it.first == "in_app_purchase" })
-        assertTrue(fakeTracker.events.any { it.first == "purchase" })
+        // Post-dedup (2026-06-12): a real payment fires EXACTLY the GA4 `purchase` revenue
+        // event and nothing else — the legacy in_app_purchase is gone.
+        assertEquals(1, fakeTracker.events.size)
+        assertEquals("purchase", fakeTracker.events[0].first)
+        assertTrue(fakeTracker.events.none { it.first == "in_app_purchase" })
     }
 
     @Test
@@ -281,9 +250,11 @@ class ConversionEventHelperTest {
 
         helper.logConversionEvent(result, paidProduct)
 
-        // Null transaction_id (sandbox) → skip GA4 purchase; in_app_purchase still fires.
+        // Null transaction_id (sandbox) → GA4 purchase skipped. With in_app_purchase removed,
+        // a sandbox direct purchase emits NO conversion event at all (correct — sandbox is
+        // not real revenue; the internal purchase_completed funnel event still fires elsewhere).
         assertTrue(fakeTracker.events.none { it.first == "purchase" })
-        assertTrue(fakeTracker.events.any { it.first == "in_app_purchase" })
+        assertTrue(fakeTracker.events.none { it.first == "in_app_purchase" })
     }
 
     @Test

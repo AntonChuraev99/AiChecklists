@@ -229,12 +229,21 @@ private class FakeUserDataRepository(
 
 private class FakeAnalyticsTracker : com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker {
     val events = mutableListOf<Pair<String, Map<String, Any>>>()
+    val screenViews = mutableListOf<String>()
     override fun setUserId(userId: String) {}
     override fun setUserProperties(properties: Map<String, Any>) {}
-    override fun screenView(name: String) {}
+    override fun screenView(name: String) {
+        screenViews.add(name)
+    }
     override fun event(name: String, params: Map<String, Any>) {
         events.add(name to params)
     }
+
+    /** First params map recorded for [name], or null if the event was never emitted. */
+    fun paramsOf(name: String): Map<String, Any>? = events.firstOrNull { it.first == name }?.second
+
+    /** Count of events emitted with [name]. */
+    fun count(name: String): Int = events.count { it.first == name }
 }
 
 private fun makeVm(
@@ -1864,5 +1873,237 @@ class ChatViewModelTest {
         assertEquals(1, repo.classifyCallCount, "Non-force prefill must classify")
         assertEquals(0, repo.agentStepCallCount, "CreateItem must NOT hit the agent loop")
         assertIs<PendingPreview>(vm.screenState.value.pendingPreview)
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Analytics funnel — opened / message_sent / response_received / thumb_down
+    // ══════════════════════════════════════════════════════════════════════════
+
+    // ── A1. OnChatOpened → screenView(CHAT) + ai_chat_opened with source ──
+    @Test
+    fun onChatOpened_emitsOpenedEventAndScreenView() = runTest {
+        val analytics = FakeAnalyticsTracker()
+        val vm = makeVm(analytics = analytics)
+
+        vm.sendIntent(ChatScreenIntent.OnChatOpened(source = "dock"))
+
+        assertTrue(analytics.screenViews.contains("chat"), "screenView(CHAT) must be sent on open")
+        val params = analytics.paramsOf("ai_chat_opened")
+        assertNotNull(params, "ai_chat_opened must be emitted")
+        assertEquals("dock", params["source"], "source param must be forwarded")
+    }
+
+    // ── A2. message_sent fires with deep_thinking / context / input_method / char_len ──
+    @Test
+    fun sendClick_emitsMessageSentWithFunnelParams() = runTest {
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.CreateItem,
+                confidence = 1.0f,
+                layer = RoutingLayer.Local,
+            )
+        )
+        val analytics = FakeAnalyticsTracker()
+        val vm = makeVm(repo = repo, analytics = analytics)
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        val params = analytics.paramsOf("ai_chat_message_sent")
+        assertNotNull(params, "ai_chat_message_sent must be emitted on a real send")
+        assertEquals("false", params["deep_thinking_enabled"])
+        assertEquals("false", params["has_context_checklist"], "no context set → false")
+        assertEquals("text", params["input_method"])
+        assertEquals("add milk".length, params["char_len"], "char_len must equal the trimmed text length")
+    }
+
+    // ── A3. message_sent is NOT emitted for blank input (guard fires first) ──
+    @Test
+    fun sendClick_blankInput_doesNotEmitMessageSent() = runTest {
+        val analytics = FakeAnalyticsTracker()
+        val vm = makeVm(analytics = analytics)
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("   "))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(0, analytics.count("ai_chat_message_sent"),
+            "Blank input must not count as a sent message")
+    }
+
+    // ── A4. message_sent has_context_checklist=true when a context checklist is set ──
+    @Test
+    fun sendClick_withContextChecklist_messageSentHasContextTrue() = runTest {
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.CreateItem,
+                confidence = 1.0f,
+                layer = RoutingLayer.Local,
+            )
+        )
+        val analytics = FakeAnalyticsTracker()
+        val vm = makeVm(repo = repo, analytics = analytics)
+
+        vm.sendIntent(ChatScreenIntent.OnSetContextChecklist(checklistId = 5L))
+        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        val params = analytics.paramsOf("ai_chat_message_sent")
+        assertNotNull(params)
+        assertEquals("true", params["has_context_checklist"])
+    }
+
+    // ── A5. response_received fires for a write-intent (outcome="preview") with layer + credits ──
+    @Test
+    fun sendClick_writeIntent_emitsResponseReceivedPreview() = runTest {
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.CreateItem,
+                confidence = 1.0f,
+                layer = RoutingLayer.Local,
+            )
+        )
+        val analytics = FakeAnalyticsTracker()
+        val vm = makeVm(repo = repo, analytics = analytics)
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk to shopping"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        val params = analytics.paramsOf("ai_chat_response_received")
+        assertNotNull(params, "ai_chat_response_received must be emitted when a preview is shown")
+        assertEquals("preview", params["outcome"])
+        assertEquals("Local", params["routed_layer"])
+        assertEquals(0, params["credits_used"], "Layer 1 (Local) costs 0 credits")
+        // preview_shown carries the action type
+        val previewParams = analytics.paramsOf("ai_chat_preview_shown")
+        assertNotNull(previewParams, "ai_chat_preview_shown must be emitted")
+        assertEquals("AddItem", previewParams["action_type"])
+    }
+
+    // ── A6. response_received fires for the agent Final (outcome="answer", layer=FullChat) ──
+    @Test
+    fun freeForm_finalAnswer_emitsResponseReceivedAnswer() = runTest {
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.FreeForm,
+                confidence = 1.0f,
+                layer = RoutingLayer.FullChat,
+            ),
+            agentStepResults = listOf(
+                AgentStepResult.Final(content = "Here is your week.", creditsRemaining = 100),
+            ),
+        )
+        val analytics = FakeAnalyticsTracker()
+        val vm = makeVm(repo = repo, analytics = analytics)
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("plan my week"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        val params = analytics.paramsOf("ai_chat_response_received")
+        assertNotNull(params, "agent Final must emit ai_chat_response_received")
+        assertEquals("answer", params["outcome"])
+        assertEquals("FullChat", params["routed_layer"])
+        assertEquals(3, params["credits_used"], "Layer 3 (FullChat) costs 3 credits")
+    }
+
+    // ── A7. thumb_down — OnFeedbackOpen emits ai_chat_thumb_down with message params ──
+    @Test
+    fun onFeedbackOpen_emitsThumbDownEvent() = runTest {
+        val analytics = FakeAnalyticsTracker()
+        val vm = makeVm(analytics = analytics)
+        val assistantMsg = ChatMessage(
+            id = "asst_dislike",
+            role = ChatRole.Assistant,
+            content = "A bad answer.",
+            timestamp = 1_000L,
+            routedLayer = RoutingLayer.FullChat,
+        )
+
+        vm.sendIntent(ChatScreenIntent.OnFeedbackOpen(assistantMsg))
+
+        val params = analytics.paramsOf("ai_chat_thumb_down")
+        assertNotNull(params, "Opening the feedback sheet IS the thumb-down moment")
+        assertEquals("asst_dislike", params["message_id"])
+        assertEquals("FullChat", params["routed_layer"])
+        assertEquals("false", params["deep_thinking_enabled"])
+        // FEEDBACK must NOT fire on open — only on submit
+        assertEquals(0, analytics.count("ai_chat_feedback"),
+            "ai_chat_feedback must not fire on open, only on submit")
+    }
+
+    // ── A8. thumb_up — migrated to catalog name, value-preserving params ──
+    @Test
+    fun onThumbUpClick_emitsThumbUpWithMigratedParams() = runTest {
+        val analytics = FakeAnalyticsTracker()
+        val vm = makeVm(analytics = analytics)
+        val assistantMsg = ChatMessage(
+            id = "asst_like",
+            role = ChatRole.Assistant,
+            content = "A good answer.",
+            timestamp = 1_000L,
+            routedLayer = RoutingLayer.Classifier,
+        )
+
+        vm.sendIntent(ChatScreenIntent.OnThumbUpClick(assistantMsg))
+
+        val params = analytics.paramsOf("ai_chat_thumb_up")
+        assertNotNull(params)
+        assertEquals("asst_like", params["message_id"])
+        assertEquals("Classifier", params["routed_layer"])
+        assertEquals("false", params["deep_thinking_enabled"])
+    }
+
+    // ── A9. feedback — migrated to catalog name, submit emits ai_chat_feedback ──
+    @Test
+    fun onFeedbackSubmit_emitsFeedbackWithMigratedParams() = runTest {
+        val analytics = FakeAnalyticsTracker()
+        val vm = makeVm(analytics = analytics)
+        val assistantMsg = ChatMessage(
+            id = "asst_fb",
+            role = ChatRole.Assistant,
+            content = "Reply.",
+            timestamp = 2_000L,
+            routedLayer = RoutingLayer.Local,
+        )
+        vm.sendIntent(ChatScreenIntent.OnFeedbackOpen(assistantMsg))
+        vm.sendIntent(ChatScreenIntent.OnFeedbackTextChange("too vague"))
+        vm.sendIntent(ChatScreenIntent.OnFeedbackSubmit)
+        testScheduler.advanceUntilIdle()
+
+        val params = analytics.paramsOf("ai_chat_feedback")
+        assertNotNull(params, "ai_chat_feedback must be emitted on submit")
+        assertEquals("asst_fb", params["message_id"])
+        assertEquals("Local", params["routed_layer"])
+        assertEquals("too vague", params["feedback"])
+    }
+
+    // ── A10. preview confirm/reject funnel ──
+    @Test
+    fun previewApply_emitsPreviewConfirmed_andReject_emitsRejected() = runTest {
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.CreateItem,
+                confidence = 1.0f,
+                layer = RoutingLayer.Local,
+            )
+        )
+        val analytics = FakeAnalyticsTracker()
+        val vm = makeVm(repo = repo, analytics = analytics)
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk to shopping"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+        assertIs<PendingPreview>(vm.screenState.value.pendingPreview)
+
+        vm.sendIntent(ChatScreenIntent.OnPreviewApply)
+        testScheduler.advanceUntilIdle()
+
+        val confirmed = analytics.paramsOf("ai_chat_preview_confirmed")
+        assertNotNull(confirmed, "Apply must emit ai_chat_preview_confirmed")
+        assertEquals("AddItem", confirmed["action_type"])
     }
 }

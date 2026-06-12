@@ -1,6 +1,8 @@
 package com.antonchuraev.homesearchchecklist.feature.sharing.presentation
 
 import androidx.lifecycle.viewModelScope
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
@@ -86,7 +88,7 @@ class ShareViewModel(
             ShareFormat.Text -> "text"
             ShareFormat.Pdf -> "pdf"
         }
-        analyticsTracker.event("share_checklist", mapOf("format" to formatName))
+        analyticsTracker.event(AnalyticsEvents.Checklist.SHARED, mapOf(AnalyticsParams.FORMAT to formatName))
 
         when (format) {
             ShareFormat.Text -> {

@@ -1,6 +1,9 @@
 package com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation
 
 import androidx.lifecycle.viewModelScope
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsScreens
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
@@ -92,6 +95,15 @@ class ChatViewModel(
     @Volatile
     private var _pendingAgentDecision: CompletableDeferred<Boolean>? = null
 
+    /**
+     * Wall-clock millis captured when the user taps Send (start of a turn). Read back when the
+     * assistant response lands to compute [AnalyticsParams.LATENCY_MS] for [AnalyticsEvents.Chat.RESPONSE_RECEIVED].
+     * The chat processes one turn at a time (gated by [ChatScreenState.isProcessing]), so a single
+     * field is sufficient — no per-message map needed. Null means "no in-flight turn to measure".
+     */
+    @Volatile
+    private var _turnStartMs: Long? = null
+
     init {
         // Seed the message list from persisted history so the user sees
         // their previous conversation immediately on re-entry.
@@ -174,6 +186,12 @@ class ChatViewModel(
             ChatScreenIntent.OnPreviewApply -> handlePreviewApply()
 
             ChatScreenIntent.OnPreviewCancel -> {
+                _screenState.value.pendingPreview?.let { preview ->
+                    analytics.event(
+                        name = AnalyticsEvents.Chat.PREVIEW_REJECTED,
+                        params = mapOf(AnalyticsParams.ACTION_TYPE to (preview.toolCall::class.simpleName ?: "unknown")),
+                    )
+                }
                 _screenState.value = _screenState.value.copy(pendingPreview = null)
                 // Emit assistant message to confirm cancellation — silent dismiss is FORBIDDEN
                 // (CLAUDE.md rule). The message appears in chat history as an inline reply.
@@ -238,11 +256,23 @@ class ChatViewModel(
             is ChatScreenIntent.OnAskAiFallback -> handleAskAiFallback(intent.text)
 
             // ── Agent plan-card intents (Phase 2d) ────────────────────────────
+            // The agent plan-card is the Layer-3 equivalent of the preview confirm funnel,
+            // so it emits the same PREVIEW_CONFIRMED / PREVIEW_REJECTED events. ACTION_TYPE
+            // is "agent_plan" (the card batches N mutating calls; per-call action types were
+            // already emitted as PREVIEW_SHOWN when the card appeared).
             ChatScreenIntent.OnAgentPlanApply -> {
+                analytics.event(
+                    name = AnalyticsEvents.Chat.PREVIEW_CONFIRMED,
+                    params = mapOf(AnalyticsParams.ACTION_TYPE to "agent_plan"),
+                )
                 _pendingAgentDecision?.complete(true)
             }
 
             ChatScreenIntent.OnAgentPlanCancel -> {
+                analytics.event(
+                    name = AnalyticsEvents.Chat.PREVIEW_REJECTED,
+                    params = mapOf(AnalyticsParams.ACTION_TYPE to "agent_plan"),
+                )
                 _pendingAgentDecision?.complete(false)
             }
 
@@ -285,6 +315,19 @@ class ChatViewModel(
             is ChatScreenIntent.OnVoiceRecordingStopped -> handleVoiceRecordingStopped(intent.recordingPath, intent.mimeType)
 
             is ChatScreenIntent.OnFeedbackOpen -> {
+                // Opening the feedback sheet IS the thumb-down moment (the bubble's feedback icon
+                // is the dislike affordance — there is no separate OnThumbDownClick intent). Track
+                // THUMB_DOWN here; the FEEDBACK event fires later on Submit with the written text.
+                val msg = intent.message
+                analytics.event(
+                    name = AnalyticsEvents.Chat.THUMB_DOWN,
+                    params = mapOf(
+                        AnalyticsParams.MESSAGE_ID to msg.id,
+                        AnalyticsParams.ROUTED_LAYER to (msg.routedLayer?.name ?: "unknown"),
+                        AnalyticsParams.DEEP_THINKING_ENABLED to _screenState.value.deepThinkingEnabled.toString(),
+                    ),
+                )
+                logger.info(TAG, "THUMB_DOWN tracked: message_id=${msg.id}")
                 _screenState.value = _screenState.value.copy(
                     feedbackTarget = intent.message,
                     feedbackText = "",
@@ -296,11 +339,11 @@ class ChatViewModel(
                 // confirmation so the user sees that their tap was registered.
                 val msg = intent.message
                 analytics.event(
-                    name = "ai_chat_thumb_up",
+                    name = AnalyticsEvents.Chat.THUMB_UP,
                     params = mapOf(
-                        "message_id" to msg.id,
-                        "routed_layer" to (msg.routedLayer?.name ?: "unknown"),
-                        "deep_thinking_enabled" to _screenState.value.deepThinkingEnabled.toString(),
+                        AnalyticsParams.MESSAGE_ID to msg.id,
+                        AnalyticsParams.ROUTED_LAYER to (msg.routedLayer?.name ?: "unknown"),
+                        AnalyticsParams.DEEP_THINKING_ENABLED to _screenState.value.deepThinkingEnabled.toString(),
                     ),
                 )
                 logger.info(TAG, "THUMB_UP tracked: message_id=${msg.id}")
@@ -328,6 +371,18 @@ class ChatViewModel(
                     contextChecklistId = intent.checklistId,
                 )
                 logger.debug(TAG, "context checklist set: ${intent.checklistId}")
+            }
+
+            is ChatScreenIntent.OnChatOpened -> {
+                // Fired once per open from the screen composition root (ChatRoute) or the
+                // inline dock (App.kt) — NOT from init (the ViewModel is an App-scoped singleton,
+                // so init runs once per process and would under-count opens).
+                analytics.screenView(AnalyticsScreens.CHAT)
+                analytics.event(
+                    name = AnalyticsEvents.Chat.OPENED,
+                    params = mapOf(AnalyticsParams.SOURCE to intent.source),
+                )
+                logger.debug(TAG, "chat opened: source=${intent.source}")
             }
         }
     }
@@ -366,14 +421,14 @@ class ChatViewModel(
             // sessions — segmenting by this flag lets us measure if the
             // command-override fix actually closes that segment.
             analytics.event(
-                name = "ai_chat_feedback",
+                name = AnalyticsEvents.Chat.FEEDBACK,
                 params = mapOf(
                     "question" to question,
                     "answer" to answer,
                     "feedback" to feedbackText,
-                    "message_id" to target.id,
-                    "routed_layer" to (target.routedLayer?.name ?: "unknown"),
-                    "deep_thinking_enabled" to state.deepThinkingEnabled.toString(),
+                    AnalyticsParams.MESSAGE_ID to target.id,
+                    AnalyticsParams.ROUTED_LAYER to (target.routedLayer?.name ?: "unknown"),
+                    AnalyticsParams.DEEP_THINKING_ENABLED to state.deepThinkingEnabled.toString(),
                 ),
             )
             logger.info(TAG, "FEEDBACK tracked: feedback_len=${feedbackText.length} message_id=${target.id}")
@@ -384,6 +439,55 @@ class ChatViewModel(
                 isSubmittingFeedback = false,
             )
         }
+    }
+
+    // ─── Response funnel analytics ──────────────────────────────────────────────
+
+    /**
+     * Tracks [AnalyticsEvents.Chat.RESPONSE_RECEIVED] — the bottom of the send funnel.
+     *
+     * Called from every terminal point of a turn (inline dispatch result, preview shown,
+     * agent Final, agent error). [outcome] is one of:
+     *  - "answer"  → a textual answer or inline dispatch result landed
+     *  - "preview" → a write-intent preview / agent plan-card was shown for confirmation
+     *  - "error"   → the turn failed (service/network/round-cap/insufficient-credits)
+     *
+     * Latency is measured from [_turnStartMs] (set in [handleSend]); null when there is no
+     * in-flight turn (e.g. an "Ask AI" fallback opened without going through handleSend — then
+     * the latency param is simply omitted). [_turnStartMs] is cleared so a late duplicate
+     * terminal call doesn't emit a second response_received for the same turn.
+     *
+     * @param routedLayer The layer that produced the response; null → "unknown".
+     */
+    private fun trackResponseReceived(routedLayer: RoutingLayer?, outcome: String) {
+        val params = mutableMapOf<String, Any>(
+            AnalyticsParams.ROUTED_LAYER to (routedLayer?.name ?: "unknown"),
+            AnalyticsParams.OUTCOME to outcome,
+        )
+        creditsForLayer(routedLayer)?.let { params[AnalyticsParams.CREDITS_USED] = it }
+        _turnStartMs?.let { start -> params[AnalyticsParams.LATENCY_MS] = nowMillis() - start }
+        _turnStartMs = null
+        analytics.event(name = AnalyticsEvents.Chat.RESPONSE_RECEIVED, params = params)
+    }
+
+    /** Maps a routing layer to its credit cost (Layer 1 = 0, Layer 2 = 1, Layer 3 = 3). */
+    private fun creditsForLayer(layer: RoutingLayer?): Int? = when (layer) {
+        RoutingLayer.Local -> 0
+        RoutingLayer.Classifier -> 1
+        RoutingLayer.FullChat -> 3
+        null -> null
+    }
+
+    /**
+     * Tracks [AnalyticsEvents.Chat.PREVIEW_SHOWN] — top of the preview confirm funnel.
+     * [AnalyticsParams.ACTION_TYPE] is the ToolCall's simple name (AddItem, DeleteItem,
+     * CreateChecklist, …) so the funnel can be segmented by action kind.
+     */
+    private fun trackPreviewShown(toolCall: ToolCall) {
+        analytics.event(
+            name = AnalyticsEvents.Chat.PREVIEW_SHOWN,
+            params = mapOf(AnalyticsParams.ACTION_TYPE to (toolCall::class.simpleName ?: "unknown")),
+        )
     }
 
     // ─── Send flow ────────────────────────────────────────────────────────────
@@ -435,6 +539,23 @@ class ChatViewModel(
             isProcessing = true,
         )
 
+        // ── Funnel: message_sent (top of the send funnel) ──────────────────────
+        // Fired once here, after the blank/attachments-only guards, so it counts only real
+        // sends. Start the latency clock on the same line so response_received can measure it.
+        // INPUT_METHOD is "text": the voice flow only fills the input field (transcription
+        // merges into inputText) — the actual dispatch is always this text-send path, so we
+        // cannot distinguish a voice-originated send here without a separate state flag.
+        _turnStartMs = nowMillis()
+        analytics.event(
+            name = AnalyticsEvents.Chat.MESSAGE_SENT,
+            params = buildMap {
+                put(AnalyticsParams.DEEP_THINKING_ENABLED, _screenState.value.deepThinkingEnabled.toString())
+                put(AnalyticsParams.HAS_CONTEXT_CHECKLIST, (_screenState.value.contextChecklistId != null).toString())
+                put(AnalyticsParams.INPUT_METHOD, "text")
+                put(AnalyticsParams.CHAR_LEN, text.length)
+            },
+        )
+
         // ── forceAgent fast-path: skip classify() and the when-block entirely ──
         // The reasoning chips already know the intent is a free-form question, so any
         // classification is at best wasteful and at worst harmful (Layer 1/2 mis-tag these
@@ -451,6 +572,7 @@ class ChatViewModel(
                 }.onFailure { e ->
                     logger.error(TAG, "handleSend(forceAgent) failed", e)
                     _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_generic_error"))
+                    trackResponseReceived(RoutingLayer.FullChat, outcome = "error")
                     _screenState.value = _screenState.value.copy(isProcessing = false)
                 }
             }
@@ -491,6 +613,7 @@ class ChatViewModel(
                                 askAiForText = text,
                             )
                         )
+                        trackResponseReceived(classification.layer, outcome = "answer")
                         _screenState.value = _screenState.value.copy(isProcessing = false)
                     }
 
@@ -505,6 +628,7 @@ class ChatViewModel(
                         val query = extractQuery(text)
                         val outcome = toolCallDispatcher.dispatch(ToolCall.FindItemsQuery(query))
                         handleOutcomeInline(outcome)
+                        trackResponseReceived(classification.layer, outcome = "answer")
                         _screenState.value = _screenState.value.copy(isProcessing = false)
                     }
 
@@ -540,6 +664,8 @@ class ChatViewModel(
                             ),
                             isProcessing = false,
                         )
+                        trackPreviewShown(toolCall)
+                        trackResponseReceived(classification.layer, outcome = "preview")
                     }
 
                     // AttachToItem — show preview only if attachments are present;
@@ -548,6 +674,7 @@ class ChatViewModel(
                         val currentAttachments = _screenState.value.pendingAttachments
                         if (currentAttachments.isEmpty()) {
                             _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_attach_no_files"))
+                            trackResponseReceived(classification.layer, outcome = "answer")
                             _screenState.value = _screenState.value.copy(isProcessing = false)
                             return@runCatching
                         }
@@ -570,11 +697,14 @@ class ChatViewModel(
                             ),
                             isProcessing = false,
                         )
+                        trackPreviewShown(toolCall)
+                        trackResponseReceived(classification.layer, outcome = "preview")
                     }
                 }
             }.onFailure { e ->
                 logger.error(TAG, "handleSend failed", e)
                 _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_generic_error"))
+                trackResponseReceived(routedLayer = null, outcome = "error")
                 _screenState.value = _screenState.value.copy(isProcessing = false)
             }
         }
@@ -584,6 +714,10 @@ class ChatViewModel(
 
     private fun handlePreviewApply() {
         val preview = _screenState.value.pendingPreview ?: return
+        analytics.event(
+            name = AnalyticsEvents.Chat.PREVIEW_CONFIRMED,
+            params = mapOf(AnalyticsParams.ACTION_TYPE to (preview.toolCall::class.simpleName ?: "unknown")),
+        )
         _screenState.value = _screenState.value.copy(isProcessing = true)
 
         viewModelScope.launch {
@@ -621,6 +755,10 @@ class ChatViewModel(
      */
     private fun handlePreviewReject() {
         val preview = _screenState.value.pendingPreview ?: return
+        analytics.event(
+            name = AnalyticsEvents.Chat.PREVIEW_REJECTED,
+            params = mapOf(AnalyticsParams.ACTION_TYPE to (preview.toolCall::class.simpleName ?: "unknown")),
+        )
 
         // Guard: attachment-only previews have no original text to re-classify.
         // The UI hides the Reject button for CreateChecklistFromAttachment, but
@@ -752,6 +890,19 @@ class ChatViewModel(
             isProcessing = true,
         )
 
+        // Funnel: this is a send (attachments-only path). char_len is 0 (no text); input_method
+        // "text" (the attachment was picked, not dictated). Start the latency clock.
+        _turnStartMs = nowMillis()
+        analytics.event(
+            name = AnalyticsEvents.Chat.MESSAGE_SENT,
+            params = buildMap {
+                put(AnalyticsParams.DEEP_THINKING_ENABLED, _screenState.value.deepThinkingEnabled.toString())
+                put(AnalyticsParams.HAS_CONTEXT_CHECKLIST, (_screenState.value.contextChecklistId != null).toString())
+                put(AnalyticsParams.INPUT_METHOD, "text")
+                put(AnalyticsParams.CHAR_LEN, 0)
+            },
+        )
+
         viewModelScope.launch {
             runCatching {
                 withContext(NonCancellable) { chatHistoryRepository.append(userMsg) }
@@ -766,8 +917,11 @@ class ChatViewModel(
                     ),
                     isProcessing = false,
                 )
+                trackPreviewShown(toolCall)
+                trackResponseReceived(RoutingLayer.Local, outcome = "preview")
             }.onFailure { e ->
                 logger.error(TAG, "handleSendAttachmentsOnly failed", e)
+                trackResponseReceived(RoutingLayer.Local, outcome = "error")
                 _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_generic_error"))
                 _screenState.value = _screenState.value.copy(isProcessing = false)
             }
@@ -959,6 +1113,16 @@ class ChatViewModel(
                         val plan = AgentPlan(items = planItems)
 
                         // Suspend the loop — show plan-card, wait for user.
+                        // The plan-card is the agent's preview funnel: emit PREVIEW_SHOWN per
+                        // mutating action, plus a single response_received(outcome="preview") so the
+                        // latency-to-first-response is captured here (the later Final is a follow-up).
+                        mutatingCalls.forEach { call ->
+                            analytics.event(
+                                name = AnalyticsEvents.Chat.PREVIEW_SHOWN,
+                                params = mapOf(AnalyticsParams.ACTION_TYPE to call.name),
+                            )
+                        }
+                        trackResponseReceived(RoutingLayer.FullChat, outcome = "preview")
                         val decision = CompletableDeferred<Boolean>()
                         _pendingAgentDecision = decision
                         _screenState.value = _screenState.value.copy(
@@ -1026,6 +1190,7 @@ class ChatViewModel(
                     }.onFailure { e ->
                         logger.error(TAG, "runAgentTurn: failed to persist credit balance — ${e.message}", e)
                     }
+                    trackResponseReceived(RoutingLayer.FullChat, outcome = "answer")
                     addAndPersistAssistantMessage(
                         content = stepResult.content,
                         routedLayer = RoutingLayer.FullChat,
@@ -1036,6 +1201,7 @@ class ChatViewModel(
 
                 AgentStepResult.InsufficientCredits -> {
                     logger.info(TAG, "runAgentTurn: InsufficientCredits")
+                    trackResponseReceived(RoutingLayer.FullChat, outcome = "error")
                     _screenState.value = _screenState.value.copy(isProcessing = false)
                     _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_insufficient_credits"))
                     return
@@ -1044,6 +1210,7 @@ class ChatViewModel(
                 AgentStepResult.NetworkError,
                 AgentStepResult.ServiceError -> {
                     logger.warning(TAG, "runAgentTurn: ${stepResult::class.simpleName}")
+                    trackResponseReceived(RoutingLayer.FullChat, outcome = "error")
                     _screenState.value = _screenState.value.copy(isProcessing = false)
                     _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_completion_error"))
                     return
@@ -1053,6 +1220,7 @@ class ChatViewModel(
 
         // Round cap reached — emit fallback message.
         logger.warning(TAG, "runAgentTurn: hit round cap ($AGENT_MAX_ROUNDS rounds) without Final")
+        trackResponseReceived(RoutingLayer.FullChat, outcome = "error")
         _screenState.value = _screenState.value.copy(isProcessing = false)
         _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_agent_round_limit"))
     }

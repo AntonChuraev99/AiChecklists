@@ -68,6 +68,7 @@ import aichecklists.core.designsystem.generated.resources.main_prompt_remind
 import aichecklists.core.designsystem.generated.resources.main_prompt_link
 import aichecklists.core.designsystem.generated.resources.main_prompt_plan_day
 import org.jetbrains.compose.resources.stringResource
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsScreens
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
@@ -111,7 +112,7 @@ fun MainScreen(
     onCreateFromTemplatesClick: (() -> Unit)? = null,
 ) {
     val analyticsTracker: AnalyticsTracker = koinInject()
-    LaunchedEffect(Unit) { analyticsTracker.screenView("main") }
+    LaunchedEffect(Unit) { analyticsTracker.screenView(AnalyticsScreens.MAIN) }
 
     val screenState: MainScreenState by viewModel.screenState.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()

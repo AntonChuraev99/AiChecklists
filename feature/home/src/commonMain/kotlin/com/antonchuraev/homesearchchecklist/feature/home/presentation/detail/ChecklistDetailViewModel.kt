@@ -1,6 +1,8 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation.detail
 
 import androidx.lifecycle.viewModelScope
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePort
@@ -231,7 +233,7 @@ class ChecklistDetailViewModel(
             // Overflow menu
             ChecklistDetailIntent.OnOverflowMenuClick -> {
                 updateContentState { it.copy(showOverflowSheet = true) }
-                analyticsTracker.event("overflow_menu_opened")
+                analyticsTracker.event(AnalyticsEvents.DetailUi.OVERFLOW_MENU_OPENED)
             }
             ChecklistDetailIntent.OnDismissOverflowSheet -> updateContentState { it.copy(showOverflowSheet = false) }
             ChecklistDetailIntent.OnToggleSeparateCompleted -> toggleSeparateCompleted()
@@ -368,14 +370,18 @@ class ChecklistDetailViewModel(
 
             // Analytics-only intents
             is ChecklistDetailIntent.OnCompletedSectionToggle -> {
-                val eventName = if (intent.expanded) "completed_section_expanded" else "completed_section_collapsed"
-                analyticsTracker.event(eventName, mapOf("completed_count" to intent.completedCount.toString()))
+                val eventName = if (intent.expanded) {
+                    AnalyticsEvents.DetailUi.COMPLETED_SECTION_EXPANDED
+                } else {
+                    AnalyticsEvents.DetailUi.COMPLETED_SECTION_COLLAPSED
+                }
+                analyticsTracker.event(eventName, mapOf(AnalyticsParams.COMPLETED_COUNT to intent.completedCount.toString()))
             }
             ChecklistDetailIntent.OnQuickAddOpened -> {
-                analyticsTracker.event("quick_add_opened")
+                analyticsTracker.event(AnalyticsEvents.DetailUi.QUICK_ADD_OPENED)
             }
             is ChecklistDetailIntent.OnQuickAddCancelled -> {
-                analyticsTracker.event("quick_add_cancelled", mapOf("had_text" to intent.hadText.toString()))
+                analyticsTracker.event(AnalyticsEvents.DetailUi.QUICK_ADD_CANCELLED, mapOf(AnalyticsParams.HAD_TEXT to intent.hadText.toString()))
             }
 
             ChecklistDetailIntent.OnReturnedFromSettings -> handleReturnedFromSettings()
@@ -493,8 +499,8 @@ class ChecklistDetailViewModel(
                 }
                 repository.updateFill(updatedFill)
                 repository.updateChecklistTemplate(updatedChecklist)
-                analyticsTracker.event("item_auto_deleted", mapOf(
-                    "checklist_id" to checklistId.toString()
+                analyticsTracker.event(AnalyticsEvents.Item.AUTO_DELETED, mapOf(
+                    AnalyticsParams.CHECKLIST_ID to checklistId.toString()
                 ))
             }
             return
@@ -523,18 +529,18 @@ class ChecklistDetailViewModel(
             }
         }
 
-        val eventName = if (checked) "item_checked" else "item_unchecked"
+        val eventName = if (checked) AnalyticsEvents.Item.CHECKED else AnalyticsEvents.Item.UNCHECKED
         val totalItems = updatedItems.size
         val checkedCount = updatedItems.count { it.checked }
         analyticsTracker.event(eventName, mapOf(
-            "checklist_id" to checklistId.toString(),
-            "progress" to if (totalItems > 0) "${checkedCount * 100 / totalItems}" else "0"
+            AnalyticsParams.CHECKLIST_ID to checklistId.toString(),
+            AnalyticsParams.PROGRESS to if (totalItems > 0) "${checkedCount * 100 / totalItems}" else "0"
         ))
 
         if (checked && totalItems > 0 && checkedCount == totalItems) {
-            analyticsTracker.event("fill_completed", mapOf(
-                "checklist_id" to checklistId.toString(),
-                "item_count" to totalItems.toString()
+            analyticsTracker.event(AnalyticsEvents.Checklist.FILL_COMPLETED, mapOf(
+                AnalyticsParams.CHECKLIST_ID to checklistId.toString(),
+                AnalyticsParams.ITEM_COUNT to totalItems.toString()
             ))
         }
 
@@ -622,8 +628,8 @@ class ChecklistDetailViewModel(
         viewModelScope.launch {
             repository.updateFill(updatedFill)
             repository.updateChecklistTemplate(updatedChecklist)
-            analyticsTracker.event("completed_items_deleted", mapOf(
-                "checklist_id" to checklistId.toString(),
+            analyticsTracker.event(AnalyticsEvents.Item.COMPLETED_ITEMS_DELETED, mapOf(
+                AnalyticsParams.CHECKLIST_ID to checklistId.toString(),
                 "deleted_count" to completedTexts.size.toString(),
                 "remaining_count" to updatedFillItems.size.toString()
             ))
@@ -747,9 +753,9 @@ class ChecklistDetailViewModel(
             }
 
             val hasReminder = reminderAt != null || repeatRule != null
-            analyticsTracker.event("item_added_quick", mapOf(
-                "checklist_id" to checklistId.toString(),
-                "item_count" to updatedFill.items.size.toString(),
+            analyticsTracker.event(AnalyticsEvents.Item.ADDED_QUICK, mapOf(
+                AnalyticsParams.CHECKLIST_ID to checklistId.toString(),
+                AnalyticsParams.ITEM_COUNT to updatedFill.items.size.toString(),
                 "has_smart_reminder" to hasReminder.toString()
             ))
 
@@ -773,8 +779,8 @@ class ChecklistDetailViewModel(
         viewModelScope.launch {
             repository.updateFill(updatedFill)
             repository.updateChecklistTemplate(updatedChecklist)
-            analyticsTracker.event("weekly_item_added", mapOf(
-                "checklist_id" to checklistId.toString(),
+            analyticsTracker.event(AnalyticsEvents.Item.WEEKLY_ADDED, mapOf(
+                AnalyticsParams.CHECKLIST_ID to checklistId.toString(),
                 "weekday" to weekday.toString()
             ))
         }
@@ -808,8 +814,8 @@ class ChecklistDetailViewModel(
         viewModelScope.launch {
             repository.updateFill(updatedFill)
             repository.updateChecklistTemplate(updatedChecklist)
-            analyticsTracker.event("weekly_item_moved", mapOf(
-                "checklist_id" to checklistId.toString(),
+            analyticsTracker.event(AnalyticsEvents.Item.WEEKLY_MOVED, mapOf(
+                AnalyticsParams.CHECKLIST_ID to checklistId.toString(),
                 "target_weekday" to targetWeekday.toString()
             ))
         }
@@ -900,10 +906,10 @@ class ChecklistDetailViewModel(
             reminderScheduler.cancelReminder(state.checklist.id)
             reminderScheduler.cancelRepeat(state.checklist.id)
             repository.deleteChecklist(state.checklist)
-            analyticsTracker.event("checklist_deleted", mapOf(
-                "checklist_id" to state.checklist.id.toString(),
-                "item_count" to (state.defaultFill?.items?.size ?: 0).toString(),
-                "source" to "overflow_menu"
+            analyticsTracker.event(AnalyticsEvents.Checklist.DELETED, mapOf(
+                AnalyticsParams.CHECKLIST_ID to state.checklist.id.toString(),
+                AnalyticsParams.ITEM_COUNT to (state.defaultFill?.items?.size ?: 0).toString(),
+                AnalyticsParams.SOURCE to "overflow_menu"
             ))
             navigator.onBack()
         }
@@ -931,9 +937,9 @@ class ChecklistDetailViewModel(
             if (checklist != null) {
                 repository.deleteChecklist(checklist)
             }
-            analyticsTracker.event("checklist_deleted", mapOf(
-                "checklist_id" to checklistId.toString(),
-                "source" to "not_found_screen",
+            analyticsTracker.event(AnalyticsEvents.Checklist.DELETED, mapOf(
+                AnalyticsParams.CHECKLIST_ID to checklistId.toString(),
+                AnalyticsParams.SOURCE to "not_found_screen",
                 // false surfaces the rare "template row already gone" case (possible orphaned
                 // fills) without adding an AppLogger dependency to this VM.
                 "template_found" to (checklist != null).toString()
@@ -1043,7 +1049,7 @@ class ChecklistDetailViewModel(
             if (!isPremium) {
                 val activeCount = repository.countActiveRepeatSchedules()
                 if (activeCount >= MAX_FREE_REPEAT_SCHEDULES) {
-                    analyticsTracker.event("recurring_limit_hit")
+                    analyticsTracker.event(AnalyticsEvents.Reminder.RECURRING_LIMIT_HIT)
                     navigator.navigateToPaywall(source = "detail_recurring_limit")
                 } else {
                     updateContentState {
@@ -1099,8 +1105,8 @@ class ChecklistDetailViewModel(
                 it.copy(checklist = it.checklist.copy(reminderAt = triggerAtMillis))
             }
 
-            analyticsTracker.event("reminder_set", mapOf(
-                "checklist_id" to state.checklist.id.toString()
+            analyticsTracker.event(AnalyticsEvents.Reminder.SET, mapOf(
+                AnalyticsParams.CHECKLIST_ID to state.checklist.id.toString()
             ))
 
             maybeShowExactAlarmInstruction()
@@ -1117,13 +1123,13 @@ class ChecklistDetailViewModel(
             }
             val repeatRule = state.checklist.repeatRule
             if (repeatRule != null) {
-                analyticsTracker.event("recurring_reminder_cancelled", mapOf(
-                    "checklist_id" to state.checklist.id.toString(),
+                analyticsTracker.event(AnalyticsEvents.Reminder.RECURRING_CANCELLED, mapOf(
+                    AnalyticsParams.CHECKLIST_ID to state.checklist.id.toString(),
                     "total_occurrences" to state.checklist.repeatOccurrenceCount.toString()
                 ))
             } else {
-                analyticsTracker.event("reminder_cancelled", mapOf(
-                    "checklist_id" to state.checklist.id.toString()
+                analyticsTracker.event(AnalyticsEvents.Reminder.CANCELLED, mapOf(
+                    AnalyticsParams.CHECKLIST_ID to state.checklist.id.toString()
                 ))
             }
         }
@@ -1166,7 +1172,7 @@ class ChecklistDetailViewModel(
                 )
             }
 
-            analyticsTracker.event("repeat_schedule_set", buildMap {
+            analyticsTracker.event(AnalyticsEvents.Reminder.REPEAT_SCHEDULE_SET, buildMap {
                 put("type", rule.type.name)
                 put("interval", rule.interval.toString())
                 put("time_of_day", "$timeMinutes")
@@ -1201,8 +1207,8 @@ class ChecklistDetailViewModel(
                     repeatRuleSummary = null
                 )
             }
-            analyticsTracker.event("repeat_schedule_cancelled", mapOf(
-                "checklist_id" to state.checklist.id.toString(),
+            analyticsTracker.event(AnalyticsEvents.Reminder.REPEAT_SCHEDULE_CANCELLED, mapOf(
+                AnalyticsParams.CHECKLIST_ID to state.checklist.id.toString(),
                 "total_occurrences" to state.checklist.repeatOccurrenceCount.toString()
             ))
         }
@@ -1357,10 +1363,10 @@ class ChecklistDetailViewModel(
             }
             repository.updateFill(updatedFill)
             repository.updateChecklistTemplate(updatedChecklist)
-            analyticsTracker.event("item_deleted", mapOf(
-                "checklist_id" to checklistId.toString(),
+            analyticsTracker.event(AnalyticsEvents.Item.DELETED, mapOf(
+                AnalyticsParams.CHECKLIST_ID to checklistId.toString(),
                 "method" to "swipe",
-                "item_count" to updatedFillItems.size.toString()
+                AnalyticsParams.ITEM_COUNT to updatedFillItems.size.toString()
             ))
         }
 
@@ -1400,8 +1406,8 @@ class ChecklistDetailViewModel(
         viewModelScope.launch {
             repository.updateFill(restoredFill)
             repository.updateChecklistTemplate(restoredChecklist)
-            analyticsTracker.event("item_undo_delete", mapOf(
-                "checklist_id" to checklistId.toString()
+            analyticsTracker.event(AnalyticsEvents.Item.UNDO_DELETE, mapOf(
+                AnalyticsParams.CHECKLIST_ID to checklistId.toString()
             ))
         }
     }
@@ -1433,10 +1439,10 @@ class ChecklistDetailViewModel(
             }
             repository.updateFill(updatedFill)
             repository.updateChecklistTemplate(updatedChecklist)
-            analyticsTracker.event("item_deleted", mapOf(
-                "checklist_id" to checklistId.toString(),
+            analyticsTracker.event(AnalyticsEvents.Item.DELETED, mapOf(
+                AnalyticsParams.CHECKLIST_ID to checklistId.toString(),
                 "method" to "sheet",
-                "item_count" to updatedFillItems.size.toString()
+                AnalyticsParams.ITEM_COUNT to updatedFillItems.size.toString()
             ))
         }
     }
@@ -1587,8 +1593,8 @@ class ChecklistDetailViewModel(
                 )
             }
 
-            analyticsTracker.event("item_reminder_set", mapOf(
-                "checklist_id" to checklistId.toString(),
+            analyticsTracker.event(AnalyticsEvents.Reminder.ITEM_SET, mapOf(
+                AnalyticsParams.CHECKLIST_ID to checklistId.toString(),
                 "has_repeat" to (repeatRule != null).toString()
             ))
 
@@ -1619,8 +1625,8 @@ class ChecklistDetailViewModel(
                 )
             }
 
-            analyticsTracker.event("item_reminder_removed", mapOf(
-                "checklist_id" to checklistId.toString()
+            analyticsTracker.event(AnalyticsEvents.Reminder.ITEM_REMOVED, mapOf(
+                AnalyticsParams.CHECKLIST_ID to checklistId.toString()
             ))
         }
     }

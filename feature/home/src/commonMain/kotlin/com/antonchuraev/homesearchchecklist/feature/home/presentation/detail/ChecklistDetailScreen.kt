@@ -189,6 +189,7 @@ import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsScreens
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.PlatformCapabilities
 import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.picker.FilePickerType
@@ -227,7 +228,7 @@ fun ChecklistDetailScreen(
     viewModel: ChecklistDetailViewModel = koinViewModel(key = "checklist_detail_$checklistId") { parametersOf(checklistId) }
 ) {
     val analyticsTracker: AnalyticsTracker = koinInject()
-    LaunchedEffect(Unit) { analyticsTracker.screenView("checklist_detail") }
+    LaunchedEffect(Unit) { analyticsTracker.screenView(AnalyticsScreens.CHECKLIST_DETAIL) }
 
     // Detect return from exact alarm settings
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {

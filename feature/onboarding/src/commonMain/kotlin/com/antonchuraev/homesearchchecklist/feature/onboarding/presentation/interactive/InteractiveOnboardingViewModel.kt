@@ -2,6 +2,8 @@ package com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.int
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
@@ -54,12 +56,12 @@ class InteractiveOnboardingViewModel(
         if (!isDebugBuild) {
             val alreadyTracked = savedStateHandle.get<Boolean>(KEY_STARTED_TRACKED) == true
             if (!alreadyTracked) {
-                analyticsTracker.event("onboarding_started", mapOf("variant" to "interactive"))
+                analyticsTracker.event(AnalyticsEvents.Onboarding.STARTED, mapOf(AnalyticsParams.VARIANT to "interactive"))
                 savedStateHandle[KEY_STARTED_TRACKED] = true
             }
             // Always track ViewModel creation for diagnostics (helps identify process death)
-            analyticsTracker.event("onboarding_vm_created", mapOf(
-                "variant" to "interactive",
+            analyticsTracker.event(AnalyticsEvents.Onboarding.VM_CREATED, mapOf(
+                AnalyticsParams.VARIANT to "interactive",
                 "is_restored" to alreadyTracked.toString()
             ))
         }
@@ -438,8 +440,8 @@ class InteractiveOnboardingViewModel(
     private fun handleSkip() {
         val state = _screenState.value
         if (!isDebugBuild) analyticsTracker.event(
-            "onboarding_skipped",
-            mapOf("variant" to "interactive", "step" to state.currentStep.name)
+            AnalyticsEvents.Onboarding.SKIPPED,
+            mapOf(AnalyticsParams.VARIANT to "interactive", "step" to state.currentStep.name)
         )
         when (state.currentStep) {
             InteractiveOnboardingStep.DiscoverMore -> {
@@ -613,7 +615,7 @@ class InteractiveOnboardingViewModel(
                     )
                 }
 
-                if (!isDebugBuild) analyticsTracker.event("repeat_schedule_set", buildMap {
+                if (!isDebugBuild) analyticsTracker.event(AnalyticsEvents.Reminder.REPEAT_SCHEDULE_SET, buildMap {
                     put("type", rule.type.name)
                     put("interval", rule.interval.toString())
                     put("preset", resolvePresetName(config))
@@ -681,9 +683,9 @@ class InteractiveOnboardingViewModel(
         viewModelScope.launch {
             if (!isDebugBuild) {
                 analyticsTracker.event(
-                    "onboarding_completed",
+                    AnalyticsEvents.Onboarding.COMPLETED,
                     mapOf(
-                        "variant" to "interactive",
+                        AnalyticsParams.VARIANT to "interactive",
                         "checklist_created" to _screenState.value.checklistCreated.toString()
                     )
                 )
@@ -712,9 +714,9 @@ class InteractiveOnboardingViewModel(
 
     private fun trackStep(stepName: String, vararg params: Pair<String, String>) {
         if (isDebugBuild) return
-        val baseParams = mutableMapOf("variant" to "interactive", "step" to stepName)
+        val baseParams = mutableMapOf(AnalyticsParams.VARIANT to "interactive", "step" to stepName)
         params.forEach { baseParams[it.first] = it.second }
-        analyticsTracker.event("onboarding_step_completed", baseParams)
+        analyticsTracker.event(AnalyticsEvents.Onboarding.STEP_COMPLETED, baseParams)
     }
 
     companion object {

@@ -11,6 +11,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.TaskStackBuilder
 import com.antonchuraev.aichecklists.R
 import com.antonchuraev.homesearchchecklist.MainActivity
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.computeNextOccurrence
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
@@ -100,7 +101,7 @@ class ReminderReceiver : BroadcastReceiver() {
                     val scheduler: ChecklistReminderScheduler = koin.get()
                     scheduler.scheduleRepeat(checklistId, nextOccurrence)
 
-                    analytics?.event("recurring_reminder_fired", mapOf(
+                    analytics?.event(AnalyticsEvents.Reminder.RECURRING_FIRED, mapOf(
                         "checklist_id" to checklistId.toString(),
                         "occurrence_count" to newCount.toString(),
                         "next_at" to nextOccurrence.toString()
@@ -109,7 +110,7 @@ class ReminderReceiver : BroadcastReceiver() {
                     // Auto-reset checkboxes if enabled
                     if (repeatRule.resetChecks) {
                         repository.resetDefaultFillChecks(checklistId)
-                        analytics?.event("recurring_checks_reset", mapOf(
+                        analytics?.event(AnalyticsEvents.Reminder.RECURRING_CHECKS_RESET, mapOf(
                             "checklist_id" to checklistId.toString(),
                             "items_count" to (defaultFill?.items?.size ?: 0).toString()
                         ))
@@ -117,7 +118,7 @@ class ReminderReceiver : BroadcastReceiver() {
                 } else {
                     // End condition reached — stop repeating
                     repository.clearRepeatSchedule(checklistId)
-                    analytics?.event("recurring_reminder_ended", mapOf(
+                    analytics?.event(AnalyticsEvents.Reminder.RECURRING_ENDED, mapOf(
                         "checklist_id" to checklistId.toString(),
                         "end_reason" to repeatRule.endCondition::class.simpleName.orEmpty(),
                         "total_occurrences" to checklist.repeatOccurrenceCount.toString()

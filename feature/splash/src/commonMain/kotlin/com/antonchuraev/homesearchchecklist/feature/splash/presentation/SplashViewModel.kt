@@ -8,6 +8,8 @@ import com.antonchuraev.homesearchchecklist.feature.paywall.domain.repository.Pa
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.RestorePurchasesUseCase
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.UserData
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.datastore.api.FirstChecklistRepository
@@ -205,7 +207,7 @@ class SplashViewModel(
                 log("auto-creating first checklist for new user uid=${uid.take(8)}")
                 checklistRepository.addChecklist(buildFirstChecklist())
                 firstChecklistRepository.markFirstChecklistCreated(uid)
-                analyticsTracker.event("first_checklist_auto_created", mapOf("variant" to variant.name))
+                analyticsTracker.event(AnalyticsEvents.Onboarding.FIRST_CHECKLIST_AUTO_CREATED, mapOf(AnalyticsParams.VARIANT to variant.name))
             }
         }.onFailure { e ->
             logger.error(TAG, "applyFirstChecklistExperiment failed: ${e.message}", e)

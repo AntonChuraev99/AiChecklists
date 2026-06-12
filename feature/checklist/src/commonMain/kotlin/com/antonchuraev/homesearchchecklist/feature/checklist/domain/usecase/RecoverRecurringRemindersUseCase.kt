@@ -1,5 +1,6 @@
 package com.antonchuraev.homesearchchecklist.feature.checklist.domain.usecase
 
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.computeNextOccurrence
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
@@ -42,7 +43,7 @@ class RecoverRecurringRemindersUseCase(
                 )
                 scheduler.scheduleRepeat(info.id, nextMillis)
 
-                analyticsTracker?.event("recurring_reminder_recovered", mapOf(
+                analyticsTracker?.event(AnalyticsEvents.Reminder.RECURRING_RECOVERED, mapOf(
                     "checklist_id" to info.id.toString(),
                     "skipped_occurrences" to (newCount - info.repeatOccurrenceCount).toString(),
                     "next_at" to nextMillis.toString()
@@ -51,7 +52,7 @@ class RecoverRecurringRemindersUseCase(
                 // End condition reached while device was off
                 repository.clearRepeatSchedule(info.id)
 
-                analyticsTracker?.event("recurring_reminder_ended", mapOf(
+                analyticsTracker?.event(AnalyticsEvents.Reminder.RECURRING_ENDED, mapOf(
                     "checklist_id" to info.id.toString(),
                     "end_reason" to rule.endCondition::class.simpleName.orEmpty(),
                     "total_occurrences" to info.repeatOccurrenceCount.toString()

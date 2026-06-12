@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.glance.GlanceId
 import androidx.glance.action.ActionParameters
 import androidx.glance.appwidget.action.ActionCallback
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.widget.ChecklistWidget
 import com.antonchuraev.homesearchchecklist.widget.data.WidgetRepository
@@ -49,7 +50,7 @@ class ToggleItemAction : ActionCallback {
             // 1. Update data in Room database
             repository.toggleItem(checklistId, fillId, itemIndex)
 
-            analyticsTracker.event("widget_item_toggled", mapOf(
+            analyticsTracker.event(AnalyticsEvents.Item.WIDGET_TOGGLED, mapOf(
                 "checklist_id" to checklistId.toString()
             ))
 

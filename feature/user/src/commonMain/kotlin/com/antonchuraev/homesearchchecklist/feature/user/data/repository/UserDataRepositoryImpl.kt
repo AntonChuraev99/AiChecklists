@@ -1,5 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.user.data.repository
 
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
@@ -152,13 +154,13 @@ class UserDataRepositoryImpl(
     }
 
     override suspend fun restoreCreditsAfterPurchase(): Result<Int> {
-        analyticsTracker.event("credits_restore_started")
+        analyticsTracker.event(AnalyticsEvents.Credits.RESTORE_STARTED)
         logger.debug(TAG, "restoreCreditsAfterPurchase: starting...")
 
         val userId = appDatastore.observeString(USER_ID_KEY, "").first()
         if (userId.isBlank()) {
             logger.error(TAG, "restoreCreditsAfterPurchase: no user_id found")
-            analyticsTracker.event("credits_restore_failed", mapOf("error" to "no_user_id"))
+            analyticsTracker.event(AnalyticsEvents.Credits.RESTORE_FAILED, mapOf(AnalyticsParams.ERROR to "no_user_id"))
             return Result.failure(IllegalStateException("User not registered"))
         }
 
@@ -173,7 +175,7 @@ class UserDataRepositoryImpl(
                 logger.info(TAG, "restoreCreditsAfterPurchase: SUCCESS (attempt $attempt) - aiCredits=${result.aiCredits}, isPremium=${result.isPremium}")
                 appDatastore.saveInt(AI_CREDITS_KEY, result.aiCredits)
                 appDatastore.saveBoolean(IS_PREMIUM_KEY, result.isPremium)
-                analyticsTracker.event("credits_restore_success", mapOf(
+                analyticsTracker.event(AnalyticsEvents.Credits.RESTORE_SUCCESS, mapOf(
                     "credits" to result.aiCredits,
                     "attempt" to attempt
                 ))
@@ -184,9 +186,9 @@ class UserDataRepositoryImpl(
             logger.error(TAG, "restoreCreditsAfterPurchase: attempt $attempt/$MAX_RESTORE_RETRIES FAILED - ${lastError?.message}", lastError)
 
             if (attempt < MAX_RESTORE_RETRIES) {
-                analyticsTracker.event("credits_restore_retry", mapOf(
+                analyticsTracker.event(AnalyticsEvents.Credits.RESTORE_RETRY, mapOf(
                     "attempt" to attempt,
-                    "error" to (lastError?.message ?: "unknown")
+                    AnalyticsParams.ERROR to (lastError?.message ?: "unknown")
                 ))
                 delay(RESTORE_RETRY_BASE_DELAY_MS * attempt)
             }
@@ -194,8 +196,8 @@ class UserDataRepositoryImpl(
 
         val errorMessage = lastError?.message ?: "unknown"
         logger.error(TAG, "restoreCreditsAfterPurchase: ALL $MAX_RESTORE_RETRIES attempts FAILED")
-        analyticsTracker.event("credits_restore_failed", mapOf(
-            "error" to errorMessage,
+        analyticsTracker.event(AnalyticsEvents.Credits.RESTORE_FAILED, mapOf(
+            AnalyticsParams.ERROR to errorMessage,
             "attempts" to MAX_RESTORE_RETRIES
         ))
         return Result.failure(lastError ?: IllegalStateException("All retries failed"))

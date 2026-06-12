@@ -44,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsScreens
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive.components.CategorySelectionStep
@@ -65,7 +66,7 @@ fun InteractiveOnboardingScreen(
     viewModel: InteractiveOnboardingViewModel = koinViewModel()
 ) {
     val analyticsTracker: AnalyticsTracker = koinInject()
-    LaunchedEffect(Unit) { analyticsTracker.screenView("interactive_onboarding") }
+    LaunchedEffect(Unit) { analyticsTracker.screenView(AnalyticsScreens.INTERACTIVE_ONBOARDING) }
 
     val state by viewModel.screenState.collectAsState()
 

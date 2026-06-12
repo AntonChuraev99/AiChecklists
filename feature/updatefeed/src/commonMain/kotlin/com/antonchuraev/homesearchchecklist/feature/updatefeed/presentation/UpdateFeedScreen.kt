@@ -27,6 +27,7 @@ import kotlinx.coroutines.launch
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.TopAppBarDefaults
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsScreens
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
 import com.antonchuraev.homesearchchecklist.desingsystem.components.PremiumBanner
@@ -67,7 +68,7 @@ private fun UpdateFeedScreenContent(
     viewModel: UpdateFeedViewModel = koinViewModel(),
 ) {
     val analyticsTracker: AnalyticsTracker = koinInject()
-    LaunchedEffect(Unit) { analyticsTracker.screenView("update_feed") }
+    LaunchedEffect(Unit) { analyticsTracker.screenView(AnalyticsScreens.UPDATE_FEED) }
 
     val state by viewModel.screenState.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()

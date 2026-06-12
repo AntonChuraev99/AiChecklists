@@ -51,6 +51,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsScreens
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
@@ -67,7 +68,7 @@ fun CreateChecklistScreen(
     ) { parametersOf(editChecklistId, initialText) }
 ) {
     val analyticsTracker: AnalyticsTracker = koinInject()
-    LaunchedEffect(Unit) { analyticsTracker.screenView("create_checklist") }
+    LaunchedEffect(Unit) { analyticsTracker.screenView(AnalyticsScreens.CREATE_CHECKLIST) }
 
     val screenState by viewModel.screenState.collectAsStateWithLifecycle()
 

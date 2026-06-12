@@ -1,6 +1,8 @@
 package com.antonchuraev.homesearchchecklist.csat
 
 import androidx.lifecycle.viewModelScope
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.common.api.Intent
@@ -90,7 +92,7 @@ class CsatViewModel(
         if (csatShownThisSession) return
         csatShownThisSession = true
         csatManager.recordShown()
-        analyticsTracker.event("csat_shown")
+        analyticsTracker.event(AnalyticsEvents.Csat.SHOWN)
         _screenState.update { it.copy(showBottomSheet = true) }
     }
 
@@ -102,7 +104,7 @@ class CsatViewModel(
             CsatIntent.Submit -> handleSubmit()
             CsatIntent.LaunchReview -> handleLaunchReview()
             CsatIntent.SkipReview -> {
-                analyticsTracker.event("csat_review_skipped")
+                analyticsTracker.event(AnalyticsEvents.Csat.REVIEW_SKIPPED)
                 handleClose()
             }
             CsatIntent.Dismiss -> handleDismiss()
@@ -114,12 +116,12 @@ class CsatViewModel(
     }
 
     private fun handleForceShow() {
-        analyticsTracker.event("csat_opened", mapOf("source" to "manual"))
+        analyticsTracker.event(AnalyticsEvents.Csat.OPENED, mapOf(AnalyticsParams.SOURCE to "manual"))
         _screenState.update { it.copy(showBottomSheet = true) }
     }
 
     private fun handleForceShowFeedback() {
-        analyticsTracker.event("feedback_opened")
+        analyticsTracker.event(AnalyticsEvents.Csat.FEEDBACK_OPENED)
         _screenState.update {
             it.copy(
                 showBottomSheet = true,
@@ -129,7 +131,7 @@ class CsatViewModel(
     }
 
     private fun handleSelectRating(rating: CsatRating) {
-        analyticsTracker.event("csat_rating_selected", mapOf("rating" to rating.name))
+        analyticsTracker.event(AnalyticsEvents.Csat.RATING_SELECTED, mapOf(AnalyticsParams.RATING to rating.name))
         _screenState.update {
             it.copy(
                 selectedRating = rating,
@@ -208,7 +210,7 @@ class CsatViewModel(
     }
 
     private fun handleLaunchReview() {
-        analyticsTracker.event("csat_review_tapped")
+        analyticsTracker.event(AnalyticsEvents.Csat.REVIEW_TAPPED)
         _screenState.update { it.copy(shouldLaunchReview = true) }
     }
 
@@ -221,7 +223,7 @@ class CsatViewModel(
 
     private fun handleDismiss() {
         val hadRating = _screenState.value.selectedRating != null
-        analyticsTracker.event("csat_dismissed", mapOf("had_rating" to hadRating))
+        analyticsTracker.event(AnalyticsEvents.Csat.DISMISSED, mapOf(AnalyticsParams.HAD_RATING to hadRating))
         viewModelScope.launch {
             csatManager.recordOutcome(CsatManager.OUTCOME_DISMISSED)
         }

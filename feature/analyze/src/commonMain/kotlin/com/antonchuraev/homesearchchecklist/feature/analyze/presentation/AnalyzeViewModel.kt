@@ -1,6 +1,8 @@
 package com.antonchuraev.homesearchchecklist.feature.analyze.presentation
 
 import androidx.lifecycle.viewModelScope
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
@@ -220,7 +222,7 @@ class AnalyzeViewModel(
         }
 
         val inputType = state.selectedInputType?.name?.lowercase() ?: "unknown"
-        analyticsTracker.event("ai_analyze_started", mapOf("input_type" to inputType))
+        analyticsTracker.event(AnalyticsEvents.Analyze.STARTED, mapOf(AnalyticsParams.INPUT_TYPE to inputType))
 
         viewModelScope.launch {
             _screenState.update { it.copy(isAnalyzing = true, error = null) }
@@ -236,8 +238,8 @@ class AnalyzeViewModel(
 
             analyzeRepository.analyzeData(inputData, targetChecklist)
                 .onSuccess { result ->
-                    analyticsTracker.event("ai_analyze_completed", mapOf(
-                        "input_type" to inputType,
+                    analyticsTracker.event(AnalyticsEvents.Analyze.COMPLETED, mapOf(
+                        AnalyticsParams.INPUT_TYPE to inputType,
                         "item_count" to result.suggestedItems.size
                     ))
                     _screenState.update {
@@ -261,8 +263,8 @@ class AnalyzeViewModel(
                     appNavigator.navigateToAnalyzeResultPreview()
                 }
                 .onFailure { error ->
-                    analyticsTracker.event("ai_analyze_failed", mapOf(
-                        "input_type" to inputType,
+                    analyticsTracker.event(AnalyticsEvents.Analyze.FAILED, mapOf(
+                        AnalyticsParams.INPUT_TYPE to inputType,
                         "error" to (error.message ?: "unknown")
                     ))
                     _screenState.update {

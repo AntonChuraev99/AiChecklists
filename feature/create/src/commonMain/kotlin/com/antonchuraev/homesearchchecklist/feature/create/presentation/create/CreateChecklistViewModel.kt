@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.create.presentation.create
 
 import androidx.lifecycle.viewModelScope
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
@@ -183,7 +184,7 @@ class CreateChecklistViewModel(
                 checklistRepository.addChecklist(
                     Checklist(name = latestState.name.trim(), items = latestState.items)
                 )
-                analyticsTracker.event("checklist_created", mapOf(
+                analyticsTracker.event(AnalyticsEvents.Checklist.CREATED, mapOf(
                     "source" to "manual",
                     "item_count" to latestState.items.size
                 ))

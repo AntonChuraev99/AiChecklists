@@ -2,6 +2,8 @@ package com.antonchuraev.homesearchchecklist.feature.paywall.presentation
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
@@ -140,7 +142,10 @@ class PaywallViewModel(
             PaywallIntent.RestorePurchases -> restorePurchases()
             PaywallIntent.DismissError -> dismissError()
             PaywallIntent.Close -> {
-                analyticsTracker.event("paywall_closed", mapOf("source" to source))
+                analyticsTracker.event(
+                    AnalyticsEvents.Paywall.CLOSED,
+                    mapOf(AnalyticsParams.SOURCE to source),
+                )
                 navigator.onBack()
             }
             is PaywallIntent.SelectPlan -> {
@@ -177,8 +182,8 @@ class PaywallViewModel(
                     )
 
                     if (products.isEmpty()) {
-                        analyticsTracker.event("products_load_empty", buildMap {
-                            put("source", source)
+                        analyticsTracker.event(AnalyticsEvents.Paywall.PRODUCTS_LOAD_EMPTY, buildMap {
+                            put(AnalyticsParams.SOURCE, source)
                             put("reason", if (offering == null) "no_current_offering" else "empty_packages")
                             analyticsContext?.toEventParams()?.let { putAll(it) }
                         })
@@ -198,8 +203,8 @@ class PaywallViewModel(
                     logger?.info(TAG, "[PAYWALL] loadProducts() success — ${products.size} products loaded: ${products.joinToString { it.id }}")
 
                     // Fire products_load_success for conversion funnel tracking.
-                    analyticsTracker.event("products_load_success", buildMap {
-                        put("source", source)
+                    analyticsTracker.event(AnalyticsEvents.Paywall.PRODUCTS_LOAD_SUCCESS, buildMap {
+                        put(AnalyticsParams.SOURCE, source)
                         analyticsContext?.toEventParams()?.let { putAll(it) }
                     })
 
@@ -228,15 +233,15 @@ class PaywallViewModel(
                         availableSkuIds = emptyList(),
                     )
                     val params = buildMap<String, Any> {
-                        put("source", source)
-                        put("error", (error.message ?: "unknown").take(100))
+                        put(AnalyticsParams.SOURCE, source)
+                        put(AnalyticsParams.ERROR, (error.message ?: "unknown").take(100))
                         if (error is PaywallException) {
                             put("error_code", error.errorCode.name)
                             put("underlying_error", (error.underlyingError ?: "none").take(100))
                         }
                         analyticsContext?.toEventParams()?.let { putAll(it) }
                     }
-                    analyticsTracker.event("products_load_failed", params)
+                    analyticsTracker.event(AnalyticsEvents.Paywall.PRODUCTS_LOAD_FAILED, params)
                     handleEmptyProducts()
                 }
         }
@@ -285,10 +290,11 @@ class PaywallViewModel(
         logger?.info(TAG, "[PAYWALL] purchase() initiated: plan=${currentState.selectedPlan.name}, sku=${selectedProduct.id}, pkg=${selectedProduct.packageId}")
 
         analyticsTracker.event(
-            "purchase_button_clicked",
+            AnalyticsEvents.Paywall.PURCHASE_BUTTON_CLICKED,
             buildMap {
-                put("source", source)
-                put("product_id", selectedProduct.id)
+                put(AnalyticsParams.SOURCE, source)
+                put(AnalyticsParams.PRODUCT_ID, selectedProduct.id)
+                put(AnalyticsParams.HAS_FREE_TRIAL, selectedProduct.hasFreeTrial)
                 put("sku_id", selectedProduct.id)
                 put("variant", currentState.variant.name)
                 put("selected_plan", currentState.selectedPlan.name)
@@ -302,9 +308,9 @@ class PaywallViewModel(
 
             when (val result = purchaseProductUseCase(selectedProduct.packageId)) {
                 is PurchaseResult.Success -> {
-                    analyticsTracker.event("purchase_completed", buildMap {
-                        put("source", source)
-                        put("product_id", selectedProduct.id)
+                    analyticsTracker.event(AnalyticsEvents.Paywall.PURCHASE_COMPLETED, buildMap {
+                        put(AnalyticsParams.SOURCE, source)
+                        put(AnalyticsParams.PRODUCT_ID, selectedProduct.id)
                         put("sku_id", selectedProduct.id)
                         put("plan_type", currentState.selectedPlan.name.lowercase())
                         put("price_str", selectedProduct.priceString.take(100))
@@ -318,9 +324,9 @@ class PaywallViewModel(
                     navigator.navigateToSubscriptionStatus(showSuccessMessage = true)
                 }
                 is PurchaseResult.Cancelled -> {
-                    analyticsTracker.event("purchase_cancelled", buildMap {
-                        put("source", source)
-                        put("product_id", selectedProduct.id)
+                    analyticsTracker.event(AnalyticsEvents.Paywall.PURCHASE_CANCELLED, buildMap {
+                        put(AnalyticsParams.SOURCE, source)
+                        put(AnalyticsParams.PRODUCT_ID, selectedProduct.id)
                         put("sku_id", selectedProduct.id)
                         put("plan_type", currentState.selectedPlan.name.lowercase())
                         analyticsContext?.toEventParams()?.let { putAll(it) }
@@ -328,12 +334,12 @@ class PaywallViewModel(
                     _screenState.update { it.copy(isPurchasing = false) }
                 }
                 is PurchaseResult.Error -> {
-                    analyticsTracker.event("purchase_failed", buildMap {
-                        put("source", source)
-                        put("product_id", selectedProduct.id)
+                    analyticsTracker.event(AnalyticsEvents.Paywall.PURCHASE_FAILED, buildMap {
+                        put(AnalyticsParams.SOURCE, source)
+                        put(AnalyticsParams.PRODUCT_ID, selectedProduct.id)
                         put("sku_id", selectedProduct.id)
                         put("plan_type", currentState.selectedPlan.name.lowercase())
-                        put("error", result.message.take(100))
+                        put(AnalyticsParams.ERROR, result.message.take(100))
                         put("error_code", result.errorCode ?: "unknown")
                         put("underlying_error", (result.underlyingError ?: "none").take(100))
                         analyticsContext?.toEventParams()?.let { putAll(it) }
@@ -349,14 +355,20 @@ class PaywallViewModel(
     }
 
     private fun restorePurchases() {
-        analyticsTracker.event("restore_button_clicked", mapOf("source" to source))
+        analyticsTracker.event(
+            AnalyticsEvents.Paywall.RESTORE_BUTTON_CLICKED,
+            mapOf(AnalyticsParams.SOURCE to source),
+        )
 
         viewModelScope.launch {
             _screenState.update { it.copy(isRestoring = true, error = null) }
 
             when (val result = restorePurchasesUseCase()) {
                 is RestoreResult.Success -> {
-                    analyticsTracker.event("restore_completed", mapOf("source" to source))
+                    analyticsTracker.event(
+                        AnalyticsEvents.Paywall.RESTORE_COMPLETED,
+                        mapOf(AnalyticsParams.SOURCE to source),
+                    )
                     _screenState.update {
                         it.copy(isRestoring = false, purchaseSuccess = true)
                     }
@@ -366,15 +378,18 @@ class PaywallViewModel(
                     navigator.navigateToSubscriptionStatus(showSuccessMessage = true)
                 }
                 is RestoreResult.NoActiveSubscription -> {
-                    analyticsTracker.event("restore_no_subscription", mapOf("source" to source))
+                    analyticsTracker.event(
+                        AnalyticsEvents.Paywall.RESTORE_NO_SUBSCRIPTION,
+                        mapOf(AnalyticsParams.SOURCE to source),
+                    )
                     _screenState.update {
                         it.copy(isRestoring = false, error = getString(Res.string.paywall_no_subscription_found))
                     }
                 }
                 is RestoreResult.Error -> {
-                    analyticsTracker.event("restore_failed", mapOf(
-                        "source" to source,
-                        "error" to (result.message).take(100),
+                    analyticsTracker.event(AnalyticsEvents.Paywall.RESTORE_FAILED, mapOf(
+                        AnalyticsParams.SOURCE to source,
+                        AnalyticsParams.ERROR to (result.message).take(100),
                         "error_code" to (result.errorCode ?: "unknown"),
                         "underlying_error" to (result.underlyingError ?: "none").take(100)
                     ))

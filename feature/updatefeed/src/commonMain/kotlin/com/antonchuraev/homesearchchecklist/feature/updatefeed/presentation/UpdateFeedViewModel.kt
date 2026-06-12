@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.updatefeed.presentation
 
 import androidx.lifecycle.viewModelScope
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
@@ -78,7 +79,7 @@ class UpdateFeedViewModel(
         val isLocked = state?.lockedActionDeepLinks?.contains(intent.action.deepLink) == true
 
         analyticsTracker.event(
-            name = "update_feed_action_click",
+            name = AnalyticsEvents.UpdateFeed.ACTION_CLICK,
             params = mapOf(
                 "post_id" to intent.postId,
                 "label" to intent.action.label,

@@ -1,5 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.paywall.domain
 
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PaywallProduct
@@ -8,12 +10,17 @@ import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.Purchas
 /**
  * Logs purchase conversion / revenue events for Google Analytics & Google Ads.
  *
- * Three event types:
+ * Two event types:
  * - "free_trial_start" — user starts a free trial (Google Ads primary conversion).
- * - "in_app_purchase"  — direct purchase without trial (existing Google Ads conversion).
  * - "purchase"         — GA4 RESERVED ecommerce event; the only one GA4 aggregates into
  *                        revenue / ROAS. Fired for DIRECT (non-trial) payments with the real
  *                        price and currency from the store product.
+ *
+ * The legacy manual "in_app_purchase" event was REMOVED 2026-06-12: it duplicated Firebase's
+ * auto-collected `in_app_purchase` (Play Billing) and risked double-counting in GA4. The
+ * GA4-reserved `purchase` event carries the real revenue, so any Google Ads conversion that
+ * was keyed on `in_app_purchase` must be repointed to `purchase` in the Ads console — otherwise
+ * that conversion action stops receiving events.
  *
  * All names route through [AnalyticsTracker.event] → Firebase Analytics (Google) + Amplitude.
  */
@@ -24,28 +31,18 @@ class ConversionEventHelper(
 
     fun logConversionEvent(result: PurchaseResult.Success, product: PaywallProduct) {
         if (product.hasFreeTrial) {
-            analyticsTracker.event(EVENT_FREE_TRIAL_START, mapOf(
-                PARAM_ITEM_ID to product.id,
-                PARAM_ITEM_NAME to PRODUCT_NAME,
-                PARAM_TRIAL_DURATION to "${product.freeTrialDays}_days",
-                PARAM_VALUE to 0.0,
-                PARAM_CURRENCY to CURRENCY_USD
+            analyticsTracker.event(AnalyticsEvents.Conversion.FREE_TRIAL_START, mapOf(
+                AnalyticsParams.ITEM_ID to product.id,
+                AnalyticsParams.ITEM_NAME to PRODUCT_NAME,
+                AnalyticsParams.TRIAL_DURATION to "${product.freeTrialDays}_days",
+                AnalyticsParams.VALUE to 0.0,
+                AnalyticsParams.CURRENCY to CURRENCY_USD
             ))
         } else {
-            val params = mutableMapOf<String, Any>(
-                PARAM_ITEM_ID to product.id,
-                PARAM_ITEM_NAME to PRODUCT_NAME,
-                PARAM_CURRENCY to CURRENCY_USD,
-                PARAM_VALUE to PRICE_USD
-            )
-            result.transactionId?.let { params[PARAM_TRANSACTION_ID] = it }
-            analyticsTracker.event(EVENT_IN_APP_PURCHASE, params)
-
             // GA4 standard ecommerce `purchase` — the ONLY event GA4 aggregates into
-            // revenue / Google Ads ROAS. Additive to in_app_purchase above; carries the
-            // REAL price + currency from the store product (not the hardcoded 1.99/USD),
-            // so yearly plans and local currencies report correct revenue.
-            // Intentionally DIRECT-payment only: a trial start has no charge today, so it
+            // revenue / Google Ads ROAS. Carries the REAL price + currency from the store
+            // product (not a hardcoded 1.99/USD), so yearly plans and local currencies report
+            // correct revenue. DIRECT-payment only: a trial start has no charge today, so it
             // stays free_trial_start only — no premature/fake revenue in GA4 for trials.
             logStandardPurchaseEvent(result, product)
         }
@@ -70,32 +67,21 @@ class ConversionEventHelper(
             return
         }
         analyticsTracker.event(
-            EVENT_PURCHASE,
+            AnalyticsEvents.Conversion.PURCHASE,
             mapOf(
-                PARAM_TRANSACTION_ID to transactionId,
-                PARAM_VALUE to product.priceAmount,
-                PARAM_CURRENCY to product.priceCurrencyCode,
+                AnalyticsParams.TRANSACTION_ID to transactionId,
+                AnalyticsParams.VALUE to product.priceAmount,
+                AnalyticsParams.CURRENCY to product.priceCurrencyCode,
             ),
         )
     }
 
     companion object {
-        const val EVENT_FREE_TRIAL_START = "free_trial_start"
-        const val EVENT_IN_APP_PURCHASE = "in_app_purchase"
-
-        /** GA4 reserved ecommerce event name — recognized for revenue aggregation. */
-        const val EVENT_PURCHASE = "purchase"
-
-        const val PARAM_ITEM_ID = "item_id"
-        const val PARAM_ITEM_NAME = "item_name"
-        const val PARAM_TRIAL_DURATION = "trial_duration"
-        const val PARAM_VALUE = "value"
-        const val PARAM_CURRENCY = "currency"
-        const val PARAM_TRANSACTION_ID = "transaction_id"
-
+        // Event names and param keys are centralized in AnalyticsEvents.Conversion /
+        // AnalyticsParams (see imports). These remaining consts are local VALUE constants
+        // (not wire keys), so they stay here.
         const val PRODUCT_NAME = "Premium Monthly"
         const val CURRENCY_USD = "USD"
-        const val PRICE_USD = 1.99
 
         private const val TAG = "ConversionEvent"
     }

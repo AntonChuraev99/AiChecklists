@@ -324,6 +324,19 @@ sealed interface ChatScreenIntent : Intent {
      * Pass `null` to clear the context (sheet opened from [MainScreen] with no focus).
      */
     data class OnSetContextChecklist(val checklistId: Long?) : ChatScreenIntent
+
+    /**
+     * The chat surface became visible — fire once per open (analytics funnel entry).
+     *
+     * Emitted from the composition root of each entry point: [ChatRoute] (full-screen,
+     * `source="screen"`) and the inline dock in `App.kt` (`source="dock"`). NOT fired from
+     * the ViewModel's `init`: the ViewModel is an App-scoped singleton, so `init` runs once
+     * per process and would under-count opens. The handler emits
+     * [AnalyticsEvents.Chat.OPENED] + `screenView(CHAT)`.
+     *
+     * @param source Where the chat was opened from ("screen", "dock", or a future deeplink tag).
+     */
+    data class OnChatOpened(val source: String) : ChatScreenIntent
 }
 
 // ---------------------------------------------------------------------------

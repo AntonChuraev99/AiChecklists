@@ -10,6 +10,9 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.paywall_save_percent
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsScreens
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.paywall.data.PaywallConfig
@@ -72,7 +75,11 @@ fun PaywallRoute(
     if (isWebPaywallTarget) {
         val navigator: AppNavigator = koinInject()
         LaunchedEffect(Unit) {
-            analyticsTracker.screenView("paywall_web_install")
+            analyticsTracker.screenView(AnalyticsScreens.PAYWALL_WEB_INSTALL)
+            analyticsTracker.event(
+                AnalyticsEvents.Paywall.SHOWN,
+                mapOf(AnalyticsParams.SOURCE to (sourceOverride ?: "unknown")),
+            )
         }
         WebInstallAppScreen(
             onClose = {
@@ -93,10 +100,21 @@ fun PaywallRoute(
         return
     }
 
-    LaunchedEffect(Unit) { analyticsTracker.screenView("paywall") }
+    LaunchedEffect(Unit) { analyticsTracker.screenView(AnalyticsScreens.PAYWALL) }
 
     val viewModel: PaywallViewModel = koinViewModel(key = "paywall_${sourceOverride}_$forceVariant") { parametersOf(sourceOverride, forceVariant) }
     val state by viewModel.screenState.collectAsStateWithLifecycle()
+
+    // paywall_shown — gate-attribution funnel entry. screen_view (above) stays for GA4
+    // screen-tracking; this carries the `source` that opened the paywall so we can join
+    // shown → purchase_button_clicked → purchase_completed by source. Keyed on state.source
+    // so it fires once the VM has resolved the canonical source (constructor / nav-arg).
+    LaunchedEffect(state.source) {
+        analyticsTracker.event(
+            AnalyticsEvents.Paywall.SHOWN,
+            mapOf(AnalyticsParams.SOURCE to state.source),
+        )
+    }
 
     // Navigate away on purchase success (handled by ViewModel in Phase 2)
     LaunchedEffect(state.purchaseSuccess) {
@@ -168,20 +186,32 @@ fun PaywallRoute(
         onClose      = {
             if (closeConsumed) return@PaywallScreen
             closeConsumed = true
-            analyticsTracker.event("paywall_closed", mapOf("source" to state.source))
+            analyticsTracker.event(
+                AnalyticsEvents.Paywall.CLOSED,
+                mapOf(AnalyticsParams.SOURCE to state.source),
+            )
             viewModel.sendIntent(PaywallIntent.Close)
         },
         onRestore    = { viewModel.sendIntent(PaywallIntent.RestorePurchases) },
         onTermsClick = {
-            analyticsTracker.event("paywall_terms_clicked", mapOf("source" to state.source))
+            analyticsTracker.event(
+                AnalyticsEvents.Paywall.TERMS_CLICKED,
+                mapOf(AnalyticsParams.SOURCE to state.source),
+            )
             uriHandler.openUri(PaywallConfig.TERMS_OF_USE_URL)
         },
         onPrivacyClick = {
-            analyticsTracker.event("paywall_privacy_clicked", mapOf("source" to state.source))
+            analyticsTracker.event(
+                AnalyticsEvents.Paywall.PRIVACY_CLICKED,
+                mapOf(AnalyticsParams.SOURCE to state.source),
+            )
             uriHandler.openUri(PaywallConfig.PRIVACY_POLICY_URL)
         },
         onSupportClick = {
-            analyticsTracker.event("paywall_support_clicked", mapOf("source" to state.source))
+            analyticsTracker.event(
+                AnalyticsEvents.Paywall.SUPPORT_CLICKED,
+                mapOf(AnalyticsParams.SOURCE to state.source),
+            )
             uriHandler.openUri("mailto:${PaywallConfig.SUPPORT_EMAIL}")
         },
         errorMessage = state.error,

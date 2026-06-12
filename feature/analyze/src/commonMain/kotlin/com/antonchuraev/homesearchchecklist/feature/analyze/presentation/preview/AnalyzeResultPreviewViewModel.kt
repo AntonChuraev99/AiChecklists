@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.analyze.presentation.preview
 
 import androidx.lifecycle.viewModelScope
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
@@ -158,7 +159,7 @@ class AnalyzeResultPreviewViewModel(
                     )
 
                     val fillId = checklistRepository.addFill(newFill)
-                    analyticsTracker.event("fill_created", mapOf(
+                    analyticsTracker.event(AnalyticsEvents.Checklist.FILL_CREATED, mapOf(
                         "source" to "ai",
                         "item_count" to state.editableItems.size
                     ))
@@ -173,7 +174,7 @@ class AnalyzeResultPreviewViewModel(
                     )
 
                     val checklistId = checklistRepository.addChecklist(checklist)
-                    analyticsTracker.event("checklist_created", mapOf(
+                    analyticsTracker.event(AnalyticsEvents.Checklist.CREATED, mapOf(
                         "source" to "ai",
                         "item_count" to state.editableItems.size
                     ))
@@ -224,7 +225,7 @@ class AnalyzeResultPreviewViewModel(
                 val updatedFill = defaultFill.copy(items = updatedItems)
                 checklistRepository.updateFill(updatedFill)
 
-                analyticsTracker.event("default_fill_updated")
+                analyticsTracker.event(AnalyticsEvents.Checklist.DEFAULT_FILL_UPDATED)
 
                 AnalyzeResultHolder.clear()
                 appNavigator.navigateToChecklistDetail(checklistId)

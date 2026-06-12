@@ -393,6 +393,15 @@ fun App() {
             val chatViewModel: ChatViewModel = koinViewModel()
             val chatUiState by chatViewModel.screenState.collectAsStateWithLifecycle()
 
+            // Funnel: fire ai_chat_opened + screenView(CHAT) each time the inline dock opens.
+            // Keyed on chatSheetOpen so it fires on the false→true transition only (the
+            // ViewModel is a singleton — its init can't count per-open dock toggles).
+            LaunchedEffect(chatSheetOpen) {
+                if (chatSheetOpen) {
+                    chatViewModel.sendIntent(ChatScreenIntent.OnChatOpened(source = "dock"))
+                }
+            }
+
             // Open the dock anchored to a checklist (or null) AND start voice recording.
             // Used by the mic button on the MainScreen / ChecklistDetail bottom bars: the dock
             // expands and OnVoiceRecordingStarted flows to the VM, which emits

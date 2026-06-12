@@ -1,6 +1,9 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation.fill
 
 import androidx.lifecycle.viewModelScope
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsScreens
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
@@ -25,7 +28,7 @@ class FillDetailViewModel(
     override val screenState: StateFlow<FillDetailState> = _screenState.asStateFlow()
 
     init {
-        analyticsTracker.screenView("fill_detail")
+        analyticsTracker.screenView(AnalyticsScreens.FILL_DETAIL)
         loadFill()
     }
 
@@ -121,16 +124,16 @@ class FillDetailViewModel(
 
                 val totalItems = updatedItems.size
                 val checkedCount = updatedItems.count { it.checked }
-                val eventName = if (checked) "item_checked" else "item_unchecked"
+                val eventName = if (checked) AnalyticsEvents.Item.CHECKED else AnalyticsEvents.Item.UNCHECKED
                 analyticsTracker.event(eventName, mapOf(
-                    "fill_id" to fillId.toString(),
-                    "progress" to if (totalItems > 0) "${checkedCount * 100 / totalItems}" else "0"
+                    AnalyticsParams.FILL_ID to fillId.toString(),
+                    AnalyticsParams.PROGRESS to if (totalItems > 0) "${checkedCount * 100 / totalItems}" else "0"
                 ))
 
                 if (totalItems > 0 && checkedCount == totalItems) {
-                    analyticsTracker.event("fill_completed", mapOf(
-                        "fill_id" to fillId.toString(),
-                        "item_count" to totalItems.toString()
+                    analyticsTracker.event(AnalyticsEvents.Checklist.FILL_COMPLETED, mapOf(
+                        AnalyticsParams.FILL_ID to fillId.toString(),
+                        AnalyticsParams.ITEM_COUNT to totalItems.toString()
                     ))
                 }
 

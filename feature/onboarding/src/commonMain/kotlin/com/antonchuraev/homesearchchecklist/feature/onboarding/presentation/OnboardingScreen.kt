@@ -70,6 +70,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsScreens
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
@@ -95,7 +96,7 @@ fun OnboardingScreen(
     )
 ) {
     val analyticsTracker: AnalyticsTracker = koinInject()
-    LaunchedEffect(Unit) { analyticsTracker.screenView("onboarding") }
+    LaunchedEffect(Unit) { analyticsTracker.screenView(AnalyticsScreens.ONBOARDING) }
 
     val state by viewModel.screenState.collectAsState()
     val paywallState by paywallViewModel.screenState.collectAsState()

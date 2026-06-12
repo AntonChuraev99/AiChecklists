@@ -47,6 +47,7 @@ import com.antonchuraev.homesearchchecklist.feature.sharing.presentation.share.S
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsScreens
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
@@ -58,7 +59,7 @@ fun ShareScreen(
     viewModel: ShareViewModel = koinViewModel(key = "share_$checklistId") { parametersOf(checklistId) }
 ) {
     val analyticsTracker: AnalyticsTracker = koinInject()
-    LaunchedEffect(Unit) { analyticsTracker.screenView("share") }
+    LaunchedEffect(Unit) { analyticsTracker.screenView(AnalyticsScreens.SHARE) }
 
     val state by viewModel.screenState.collectAsStateWithLifecycle()
 

@@ -100,6 +100,12 @@ fun ChatRoute(
 ) {
     val state by viewModel.screenState.collectAsState()
 
+    // Funnel: fire ai_chat_opened + screenView(CHAT) once per full-screen open.
+    // key=Unit so it fires on entry only, not on every recomposition.
+    LaunchedEffect(Unit) {
+        viewModel.sendIntent(ChatScreenIntent.OnChatOpened(source = "screen"))
+    }
+
     // Tracks the source type we're waiting to pick, used by trigger-flag LaunchedEffect
     var pendingPickerSource by remember { mutableStateOf<AttachmentSource?>(null) }
 

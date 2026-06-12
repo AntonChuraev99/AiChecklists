@@ -65,6 +65,7 @@ import org.jetbrains.compose.resources.stringResource
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.TopAppBarDefaults
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsScreens
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
@@ -81,7 +82,7 @@ fun AnalyzeScreen(
     ) { parametersOf(checklistId, fillDefault, initialText) }
 ) {
     val analyticsTracker: AnalyticsTracker = koinInject()
-    LaunchedEffect(Unit) { analyticsTracker.screenView("analyze") }
+    LaunchedEffect(Unit) { analyticsTracker.screenView(AnalyticsScreens.ANALYZE) }
 
     val screenState by viewModel.screenState.collectAsStateWithLifecycle()
 

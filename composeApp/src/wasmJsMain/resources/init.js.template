@@ -10,6 +10,7 @@
 //   FIREBASE_WEB_STORAGE_BUCKET=aichecklists-40230.firebasestorage.app
 //   FIREBASE_WEB_MESSAGING_SENDER_ID=27698629989
 //   FIREBASE_WEB_APP_ID=<from Firebase Console → Project Settings → Web app>
+//   FIREBASE_WEB_MEASUREMENT_ID=<G-XXXXXXX, from Firebase Console → Project Settings → Web app; required for GA4 web analytics>
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js';
 import {
     getRemoteConfig,
@@ -39,6 +40,13 @@ import {
     onSnapshot,
     writeBatch,
 } from 'https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js';
+import {
+    getAnalytics,
+    logEvent,
+    setUserId as fbSetUserId,
+    setUserProperties as fbSetUserProperties,
+    isSupported as analyticsIsSupported,
+} from 'https://www.gstatic.com/firebasejs/12.11.0/firebase-analytics.js';
 
 // If ?clear-data is active, the page is reloading — don't start the app
 if (window.__clearingData) {
@@ -52,12 +60,60 @@ const firebaseConfig = {
     storageBucket: "__FIREBASE_STORAGE_BUCKET__",
     messagingSenderId: "__FIREBASE_MESSAGING_SENDER_ID__",
     appId: "__FIREBASE_APP_ID__",
+    measurementId: "__FIREBASE_MEASUREMENT_ID__",
 };
 
 const app = initializeApp(firebaseConfig);
 
 // === Firestore database instance ===
 const firestoreDb = getFirestore(app);
+
+// === Firebase Analytics (GA4) ===
+// getAnalytics() throws in unsupported environments (no cookies, some WebViews,
+// SSR), so gate it behind isSupported(). Analytics inits asynchronously — events
+// fired before init completes are silently dropped (acceptable: only the first
+// 1–2 splash events). All bridges no-op until __fbAnalytics is ready.
+// Requires measurementId (G-XXXXXXX) — without it events won't reach GA4 (but
+// nothing throws).
+let __fbAnalytics = null;
+analyticsIsSupported().then((ok) => {
+    if (!ok) { console.warn('[Analytics] not supported in this env'); return; }
+    try {
+        __fbAnalytics = getAnalytics(app);
+        console.log('[Analytics] init OK');
+    } catch (e) {
+        console.warn('[Analytics] init failed', e);
+    }
+}).catch((e) => console.warn('[Analytics] isSupported() rejected', e));
+
+globalThis.__analyticsLogEvent = (name, paramsJson) => {
+    try {
+        if (!__fbAnalytics) return;
+        const p = paramsJson ? JSON.parse(paramsJson) : {};
+        logEvent(__fbAnalytics, name, p);
+    } catch (e) { console.warn('[Analytics] logEvent', e); }
+};
+
+globalThis.__analyticsScreenView = (name) => {
+    try {
+        if (!__fbAnalytics) return;
+        logEvent(__fbAnalytics, 'screen_view', { screen_name: name });
+    } catch (e) { console.warn('[Analytics] screenView', e); }
+};
+
+globalThis.__analyticsSetUserId = (id) => {
+    try {
+        if (__fbAnalytics) fbSetUserId(__fbAnalytics, id);
+    } catch (e) { console.warn('[Analytics] setUserId', e); }
+};
+
+globalThis.__analyticsSetUserProperties = (propsJson) => {
+    try {
+        if (!__fbAnalytics) return;
+        const p = propsJson ? JSON.parse(propsJson) : {};
+        fbSetUserProperties(__fbAnalytics, p);
+    } catch (e) { console.warn('[Analytics] setUserProperties', e); }
+};
 
 // === Firebase Remote Config ===
 const rc = getRemoteConfig(app);

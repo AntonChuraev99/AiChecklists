@@ -54,6 +54,7 @@ import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsScreens
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
@@ -64,7 +65,7 @@ fun AnalyzeResultPreviewScreen(
     viewModel: AnalyzeResultPreviewViewModel = koinViewModel()
 ) {
     val analyticsTracker: AnalyticsTracker = koinInject()
-    LaunchedEffect(Unit) { analyticsTracker.screenView("analyze_result") }
+    LaunchedEffect(Unit) { analyticsTracker.screenView(AnalyticsScreens.ANALYZE_RESULT) }
 
     val state by viewModel.screenState.collectAsState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
