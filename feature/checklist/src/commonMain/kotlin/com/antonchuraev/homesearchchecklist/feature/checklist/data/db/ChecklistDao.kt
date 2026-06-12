@@ -62,6 +62,17 @@ interface ChecklistDao {
     @Query("UPDATE checklists SET isDeleted = 1, syncStatus = 2, updatedAt = :updatedAt WHERE id = :id")
     suspend fun softDelete(id: Long, updatedAt: Long)
 
+    /**
+     * Marks a checklist dirty (PENDING_UPLOAD) and bumps its updatedAt without touching
+     * any content. Used when a child fill changes in a way that must propagate through
+     * the parent's Firestore document (e.g. a whole fill deleted): fills are embedded in
+     * the checklist document, so the parent must be re-uploaded with a newer timestamp
+     * for other devices' Last-Write-Wins merge to pick up the change. Skips rows already
+     * pending delete (syncStatus = 2) so a queued deletion is never resurrected.
+     */
+    @Query("UPDATE checklists SET syncStatus = 1, updatedAt = :updatedAt WHERE id = :id AND syncStatus != 2")
+    suspend fun touchForSync(id: Long, updatedAt: Long)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(checklist: ChecklistEntity): Long
 

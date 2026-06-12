@@ -105,6 +105,7 @@ class SyncRepositoryImpl(
         return try {
             val pendingChecklists = checklistDao.getPendingSync()
             log("push: ${pendingChecklists.size} pending checklists")
+            val uploadedChecklistIds = mutableSetOf<Long>()
             for (entity in pendingChecklists) {
                 if (entity.syncStatus == SyncStatus.PENDING_DELETE.value) {
                     val cid = entity.cloudId
@@ -118,37 +119,39 @@ class SyncRepositoryImpl(
                     }
                     checklistDao.deleteById(entity.id)
                 } else {
-                    // Backfill a cloudId for legacy checklists created before cloud sync
-                    // existed: cloudId is a nullable column, and such rows used to be
-                    // silently skipped here (`?: continue`), so they never reached the
-                    // cloud (the web app then showed nothing). Generate + persist one.
-                    val cid = entity.cloudId ?: generateCloudId().also { newId ->
-                        logInfo("push: backfilling missing cloudId for '${entity.name}' -> $newId")
-                        checklistDao.assignCloudId(entity.id, newId)
-                    }
-                    val fills = fillDao.getActiveFillsByChecklistId(entity.id)
-                    // Same backfill for legacy fills so they merge by a stable cloudId.
-                    val fillSyncData = fills.map { fill ->
-                        val fillCid = fill.cloudId ?: generateCloudId().also { newId ->
-                            fillDao.assignCloudId(fill.id, newId)
-                        }
-                        fill.copy(cloudId = fillCid).toFillSyncData()
-                    }
-                    val syncData = entity.copy(cloudId = cid).toSyncData(fillSyncData)
-                    log("push: uploading '${entity.name}' cloudId=$cid, ${fills.size} fills")
-                    val result = firestoreDataSource.uploadChecklist(uid, syncData)
-                    if (result is AppResult.Success) {
-                        checklistDao.markSynced(entity.id, updatedAt = currentTimeMillis())
-                        fills.forEach { fillDao.markSynced(it.id, updatedAt = currentTimeMillis()) }
-                        log("push: '${entity.name}' synced OK")
-                    } else if (result is AppResult.Error) {
-                        logError("push: '${entity.name}' FAILED: ${result.exception.message}", result.exception)
-                    }
+                    uploadChecklistEntity(uid, entity)
+                    uploadedChecklistIds += entity.id
                 }
             }
 
+            // Fills are embedded inside their parent checklist's Firestore document, so a
+            // fill edited in place (item checked/unchecked, note, attachment, item added
+            // or removed within the fill) marks ONLY the fill PENDING_UPLOAD while its
+            // parent checklist stays SYNCED — and a SYNCED parent is absent from the loop
+            // above. Without this pass such edits never reach the cloud: the long-standing
+            // "checked items don't sync to web" bug. Re-upload the parent of every
+            // PENDING_UPLOAD fill (skipping parents already uploaded above), which carries
+            // the fill content and bumps the document's updatedAt so other devices' LWW
+            // merge accepts it. PENDING_UPLOAD fills under an already-uploaded parent were
+            // marked SYNCED by uploadChecklistEntity, so they no longer appear here.
             val pendingFills = fillDao.getPendingSync()
-            if (pendingFills.isNotEmpty()) log("push: ${pendingFills.size} pending fills (delete)")
+            val dirtyFillParentIds = pendingFills
+                .filter { it.syncStatus == SyncStatus.PENDING_UPLOAD.value }
+                .map { it.checklistId }
+                .toSet() - uploadedChecklistIds
+            if (dirtyFillParentIds.isNotEmpty()) {
+                log("push: ${dirtyFillParentIds.size} checklist(s) with dirty fills — re-uploading parent")
+            }
+            for (checklistId in dirtyFillParentIds) {
+                val parent = checklistDao.getById(checklistId) ?: continue
+                // A pending-delete / already-removed parent is handled by the delete path;
+                // don't resurrect it here.
+                if (parent.isDeleted || parent.syncStatus == SyncStatus.PENDING_DELETE.value) continue
+                uploadChecklistEntity(uid, parent)
+            }
+
+            // Drop any local PENDING_DELETE fill tombstones: the parent re-upload above
+            // already removed them from the cloud document via active-fills filtering.
             for (fill in pendingFills) {
                 if (fill.syncStatus == SyncStatus.PENDING_DELETE.value) {
                     fillDao.deleteById(fill.id)
@@ -162,6 +165,51 @@ class SyncRepositoryImpl(
             logError("push: ERROR ${e.message}", e)
             _syncState.value = SyncState.Error(e.message ?: "Sync failed")
             AppResult.Error(e)
+        }
+    }
+
+    /**
+     * Uploads one checklist (with its active fills embedded) to Firestore and, on
+     * success, marks the checklist and those fills SYNCED.
+     *
+     * Backfills a missing cloudId for legacy checklists/fills created before cloud sync
+     * existed (the column is nullable; such rows used to be silently skipped and never
+     * reached the cloud — the web app then showed nothing).
+     *
+     * updatedAt is bumped to push time both in the uploaded document and locally: a fill
+     * edited in place does NOT advance its parent's updatedAt, so re-uploading the parent
+     * with its stale timestamp would be SKIPped by other devices' Last-Write-Wins merge
+     * and the embedded-fill change would never propagate. Writing the same fresh value to
+     * the cloud and to Room keeps the two copies consistent and strictly newer than the
+     * copy other devices hold.
+     */
+    private suspend fun uploadChecklistEntity(
+        uid: String,
+        entity: com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistEntity,
+    ) {
+        val cid = entity.cloudId ?: generateCloudId().also { newId ->
+            logInfo("push: backfilling missing cloudId for '${entity.name}' -> $newId")
+            checklistDao.assignCloudId(entity.id, newId)
+        }
+        val fills = fillDao.getActiveFillsByChecklistId(entity.id)
+        val fillSyncData = fills.map { fill ->
+            val fillCid = fill.cloudId ?: generateCloudId().also { newId ->
+                fillDao.assignCloudId(fill.id, newId)
+            }
+            fill.copy(cloudId = fillCid).toFillSyncData()
+        }
+        val now = currentTimeMillis()
+        val syncData = entity.copy(cloudId = cid, updatedAt = now).toSyncData(fillSyncData)
+        log("push: uploading '${entity.name}' cloudId=$cid, ${fills.size} fills")
+        when (val result = firestoreDataSource.uploadChecklist(uid, syncData)) {
+            is AppResult.Success -> {
+                checklistDao.markSynced(entity.id, updatedAt = now)
+                fills.forEach { fillDao.markSynced(it.id, updatedAt = now) }
+                log("push: '${entity.name}' synced OK")
+            }
+            is AppResult.Error ->
+                logError("push: '${entity.name}' FAILED: ${result.exception.message}", result.exception)
+            is AppResult.Loading -> Unit
         }
     }
 

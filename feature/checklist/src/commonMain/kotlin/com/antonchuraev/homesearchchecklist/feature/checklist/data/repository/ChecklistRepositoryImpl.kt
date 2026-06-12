@@ -189,7 +189,11 @@ class ChecklistRepositoryImpl(
             val resetItems = defaultFillEntity.items.map {
                 ChecklistFillItem(text = it.text, checked = false, note = it.note)
             }
-            fillDao.insert(defaultFillEntity.copy(items = resetItems))
+            fillDao.insert(defaultFillEntity.copy(
+                items = resetItems,
+                updatedAt = currentTimeMillis(),
+                syncStatus = SyncStatus.PENDING_UPLOAD.value,
+            ))
         }
     }
 
@@ -248,8 +252,13 @@ class ChecklistRepositoryImpl(
                 it[itemIndex] = item.withPriority(newPriority)
             }
 
-            // 3. Persist updated fill
-            fillDao.insert(fillEntity.copy(items = updatedFillItems))
+            // 3. Persist updated fill — mark dirty so the priority change syncs to the cloud.
+            val now = currentTimeMillis()
+            fillDao.insert(fillEntity.copy(
+                items = updatedFillItems,
+                updatedAt = now,
+                syncStatus = SyncStatus.PENDING_UPLOAD.value,
+            ))
 
             // 4. Dual update: sync priority to template items (matched by text)
             // Template items use text as the stable key (same pattern as updateChecklist sync)
@@ -262,7 +271,11 @@ class ChecklistRepositoryImpl(
                         templateItem
                     }
                 }
-                checklistDao.update(checklistEntity.copy(items = updatedTemplateItems))
+                checklistDao.update(checklistEntity.copy(
+                    items = updatedTemplateItems,
+                    updatedAt = now,
+                    syncStatus = SyncStatus.PENDING_UPLOAD.value,
+                ))
             }
         }
     }
@@ -274,7 +287,13 @@ class ChecklistRepositoryImpl(
         val updatedItems = fillEntity.items.map { item ->
             if (item.id == itemId) item.withAttachmentAdded(attachment) else item
         }
-        fillDao.insert(fillEntity.copy(items = updatedItems))
+        // Mark dirty so the change reaches the cloud (sync push re-uploads the parent of
+        // any PENDING_UPLOAD fill). Without this the edit stays local-only forever.
+        fillDao.insert(fillEntity.copy(
+            items = updatedItems,
+            updatedAt = currentTimeMillis(),
+            syncStatus = SyncStatus.PENDING_UPLOAD.value,
+        ))
     }
 
     override suspend fun removeAttachment(fillId: Long, itemId: String, attachmentId: String) {
@@ -292,7 +311,11 @@ class ChecklistRepositoryImpl(
         val updatedItems = fillEntity.items.map { item ->
             if (item.id == itemId) item.withAttachmentRemoved(attachmentId) else item
         }
-        fillDao.insert(fillEntity.copy(items = updatedItems))
+        fillDao.insert(fillEntity.copy(
+            items = updatedItems,
+            updatedAt = currentTimeMillis(),
+            syncStatus = SyncStatus.PENDING_UPLOAD.value,
+        ))
     }
 
     // Weekly mode
@@ -348,6 +371,11 @@ class ChecklistRepositoryImpl(
         // File delete first — a DB orphan is recoverable on next delete; a file orphan is not.
         attachmentStorage.deleteAttachmentsForFill(fill.id)
         fillDao.deleteById(fill.id)
+        // Fills live inside the parent checklist's Firestore document. A hard local delete
+        // leaves no PENDING_UPLOAD tombstone for the sync push to act on, so the parent
+        // must be re-uploaded (now missing this fill) for other devices' per-fill
+        // reconciliation to drop it too. Bump the parent so pushPendingChanges picks it up.
+        checklistDao.touchForSync(fill.checklistId, currentTimeMillis())
     }
 
     override suspend fun reorderChecklists(orderedIds: List<Long>) {

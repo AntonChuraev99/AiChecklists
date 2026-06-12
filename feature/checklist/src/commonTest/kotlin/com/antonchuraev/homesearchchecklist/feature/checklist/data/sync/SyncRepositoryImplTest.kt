@@ -451,6 +451,78 @@ class SyncRepositoryImplTest {
         )
     }
 
+    // ─── Tests: dirty fill under a SYNCED checklist (checked-items-don't-sync) ──
+
+    @Test
+    fun push_uploadsParentOfDirtyFillWhenChecklistIsSynced() = runTest {
+        // Reproduces the production bug "checked items don't sync to web". Toggling a
+        // checkbox marks ONLY the fill PENDING_UPLOAD; its parent checklist stays
+        // SYNCED. The parent is therefore absent from checklistDao.getPendingSync(),
+        // and the old fill loop only handled PENDING_DELETE — so the new checked state
+        // never reached the cloud. The push must re-upload the parent (fills are
+        // embedded in the parent's Firestore document) so the item state propagates.
+        dao.checklists.add(localSynced(1L, "c1", "Groceries", updatedAt = 100L))
+        fillDao.fills.add(
+            fillEntity(
+                id = 10L,
+                checklistId = 1L,
+                cloudId = "f1",
+                syncStatus = SyncStatus.PENDING_UPLOAD.value,
+                updatedAt = 150L,
+            ),
+        )
+        val repo = newRepo()
+        auth.currentUserOverride = testUser
+
+        repo.pushPendingChanges()
+
+        val uploadedParent = firestore.uploaded.singleOrNull { it.cloudId == "c1" }
+        assertNotNull(
+            uploadedParent,
+            "parent checklist of a dirty fill must be re-uploaded so item state reaches the cloud",
+        )
+        assertTrue(
+            uploadedParent.fills.any { it.cloudId == "f1" },
+            "the re-uploaded parent document must carry the dirty fill's content",
+        )
+        assertTrue(
+            uploadedParent.updatedAt > 100L,
+            "parent updatedAt must be bumped above the stale local value, else other " +
+                "devices' Last-Write-Wins merge SKIPs the change and fills never propagate",
+        )
+        assertEquals(
+            SyncStatus.SYNCED.value,
+            fillDao.fills.single().syncStatus,
+            "the dirty fill must be cleared to SYNCED once its parent is uploaded",
+        )
+    }
+
+    @Test
+    fun push_doesNotDoubleUploadWhenChecklistAndItsFillBothDirty() = runTest {
+        // When the checklist itself is PENDING_UPLOAD its fills are already uploaded as
+        // part of it. The dirty-fill pass must not upload the same parent a second time.
+        dao.checklists.add(localPendingUpload(1L, "c1", "List", updatedAt = 100L))
+        fillDao.fills.add(
+            fillEntity(
+                id = 10L,
+                checklistId = 1L,
+                cloudId = "f1",
+                syncStatus = SyncStatus.PENDING_UPLOAD.value,
+                updatedAt = 150L,
+            ),
+        )
+        val repo = newRepo()
+        auth.currentUserOverride = testUser
+
+        repo.pushPendingChanges()
+
+        assertEquals(
+            1,
+            firestore.uploaded.count { it.cloudId == "c1" },
+            "parent checklist must be uploaded exactly once",
+        )
+    }
+
     @Test
     fun gate_isPerUid() = runTest {
         gate.doneUids.add("other-uid")
@@ -550,6 +622,16 @@ class SyncRepositoryImplTest {
 
         override suspend fun deleteById(id: Long) {
             checklists.removeAll { it.id == id }
+        }
+
+        override suspend fun touchForSync(id: Long, updatedAt: Long) {
+            replaceWith {
+                if (it.id == id && it.syncStatus != SyncStatus.PENDING_DELETE.value) {
+                    it.copy(syncStatus = SyncStatus.PENDING_UPLOAD.value, updatedAt = updatedAt)
+                } else {
+                    it
+                }
+            }
         }
 
         // ── Unused stubs ──
