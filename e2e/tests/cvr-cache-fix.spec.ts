@@ -23,10 +23,10 @@ import { test, expect } from "@playwright/test";
  *
  * Test targets:
  *   - Local dev server: http://localhost:9090  (default via GISTI_WEB_URL)
- *   - Production:       https://checklists.gisti.workers.dev  (GISTI_WEB_URL override)
+ *   - Production:       https://gisti-ai.com  (GISTI_WEB_URL override)
  *
  * Running against production:
- *   GISTI_WEB_URL=https://checklists.gisti.workers.dev npx playwright test cvr-cache-fix
+ *   GISTI_WEB_URL=https://gisti-ai.com npx playwright test cvr-cache-fix
  *
  * IMPORTANT: Canvas render tests are conditionally skipped in Playwright when the
  * bundled Chromium cannot stream the 26 MB wasm bundle (known issue documented in
@@ -709,7 +709,7 @@ test.describe("CVR fix — end-to-end render (canvas mount)", () => {
       test.skip(
         true,
         "Canvas did not mount (likely Playwright wasm streaming issue or slow CI) — " +
-          "run with GISTI_WEB_URL=https://checklists.gisti.workers.dev for production validation",
+          "run with GISTI_WEB_URL=https://gisti-ai.com for production validation",
       );
       return;
     }

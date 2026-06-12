@@ -1,26 +1,47 @@
 // Cloudflare Worker configuration for the Gisti AI Checklists wasmJs build.
 //
-// Production URL: https://checklists.gisti.workers.dev/
+// Production URL: https://gisti-ai.com/ (custom domains below; zone lives in
+// this Cloudflare account — wrangler creates DNS + TLS on deploy).
+// Legacy URL: https://checklists.gisti.workers.dev/ — 301-redirects to
+// gisti-ai.com via src/redirect.js (www.gisti-ai.com redirects too).
+// Migration plan: docs/plans/2026-06-12-web-domain-migration-gisti-ai-plan.md.
 //
-// Worker type: Static Assets only — no `main` script, no Worker code at runtime.
-// Cloudflare serves files from `assets.directory` and falls back to `index.html`
-// for unknown paths (SPA routing via `not_found_handling`).
+// Worker type: Static Assets + a tiny hostname-canonicalization script
+// (src/redirect.js). run_worker_first routes every request through the script
+// (an asset match would otherwise bypass it); non-redirect hosts fall through
+// to env.ASSETS.fetch, which keeps SPA fallback (`not_found_handling`).
 //
 // Deploy strategy (Cloudflare Workers Builds):
 //   - Push to `master` triggers `npx wrangler deploy` → production
-//     (https://checklists.gisti.workers.dev/).
-//   - Push to other branches triggers `npx wrangler versions upload` → preview URL.
+//     (https://gisti-ai.com/).
+//   - Push to other branches triggers `npx wrangler versions upload` → preview URL
+//     on *.gisti.workers.dev (custom domains apply only on `deploy`).
 //     See: https://developers.cloudflare.com/workers/ci-cd/builds/build-branches/
 //
 // Local deploy: `./gradlew composeApp:wasmJsBrowserDistribution && npx wrangler@4 deploy`.
+//
+// ⚠ Do not add `env` blocks without an explicit "routes": [] override in each —
+// wrangler v4 inherits top-level routes and an `--env` deploy would steal the
+// custom domain from the production Worker (workers-sdk#13925).
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "checklists",
 	"compatibility_date": "2026-05-08",
 	"preview_urls": true,
+	// Keep the legacy workers.dev URL alive: once routes exist, wrangler flips
+	// the workers_dev default to false — it must stay explicit here until the
+	// 301 redirect (src/redirect.js) ships AND we deliberately sunset the host.
+	"workers_dev": true,
+	"routes": [
+		{ "pattern": "gisti-ai.com", "custom_domain": true },
+		{ "pattern": "www.gisti-ai.com", "custom_domain": true }
+	],
+	"main": "src/redirect.js",
 	"assets": {
 		"directory": "./composeApp/build/dist/wasmJs/productionExecutable",
-		"not_found_handling": "single-page-application"
+		"not_found_handling": "single-page-application",
+		"binding": "ASSETS",
+		"run_worker_first": true
 	},
 	"observability": {
 		"enabled": true

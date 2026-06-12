@@ -456,7 +456,7 @@ private fun BrowserWindow(modifier: Modifier = Modifier) {
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "checklists.gisti.app",
+                    text = "gisti-ai.com",
                     fontSize = 6.sp,
                     color = BrandTextSecondary
                 )

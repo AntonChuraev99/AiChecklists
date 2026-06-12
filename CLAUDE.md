@@ -9,7 +9,7 @@ Guidance for Claude Code in this repo. Keep this file **≤200 lines** (Anthropi
 | Target | Status | Where |
 |--------|--------|-------|
 | Android | Production | Google Play |
-| Web (wasmJs) | Production | <https://checklists.gisti.workers.dev/> (Cloudflare Workers Static Assets) |
+| Web (wasmJs) | Production | <https://gisti-ai.com/> (Cloudflare Workers Static Assets; legacy checklists.gisti.workers.dev 301-redirects) |
 | iOS | Code-only, not released | published after Android revenue covers the $99/yr Apple fee |
 
 **Web** is a full parallel platform (not a lite companion): Compose wasmJs renderer (Skiko canvas), Room 3.0 over SQLite OPFS Web Worker, Firebase JS SDK (ESM). AI flow goes through CORS-enabled Cloud Functions — direct Gemini calls from the browser are forbidden.
