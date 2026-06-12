@@ -30,12 +30,15 @@ import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserD
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -116,6 +119,35 @@ private class FakeChatHistoryRepository : ChatHistoryRepository {
     override suspend fun append(message: ChatMessage) { stored.add(message) }
     override suspend fun clear() { stored.clear() }
     override suspend fun count(): Int = stored.size
+}
+
+/**
+ * History repo whose [observeRecent] flow THROWS on the first [throwTimes] subscriptions and then
+ * emits [seed]. Each `.first()` collection re-subscribes the cold flow → a fresh attempt, which is
+ * exactly how `ChatViewModel.init`'s `retryWhen { ... }` retries the load.
+ *
+ * Models the web (wasmJs) reality the init-seed retry was built for: the Room/OPFS Web Worker
+ * driver isn't ready when the singleton ChatViewModel inits, so the first query/queries throw.
+ * Set [throwTimes] past the retry cap (e.g. 100) to model "DB never becomes ready".
+ */
+private class ThrowingChatHistoryRepository(
+    private val throwTimes: Int,
+    private val seed: List<ChatMessage> = emptyList(),
+) : ChatHistoryRepository {
+    var subscribeCount = 0
+        private set
+
+    override fun observeRecent(limit: Int): Flow<List<ChatMessage>> = flow {
+        subscribeCount++
+        if (subscribeCount <= throwTimes) {
+            error("DB not ready (attempt $subscribeCount)")
+        }
+        emit(seed.takeLast(limit))
+    }
+
+    override suspend fun append(message: ChatMessage) = Unit
+    override suspend fun clear() = Unit
+    override suspend fun count(): Int = seed.size
 }
 
 private class FakeChecklistRepository(
@@ -2105,5 +2137,103 @@ class ChatViewModelTest {
         val confirmed = analytics.paramsOf("ai_chat_preview_confirmed")
         assertNotNull(confirmed, "Apply must emit ai_chat_preview_confirmed")
         assertEquals("AddItem", confirmed["action_type"])
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // init-seed history-load resilience (web black-empty-snackbar regression)
+    // ══════════════════════════════════════════════════════════════════════════
+    //
+    // Web bug: on app open a black snackbar with no text appeared at the bottom. The singleton
+    // ChatViewModel's init seeds chat history via observeRecent(...).first(). On wasmJs the
+    // Room/OPFS Web Worker driver isn't ready yet → the query threw. The OLD code emitted
+    // ShowSnackbar("chat_history_load_error") from that failure — fired BEFORE Compose Resources
+    // (.cvr) finished loading, so stringResource() resolved to empty → an empty black snackbar the
+    // user never triggered and can't act on. The fix retries with backoff (5×, 400ms) and on final
+    // failure ONLY logs (no snackbar). These tests lock that contract.
+    //
+    // Timing: the fix uses delay() inside retryWhen, so virtual time must be advanced. We override
+    // Main with an UnconfinedTestDispatcher bound to runTest's scheduler. Unconfined runs the init
+    // seed eagerly at VM construction, but it immediately SUSPENDS on the first delay() (backoff) —
+    // so we can subscribe to sideEffect AFTER construction yet BEFORE any retry-exhausted emission
+    // fires. sideEffect is a replay=0 SharedFlow, so a late subscriber would miss the emission and
+    // the "no snackbar" assert would be vacuous; subscribing before the emit makes it real.
+
+    @Test
+    fun init_historyLoadAlwaysThrows_doesNotEmitSnackbar() = runTest {
+        // Bind Main to the runTest scheduler so the init seed's delay()-driven retries advance here.
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+
+        // throwTimes far past the retry cap → every attempt throws → retries exhaust → onFailure.
+        val historyRepo = ThrowingChatHistoryRepository(throwTimes = 100)
+        // Construction starts init eagerly; the seed coroutine suspends on the first backoff delay().
+        val vm = makeVm(historyRepo = historyRepo)
+
+        // Capture the FIRST side-effect (if any) the init path produces. Subscribe via UNDISPATCHED
+        // BEFORE advancing time so the collector is active when the seed's failure path runs — the
+        // proven pattern in this file (sideEffect is a replay=0 SharedFlow, a late subscriber would
+        // miss the emission and make the assert vacuous). withTimeoutOrNull resolves to:
+        //   - the emitted ShowSnackbar (OLD buggy code) → assertion below fails (RED), or
+        //   - null (FIXED code: only logger.error, no emission) → assertion passes (GREEN).
+        val firstEffect = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            withTimeoutOrNull(60_000) { vm.sideEffect.first() }
+        }
+
+        // Drain the 5 retry backoffs (5 × 400ms) → onFailure runs while the collector is subscribed,
+        // then the 60s virtual timeout elapses so withTimeoutOrNull returns null when nothing emits.
+        testScheduler.advanceUntilIdle()
+
+        // 1. The retry loop must have actually run all the way to exhaustion (>1 subscribe = retried),
+        //    so we know the failure path was exercised — not skipped.
+        assertTrue(
+            historyRepo.subscribeCount >= 2,
+            "History load must have retried on failure (subscribeCount=${historyRepo.subscribeCount})",
+        )
+
+        // 2. THE REGRESSION: the init seed failure must NOT surface any user-facing side-effect —
+        //    and in particular never the empty-black ShowSnackbar("chat_history_load_error").
+        val effect = firstEffect.await()
+        assertNull(
+            effect,
+            "init history-load failure must NOT emit a side-effect (web black-empty-snackbar bug); got $effect",
+        )
+
+        // 3. The ViewModel stays usable — no crash, messages empty (seed yielded nothing).
+        assertEquals(0, vm.screenState.value.messages.size, "Failed seed must leave messages empty")
+    }
+
+    @Test
+    fun init_historyLoadFlakyThenSucceeds_seedsMessages() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Throws on the first 3 attempts (DB warming up), then emits a non-empty history. With a
+        // 5-retry cap the 4th attempt succeeds → the seed lands. This demonstrates the retry's value:
+        // without it the one-shot .first() would have thrown on attempt 1 and the history never seeds.
+        val persisted = listOf(
+            ChatMessage(
+                id = "u1",
+                role = ChatRole.User,
+                content = "buy milk",
+                timestamp = 1_000L,
+            ),
+            ChatMessage(
+                id = "a1",
+                role = ChatRole.Assistant,
+                content = "Added milk.",
+                timestamp = 2_000L,
+            ),
+        )
+        val historyRepo = ThrowingChatHistoryRepository(throwTimes = 3, seed = persisted)
+        val vm = makeVm(historyRepo = historyRepo)
+
+        // Advance virtual time through the 3 failed attempts (3 × 400ms backoff) + the 4th success.
+        testScheduler.advanceUntilIdle()
+
+        // Retried 3 times then succeeded on the 4th subscription.
+        assertEquals(4, historyRepo.subscribeCount, "Must retry 3 times then succeed on the 4th attempt")
+
+        // The persisted history was seeded into state thanks to the retry.
+        val messages = vm.screenState.value.messages
+        assertEquals(2, messages.size, "Persisted history must be seeded after a flaky load recovers")
+        assertEquals(listOf("buy milk", "Added milk."), messages.map { it.content })
     }
 }

@@ -37,12 +37,14 @@ import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserD
 import kotlin.concurrent.Volatile
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.random.Random
@@ -107,17 +109,45 @@ class ChatViewModel(
     init {
         // Seed the message list from persisted history so the user sees
         // their previous conversation immediately on re-entry.
+        //
+        // This runs from the singleton ChatViewModel's init at app startup. On web
+        // (wasmJs) the Room/OPFS Web Worker driver is often not ready yet at that moment,
+        // so the first query throws. Previously that surfaced an error snackbar — which
+        // (a) the user never triggered and cannot act on, and (b) fired before Compose
+        // Resources (.cvr) finished loading, so stringResource() was still empty → an
+        // empty black snackbar on every web open. It also left chat history unseeded,
+        // because the seed is one-shot (no continuous re-observe). Fix: retry the query
+        // with backoff until the DB is ready instead of toasting. Android resolves the
+        // DB instantly, so this never retries there.
         viewModelScope.launch {
             runCatching {
-                chatHistoryRepository.observeRecent(HISTORY_DISPLAY_LIMIT).first().also { history ->
-                    if (history.isNotEmpty()) {
-                        _screenState.value = _screenState.value.copy(messages = history)
-                        logger.debug(TAG, "init: loaded ${history.size} messages from history")
+                chatHistoryRepository.observeRecent(HISTORY_DISPLAY_LIMIT)
+                    .retryWhen { cause, attempt ->
+                        if (attempt < HISTORY_LOAD_MAX_RETRIES) {
+                            logger.warning(
+                                TAG,
+                                "init: history load attempt ${attempt + 1} failed " +
+                                    "(DB not ready?) — ${cause.message}",
+                            )
+                            delay(HISTORY_LOAD_RETRY_DELAY_MS)
+                            true
+                        } else {
+                            false
+                        }
                     }
-                }
+                    .first()
+                    .also { history ->
+                        // Guard against clobbering live messages that may have arrived
+                        // during the retry window.
+                        if (history.isNotEmpty() && _screenState.value.messages.isEmpty()) {
+                            _screenState.value = _screenState.value.copy(messages = history)
+                            logger.debug(TAG, "init: loaded ${history.size} messages from history")
+                        }
+                    }
             }.onFailure { e ->
-                logger.error(TAG, "init: failed to load history — ${e.message}", e)
-                _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_history_load_error"))
+                // Retries exhausted (or a non-transient failure). Log only — never a
+                // user-facing snackbar for a background startup seed the user can't act on.
+                logger.error(TAG, "init: failed to load history after retries — ${e.message}", e)
             }
         }
 
@@ -1701,6 +1731,10 @@ class ChatViewModel(
         const val TAG = "ChatViewModel"
         /** Max messages to display from persisted history on screen open. */
         const val HISTORY_DISPLAY_LIMIT = 20
+        /** Retries for the startup history seed when the DB driver isn't ready yet (wasmJs OPFS race). */
+        const val HISTORY_LOAD_MAX_RETRIES = 5L
+        /** Backoff between history-seed retries; ~5×400ms covers OPFS Web Worker warm-up. */
+        const val HISTORY_LOAD_RETRY_DELAY_MS = 400L
         /** Max checklists to include in Layer 3 context summary. */
         const val CHECKLIST_SUMMARY_LIMIT = 8
         /** Free-tier attachment limit per chat message (mirrors item-attachments FREE_LIMIT = 3). */
