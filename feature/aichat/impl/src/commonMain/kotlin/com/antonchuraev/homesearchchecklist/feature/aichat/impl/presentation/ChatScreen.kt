@@ -210,7 +210,7 @@ fun ChatScreen(
     if (state.showSettingsSheet) {
         ChatSettingsSheet(
             creditBalance = state.creditBalance,
-            isPremium = false, // Pending: docs/todos/2026-05-17-chat-settings-premium-flag.md
+            isPremium = state.isPremium,
             deepThinkingEnabled = state.deepThinkingEnabled,
             onDeepThinkingToggle = { onIntent(ChatScreenIntent.OnDeepThinkingToggle(it)) },
             onGetMoreClick = {

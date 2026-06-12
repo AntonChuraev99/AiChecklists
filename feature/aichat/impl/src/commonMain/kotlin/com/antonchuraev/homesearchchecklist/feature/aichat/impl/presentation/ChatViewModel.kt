@@ -115,7 +115,10 @@ class ChatViewModel(
         // feedback; the next Firestore sync will reconcile any drift.
         viewModelScope.launch {
             userDataRepository.getUserDataFlow().collect { userData ->
-                _screenState.value = _screenState.value.copy(creditBalance = userData.aiCredits)
+                _screenState.value = _screenState.value.copy(
+                    creditBalance = userData.aiCredits,
+                    isPremium = userData.isPremium,
+                )
             }
         }
 

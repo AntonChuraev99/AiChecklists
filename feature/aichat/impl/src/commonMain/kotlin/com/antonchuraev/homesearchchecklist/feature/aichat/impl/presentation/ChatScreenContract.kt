@@ -48,6 +48,7 @@ data class ChatScreenState(
     val inputText: String = "",
     val pendingPreview: PendingPreview? = null,
     val creditBalance: Int = 0,
+    val isPremium: Boolean = false,
     val showPricingSheet: Boolean = false,
     val showSettingsSheet: Boolean = false,
     val showFeaturesSheet: Boolean = false,
