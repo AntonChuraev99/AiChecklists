@@ -844,6 +844,11 @@ private fun ChecklistDetailContent(
                             onAddItem = {
                                 onIntent(ChecklistDetailIntent.OnAddItemWithParse)
                             },
+                            onItemCommitted = {
+                                // Successful add — collapse the inline input (no cancel analytics;
+                                // the ViewModel already cleared the text).
+                                addItemActive = false
+                            },
                             onClose = { hadText ->
                                 onIntent(ChecklistDetailIntent.OnItemInputChanged(""))
                                 onIntent(ChecklistDetailIntent.OnQuickAddCancelled(hadText = hadText))
@@ -2593,16 +2598,37 @@ private fun InlineAddItemInput(
     onTextChange: (String) -> Unit,
     parsedToken: ParsedDateToken?,
     onAddItem: () -> Unit,
+    onItemCommitted: () -> Unit,
     onClose: (hadText: Boolean) -> Unit,
 ) {
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     val density = LocalDensity.current
     val imeBottom = WindowInsets.ime.getBottom(density)
     var wasKeyboardVisible by remember { mutableStateOf(false) }
+    // Set true the instant an add gesture (IME Done or the check button) fires. The ViewModel
+    // clears [text] synchronously ONLY when the item was actually added (a trigger-only phrase
+    // like "tomorrow 7am" is rejected and keeps the text for the user to finish). So the next
+    // recomposition tells us the outcome: blank text = success, non-blank = rejected.
+    var submitAttempted by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
+    }
+
+    // Resolve the add outcome the frame after a submit. On success collapse the inline input
+    // immediately (hide IME + remove the row) so it doesn't briefly flash empty before the
+    // IME-dismiss effect below would have caught up. On rejection do nothing — keep the keyboard
+    // and the preserved text so the user can complete it (a Smart Add hint is already showing).
+    LaunchedEffect(text, submitAttempted) {
+        if (submitAttempted) {
+            submitAttempted = false
+            if (text.isBlank()) {
+                keyboardController?.hide()
+                onItemCommitted()
+            }
+        }
     }
 
     // Track keyboard visibility: when keyboard hides via system back, close input
@@ -2656,13 +2682,17 @@ private fun InlineAddItemInput(
                 ),
                 keyboardActions = KeyboardActions(
                     onDone = {
-                        if (text.isNotBlank()) onAddItem()
+                        if (text.isNotBlank()) {
+                            submitAttempted = true
+                            onAddItem()
+                        }
                     }
                 )
             )
             IconButton(
                 onClick = {
                     if (text.isNotBlank()) {
+                        submitAttempted = true
                         onAddItem()
                     } else {
                         onClose(false)

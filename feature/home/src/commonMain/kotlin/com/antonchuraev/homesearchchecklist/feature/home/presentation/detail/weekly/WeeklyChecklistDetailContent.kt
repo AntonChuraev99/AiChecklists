@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -290,6 +291,7 @@ private fun WeeklyAddItemRow(
     modifier: Modifier = Modifier,
 ) {
     val subduedBorder = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+    val keyboardController = LocalSoftwareKeyboardController.current
 
     OutlinedTextField(
         value = text,
@@ -305,7 +307,12 @@ private fun WeeklyAddItemRow(
         singleLine = true,
         shape = MaterialTheme.shapes.medium,
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-        keyboardActions = KeyboardActions(onDone = { onSubmit() }),
+        keyboardActions = KeyboardActions(
+            onDone = {
+                onSubmit()
+                keyboardController?.hide()
+            },
+        ),
         colors = OutlinedTextFieldDefaults.colors(
             unfocusedBorderColor = subduedBorder,
             focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
