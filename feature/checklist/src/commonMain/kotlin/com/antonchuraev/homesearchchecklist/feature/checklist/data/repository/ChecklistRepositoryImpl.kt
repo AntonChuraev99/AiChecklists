@@ -189,11 +189,13 @@ class ChecklistRepositoryImpl(
             val resetItems = defaultFillEntity.items.map {
                 ChecklistFillItem(text = it.text, checked = false, note = it.note)
             }
+            val now = currentTimeMillis()
             fillDao.insert(defaultFillEntity.copy(
                 items = resetItems,
-                updatedAt = currentTimeMillis(),
+                updatedAt = now,
                 syncStatus = SyncStatus.PENDING_UPLOAD.value,
             ))
+            checklistDao.touchForSync(defaultFillEntity.checklistId, now)
         }
     }
 
@@ -287,13 +289,15 @@ class ChecklistRepositoryImpl(
         val updatedItems = fillEntity.items.map { item ->
             if (item.id == itemId) item.withAttachmentAdded(attachment) else item
         }
-        // Mark dirty so the change reaches the cloud (sync push re-uploads the parent of
-        // any PENDING_UPLOAD fill). Without this the edit stays local-only forever.
+        // Mark dirty so the change reaches the cloud, and touch the parent so the sync
+        // push fires promptly (see updateFill). Without this the edit stays local-only.
+        val now = currentTimeMillis()
         fillDao.insert(fillEntity.copy(
             items = updatedItems,
-            updatedAt = currentTimeMillis(),
+            updatedAt = now,
             syncStatus = SyncStatus.PENDING_UPLOAD.value,
         ))
+        checklistDao.touchForSync(fillEntity.checklistId, now)
     }
 
     override suspend fun removeAttachment(fillId: Long, itemId: String, attachmentId: String) {
@@ -311,11 +315,13 @@ class ChecklistRepositoryImpl(
         val updatedItems = fillEntity.items.map { item ->
             if (item.id == itemId) item.withAttachmentRemoved(attachmentId) else item
         }
+        val now = currentTimeMillis()
         fillDao.insert(fillEntity.copy(
             items = updatedItems,
-            updatedAt = currentTimeMillis(),
+            updatedAt = now,
             syncStatus = SyncStatus.PENDING_UPLOAD.value,
         ))
+        checklistDao.touchForSync(fillEntity.checklistId, now)
     }
 
     // Weekly mode
@@ -351,19 +357,31 @@ class ChecklistRepositoryImpl(
     }
 
     override suspend fun addFill(fill: ChecklistFill): Long {
+        val now = currentTimeMillis()
         val entity = fill.toEntity().copy(
             cloudId = fill.cloudId ?: generateCloudId(),
-            updatedAt = currentTimeMillis(),
+            updatedAt = now,
             syncStatus = SyncStatus.PENDING_UPLOAD.value,
         )
-        return fillDao.insert(entity)
+        val id = fillDao.insert(entity)
+        // Touch parent so the sync push fires promptly (see updateFill).
+        checklistDao.touchForSync(fill.checklistId, now)
+        return id
     }
 
     override suspend fun updateFill(fill: ChecklistFill) {
+        val now = currentTimeMillis()
         fillDao.insert(fill.toEntity().copy(
-            updatedAt = currentTimeMillis(),
+            updatedAt = now,
             syncStatus = SyncStatus.PENDING_UPLOAD.value,
         ))
+        // The sync push is triggered by writes to the CHECKLISTS table
+        // (MainScreenViewModel observes repository.checklists). A fill-only edit (checkbox,
+        // note, cover, name) never touches that table, so the push would fire late — only
+        // on the next unrelated checklist change — making checked items sync very slowly.
+        // Touch the parent so the trigger fires immediately and the document's updatedAt
+        // advances for cross-device LWW. Fills are embedded in the parent's cloud document.
+        checklistDao.touchForSync(fill.checklistId, now)
     }
 
     override suspend fun deleteFill(fill: ChecklistFill) {
