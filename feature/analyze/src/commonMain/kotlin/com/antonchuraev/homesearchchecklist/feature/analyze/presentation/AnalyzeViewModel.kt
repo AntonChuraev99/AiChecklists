@@ -23,6 +23,7 @@ import kotlinx.coroutines.launch
 class AnalyzeViewModel(
     private val checklistId: Long?,
     private val fillDefault: Boolean = false,
+    private val initialText: String? = null,
     private val analyzeRepository: AnalyzeRepository,
     private val checklistRepository: ChecklistRepository,
     private val appNavigator: AppNavigator,
@@ -31,11 +32,21 @@ class AnalyzeViewModel(
     private val analyticsTracker: AnalyticsTracker
 ) : AppViewModel<AnalyzeScreenState, AnalyzeScreenIntent, Nothing>() {
 
-    private val _screenState = MutableStateFlow(AnalyzeScreenState(
-        isFillMode = checklistId != null,
-        fillDefault = fillDefault,
-        selectedChecklistId = checklistId
-    ))
+    private val _screenState = MutableStateFlow(
+        run {
+            // Prefill from shared/selected text (ACTION_PROCESS_TEXT "Checklist from text" /
+            // "Fill (AI)" actions): pre-select RAW_TEXT and populate the input. Analysis is
+            // NOT auto-run — the user taps Analyze themselves (protects the AI-credit budget).
+            val prefill = initialText?.takeIf { it.isNotBlank() }
+            AnalyzeScreenState(
+                isFillMode = checklistId != null,
+                fillDefault = fillDefault,
+                selectedChecklistId = checklistId,
+                selectedInputType = if (prefill != null) InputDataType.RAW_TEXT else null,
+                inputText = prefill.orEmpty()
+            )
+        }
+    )
     override val screenState: StateFlow<AnalyzeScreenState> = _screenState.asStateFlow()
 
     init {

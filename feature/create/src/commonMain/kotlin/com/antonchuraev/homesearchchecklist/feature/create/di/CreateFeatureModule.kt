@@ -24,7 +24,8 @@ val createFeatureModule = module {
     // ViewModels
     viewModel { params ->
         CreateChecklistViewModel(
-            editChecklistId = params.getOrNull(),
+            editChecklistId = params.getOrNull<Long>(),
+            initialText = params.getOrNull<String>(),
             checklistRepository = get(),
             appNavigator = get(),
             analyticsTracker = get(),

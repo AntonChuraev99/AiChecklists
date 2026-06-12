@@ -30,4 +30,11 @@
     <!-- Push-уведомления / промо (FCM re-engagement) -->
     <string name="promotions_notification_channel">Обновления и советы</string>
     <string name="promotions_notification_channel_desc">Обновления приложения, советы и напоминания вернуться</string>
+
+    <!-- Пункты меню выделения текста ACTION_PROCESS_TEXT (должны быть короткими) -->
+    <string name="process_text_create_ai">Чек-лист из текста</string>
+    <string name="process_text_add_to_existing">Добавить в чек-лист</string>
+    <string name="process_text_new_checklist">Новый чек-лист</string>
+    <string name="process_text_fill_ai">Заполнить (AI)</string>
+    <string name="process_text_empty">Текст не выделен</string>
 </resources>

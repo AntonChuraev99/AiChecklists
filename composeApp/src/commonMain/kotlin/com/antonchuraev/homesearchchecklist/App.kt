@@ -170,6 +170,7 @@ import com.antonchuraev.homesearchchecklist.feature.splash.presentation.SplashSc
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.ChecklistDetailScreen
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.fill.FillDetailScreen
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.fills.FillsListScreen
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.picker.AddToChecklistPickerScreen
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.PaywallRoute
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.SubscriptionStatusScreen
 import com.antonchuraev.homesearchchecklist.feature.sharing.presentation.ShareScreen
@@ -841,6 +842,7 @@ fun App() {
                         CreateChecklistScreen(
                             editChecklistId = route.editChecklistId,
                             templateId = route.templateId,
+                            initialText = route.initialText,
                         )
                     }
 
@@ -880,7 +882,15 @@ fun App() {
                     }
 
                     entry<AppNavRoute.Analyze> { route ->
-                        AnalyzeScreen(checklistId = route.checklistId, fillDefault = route.fillDefault)
+                        AnalyzeScreen(
+                            checklistId = route.checklistId,
+                            fillDefault = route.fillDefault,
+                            initialText = route.initialText,
+                        )
+                    }
+
+                    entry<AppNavRoute.AddToChecklistPicker> { route ->
+                        AddToChecklistPickerScreen(text = route.text, purpose = route.purpose)
                     }
 
                     entry<AppNavRoute.AnalyzeResultPreview> {

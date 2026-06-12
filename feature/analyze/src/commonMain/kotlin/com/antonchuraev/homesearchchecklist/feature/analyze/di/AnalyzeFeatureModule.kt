@@ -29,11 +29,12 @@ val analyzeFeatureModule = module {
     // attachment flows (CreateChecklistFromAttachment).
     single<AiAnalyzer> { FirebaseAiAnalyzerAdapter(analyzeRepository = get()) }
 
-    // ViewModel with optional checklistId and fillDefault parameters
-    viewModel { (checklistId: Long?, fillDefault: Boolean) ->
+    // ViewModel with optional checklistId, fillDefault and initialText parameters
+    viewModel { (checklistId: Long?, fillDefault: Boolean, initialText: String?) ->
         AnalyzeViewModel(
             checklistId = checklistId,
             fillDefault = fillDefault,
+            initialText = initialText,
             analyzeRepository = get(),
             checklistRepository = get(),
             appNavigator = get(),

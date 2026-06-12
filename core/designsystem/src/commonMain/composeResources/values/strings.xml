@@ -538,6 +538,10 @@
         <item quantity="one">%d item remaining</item>
         <item quantity="other">%d items remaining</item>
     </plurals>
+    <plurals name="items_count">
+        <item quantity="one">%1$d item</item>
+        <item quantity="other">%1$d items</item>
+    </plurals>
     <string name="reminder_exact_alarm_title">Enable Precise Reminders</string>
     <string name="reminder_exact_alarm_step1">Tap "Open Settings" below</string>
     <string name="reminder_exact_alarm_step2">Find "Alarms &amp; reminders"</string>
@@ -1200,4 +1204,15 @@
     <string name="first_checklist_item_2">Tap any item to edit it</string>
     <string name="first_checklist_item_3">Use the + button to add your own</string>
     <string name="first_checklist_item_4">Meet your AI assistant — the chat bar at the bottom of the screen. Ask in plain words to add items, set reminders, or build a whole checklist (try «add milk» or «remind me Friday at 6pm»), or tap the mic to speak.</string>
+
+    <!-- Add to existing checklist picker (ACTION_PROCESS_TEXT "Add to checklist" action) -->
+    <string name="add_to_checklist_title">Add to checklist</string>
+    <string name="add_to_checklist_subtitle">Choose a checklist to add the selected text to</string>
+    <string name="add_to_checklist_empty_title">No checklists yet</string>
+    <string name="add_to_checklist_empty_description">Create your first checklist to add the selected text.</string>
+    <string name="add_to_checklist_create_new">Create new checklist</string>
+    <string name="add_to_checklist_item_count">%1$d items</string>
+    <string name="fill_checklist_picker_title">Choose checklist to fill</string>
+    <string name="fill_checklist_picker_subtitle">Pick a checklist and AI will fill it from the selected text</string>
+    <string name="fill_checklist_picker_empty_description">Create a checklist first, then AI can fill it from your text.</string>
 </resources>

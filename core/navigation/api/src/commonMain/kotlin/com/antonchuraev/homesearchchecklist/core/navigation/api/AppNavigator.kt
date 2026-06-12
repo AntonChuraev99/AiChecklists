@@ -48,8 +48,11 @@ interface AppNavigator {
 
     /**
      * todo change templateId to template class
+     *
+     * @param initialText optional prefilled item text (split into items on the create screen,
+     *   e.g. from the ACTION_PROCESS_TEXT system selection menu). null = no prefill.
      */
-    fun navigateToCreateChecklistScreen(templateId: Int? = null)
+    fun navigateToCreateChecklistScreen(templateId: Int? = null, initialText: String? = null)
 
     fun navigateToEditChecklist(checklistId: Long)
 
@@ -57,7 +60,15 @@ interface AppNavigator {
 
     fun navigateToTemplatePreview(templateId: String)
 
-    fun navigateToAnalyzeScreen(checklistId: Long? = null, fillDefault: Boolean = false)
+    /**
+     * @param initialText optional prefilled raw text (e.g. from ACTION_PROCESS_TEXT). When
+     *   non-null the screen pre-selects RAW_TEXT and fills the input WITHOUT auto-analyzing.
+     */
+    fun navigateToAnalyzeScreen(
+        checklistId: Long? = null,
+        fillDefault: Boolean = false,
+        initialText: String? = null,
+    )
 
     fun navigateToAnalyzeResultPreview()
 
@@ -100,4 +111,16 @@ interface AppNavigator {
     fun navigateToScreenCatalog()
 
     fun navigateToOnboardings()
+
+    /**
+     * Show the checklist picker for an ACTION_PROCESS_TEXT flow.
+     *
+     * @param purpose [AddToChecklistPurpose.ADD_ITEM] (default) appends [text] as a single item and
+     *   opens detail; [AddToChecklistPurpose.FILL_AI] opens Analyze in fill-mode for the chosen
+     *   checklist with [text] pre-filled. Default keeps the existing "Add to checklist" call intact.
+     */
+    fun navigateToAddToChecklistPicker(
+        text: String,
+        purpose: AddToChecklistPurpose = AddToChecklistPurpose.ADD_ITEM,
+    )
 }

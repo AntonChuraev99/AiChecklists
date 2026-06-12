@@ -19,6 +19,7 @@ import kotlinx.coroutines.launch
 
 class CreateChecklistViewModel(
     private val editChecklistId: Long?,
+    private val initialText: String? = null,
     private val checklistRepository: ChecklistRepository,
     private val appNavigator: AppNavigator,
     private val analyticsTracker: AnalyticsTracker,
@@ -27,7 +28,10 @@ class CreateChecklistViewModel(
 
     private val _screenState = MutableStateFlow(CreateChecklistState(
         isEditMode = editChecklistId != null,
-        editChecklistId = editChecklistId
+        editChecklistId = editChecklistId,
+        // Prefill items from shared/selected text (ACTION_PROCESS_TEXT "New checklist" action).
+        // Only applies in create mode — edit mode loads from the persisted checklist.
+        items = if (editChecklistId == null) splitIntoItems(initialText) else emptyList()
     ))
     override val screenState: StateFlow<CreateChecklistState> = _screenState.asStateFlow()
 
@@ -38,6 +42,18 @@ class CreateChecklistViewModel(
             // Only observe limits in create mode — edit mode is never gated
             observeUserLimits()
         }
+    }
+
+    /**
+     * Splits prefilled [text] into checklist items: one item per non-blank line.
+     * Single-line text becomes a single item. Returns empty for null/blank input.
+     */
+    private fun splitIntoItems(text: String?): List<ChecklistItem> {
+        if (text.isNullOrBlank()) return emptyList()
+        return text.lines()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .map { ChecklistItem(it, false) }
     }
 
     private fun observeUserLimits() {

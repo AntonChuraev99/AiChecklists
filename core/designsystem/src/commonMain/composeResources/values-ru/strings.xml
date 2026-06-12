@@ -522,6 +522,12 @@
         <item quantity="many">%d элементов осталось</item>
         <item quantity="other">%d элементов осталось</item>
     </plurals>
+    <plurals name="items_count">
+        <item quantity="one">%1$d пункт</item>
+        <item quantity="few">%1$d пункта</item>
+        <item quantity="many">%1$d пунктов</item>
+        <item quantity="other">%1$d пунктов</item>
+    </plurals>
     <string name="reminder_exact_alarm_title">Включить точные напоминания</string>
     <string name="reminder_exact_alarm_step1">Нажмите «Открыть настройки» ниже</string>
     <string name="reminder_exact_alarm_step2">Найдите «Будильники &amp; напоминания»</string>
@@ -1169,4 +1175,15 @@
     <string name="first_checklist_item_2">Нажмите на пункт, чтобы изменить его</string>
     <string name="first_checklist_item_3">Нажмите +, чтобы добавить свой пункт</string>
     <string name="first_checklist_item_4">Познакомьтесь с ИИ-ассистентом — это строка чата внизу экрана. Попросите обычными словами добавить пункты, поставить напоминания или собрать целый чеклист («добавь молоко» или «напомни в пятницу в 18:00»), или нажмите микрофон, чтобы сказать голосом.</string>
+
+    <!-- Выбор чек-листа для добавления (действие ACTION_PROCESS_TEXT «Добавить в чек-лист») -->
+    <string name="add_to_checklist_title">Добавить в чек-лист</string>
+    <string name="add_to_checklist_subtitle">Выберите чек-лист, чтобы добавить выделенный текст</string>
+    <string name="add_to_checklist_empty_title">Чек-листов пока нет</string>
+    <string name="add_to_checklist_empty_description">Создайте первый чек-лист, чтобы добавить выделенный текст.</string>
+    <string name="add_to_checklist_create_new">Создать чек-лист</string>
+    <string name="add_to_checklist_item_count">%1$d пунктов</string>
+    <string name="fill_checklist_picker_title">Выберите чек-лист для заполнения</string>
+    <string name="fill_checklist_picker_subtitle">Выберите чек-лист, и ИИ заполнит его по выделенному тексту</string>
+    <string name="fill_checklist_picker_empty_description">Сначала создайте чек-лист, затем ИИ сможет заполнить его по вашему тексту.</string>
 </resources>

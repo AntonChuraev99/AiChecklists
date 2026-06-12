@@ -31,7 +31,13 @@ sealed interface AppNavRoute : NavKey {
     @Serializable
     sealed interface CreateChecklistRoute : AppNavRoute {
         @Serializable
-        data class CreateChecklist(val templateId: Int? = null, val editChecklistId: Long? = null) : CreateChecklistRoute
+        data class CreateChecklist(
+            val templateId: Int? = null,
+            val editChecklistId: Long? = null,
+            // Prefilled item text (e.g. from the ACTION_PROCESS_TEXT system selection menu).
+            // Split into one or more items in CreateChecklistViewModel. null = no prefill.
+            val initialText: String? = null,
+        ) : CreateChecklistRoute
 
         @Serializable
         data object Templates : CreateChecklistRoute
@@ -47,7 +53,14 @@ sealed interface AppNavRoute : NavKey {
     data object StoreScreenshot : AppNavRoute
 
     @Serializable
-    data class Analyze(val checklistId: Long? = null, val fillDefault: Boolean = false) : AppNavRoute
+    data class Analyze(
+        val checklistId: Long? = null,
+        val fillDefault: Boolean = false,
+        // Prefilled raw text (e.g. from ACTION_PROCESS_TEXT). When non-null the screen
+        // pre-selects RAW_TEXT input and fills inputText WITHOUT auto-running analysis
+        // (protects the AI-credit budget — the user taps Analyze themselves). null = no prefill.
+        val initialText: String? = null,
+    ) : AppNavRoute
 
     @Serializable
     data object AnalyzeResultPreview : AppNavRoute
@@ -96,4 +109,32 @@ sealed interface AppNavRoute : NavKey {
 
     @Serializable
     data object Onboardings : AppNavRoute
+
+    /**
+     * Picker shown after an ACTION_PROCESS_TEXT action that needs a target checklist.
+     *
+     * [purpose] decides what selecting a checklist does:
+     * - [AddToChecklistPurpose.ADD_ITEM] (default): appends [text] as a single item and opens
+     *   its detail screen (the "Add to checklist" action).
+     * - [AddToChecklistPurpose.FILL_AI]: opens Analyze in fill-mode for the chosen checklist with
+     *   [text] pre-filled as raw text (the "Fill (AI)" action), letting AI fill the template.
+     */
+    @Serializable
+    data class AddToChecklistPicker(
+        val text: String,
+        val purpose: AddToChecklistPurpose = AddToChecklistPurpose.ADD_ITEM,
+    ) : AppNavRoute
+}
+
+/**
+ * Why the [AppNavRoute.AddToChecklistPicker] was opened — drives both the on-select behavior and
+ * the screen title. @Serializable so it can travel inside the serializable route.
+ */
+@Serializable
+enum class AddToChecklistPurpose {
+    /** Append the shared text as one item to the selected checklist. */
+    ADD_ITEM,
+
+    /** Open Analyze in fill-mode for the selected checklist with the shared text pre-filled. */
+    FILL_AI,
 }

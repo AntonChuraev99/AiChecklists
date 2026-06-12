@@ -25,6 +25,7 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppContextHolder
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppThemeMode
 import com.antonchuraev.homesearchchecklist.core.datastore.api.ThemeRepository
+import com.antonchuraev.homesearchchecklist.core.navigation.api.AddToChecklistPurpose
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.notification.ReminderReceiver
 import org.koin.android.ext.android.inject
@@ -49,6 +50,44 @@ class MainActivity : ComponentActivity() {
         return id
     }
 
+    /**
+     * Pending ACTION_PROCESS_TEXT request captured on cold start (before the NavController is
+     * ready). Consumed in the setContent LaunchedEffect once navigation can run.
+     */
+    private var pendingProcessText: ProcessTextRequest? = null
+
+    private data class ProcessTextRequest(val text: String, val mode: ProcessTextMode)
+
+    private fun extractProcessTextRequest(intent: Intent?): ProcessTextRequest? {
+        if (intent?.action != ProcessTextContract.ACTION_PROCESS_TEXT) return null
+        val text = intent.getStringExtra(ProcessTextContract.EXTRA_TEXT)?.takeIf { it.isNotBlank() }
+            ?: return null
+        val mode = intent.getStringExtra(ProcessTextContract.EXTRA_MODE)
+            ?.let { name -> ProcessTextMode.entries.firstOrNull { it.name == name } }
+            ?: ProcessTextMode.CREATE_AI
+        return ProcessTextRequest(text, mode)
+    }
+
+    private fun routeProcessText(request: ProcessTextRequest) {
+        analyticsTracker.event(
+            "process_text_entry",
+            mapOf("mode" to request.mode.name.lowercase())
+        )
+        when (request.mode) {
+            ProcessTextMode.CREATE_AI ->
+                appNavigator.navigateToAnalyzeScreen(initialText = request.text, fillDefault = false)
+            ProcessTextMode.FILL_AI ->
+                appNavigator.navigateToAddToChecklistPicker(
+                    text = request.text,
+                    purpose = AddToChecklistPurpose.FILL_AI,
+                )
+            ProcessTextMode.NEW_CHECKLIST ->
+                appNavigator.navigateToCreateChecklistScreen(initialText = request.text)
+            ProcessTextMode.ADD_TO_EXISTING ->
+                appNavigator.navigateToAddToChecklistPicker(request.text)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         AppContextHolder.init(applicationContext)
         // Initial edge-to-edge (light default) — overridden reactively in setContent once theme is resolved
@@ -60,6 +99,12 @@ class MainActivity : ComponentActivity() {
         // Check for deep link in launch intent (cold start from notification)
         extractDeepLinkChecklistId(intent)?.let { id ->
             pendingChecklistId = id
+        }
+
+        // Check for an ACTION_PROCESS_TEXT request (cold start from the selection toolbar).
+        // Navigation can't run until the NavController is ready, so stash and consume below.
+        extractProcessTextRequest(intent)?.let { request ->
+            pendingProcessText = request
         }
 
         setContent {
@@ -124,6 +169,12 @@ class MainActivity : ComponentActivity() {
                         "checklist_id" to id.toString()
                     ))
                 }
+
+                // Consume pending ACTION_PROCESS_TEXT request (cold start from selection toolbar)
+                pendingProcessText?.let { request ->
+                    pendingProcessText = null
+                    routeProcessText(request)
+                }
             }
         }
     }
@@ -136,6 +187,10 @@ class MainActivity : ComponentActivity() {
             analyticsTracker.event("reminder_notification_tapped", mapOf(
                 "checklist_id" to id.toString()
             ))
+        }
+        // Warm start from the ACTION_PROCESS_TEXT selection toolbar — navigate immediately.
+        extractProcessTextRequest(intent)?.let { request ->
+            routeProcessText(request)
         }
     }
 

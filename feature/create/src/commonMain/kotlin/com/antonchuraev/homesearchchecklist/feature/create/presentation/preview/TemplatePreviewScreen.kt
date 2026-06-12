@@ -51,6 +51,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
 import com.antonchuraev.homesearchchecklist.feature.create.domain.model.ChecklistTemplate
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
@@ -166,7 +167,7 @@ private fun TemplatePreviewContent(
         // Items count
         item {
             Text(
-                text = stringResource(Res.string.template_preview_items_count, items.size),
+                text = pluralStringResource(Res.plurals.items_count, items.size, items.size),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onBackground,

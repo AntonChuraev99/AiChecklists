@@ -28,4 +28,11 @@
     <!-- Push / Promotions Notifications (FCM re-engagement) -->
     <string name="promotions_notification_channel">Updates &amp; Tips</string>
     <string name="promotions_notification_channel_desc">Product updates, tips, and reminders to come back</string>
+
+    <!-- ACTION_PROCESS_TEXT selection-toolbar menu labels (must stay short) -->
+    <string name="process_text_create_ai">Checklist from text</string>
+    <string name="process_text_add_to_existing">Add to checklist</string>
+    <string name="process_text_new_checklist">New checklist</string>
+    <string name="process_text_fill_ai">Fill (AI)</string>
+    <string name="process_text_empty">No text selected</string>
 </resources>

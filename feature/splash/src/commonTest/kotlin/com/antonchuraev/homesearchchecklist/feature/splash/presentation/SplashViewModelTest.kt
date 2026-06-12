@@ -1,13 +1,23 @@
 package com.antonchuraev.homesearchchecklist.feature.splash.presentation
 
+import androidx.navigation3.runtime.NavBackStack
+import androidx.navigation3.runtime.NavKey
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
+import com.antonchuraev.homesearchchecklist.core.datastore.api.FirstChecklistRepository
+import com.antonchuraev.homesearchchecklist.core.navigation.api.AddToChecklistPurpose
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
-import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavRoute
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
-import com.antonchuraev.homesearchchecklist.core.navigation.api.NavCommand
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigKeys
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistReminderInfo
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistRepeatInfo
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ItemReminderInfo
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.LoginResult
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.RestoreResult
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.SubscriptionStatus
@@ -17,6 +27,7 @@ import com.antonchuraev.homesearchchecklist.feature.user.domain.model.Registrati
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.UserData
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.CompleteOnboardingUseCase
+import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.GetFirstChecklistVariantUseCase
 import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.GetOnboardingVariantUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -26,7 +37,9 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -44,13 +57,16 @@ import kotlin.test.assertTrue
 /**
  * Unit tests for the [SplashViewModel] init flow.
  *
- * Two groups:
+ * Groups:
  * - linkWithPaywall logic (idempotent logIn, auto-restore gate, failure handling)
  * - Remote Config gating: whenever onboarding still needs to be shown, the
  *   ViewModel MUST block navigateTo() until fetchAndActivate() completes, so
  *   the resolved A/B variant comes from the server rather than the client-side
  *   default. Without this gate the historical Amplitude distribution collapsed
  *   to a single "interactive" variant (47 vs 0 uniques over 14 days).
+ * - First-checklist A/B experiment: the `first_checklist_variant` user property
+ *   is always set; the starter checklist is auto-created only for new users in
+ *   the AUTO_CREATE treatment that haven't been seeded yet.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SplashViewModelTest {
@@ -60,12 +76,18 @@ class SplashViewModelTest {
 
     private lateinit var fakePaywall: FakePaywallRepository
     private lateinit var fakeUserData: FakeUserDataRepository
+    private lateinit var fakeChecklist: FakeChecklistRepository
+    private lateinit var fakeFirstChecklist: FakeFirstChecklistRepository
+    private lateinit var fakeAnalytics: RecordingAnalyticsTracker
 
     @BeforeTest
     fun setup() {
         Dispatchers.setMain(testDispatcher)
         fakePaywall = FakePaywallRepository()
         fakeUserData = FakeUserDataRepository()
+        fakeChecklist = FakeChecklistRepository()
+        fakeFirstChecklist = FakeFirstChecklistRepository()
+        fakeAnalytics = RecordingAnalyticsTracker()
     }
 
     @AfterTest
@@ -76,7 +98,8 @@ class SplashViewModelTest {
     /**
      * Builds [SplashViewModel] with sensible defaults. Callers may swap in a
      * recording navigator / order-tracking RC provider when they need to assert
-     * routing or gating.
+     * routing or gating, or a [firstChecklistRc] when they need to drive the
+     * first-checklist A/B variant.
      */
     private fun createViewModel(
         userId: String = "test-uuid",
@@ -103,10 +126,13 @@ class SplashViewModelTest {
             appNavigator = navigator,
             appScope = testScope,
             logger = NoOpLogger(),
-            analyticsTracker = NoOpAnalyticsTracker(),
+            analyticsTracker = fakeAnalytics,
             getOnboardingVariant = GetOnboardingVariantUseCase(remoteConfig, NoOpLogger()),
             completeOnboardingUseCase = CompleteOnboardingUseCase(fakeUserData),
             remoteConfigProvider = remoteConfig,
+            getFirstChecklistVariant = GetFirstChecklistVariantUseCase(remoteConfig, NoOpLogger()),
+            checklistRepository = fakeChecklist,
+            firstChecklistRepository = fakeFirstChecklist,
         )
     }
 
@@ -185,7 +211,7 @@ class SplashViewModelTest {
     }
 
     // ============================================================
-    // Remote Config gating — new scenarios for A/B distribution fix
+    // Remote Config gating — A/B distribution fix scenarios
     // ============================================================
 
     /**
@@ -304,6 +330,113 @@ class SplashViewModelTest {
     }
 
     // ============================================================
+    // First-checklist A/B experiment
+    // ============================================================
+
+    /**
+     * The `first_checklist_variant` user property must be set for EVERY user
+     * (so analytics can split cohorts), regardless of whether they are new or
+     * which treatment they land in. Here a returning user (isNewUser=false)
+     * still gets the property even though no checklist is auto-created.
+     */
+    @Test
+    fun applyFirstChecklistExperiment_anyUser_setsVariantUserProperty() = testScope.runTest {
+        // Default RC value for first_checklist_variant is "auto_create" → AUTO_CREATE.
+        createViewModel(userId = "existing-uuid", isOnboardingPassed = true)
+        advanceUntilIdle()
+
+        assertEquals(
+            GetFirstChecklistVariantUseCase.FirstChecklistVariant.AUTO_CREATE.name,
+            fakeAnalytics.firstChecklistVariantProperty,
+            "first_checklist_variant user property must be set from the resolved variant"
+        )
+    }
+
+    /**
+     * New user in the AUTO_CREATE treatment who hasn't been seeded: the ViewModel
+     * enters the auto-create branch and reaches the per-uid seed gate for this uid.
+     *
+     * NOTE: we deliberately assert the seed-gate *read* rather than the final
+     * `addChecklist`. The starter checklist is built via `buildFirstChecklist()`,
+     * which loads localized strings through Compose Resources (`getString`) — that
+     * path touches `android.content.res.Resources` and is "not mocked" in the JVM
+     * host-test environment (it throws and the `runCatching` guard swallows it).
+     * The seed-gate read runs *before* the resource call, so it is the deepest
+     * deterministic observable of the auto-create decision at this layer. The
+     * end-to-end creation is covered on-device, not here.
+     */
+    @Test
+    fun applyFirstChecklistExperiment_newUserAutoCreateNotSeeded_entersCreateBranch() = testScope.runTest {
+        // Blank userId routes through ensureUserRegistered with isNewUser=true.
+        fakeUserData.nextRegistration = RegistrationData(
+            userData = UserData(userId = "new-uuid", isOnboardingPassed = true),
+            isNewUser = true,
+        )
+
+        createViewModel(userId = "", isOnboardingPassed = true)
+        advanceUntilIdle()
+
+        assertTrue(
+            fakeFirstChecklist.seedCheckedUids.contains("new-uuid"),
+            "new user in AUTO_CREATE must consult the per-uid seed gate before creating"
+        )
+        assertEquals(
+            GetFirstChecklistVariantUseCase.FirstChecklistVariant.AUTO_CREATE.name,
+            fakeAnalytics.firstChecklistVariantProperty,
+            "the AUTO_CREATE cohort property must be recorded for the new user"
+        )
+    }
+
+    /**
+     * New user in AUTO_CREATE who was ALREADY seeded (e.g. deleted the starter
+     * and relaunched): the guard short-circuits BEFORE `buildFirstChecklist()`,
+     * so the creation branch is skipped and the seed flag is NOT re-marked. This
+     * path is fully deterministic (no Compose Resources are touched).
+     */
+    @Test
+    fun applyFirstChecklistExperiment_newUserAutoCreateAlreadySeeded_doesNotRecreate() = testScope.runTest {
+        fakeUserData.nextRegistration = RegistrationData(
+            userData = UserData(userId = "seeded-uuid", isOnboardingPassed = true),
+            isNewUser = true,
+        )
+        fakeFirstChecklist.seededUids.add("seeded-uuid")
+
+        createViewModel(userId = "", isOnboardingPassed = true)
+        advanceUntilIdle()
+
+        assertTrue(
+            fakeChecklist.addedChecklists.isEmpty(),
+            "already-seeded user must NOT get a second starter checklist"
+        )
+        assertFalse(
+            fakeFirstChecklist.markedUids.contains("seeded-uuid"),
+            "markFirstChecklistCreated must NOT be called again for an already-seeded user"
+        )
+    }
+
+    /**
+     * Returning user (isNewUser=false) in AUTO_CREATE: cohort property is set,
+     * but the creation branch is skipped (auto-create is new-users-only), so no
+     * starter checklist is added. The skip happens before `buildFirstChecklist()`,
+     * keeping this path deterministic.
+     */
+    @Test
+    fun applyFirstChecklistExperiment_returningUserAutoCreate_doesNotCreateStarterChecklist() = testScope.runTest {
+        createViewModel(userId = "returning-uuid", isOnboardingPassed = true)
+        advanceUntilIdle()
+
+        assertTrue(
+            fakeChecklist.addedChecklists.isEmpty(),
+            "returning user must NOT get an auto-created starter checklist"
+        )
+        assertEquals(
+            GetFirstChecklistVariantUseCase.FirstChecklistVariant.AUTO_CREATE.name,
+            fakeAnalytics.firstChecklistVariantProperty,
+            "cohort property must still be set for returning users"
+        )
+    }
+
+    // ============================================================
     // Test doubles
     // ============================================================
 
@@ -377,10 +510,98 @@ class SplashViewModelTest {
         override suspend fun getFirstLaunchAtMillis(): Long = 0L
     }
 
+    /**
+     * Minimal [ChecklistRepository] fake. Only [addChecklist] is wired (the splash
+     * experiment uses nothing else); every other method either returns a benign
+     * default or fails loudly via [notUsed] so an unexpected call is caught.
+     */
+    private class FakeChecklistRepository : ChecklistRepository {
+        val addedChecklists = mutableListOf<Checklist>()
+
+        override val checklists: Flow<List<Checklist>> = emptyFlow()
+
+        override suspend fun addChecklist(checklist: Checklist): Long {
+            addedChecklists += checklist
+            return 1L
+        }
+
+        override suspend fun updateChecklist(checklist: Checklist) = notUsed()
+        override suspend fun updateChecklistTemplate(checklist: Checklist) = notUsed()
+        override suspend fun deleteChecklist(checklist: Checklist) = notUsed()
+        override suspend fun getChecklistById(id: Long): Checklist? = null
+        override fun observeChecklistById(id: Long): Flow<Checklist?> = flowOf(null)
+        override suspend fun reorderChecklists(orderedIds: List<Long>) = notUsed()
+
+        override suspend fun setSeparateCompleted(checklistId: Long, value: Boolean) = notUsed()
+        override suspend fun setAutoDeleteCompleted(checklistId: Long, value: Boolean) = notUsed()
+
+        override suspend fun setReminder(checklistId: Long, reminderAt: Long?) = notUsed()
+        override suspend fun countActiveReminders(): Int = 0
+        override suspend fun getActiveReminders(): List<ChecklistReminderInfo> = emptyList()
+        override suspend fun getDefaultFillOneShot(checklistId: Long): ChecklistFill? = null
+
+        override suspend fun setRepeatSchedule(
+            checklistId: Long,
+            rule: ReminderRepeatRule,
+            timeOfDayMinutes: Int,
+            firstTriggerAt: Long,
+        ) = notUsed()
+
+        override suspend fun advanceRepeatSchedule(checklistId: Long, nextAt: Long?, newCount: Int) = notUsed()
+        override suspend fun clearRepeatSchedule(checklistId: Long) = notUsed()
+        override suspend fun resetDefaultFillChecks(checklistId: Long) = notUsed()
+        override suspend fun countActiveRepeatSchedules(): Int = 0
+        override suspend fun getActiveRepeatSchedules(): List<ChecklistRepeatInfo> = emptyList()
+        override fun observeRemindersInRange(fromMs: Long, toMs: Long): Flow<List<TodayReminderInfo>> = flowOf(emptyList())
+        override suspend fun getRemindersInRange(fromMs: Long, toMs: Long): List<TodayReminderInfo> = emptyList()
+        override suspend fun togglePriority(fillId: Long, itemId: String): Result<Unit> = Result.success(Unit)
+        override suspend fun addAttachment(
+            fillId: Long,
+            itemId: String,
+            attachment: com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Attachment,
+        ) = Unit
+        override suspend fun removeAttachment(fillId: Long, itemId: String, attachmentId: String) = Unit
+        override suspend fun getPastDueRepeatSchedules(nowMillis: Long): List<ChecklistRepeatInfo> = emptyList()
+
+        override suspend fun getTotalAdditionalFillCount(): Int = 0
+        override suspend fun getWeeklyChecklistCount(): Int = 0
+        override val weeklyChecklistCount: Flow<Int> = flowOf(0)
+        override suspend fun getAllItemRemindersForRescheduling(): List<ItemReminderInfo> = emptyList()
+
+        override fun getFillsByChecklistId(checklistId: Long): Flow<List<ChecklistFill>> = emptyFlow()
+        override fun getDefaultFillByChecklistId(checklistId: Long): Flow<ChecklistFill?> = emptyFlow()
+        override fun getAdditionalFillsByChecklistId(checklistId: Long): Flow<List<ChecklistFill>> = emptyFlow()
+        override suspend fun getFillById(id: Long): ChecklistFill? = null
+        override suspend fun getFillCountByChecklistId(checklistId: Long): Int = 0
+        override suspend fun addFill(fill: ChecklistFill): Long = 0L
+        override suspend fun updateFill(fill: ChecklistFill) = notUsed()
+        override suspend fun deleteFill(fill: ChecklistFill) = notUsed()
+
+        private fun notUsed(): Nothing = error("FakeChecklistRepository: method not wired for this test")
+    }
+
+    private class FakeFirstChecklistRepository : FirstChecklistRepository {
+        /** uids that are already seeded before the test runs. */
+        val seededUids = mutableSetOf<String>()
+        /** uids that the ViewModel marked as seeded during the test. */
+        val markedUids = mutableListOf<String>()
+        /** uids whose seed flag the ViewModel queried (proves the auto-create branch was entered). */
+        val seedCheckedUids = mutableListOf<String>()
+
+        override suspend fun isFirstChecklistCreated(uid: String): Boolean {
+            seedCheckedUids += uid
+            return uid in seededUids
+        }
+
+        override suspend fun markFirstChecklistCreated(uid: String) {
+            markedUids += uid
+            seededUids += uid
+        }
+    }
+
     private class NoOpNavigator : AppNavigator {
-        override val commands: Flow<NavCommand> = emptyFlow()
+        override val backStack: NavBackStack<NavKey> = NavBackStack()
         override val events: SharedFlow<AppNavEvent> = MutableSharedFlow()
-        override val backStack: StateFlow<List<AppNavRoute>> = MutableStateFlow(emptyList())
         override fun showWidgetInstruction() {}
         override fun requestCreateWeeklyChecklist() {}
         override fun onBack() {}
@@ -389,11 +610,11 @@ class SplashViewModelTest {
         override fun navigateToMainScreen(clearBackStack: Boolean) {}
         override fun navigateToDebugMenu() {}
         override fun navigateToStoreScreenshot() {}
-        override fun navigateToCreateChecklistScreen(templateId: Int?) {}
+        override fun navigateToCreateChecklistScreen(templateId: Int?, initialText: String?) {}
         override fun navigateToEditChecklist(checklistId: Long) {}
         override fun navigateToTemplatesScreen() {}
         override fun navigateToTemplatePreview(templateId: String) {}
-        override fun navigateToAnalyzeScreen(checklistId: Long?, fillDefault: Boolean) {}
+        override fun navigateToAnalyzeScreen(checklistId: Long?, fillDefault: Boolean, initialText: String?) {}
         override fun navigateToAnalyzeResultPreview() {}
         override fun navigateToChecklistDetail(checklistId: Long, focusItemId: String?, clearBackStack: Boolean) {}
         override fun navigateToFillDetail(fillId: Long, clearBackStack: Boolean) {}
@@ -409,6 +630,7 @@ class SplashViewModelTest {
         override fun navigateToAiChat() {}
         override fun navigateToScreenCatalog() {}
         override fun navigateToOnboardings() {}
+        override fun navigateToAddToChecklistPicker(text: String, purpose: AddToChecklistPurpose) {}
     }
 
     /**
@@ -418,9 +640,8 @@ class SplashViewModelTest {
     private class RecordingNavigator : AppNavigator {
         val routes = mutableListOf<String>()
 
-        override val commands: Flow<NavCommand> = emptyFlow()
+        override val backStack: NavBackStack<NavKey> = NavBackStack()
         override val events: SharedFlow<AppNavEvent> = MutableSharedFlow()
-        override val backStack: StateFlow<List<AppNavRoute>> = MutableStateFlow(emptyList())
         override fun showWidgetInstruction() {}
         override fun requestCreateWeeklyChecklist() {}
         override fun onBack() {}
@@ -429,11 +650,11 @@ class SplashViewModelTest {
         override fun navigateToMainScreen(clearBackStack: Boolean) { routes += "main" }
         override fun navigateToDebugMenu() {}
         override fun navigateToStoreScreenshot() {}
-        override fun navigateToCreateChecklistScreen(templateId: Int?) {}
+        override fun navigateToCreateChecklistScreen(templateId: Int?, initialText: String?) {}
         override fun navigateToEditChecklist(checklistId: Long) {}
         override fun navigateToTemplatesScreen() {}
         override fun navigateToTemplatePreview(templateId: String) {}
-        override fun navigateToAnalyzeScreen(checklistId: Long?, fillDefault: Boolean) {}
+        override fun navigateToAnalyzeScreen(checklistId: Long?, fillDefault: Boolean, initialText: String?) {}
         override fun navigateToAnalyzeResultPreview() {}
         override fun navigateToChecklistDetail(checklistId: Long, focusItemId: String?, clearBackStack: Boolean) {}
         override fun navigateToFillDetail(fillId: Long, clearBackStack: Boolean) {}
@@ -449,6 +670,7 @@ class SplashViewModelTest {
         override fun navigateToAiChat() {}
         override fun navigateToScreenCatalog() {}
         override fun navigateToOnboardings() {}
+        override fun navigateToAddToChecklistPicker(text: String, purpose: AddToChecklistPurpose) {}
     }
 
     private class NoOpLogger : AppLogger {
@@ -458,9 +680,17 @@ class SplashViewModelTest {
         override fun error(tag: String, message: String, throwable: Throwable?) {}
     }
 
-    private class NoOpAnalyticsTracker : AnalyticsTracker {
+    /**
+     * Captures the `first_checklist_variant` user property so the A/B tests can
+     * assert it is always set regardless of treatment.
+     */
+    private class RecordingAnalyticsTracker : AnalyticsTracker {
+        var firstChecklistVariantProperty: String? = null
+
         override fun setUserId(userId: String) {}
-        override fun setUserProperties(properties: Map<String, Any>) {}
+        override fun setUserProperties(properties: Map<String, Any>) {
+            (properties["first_checklist_variant"] as? String)?.let { firstChecklistVariantProperty = it }
+        }
         override fun screenView(name: String) {}
         override fun event(name: String, params: Map<String, Any>) {}
     }

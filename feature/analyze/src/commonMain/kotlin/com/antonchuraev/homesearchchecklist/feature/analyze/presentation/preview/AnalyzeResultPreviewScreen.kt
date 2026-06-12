@@ -52,6 +52,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import org.koin.compose.koinInject
@@ -228,7 +229,7 @@ private fun AnalyzeResultPreviewContent(
         // Items count
         item {
             Text(
-                text = stringResource(Res.string.analyze_preview_items_count, state.editableItems.size),
+                text = pluralStringResource(Res.plurals.items_count, state.editableItems.size, state.editableItems.size),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onBackground,

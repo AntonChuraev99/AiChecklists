@@ -37,11 +37,11 @@ class UpdateFeedDeepLinkHandlerTest {
         override fun navigateToMainScreen(clearBackStack: Boolean) { mainScreenCallCount++ }
         override fun navigateToDebugMenu() {}
         override fun navigateToStoreScreenshot() {}
-        override fun navigateToCreateChecklistScreen(templateId: Int?) { createCallCount++ }
+        override fun navigateToCreateChecklistScreen(templateId: Int?, initialText: String?) { createCallCount++ }
         override fun navigateToEditChecklist(checklistId: Long) {}
         override fun navigateToTemplatesScreen() { templatesCallCount++ }
         override fun navigateToTemplatePreview(templateId: String) {}
-        override fun navigateToAnalyzeScreen(checklistId: Long?, fillDefault: Boolean) { analyzeCallCount++ }
+        override fun navigateToAnalyzeScreen(checklistId: Long?, fillDefault: Boolean, initialText: String?) { analyzeCallCount++ }
         override fun navigateToAnalyzeResultPreview() {}
         override fun navigateToChecklistDetail(checklistId: Long, focusItemId: String?, clearBackStack: Boolean) {}
         override fun navigateToFillDetail(fillId: Long, clearBackStack: Boolean) {}
@@ -57,6 +57,7 @@ class UpdateFeedDeepLinkHandlerTest {
         override fun navigateToAiChat() { aiChatCallCount++ }
         override fun navigateToScreenCatalog() {}
         override fun navigateToOnboardings() {}
+        override fun navigateToAddToChecklistPicker(text: String, purpose: com.antonchuraev.homesearchchecklist.core.navigation.api.AddToChecklistPurpose) {}
         override fun showWidgetInstruction() { widgetInstructionCallCount++ }
         override fun requestCreateWeeklyChecklist() { requestCreateWeeklyChecklistCount++ }
     }

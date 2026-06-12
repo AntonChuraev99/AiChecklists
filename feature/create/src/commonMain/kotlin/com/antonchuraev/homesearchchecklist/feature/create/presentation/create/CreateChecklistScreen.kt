@@ -61,7 +61,10 @@ import org.koin.core.parameter.parametersOf
 fun CreateChecklistScreen(
     editChecklistId: Long? = null,
     templateId: Int? = null,
-    viewModel: CreateChecklistViewModel = koinViewModel(key = "create_checklist_$editChecklistId") { parametersOf(editChecklistId) }
+    initialText: String? = null,
+    viewModel: CreateChecklistViewModel = koinViewModel(
+        key = "create_checklist_${editChecklistId}_${initialText?.hashCode()}"
+    ) { parametersOf(editChecklistId, initialText) }
 ) {
     val analyticsTracker: AnalyticsTracker = koinInject()
     LaunchedEffect(Unit) { analyticsTracker.screenView("create_checklist") }

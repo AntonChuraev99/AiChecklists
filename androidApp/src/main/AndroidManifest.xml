@@ -30,6 +30,67 @@
             </intent-filter>
         </activity>
 
+        <!--
+          ACTION_PROCESS_TEXT trampoline + 4 selection-toolbar entries.
+          ProcessTextActivity itself is not exported; the 4 aliases are the exported entry
+          points (one menu item each, with its own label). The alias class name tells the
+          trampoline which action was tapped (see ProcessTextContract).
+        -->
+        <activity
+            android:name="com.antonchuraev.homesearchchecklist.ProcessTextActivity"
+            android:exported="false"
+            android:noHistory="true"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.NoDisplay" />
+
+        <activity-alias
+            android:name="com.antonchuraev.homesearchchecklist.ProcessTextCreateAiAlias"
+            android:targetActivity="com.antonchuraev.homesearchchecklist.ProcessTextActivity"
+            android:exported="true"
+            android:label="@string/process_text_create_ai">
+            <intent-filter>
+                <action android:name="android.intent.action.PROCESS_TEXT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name="com.antonchuraev.homesearchchecklist.ProcessTextAddToExistingAlias"
+            android:targetActivity="com.antonchuraev.homesearchchecklist.ProcessTextActivity"
+            android:exported="true"
+            android:label="@string/process_text_add_to_existing">
+            <intent-filter>
+                <action android:name="android.intent.action.PROCESS_TEXT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name="com.antonchuraev.homesearchchecklist.ProcessTextNewChecklistAlias"
+            android:targetActivity="com.antonchuraev.homesearchchecklist.ProcessTextActivity"
+            android:exported="true"
+            android:label="@string/process_text_new_checklist">
+            <intent-filter>
+                <action android:name="android.intent.action.PROCESS_TEXT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name="com.antonchuraev.homesearchchecklist.ProcessTextFillAiAlias"
+            android:targetActivity="com.antonchuraev.homesearchchecklist.ProcessTextActivity"
+            android:exported="true"
+            android:label="@string/process_text_fill_ai">
+            <intent-filter>
+                <action android:name="android.intent.action.PROCESS_TEXT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity-alias>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

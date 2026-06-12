@@ -747,11 +747,11 @@ class ChecklistDetailItemReminderTest {
         override fun navigateToMainScreen(clearBackStack: Boolean) {}
         override fun navigateToDebugMenu() {}
         override fun navigateToStoreScreenshot() {}
-        override fun navigateToCreateChecklistScreen(templateId: Int?) {}
+        override fun navigateToCreateChecklistScreen(templateId: Int?, initialText: String?) {}
         override fun navigateToEditChecklist(checklistId: Long) {}
         override fun navigateToTemplatesScreen() {}
         override fun navigateToTemplatePreview(templateId: String) {}
-        override fun navigateToAnalyzeScreen(checklistId: Long?, fillDefault: Boolean) {}
+        override fun navigateToAnalyzeScreen(checklistId: Long?, fillDefault: Boolean, initialText: String?) {}
         override fun navigateToAnalyzeResultPreview() {}
         override fun navigateToChecklistDetail(checklistId: Long, focusItemId: String?, clearBackStack: Boolean) {}
         override fun navigateToFillDetail(fillId: Long, clearBackStack: Boolean) {}
@@ -768,6 +768,7 @@ class ChecklistDetailItemReminderTest {
         override fun navigateToAiChat() {}
         override fun navigateToScreenCatalog() {}
         override fun navigateToOnboardings() {}
+        override fun navigateToAddToChecklistPicker(text: String, purpose: com.antonchuraev.homesearchchecklist.core.navigation.api.AddToChecklistPurpose) {}
     }
 
     private class FakeRemoteConfigProvider : RemoteConfigProvider {

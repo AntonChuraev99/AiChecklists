@@ -2,6 +2,7 @@ package com.antonchuraev.homesearchchecklist.core.navigation.impl
 
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
+import com.antonchuraev.homesearchchecklist.core.navigation.api.AddToChecklistPurpose
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavRoute
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
@@ -77,8 +78,13 @@ class AppNavigatorImpl : AppNavigator {
 
     override fun navigateToStoreScreenshot() = push(AppNavRoute.StoreScreenshot)
 
-    override fun navigateToCreateChecklistScreen(templateId: Int?) =
-        push(AppNavRoute.CreateChecklistRoute.CreateChecklist(templateId = templateId))
+    override fun navigateToCreateChecklistScreen(templateId: Int?, initialText: String?) =
+        push(
+            AppNavRoute.CreateChecklistRoute.CreateChecklist(
+                templateId = templateId,
+                initialText = initialText,
+            )
+        )
 
     override fun navigateToEditChecklist(checklistId: Long) =
         push(AppNavRoute.CreateChecklistRoute.CreateChecklist(editChecklistId = checklistId))
@@ -88,8 +94,8 @@ class AppNavigatorImpl : AppNavigator {
     override fun navigateToTemplatePreview(templateId: String) =
         push(AppNavRoute.CreateChecklistRoute.TemplatePreview(templateId))
 
-    override fun navigateToAnalyzeScreen(checklistId: Long?, fillDefault: Boolean) =
-        push(AppNavRoute.Analyze(checklistId, fillDefault))
+    override fun navigateToAnalyzeScreen(checklistId: Long?, fillDefault: Boolean, initialText: String?) =
+        push(AppNavRoute.Analyze(checklistId, fillDefault, initialText))
 
     override fun navigateToAnalyzeResultPreview() = push(AppNavRoute.AnalyzeResultPreview)
 
@@ -144,6 +150,9 @@ class AppNavigatorImpl : AppNavigator {
     override fun navigateToScreenCatalog() = push(AppNavRoute.ScreenCatalog)
 
     override fun navigateToOnboardings() = push(AppNavRoute.Onboardings)
+
+    override fun navigateToAddToChecklistPicker(text: String, purpose: AddToChecklistPurpose) =
+        push(AppNavRoute.AddToChecklistPicker(text, purpose))
 
     // -------------------------------------------------------------------------
     // Helpers
