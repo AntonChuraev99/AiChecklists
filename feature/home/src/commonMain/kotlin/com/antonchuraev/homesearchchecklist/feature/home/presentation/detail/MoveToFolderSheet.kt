@@ -78,8 +78,11 @@ internal fun MoveToFolderSheet(
     }
 }
 
+// internal (not private) so the Roborazzi screenshot test in androidHostTest can render the
+// destination rows inline (deterministic capture without the sheet window) — see
+// feature/home/src/androidHostTest/.../FolderComponentsScreenshotTest.kt.
 @Composable
-private fun MoveTargetRow(
+internal fun MoveTargetRow(
     target: MoveTargetUiModel,
     onClick: () -> Unit,
 ) {

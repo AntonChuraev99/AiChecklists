@@ -2348,8 +2348,10 @@ private fun FillTargetBottomSheet(
  * @param onMove      Open the "Move to…" target sheet for this folder.
  * @param onDelete    Request a (cascading) folder delete → confirm dialog.
  */
+// internal (not private) so the Roborazzi screenshot test in androidHostTest can render it in
+// isolation — see feature/home/src/androidHostTest/.../FolderComponentsScreenshotTest.kt.
 @Composable
-private fun FolderActionsSheet(
+internal fun FolderActionsSheet(
     folderName: String,
     hasReminder: Boolean,
     onReminder: () -> Unit,
@@ -2443,8 +2445,9 @@ private fun FolderActionsSheet(
  * ([descendantCount]): an empty folder gets a plain prompt; a non-empty one warns how many
  * nested items will go with it.
  */
+// internal (not private) so the Roborazzi screenshot test in androidHostTest can render it.
 @Composable
-private fun DeleteFolderConfirmationDialog(
+internal fun DeleteFolderConfirmationDialog(
     descendantCount: Int,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
@@ -2480,8 +2483,9 @@ private fun DeleteFolderConfirmationDialog(
  * Flatten is non-destructive to items (they move to the top level) but removes the folders, so we
  * warn first. The confirm button is a normal (not destructive) action since the items are kept.
  */
+// internal (not private) so the Roborazzi screenshot test in androidHostTest can render it.
 @Composable
-private fun DisableFoldersConfirmationDialog(
+internal fun DisableFoldersConfirmationDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -2510,8 +2514,9 @@ private fun DisableFoldersConfirmationDialog(
  * Rename dialog for a folder. A thin wrapper around [AppTextField] + Save/Cancel, mirroring
  * [NoteDialog]. Save is disabled while the trimmed name is blank.
  */
+// internal (not private) so the Roborazzi screenshot test in androidHostTest can render it.
 @Composable
-private fun RenameFolderDialog(
+internal fun RenameFolderDialog(
     name: String,
     onNameChanged: (String) -> Unit,
     onConfirm: () -> Unit,
