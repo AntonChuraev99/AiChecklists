@@ -105,6 +105,13 @@
     <string name="drawer_version_label">Version %1$s</string>
     <string name="drawer_logo_content_description">Gisti logo</string>
     <string name="drawer_item_home">Home</string>
+    <!-- Drawer cross-promo store badge -->
+    <string name="drawer_promo_web_top">ALSO ON THE WEB</string>
+    <string name="drawer_promo_web_bottom">Open gisti-ai.com</string>
+    <string name="drawer_promo_android_top">GET IT ON</string>
+    <string name="drawer_promo_android_bottom">Google Play</string>
+    <string name="drawer_promo_web_cd">Open Gisti web version at gisti-ai.com</string>
+    <string name="drawer_promo_android_cd">Get the Gisti app on Google Play</string>
 
     <!-- Main Screen -->
     <string name="main_title">My Checklists</string>

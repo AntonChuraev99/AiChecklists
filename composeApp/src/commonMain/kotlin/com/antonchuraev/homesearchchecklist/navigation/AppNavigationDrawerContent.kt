@@ -1,6 +1,8 @@
 package com.antonchuraev.homesearchchecklist.navigation
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,8 +15,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.automirrored.outlined.Article
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.AutoAwesome
@@ -36,16 +40,27 @@ import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.feature.paywall.data.PaywallConfig
+import com.antonchuraev.homesearchchecklist.feature.user.data.device.getPlatformName
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.calendar_nav_label
+import aichecklists.core.designsystem.generated.resources.ic_google_play
+import aichecklists.core.designsystem.generated.resources.drawer_promo_android_bottom
+import aichecklists.core.designsystem.generated.resources.drawer_promo_android_cd
+import aichecklists.core.designsystem.generated.resources.drawer_promo_android_top
+import aichecklists.core.designsystem.generated.resources.drawer_promo_web_bottom
+import aichecklists.core.designsystem.generated.resources.drawer_promo_web_cd
+import aichecklists.core.designsystem.generated.resources.drawer_promo_web_top
 import aichecklists.core.designsystem.generated.resources.nav_ai_chat
 import aichecklists.core.designsystem.generated.resources.drawer_account
 import aichecklists.core.designsystem.generated.resources.drawer_item_home
@@ -65,6 +80,7 @@ import aichecklists.core.designsystem.generated.resources.paywall_privacy
 import aichecklists.core.designsystem.generated.resources.paywall_terms
 import aichecklists.core.designsystem.generated.resources.settings_title
 import aichecklists.core.designsystem.generated.resources.update_feed_menu_item
+import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -116,12 +132,25 @@ fun AppNavigationDrawerContent(
     // ModalDrawerSheet already applies DrawerDefaults.windowInsets, so we
     // must NOT add statusBarsPadding/navigationBarsPadding here — it would
     // double-pad.
+    val platformName = remember { getPlatformName() }
+
     Column(
         modifier = Modifier
             .fillMaxHeight()
             .verticalScroll(rememberScrollState())
     ) {
         DrawerBrandHeader()
+
+        // Cross-promo store badge: points the user to the OTHER platform.
+        // Lives inside the scrollable Column (not a pinned footer) so it never
+        // gets clipped on landscape / large font scales.
+        DrawerStorePromoBadge(
+            platformName = platformName,
+            onClick = { url ->
+                onCloseDrawer()
+                uriHandler.openUri(url)
+            },
+        )
 
         if (isGoogleLinked && googleEmail != null) {
             GoogleProfileSection(
@@ -289,20 +318,23 @@ fun AppNavigationDrawerContent(
 
 @Composable
 private fun DrawerBrandHeader() {
+    // Compact one-line brand row: 32dp logo tile + "Gisti" + "· AI Checklists"
+    // on a single baseline. Trimmed vertical padding (Md, not Lg) frees room for
+    // the cross-promo badge that sits directly below.
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(
                 horizontal = AppDimens.SpacingLg,
-                vertical = AppDimens.SpacingLg
+                vertical = AppDimens.SpacingMd
             ),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
+        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
     ) {
         Box(
             modifier = Modifier
-                .size(40.dp)
-                .clip(MaterialTheme.shapes.medium)
+                .size(32.dp)
+                .clip(MaterialTheme.shapes.small)
                 .background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center
         ) {
@@ -310,23 +342,107 @@ private fun DrawerBrandHeader() {
                 imageVector = Icons.Outlined.AutoAwesome,
                 contentDescription = stringResource(Res.string.drawer_logo_content_description),
                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(20.dp)
+            )
+        }
+        Text(
+            text = "Gisti",
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            text = stringResource(Res.string.drawer_tagline),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/**
+ * Cross-promotion store badge in the drawer header. Surfaces the OTHER platform:
+ * - on Web (wasmJs) → "GET IT ON Google Play" → [GOOGLE_PLAY_URL]
+ * - on Android (and iOS / anything else, since iOS isn't shipped) → the web app at
+ *   [WEB_APP_URL].
+ *
+ * Styled as a distinct outlined badge (not a NavigationDrawerItem) per design ask,
+ * mirroring the swapface StoreBadge: surfaceContainerHigh fill, outlineVariant
+ * border, 12dp corners, two-line label (small caps top / bold bottom). Horizontal
+ * padding matches the section items so it aligns with the list below.
+ */
+@Composable
+private fun DrawerStorePromoBadge(
+    platformName: String,
+    onClick: (url: String) -> Unit,
+) {
+    val isWeb = platformName == "web"
+    val targetUrl = if (isWeb) GOOGLE_PLAY_URL else WEB_APP_URL
+    val topLine = stringResource(
+        if (isWeb) Res.string.drawer_promo_android_top else Res.string.drawer_promo_web_top
+    )
+    val bottomLine = stringResource(
+        if (isWeb) Res.string.drawer_promo_android_bottom else Res.string.drawer_promo_web_bottom
+    )
+    val cd = stringResource(
+        if (isWeb) Res.string.drawer_promo_android_cd else Res.string.drawer_promo_web_cd
+    )
+
+    val badgeShape = RoundedCornerShape(12.dp)
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(
+                horizontal = AppDimens.SpacingLg,
+                vertical = AppDimens.SpacingSm
+            )
+            .clip(badgeShape)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, badgeShape)
+            .clickable { onClick(targetUrl) }
+            .semantics { contentDescription = cd }
+            .padding(horizontal = AppDimens.SpacingLg, vertical = AppDimens.SpacingMd),
+    ) {
+        if (isWeb) {
+            // Official multi-color Google Play glyph: Image, NOT Icon (Icon would
+            // flatten it to a single tint). contentDescription is null — the badge
+            // Row already owns the semantic label.
+            Image(
+                painter = painterResource(Res.drawable.ic_google_play),
+                contentDescription = null,
+                modifier = Modifier.size(22.dp),
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Outlined.Public,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp),
             )
         }
         Column {
             Text(
-                text = "Gisti",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface,
+                text = topLine,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                text = stringResource(Res.string.drawer_tagline),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = bottomLine,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
             )
         }
     }
 }
+
+// Cross-promo URLs. NOTE: GOOGLE_PLAY_URL duplicates feature:paywall's internal
+// GISTI_GOOGLE_PLAY_URL (same value) — that const is module-internal and not
+// reachable from composeApp. Candidate for future consolidation into a shared
+// core constant.
+private const val WEB_APP_URL = "https://gisti-ai.com/"
+private const val GOOGLE_PLAY_URL =
+    "https://play.google.com/store/apps/details?id=com.antonchuraev.aichecklists"
 
 @Composable
 private fun DrawerSectionLabel(text: String) {
