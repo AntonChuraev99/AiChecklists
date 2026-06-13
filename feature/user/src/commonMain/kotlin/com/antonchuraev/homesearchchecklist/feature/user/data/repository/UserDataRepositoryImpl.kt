@@ -242,6 +242,26 @@ class UserDataRepositoryImpl(
         appDatastore.saveBoolean(IS_GOOGLE_LINKED_KEY, false)
     }
 
+    override suspend fun updateCachedCredits(aiCredits: Int, isPremium: Boolean) {
+        appDatastore.saveInt(AI_CREDITS_KEY, aiCredits)
+        appDatastore.saveBoolean(IS_PREMIUM_KEY, isPremium)
+    }
+
+    override suspend fun convergeUserIdToCanonical(canonicalUserId: String) {
+        if (canonicalUserId.isBlank()) return
+        val current = appDatastore.observeString(USER_ID_KEY, "").first()
+        // Only converge a real, diverged device; leave the blank (pre-registration) case to
+        // the normal register flow. Switching USER_ID_KEY here makes the credit listener and
+        // all server-side credit deductions target the shared Google-linked doc.
+        if (current.isNotBlank() && current != canonicalUserId) {
+            logger.info(
+                TAG,
+                "convergence: USER_ID_KEY ${current.take(8)}... -> ${canonicalUserId.take(8)}... (Google-linked canonical credit doc)",
+            )
+            appDatastore.saveString(USER_ID_KEY, canonicalUserId)
+        }
+    }
+
     override suspend fun getFirstLaunchAtMillis(): Long {
         return appDatastore.observeString(FIRST_LAUNCH_AT_KEY, "").first().toLongOrNull() ?: 0L
     }

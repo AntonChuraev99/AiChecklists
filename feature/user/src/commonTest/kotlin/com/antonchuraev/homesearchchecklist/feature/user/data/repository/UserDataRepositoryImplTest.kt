@@ -539,6 +539,62 @@ class UserDataRepositoryImplTest {
     }
 
     // ============================================
+    // convergeUserIdToCanonical() tests (self-healing credit-doc convergence)
+    // ============================================
+
+    @Test
+    fun convergeUserIdToCanonical_differentId_switchesUserId() = runTest {
+        // Arrange: device stranded on its own device-id credit doc (legacy Google link)
+        val datastore = createStubDatastore(strings = mapOf("user_id" to "619088ac-device-doc"))
+        val repo = createRepository(datastore)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Act: converge onto the canonical google_uid doc
+        repo.convergeUserIdToCanonical("013a6fd1-canonical")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Assert: USER_ID_KEY switched (verified at storage level — most reliable)
+        assertEquals("013a6fd1-canonical", datastore.observeString("user_id", "").first())
+    }
+
+    @Test
+    fun convergeUserIdToCanonical_sameId_isNoOp() = runTest {
+        val datastore = createStubDatastore(strings = mapOf("user_id" to "already-canonical"))
+        val repo = createRepository(datastore)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        repo.convergeUserIdToCanonical("already-canonical")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("already-canonical", datastore.observeString("user_id", "").first())
+    }
+
+    @Test
+    fun convergeUserIdToCanonical_blankCanonical_isNoOp() = runTest {
+        val datastore = createStubDatastore(strings = mapOf("user_id" to "619088ac-device-doc"))
+        val repo = createRepository(datastore)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        repo.convergeUserIdToCanonical("")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("619088ac-device-doc", datastore.observeString("user_id", "").first())
+    }
+
+    @Test
+    fun convergeUserIdToCanonical_blankCurrent_leavesToRegisterFlow() = runTest {
+        // No user_id yet: convergence must NOT pre-empt the normal registration flow
+        val datastore = createStubDatastore()
+        val repo = createRepository(datastore)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        repo.convergeUserIdToCanonical("013a6fd1-canonical")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("", datastore.observeString("user_id", "").first())
+    }
+
+    // ============================================
     // Helper Functions
     // ============================================
 

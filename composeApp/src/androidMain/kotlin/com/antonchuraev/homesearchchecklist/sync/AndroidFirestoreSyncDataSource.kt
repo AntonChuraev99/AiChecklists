@@ -4,6 +4,7 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AppResult
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.ChecklistSyncData
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.FillSyncData
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.FirestoreSyncDataSource
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.UserDocSyncData
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
@@ -206,5 +207,38 @@ class AndroidFirestoreSyncDataSource : FirestoreSyncDataSource {
         AppResult.Success(checklists)
     }.getOrElse { e ->
         AppResult.Error(Exception(e.message ?: "Fetch failed", e))
+    }
+
+    override fun observeUserDoc(userId: String): Flow<AppResult<UserDocSyncData?>> = callbackFlow {
+        val ref = firestore.collection("users").document(userId)
+        val listener = ref.addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                trySend(AppResult.Error(Exception(error.message ?: "Firestore snapshot error")))
+                return@addSnapshotListener
+            }
+            val data = snapshot?.data
+            trySend(
+                AppResult.Success(
+                    data?.let {
+                        UserDocSyncData(
+                            aiCredits = (it["ai_credits"] as? Number)?.toInt() ?: 0,
+                            isPremium = (it["is_premium"] as? Boolean) ?: false,
+                        )
+                    }
+                )
+            )
+        }
+        awaitClose { listener.remove() }
+    }
+
+    override suspend fun findUserIdByGoogleUid(googleUid: String): AppResult<String?> = runCatching {
+        val snapshot = firestore.collection("users")
+            .whereEqualTo("google_uid", googleUid)
+            .limit(1)
+            .get()
+            .await()
+        AppResult.Success(snapshot.documents.firstOrNull()?.id)
+    }.getOrElse { e ->
+        AppResult.Error(Exception(e.message ?: "google_uid lookup failed", e))
     }
 }

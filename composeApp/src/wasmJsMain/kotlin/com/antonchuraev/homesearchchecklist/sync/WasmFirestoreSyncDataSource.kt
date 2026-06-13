@@ -5,6 +5,7 @@ package com.antonchuraev.homesearchchecklist.sync
 import com.antonchuraev.homesearchchecklist.core.common.api.AppResult
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.ChecklistSyncData
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.FirestoreSyncDataSource
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.UserDocSyncData
 import kotlin.js.Promise
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
@@ -205,6 +206,50 @@ internal class WasmFirestoreSyncDataSource : FirestoreSyncDataSource {
                 AppResult.Error(Exception(resp.error ?: "Fetch failed"))
             }
         }.getOrElse { AppResult.Error(Exception(it.message ?: "fetchAllChecklists failed")) }
+
+    override fun observeUserDoc(userId: String): Flow<AppResult<UserDocSyncData?>> = callbackFlow {
+        val callbackId = "userdoc:$userId:${nowMs()}"
+        val slotKey = "__ktcb_$callbackId"
+        initSnapshotSlot(slotKey)
+        installCallbackRouter(callbackId, slotKey)
+        val listenerId = jsFirestoreOnDocSnapshot("users", userId, callbackId)
+
+        while (true) {
+            val payload = drainNextPayload(slotKey)
+            if (payload == null) { delay(150); continue }
+            try {
+                val resp = jsonParser.decodeFromString(JsResponse.serializer(), payload)
+                if (resp.ok) {
+                    val data = resp.data?.let {
+                        jsonParser.decodeFromString(UserDocSyncData.serializer(), it.toString())
+                    }
+                    trySend(AppResult.Success(data))
+                } else {
+                    trySend(AppResult.Error(Exception(resp.error ?: "Listener error")))
+                }
+            } catch (e: Exception) {
+                trySend(AppResult.Error(e))
+            }
+        }
+
+        @Suppress("UNREACHABLE_CODE")
+        awaitClose {
+            jsFirestoreUnsubscribe(listenerId)
+            removeCallbackRouter(callbackId)
+            clearSnapshotSlot(slotKey)
+        }
+    }
+
+    /**
+     * Web register + Google-link happen on the SAME device, so the web client's own doc
+     * IS the canonical `google_uid` doc — it never needs to converge AWAY from it. Returning
+     * null (no convergence) is therefore correct on web today. A real query bridge
+     * (`__firestoreQueryByField`) is only needed for the symmetric edge case of a future web
+     * device that registered a fresh doc after another device already became canonical.
+     * Pending: docs/todos/2026-06-13-wasm-credit-convergence-query-bridge.md
+     */
+    override suspend fun findUserIdByGoogleUid(googleUid: String): AppResult<String?> =
+        AppResult.Success(null)
 }
 
 @Serializable

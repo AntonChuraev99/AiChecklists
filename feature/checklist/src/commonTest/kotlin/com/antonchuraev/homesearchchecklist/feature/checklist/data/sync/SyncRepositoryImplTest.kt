@@ -767,6 +767,8 @@ class SyncRepositoryImplTest {
 
         override fun observeChecklistIds(userId: String): Flow<AppResult<List<String>>> = emptyFlow()
         override fun observeChecklist(userId: String, cloudId: String): Flow<AppResult<ChecklistSyncData>> = emptyFlow()
+        override fun observeUserDoc(userId: String): Flow<AppResult<UserDocSyncData?>> = emptyFlow()
+        override suspend fun findUserIdByGoogleUid(googleUid: String): AppResult<String?> = AppResult.Success(null)
 
         override suspend fun uploadChecklist(userId: String, data: ChecklistSyncData): AppResult<Unit> {
             uploaded.add(data)

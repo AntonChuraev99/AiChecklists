@@ -16,6 +16,7 @@ import com.antonchuraev.homesearchchecklist.csat.CsatIntent
 import com.antonchuraev.homesearchchecklist.csat.CsatViewModel
 import com.antonchuraev.homesearchchecklist.csat.InAppReviewLauncher
 import com.antonchuraev.homesearchchecklist.appupdate.AppUpdateLauncher
+import com.antonchuraev.homesearchchecklist.sync.UserCreditsSync
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppLanguage
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppThemeMode
 import com.antonchuraev.homesearchchecklist.core.datastore.api.LanguageRepository
@@ -313,6 +314,11 @@ fun App() {
 
         val csatViewModel: CsatViewModel = koinInject()
         val csatState by csatViewModel.screenState.collectAsState()
+
+        // Live AI-credits / premium sync: Firestore listener on users/{userId} keeps the
+        // cached balance current and shared across web/Android (credits are spent server-side).
+        val userCreditsSync: UserCreditsSync = koinInject()
+        LaunchedEffect(Unit) { userCreditsSync.start() }
 
         var showWidgetInstruction by remember { mutableStateOf(false) }
         val createWeeklyChecklistUseCase: CreateWeeklyChecklistUseCase = koinInject()

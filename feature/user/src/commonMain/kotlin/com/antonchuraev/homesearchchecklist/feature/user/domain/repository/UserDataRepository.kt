@@ -77,6 +77,26 @@ interface UserDataRepository {
      * without requiring a full app restart.
      */
     suspend fun clearGoogleAccountData() {}
+
+    /**
+     * Updates the locally cached AI credits / premium status from a server-side
+     * snapshot (real-time Firestore listener on `users/{userId}`). Lets server-side
+     * credit deductions made on OTHER devices propagate to this device's balance, so
+     * the AI-credit pool is actually shared across web/Android for one account.
+     */
+    suspend fun updateCachedCredits(aiCredits: Int, isPremium: Boolean) {}
+
+    /**
+     * Self-healing convergence: re-point the locally stored USER_ID_KEY (the credit-doc id)
+     * at [canonicalUserId] — the canonical Google-linked doc resolved by `google_uid`.
+     *
+     * Heals legacy devices that linked Google before USER_ID_KEY switching shipped: they
+     * still point at their own device-id credit doc (no `google_uid`, never shared). After
+     * convergence the credit listener re-attaches to the shared doc, so the AI-credit pool
+     * is finally common across web/Android. No-op when blank or already equal. Default no-op
+     * keeps test fakes compiling.
+     */
+    suspend fun convergeUserIdToCanonical(canonicalUserId: String) {}
 }
 
 data class LinkGoogleAccountResult(

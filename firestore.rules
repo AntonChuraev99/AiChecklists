@@ -6,9 +6,18 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // User-scoped data: only owner can read/write
+    // User-scoped data: only owner can read/write.
+    // READ also permits the owner's linked CREDIT doc, whose document id is the
+    // device-registration UUID (NOT the Firebase Auth uid) but carries
+    // google_uid == the owner's uid. Needed for the client-side real-time credit
+    // listener (UserCreditsSync) — without it the balance can't sync across devices.
+    // WRITE stays strict: the credit doc is written only server-side by Cloud
+    // Functions (Admin SDK), never by the client.
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null
+                  && (request.auth.uid == userId
+                      || (resource != null && resource.data.google_uid == request.auth.uid));
+      allow write: if request.auth != null && request.auth.uid == userId;
 
       match /checklists/{checklistId} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
