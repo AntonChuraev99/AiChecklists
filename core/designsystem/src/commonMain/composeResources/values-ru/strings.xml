@@ -206,6 +206,7 @@
     <string name="analyze_preview_remove_item">Удалить элемент</string>
     <string name="analyze_preview_add_item">Добавить элемент</string>
     <string name="analyze_preview_add_item_hint">Добавить элемент...</string>
+    <string name="analyze_preview_folder_hint">ИИ распределил элементы по папкам. Переименовать и переставить можно после создания.</string>
 
     <!-- Экран анализа -->
     <string name="analyze_title">ИИ-анализ</string>

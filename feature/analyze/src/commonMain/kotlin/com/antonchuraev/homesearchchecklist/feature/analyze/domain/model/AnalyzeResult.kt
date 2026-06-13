@@ -32,6 +32,15 @@ data class AnalyzeResult(
     val warnings: List<String> = emptyList(),
 
     /**
+     * True when [suggestedItems] contains at least one folder node (a nested structure was
+     * detected in the AI response). Presentation creates the new checklist with
+     * `foldersEnabled = true` in that case. Always false in fill mode and for flat (legacy)
+     * responses. Equivalent to `suggestedItems.any { it.isFolder }`; kept as an explicit field
+     * so the value is decided once at parse time alongside the flattening logic.
+     */
+    val hasFolders: Boolean = false,
+
+    /**
      * Raw fill items with separate text/checked/note fields (for fill-default mode).
      * Only populated in fill mode. Not serialized.
      */

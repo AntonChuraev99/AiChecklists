@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.Card
 import androidx.compose.material3.OutlinedCard
@@ -50,6 +51,9 @@ import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistNodeType
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.tree.ChecklistTree
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
 import org.jetbrains.compose.resources.pluralStringResource
@@ -91,15 +95,22 @@ fun AnalyzeResultPreviewScreen(
                             .padding(vertical = AppDimens.SpacingLg)
                             .navigationBarsPadding()
                     ) {
+                        // In folder mode the count reflects checkable leaves (folders aren't items),
+                        // matching the count shown above the list.
+                        val createCount = if (state.hasFolders) {
+                            state.structuredItems.count { it.type == ChecklistNodeType.ITEM }
+                        } else {
+                            state.editableItems.size
+                        }
                         AppButton(
                             text = if (state.isCreating)
                                 stringResource(Res.string.analyze_preview_creating)
                             else if (state.fillDefault)
                                 stringResource(Res.string.fill_apply)
                             else if (state.isFillMode)
-                                stringResource(Res.string.analyze_preview_create_fill_button, state.editableItems.size)
+                                stringResource(Res.string.analyze_preview_create_fill_button, createCount)
                             else
-                                stringResource(Res.string.analyze_preview_create_button, state.editableItems.size),
+                                stringResource(Res.string.analyze_preview_create_button, createCount),
                             onClick = { viewModel.sendIntent(AnalyzeResultPreviewScreenIntent.OnCreateChecklist) },
                             icon = Icons.Filled.Add,
                             enabled = !state.isCreating && state.editableItems.isNotEmpty() && (state.fillDefault || state.checklistName.isNotBlank()),
@@ -227,10 +238,15 @@ private fun AnalyzeResultPreviewContent(
             }
         }
 
-        // Items count
+        // Items count. In folder mode count only checkable leaves (folders aren't items).
+        val displayCount = if (state.hasFolders) {
+            state.structuredItems.count { it.type == ChecklistNodeType.ITEM }
+        } else {
+            state.editableItems.size
+        }
         item {
             Text(
-                text = pluralStringResource(Res.plurals.items_count, state.editableItems.size, state.editableItems.size),
+                text = pluralStringResource(Res.plurals.items_count, displayCount, displayCount),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onBackground,
@@ -238,27 +254,48 @@ private fun AnalyzeResultPreviewContent(
             )
         }
 
-        // Add new item field (at top, new items appear below)
-        item {
-            AddItemInputField(
-                text = state.newItemText,
-                onTextChange = onNewItemTextChange,
-                onAdd = onAddItem,
-                placeholder = stringResource(Res.string.analyze_preview_add_item_hint)
-            )
-            Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
-        }
+        if (state.hasFolders) {
+            // Folder mode: read-only hierarchical preview. Editing a flat row would desync the
+            // tree, so add/remove are hidden; the user restructures after creation.
+            item {
+                Text(
+                    text = stringResource(Res.string.analyze_preview_folder_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = AppDimens.SpacingSm)
+                )
+            }
+            itemsIndexed(
+                items = state.structuredItems,
+                key = { _, item -> item.id }
+            ) { _, item ->
+                val depth = (ChecklistTree.ancestorPath(state.structuredItems, item.id).size - 1)
+                    .coerceAtLeast(0)
+                StructuredItemCard(item = item, depth = depth)
+            }
+        } else {
+            // Add new item field (at top, new items appear below)
+            item {
+                AddItemInputField(
+                    text = state.newItemText,
+                    onTextChange = onNewItemTextChange,
+                    onAdd = onAddItem,
+                    placeholder = stringResource(Res.string.analyze_preview_add_item_hint)
+                )
+                Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
+            }
 
-        // Editable items list (new items appear at top)
-        itemsIndexed(
-            items = state.editableItems,
-            key = { index, item -> "$index-${item.hashCode()}" }
-        ) { index, item ->
-            ChecklistItemCard(
-                text = item,
-                onRemove = { onRemoveItem(index) },
-                modifier = Modifier.animateItem()
-            )
+            // Editable items list (new items appear at top)
+            itemsIndexed(
+                items = state.editableItems,
+                key = { index, item -> "$index-${item.hashCode()}" }
+            ) { index, item ->
+                ChecklistItemCard(
+                    text = item,
+                    onRemove = { onRemoveItem(index) },
+                    modifier = Modifier.animateItem()
+                )
+            }
         }
 
         // Bottom padding for button
@@ -313,6 +350,82 @@ private fun ChecklistItemCard(
                     modifier = Modifier.size(20.dp)
                 )
             }
+        }
+    }
+
+    if (isDark) {
+        OutlinedCard(
+            modifier = modifier.fillMaxWidth(),
+            shape = shape,
+            colors = CardDefaults.outlinedCardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            ),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+        ) { cardContent() }
+    } else {
+        Card(
+            modifier = modifier.fillMaxWidth(),
+            shape = shape,
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = AppDimens.CardElevation)
+        ) { cardContent() }
+    }
+}
+
+/**
+ * Read-only card for the folder-mode preview. Indents by tree [depth] and shows a folder icon
+ * for FOLDER nodes (bold) or a checkbox placeholder for leaves. No remove/edit affordance —
+ * the structure is finalized at creation; the user restructures on the detail screen.
+ */
+@Composable
+private fun StructuredItemCard(
+    item: ChecklistItem,
+    depth: Int,
+    modifier: Modifier = Modifier
+) {
+    val isDark = LocalIsDarkTheme.current
+    val shape = RoundedCornerShape(12.dp)
+    val isFolder = item.type == ChecklistNodeType.FOLDER
+    val cardContent: @Composable () -> Unit = {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    start = AppDimens.SpacingMd + (AppDimens.SpacingLg * depth),
+                    end = AppDimens.SpacingMd,
+                    top = AppDimens.SpacingSm,
+                    bottom = AppDimens.SpacingSm
+                ),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (isFolder) {
+                Icon(
+                    imageVector = Icons.Outlined.Folder,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            } else {
+                // Checkbox placeholder (matches the flat preview card)
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(AppDimens.SpacingMd))
+
+            Text(
+                text = item.text,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = if (isFolder) FontWeight.SemiBold else FontWeight.Normal,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f)
+            )
         }
     }
 

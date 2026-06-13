@@ -69,6 +69,10 @@ sealed interface AppNavRoute : NavKey {
     data class ChecklistDetail(
         val checklistId: Long,
         val focusItemId: String? = null,
+        // Folder drill-down: id of the FOLDER node whose children are shown. null = checklist root.
+        // Each drill-down pushes a new ChecklistDetail entry with this set, so Nav3 back/Up
+        // walks the folder hierarchy via the back stack (no custom breadcrumb needed).
+        val currentFolderId: String? = null,
     ) : AppNavRoute
 
     @Serializable

@@ -112,6 +112,11 @@ class AppNavigatorImpl : AppNavigator {
         }
     }
 
+    override fun navigateToFolder(checklistId: Long, folderId: String) {
+        // Plain push (never clears) so Up/back returns to the parent folder level.
+        backStack.add(AppNavRoute.ChecklistDetail(checklistId, currentFolderId = folderId))
+    }
+
     override fun navigateToFillDetail(fillId: Long, clearBackStack: Boolean) {
         val route = AppNavRoute.FillDetail(fillId)
         if (clearBackStack) {

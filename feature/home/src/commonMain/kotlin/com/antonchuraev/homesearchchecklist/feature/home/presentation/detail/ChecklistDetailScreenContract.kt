@@ -23,6 +23,50 @@ data class UndoableDeleteItem(
     val originalChecklistIndex: Int,
 )
 
+/**
+ * Lightweight UI model for a folder row at the current drill-down level.
+ *
+ * [id]/[name] mirror the underlying template [com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem].
+ * [checked]/[total] are the aggregate of the folder's descendant leaves (from
+ * [com.antonchuraev.homesearchchecklist.feature.checklist.domain.tree.ChecklistTree.folderProgress]).
+ * Computed in the ViewModel so the Composable stays a pure renderer.
+ */
+data class FolderUiModel(
+    val id: String,
+    val name: String,
+    val checked: Int,
+    val total: Int,
+    // True when the folder's linked fill row carries an active reminder (one-shot or recurring).
+    // Drives the read-only reminder indicator on [FolderCard] (no hit-zone — the action lives in
+    // the folder actions sheet). Computed in the ViewModel from the folder's fill row.
+    val hasReminder: Boolean = false,
+)
+
+/**
+ * A candidate destination folder for the "Move to…" sheet.
+ *
+ * The list is a flattened, depth-indented view of the whole folder tree of the checklist
+ * (plus a synthetic root row, modelled with [id] == null). [enabled] is precomputed in the
+ * ViewModel via
+ * [com.antonchuraev.homesearchchecklist.feature.checklist.domain.tree.ChecklistTree.canMove]:
+ * the node being moved and all of its descendants are disabled so a move can never create a
+ * cycle. [isCurrentParent] marks the node's current parent so the row can read "Current
+ * location" and stay non-actionable (moving somewhere it already is would be a no-op).
+ *
+ * @param id     Target folder id; null = checklist root ("Home").
+ * @param name   Display label (folder text, or the root label for the synthetic root row).
+ * @param depth  Indentation level (0 = root / top-level folders) for the leading inset.
+ * @param enabled Whether this target is a legal destination for the node being moved.
+ * @param isCurrentParent True when this target is where the node already lives.
+ */
+data class MoveTargetUiModel(
+    val id: String?,
+    val name: String,
+    val depth: Int,
+    val enabled: Boolean,
+    val isCurrentParent: Boolean,
+)
+
 sealed interface ChecklistDetailState : State {
     data object Loading : ChecklistDetailState
     data object NotFound : ChecklistDetailState
@@ -30,6 +74,38 @@ sealed interface ChecklistDetailState : State {
         val checklist: Checklist,
         val defaultFill: ChecklistFill?,
         val additionalFillsCount: Int = 0,
+        // ── Folders (nested checklists) ──
+        // Mirror of checklist.foldersEnabled, lifted onto state so the Composable can branch
+        // without reading the domain model directly.
+        val foldersEnabled: Boolean = false,
+        // Folder node whose children are being shown. null = checklist root.
+        val currentFolderId: String? = null,
+        // Title of the current folder (its template text). null at root → header shows checklist name.
+        val currentFolderTitle: String? = null,
+        // Folder rows to render at the current level (empty when !foldersEnabled). Each carries
+        // aggregate descendant-leaf progress, precomputed in the ViewModel.
+        val folders: List<FolderUiModel> = emptyList(),
+        // Fill-item ids that belong to the current folder level (leaf items whose linked template
+        // item has parentId == currentFolderId). null = no folder filtering (flat list / !foldersEnabled);
+        // the Composable shows all fill items. Non-null = show only these ids at this level.
+        val visibleFillItemIds: Set<String>? = null,
+        // ── Folder node actions (Phase 4) ──
+        // Folder whose actions sheet (Rename / Move to… / Delete) is open. null = closed.
+        val folderActionsSheetFor: String? = null,
+        // Node (folder OR leaf item) whose "Move to…" target sheet is open. null = closed.
+        // A node is identified by its TEMPLATE item id (folders are template-only; for leaves
+        // the move re-parents the template item, the fill stays flat).
+        val moveSheetForNodeId: String? = null,
+        // Flattened, depth-indented destination folders for the open move sheet (empty when closed).
+        val moveTargets: List<MoveTargetUiModel> = emptyList(),
+        // Folder pending deletion confirmation. null = no confirm dialog showing.
+        val pendingFolderDeleteId: String? = null,
+        // How many descendant items (leaves + sub-folders) the pending folder delete will cascade.
+        // Drives the "This will delete N items inside" confirm copy.
+        val pendingFolderDeleteCount: Int = 0,
+        // Inline rename draft for [folderActionsSheetFor]. null = rename dialog closed.
+        val folderRenameForId: String? = null,
+        val folderRenameDraft: String = "",
         val showDeleteConfirmation: Boolean = false,
         val showAddFillDialog: Boolean = false,
         val newFillName: String = "",
@@ -56,6 +132,10 @@ sealed interface ChecklistDetailState : State {
         val showOverflowSheet: Boolean = false,
         val separateCompleted: Boolean = false,
         val autoDeleteCompleted: Boolean = false,
+        // Confirm dialog before disabling folders when the checklist still has folder nodes.
+        // true → show the "flatten" warning (folders removed, items kept at top level).
+        // Disabling a checklist that has NO folders skips this and flips foldersEnabled straight off.
+        val showFlattenFoldersConfirm: Boolean = false,
         val pendingUndoItem: UndoableDeleteItem? = null,
         // Weekly mode: non-null while MoveToDayBottomSheet is open
         val moveToDayItemId: String? = null,
@@ -132,6 +212,50 @@ sealed interface ChecklistDetailIntent : Intent {
      * [OnAddItem] in all screen call-sites (Option B — single intent, branching inside VM).
      */
     data object OnAddItemWithParse : ChecklistDetailIntent
+
+    // ── Folders (nested checklists) ──
+    /** Drill into folder [folderId] (pushes a new ChecklistDetail entry scoped to it). */
+    data class OnOpenFolder(val folderId: String) : ChecklistDetailIntent
+    /** Create a new empty folder under the current level (parentId = currentFolderId). */
+    data object OnCreateFolder : ChecklistDetailIntent
+
+    // ── Folder node actions (Phase 4): move / rename / delete ──
+    /** Long-press a FolderCard → open the folder actions sheet (Rename / Move to… / Delete). */
+    data class OnFolderLongPress(val folderId: String) : ChecklistDetailIntent
+    data object OnDismissFolderActions : ChecklistDetailIntent
+
+    /** Open the rename dialog for [folderId] (seeds the draft with its current name). */
+    data class OnRenameFolder(val folderId: String) : ChecklistDetailIntent
+    data class OnFolderRenameDraftChange(val text: String) : ChecklistDetailIntent
+    /** Commit the rename: writes the folder node text (template) + its linked fill row text. */
+    data object OnConfirmRenameFolder : ChecklistDetailIntent
+    data object OnDismissRenameFolder : ChecklistDetailIntent
+
+    /**
+     * Open the "Move to…" sheet for a node (folder OR leaf item), identified by its TEMPLATE
+     * item id. Builds the depth-indented [MoveTargetUiModel] list with legality from
+     * [com.antonchuraev.homesearchchecklist.feature.checklist.domain.tree.ChecklistTree.canMove].
+     */
+    data class OnMoveNodeRequested(val nodeId: String) : ChecklistDetailIntent
+    /** Re-parent [nodeId] under [targetFolderId] (null = checklist root). Guarded by canMove. */
+    data class OnMoveNodeToFolder(val nodeId: String, val targetFolderId: String?) : ChecklistDetailIntent
+    data object OnDismissMoveSheet : ChecklistDetailIntent
+
+    /**
+     * Open the reminder sheet for a FOLDER node (from its actions sheet). [folderId] is the
+     * TEMPLATE node id; the VM resolves the folder's linked fill-item id and reuses the per-item
+     * reminder flow ([OnItemReminderClick] / [OnSaveItemReminder] / [OnRemoveItemReminder]) — a
+     * folder's reminder lives on its flat fill row exactly like a leaf's. Lazily creates the fill
+     * row for legacy folders that lack one.
+     */
+    data class OnFolderReminderClick(val folderId: String) : ChecklistDetailIntent
+
+    /** Request folder deletion: opens the confirm dialog (computes cascade count). */
+    data class OnDeleteFolder(val folderId: String) : ChecklistDetailIntent
+    /** Confirm the cascade delete: removes the folder + all descendants, cancels leaf alarms. */
+    data object OnConfirmDeleteFolder : ChecklistDetailIntent
+    data object OnDismissDeleteFolder : ChecklistDetailIntent
+
     data class OnNoteChanged(val note: String) : ChecklistDetailIntent
     data object OnSaveNote : ChecklistDetailIntent
     data object OnDismissNoteDialog : ChecklistDetailIntent
@@ -177,6 +301,19 @@ sealed interface ChecklistDetailIntent : Intent {
     data object OnToggleSeparateCompleted : ChecklistDetailIntent
     data object OnToggleAutoDeleteCompleted : ChecklistDetailIntent
     data object OnDeleteCompletedItems : ChecklistDetailIntent
+
+    /**
+     * Toggle the per-checklist folders feature on/off.
+     *
+     * Turning ON simply enables folders (no-op when the checklist is in Weekly view mode —
+     * folders and Weekly are mutually exclusive groupings of the same flat list).
+     * Turning OFF: if the checklist still has folder nodes, opens the flatten-confirm dialog
+     * ([ChecklistDetailState.Content.showFlattenFoldersConfirm]); otherwise disables straight away.
+     */
+    data object OnToggleFoldersEnabled : ChecklistDetailIntent
+    /** Confirm disabling folders: flattens the tree (items kept at root) then sets foldersEnabled=false. */
+    data object OnConfirmDisableFolders : ChecklistDetailIntent
+    data object OnDismissDisableFolders : ChecklistDetailIntent
 
     // Item reorder and delete
     data class OnFinalizeReorder(val orderedItemIds: List<String>) : ChecklistDetailIntent

@@ -49,13 +49,19 @@ data class FilledItem(
 
 /**
  * Result of generating a new checklist.
+ *
+ * [items] is a FLAT list even when the AI returned a nested folder structure: folder nodes are
+ * interleaved with their children in DFS pre-order, and parent/child links are carried via
+ * [ChecklistItem.parentId] / [ChecklistItem.type]. [hasFolders] is true iff any node is a folder,
+ * so the presentation layer knows to create the checklist with `foldersEnabled = true`.
  */
 data class GenerateChecklistResult(
     val checklistName: String,
     val items: List<ChecklistItem>,
     val summary: String,
     val confidence: Float,
-    val aiCredits: Int = 0 // Remaining credits after action
+    val aiCredits: Int = 0, // Remaining credits after action
+    val hasFolders: Boolean = false
 )
 
 /**

@@ -165,6 +165,7 @@ private class FakeChecklistRepository(
     override suspend fun reorderChecklists(orderedIds: List<Long>) = Unit
     override suspend fun setSeparateCompleted(checklistId: Long, value: Boolean) = Unit
     override suspend fun setAutoDeleteCompleted(checklistId: Long, value: Boolean) = Unit
+    override suspend fun setFoldersEnabled(checklistId: Long, value: Boolean) = Unit
     override suspend fun setReminder(checklistId: Long, reminderAt: Long?) = Unit
     override suspend fun countActiveReminders(): Int = 0
     override suspend fun getActiveReminders() = emptyList<com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistReminderInfo>()

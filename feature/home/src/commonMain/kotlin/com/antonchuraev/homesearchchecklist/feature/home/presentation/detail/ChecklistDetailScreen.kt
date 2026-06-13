@@ -52,6 +52,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.outlined.DriveFileMove
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
@@ -63,6 +64,8 @@ import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.CreateNewFolder
+import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.filled.Delete
@@ -152,6 +155,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonDestructive
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonText
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.ChecklistDetailChatDock
@@ -167,7 +171,6 @@ import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
-import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistViewMode
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
@@ -209,6 +212,12 @@ fun ChecklistDetailScreen(
     checklistId: Long,
     focusItemId: String? = null,
     /**
+     * Folder drill-down level: id of the FOLDER node whose children are shown. null = checklist root.
+     * Forwarded from the [com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavRoute.ChecklistDetail]
+     * route by App.kt. Part of the ViewModel key so each level gets its own ViewModel instance.
+     */
+    currentFolderId: String? = null,
+    /**
      * Opens the AI-chat sheet pre-anchored to this checklist.
      * Called with (checklistId, checklistName) so App.kt can display the context label.
      * Wired by App.kt.
@@ -225,7 +234,9 @@ fun ChecklistDetailScreen(
      * context and dispatch the right prefill / send. Wired by App.kt.
      */
     onChecklistQuickAction: ((Long, String, GistiChecklistAction) -> Unit)? = null,
-    viewModel: ChecklistDetailViewModel = koinViewModel(key = "checklist_detail_$checklistId") { parametersOf(checklistId) }
+    viewModel: ChecklistDetailViewModel = koinViewModel(
+        key = "checklist_detail_${checklistId}_${currentFolderId ?: "root"}"
+    ) { parametersOf(checklistId, currentFolderId) }
 ) {
     val analyticsTracker: AnalyticsTracker = koinInject()
     LaunchedEffect(Unit) { analyticsTracker.screenView(AnalyticsScreens.CHECKLIST_DETAIL) }
@@ -369,6 +380,7 @@ private fun ChecklistDetailContent(
     val attachmentLoadErrorMsg = stringResource(Res.string.attachment_load_error)
     val attachmentTooLargeMsg = stringResource(Res.string.attachment_size_too_large_snackbar)
     val attachmentDeletedMsg = stringResource(Res.string.attachment_deleted_snackbar)
+    val folderReminderUnavailableMsg = stringResource(Res.string.folder_reminder_unavailable)
     LaunchedEffect(state.snackbarMessage) {
         val message = state.snackbarMessage ?: return@LaunchedEffect
         val isSmartAddHint = message == ChecklistDetailViewModel.SNACKBAR_SMART_ADD_HINT_ADD_TEXT ||
@@ -382,6 +394,7 @@ private fun ChecklistDetailContent(
             ChecklistDetailViewModel.SNACKBAR_ATTACHMENT_LOAD_ERROR -> attachmentLoadErrorMsg
             ChecklistDetailViewModel.SNACKBAR_ATTACHMENT_TOO_LARGE -> attachmentTooLargeMsg
             ChecklistDetailViewModel.SNACKBAR_ATTACHMENT_DELETED -> attachmentDeletedMsg
+            ChecklistDetailViewModel.SNACKBAR_FOLDER_REMINDER_UNAVAILABLE -> folderReminderUnavailableMsg
             else -> message
         }
         smartAddHintActive.value = isSmartAddHint
@@ -502,6 +515,14 @@ private fun ChecklistDetailContent(
     // Key includes defaultFill?.items so we retry if state was Loading when first composed.
     LaunchedEffect(focusItemId, state.defaultFill?.items) {
         if (didFocusScroll || focusItemId == null) return@LaunchedEffect
+        // Folder mode inserts FolderCards into the list, so the flat index math below no longer
+        // matches the rendered LazyColumn (and a deeplinked item may live in a nested folder not
+        // shown at this level). Skip the auto-scroll for folder checklists (Phase 4 will resolve
+        // deeplink-to-nested-item). Non-folder checklists are unaffected.
+        if (state.foldersEnabled) {
+            didFocusScroll = true
+            return@LaunchedEffect
+        }
         val fill = state.defaultFill ?: return@LaunchedEffect
 
         // Derive unchecked / completed split exactly as the LazyColumn does.
@@ -723,17 +744,26 @@ private fun ChecklistDetailContent(
                     }
                 }
                 ChecklistViewMode.Standard -> {
-            val sourceUnchecked = remember(defaultFill.items, state.separateCompleted) {
-                if (state.separateCompleted) defaultFill.items.filter { !it.checked }
-                else defaultFill.items
+            // Folder mode: show only the leaf items of the current folder level. visibleFillItemIds
+            // is null when folders are off (flat list) → no filtering, identical to before.
+            val visibleFillItems = remember(defaultFill.items, state.visibleFillItemIds) {
+                val ids = state.visibleFillItemIds
+                if (ids == null) defaultFill.items else defaultFill.items.filter { it.id in ids }
             }
-            val completedItems by remember(defaultFill.items, state.separateCompleted) {
+            val sourceUnchecked = remember(visibleFillItems, state.separateCompleted) {
+                if (state.separateCompleted) visibleFillItems.filter { !it.checked }
+                else visibleFillItems
+            }
+            val completedItems by remember(visibleFillItems, state.separateCompleted) {
                 derivedStateOf {
-                    if (state.separateCompleted) defaultFill.items.filter { it.checked }
+                    if (state.separateCompleted) visibleFillItems.filter { it.checked }
                     else emptyList()
                 }
             }
             var completedExpanded by remember { mutableStateOf(true) }
+            // Header items before the unchecked list (used to offset the reorder index math):
+            // ProgressHeader, optional ViewAllFillsCard, and each FolderCard.
+            val folderHeaderCount = state.folders.size
 
             // Local mutable list for optimistic reorder (no DB writes during drag)
             var localUnchecked by remember(sourceUnchecked) {
@@ -741,8 +771,8 @@ private fun ChecklistDetailContent(
             }
 
             val reorderableState = rememberReorderableLazyListState(listState) { from, to ->
-                // Offset: title(0) + progress(1) + optional fills card(2) = 2 or 3 header items
-                val headerCount = 2 + (if (state.additionalFillsCount > 0) 1 else 0)
+                // Offset: title(0) + progress(1) + optional fills card + folder cards = header items
+                val headerCount = 2 + (if (state.additionalFillsCount > 0) 1 else 0) + folderHeaderCount
                 val fromIndex = from.index - headerCount
                 val toIndex = to.index - headerCount
                 if (fromIndex >= 0 && toIndex >= 0 && fromIndex < localUnchecked.size && toIndex < localUnchecked.size) {
@@ -768,11 +798,13 @@ private fun ChecklistDetailContent(
                 // above) — this is the "empty space" between the last item and the floating dock.
                 contentPadding = PaddingValues(bottom = listBottomPadding),
             ) {
-                // Progress header with checklist name + completion celebration
+                // Progress header. At a folder level the header shows the folder name (the
+                // checklist name still lives in the top app bar); the progress bar reflects only
+                // the items visible at this level.
                 item {
                     ProgressHeader(
-                        fill = defaultFill,
-                        name = state.checklist.name,
+                        items = visibleFillItems,
+                        name = state.currentFolderTitle ?: state.checklist.name,
                     )
                 }
 
@@ -784,6 +816,28 @@ private fun ChecklistDetailContent(
                             onClick = { onIntent(ChecklistDetailIntent.OnViewAllFillsClick) }
                         )
                         Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
+                    }
+                }
+
+                // Folders at the current level (folder mode only) — rendered before leaf items.
+                if (state.foldersEnabled) {
+                    items(
+                        count = state.folders.size,
+                        key = { "folder_${state.folders[it].id}" },
+                    ) { index ->
+                        val folder = state.folders[index]
+                        FolderCard(
+                            name = folder.name,
+                            total = folder.total,
+                            progressLabel = stringResource(
+                                Res.string.folder_progress,
+                                folder.checked,
+                                folder.total,
+                            ),
+                            hasReminder = folder.hasReminder,
+                            onOpen = { onIntent(ChecklistDetailIntent.OnOpenFolder(folder.id)) },
+                            onLongPress = { onIntent(ChecklistDetailIntent.OnFolderLongPress(folder.id)) },
+                        )
                     }
                 }
 
@@ -983,6 +1037,12 @@ private fun ChecklistDetailContent(
             onAddImageClick = { onIntent(ChecklistDetailIntent.OnAddImageAttachment(detailsItem.id)) },
             onAddFileClick = { onIntent(ChecklistDetailIntent.OnAddFileAttachment(detailsItem.id)) },
             canAddAttachment = isPremium || detailsItem.attachments.size < ChecklistDetailViewModel.FREE_ATTACHMENT_LIMIT_PER_ITEM,
+            // Move to… targets the leaf's TEMPLATE node (folders live on the template). Hidden for
+            // legacy fill rows without a template link (nothing to re-parent).
+            showMoveAction = state.foldersEnabled && detailsItem.templateItemId != null,
+            onMoveClick = {
+                detailsItem.templateItemId?.let { onIntent(ChecklistDetailIntent.OnMoveNodeRequested(it)) }
+            },
         )
     }
 
@@ -1032,6 +1092,69 @@ private fun ChecklistDetailContent(
             checklistName = state.checklist.name,
             onConfirm = { onIntent(ChecklistDetailIntent.OnConfirmDeleteChecklist) },
             onDismiss = { onIntent(ChecklistDetailIntent.OnDismissDeleteConfirmation) }
+        )
+    }
+
+    // ── Folder node actions (Phase 4) ──
+
+    // Folder actions sheet (long-press a FolderCard): Reminder / Rename / Move to… / Delete.
+    val folderForActions = state.folderActionsSheetFor?.let { id ->
+        state.checklist.items.firstOrNull { it.id == id && it.isFolder }
+    }
+    if (folderForActions != null) {
+        // The folder is always at the current drill-down level when its actions sheet is open, so
+        // its UI model (carrying the reminder flag) is present in state.folders.
+        val folderHasReminder = state.folders
+            .firstOrNull { it.id == folderForActions.id }
+            ?.hasReminder == true
+        FolderActionsSheet(
+            folderName = folderForActions.text,
+            hasReminder = folderHasReminder,
+            onReminder = { onIntent(ChecklistDetailIntent.OnFolderReminderClick(folderForActions.id)) },
+            onRename = { onIntent(ChecklistDetailIntent.OnRenameFolder(folderForActions.id)) },
+            onMove = { onIntent(ChecklistDetailIntent.OnMoveNodeRequested(folderForActions.id)) },
+            onDelete = { onIntent(ChecklistDetailIntent.OnDeleteFolder(folderForActions.id)) },
+            onDismiss = { onIntent(ChecklistDetailIntent.OnDismissFolderActions) },
+        )
+    }
+
+    // Rename folder dialog
+    if (state.folderRenameForId != null) {
+        RenameFolderDialog(
+            name = state.folderRenameDraft,
+            onNameChanged = { onIntent(ChecklistDetailIntent.OnFolderRenameDraftChange(it)) },
+            onConfirm = { onIntent(ChecklistDetailIntent.OnConfirmRenameFolder) },
+            onDismiss = { onIntent(ChecklistDetailIntent.OnDismissRenameFolder) },
+        )
+    }
+
+    // Move to… target sheet (folder OR leaf — identified by template node id)
+    val moveNodeId = state.moveSheetForNodeId
+    if (moveNodeId != null) {
+        MoveToFolderSheet(
+            targets = state.moveTargets,
+            onTargetSelected = { targetFolderId ->
+                onIntent(ChecklistDetailIntent.OnMoveNodeToFolder(moveNodeId, targetFolderId))
+            },
+            onDismiss = { onIntent(ChecklistDetailIntent.OnDismissMoveSheet) },
+        )
+    }
+
+    // Delete folder confirmation (cascade warning)
+    if (state.pendingFolderDeleteId != null) {
+        DeleteFolderConfirmationDialog(
+            descendantCount = state.pendingFolderDeleteCount,
+            onConfirm = { onIntent(ChecklistDetailIntent.OnConfirmDeleteFolder) },
+            onDismiss = { onIntent(ChecklistDetailIntent.OnDismissDeleteFolder) },
+        )
+    }
+
+    // Disable-folders (flatten) confirmation: shown only when folders exist and the user turns
+    // the feature off. Items are kept and lifted to the top level; folder containers are removed.
+    if (state.showFlattenFoldersConfirm) {
+        DisableFoldersConfirmationDialog(
+            onConfirm = { onIntent(ChecklistDetailIntent.OnConfirmDisableFolders) },
+            onDismiss = { onIntent(ChecklistDetailIntent.OnDismissDisableFolders) },
         )
     }
 
@@ -1193,6 +1316,13 @@ private fun ChecklistDetailContent(
             separateCompleted = state.separateCompleted,
             autoDeleteCompleted = state.autoDeleteCompleted,
             hasCompletedItems = state.defaultFill?.items?.any { it.checked } == true,
+            foldersEnabled = state.foldersEnabled,
+            isWeeklyMode = state.checklist.viewMode == ChecklistViewMode.Weekly,
+            onCreateFolder = {
+                onIntent(ChecklistDetailIntent.OnDismissOverflowSheet)
+                onIntent(ChecklistDetailIntent.OnCreateFolder)
+            },
+            onToggleFoldersEnabled = { onIntent(ChecklistDetailIntent.OnToggleFoldersEnabled) },
             onDeleteCompletedItems = { onIntent(ChecklistDetailIntent.OnDeleteCompletedItems) },
             onToggleAutoDeleteCompleted = { onIntent(ChecklistDetailIntent.OnToggleAutoDeleteCompleted) },
             onToggleSeparateCompleted = { onIntent(ChecklistDetailIntent.OnToggleSeparateCompleted) },
@@ -1227,9 +1357,9 @@ private fun ChecklistDetailContent(
 }
 
 @Composable
-private fun ProgressHeader(fill: ChecklistFill, name: String) {
-    val checkedCount = fill.items.count { it.checked }
-    val totalCount = fill.items.size
+private fun ProgressHeader(items: List<ChecklistFillItem>, name: String) {
+    val checkedCount = items.count { it.checked }
+    val totalCount = items.size
     val progress = if (totalCount > 0) checkedCount.toFloat() / totalCount else 0f
     val isComplete = totalCount > 0 && checkedCount == totalCount
 
@@ -1598,6 +1728,10 @@ internal fun ItemDetailsSheet(
     onAddImageClick: () -> Unit = {},
     onAddFileClick: () -> Unit = {},
     canAddAttachment: Boolean = true,
+    // Move to… — only shown when the checklist has folders enabled (Phase 4). Defaulted off so
+    // existing call sites / tests compile unchanged.
+    showMoveAction: Boolean = false,
+    onMoveClick: () -> Unit = {},
 ) {
     AdaptiveSheetOrDialog(
         onDismiss = onDismiss,
@@ -1782,6 +1916,20 @@ internal fun ItemDetailsSheet(
             )
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+            // ── Move to… row (folder mode only) ──
+            if (showMoveAction) {
+                ItemDetailsSheetRow(
+                    icon = Icons.AutoMirrored.Outlined.DriveFileMove,
+                    iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    title = stringResource(Res.string.folder_move),
+                    subtitle = null,
+                    showChevron = true,
+                    onClick = onMoveClick,
+                )
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            }
 
             Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
 
@@ -2183,6 +2331,223 @@ private fun FillTargetBottomSheet(
     }
 }
 
+/**
+ * Actions sheet for a FOLDER node (opened by long-pressing a [FolderCard]): Reminder, Rename,
+ * Move to…, and Delete. Mirrors the leaf [ItemDetailsSheet] layout (same [ItemDetailsSheetRow] rows
+ * and [AdaptiveSheetOrDialog] container) so folders feel consistent with items.
+ *
+ * The Reminder row reuses the leaf per-item reminder flow end-to-end: tapping it opens the shared
+ * [ReminderSheet] scoped to the folder's fill row (resolved in the ViewModel), so there is no
+ * duplicate reminder UI.
+ *
+ * @param folderName  Current folder name (sheet title).
+ * @param hasReminder Whether the folder currently has an active reminder (drives the row's icon +
+ *                    subtitle, exactly like the leaf reminder row).
+ * @param onReminder  Open the reminder sheet for this folder.
+ * @param onRename    Open the rename dialog.
+ * @param onMove      Open the "Move to…" target sheet for this folder.
+ * @param onDelete    Request a (cascading) folder delete → confirm dialog.
+ */
+@Composable
+private fun FolderActionsSheet(
+    folderName: String,
+    hasReminder: Boolean,
+    onReminder: () -> Unit,
+    onRename: () -> Unit,
+    onMove: () -> Unit,
+    onDelete: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AdaptiveSheetOrDialog(
+        onDismiss = onDismiss,
+        title = { Text(folderName, style = MaterialTheme.typography.titleMedium) },
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
+                .padding(bottom = AppDimens.SpacingXxl)
+        ) {
+            Text(
+                text = folderName,
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = AppDimens.SpacingMd)
+            )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+            // Reminder row — reuses the leaf reminder presentation (Notifications icon + status
+            // subtitle) and the leaf reminder flow underneath.
+            ItemDetailsSheetRow(
+                icon = if (hasReminder) Icons.Filled.Notifications else Icons.Outlined.Notifications,
+                iconTint = if (hasReminder) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                title = stringResource(Res.string.folder_reminder),
+                subtitle = stringResource(
+                    if (hasReminder) Res.string.folder_reminder_active
+                    else Res.string.detail_item_sheet_subtitle_no_reminder
+                ),
+                showChevron = true,
+                onClick = onReminder,
+            )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+            ItemDetailsSheetRow(
+                icon = Icons.Outlined.Edit,
+                iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
+                title = stringResource(Res.string.folder_rename),
+                subtitle = null,
+                showChevron = false,
+                onClick = onRename,
+            )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+            ItemDetailsSheetRow(
+                icon = Icons.AutoMirrored.Outlined.DriveFileMove,
+                iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
+                title = stringResource(Res.string.folder_move),
+                subtitle = null,
+                showChevron = true,
+                onClick = onMove,
+            )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+            Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
+
+            ItemDetailsSheetRow(
+                icon = Icons.Outlined.Delete,
+                iconTint = MaterialTheme.colorScheme.error,
+                title = stringResource(Res.string.folder_delete),
+                subtitle = null,
+                showChevron = false,
+                titleColor = MaterialTheme.colorScheme.error,
+                onClick = onDelete,
+            )
+        }
+    }
+}
+
+/**
+ * Confirm dialog for deleting a folder. The message scales with the cascade size
+ * ([descendantCount]): an empty folder gets a plain prompt; a non-empty one warns how many
+ * nested items will go with it.
+ */
+@Composable
+private fun DeleteFolderConfirmationDialog(
+    descendantCount: Int,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val message = when (descendantCount) {
+        0 -> stringResource(Res.string.folder_delete_message_empty)
+        1 -> stringResource(Res.string.folder_delete_message_one)
+        else -> stringResource(Res.string.folder_delete_message_other, descendantCount)
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(Res.string.folder_delete_title)) },
+        text = { Text(message) },
+        confirmButton = {
+            AppButtonDestructive(
+                text = stringResource(Res.string.delete),
+                onClick = onConfirm,
+            )
+        },
+        dismissButton = {
+            AppButtonText(
+                text = stringResource(Res.string.cancel),
+                onClick = onDismiss,
+            )
+        },
+        containerColor = MaterialTheme.colorScheme.surface,
+        shape = MaterialTheme.shapes.large,
+    )
+}
+
+/**
+ * Confirmation shown before disabling folders on a checklist that still has folder nodes.
+ * Flatten is non-destructive to items (they move to the top level) but removes the folders, so we
+ * warn first. The confirm button is a normal (not destructive) action since the items are kept.
+ */
+@Composable
+private fun DisableFoldersConfirmationDialog(
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(Res.string.folders_disable_title)) },
+        text = { Text(stringResource(Res.string.folders_disable_message)) },
+        confirmButton = {
+            AppButton(
+                text = stringResource(Res.string.folders_disable_confirm),
+                onClick = onConfirm,
+            )
+        },
+        dismissButton = {
+            AppButtonText(
+                text = stringResource(Res.string.folders_disable_cancel),
+                onClick = onDismiss,
+            )
+        },
+        containerColor = MaterialTheme.colorScheme.surface,
+        shape = MaterialTheme.shapes.large,
+    )
+}
+
+/**
+ * Rename dialog for a folder. A thin wrapper around [AppTextField] + Save/Cancel, mirroring
+ * [NoteDialog]. Save is disabled while the trimmed name is blank.
+ */
+@Composable
+private fun RenameFolderDialog(
+    name: String,
+    onNameChanged: (String) -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(Res.string.folder_rename_title)) },
+        text = {
+            AppTextField(
+                value = name,
+                onValueChange = onNameChanged,
+                label = stringResource(Res.string.folder_name_label),
+                placeholder = stringResource(Res.string.folder_name_placeholder),
+                singleLine = true,
+                showClearButton = true,
+            )
+        },
+        confirmButton = {
+            AppButtonText(
+                text = stringResource(Res.string.save),
+                onClick = onConfirm,
+                enabled = name.trim().isNotEmpty(),
+            )
+        },
+        dismissButton = {
+            AppButtonText(
+                text = stringResource(Res.string.cancel),
+                onClick = onDismiss,
+            )
+        },
+        containerColor = MaterialTheme.colorScheme.surface,
+        shape = MaterialTheme.shapes.large,
+    )
+}
+
 @Composable
 private fun FillLimitDialog(
     maxFills: Int,
@@ -2429,6 +2794,10 @@ private fun OverflowMenuSheet(
     separateCompleted: Boolean,
     autoDeleteCompleted: Boolean,
     hasCompletedItems: Boolean,
+    foldersEnabled: Boolean,
+    isWeeklyMode: Boolean,
+    onCreateFolder: () -> Unit,
+    onToggleFoldersEnabled: () -> Unit,
     onDeleteCompletedItems: () -> Unit,
     onToggleAutoDeleteCompleted: () -> Unit,
     onToggleSeparateCompleted: () -> Unit,
@@ -2445,6 +2814,76 @@ private fun OverflowMenuSheet(
                 .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
                 .padding(bottom = AppDimens.SpacingXxl)
         ) {
+            // Folders master toggle. Mutually exclusive with Weekly view: disabled (greyed, with a
+            // hint) while the checklist is in Weekly mode, since both are alternative groupings of
+            // the same flat list.
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(
+                        if (isWeeklyMode) Modifier else Modifier.clickable { onToggleFoldersEnabled() }
+                    )
+                    .padding(vertical = AppDimens.SpacingMd),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Folder,
+                    contentDescription = null,
+                    tint = if (isWeeklyMode) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(AppDimens.SpacingMd))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(Res.string.folders_toggle),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = if (isWeeklyMode) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                        else MaterialTheme.colorScheme.onSurface,
+                    )
+                    if (isWeeklyMode) {
+                        Text(
+                            text = stringResource(Res.string.folders_toggle_weekly_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                AppSwitch(
+                    checked = foldersEnabled,
+                    onCheckedChange = null,
+                    enabled = !isWeeklyMode,
+                )
+            }
+
+            HorizontalDivider()
+
+            // New Folder (folder mode only) — creates a folder at the current drill-down level.
+            if (foldersEnabled) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onCreateFolder() }
+                        .padding(vertical = AppDimens.SpacingMd),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.CreateNewFolder,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(AppDimens.SpacingMd))
+                    Text(
+                        text = stringResource(Res.string.folder_create),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+
+                HorizontalDivider()
+            }
+
             // Delete completed items button
             Row(
                 modifier = Modifier

@@ -642,6 +642,7 @@ class SyncRepositoryImplTest {
         override suspend fun softDelete(id: Long, updatedAt: Long) {}
         override suspend fun setSeparateCompleted(id: Long, value: Boolean) {}
         override suspend fun setAutoDeleteCompleted(id: Long, value: Boolean) {}
+        override suspend fun setFoldersEnabled(id: Long, value: Boolean) {}
         override suspend fun updatePosition(id: Long, position: Int) {}
         override suspend fun incrementAllPositions() {}
         override suspend fun getAllOrderedByPosition(): List<ChecklistEntity> = emptyList()

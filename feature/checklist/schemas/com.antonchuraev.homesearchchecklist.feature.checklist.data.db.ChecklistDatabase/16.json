@@ -1,0 +1,289 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 16,
+    "identityHash": "3bc439f5cab70dfc355dd8852b3fb5d7",
+    "entities": [
+      {
+        "tableName": "checklists",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `items` TEXT NOT NULL, `reminderAt` INTEGER, `repeatRule` TEXT, `repeatTimeOfDayMinutes` INTEGER, `repeatNextAt` INTEGER, `repeatOccurrenceCount` INTEGER NOT NULL, `separateCompleted` INTEGER NOT NULL, `position` INTEGER NOT NULL, `autoDeleteCompleted` INTEGER NOT NULL, `viewMode` TEXT NOT NULL, `foldersEnabled` INTEGER NOT NULL, `cloudId` TEXT, `userId` TEXT, `updatedAt` INTEGER NOT NULL, `syncStatus` INTEGER NOT NULL, `isDeleted` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "items",
+            "columnName": "items",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reminderAt",
+            "columnName": "reminderAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "repeatRule",
+            "columnName": "repeatRule",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "repeatTimeOfDayMinutes",
+            "columnName": "repeatTimeOfDayMinutes",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "repeatNextAt",
+            "columnName": "repeatNextAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "repeatOccurrenceCount",
+            "columnName": "repeatOccurrenceCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "separateCompleted",
+            "columnName": "separateCompleted",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "position",
+            "columnName": "position",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "autoDeleteCompleted",
+            "columnName": "autoDeleteCompleted",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "viewMode",
+            "columnName": "viewMode",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "foldersEnabled",
+            "columnName": "foldersEnabled",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cloudId",
+            "columnName": "cloudId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "userId",
+            "columnName": "userId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncStatus",
+            "columnName": "syncStatus",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isDeleted",
+            "columnName": "isDeleted",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "checklist_fills",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `checklistId` INTEGER NOT NULL, `name` TEXT NOT NULL, `coverImagePath` TEXT, `items` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `isDefault` INTEGER NOT NULL, `cloudId` TEXT, `userId` TEXT, `updatedAt` INTEGER NOT NULL, `syncStatus` INTEGER NOT NULL, `isDeleted` INTEGER NOT NULL, FOREIGN KEY(`checklistId`) REFERENCES `checklists`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "checklistId",
+            "columnName": "checklistId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "coverImagePath",
+            "columnName": "coverImagePath",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "items",
+            "columnName": "items",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isDefault",
+            "columnName": "isDefault",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cloudId",
+            "columnName": "cloudId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "userId",
+            "columnName": "userId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncStatus",
+            "columnName": "syncStatus",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isDeleted",
+            "columnName": "isDeleted",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_checklist_fills_checklistId",
+            "unique": false,
+            "columnNames": [
+              "checklistId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_checklist_fills_checklistId` ON `${TABLE_NAME}` (`checklistId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "checklists",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "checklistId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "ai_chat_history",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `role` TEXT NOT NULL, `content` TEXT NOT NULL, `timestamp` INTEGER NOT NULL, `costCredits` INTEGER NOT NULL, `routedLayer` TEXT, `linkedChecklistId` INTEGER, `attachmentsJson` TEXT, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "role",
+            "columnName": "role",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "content",
+            "columnName": "content",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timestamp",
+            "columnName": "timestamp",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "costCredits",
+            "columnName": "costCredits",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "routedLayer",
+            "columnName": "routedLayer",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "linkedChecklistId",
+            "columnName": "linkedChecklistId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "attachmentsJson",
+            "columnName": "attachmentsJson",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '3bc439f5cab70dfc355dd8852b3fb5d7')"
+    ]
+  }
+}
