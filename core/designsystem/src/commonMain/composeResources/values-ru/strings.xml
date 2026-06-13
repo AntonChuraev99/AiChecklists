@@ -477,7 +477,6 @@
     <string name="csat_love_it">Обожаю!</string>
     <string name="csat_whats_the_problem">В чём главная проблема?</string>
     <string name="csat_what_could_be_better">Что можно улучшить?</string>
-    <string name="csat_what_do_you_like">Что нравится больше всего?</string>
     <!-- Чипы «Не нравится» -->
     <string name="csat_chip_buggy">Баги</string>
     <string name="csat_chip_slow">Медленно</string>
@@ -490,18 +489,8 @@
     <string name="csat_chip_faster">Быстрее</string>
     <string name="csat_chip_more_templates">Больше шаблонов</string>
     <string name="csat_chip_better_ai">Лучший ИИ</string>
-    <!-- Позитивные чипы -->
-    <string name="csat_chip_ai_quality">Качество ИИ</string>
-    <string name="csat_chip_templates">Шаблоны</string>
-    <string name="csat_chip_nice_design">Приятный дизайн</string>
-    <string name="csat_chip_easy_export">Удобный экспорт</string>
-    <string name="csat_chip_easy_to_use">Легко пользоваться</string>
     <string name="csat_feedback_placeholder">Поделитесь мыслями…</string>
     <string name="csat_submit">Отправить</string>
-    <string name="csat_thank_you_title">Спасибо за отзыв!</string>
-    <string name="csat_thank_you_description">Не могли бы вы оставить оценку?\nЭто очень нам поможет!</string>
-    <string name="csat_rate_button">Оценить в Google Play</string>
-    <string name="csat_maybe_later">Позже</string>
 
     <!-- Напоминания -->
     <string name="reminder_set_reminder">Установить напоминание</string>

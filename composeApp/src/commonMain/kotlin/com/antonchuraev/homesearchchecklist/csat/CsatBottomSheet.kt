@@ -1,31 +1,21 @@
 package com.antonchuraev.homesearchchecklist.csat
 
 import aichecklists.core.designsystem.generated.resources.Res
-import aichecklists.core.designsystem.generated.resources.csat_chip_ai_quality
 import aichecklists.core.designsystem.generated.resources.csat_chip_better_ai
 import aichecklists.core.designsystem.generated.resources.csat_chip_better_design
 import aichecklists.core.designsystem.generated.resources.csat_chip_buggy
-import aichecklists.core.designsystem.generated.resources.csat_chip_easy_export
-import aichecklists.core.designsystem.generated.resources.csat_chip_easy_to_use
 import aichecklists.core.designsystem.generated.resources.csat_chip_faster
 import aichecklists.core.designsystem.generated.resources.csat_chip_hard_to_use
 import aichecklists.core.designsystem.generated.resources.csat_chip_inaccurate_ai
 import aichecklists.core.designsystem.generated.resources.csat_chip_more_features
 import aichecklists.core.designsystem.generated.resources.csat_chip_more_templates
-import aichecklists.core.designsystem.generated.resources.csat_chip_nice_design
 import aichecklists.core.designsystem.generated.resources.csat_chip_slow
-import aichecklists.core.designsystem.generated.resources.csat_chip_templates
 import aichecklists.core.designsystem.generated.resources.csat_chip_too_expensive
 import aichecklists.core.designsystem.generated.resources.csat_love_it
-import aichecklists.core.designsystem.generated.resources.csat_maybe_later
 import aichecklists.core.designsystem.generated.resources.csat_not_good
 import aichecklists.core.designsystem.generated.resources.csat_okay
-import aichecklists.core.designsystem.generated.resources.csat_rate_button
-import aichecklists.core.designsystem.generated.resources.csat_thank_you_description
-import aichecklists.core.designsystem.generated.resources.csat_thank_you_title
 import aichecklists.core.designsystem.generated.resources.csat_title
 import aichecklists.core.designsystem.generated.resources.csat_what_could_be_better
-import aichecklists.core.designsystem.generated.resources.csat_what_do_you_like
 import aichecklists.core.designsystem.generated.resources.csat_whats_the_problem
 import aichecklists.core.designsystem.generated.resources.feedback_only_description
 import aichecklists.core.designsystem.generated.resources.feedback_only_title
@@ -66,8 +56,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
-import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonText
 import com.antonchuraev.homesearchchecklist.desingsystem.emoji.LocalEmojiFont
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import org.jetbrains.compose.resources.StringResource
@@ -155,24 +143,6 @@ fun CsatBottomSheet(
                                 onSubmit = { onIntent(CsatIntent.Submit) },
                             )
                         }
-
-                        ContentState.PositiveFeedback -> {
-                            PositiveFeedbackContent(
-                                chips = FeedbackChip.positiveChips,
-                                selectedChips = state.selectedChips,
-                                feedbackText = state.feedbackText,
-                                onToggleChip = { onIntent(CsatIntent.ToggleChip(it)) },
-                                onTextChange = { onIntent(CsatIntent.UpdateText(it)) },
-                                onSubmit = { onIntent(CsatIntent.Submit) },
-                            )
-                        }
-
-                        ContentState.ThankYou -> {
-                            ThankYouContent(
-                                onRate = { onIntent(CsatIntent.LaunchReview) },
-                                onSkip = { onIntent(CsatIntent.SkipReview) },
-                            )
-                        }
                     }
                 }
             }
@@ -182,15 +152,14 @@ fun CsatBottomSheet(
 
 /** Discrete content states for AnimatedContent transitions. */
 private enum class ContentState {
-    Empty, NotGoodFeedback, OkayFeedback, PositiveFeedback, ThankYou;
+    Empty, NotGoodFeedback, OkayFeedback;
 
     companion object {
-        fun from(state: CsatState): ContentState = when {
-            state.selectedRating == null -> Empty
-            state.selectedRating == CsatRating.LoveIt && state.isSubmitted -> ThankYou
-            state.selectedRating == CsatRating.LoveIt -> PositiveFeedback
-            state.selectedRating == CsatRating.Okay -> OkayFeedback
-            else -> NotGoodFeedback
+        fun from(state: CsatState): ContentState = when (state.selectedRating) {
+            CsatRating.NotGood -> NotGoodFeedback
+            CsatRating.Okay -> OkayFeedback
+            // null = nothing picked yet; LoveIt closes the sheet instantly, so it never renders here.
+            null, CsatRating.LoveIt -> Empty
         }
     }
 }
@@ -384,88 +353,6 @@ private fun NegativeFeedbackContent(
     }
 }
 
-@Composable
-private fun PositiveFeedbackContent(
-    chips: List<FeedbackChip>,
-    selectedChips: Set<FeedbackChip>,
-    feedbackText: String,
-    onToggleChip: (FeedbackChip) -> Unit,
-    onTextChange: (String) -> Unit,
-    onSubmit: () -> Unit,
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        FeedbackChipsRow(
-            title = stringResource(Res.string.csat_what_do_you_like),
-            chips = chips,
-            selectedChips = selectedChips,
-            onToggleChip = onToggleChip,
-        )
-
-        Spacer(Modifier.height(AppDimens.SpacingMd))
-
-        FeedbackInputSection(
-            value = feedbackText,
-            onValueChange = onTextChange,
-            onSubmitClick = onSubmit,
-            submitEnabled = true,
-        )
-    }
-}
-
-@Composable
-private fun ThankYouContent(
-    onRate: () -> Unit,
-    onSkip: () -> Unit,
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            text = "✅",
-            fontFamily = LocalEmojiFont.current,
-            fontSize = 40.sp,
-        )
-
-        Spacer(Modifier.height(AppDimens.SpacingSm))
-
-        Text(
-            text = stringResource(Res.string.csat_thank_you_title),
-            style = MaterialTheme.typography.titleMedium,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        Spacer(Modifier.height(AppDimens.SpacingSm))
-
-        Text(
-            text = stringResource(Res.string.csat_thank_you_description),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        Spacer(Modifier.height(AppDimens.SpacingXl))
-
-        AppButton(
-            text = stringResource(Res.string.csat_rate_button),
-            onClick = onRate,
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        Spacer(Modifier.height(AppDimens.SpacingSm))
-
-        AppButtonText(
-            text = stringResource(Res.string.csat_maybe_later),
-            onClick = onSkip,
-        )
-    }
-}
-
 /** Maps each [FeedbackChip] to its localized string resource. */
 private val FeedbackChip.labelRes: StringResource
     get() = when (this) {
@@ -481,10 +368,4 @@ private val FeedbackChip.labelRes: StringResource
         FeedbackChip.Faster -> Res.string.csat_chip_faster
         FeedbackChip.MoreTemplates -> Res.string.csat_chip_more_templates
         FeedbackChip.BetterAi -> Res.string.csat_chip_better_ai
-        // Positive
-        FeedbackChip.AiQuality -> Res.string.csat_chip_ai_quality
-        FeedbackChip.Templates -> Res.string.csat_chip_templates
-        FeedbackChip.NiceDesign -> Res.string.csat_chip_nice_design
-        FeedbackChip.EasyExport -> Res.string.csat_chip_easy_export
-        FeedbackChip.EasyToUse -> Res.string.csat_chip_easy_to_use
     }

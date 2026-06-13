@@ -23,15 +23,11 @@ enum class FeedbackChip {
 
     // Okay chips — room for improvement
     MoreFeatures, BetterDesign, Faster, MoreTemplates, BetterAi,
-
-    // Positive chips — what users love
-    AiQuality, Templates, NiceDesign, EasyExport, EasyToUse,
     ;
 
     companion object {
         val notGoodChips = listOf(Buggy, Slow, HardToUse, InaccurateAi, TooExpensive)
         val okayChips = listOf(MoreFeatures, BetterDesign, Faster, MoreTemplates, BetterAi)
-        val positiveChips = listOf(AiQuality, Templates, NiceDesign, EasyExport, EasyToUse)
     }
 }
 
@@ -40,7 +36,6 @@ data class CsatState(
     val selectedRating: CsatRating? = null,
     val selectedChips: Set<FeedbackChip> = emptySet(),
     val feedbackText: String = "",
-    val isSubmitted: Boolean = false,
     val isSubmitting: Boolean = false,
     val shouldLaunchReview: Boolean = false,
     val isFeedbackOnly: Boolean = false,
@@ -52,8 +47,6 @@ sealed interface CsatIntent : Intent {
     data class ToggleChip(val chip: FeedbackChip) : CsatIntent
     data class UpdateText(val text: String) : CsatIntent
     data object Submit : CsatIntent
-    data object LaunchReview : CsatIntent
-    data object SkipReview : CsatIntent
     data object Dismiss : CsatIntent
     data object ReviewComplete : CsatIntent
     data object ForceShow : CsatIntent
@@ -102,11 +95,6 @@ class CsatViewModel(
             is CsatIntent.ToggleChip -> handleToggleChip(intent.chip)
             is CsatIntent.UpdateText -> handleUpdateText(intent.text)
             CsatIntent.Submit -> handleSubmit()
-            CsatIntent.LaunchReview -> handleLaunchReview()
-            CsatIntent.SkipReview -> {
-                analyticsTracker.event(AnalyticsEvents.Csat.REVIEW_SKIPPED)
-                handleClose()
-            }
             CsatIntent.Dismiss -> handleDismiss()
             CsatIntent.ReviewComplete -> handleReviewComplete()
             CsatIntent.ForceShow -> handleForceShow()
@@ -132,12 +120,32 @@ class CsatViewModel(
 
     private fun handleSelectRating(rating: CsatRating) {
         analyticsTracker.event(AnalyticsEvents.Csat.RATING_SELECTED, mapOf(AnalyticsParams.RATING to rating.name))
+
+        // "Love It!" → launch the native Play in-app review immediately and close the
+        // survey; the thanks snackbar fires on review completion (handleReviewComplete).
+        // Auto-launching review on positive sentiment is sentiment-gating, which Google
+        // Play discourages — done deliberately per product decision (2026-06-13). See
+        // docs/active/csat-loveit-direct-review-2026-06-13.md.
+        if (rating == CsatRating.LoveIt) {
+            analyticsTracker.event(AnalyticsEvents.Csat.REVIEW_TAPPED)
+            viewModelScope.launch {
+                csatManager.recordOutcome(CsatManager.OUTCOME_SUBMITTED)
+            }
+            _screenState.update {
+                it.copy(
+                    selectedRating = rating,
+                    showBottomSheet = false,
+                    shouldLaunchReview = true,
+                )
+            }
+            return
+        }
+
         _screenState.update {
             it.copy(
                 selectedRating = rating,
                 selectedChips = emptySet(),
                 feedbackText = "",
-                isSubmitted = false,
             )
         }
     }
@@ -198,25 +206,15 @@ class CsatViewModel(
             csatManager.recordOutcome(CsatManager.OUTCOME_SUBMITTED)
         }
 
-        when (rating) {
-            CsatRating.LoveIt -> {
-                _screenState.update { it.copy(isSubmitted = true) }
-            }
-            else -> {
-                _screenState.update { it.copy(showFeedbackThanks = true) }
-                handleClose()
-            }
-        }
-    }
-
-    private fun handleLaunchReview() {
-        analyticsTracker.event(AnalyticsEvents.Csat.REVIEW_TAPPED)
-        _screenState.update { it.copy(shouldLaunchReview = true) }
+        // Only NotGood / Okay reach Submit now — LoveIt launches review on selection.
+        _screenState.update { it.copy(showFeedbackThanks = true) }
+        handleClose()
     }
 
     private fun handleReviewComplete() {
+        // Review flow finished (shown, dismissed, or quota-exceeded) → thank the user.
         _screenState.update {
-            it.copy(shouldLaunchReview = false, showBottomSheet = false)
+            it.copy(shouldLaunchReview = false, showBottomSheet = false, showFeedbackThanks = true)
         }
         resetState()
     }
@@ -241,7 +239,6 @@ class CsatViewModel(
                 selectedRating = null,
                 selectedChips = emptySet(),
                 feedbackText = "",
-                isSubmitted = false,
                 isSubmitting = false,
                 shouldLaunchReview = false,
                 isFeedbackOnly = false,

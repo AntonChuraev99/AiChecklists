@@ -16,6 +16,7 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -91,7 +92,6 @@ class CsatViewModelTest {
 
         val state = vm.screenState.value
         assertFalse(state.showBottomSheet, "Expected showBottomSheet = false after submit")
-        assertFalse(state.isSubmitted, "Expected isSubmitted = false — no ThankYou step")
         assertFalse(state.isFeedbackOnly, "Expected isFeedbackOnly reset to false after close")
         assertTrue(state.showFeedbackThanks, "Expected showFeedbackThanks = true for snackbar trigger")
         assertTrue(
@@ -118,12 +118,48 @@ class CsatViewModelTest {
 
         val state = vm.screenState.value
         assertFalse(state.showBottomSheet, "Sheet must close after Negative submit")
-        assertFalse(state.isSubmitted, "ThankYou step must NOT show for Negative")
         assertTrue(state.showFeedbackThanks, "Snackbar flag must be true for Negative submit")
         assertTrue(
             fakeAnalyticsTracker.hasEvent("csat_submitted"),
             "csat_submitted must still be tracked for rating flow",
         )
+    }
+
+    // --- Selecting "Love It!" launches the in-app review immediately ---
+
+    @Test
+    fun selectLoveIt_closesSheetAndLaunchesReview() = runTest {
+        val vm = createViewModel()
+
+        vm.onIntent(CsatIntent.ForceShow)
+        vm.onIntent(CsatIntent.SelectRating(CsatRating.LoveIt))
+        advanceUntilIdle()
+
+        val state = vm.screenState.value
+        assertFalse(state.showBottomSheet, "Sheet must close immediately on Love It! selection")
+        assertTrue(state.shouldLaunchReview, "Love It! must trigger the in-app review launcher")
+        assertFalse(state.showFeedbackThanks, "Thanks snackbar must wait until review completes")
+        assertTrue(
+            fakeAnalyticsTracker.hasEvent("csat_review_tapped"),
+            "Expected csat_review_tapped analytics event on Love It!",
+        )
+    }
+
+    // --- Review completion thanks the user and resets state ---
+
+    @Test
+    fun reviewComplete_afterLoveIt_showsThanksAndResets() = runTest {
+        val vm = createViewModel()
+
+        vm.onIntent(CsatIntent.ForceShow)
+        vm.onIntent(CsatIntent.SelectRating(CsatRating.LoveIt))
+        vm.onIntent(CsatIntent.ReviewComplete)
+        advanceUntilIdle()
+
+        val state = vm.screenState.value
+        assertFalse(state.shouldLaunchReview, "shouldLaunchReview must reset after review completes")
+        assertTrue(state.showFeedbackThanks, "Thanks snackbar flag must be set on review completion")
+        assertNull(state.selectedRating, "Rating must reset after review completes")
     }
 
     // --- FeedbackThanksShown clears the snackbar trigger ---
