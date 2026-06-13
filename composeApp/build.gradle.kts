@@ -70,6 +70,9 @@ kotlin {
             // Google Play In-App Review — needed for InAppReviewLauncher.android.kt actual
             implementation(libs.play.review.ktx)
 
+            // Google Play In-App Updates — needed for AppUpdateController + AppUpdateLauncher.android.kt actual
+            implementation(libs.play.app.update.ktx)
+
             // Amplitude Analytics — needed for Analytics.kt (actual platform code)
             implementation(libs.amplitude.analytics)
             implementation(libs.play.services.appset)

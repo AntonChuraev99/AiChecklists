@@ -35,6 +35,7 @@ googleServices = "4.4.4"
 firebaseBom = "34.13.0"
 firebaseCrashlytics = "3.0.7"
 playReview = "2.0.2"
+appUpdate = "2.1.0"
 kotlinxDatetime = "0.8.0"
 kotlinxDatetimeWasm = "0.8.0"
 amplitude = "1.22.4"
@@ -119,6 +120,9 @@ ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
 
 # Google Play In-App Review
 play-review-ktx = { module = "com.google.android.play:review-ktx", version.ref = "playReview" }
+
+# Google Play In-App Updates
+play-app-update-ktx = { module = "com.google.android.play:app-update-ktx", version.ref = "appUpdate" }
 
 # Kotlinx Datetime
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinxDatetime" }

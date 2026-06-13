@@ -3,6 +3,7 @@ package com.antonchuraev.homesearchchecklist.di
 import com.antonchuraev.homesearchchecklist.Analytics
 import com.antonchuraev.homesearchchecklist.AppBuildConfig
 import com.antonchuraev.homesearchchecklist.CrashlyticsAppLogger
+import com.antonchuraev.homesearchchecklist.appupdate.AppUpdateController
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppContextHolder
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
@@ -57,4 +58,8 @@ actual fun platformModule(): Module = module {
     // the re-engagement campaign. Resolved by GistiFirebaseMessagingService (onNewToken)
     // and GistiApplication (app-start registration) via GlobalContext.
     single<PushTokenRepository> { PushTokenRepositoryAndroid(get(), get()) }
+
+    // Google Play in-app update controller (Android-only). Observed by AppUpdateLauncher;
+    // get() resolves Context (AppContextHolder.context), AppLogger and AnalyticsTracker above.
+    single { AppUpdateController(get(), get(), get()) }
 }

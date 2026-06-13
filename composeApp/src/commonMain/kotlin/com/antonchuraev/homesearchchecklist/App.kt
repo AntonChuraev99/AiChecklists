@@ -15,6 +15,7 @@ import com.antonchuraev.homesearchchecklist.csat.CsatBottomSheet
 import com.antonchuraev.homesearchchecklist.csat.CsatIntent
 import com.antonchuraev.homesearchchecklist.csat.CsatViewModel
 import com.antonchuraev.homesearchchecklist.csat.InAppReviewLauncher
+import com.antonchuraev.homesearchchecklist.appupdate.AppUpdateLauncher
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppLanguage
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppThemeMode
 import com.antonchuraev.homesearchchecklist.core.datastore.api.LanguageRepository
@@ -1217,6 +1218,11 @@ fun App() {
                 shouldLaunch = csatState.shouldLaunchReview,
                 onComplete = { csatViewModel.sendIntent(CsatIntent.ReviewComplete) },
             )
+
+            // In-App Update launcher — side-effect composable, no UI. Android-only (no-op on
+            // web/iOS): checks Google Play on cold start + resume and shows the restart snackbar
+            // through the shared snackbarHostState when a flexible update has downloaded.
+            AppUpdateLauncher(snackbarHostState = snackbarHostState)
             } // AppLocaleEnvironment
         } // AppTheme
         } // CompositionLocalProvider(LocalEmojiFont)

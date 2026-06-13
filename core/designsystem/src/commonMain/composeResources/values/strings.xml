@@ -1215,4 +1215,8 @@
     <string name="fill_checklist_picker_title">Choose checklist to fill</string>
     <string name="fill_checklist_picker_subtitle">Pick a checklist and AI will fill it from the selected text</string>
     <string name="fill_checklist_picker_empty_description">Create a checklist first, then AI can fill it from your text.</string>
+
+    <!-- In-app update (Google Play flexible update — restart snackbar) -->
+    <string name="app_update_downloaded_message">Update downloaded</string>
+    <string name="app_update_downloaded_restart">Restart</string>
 </resources>
