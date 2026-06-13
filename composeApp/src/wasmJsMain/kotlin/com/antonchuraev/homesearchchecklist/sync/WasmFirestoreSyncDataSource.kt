@@ -15,6 +15,8 @@ import kotlinx.coroutines.await
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 
 @JsFun("(collectionPath, docId, dataJson) => globalThis.__firestoreSetDoc(collectionPath, docId, dataJson)")
 private external fun jsFirestoreSetDoc(collectionPath: String, docId: String, dataJson: String): Promise<JsAny?>
@@ -24,6 +26,9 @@ private external fun jsFirestoreGetDoc(collectionPath: String, docId: String): P
 
 @JsFun("(collectionPath) => globalThis.__firestoreGetDocs(collectionPath)")
 private external fun jsFirestoreGetDocs(collectionPath: String): Promise<JsAny?>
+
+@JsFun("(collectionPath, field, value) => globalThis.__firestoreQueryByField(collectionPath, field, value)")
+private external fun jsFirestoreQueryByField(collectionPath: String, field: String, value: String): Promise<JsAny?>
 
 @JsFun("(collectionPath, docId) => globalThis.__firestoreDeleteDoc(collectionPath, docId)")
 private external fun jsFirestoreDeleteDoc(collectionPath: String, docId: String): Promise<JsAny?>
@@ -241,15 +246,22 @@ internal class WasmFirestoreSyncDataSource : FirestoreSyncDataSource {
     }
 
     /**
-     * Web register + Google-link happen on the SAME device, so the web client's own doc
-     * IS the canonical `google_uid` doc — it never needs to converge AWAY from it. Returning
-     * null (no convergence) is therefore correct on web today. A real query bridge
-     * (`__firestoreQueryByField`) is only needed for the symmetric edge case of a future web
-     * device that registered a fresh doc after another device already became canonical.
-     * Pending: docs/todos/2026-06-13-wasm-credit-convergence-query-bridge.md
+     * Resolves the canonical credit-doc id by querying `users` for the doc whose `google_uid`
+     * equals [googleUid]. Lets a diverged web session (logged in on an old build → stranded on
+     * its own 0-credit device-id doc, no google_email) self-heal onto the shared Google-linked
+     * doc — the same convergence the Android client does. Returns null when no linked doc exists.
      */
     override suspend fun findUserIdByGoogleUid(googleUid: String): AppResult<String?> =
-        AppResult.Success(null)
+        runCatching {
+            val response = jsFirestoreQueryByField("users", "google_uid", googleUid)
+                .awaitAsString() ?: return AppResult.Error(Exception("Null response"))
+            val resp = jsonParser.decodeFromString(JsResponse.serializer(), response)
+            if (resp.ok) {
+                AppResult.Success(resp.data?.jsonPrimitive?.contentOrNull)
+            } else {
+                AppResult.Error(Exception(resp.error ?: "google_uid query failed"))
+            }
+        }.getOrElse { AppResult.Error(Exception(it.message ?: "findUserIdByGoogleUid failed")) }
 }
 
 @Serializable

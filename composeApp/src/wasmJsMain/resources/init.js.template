@@ -701,6 +701,23 @@ globalThis.__firestoreGetDocs = async (collectionPath) => {
     }
 };
 
+// Find the id of the first document in a collection whose `field` equals `value`.
+// Used by self-healing credit convergence to resolve the canonical google_uid doc.
+// Returns: JSON string {ok: true, data: "<docId>"} | {ok: true, data: null} | {ok: false, error: "..."}
+globalThis.__firestoreQueryByField = async (collectionPath, field, value) => {
+    try {
+        const ref = collection(firestoreDb, collectionPath);
+        const q = query(ref, where(field, '==', value));
+        const snap = await getDocs(q);
+        let foundId = null;
+        snap.forEach((d) => { if (foundId === null) foundId = d.id; });
+        return JSON.stringify({ ok: true, data: foundId });
+    } catch (err) {
+        console.error('[Firestore] __firestoreQueryByField error:', err);
+        return JSON.stringify({ ok: false, error: err?.message ?? String(err) });
+    }
+};
+
 // Delete a single document.
 // Returns: JSON string {ok: true} | {ok: false, error: "..."}
 globalThis.__firestoreDeleteDoc = async (collectionPath, docId) => {
