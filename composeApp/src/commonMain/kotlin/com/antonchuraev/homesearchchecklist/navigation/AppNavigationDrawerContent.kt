@@ -40,6 +40,8 @@ import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.font.FontWeight
@@ -54,7 +56,6 @@ import com.antonchuraev.homesearchchecklist.feature.paywall.data.PaywallConfig
 import com.antonchuraev.homesearchchecklist.feature.user.data.device.getPlatformName
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.calendar_nav_label
-import aichecklists.core.designsystem.generated.resources.ic_google_play
 import aichecklists.core.designsystem.generated.resources.drawer_promo_android_bottom
 import aichecklists.core.designsystem.generated.resources.drawer_promo_android_cd
 import aichecklists.core.designsystem.generated.resources.drawer_promo_android_top
@@ -80,7 +81,7 @@ import aichecklists.core.designsystem.generated.resources.paywall_privacy
 import aichecklists.core.designsystem.generated.resources.paywall_terms
 import aichecklists.core.designsystem.generated.resources.settings_title
 import aichecklists.core.designsystem.generated.resources.update_feed_menu_item
-import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -376,12 +377,15 @@ private fun DrawerStorePromoBadge(
 ) {
     val isWeb = platformName == "web"
     val targetUrl = if (isWeb) GOOGLE_PLAY_URL else WEB_APP_URL
-    val topLine = stringResource(
-        if (isWeb) Res.string.drawer_promo_android_top else Res.string.drawer_promo_web_top
-    )
-    val bottomLine = stringResource(
-        if (isWeb) Res.string.drawer_promo_android_bottom else Res.string.drawer_promo_web_bottom
-    )
+    val topRes = if (isWeb) Res.string.drawer_promo_android_top else Res.string.drawer_promo_web_top
+    val bottomRes = if (isWeb) Res.string.drawer_promo_android_bottom else Res.string.drawer_promo_web_bottom
+    // stringResource resolves async on wasmJs. These promo strings are first requested
+    // only when the drawer opens, so the first composition can land before the value
+    // loads — and it didn't recompose until an unrelated invalidation (window resize),
+    // leaving the label blank. produceState + the suspend getString forces a recomposition
+    // the moment the value arrives, so the label appears on first open.
+    val topLine by produceState("", topRes) { value = getString(topRes) }
+    val bottomLine by produceState("", bottomRes) { value = getString(bottomRes) }
     val cd = stringResource(
         if (isWeb) Res.string.drawer_promo_android_cd else Res.string.drawer_promo_web_cd
     )
@@ -404,11 +408,12 @@ private fun DrawerStorePromoBadge(
             .padding(horizontal = AppDimens.SpacingLg, vertical = AppDimens.SpacingMd),
     ) {
         if (isWeb) {
-            // Official multi-color Google Play glyph: Image, NOT Icon (Icon would
-            // flatten it to a single tint). contentDescription is null — the badge
+            // Official multi-color Google Play glyph as a code-built ImageVector
+            // (see GooglePlayLogo) — NOT the XML drawable, whose runtime parser
+            // renders blank on wasmJs/Skiko. contentDescription is null — the badge
             // Row already owns the semantic label.
             Image(
-                painter = painterResource(Res.drawable.ic_google_play),
+                imageVector = GooglePlayLogo,
                 contentDescription = null,
                 modifier = Modifier.size(22.dp),
             )

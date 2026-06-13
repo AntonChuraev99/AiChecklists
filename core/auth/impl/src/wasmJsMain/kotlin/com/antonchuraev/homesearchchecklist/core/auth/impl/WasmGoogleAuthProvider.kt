@@ -13,6 +13,18 @@ import kotlinx.coroutines.flow.asStateFlow
 @JsFun("() => globalThis.__googleSignIn()")
 private external fun signInWithGooglePromise(): Promise<JsAny>
 
+// Mobile-web flag set in init.js. On mobile, __googleSignIn initiates a
+// full-page redirect (signInWithRedirect) instead of a popup — the page
+// unloads, so signIn() must NOT await a result or emit an error state.
+@JsFun("() => !!globalThis.__isMobileWeb")
+private external fun isMobileWeb(): Boolean
+
+// Fire-and-forget redirect kickoff. We deliberately don't await the returned
+// promise: on success the page navigates to Google before it settles. The
+// .catch keeps a failed kickoff from surfacing as an unhandled rejection.
+@JsFun("() => { try { globalThis.__googleSignIn().catch(function(){}); } catch (e) {} }")
+private external fun startGoogleRedirect()
+
 @JsFun("() => globalThis.__getCurrentFirebaseUser()")
 private external fun getCurrentUserPromise(): Promise<JsAny?>
 
@@ -83,6 +95,20 @@ internal class WasmGoogleAuthProvider : AuthProvider {
 
     override suspend fun signIn(): Result<GoogleUser> {
         _authState.value = GoogleAuthState.Loading
+
+        // Mobile web: signInWithRedirect navigates the page to Google. We can't
+        // await a result (the page unloads) and must NOT flip authState to Error.
+        // After the user returns, init.js's getRedirectResult consumes the token,
+        // onAuthStateChanged fires, and restoreSession() (via __authReadyPromise)
+        // sets authState=Authenticated. Leave authState=Loading and kick off the
+        // redirect. The returned failure is informational only — the page reloads
+        // before any caller continuation runs.
+        if (isMobileWeb()) {
+            authDiagLog("signIn: mobile web -> signInWithRedirect (page will navigate; authState stays Loading)")
+            startGoogleRedirect()
+            return Result.failure(IllegalStateException("redirect-in-progress"))
+        }
+
         authDiagLog("signIn: calling globalThis.__googleSignIn() (signInWithPopup)...")
         return runCatching {
             val result: JsAny = signInWithGooglePromise().await()

@@ -5,7 +5,7 @@
 //
 // Add these keys to local.properties to enable Firebase RC:
 //   FIREBASE_WEB_API_KEY=<from Firebase Console → Project Settings → Web app>
-//   FIREBASE_WEB_AUTH_DOMAIN=aichecklists-40230.firebaseapp.com
+//   FIREBASE_WEB_AUTH_DOMAIN=gisti-ai.com   (prod: site's own origin; /__/auth/ is reverse-proxied to Firebase in src/redirect.js. Localhost Google-auth testing: aichecklists-40230.firebaseapp.com)
 //   FIREBASE_WEB_PROJECT_ID=aichecklists-40230
 //   FIREBASE_WEB_STORAGE_BUCKET=aichecklists-40230.firebasestorage.app
 //   FIREBASE_WEB_MESSAGING_SENDER_ID=27698629989
@@ -22,6 +22,8 @@ import { getFunctions, httpsCallable }
 import {
     getAuth,
     signInWithPopup,
+    signInWithRedirect,
+    getRedirectResult,
     signInAnonymously,
     GoogleAuthProvider as JsGoogleAuthProvider,
     onAuthStateChanged,
@@ -185,8 +187,35 @@ globalThis.__functionsCall = async (name, dataJson) => {
 const auth = getAuth(app);
 const googleProvider = new JsGoogleAuthProvider();
 
-globalThis.__googleSignIn = () =>
-    signInWithPopup(auth, googleProvider).then(async (result) => {
+// Mobile-web detection. On mobile browsers signInWithPopup is unreliable:
+// the OAuth tab takes over and the original tab loses its opener link, so
+// Firebase's popup.ts returns auth/popup-closed-by-user before the credential
+// exchange completes. signInWithRedirect is Firebase's official mobile
+// recommendation (https://firebase.google.com/docs/auth/web/redirect-best-practices).
+// Desktop keeps the popup path unchanged. Exposed on globalThis so the Kotlin
+// provider can branch (avoid awaiting a promise that never resolves on the
+// redirect path — the page unloads mid-flow).
+const __isMobileWeb = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+globalThis.__isMobileWeb = __isMobileWeb;
+
+// Mobile: signInWithRedirect navigates the page to Google. The returned promise
+//   does NOT resolve with a usable result here (the page unloads); the UI must
+//   not await it. After the user returns, getRedirectResult (below) consumes the
+//   pending credential and onAuthStateChanged fires with the signed-in user.
+// Desktop: unchanged signInWithPopup path returning {ok,uid,...}.
+globalThis.__googleSignIn = () => {
+    if (__isMobileWeb) {
+        // Returns a promise that typically rejects only if the redirect cannot
+        // be initiated; on success the page navigates away before it settles.
+        return signInWithRedirect(auth, googleProvider)
+            .then(() => ({ ok: true, redirect: true, uid: '', email: '', displayName: '', photoURL: '', idToken: '' }))
+            .catch((error) => ({
+                ok: false, redirect: true,
+                uid: '', email: '', displayName: '', photoURL: '', idToken: '',
+                error: error.code + ': ' + error.message,
+            }));
+    }
+    return signInWithPopup(auth, googleProvider).then(async (result) => {
         const user = result.user;
         const idToken = await user.getIdToken();
         return {
@@ -202,6 +231,7 @@ globalThis.__googleSignIn = () =>
         uid: '', email: '', displayName: '', photoURL: '', idToken: '',
         error: error.code + ': ' + error.message,
     }));
+};
 
 // Anonymous sign-in — for Playwright E2E tests (no Google popup needed).
 // Returns {ok, uid, idToken} or {ok: false, error}.
@@ -250,6 +280,38 @@ globalThis.__authReadyPromise = new Promise((resolve) => {
         }
     });
 });
+
+// === Redirect-return consumer (mobile Google sign-in) ===
+// After signInWithRedirect, Firebase needs getRedirectResult() to be called
+// once on the returning page load — otherwise the redirect token sits in the
+// URL and never makes it into the auth state. We only care about the side
+// effect of credential exchange; onAuthStateChanged above then emits the
+// signed-in user (the Kotlin restoreSession() picks it up from __authReadyPromise).
+//
+// Fire-and-forget (does NOT block __authReadyPromise): onAuthStateChanged
+// resolves independently. Wrapped in Promise.race with a 5s timeout as a
+// safety net — even though authDomain is same-origin (gisti-ai.com, /__/auth/*
+// is reverse-proxied), getRedirectResult can hang the splash forever on a
+// slow/blocked network; the timeout lets the app proceed regardless.
+const __GET_REDIRECT_RESULT_TIMEOUT_MS = 5000;
+(async () => {
+    const timeoutPromise = new Promise((resolve) => setTimeout(() => {
+        console.warn('[AuthRedirect] getRedirectResult timed out after ' +
+            __GET_REDIRECT_RESULT_TIMEOUT_MS + ' ms — proceeding without redirect token');
+        resolve(null);
+    }, __GET_REDIRECT_RESULT_TIMEOUT_MS));
+    try {
+        const result = await Promise.race([getRedirectResult(auth), timeoutPromise]);
+        if (result && result.user) {
+            console.log('[AuthRedirect] signed-in uid=' + result.user.uid.substring(0, 8) + '...');
+        }
+        // result === null is normal: no pending redirect (fresh load / desktop).
+    } catch (err) {
+        const code = (err && err.code) ? err.code : 'unknown';
+        const msg = (err && err.message) ? err.message : String(err);
+        console.warn('[AuthRedirect] code=' + code + ' msg=' + msg);
+    }
+})();
 
 // === File Picker bridge ===
 // Staging map: key = "wasm-blob://<uuid>", value = ArrayBuffer

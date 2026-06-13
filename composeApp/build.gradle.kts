@@ -178,7 +178,12 @@ val firebaseWebProps: Map<String, String> = run {
     }
     mapOf(
         "FIREBASE_API_KEY" to props.getProperty("FIREBASE_WEB_API_KEY", "MISSING_FIREBASE_WEB_API_KEY"),
-        "FIREBASE_AUTH_DOMAIN" to props.getProperty("FIREBASE_WEB_AUTH_DOMAIN", "aichecklists-40230.firebaseapp.com"),
+        // authDomain MUST equal the site's own origin (gisti-ai.com) so Firebase Auth's
+        // /__/auth/ handler+iframe are SAME-ORIGIN, served via the reverse-proxy in
+        // src/redirect.js. The default <project>.firebaseapp.com is a third-party origin;
+        // Chrome 130+ mobile partitions its iframe storage → Google sign-in breaks.
+        // Local Google-auth testing on localhost: override to aichecklists-40230.firebaseapp.com.
+        "FIREBASE_AUTH_DOMAIN" to props.getProperty("FIREBASE_WEB_AUTH_DOMAIN", "gisti-ai.com"),
         "FIREBASE_PROJECT_ID" to props.getProperty("FIREBASE_WEB_PROJECT_ID", "aichecklists-40230"),
         "FIREBASE_STORAGE_BUCKET" to props.getProperty("FIREBASE_WEB_STORAGE_BUCKET", "aichecklists-40230.firebasestorage.app"),
         "FIREBASE_MESSAGING_SENDER_ID" to props.getProperty("FIREBASE_WEB_MESSAGING_SENDER_ID", "27698629989"),

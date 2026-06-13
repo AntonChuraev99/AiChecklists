@@ -72,7 +72,7 @@
         // cache persists through refreshes → Base64 decode crash → UI freeze.
         // One-time clear for all users; version bump forces re-clear.
         (function() {
-            var RESET_KEY = '__gistiCacheClearV2';
+            var RESET_KEY = '__gistiCacheClearV3';
             if (typeof caches !== 'undefined' && !localStorage.getItem(RESET_KEY)) {
                 window.__clearingData = true;
                 caches.keys().then(function(names) {
