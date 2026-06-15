@@ -808,6 +808,7 @@ class ChecklistDetailRepeatRuleTest {
         override fun observeChecklistById(id: Long): Flow<Checklist?> = flowOf(storedChecklist)
         override suspend fun setSeparateCompleted(checklistId: Long, value: Boolean) {}
         override suspend fun setAutoDeleteCompleted(checklistId: Long, value: Boolean) {}
+        override suspend fun setFoldersEnabled(checklistId: Long, value: Boolean) {}
         override suspend fun setReminder(checklistId: Long, reminderAt: Long?) {}
         override suspend fun countActiveReminders(): Int = 0
         override suspend fun getActiveReminders(): List<ChecklistReminderInfo> = emptyList()

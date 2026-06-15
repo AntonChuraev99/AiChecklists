@@ -919,6 +919,10 @@ fun App() {
                         ChecklistDetailScreen(
                             checklistId = route.checklistId,
                             focusItemId = route.focusItemId,
+                            // Folder drill-down level (null = checklist root). Each folder open
+                            // pushes a new ChecklistDetail entry carrying this; forwarded into the
+                            // screen (and its keyed ViewModel) here.
+                            currentFolderId = route.currentFolderId,
                             onOpenChatSheet = { checklistId, checklistName ->
                                 onOpenChatSheet(checklistId, checklistName)
                             },

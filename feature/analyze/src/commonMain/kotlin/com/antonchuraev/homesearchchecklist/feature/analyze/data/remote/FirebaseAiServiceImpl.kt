@@ -127,17 +127,20 @@ class FirebaseAiServiceImpl(
         val responseBody = response.body<GenerateChecklistResponseDto>()
 
         if (responseBody.success) {
-            logger.info(TAG, "generateChecklist: SUCCESS - checklistName=${responseBody.checklistName}, items=${responseBody.items?.size}, aiCredits=${responseBody.aiCredits}")
+            // Flatten the (possibly nested) AI response into a flat template item list with
+            // parentId/type links and unique ids. Flat (legacy) responses produce a flat list.
+            val flatItems = flattenGeneratedItems(responseBody.items ?: emptyList())
+            val hasFolders = flatItems.any { it.isFolder }
+            logger.info(TAG, "generateChecklist: SUCCESS - checklistName=${responseBody.checklistName}, items=${flatItems.size}, hasFolders=$hasFolders, aiCredits=${responseBody.aiCredits}")
             AiServiceResponse(
                 success = true,
                 data = GenerateChecklistResult(
                     checklistName = responseBody.checklistName ?: "New Checklist",
-                    items = responseBody.items?.map {
-                        ChecklistItem(text = it.text, checked = it.checked)
-                    } ?: emptyList(),
+                    items = flatItems,
                     summary = responseBody.summary ?: "",
                     confidence = responseBody.confidence ?: 0.8f,
-                    aiCredits = responseBody.aiCredits ?: -1
+                    aiCredits = responseBody.aiCredits ?: -1,
+                    hasFolders = hasFolders
                 ),
                 usage = responseBody.usage?.toUsageInfo()
             )
@@ -301,7 +304,7 @@ private data class GenerateChecklistResponseDto(
     val success: Boolean,
     val error: String? = null,
     @SerialName("checklist_name") val checklistName: String? = null,
-    val items: List<ItemDto>? = null,
+    val items: List<GenItemDto>? = null,
     val summary: String? = null,
     val confidence: Float? = null,
     @SerialName("ai_credits") val aiCredits: Int? = null,

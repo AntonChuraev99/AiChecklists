@@ -258,7 +258,8 @@ class AnalyzeViewModel(
                         fillDefault = state.fillDefault,
                         targetChecklistId = state.selectedChecklistId,
                         targetChecklistName = targetChecklist?.name,
-                        fillDefaultItems = if (state.isFillMode) result.fillItems else null
+                        fillDefaultItems = if (state.isFillMode) result.fillItems else null,
+                        hasFolders = !state.isFillMode && result.hasFolders
                     )
                     appNavigator.navigateToAnalyzeResultPreview()
                 }

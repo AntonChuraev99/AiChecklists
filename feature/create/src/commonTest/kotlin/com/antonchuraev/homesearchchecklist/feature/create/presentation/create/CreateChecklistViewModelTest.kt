@@ -343,6 +343,7 @@ class CreateChecklistViewModelTest {
 
         override suspend fun setSeparateCompleted(checklistId: Long, value: Boolean) = notUsed()
         override suspend fun setAutoDeleteCompleted(checklistId: Long, value: Boolean) = notUsed()
+        override suspend fun setFoldersEnabled(checklistId: Long, value: Boolean) = notUsed()
 
         override suspend fun setReminder(checklistId: Long, reminderAt: Long?) = notUsed()
         override suspend fun countActiveReminders(): Int = 0

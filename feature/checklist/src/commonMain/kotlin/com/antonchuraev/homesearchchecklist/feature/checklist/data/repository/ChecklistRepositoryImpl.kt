@@ -58,7 +58,8 @@ class ChecklistRepositoryImpl(
                 ChecklistFillItem(
                     text = item.text,
                     checked = false,
-                    note = null
+                    note = null,
+                    templateItemId = item.id,
                 )
             },
             createdAt = now,
@@ -78,17 +79,32 @@ class ChecklistRepositoryImpl(
             syncStatus = SyncStatus.PENDING_UPLOAD.value,
         ))
 
-        // Sync default fill items with updated checklist items
+        // Sync default fill items with updated checklist items.
+        // Reconcile by the stable templateItemId link, falling back to text for legacy fill
+        // rows written before the link existed. Crucially we now PRESERVE the matched fill
+        // item (id/checked/note/reminders/attachments) instead of rebuilding it from scratch —
+        // the old text-keyed rebuild regenerated every fill item id and dropped per-item
+        // reminders + attachments on any template edit.
         val defaultFillEntity = fillDao.getDefaultFillByChecklistId(checklist.id)
         if (defaultFillEntity != null) {
-            val existingItemsMap = defaultFillEntity.items.associateBy { it.text }
-            val updatedItems = checklist.items.map { checklistItem ->
-                val existingItem = existingItemsMap[checklistItem.text]
-                ChecklistFillItem(
-                    text = checklistItem.text,
-                    checked = existingItem?.checked ?: false,
-                    note = existingItem?.note
-                )
+            // Backfill-compatible: match by the stable templateItemId, fall back to text for
+            // legacy fill rows written before the link existed.
+            val byLink = defaultFillEntity.items.associateBy { it.templateItemId }
+            val byText = defaultFillEntity.items.associateBy { it.text }
+            val updatedItems = checklist.items.map { templateItem ->
+                val existing = byLink[templateItem.id] ?: byText[templateItem.text]
+                if (existing != null) {
+                    // Preserve the matched fill item's id/checked/note/reminders/attachments;
+                    // (re)attach the link and mirror the (possibly edited) template text.
+                    existing.withTemplateItemId(templateItem.id).withText(templateItem.text)
+                } else {
+                    ChecklistFillItem(
+                        text = templateItem.text,
+                        checked = false,
+                        note = null,
+                        templateItemId = templateItem.id,
+                    )
+                }
             }
             fillDao.insert(defaultFillEntity.copy(items = updatedItems))
         }
@@ -126,6 +142,16 @@ class ChecklistRepositoryImpl(
 
     override suspend fun setAutoDeleteCompleted(checklistId: Long, value: Boolean) {
         checklistDao.setAutoDeleteCompleted(checklistId, value)
+    }
+
+    override suspend fun setFoldersEnabled(checklistId: Long, value: Boolean) {
+        checklistDao.setFoldersEnabled(checklistId, value)
+        // Mark the parent dirty so this per-checklist setting propagates cross-device.
+        // The column update above does not touch syncStatus/updatedAt, so without this the
+        // change would only push on the next unrelated checklist edit (the existing gap for
+        // setSeparateCompleted/setAutoDeleteCompleted). touchForSync also bumps updatedAt for
+        // other devices' Last-Write-Wins merge and skips rows already PENDING_DELETE.
+        checklistDao.touchForSync(checklistId, currentTimeMillis())
     }
 
     // One-shot reminders
@@ -186,9 +212,10 @@ class ChecklistRepositoryImpl(
     override suspend fun resetDefaultFillChecks(checklistId: Long) {
         val defaultFillEntity = fillDao.getDefaultFillByChecklistId(checklistId)
         if (defaultFillEntity != null) {
-            val resetItems = defaultFillEntity.items.map {
-                ChecklistFillItem(text = it.text, checked = false, note = it.note)
-            }
+            // Reset only the checked state; preserve id, note, weekday, priority,
+            // reminders, attachments, and the template link. Re-creating items from
+            // text alone would wipe attachments/reminders on every repeat reset.
+            val resetItems = defaultFillEntity.items.map { it.withChecked(false) }
             val now = currentTimeMillis()
             fillDao.insert(defaultFillEntity.copy(
                 items = resetItems,
@@ -262,12 +289,19 @@ class ChecklistRepositoryImpl(
                 syncStatus = SyncStatus.PENDING_UPLOAD.value,
             ))
 
-            // 4. Dual update: sync priority to template items (matched by text)
-            // Template items use text as the stable key (same pattern as updateChecklist sync)
+            // 4. Dual update: sync priority to the matching template item.
+            // Match by the stable templateItemId link, falling back to text for legacy fill
+            // rows that predate the link. Text fallback can mis-target when two items share the
+            // same text, but the link makes the common case exact.
             val checklistEntity = checklistDao.getById(fillEntity.checklistId)
             if (checklistEntity != null) {
                 val updatedTemplateItems = checklistEntity.items.map { templateItem ->
-                    if (templateItem.text == item.text) {
+                    val matches = if (item.templateItemId != null) {
+                        templateItem.id == item.templateItemId
+                    } else {
+                        templateItem.text == item.text
+                    }
+                    if (matches) {
                         templateItem.withPriority(newPriority)
                     } else {
                         templateItem

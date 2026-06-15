@@ -16,6 +16,7 @@ data class ChecklistSyncData(
     val position: Int = 0,
     val autoDeleteCompleted: Boolean = false,
     val viewMode: String = "Standard",
+    val foldersEnabled: Boolean = false,
     val updatedAt: Long = 0L,
     val isDeleted: Boolean = false,
     val fills: List<FillSyncData> = emptyList(),

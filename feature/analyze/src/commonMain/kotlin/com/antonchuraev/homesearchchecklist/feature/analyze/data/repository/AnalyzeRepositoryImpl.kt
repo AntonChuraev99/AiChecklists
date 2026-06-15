@@ -51,17 +51,20 @@ class AnalyzeRepositoryImpl(
                             userDataRepository.update(userData.copy(aiCredits = newGenerations))
                         }
 
-                        val fillItems = response.data.filledItems.map { filled ->
-                            ChecklistFillItem(
-                                text = filled.text,
-                                checked = filled.checked,
-                                note = filled.note?.takeIf { it.isNotBlank() }
-                            )
-                        }
+                        // Build the template items first so each fill item can carry a stable
+                        // link to its template counterpart (index-aligned, same source list).
                         val filledItems = response.data.filledItems.map { filled ->
                             ChecklistItem(
                                 text = filled.note?.let { "${filled.text} - $it" } ?: filled.text,
                                 checked = filled.checked
+                            )
+                        }
+                        val fillItems = response.data.filledItems.mapIndexed { index, filled ->
+                            ChecklistFillItem(
+                                text = filled.text,
+                                checked = filled.checked,
+                                note = filled.note?.takeIf { it.isNotBlank() },
+                                templateItemId = filledItems[index].id,
                             )
                         }
                         Result.success(
@@ -99,7 +102,8 @@ class AnalyzeRepositoryImpl(
                             AnalyzeResult(
                                 suggestedItems = response.data.items,
                                 confidence = response.data.confidence,
-                                summary = response.data.summary
+                                summary = response.data.summary,
+                                hasFolders = response.data.hasFolders
                             )
                         )
                     } else {
@@ -141,12 +145,18 @@ class AnalyzeRepositoryImpl(
         result: AnalyzeResult
     ): Result<Checklist> {
         return try {
+            // Use suggestedItems verbatim so the AI-detected folder structure (parentId/type)
+            // reaches the persisted template. foldersEnabled mirrors the parsed flag so the
+            // detail screen renders in folder mode. The default fill is created automatically
+            // by addChecklist with a row (linked via templateItemId) for EVERY node — folders
+            // included — so folder-level reminders/progress (Phase 5) resolve a fill row.
             val newChecklist = Checklist(
                 name = name,
-                items = result.suggestedItems
+                items = result.suggestedItems,
+                foldersEnabled = result.hasFolders
             )
-            checklistRepository.addChecklist(newChecklist)
-            Result.success(newChecklist)
+            val checklistId = checklistRepository.addChecklist(newChecklist)
+            Result.success(newChecklist.copy(id = checklistId))
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -158,12 +168,14 @@ class AnalyzeRepositoryImpl(
         result: AnalyzeResult
     ): Result<Long> {
         return try {
-            // Convert checklist items to fill items with checked state from AI analysis
+            // Convert checklist items to fill items with checked state from AI analysis.
+            // Link each fill item to its template counterpart via the stable ChecklistItem.id.
             val fillItems = result.suggestedItems.map { item ->
                 ChecklistFillItem(
                     text = item.text,
                     checked = item.checked,
-                    note = null
+                    note = null,
+                    templateItemId = item.id,
                 )
             }
 

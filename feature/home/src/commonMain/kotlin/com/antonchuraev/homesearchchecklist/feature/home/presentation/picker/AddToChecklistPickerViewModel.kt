@@ -97,8 +97,15 @@ class AddToChecklistPickerViewModel(
                 // FILL, the edit screen reads the TEMPLATE — update both so the item is visible
                 // immediately and the focusItemId matches a fill item. updateChecklistTemplate (not
                 // updateChecklist) keeps the fill IDs stable so newFillItem.id stays valid.
-                val newFillItem = ChecklistFillItem(text = text, checked = false, note = null)
+                // Template first so its stable id can be linked into the fill item, keeping the
+                // template↔fill pair reconciled without relying on text backfill.
                 val newTemplateItem = ChecklistItem(text = text)
+                val newFillItem = ChecklistFillItem(
+                    text = text,
+                    checked = false,
+                    note = null,
+                    templateItemId = newTemplateItem.id,
+                )
 
                 val defaultFill = checklistRepository.getDefaultFillByChecklistId(checklistId).first()
                 if (defaultFill != null) {

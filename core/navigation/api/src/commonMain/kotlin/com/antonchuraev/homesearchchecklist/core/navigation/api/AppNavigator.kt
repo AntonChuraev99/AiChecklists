@@ -83,6 +83,18 @@ interface AppNavigator {
     )
 
     /**
+     * Drill down into a folder ([folderId]) of checklist [checklistId]: pushes a new
+     * ChecklistDetail entry scoped to that folder. Back/Up walks the folder tree via the
+     * Nav3 back stack.
+     *
+     * Has a default body delegating to [navigateToChecklistDetail] so that lightweight
+     * test fakes of [AppNavigator] need not override it; the production [AppNavigator]
+     * implementation overrides it to carry [folderId] into the route.
+     */
+    fun navigateToFolder(checklistId: Long, folderId: String) =
+        navigateToChecklistDetail(checklistId)
+
+    /**
      * Navigate to fill detail. If clearBackStack is true, clears back stack to main screen.
      */
     fun navigateToFillDetail(fillId: Long, clearBackStack: Boolean = false)

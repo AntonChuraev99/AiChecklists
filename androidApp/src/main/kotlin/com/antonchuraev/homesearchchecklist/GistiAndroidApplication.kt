@@ -21,7 +21,7 @@ import org.koin.core.context.startKoin
  *
  * The AndroidManifest.xml registers this class as the Application.
  */
-class GistiAndroidApplication : GistiApplication() {
+open class GistiAndroidApplication : GistiApplication() {
 
     override fun startKoinIfNeeded() {
         // Initialize Amplitude with the build-type API key from BuildConfig.

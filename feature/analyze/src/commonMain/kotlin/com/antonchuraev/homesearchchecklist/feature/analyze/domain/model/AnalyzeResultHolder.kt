@@ -18,7 +18,8 @@ object AnalyzeResultHolder {
         fillDefault: Boolean = false,
         targetChecklistId: Long? = null,
         targetChecklistName: String? = null,
-        fillDefaultItems: List<ChecklistFillItem>? = null
+        fillDefaultItems: List<ChecklistFillItem>? = null,
+        hasFolders: Boolean = false
     ) {
         data = AnalyzeResultData(
             items = items.toMutableList(),
@@ -28,7 +29,8 @@ object AnalyzeResultHolder {
             fillDefault = fillDefault,
             targetChecklistId = targetChecklistId,
             targetChecklistName = targetChecklistName,
-            fillDefaultItems = fillDefaultItems
+            fillDefaultItems = fillDefaultItems,
+            hasFolders = hasFolders
         )
     }
 
@@ -47,5 +49,11 @@ data class AnalyzeResultData(
     val fillDefault: Boolean = false,
     val targetChecklistId: Long?,
     val targetChecklistName: String?,
-    val fillDefaultItems: List<ChecklistFillItem>? = null
+    val fillDefaultItems: List<ChecklistFillItem>? = null,
+    /**
+     * True when [items] carry an AI-detected folder structure (parentId/type). The preview
+     * shows the tree read-only and creates the checklist with foldersEnabled = true. Always
+     * false in fill mode and for flat responses.
+     */
+    val hasFolders: Boolean = false
 )

@@ -33,6 +33,15 @@ interface ChecklistRepository {
     suspend fun setSeparateCompleted(checklistId: Long, value: Boolean)
     suspend fun setAutoDeleteCompleted(checklistId: Long, value: Boolean)
 
+    /**
+     * Enables or disables the per-checklist folders feature.
+     *
+     * Unlike [setSeparateCompleted]/[setAutoDeleteCompleted] (which only flip a column and
+     * rely on a later unrelated edit to push), this also marks the checklist dirty via
+     * [ChecklistDao.touchForSync] so the setting propagates to other devices promptly.
+     */
+    suspend fun setFoldersEnabled(checklistId: Long, value: Boolean)
+
     // One-shot reminders (independent of repeat)
     suspend fun setReminder(checklistId: Long, reminderAt: Long?)
     /**

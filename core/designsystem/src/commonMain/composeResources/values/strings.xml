@@ -213,6 +213,7 @@
     <string name="analyze_preview_remove_item">Remove item</string>
     <string name="analyze_preview_add_item">Add item</string>
     <string name="analyze_preview_add_item_hint">Add new item...</string>
+    <string name="analyze_preview_folder_hint">AI organized this into folders. You can rename and rearrange after creating.</string>
 
     <!-- Analyze Screen -->
     <string name="analyze_title">AI Analysis</string>
@@ -325,6 +326,38 @@
     <string name="delete_checklist">Delete checklist</string>
     <string name="collapse">Collapse</string>
     <string name="expand">Expand</string>
+
+    <!-- Folders (nested checklists) -->
+    <string name="folder_default_name">New Folder</string>
+    <string name="folder_create">New Folder</string>
+    <string name="folder_open">Open folder</string>
+    <string name="folder_progress">%1$d/%2$d</string>
+    <!-- Folder actions (Phase 4) -->
+    <string name="folder_actions_title">Folder actions</string>
+    <!-- Folder reminder (Phase 5) -->
+    <string name="folder_reminder">Reminder</string>
+    <string name="folder_reminder_active">Reminder set</string>
+    <string name="folder_reminder_unavailable">This folder is no longer available.</string>
+    <string name="folder_rename">Rename</string>
+    <string name="folder_rename_title">Rename folder</string>
+    <string name="folder_name_label">Folder name</string>
+    <string name="folder_name_placeholder">Enter a name</string>
+    <string name="folder_move">Move to…</string>
+    <string name="folder_delete">Delete folder</string>
+    <string name="folder_delete_title">Delete folder?</string>
+    <string name="folder_delete_message_empty">Delete this folder?</string>
+    <string name="folder_delete_message_one">This will delete the folder and 1 item inside it. This can't be undone.</string>
+    <string name="folder_delete_message_other">This will delete the folder and %1$d items inside it. This can't be undone.</string>
+    <string name="move_to_folder_title">Move to…</string>
+    <string name="move_to_root">Home (top level)</string>
+    <string name="move_here_current">Current location</string>
+    <!-- Folders on/off toggle + flatten confirm (Phase 7) -->
+    <string name="folders_toggle">Folders</string>
+    <string name="folders_toggle_weekly_hint">Not available in Weekly view</string>
+    <string name="folders_disable_title">Turn off folders?</string>
+    <string name="folders_disable_message">This will remove folders and move all items to the top level. Your items are kept.</string>
+    <string name="folders_disable_confirm">Turn off</string>
+    <string name="folders_disable_cancel">Cancel</string>
 
     <string name="checklist_fill_delete_title">Delete Fill?</string>
     <string name="checklist_fill_delete_message">Are you sure you want to delete "%1$s"? This action cannot be undone.</string>

@@ -63,6 +63,11 @@ class AnalyzeResultPreviewViewModel(
 
         targetChecklistId = data.targetChecklistId
 
+        // Folders only apply to the new-checklist path (never fill mode). When present we keep
+        // the structured items (parentId/type) so the structure survives to creation and the
+        // preview can render the tree.
+        val hasFolders = data.hasFolders && !data.isFillMode
+
         _screenState.update {
             it.copy(
                 isLoading = false,
@@ -76,7 +81,9 @@ class AnalyzeResultPreviewViewModel(
                 isFillMode = data.isFillMode,
                 fillDefault = data.fillDefault,
                 fillDefaultItems = data.fillDefaultItems ?: emptyList(),
-                targetChecklistName = data.targetChecklistName
+                targetChecklistName = data.targetChecklistName,
+                hasFolders = hasFolders,
+                structuredItems = if (hasFolders) data.items.toList() else emptyList()
             )
         }
     }
@@ -86,6 +93,9 @@ class AnalyzeResultPreviewViewModel(
     }
 
     private fun removeItem(index: Int) {
+        // In folder mode the preview is read-only: editing a flat index would desync the tree
+        // (structuredItems). The user restructures after creation.
+        if (_screenState.value.hasFolders) return
         _screenState.update { state ->
             val newItems = state.editableItems.toMutableList().apply {
                 if (index in indices) removeAt(index)
@@ -102,6 +112,8 @@ class AnalyzeResultPreviewViewModel(
     }
 
     private fun addItem() {
+        // Adding a flat row in folder mode would land it outside the tree; disabled for v1.
+        if (_screenState.value.hasFolders) return
         val text = _screenState.value.newItemText.trim()
         if (text.isNotEmpty()) {
             _screenState.update { state ->
@@ -167,16 +179,29 @@ class AnalyzeResultPreviewViewModel(
                     AnalyzeResultHolder.clear()
                     appNavigator.navigateToFillDetail(fillId, clearBackStack = true)
                 } else {
-                    // Create new checklist
-                    val checklist = Checklist(
-                        name = state.checklistName,
-                        items = state.editableItems.map { ChecklistItem(text = it, checked = false) }
-                    )
+                    // Create new checklist. In folder mode use the structured items verbatim so
+                    // parentId/type reach the template and set foldersEnabled; the default fill
+                    // (created by addChecklist) gets a linked row for every node — folders too —
+                    // so folder reminders/progress resolve. In the flat path build plain items
+                    // from the (editable) text list as before.
+                    val checklist = if (state.hasFolders) {
+                        Checklist(
+                            name = state.checklistName,
+                            items = state.structuredItems,
+                            foldersEnabled = true
+                        )
+                    } else {
+                        Checklist(
+                            name = state.checklistName,
+                            items = state.editableItems.map { ChecklistItem(text = it, checked = false) }
+                        )
+                    }
 
                     val checklistId = checklistRepository.addChecklist(checklist)
                     analyticsTracker.event(AnalyticsEvents.Checklist.CREATED, mapOf(
                         "source" to "ai",
-                        "item_count" to state.editableItems.size
+                        "item_count" to checklist.items.size,
+                        "has_folders" to state.hasFolders
                     ))
                     _screenState.update { it.copy(isCreating = false) }
                     AnalyzeResultHolder.clear()

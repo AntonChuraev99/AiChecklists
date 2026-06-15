@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.androidLibrary)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
+    alias(libs.plugins.roborazzi)
 }
 
 kotlin {
@@ -13,7 +14,11 @@ kotlin {
         namespace = "com.antonchuraev.homesearchchecklist.feature.home"
         compileSdk = libs.versions.android.compileSdk.get().toInt()
         minSdk = libs.versions.android.minSdk.get().toInt()
-        withHostTest {}
+        // isIncludeAndroidResources lets Robolectric resolve the Compose-Resources strings the
+        // folder UI reads from core/designsystem (Res.string.folder_*) during screenshot tests.
+        withHostTest {
+            isIncludeAndroidResources = true
+        }
 }
 
     listOf(iosArm64(), iosSimulatorArm64()).forEach {
@@ -72,5 +77,25 @@ kotlin {
             // ui-tooling provides @PreviewLightDark and other preview annotations for androidMain
             implementation(libs.androidx.compose.ui.tooling)
         }
+
+        // androidHostTest source set: JVM/Robolectric screenshot tests (Roborazzi) for the folder UI.
+        // Task: ./gradlew :feature:home:recordRoborazziAndroidHostTest  (record golden)
+        //       ./gradlew :feature:home:verifyRoborazziAndroidHostTest  (verify)
+        getByName("androidHostTest").dependencies {
+            implementation(libs.junit)
+            implementation(libs.robolectric)
+            implementation(libs.roborazzi)
+            implementation(libs.roborazzi.compose)
+            implementation(libs.roborazzi.junit.rule)
+            implementation(libs.androidx.compose.ui.tooling)
+            implementation(libs.androidx.compose.ui.test.junit4)
+            implementation(libs.androidx.compose.ui.test.manifest)
+        }
     }
+}
+
+roborazzi {
+    // Store golden PNGs under src/ so they are versioned alongside the test code.
+    // Verify task compares against these files; record task writes them.
+    outputDir.set(file("src/androidHostTest/roborazzi"))
 }

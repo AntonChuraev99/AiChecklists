@@ -16,8 +16,8 @@ val homeFeatureModule = module {
     viewModelOf(::MainScreenViewModel)
     viewModelOf(::TodayViewModel)
     viewModel { CalendarViewModel(get(), get(), get()) }
-    viewModel { (checklistId: Long) ->
-        ChecklistDetailViewModel(checklistId, get(), get(), get(), get(), get(), get(), get(), get())
+    viewModel { (checklistId: Long, currentFolderId: String?) ->
+        ChecklistDetailViewModel(checklistId, currentFolderId, get(), get(), get(), get(), get(), get(), get(), get())
     }
     viewModel { (fillId: Long) ->
         FillDetailViewModel(fillId, get(), get(), get())
