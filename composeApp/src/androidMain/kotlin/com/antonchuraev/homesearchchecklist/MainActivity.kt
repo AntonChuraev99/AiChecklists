@@ -20,6 +20,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.antonchuraev.homesearchchecklist.consent.ConsentDialog
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.isAppLocaleOverrideStale
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.reapplyAppLocaleNow
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.reassertAppLocale
 import com.antonchuraev.homesearchchecklist.core.auth.api.GoogleAuthRepository
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
@@ -177,6 +180,20 @@ class MainActivity : ComponentActivity() {
                     routeProcessText(request)
                 }
             }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // External Activities (the Google Play Billing sheet, system pickers, OAuth) reset
+        // the process-global Locale.getDefault() back to the device language WITHOUT
+        // recreating us (onResume, not onCreate). Re-apply the chosen language so Compose
+        // string resources — which on Android follow the global Locale, not LocalConfiguration
+        // (Google issue 240191036) — don't stay reverted to the device language. The staleness
+        // gate keeps a normal resume (no drift) from recomposing the tree.
+        if (isAppLocaleOverrideStale()) {
+            reapplyAppLocaleNow()
+            reassertAppLocale()
         }
     }
 

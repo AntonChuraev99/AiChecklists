@@ -57,3 +57,17 @@ actual object LocalAppLocale {
         return LocalAppLocaleInternal provides effective
     }
 }
+
+/**
+ * wasmJs: nothing to re-assert on foreground return. The locale flows through a
+ * Compose [staticCompositionLocalOf] + a `globalThis.__customLocale` slot read by
+ * the Navigator.languages shim — not a mutable JVM-global `Locale.getDefault()` —
+ * and there is no Google Play Billing sheet on the web. Always not stale.
+ */
+actual fun isAppLocaleOverrideStale(): Boolean = false
+
+/**
+ * wasmJs: no JVM-global locale to re-apply (it flows through a Compose CompositionLocal
+ * + a globalThis slot), and no Google Play Billing sheet on the web. No-op.
+ */
+actual fun reapplyAppLocaleNow() {}

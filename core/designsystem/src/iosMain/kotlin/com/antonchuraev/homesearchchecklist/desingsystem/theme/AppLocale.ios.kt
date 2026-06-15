@@ -35,3 +35,17 @@ actual object LocalAppLocale {
         return LocalLocaleOverride provides new
     }
 }
+
+/**
+ * iOS: nothing to re-assert on foreground return. The locale flows through a
+ * Compose [staticCompositionLocalOf] (and `NSUserDefaults["AppleLanguages"]`),
+ * not a mutable JVM-global `Locale.getDefault()`, and there is no Google Play
+ * Billing sheet to perturb it. Always not stale.
+ */
+actual fun isAppLocaleOverrideStale(): Boolean = false
+
+/**
+ * iOS: no JVM-global locale to re-apply (it flows through a Compose CompositionLocal
+ * + NSUserDefaults), and no Google Play Billing sheet to perturb it. No-op.
+ */
+actual fun reapplyAppLocaleNow() {}
