@@ -33,6 +33,10 @@ object RemoteConfigKeys {
     // Remotely switchable to "yearly" via Firebase RC for markets where yearly converts better.
     const val PAYWALL_DEFAULT_PLAN = "paywall_default_plan"
 
+    // Paywall config (JSON blob) — A/B-testable offer selection.
+    // Shape: { "currentOffer": "<revenuecat_offering_id>" } now; extensible later.
+    const val PAYWALL_CONFIG = "paywall_config"
+
     // First-checklist A/B variant: "auto_create" | "current".
     // "auto_create" (the default) seeds a "Your first checklist" template on first launch
     // for new users; "current" keeps the existing empty-state flow.
@@ -76,6 +80,10 @@ object RemoteConfigDefaults {
 
     // Paywall default plan — "monthly" so low-tier markets see affordable price first.
     const val PAYWALL_DEFAULT_PLAN = "monthly"
+
+    // Empty client default by design: empty → resolver falls back to
+    // PaywallRemoteConfig.DEFAULT_OFFER. Distinguishes "RC returned config" from "fetch failed".
+    const val PAYWALL_CONFIG = ""
 
     // First-checklist A/B variant default: "auto_create".
     //

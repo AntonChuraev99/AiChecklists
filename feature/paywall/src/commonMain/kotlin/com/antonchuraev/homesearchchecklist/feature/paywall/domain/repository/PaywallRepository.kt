@@ -11,7 +11,7 @@ interface PaywallRepository {
 
     val subscriptionStatus: Flow<SubscriptionStatus>
 
-    suspend fun getOfferings(): Result<PaywallOffering?>
+    suspend fun getOfferings(offeringId: String): Result<PaywallOffering?>
 
     suspend fun purchase(packageId: String): PurchaseResult
 

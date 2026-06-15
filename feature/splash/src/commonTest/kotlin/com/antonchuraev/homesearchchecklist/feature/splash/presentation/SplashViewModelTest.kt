@@ -470,7 +470,7 @@ class SplashViewModelTest {
             return RestoreResult.Success(SubscriptionStatus.FREE)
         }
 
-        override suspend fun getOfferings() = Result.success(null)
+        override suspend fun getOfferings(offeringId: String) = Result.success(null)
         override suspend fun purchase(packageId: String) = throw UnsupportedOperationException()
         override suspend fun logOut() = Result.success(SubscriptionStatus.FREE)
     }

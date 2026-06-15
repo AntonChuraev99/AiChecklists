@@ -91,7 +91,7 @@ class CreateWeeklyChecklistUseCaseTest {
             if (isPremium) SubscriptionStatus(isActive = true, activeEntitlements = setOf("AiChecklists Pro"))
             else SubscriptionStatus.FREE
         )
-        override suspend fun getOfferings(): Result<PaywallOffering?> = Result.success(null)
+        override suspend fun getOfferings(offeringId: String): Result<PaywallOffering?> = Result.success(null)
         override suspend fun purchase(packageId: String): PurchaseResult = PurchaseResult.Error("stub")
         override suspend fun restorePurchases(): RestoreResult = RestoreResult.Error("stub")
         override suspend fun refreshSubscriptionStatus() {}

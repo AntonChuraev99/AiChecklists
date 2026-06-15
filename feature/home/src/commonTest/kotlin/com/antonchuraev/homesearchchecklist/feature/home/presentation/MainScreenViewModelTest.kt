@@ -167,7 +167,7 @@ private class FakeChecklistRepository : ChecklistRepository {
 private class FakePaywallRepository : PaywallRepository {
     override val subscriptionStatus: Flow<SubscriptionStatus> =
         flowOf(SubscriptionStatus.FREE)
-    override suspend fun getOfferings(): Result<PaywallOffering?> = Result.success(null)
+    override suspend fun getOfferings(offeringId: String): Result<PaywallOffering?> = Result.success(null)
     override suspend fun purchase(packageId: String): PurchaseResult = PurchaseResult.Cancelled
     override suspend fun restorePurchases(): RestoreResult = RestoreResult.NoActiveSubscription
     override suspend fun refreshSubscriptionStatus() {}

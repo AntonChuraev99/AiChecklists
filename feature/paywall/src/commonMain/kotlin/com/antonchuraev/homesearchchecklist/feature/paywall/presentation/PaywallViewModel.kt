@@ -181,6 +181,13 @@ class PaywallViewModel(
                         availableSkuIds = products.map { it.id },
                     )
 
+                    // Report the active offer (RevenueCat offering id from paywall_config) as a
+                    // user property so analytics / A/B segments can split metrics by which offer
+                    // the user was actually shown.
+                    offering?.id?.let { activeOffer ->
+                        analyticsTracker.setUserProperties(mapOf("current_offer" to activeOffer))
+                    }
+
                     if (products.isEmpty()) {
                         analyticsTracker.event(AnalyticsEvents.Paywall.PRODUCTS_LOAD_EMPTY, buildMap {
                             put(AnalyticsParams.SOURCE, source)
