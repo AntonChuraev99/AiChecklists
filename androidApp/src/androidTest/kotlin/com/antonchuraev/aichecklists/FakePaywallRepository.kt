@@ -60,7 +60,7 @@ class FakePaywallRepository : PaywallRepository {
     override val subscriptionStatus: Flow<SubscriptionStatus> = flowOf(freeUser)
 
     // Returns two loaded products — PaywallViewModel.loadProducts() populates products list
-    override suspend fun getOfferings(): Result<PaywallOffering?> =
+    override suspend fun getOfferings(offeringId: String): Result<PaywallOffering?> =
         Result.success(fakeOffering)
 
     // Never called during screenshot capture

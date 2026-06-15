@@ -3,6 +3,7 @@ package com.antonchuraev.homesearchchecklist.feature.paywall.di
 import com.antonchuraev.homesearchchecklist.feature.paywall.data.billing.BillingPlatformPreCheck
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.repository.PaywallRepository
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetOfferingsUseCase
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetPaywallConfigUseCase
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetSubscriptionStatusUseCase
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetUserLimitsUseCase
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.PurchaseProductUseCase
@@ -27,7 +28,8 @@ val paywallFeatureModule = module {
 
     // Use cases
     factory { GetSubscriptionStatusUseCase(get()) }
-    factory { GetOfferingsUseCase(get()) }
+    factory { GetPaywallConfigUseCase(get(), getOrNull()) }
+    factory { GetOfferingsUseCase(get(), get()) }
     factory { PurchaseProductUseCase(get(), get()) }
     factory { RestorePurchasesUseCase(get(), get()) }
     factory { GetUserLimitsUseCase(get(), get(), get(), get()) }

@@ -18,7 +18,7 @@ class WebPaywallRepositoryStub : PaywallRepository {
     override val subscriptionStatus: Flow<SubscriptionStatus> =
         MutableStateFlow(SubscriptionStatus.FREE)
 
-    override suspend fun getOfferings(): Result<PaywallOffering?> =
+    override suspend fun getOfferings(offeringId: String): Result<PaywallOffering?> =
         Result.success(null)
 
     override suspend fun purchase(packageId: String): PurchaseResult =

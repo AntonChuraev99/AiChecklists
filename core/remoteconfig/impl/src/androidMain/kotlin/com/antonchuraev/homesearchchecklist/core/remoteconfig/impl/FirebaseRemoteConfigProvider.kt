@@ -15,8 +15,17 @@ class FirebaseRemoteConfigProvider : RemoteConfigProvider {
     private val remoteConfig: FirebaseRemoteConfig = FirebaseRemoteConfig.getInstance()
 
     init {
+        // Debug builds fetch on every call (0s) so RC values and A/B experiment
+        // assignments are visible immediately during testing; production keeps the
+        // 1h throttle. Detected via the debuggable manifest flag (no DI needed here).
+        val isDebuggable = try {
+            val ctx = com.google.firebase.FirebaseApp.getInstance().applicationContext
+            (ctx.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
+        } catch (e: Exception) {
+            false
+        }
         val configSettings = FirebaseRemoteConfigSettings.Builder()
-            .setMinimumFetchIntervalInSeconds(3600) // 1 hour
+            .setMinimumFetchIntervalInSeconds(if (isDebuggable) 0L else 3600L)
             .build()
         remoteConfig.setConfigSettingsAsync(configSettings)
         remoteConfig.setDefaultsAsync(getDefaultsMap())
@@ -37,6 +46,7 @@ class FirebaseRemoteConfigProvider : RemoteConfigProvider {
         RemoteConfigKeys.ONBOARDING to RemoteConfigDefaults.ONBOARDING,
         RemoteConfigKeys.PAYWALL_VARIANT to RemoteConfigDefaults.PAYWALL_VARIANT,
         RemoteConfigKeys.PAYWALL_DEFAULT_PLAN to RemoteConfigDefaults.PAYWALL_DEFAULT_PLAN,
+        RemoteConfigKeys.PAYWALL_CONFIG to RemoteConfigDefaults.PAYWALL_CONFIG,
     )
 
     override suspend fun fetchAndActivate(): Boolean {

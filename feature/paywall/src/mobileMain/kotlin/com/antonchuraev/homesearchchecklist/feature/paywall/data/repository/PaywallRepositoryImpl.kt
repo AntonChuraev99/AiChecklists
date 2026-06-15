@@ -1,7 +1,6 @@
 package com.antonchuraev.homesearchchecklist.feature.paywall.data.repository
 
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
-import com.antonchuraev.homesearchchecklist.feature.paywall.data.PaywallConfig
 import com.antonchuraev.homesearchchecklist.feature.paywall.data.billing.BillingPlatformPreCheck
 import com.antonchuraev.homesearchchecklist.feature.paywall.data.billing.PreCheckResult
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.toPaywallErrorCode
@@ -86,7 +85,7 @@ class PaywallRepositoryImpl(
         return isConfigured()
     }
 
-    override suspend fun getOfferings(): Result<PaywallOffering?> {
+    override suspend fun getOfferings(offeringId: String): Result<PaywallOffering?> {
         val preCheckResult = preCheck.check()
         if (preCheckResult is PreCheckResult.Failed) {
             logger?.warning(TAG, "[PAYWALL] Pre-flight failed: ${preCheckResult.reason.name} — ${preCheckResult.debugMessage}")
@@ -123,11 +122,10 @@ class PaywallRepositoryImpl(
                     continuation.resume(Result.failure(error.toPaywallException(billingWasReady = true)))
                 },
                 onSuccess = { offerings ->
-                    // Prefer named offering (PaywallConfig.OFFERING_ID) so the active
-                    // offering is locked to this build version. Fall back to
-                    // offerings.current if the named one is missing so dashboard
-                    // changes can still propagate. Mirrors swapfaceandroid pattern.
-                    val currentOffering = offerings.all[PaywallConfig.OFFERING_ID]
+                    // Prefer the resolved offering id (Remote Config paywall_config, baseline
+                    // PaywallRemoteConfig.DEFAULT_OFFER). Fall back to offerings.current if it's
+                    // missing on the server so dashboard changes still propagate.
+                    val currentOffering = offerings.all[offeringId]
                         ?: offerings.current
                     if (currentOffering == null) {
                         continuation.resume(Result.success(null))

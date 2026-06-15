@@ -236,6 +236,11 @@ fun App() {
         val languageRepository: LanguageRepository = remember { koin.get<LanguageRepository>() }
         val language by languageRepository.language.collectAsStateWithLifecycle(initialValue = AppLanguage.System)
         LaunchedEffect(language) { customAppLocale = language.tag }
+        // NOTE: re-asserting the locale on foreground return (after the Google Play
+        // Billing sheet resets the process-global Locale.getDefault()) is handled in
+        // MainActivity.onResume — synchronously, BEFORE Compose draws the next frame,
+        // so there is no device-language flash. A Compose LifecycleEventEffect here
+        // would run a frame too late (effects fire after composition) and flicker.
 
         val googleAuthRepository: GoogleAuthRepository = remember { koin.get<GoogleAuthRepository>() }
         val userDataRepository: UserDataRepository = remember { koin.get<UserDataRepository>() }

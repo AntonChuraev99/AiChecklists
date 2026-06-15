@@ -333,7 +333,7 @@ class ChecklistDetailAnalyticsTest {
 
     private class FakePaywallRepository : PaywallRepository {
         override val subscriptionStatus: Flow<SubscriptionStatus> = flowOf(SubscriptionStatus.FREE)
-        override suspend fun getOfferings(): Result<PaywallOffering?> = Result.success(null)
+        override suspend fun getOfferings(offeringId: String): Result<PaywallOffering?> = Result.success(null)
         override suspend fun purchase(packageId: String): PurchaseResult =
             PurchaseResult.Error("not implemented")
         override suspend fun restorePurchases(): RestoreResult =

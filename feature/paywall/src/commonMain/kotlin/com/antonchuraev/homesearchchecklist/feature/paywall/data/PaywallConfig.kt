@@ -5,12 +5,6 @@ object PaywallConfig {
     const val ANDROID_API_KEY = "goog_tpOemOyrsIGCbUGnmCWVeRhRZUT"
     const val IOS_API_KEY = "" // iOS release planned after Android revenue covers Apple Store publication cost
 
-    // Preferred offering identifier — resolved by name from RevenueCat dashboard.
-    // Falls back to offerings.current if this name is missing on the server, so
-    // changing the dashboard offering won't break old builds shipping a different
-    // OFFERING_ID value. Bump this when introducing a new offering version.
-    const val OFFERING_ID = "monthAndYear"
-
     // Entitlement identifier lives in feature/paywall/.../domain/model/SubscriptionStatus.kt
     // as Entitlements.PREMIUM (single source of truth). Do not duplicate here.
 

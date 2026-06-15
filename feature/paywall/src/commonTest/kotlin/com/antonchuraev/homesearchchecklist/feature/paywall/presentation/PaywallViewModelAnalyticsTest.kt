@@ -18,6 +18,7 @@ import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.Restore
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.SubscriptionStatus
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.repository.PaywallRepository
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetOfferingsUseCase
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetPaywallConfigUseCase
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.PurchaseProductUseCase
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.RestorePurchasesUseCase
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.RegistrationData
@@ -105,14 +106,18 @@ class PaywallViewModelAnalyticsTest {
             purchaseResult = PurchaseResult.Cancelled,
         )
         val userRepo = FakeUserDataRepository()
+        val remoteConfig = FakeRemoteConfigProvider()
         val vm = PaywallViewModel(
             savedStateHandle = SavedStateHandle(),
             navigator = FakeAppNavigator(),
-            getOfferingsUseCase = GetOfferingsUseCase(paywallRepo),
+            getOfferingsUseCase = GetOfferingsUseCase(
+                paywallRepo,
+                GetPaywallConfigUseCase(remoteConfig),
+            ),
             purchaseProductUseCase = PurchaseProductUseCase(paywallRepo, userRepo),
             restorePurchasesUseCase = RestorePurchasesUseCase(paywallRepo, userRepo),
             analyticsTracker = tracker,
-            remoteConfigProvider = FakeRemoteConfigProvider(),
+            remoteConfigProvider = remoteConfig,
             sourceOverride = source,
         )
         return vm to tracker
@@ -190,7 +195,8 @@ class PaywallViewModelAnalyticsTest {
         private val purchaseResult: PurchaseResult,
     ) : PaywallRepository {
         override val subscriptionStatus: Flow<SubscriptionStatus> = flowOf(SubscriptionStatus.FREE)
-        override suspend fun getOfferings(): Result<PaywallOffering?> = Result.success(offering)
+        override suspend fun getOfferings(offeringId: String): Result<PaywallOffering?> =
+            Result.success(offering)
         override suspend fun purchase(packageId: String): PurchaseResult = purchaseResult
         override suspend fun restorePurchases(): RestoreResult = RestoreResult.NoActiveSubscription
         override suspend fun refreshSubscriptionStatus() {}
