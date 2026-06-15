@@ -352,6 +352,60 @@ class ChecklistDetailFolderActionsTest {
         assertTrue(a2Index < a1Index, "the visible slice must actually be reordered (A2 before A1)")
     }
 
+    @Test
+    fun finalizeReorder_movesFolderAmongItems_keepsFolderAndOffLevelInPlace() = runTest {
+        // Mixed reorder at root: folders + leaves intermixed in ONE reorderable list. The root level
+        // shows folderA, folderB and the leaf leafRoot. A folder reorder id is its TEMPLATE id; a
+        // leaf reorder id is its FILL id. Drag folderB ahead of folderA.
+        val vm = createViewModel(folderId = null)
+        vm.onIntent(
+            ChecklistDetailIntent.OnFinalizeReorder(
+                // [folderB(template id), folderA(template id), leafRoot(fill id)]
+                listOf(folderB.id, folderA.id, fillLeafRoot.id),
+            )
+        )
+
+        // Template: no node may be dropped (folders + nested subtrees survive).
+        val savedTemplate = repository.lastUpdatedTemplate
+        assertNotNull(savedTemplate, "template must persist")
+        assertEquals(
+            templateItems.map { it.id }.toSet(),
+            savedTemplate.items.map { it.id }.toSet(),
+            "moving a folder among items must not drop any template node",
+        )
+        // The two folders actually swapped order; off-level nodes keep their slots.
+        val folderAIndex = savedTemplate.items.indexOfFirst { it.id == folderA.id }
+        val folderBIndex = savedTemplate.items.indexOfFirst { it.id == folderB.id }
+        assertTrue(folderBIndex < folderAIndex, "folderB must now precede folderA in the template")
+        // folderAChild (nested under folderA) and the nested leaves are untouched.
+        assertTrue(savedTemplate.items.any { it.id == folderAChild.id })
+        assertTrue(savedTemplate.items.any { it.id == leafA1.id })
+        assertTrue(savedTemplate.items.any { it.id == leafAC1.id })
+
+        // Fill: no folder placeholder row or leaf row may be dropped.
+        val savedFill = repository.lastUpdatedFill
+        assertNotNull(savedFill, "fill must persist")
+        assertEquals(
+            testFill.items.map { it.id }.toSet(),
+            savedFill.items.map { it.id }.toSet(),
+            "moving a folder must not drop any fill row (folder placeholder rows included)",
+        )
+    }
+
+    @Test
+    fun buildFolderState_levelNodes_interleavesFoldersAndLeavesInTemplateOrder() = runTest {
+        // levelNodes drives the single mixed reorderable list. At root it must contain folderA,
+        // folderB (folders) and the leafRoot leaf, in template order.
+        val vm = createViewModel(folderId = null)
+
+        val nodes = contentState(vm).levelNodes
+        // Root template order: folderA, folderB, leafRoot (folderAChild/leafA1/leafAC1 are nested).
+        assertEquals(3, nodes.size, "root level shows folderA, folderB and leafRoot")
+        assertEquals(folderA.id, (nodes[0] as LevelNode.Folder).model.id)
+        assertEquals(folderB.id, (nodes[1] as LevelNode.Folder).model.id)
+        assertEquals(fillLeafRoot.id, (nodes[2] as LevelNode.Leaf).fillItemId)
+    }
+
     // ── Rename ────────────────────────────────────────────────────────────
 
     @Test
@@ -380,19 +434,53 @@ class ChecklistDetailFolderActionsTest {
     }
 
     @Test
-    fun startFolderRename_fromActionsSheet_closesSheetSoDialogIsReachable() = runTest {
+    fun startFolderRename_fromActionsSheet_keepsSheetOpenForInlineEdit() = runTest {
         val vm = createViewModel()
-        // Open the folder actions sheet (long-press), then tap "Rename".
+        // Open the folder actions sheet (long-press), then tap the name to rename it inline.
         vm.onIntent(ChecklistDetailIntent.OnFolderLongPress(folderA.id))
         assertEquals(folderA.id, contentState(vm).folderActionsSheetFor)
 
         vm.onIntent(ChecklistDetailIntent.OnRenameFolder(folderA.id))
 
         val state = contentState(vm)
-        assertEquals(folderA.id, state.folderRenameForId, "rename dialog opens")
-        // Regression: the actions sheet must close, otherwise the ModalBottomSheet covers the
-        // rename dialog and its text field can't be reached.
-        assertNull(state.folderActionsSheetFor, "actions sheet closes when rename starts")
+        assertEquals(folderA.id, state.folderRenameForId, "inline-rename mode is entered")
+        assertEquals("Folder A", state.folderRenameDraft, "draft is seeded with the current name")
+        // The rename is inline INSIDE the sheet (headline → text field), mirroring the leaf
+        // ItemDetailsSheet — so the actions sheet must STAY open, not close.
+        assertEquals(folderA.id, state.folderActionsSheetFor, "actions sheet stays open for inline edit")
+    }
+
+    @Test
+    fun confirmFolderRename_fromOpenSheet_keepsSheetOpen_showingNewName() = runTest {
+        val vm = createViewModel()
+        vm.onIntent(ChecklistDetailIntent.OnFolderLongPress(folderA.id))
+        vm.onIntent(ChecklistDetailIntent.OnRenameFolder(folderA.id))
+        vm.onIntent(ChecklistDetailIntent.OnFolderRenameDraftChange("Renamed A"))
+        vm.onIntent(ChecklistDetailIntent.OnConfirmRenameFolder)
+
+        val state = contentState(vm)
+        // Like the leaf details sheet: committing leaves edit mode but keeps the sheet open so the
+        // renamed headline shows in place.
+        assertNull(state.folderRenameForId, "inline-edit mode is left after commit")
+        assertEquals(folderA.id, state.folderActionsSheetFor, "actions sheet stays open after commit")
+        // The folder row name is updated optimistically.
+        assertEquals("Renamed A", state.folders.firstOrNull { it.id == folderA.id }?.name)
+    }
+
+    @Test
+    fun dismissFolderActions_whileEditingName_clearsRenameDraft() = runTest {
+        val vm = createViewModel()
+        vm.onIntent(ChecklistDetailIntent.OnFolderLongPress(folderA.id))
+        vm.onIntent(ChecklistDetailIntent.OnRenameFolder(folderA.id))
+        vm.onIntent(ChecklistDetailIntent.OnFolderRenameDraftChange("half-typed"))
+
+        // Closing the sheet mid-edit must reset inline-rename state so the next open starts clean.
+        vm.onIntent(ChecklistDetailIntent.OnDismissFolderActions)
+
+        val state = contentState(vm)
+        assertNull(state.folderActionsSheetFor)
+        assertNull(state.folderRenameForId)
+        assertEquals("", state.folderRenameDraft)
     }
 
     @Test

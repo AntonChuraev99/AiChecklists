@@ -43,6 +43,35 @@ data class FolderUiModel(
 )
 
 /**
+ * One reorderable node at the current drill-down level: a folder OR a leaf item, intermixed in
+ * template order. The detail screen renders a SINGLE reorderable list of these so a folder can be
+ * dragged to any slot between items (the user-chosen "folders and items mixed" model), instead of
+ * folders sitting in a separate non-draggable section above the leaves.
+ *
+ * [reorderId] is the stable key used both as the LazyColumn / `ReorderableItem` key AND the id
+ * passed back in [ChecklistDetailIntent.OnFinalizeReorder]:
+ *  - [Folder.reorderId] = the TEMPLATE folder id (folders live on the template; the ViewModel
+ *    repositions the template node by this id directly and the folder's placeholder fill row via
+ *    its `templateItemId` link).
+ *  - [Leaf.reorderId] = the FILL-item id (leaves are repositioned on the fill, template mirrored
+ *    via the fill→template link — exactly as before folders existed).
+ *
+ * Template folder ids and leaf fill ids never collide (distinct UUID spaces), so a mixed list of
+ * [reorderId]s resolves unambiguously in the ViewModel.
+ */
+sealed interface LevelNode {
+    val reorderId: String
+
+    data class Folder(val model: FolderUiModel) : LevelNode {
+        override val reorderId: String get() = model.id
+    }
+
+    data class Leaf(val fillItemId: String) : LevelNode {
+        override val reorderId: String get() = fillItemId
+    }
+}
+
+/**
  * A candidate destination folder for the "Move to…" sheet.
  *
  * The list is a flattened, depth-indented view of the whole folder tree of the checklist
@@ -89,6 +118,12 @@ sealed interface ChecklistDetailState : State {
         // item has parentId == currentFolderId). null = no folder filtering (flat list / !foldersEnabled);
         // the Composable shows all fill items. Non-null = show only these ids at this level.
         val visibleFillItemIds: Set<String>? = null,
+        // Ordered mixed list of folders + leaf items at the current level, in template order (empty
+        // when !foldersEnabled → the screen uses the flat fill-item list instead). Drives the SINGLE
+        // reorderable list so a folder can be dragged between items. Leaves here mirror
+        // [visibleFillItemIds]; folders mirror [folders]. Checked leaves are still split off into the
+        // completed section by the screen when separateCompleted is on.
+        val levelNodes: List<LevelNode> = emptyList(),
         // ── Folder node actions (Phase 4) ──
         // Folder whose actions sheet (Rename / Move to… / Delete) is open. null = closed.
         val folderActionsSheetFor: String? = null,
@@ -224,11 +259,19 @@ sealed interface ChecklistDetailIntent : Intent {
     data class OnFolderLongPress(val folderId: String) : ChecklistDetailIntent
     data object OnDismissFolderActions : ChecklistDetailIntent
 
-    /** Open the rename dialog for [folderId] (seeds the draft with its current name). */
+    /**
+     * Enter inline-rename mode for [folderId] inside the open folder actions sheet (seeds the
+     * draft with its current name). The sheet stays open and its headline swaps to a text field —
+     * mirroring the leaf [ItemDetailsSheet] title edit (no separate rename dialog).
+     */
     data class OnRenameFolder(val folderId: String) : ChecklistDetailIntent
     data class OnFolderRenameDraftChange(val text: String) : ChecklistDetailIntent
-    /** Commit the rename: writes the folder node text (template) + its linked fill row text. */
+    /**
+     * Commit the rename: writes the folder node text (template) + its linked fill row text. The
+     * actions sheet stays open showing the new name (leaves inline-edit mode only).
+     */
     data object OnConfirmRenameFolder : ChecklistDetailIntent
+    /** Leave inline-rename mode without committing (kept for symmetry / programmatic cancel). */
     data object OnDismissRenameFolder : ChecklistDetailIntent
 
     /**

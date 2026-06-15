@@ -750,10 +750,6 @@ private fun ChecklistDetailContent(
                 val ids = state.visibleFillItemIds
                 if (ids == null) defaultFill.items else defaultFill.items.filter { it.id in ids }
             }
-            val sourceUnchecked = remember(visibleFillItems, state.separateCompleted) {
-                if (state.separateCompleted) visibleFillItems.filter { !it.checked }
-                else visibleFillItems
-            }
             val completedItems by remember(visibleFillItems, state.separateCompleted) {
                 derivedStateOf {
                     if (state.separateCompleted) visibleFillItems.filter { it.checked }
@@ -761,22 +757,50 @@ private fun ChecklistDetailContent(
                 }
             }
             var completedExpanded by remember { mutableStateOf(true) }
-            // Header items before the unchecked list (used to offset the reorder index math):
-            // ProgressHeader, optional ViewAllFillsCard, and each FolderCard.
-            val folderHeaderCount = state.folders.size
+
+            // SINGLE mixed reorderable list of nodes at this level (folders + leaves intermixed in
+            // template order), so a folder can be dragged to any slot between items. In folder mode
+            // the order comes from the ViewModel (state.levelNodes); with folders OFF there are no
+            // folders and the list is just the (filtered) fill items — identical to before.
+            val checkedFillIds = remember(visibleFillItems, state.separateCompleted) {
+                if (state.separateCompleted) {
+                    visibleFillItems.filter { it.checked }.map { it.id }.toSet()
+                } else {
+                    emptySet()
+                }
+            }
+            val sourceNodes = remember(state.levelNodes, state.foldersEnabled, visibleFillItems, checkedFillIds) {
+                if (state.foldersEnabled) {
+                    // Drop checked leaves into the completed section; keep folders + unchecked leaves.
+                    state.levelNodes.filter { node ->
+                        node !is LevelNode.Leaf || node.fillItemId !in checkedFillIds
+                    }
+                } else {
+                    // Flat list (no folders): every visible fill item is a leaf node, minus the
+                    // completed ones when separateCompleted is on.
+                    visibleFillItems
+                        .filter { it.id !in checkedFillIds }
+                        .map { LevelNode.Leaf(it.id) }
+                }
+            }
+            val fillItemById = remember(defaultFill.items) { defaultFill.items.associateBy { it.id } }
 
             // Local mutable list for optimistic reorder (no DB writes during drag)
-            var localUnchecked by remember(sourceUnchecked) {
-                mutableStateOf(sourceUnchecked)
+            var localNodes by remember(sourceNodes) {
+                mutableStateOf(sourceNodes)
             }
 
             val reorderableState = rememberReorderableLazyListState(listState) { from, to ->
-                // Offset: title(0) + progress(1) + optional fills card + folder cards = header items
-                val headerCount = 2 + (if (state.additionalFillsCount > 0) 1 else 0) + folderHeaderCount
+                // Offset = number of LazyColumn items BEFORE the reorderable list: ProgressHeader (1)
+                // + optional ViewAllFillsCard. Folders now live IN the reorderable list, so they no
+                // longer add to the offset (matches the proven MainScreenContent reorder offset =
+                // header-item count). NB: the previous value (2 + …) was off by one, which made the
+                // first row undraggable to the very top — corrected here so a top folder can move up.
+                val headerCount = 1 + (if (state.additionalFillsCount > 0) 1 else 0)
                 val fromIndex = from.index - headerCount
                 val toIndex = to.index - headerCount
-                if (fromIndex >= 0 && toIndex >= 0 && fromIndex < localUnchecked.size && toIndex < localUnchecked.size) {
-                    localUnchecked = localUnchecked.toMutableList().apply {
+                if (fromIndex >= 0 && toIndex >= 0 && fromIndex < localNodes.size && toIndex < localNodes.size) {
+                    localNodes = localNodes.toMutableList().apply {
                         add(toIndex, removeAt(fromIndex))
                     }
                     hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -819,72 +843,87 @@ private fun ChecklistDetailContent(
                     }
                 }
 
-                // Folders at the current level (folder mode only) — rendered before leaf items.
-                if (state.foldersEnabled) {
-                    items(
-                        count = state.folders.size,
-                        key = { "folder_${state.folders[it].id}" },
-                    ) { index ->
-                        val folder = state.folders[index]
-                        FolderCard(
-                            name = folder.name,
-                            total = folder.total,
-                            progressLabel = stringResource(
-                                Res.string.folder_progress,
-                                folder.checked,
-                                folder.total,
-                            ),
-                            hasReminder = folder.hasReminder,
-                            onOpen = { onIntent(ChecklistDetailIntent.OnOpenFolder(folder.id)) },
-                            onLongPress = { onIntent(ChecklistDetailIntent.OnFolderLongPress(folder.id)) },
-                        )
-                    }
-                }
-
-                // Unchecked items (or all items when separateCompleted is off)
+                // Mixed reorderable list of folders + unchecked leaves at this level, in template
+                // order. A folder can be dragged to any slot between items (folders + items mixed).
+                // With folders OFF, localNodes contains only leaves → identical to the previous
+                // flat-list behaviour.
                 items(
-                    count = localUnchecked.size,
-                    key = { localUnchecked[it].id }
+                    count = localNodes.size,
+                    key = { localNodes[it].reorderId },
                 ) { index ->
-                    val item = localUnchecked[index]
+                    val node = localNodes[index]
                     ReorderableItem(
                         state = reorderableState,
-                        key = item.id,
-                        enabled = isEditMode
+                        key = node.reorderId,
+                        enabled = isEditMode,
                     ) { isDragging ->
-                        SwipeableChecklistItemCard(
-                            isEditMode = isEditMode,
-                            onSwipeDelete = {
-                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                onIntent(ChecklistDetailIntent.OnSwipeDeleteItem(item.id))
-                            },
-                        ) {
-                            ChecklistItemCard(
-                                item = item,
-                                isDragging = isDragging,
-                                isEditMode = isEditMode,
-                                wiggleAngle = wiggleAngle,
-                                onCheckedChange = { checked ->
-                                    onIntent(ChecklistDetailIntent.OnItemCheckedChange(item.id, checked))
-                                },
-                                onItemTap = { onIntent(ChecklistDetailIntent.OnItemTapForDetails(item.id)) },
-                                onLongClick = {
-                                    if (!isEditMode) {
-                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        isEditMode = true
-                                    }
-                                },
-                                isHighlighted = item.id == highlightedItemId,
-                                cardDragModifier = Modifier.longPressDraggableHandle(
-                                    onDragStarted = {
-                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    },
-                                    onDragStopped = {
-                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        onIntent(ChecklistDetailIntent.OnFinalizeReorder(localUnchecked.map { it.id }))
-                                    }
+                        when (node) {
+                            is LevelNode.Folder -> {
+                                val folder = node.model
+                                FolderCard(
+                                    name = folder.name,
+                                    total = folder.total,
+                                    progressLabel = stringResource(
+                                        Res.string.folder_progress,
+                                        folder.checked,
+                                        folder.total,
+                                    ),
+                                    hasReminder = folder.hasReminder,
+                                    isEditMode = isEditMode,
+                                    isDragging = isDragging,
+                                    wiggleAngle = wiggleAngle,
+                                    onOpen = { onIntent(ChecklistDetailIntent.OnOpenFolder(folder.id)) },
+                                    onLongPress = { onIntent(ChecklistDetailIntent.OnFolderLongPress(folder.id)) },
+                                    cardDragModifier = Modifier.longPressDraggableHandle(
+                                        onDragStarted = {
+                                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        },
+                                        onDragStopped = {
+                                            hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            onIntent(ChecklistDetailIntent.OnFinalizeReorder(localNodes.map { it.reorderId }))
+                                        },
+                                    ),
                                 )
-                            )
+                            }
+                            is LevelNode.Leaf -> {
+                                val item = fillItemById[node.fillItemId]
+                                if (item != null) {
+                                    SwipeableChecklistItemCard(
+                                        isEditMode = isEditMode,
+                                        onSwipeDelete = {
+                                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            onIntent(ChecklistDetailIntent.OnSwipeDeleteItem(item.id))
+                                        },
+                                    ) {
+                                        ChecklistItemCard(
+                                            item = item,
+                                            isDragging = isDragging,
+                                            isEditMode = isEditMode,
+                                            wiggleAngle = wiggleAngle,
+                                            onCheckedChange = { checked ->
+                                                onIntent(ChecklistDetailIntent.OnItemCheckedChange(item.id, checked))
+                                            },
+                                            onItemTap = { onIntent(ChecklistDetailIntent.OnItemTapForDetails(item.id)) },
+                                            onLongClick = {
+                                                if (!isEditMode) {
+                                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                    isEditMode = true
+                                                }
+                                            },
+                                            isHighlighted = item.id == highlightedItemId,
+                                            cardDragModifier = Modifier.longPressDraggableHandle(
+                                                onDragStarted = {
+                                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                },
+                                                onDragStopped = {
+                                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                    onIntent(ChecklistDetailIntent.OnFinalizeReorder(localNodes.map { it.reorderId }))
+                                                },
+                                            ),
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -1111,20 +1150,16 @@ private fun ChecklistDetailContent(
             folderName = folderForActions.text,
             hasReminder = folderHasReminder,
             onReminder = { onIntent(ChecklistDetailIntent.OnFolderReminderClick(folderForActions.id)) },
-            onRename = { onIntent(ChecklistDetailIntent.OnRenameFolder(folderForActions.id)) },
             onMove = { onIntent(ChecklistDetailIntent.OnMoveNodeRequested(folderForActions.id)) },
             onDelete = { onIntent(ChecklistDetailIntent.OnDeleteFolder(folderForActions.id)) },
             onDismiss = { onIntent(ChecklistDetailIntent.OnDismissFolderActions) },
-        )
-    }
-
-    // Rename folder dialog
-    if (state.folderRenameForId != null) {
-        RenameFolderDialog(
-            name = state.folderRenameDraft,
-            onNameChanged = { onIntent(ChecklistDetailIntent.OnFolderRenameDraftChange(it)) },
-            onConfirm = { onIntent(ChecklistDetailIntent.OnConfirmRenameFolder) },
-            onDismiss = { onIntent(ChecklistDetailIntent.OnDismissRenameFolder) },
+            // Inline rename of the folder name (no separate Rename row / dialog) — mirrors the leaf
+            // ItemDetailsSheet text edit. Edit mode is active when the rename draft targets this folder.
+            isEditingName = state.folderRenameForId == folderForActions.id,
+            editingNameDraft = state.folderRenameDraft,
+            onStartNameEdit = { onIntent(ChecklistDetailIntent.OnRenameFolder(folderForActions.id)) },
+            onNameDraftChange = { onIntent(ChecklistDetailIntent.OnFolderRenameDraftChange(it)) },
+            onConfirmNameEdit = { onIntent(ChecklistDetailIntent.OnConfirmRenameFolder) },
         )
     }
 
@@ -2340,11 +2375,19 @@ private fun FillTargetBottomSheet(
  * [ReminderSheet] scoped to the folder's fill row (resolved in the ViewModel), so there is no
  * duplicate reminder UI.
  *
- * @param folderName  Current folder name (sheet title).
+ * The folder name doubles as an inline-editable title — tapping it swaps the headline for a
+ * [BasicTextField] with autofocus + a Save action, mirroring the leaf [ItemDetailsSheet] text edit
+ * (so there is no separate "Rename" row / dialog). Confirm-on-blur keeps the gesture forgiving.
+ *
+ * @param folderName  Current folder name (sheet title + inline-edit headline).
+ * @param isEditingName Whether the headline is currently in inline-edit mode.
+ * @param editingNameDraft Draft text shown in the inline editor (owned by the ViewModel).
+ * @param onStartNameEdit Tap the headline → enter inline-edit mode (keeps the sheet open).
+ * @param onNameDraftChange Inline editor keystroke.
+ * @param onConfirmNameEdit Commit the rename (Save / blur).
  * @param hasReminder Whether the folder currently has an active reminder (drives the row's icon +
  *                    subtitle, exactly like the leaf reminder row).
  * @param onReminder  Open the reminder sheet for this folder.
- * @param onRename    Open the rename dialog.
  * @param onMove      Open the "Move to…" target sheet for this folder.
  * @param onDelete    Request a (cascading) folder delete → confirm dialog.
  */
@@ -2355,14 +2398,19 @@ internal fun FolderActionsSheet(
     folderName: String,
     hasReminder: Boolean,
     onReminder: () -> Unit,
-    onRename: () -> Unit,
     onMove: () -> Unit,
     onDelete: () -> Unit,
     onDismiss: () -> Unit,
+    isEditingName: Boolean = false,
+    editingNameDraft: String = "",
+    onStartNameEdit: () -> Unit = {},
+    onNameDraftChange: (String) -> Unit = {},
+    onConfirmNameEdit: () -> Unit = {},
 ) {
     AdaptiveSheetOrDialog(
         onDismiss = onDismiss,
-        title = { Text(folderName, style = MaterialTheme.typography.titleMedium) },
+        // No small title: the editable headline below is the only folder name. On Expanded/web the
+        // AlertDialog would otherwise also render this title, duplicating the name (user-reported).
     ) {
         Column(
             modifier = Modifier
@@ -2370,16 +2418,67 @@ internal fun FolderActionsSheet(
                 .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
                 .padding(bottom = AppDimens.SpacingXxl)
         ) {
-            Text(
-                text = folderName,
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = AppDimens.SpacingMd)
-            )
+            // Folder name as the sheet title — tap to rename inline (same pattern as the leaf
+            // ItemDetailsSheet), so there is no separate "Rename" row.
+            if (isEditingName) {
+                val focusRequester = remember { FocusRequester() }
+                val keyboardController = LocalSoftwareKeyboardController.current
+                var hasGainedFocus by remember { mutableStateOf(false) }
+                val canSave = remember(editingNameDraft, folderName) {
+                    val trimmed = editingNameDraft.trim()
+                    trimmed.isNotEmpty() && trimmed != folderName.trim()
+                }
+
+                LaunchedEffect(Unit) {
+                    focusRequester.requestFocus()
+                    keyboardController?.show()
+                }
+
+                // Header: Save action top-right, independent of title width
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    AppButtonText(
+                        text = stringResource(Res.string.save),
+                        onClick = onConfirmNameEdit,
+                        enabled = canSave,
+                    )
+                }
+
+                BasicTextField(
+                    value = editingNameDraft,
+                    onValueChange = onNameDraftChange,
+                    textStyle = MaterialTheme.typography.headlineSmall.copy(
+                        color = MaterialTheme.colorScheme.onSurface
+                    ),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = AppDimens.SpacingMd)
+                        .focusRequester(focusRequester)
+                        .onFocusChanged { focusState ->
+                            if (focusState.isFocused) {
+                                hasGainedFocus = true
+                            } else if (hasGainedFocus) {
+                                onConfirmNameEdit()
+                            }
+                        }
+                )
+            } else {
+                Text(
+                    text = folderName,
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = AppDimens.MinTouchTarget)
+                        .clickable(onClick = onStartNameEdit)
+                        .padding(bottom = AppDimens.SpacingMd)
+                )
+            }
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
@@ -2399,17 +2498,6 @@ internal fun FolderActionsSheet(
                 ),
                 showChevron = true,
                 onClick = onReminder,
-            )
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-            ItemDetailsSheetRow(
-                icon = Icons.Outlined.Edit,
-                iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
-                title = stringResource(Res.string.folder_rename),
-                subtitle = null,
-                showChevron = false,
-                onClick = onRename,
             )
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -2502,49 +2590,6 @@ internal fun DisableFoldersConfirmationDialog(
         dismissButton = {
             AppButtonText(
                 text = stringResource(Res.string.folders_disable_cancel),
-                onClick = onDismiss,
-            )
-        },
-        containerColor = MaterialTheme.colorScheme.surface,
-        shape = MaterialTheme.shapes.large,
-    )
-}
-
-/**
- * Rename dialog for a folder. A thin wrapper around [AppTextField] + Save/Cancel, mirroring
- * [NoteDialog]. Save is disabled while the trimmed name is blank.
- */
-// internal (not private) so the Roborazzi screenshot test in androidHostTest can render it.
-@Composable
-internal fun RenameFolderDialog(
-    name: String,
-    onNameChanged: (String) -> Unit,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(Res.string.folder_rename_title)) },
-        text = {
-            AppTextField(
-                value = name,
-                onValueChange = onNameChanged,
-                label = stringResource(Res.string.folder_name_label),
-                placeholder = stringResource(Res.string.folder_name_placeholder),
-                singleLine = true,
-                showClearButton = true,
-            )
-        },
-        confirmButton = {
-            AppButtonText(
-                text = stringResource(Res.string.save),
-                onClick = onConfirm,
-                enabled = name.trim().isNotEmpty(),
-            )
-        },
-        dismissButton = {
-            AppButtonText(
-                text = stringResource(Res.string.cancel),
                 onClick = onDismiss,
             )
         },

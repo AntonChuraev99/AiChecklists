@@ -35,8 +35,8 @@ import org.robolectric.annotation.GraphicsMode
  *  - [MoveToFolderSheet] — the depth-indented destination tree with disabled (illegal) rows,
  *    the current-parent check, and the "Move to root" leading row
  *  - The folder dialogs/sheet from `ChecklistDetailScreen.kt`:
- *    [FolderActionsSheet], [RenameFolderDialog], [DeleteFolderConfirmationDialog],
- *    [DisableFoldersConfirmationDialog]
+ *    [FolderActionsSheet] (renaming is inline inside this sheet now — no separate dialog),
+ *    [DeleteFolderConfirmationDialog], [DisableFoldersConfirmationDialog]
  *
  * Two capture strategies are used:
  *  - [captureRoboImage] on `onRoot()` for **inline** content (FolderCard, the Move tree rows).
@@ -147,10 +147,36 @@ class FolderComponentsScreenshotTest {
                     folderName = "Quarterly planning",
                     hasReminder = true,
                     onReminder = {},
-                    onRename = {},
                     onMove = {},
                     onDelete = {},
                     onDismiss = {},
+                )
+            }
+        }
+        composeTestRule.waitForIdle()
+        captureScreenRoboImage()
+    }
+
+    @OptIn(ExperimentalRoborazziApi::class)
+    @Test
+    @Config(sdk = [34], qualifiers = "w800dp-h1280dp-normal-long-notround-any-320dpi-keyshidden-nonav")
+    fun folderActionsSheet_editingName_dialog() {
+        // Inline-rename mode: the headline becomes a text field with a Save action (replaces the
+        // old standalone RenameFolderDialog).
+        composeTestRule.setContent {
+            AppTheme(darkTheme = false) {
+                val draft = remember { mutableStateOf("Quarterly planning") }
+                FolderActionsSheet(
+                    folderName = "Quarterly planning",
+                    hasReminder = true,
+                    onReminder = {},
+                    onMove = {},
+                    onDelete = {},
+                    onDismiss = {},
+                    isEditingName = true,
+                    editingNameDraft = draft.value,
+                    onNameDraftChange = { draft.value = it },
+                    onConfirmNameEdit = {},
                 )
             }
         }
@@ -167,25 +193,6 @@ class FolderComponentsScreenshotTest {
                 MoveToFolderSheet(
                     targets = sampleMoveTargets(),
                     onTargetSelected = {},
-                    onDismiss = {},
-                )
-            }
-        }
-        composeTestRule.waitForIdle()
-        captureScreenRoboImage()
-    }
-
-    @OptIn(ExperimentalRoborazziApi::class)
-    @Test
-    @Config(sdk = [34], qualifiers = "w800dp-h1280dp-normal-long-notround-any-320dpi-keyshidden-nonav")
-    fun renameFolderDialog_dialog() {
-        composeTestRule.setContent {
-            AppTheme(darkTheme = false) {
-                val name = remember { mutableStateOf("Quarterly planning") }
-                RenameFolderDialog(
-                    name = name.value,
-                    onNameChanged = { name.value = it },
-                    onConfirm = {},
                     onDismiss = {},
                 )
             }

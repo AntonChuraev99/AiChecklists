@@ -197,6 +197,7 @@ class ChecklistDetailViewModel(
                 currentFolderTitle = folderState.currentFolderTitle,
                 folders = folderState.folders,
                 visibleFillItemIds = folderState.visibleFillItemIds,
+                levelNodes = folderState.levelNodes,
             )
         } else {
             // Pull the latest userLimits from its independent flow — it may have
@@ -213,6 +214,7 @@ class ChecklistDetailViewModel(
                 currentFolderTitle = folderState.currentFolderTitle,
                 folders = folderState.folders,
                 visibleFillItemIds = folderState.visibleFillItemIds,
+                levelNodes = folderState.levelNodes,
             )
         }
     }
@@ -236,46 +238,67 @@ class ChecklistDetailViewModel(
                 currentFolderTitle = null,
                 folders = emptyList(),
                 visibleFillItemIds = null,
+                levelNodes = emptyList(),
             )
         }
 
         val items = checklist.items
         val fillItems = fill?.items.orEmpty()
 
-        // Folders directly under the current level, with aggregate descendant-leaf progress.
-        val folderModels = ChecklistTree.childrenOf(items, currentFolderId)
-            .filter { it.type == ChecklistNodeType.FOLDER }
-            .map { folder ->
-                val progress = ChecklistTree.folderProgress(items, fillItems, folder.id)
+        // Children of the current level in TEMPLATE order (folders + leaves intermixed). This single
+        // ordered list backs both the folder rows and the mixed reorderable list (levelNodes), so a
+        // folder keeps its real position relative to sibling items.
+        val levelChildren = ChecklistTree.childrenOf(items, currentFolderId)
+
+        // The fill-item id linked to each leaf template node (stable templateItemId link).
+        val fillIdByTemplateId: Map<String, String> = buildMap {
+            for (fillItem in fillItems) {
+                val templateId = fillItem.templateItemId ?: continue
+                // First linked row wins (defensive against duplicate links in corrupted data).
+                // NB: Map.putIfAbsent is JVM-only — not available in Kotlin/Wasm common stdlib.
+                if (!containsKey(templateId)) put(templateId, fillItem.id)
+            }
+        }
+
+        val folderModels = mutableListOf<FolderUiModel>()
+        val levelNodes = mutableListOf<LevelNode>()
+        val visibleIds = LinkedHashSet<String>()
+
+        for (child in levelChildren) {
+            if (child.type == ChecklistNodeType.FOLDER) {
+                val progress = ChecklistTree.folderProgress(items, fillItems, child.id)
                 // A folder owns a flat fill row (created in createFolder, linked by templateItemId);
                 // its reminder fields live there exactly like a leaf's. Legacy folders without a row
                 // simply read hasReminder = false until a reminder is set (the row is created lazily).
                 val hasReminder = fillItems
-                    .firstOrNull { it.templateItemId == folder.id }
+                    .firstOrNull { it.templateItemId == child.id }
                     ?.hasActiveReminder == true
-                FolderUiModel(
-                    id = folder.id,
-                    name = folder.text,
+                val model = FolderUiModel(
+                    id = child.id,
+                    name = child.text,
                     checked = progress.checked,
                     total = progress.total,
                     hasReminder = hasReminder,
                 )
+                folderModels += model
+                levelNodes += LevelNode.Folder(model)
+            } else {
+                // Leaf — surface only if it has a fill row at this level (its checked/note/attachment
+                // state lives there). A template leaf without a fill row is not rendered.
+                val fillId = fillIdByTemplateId[child.id] ?: continue
+                visibleIds += fillId
+                levelNodes += LevelNode.Leaf(fillId)
             }
+        }
 
-        // Template ids of the LEAF items directly under the current level.
-        val leafTemplateIds = ChecklistTree.childrenOf(items, currentFolderId)
-            .filter { it.type == ChecklistNodeType.ITEM }
-            .map { it.id }
-            .toSet()
-
-        // Map those to fill-item ids via the stable template link. Fill rows without a link
-        // (legacy) only surface at the root level so they never silently disappear inside a folder.
-        val visibleIds = buildSet {
-            for (item in fillItems) {
-                val templateId = item.templateItemId
-                when {
-                    templateId != null && templateId in leafTemplateIds -> add(item.id)
-                    templateId == null && currentFolderId == null -> add(item.id)
+        // Legacy fill rows WITHOUT a template link only surface at the root level so they never
+        // silently disappear inside a folder. Append them after the linked children (they have no
+        // template node to interleave with) so they stay visible and reorderable.
+        if (currentFolderId == null) {
+            for (fillItem in fillItems) {
+                if (fillItem.templateItemId == null) {
+                    visibleIds += fillItem.id
+                    levelNodes += LevelNode.Leaf(fillItem.id)
                 }
             }
         }
@@ -291,6 +314,7 @@ class ChecklistDetailViewModel(
             currentFolderTitle = title,
             folders = folderModels,
             visibleFillItemIds = visibleIds,
+            levelNodes = levelNodes,
         )
     }
 
@@ -301,6 +325,7 @@ class ChecklistDetailViewModel(
         val currentFolderTitle: String?,
         val folders: List<FolderUiModel>,
         val visibleFillItemIds: Set<String>?,
+        val levelNodes: List<LevelNode>,
     )
 
     /**
@@ -340,9 +365,23 @@ class ChecklistDetailViewModel(
 
             // ── Folder node actions (Phase 4) ──
             is ChecklistDetailIntent.OnFolderLongPress ->
-                updateContentState { it.copy(folderActionsSheetFor = intent.folderId) }
+                // Open the sheet in view mode (clear any stale inline-rename draft from a prior open).
+                updateContentState {
+                    it.copy(
+                        folderActionsSheetFor = intent.folderId,
+                        folderRenameForId = null,
+                        folderRenameDraft = "",
+                    )
+                }
             ChecklistDetailIntent.OnDismissFolderActions ->
-                updateContentState { it.copy(folderActionsSheetFor = null) }
+                // Closing the sheet also leaves inline-rename mode so the next open starts clean.
+                updateContentState {
+                    it.copy(
+                        folderActionsSheetFor = null,
+                        folderRenameForId = null,
+                        folderRenameDraft = "",
+                    )
+                }
 
             is ChecklistDetailIntent.OnRenameFolder -> startFolderRename(intent.folderId)
             is ChecklistDetailIntent.OnFolderRenameDraftChange ->
@@ -878,6 +917,7 @@ class ChecklistDetailViewModel(
                 currentFolderTitle = snapshot.currentFolderTitle,
                 folders = snapshot.folders,
                 visibleFillItemIds = snapshot.visibleFillItemIds,
+                levelNodes = snapshot.levelNodes,
                 showFlattenFoldersConfirm = false,
             )
         }
@@ -1056,10 +1096,15 @@ class ChecklistDetailViewModel(
         val updatedFill = fill.copy(items = fill.items + newFillItem)
         val updatedChecklist = state.checklist.copy(items = state.checklist.items + newChecklistItem)
         // Refresh folder visibility too so a just-added item shows immediately in folder mode
-        // (otherwise it'd be absent from visibleFillItemIds until the next Room emission).
+        // (otherwise it'd be absent from visibleFillItemIds / the reorderable list until the next
+        // Room emission).
         updateContentState {
             val snapshot = buildFolderState(updatedChecklist, updatedFill)
-            it.copy(checklist = updatedChecklist, visibleFillItemIds = snapshot.visibleFillItemIds)
+            it.copy(
+                checklist = updatedChecklist,
+                visibleFillItemIds = snapshot.visibleFillItemIds,
+                levelNodes = snapshot.levelNodes,
+            )
         }
 
         viewModelScope.launch {
@@ -1131,6 +1176,7 @@ class ChecklistDetailViewModel(
                         defaultFill = updatedFill,
                         folders = snapshot.folders,
                         visibleFillItemIds = snapshot.visibleFillItemIds,
+                        levelNodes = snapshot.levelNodes,
                     )
                 } else {
                     it
@@ -1162,13 +1208,13 @@ class ChecklistDetailViewModel(
         val folder = state.checklist.items.firstOrNull {
             it.id == folderId && it.type == ChecklistNodeType.FOLDER
         } ?: return
+        // The rename happens INLINE inside the open folder actions sheet (mirrors how the leaf
+        // ItemDetailsSheet edits its title), so the sheet must stay open. The headline swaps to a
+        // TextField because folderRenameForId now matches folderActionsSheetFor.
         updateContentState {
             it.copy(
                 folderRenameForId = folderId,
                 folderRenameDraft = folder.text,
-                // Close the actions sheet first — otherwise the ModalBottomSheet stays open
-                // underneath/over the rename dialog and the text field can't be reached.
-                folderActionsSheetFor = null,
             )
         }
     }
@@ -1179,7 +1225,9 @@ class ChecklistDetailViewModel(
      * [ChecklistFillItem.templateItemId]) so both stores stay consistent — mirroring how
      * [confirmItemTextEdit] keeps a leaf's fill/template text in sync.
      *
-     * Blank or unchanged text closes the dialog without a write (no empty folder names).
+     * Blank or unchanged text just leaves inline-edit mode without a write (no empty folder names).
+     * The actions sheet stays open in both cases — the new name shows in the headline, exactly like
+     * the leaf details sheet after a text edit.
      */
     private fun confirmFolderRename() {
         val state = _screenState.value as? ChecklistDetailState.Content ?: return
@@ -1192,7 +1240,7 @@ class ChecklistDetailViewModel(
         }
         if (folder == null || newName.isBlank() || folder.text == newName) {
             updateContentState {
-                it.copy(folderRenameForId = null, folderRenameDraft = "", folderActionsSheetFor = null)
+                it.copy(folderRenameForId = null, folderRenameDraft = "")
             }
             return
         }
@@ -1211,16 +1259,20 @@ class ChecklistDetailViewModel(
         val updatedFill = fill.copy(items = updatedFillItems)
 
         // Optimistic update; buildFolderState re-derives folder rows (names) from the new template.
+        // The actions sheet stays open (folderActionsSheetFor untouched) so the renamed headline
+        // shows in place — leaving edit mode only (folderRenameForId cleared).
         updateContentState {
             val snapshot = buildFolderState(updatedChecklist, updatedFill)
             it.copy(
                 checklist = updatedChecklist,
                 defaultFill = updatedFill,
                 folders = snapshot.folders,
+                // Refresh the mixed reorderable list too so the renamed folder card updates in
+                // place (its LevelNode.Folder carries the name).
+                levelNodes = snapshot.levelNodes,
                 currentFolderTitle = snapshot.currentFolderTitle,
                 folderRenameForId = null,
                 folderRenameDraft = "",
-                folderActionsSheetFor = null,
             )
         }
 
@@ -1341,6 +1393,7 @@ class ChecklistDetailViewModel(
                 checklist = updatedChecklist,
                 folders = snapshot.folders,
                 visibleFillItemIds = snapshot.visibleFillItemIds,
+                levelNodes = snapshot.levelNodes,
                 moveSheetForNodeId = null,
                 moveTargets = emptyList(),
                 folderActionsSheetFor = null,
@@ -1438,6 +1491,7 @@ class ChecklistDetailViewModel(
                     defaultFill = updatedFill,
                     folders = snapshot.folders,
                     visibleFillItemIds = snapshot.visibleFillItemIds,
+                    levelNodes = snapshot.levelNodes,
                     pendingFolderDeleteId = null,
                     pendingFolderDeleteCount = 0,
                 )
@@ -1682,7 +1736,10 @@ class ChecklistDetailViewModel(
                 AnalyticsParams.ITEM_COUNT to (state.defaultFill?.items?.size ?: 0).toString(),
                 AnalyticsParams.SOURCE to "overflow_menu"
             ))
-            navigator.onBack()
+            // The whole checklist is gone — pop ALL of its levels (root + any folder drill-down
+            // entries) back to the main list. navigator.onBack() only popped one entry, leaving the
+            // user on the deleted checklist's parent folder level when invoked from inside a folder.
+            navigator.navigateToMainScreen(clearBackStack = true)
         }
     }
 
@@ -1715,7 +1772,8 @@ class ChecklistDetailViewModel(
                 // fills) without adding an AppLogger dependency to this VM.
                 "template_found" to (checklist != null).toString()
             ))
-            navigator.onBack()
+            // Same as deleteChecklist: clear the whole checklist's stack back to the main list.
+            navigator.navigateToMainScreen(clearBackStack = true)
         }
     }
 
@@ -2071,12 +2129,44 @@ class ChecklistDetailViewModel(
         // The reorder UI only ever carries the ids VISIBLE at the current level: folder mode filters
         // the list down to a single folder level, and separateCompleted hides checked items. We
         // therefore re-sequence ONLY those ids, each landing back into one of the slots the visible
-        // items already occupied, and leave every other fill row exactly where it is — items in
-        // sibling folders, the folder container rows, root items (when standing inside a folder),
-        // and checked items. Rebuilding the whole fill from just the visible slice silently dropped
-        // — and synced to every device — all off-level data (the critical data-loss bug).
+        // nodes already occupied, and leave every other fill/template node exactly where it is —
+        // nodes in sibling folders, off-level nodes, root items (when standing inside a folder), and
+        // checked items. Rebuilding the whole fill/template from just the visible slice silently
+        // dropped — and synced to every device — all off-level data (the critical data-loss bug).
+        //
+        // The list is MIXED: a leaf node is identified by its FILL-item id, a folder node by its
+        // TEMPLATE id (folders live on the template). These id spaces never collide, so each ordered
+        // id resolves to at most one fill row + at most one template node:
+        //   • leaf  → fill row = fillItemsById[id];  template = via templateItemId link (text fallback)
+        //   • folder→ template = templateById[id];   fill row  = its placeholder row (templateItemId link)
         val fillItemsById = fill.items.associateBy { it.id }
-        val reorderedFillQueue = ArrayDeque(orderedItemIds.mapNotNull { fillItemsById[it] })
+        val fillByTemplateId = fill.items
+            .filter { it.templateItemId != null }
+            .associateBy { it.templateItemId!! }
+        val templateById = state.checklist.items.associateBy { it.id }
+        val templateByText = state.checklist.items.associateBy { it.text }
+
+        // Build the ordered fill rows + template nodes that take part in the reorder, in the visible
+        // order, each resolved as above. distinctBy{id} guards against any accidental duplicate.
+        val orderedFillRows = ArrayList<ChecklistFillItem>(orderedItemIds.size)
+        val orderedTemplateNodes = ArrayList<ChecklistItem>(orderedItemIds.size)
+        for (id in orderedItemIds) {
+            val leafFill = fillItemsById[id]
+            if (leafFill != null) {
+                // Leaf node (id is a fill-item id).
+                orderedFillRows += leafFill
+                (leafFill.templateItemId?.let { templateById[it] } ?: templateByText[leafFill.text])
+                    ?.let { orderedTemplateNodes += it }
+            } else {
+                // Folder node (id is a template id). Reposition the folder template node directly and
+                // its placeholder fill row (if present — legacy folders may lack one).
+                templateById[id]?.let { orderedTemplateNodes += it }
+                fillByTemplateId[id]?.let { orderedFillRows += it }
+            }
+        }
+
+        // Splice the fill rows back into the slots their members already occupied.
+        val reorderedFillQueue = ArrayDeque(orderedFillRows.distinctBy { it.id })
         val reorderedFillIds = reorderedFillQueue.map { it.id }.toSet()
         val newFillItems = fill.items.map { item ->
             if (item.id in reorderedFillIds && reorderedFillQueue.isNotEmpty()) {
@@ -2087,18 +2177,11 @@ class ChecklistDetailViewModel(
         }
         val updatedFill = fill.copy(items = newFillItems)
 
-        // Mirror the same re-sequencing onto the template items via the stable fill→template link
-        // (text fallback for legacy unlinked rows). Only template nodes whose fill row took part in
-        // the reorder are repositioned; all others — folder containers, off-level nodes, checked
-        // items — keep their original slot, so no template structure is lost.
-        val templateById = state.checklist.items.associateBy { it.id }
-        val templateByText = state.checklist.items.associateBy { it.text }
-        val reorderedTemplateInOrder = orderedItemIds.mapNotNull { id ->
-            val fillItem = fillItemsById[id] ?: return@mapNotNull null
-            fillItem.templateItemId?.let { templateById[it] } ?: templateByText[fillItem.text]
-        }.distinctBy { it.id }
-        val reorderedTemplateQueue = ArrayDeque(reorderedTemplateInOrder)
-        val reorderedTemplateIds = reorderedTemplateInOrder.map { it.id }.toSet()
+        // Splice the template nodes the same way. Only nodes that took part in the reorder are
+        // repositioned; all others — off-level nodes, folder subtrees, checked items — keep their
+        // original slot, so no template structure (folders or nested items) is lost.
+        val reorderedTemplateQueue = ArrayDeque(orderedTemplateNodes.distinctBy { it.id })
+        val reorderedTemplateIds = reorderedTemplateQueue.map { it.id }.toSet()
         val newTemplateItems = state.checklist.items.map { templateItem ->
             if (templateItem.id in reorderedTemplateIds && reorderedTemplateQueue.isNotEmpty()) {
                 reorderedTemplateQueue.removeFirst()

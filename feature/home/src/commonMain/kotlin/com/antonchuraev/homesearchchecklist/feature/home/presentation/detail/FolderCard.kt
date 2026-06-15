@@ -17,8 +17,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.folder_reminder
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
@@ -36,9 +38,14 @@ import org.jetbrains.compose.resources.stringResource
  * Visuals follow the design system: [AppCard] container, a leading folder icon, the folder name,
  * an aggregate-progress meta chip ("checked/total" of all descendant leaves) and a chevron.
  *
- * Tap drills into the folder; long-press opens the folder actions sheet (Rename / Move to… /
- * Delete) — mirroring how a leaf item exposes its actions via long-press / the details sheet
- * (Phase 4). The single-tap target stays "open the folder".
+ * Outside edit mode: tap drills into the folder; long-press opens the folder actions sheet
+ * (Rename / Move to… / Delete) — mirroring how a leaf item exposes its actions via long-press /
+ * the details sheet (Phase 4). The single-tap target stays "open the folder".
+ *
+ * In edit mode ([isEditMode]) the folder joins the single mixed reorderable list, so it can be
+ * dragged between items. The whole card becomes the drag handle ([cardDragModifier]) and tap /
+ * long-press navigation is suppressed (you're reordering, not opening) — matching how leaf items
+ * behave during reorder.
  *
  * A read-only reminder bell ([hasReminder]) renders before the chevron when the folder has an
  * active reminder. Per the card hit-zone rule it is purely visual — it has no `clickable`; the
@@ -48,8 +55,10 @@ import org.jetbrains.compose.resources.stringResource
  * @param total     Total descendant leaves (chip hidden when 0 — an empty folder shows no count).
  * @param progressLabel Pre-formatted "checked/total" label (resolved from string resources by the caller).
  * @param hasReminder Whether to show the read-only reminder indicator.
- * @param onOpen    Invoked when the card is tapped → drill into this folder.
- * @param onLongPress Invoked on long-press → open the folder actions sheet.
+ * @param onOpen    Invoked when the card is tapped (outside edit mode) → drill into this folder.
+ * @param onLongPress Invoked on long-press (outside edit mode) → open the folder actions sheet.
+ * @param isEditMode When true the card becomes a drag handle and tap/long-press are suppressed.
+ * @param cardDragModifier The reorderable drag-handle modifier applied to the card in edit mode.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -61,16 +70,34 @@ internal fun FolderCard(
     onOpen: () -> Unit,
     onLongPress: () -> Unit,
     modifier: Modifier = Modifier,
+    isEditMode: Boolean = false,
+    isDragging: Boolean = false,
+    cardDragModifier: Modifier = Modifier,
+    wiggleAngle: Float = 0f,
 ) {
     // AppCard with no onClick (so it stays a plain surface) + combinedClickable on its modifier,
     // because AppCard's built-in onClick can't carry a long-press. The default-indication overload
-    // keeps the tap ripple; visuals (elevation/border/shape) are unchanged. The whole card surface
-    // is the tap (open) / long-press (actions) target.
-    AppCard(
-        modifier = modifier.combinedClickable(
+    // keeps the tap ripple; visuals (elevation/border/shape) are unchanged.
+    //   • Normal mode: the whole card surface is the tap (open) / long-press (actions) target.
+    //   • Edit mode: the card surface becomes the reorder drag handle; tap/long-press are dropped.
+    val interactionModifier = if (isEditMode) {
+        cardDragModifier
+    } else {
+        Modifier.combinedClickable(
             onClick = onOpen,
             onLongClick = onLongPress,
-        ),
+        )
+    }
+    AppCard(
+        modifier = modifier
+            .then(if (isDragging) Modifier.zIndex(1f) else Modifier)
+            .graphicsLayer {
+                // Match the leaf wiggle in edit mode; freeze the rotation while this card is dragged.
+                if (isEditMode && !isDragging) {
+                    rotationZ = wiggleAngle
+                }
+            }
+            .then(interactionModifier),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
