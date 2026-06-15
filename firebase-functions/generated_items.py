@@ -45,8 +45,17 @@ def sanitize_generated_items(items, max_depth=MAX_FOLDER_DEPTH, max_total=MAX_GE
                 counter["n"] += 1
                 children = walk(node.get("children"), depth + 1)
                 result.append({"text": text, "type": "folder", "children": children})
+            elif is_folder:
+                # Folder past the depth cap: flatten instead of dropping its contents. Emit the
+                # folder's own label as a leaf, then promote every descendant to a leaf at this
+                # (deepest allowed) level — walking with the SAME depth so nested sub-folders also
+                # collapse to leaves here rather than vanishing. Matches the docstring contract
+                # ("contents are promoted to leaf items at the deepest allowed level").
+                counter["n"] += 1
+                result.append({"text": text, "checked": False})
+                result.extend(walk(node.get("children"), depth))
             else:
-                # Leaf item, or a folder past the depth cap (flattened to a leaf).
+                # Plain leaf item.
                 counter["n"] += 1
                 result.append({"text": text, "checked": False})
         return result

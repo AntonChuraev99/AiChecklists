@@ -92,6 +92,15 @@ class ChecklistDetailViewModel(
 
     private var pendingUndoJob: Job? = null
 
+    /**
+     * Guards against a double back-pop when the folder level we are standing on disappears.
+     * Set once — either by [confirmFolderDelete] when the user deletes the current folder
+     * locally (it pops synchronously to avoid a ghost frame), or by [loadData] when the same
+     * folder is removed/flattened from another device or a parent back-stack entry and the Room
+     * flow re-emits without it. Without this both paths could fire navigator.onBack() twice.
+     */
+    private var poppedMissingLevel = false
+
     init {
         loadData()
         observeInputForParsing()
@@ -134,6 +143,22 @@ class ChecklistDetailViewModel(
                 if (checklist == null || defaultFill == null) {
                     _screenState.value = ChecklistDetailState.NotFound
                     return@collect
+                }
+
+                // If the folder level we're standing on was deleted or flattened elsewhere (sync
+                // from another device, or a cascade delete from a parent back-stack entry), its
+                // node is gone from the template. Pop out instead of rendering a "ghost level"
+                // (an empty list titled with the whole checklist's name). Guarded so we never
+                // double-pop with confirmFolderDelete's synchronous local pop.
+                val fid = currentFolderId
+                if (fid != null && !poppedMissingLevel) {
+                    val folderStillExists = checklist.foldersEnabled &&
+                        checklist.items.any { it.id == fid && it.type == ChecklistNodeType.FOLDER }
+                    if (!folderStillExists) {
+                        poppedMissingLevel = true
+                        navigator.onBack()
+                        return@collect
+                    }
                 }
 
                 updateOrCreateContentState(checklist, defaultFill, additionalFills.size)
@@ -1402,6 +1427,7 @@ class ChecklistDetailViewModel(
         // ViewModel re-derives from Room once the writes below land. Otherwise update in place.
         val viewingDeletedSubtree = currentFolderId != null && currentFolderId in removeIds
         if (viewingDeletedSubtree) {
+            poppedMissingLevel = true
             updateContentState { it.copy(pendingFolderDeleteId = null, pendingFolderDeleteCount = 0) }
             navigator.onBack()
         } else {
@@ -2042,33 +2068,45 @@ class ChecklistDetailViewModel(
         val state = _screenState.value as? ChecklistDetailState.Content ?: return
         val fill = state.defaultFill ?: return
 
-        // Build a lookup for fill items by id
+        // The reorder UI only ever carries the ids VISIBLE at the current level: folder mode filters
+        // the list down to a single folder level, and separateCompleted hides checked items. We
+        // therefore re-sequence ONLY those ids, each landing back into one of the slots the visible
+        // items already occupied, and leave every other fill row exactly where it is — items in
+        // sibling folders, the folder container rows, root items (when standing inside a folder),
+        // and checked items. Rebuilding the whole fill from just the visible slice silently dropped
+        // — and synced to every device — all off-level data (the critical data-loss bug).
         val fillItemsById = fill.items.associateBy { it.id }
-        val completedItems = if (state.separateCompleted) fill.items.filter { it.checked } else emptyList()
-
-        // Reorder unchecked items according to the provided order
-        val reorderedUnchecked = orderedItemIds.mapNotNull { fillItemsById[it] }
-        val newFillItems = reorderedUnchecked + completedItems
+        val reorderedFillQueue = ArrayDeque(orderedItemIds.mapNotNull { fillItemsById[it] })
+        val reorderedFillIds = reorderedFillQueue.map { it.id }.toSet()
+        val newFillItems = fill.items.map { item ->
+            if (item.id in reorderedFillIds && reorderedFillQueue.isNotEmpty()) {
+                reorderedFillQueue.removeFirst()
+            } else {
+                item
+            }
+        }
         val updatedFill = fill.copy(items = newFillItems)
 
-        // Mirror the reorder onto the template items. Resolve each reordered fill item to its
-        // template item by the stable link, falling back to text for legacy fill rows. Then any
-        // template item not consumed by the unchecked order is treated as completed (only kept
-        // when separateCompleted splits them out).
+        // Mirror the same re-sequencing onto the template items via the stable fill→template link
+        // (text fallback for legacy unlinked rows). Only template nodes whose fill row took part in
+        // the reorder are repositioned; all others — folder containers, off-level nodes, checked
+        // items — keep their original slot, so no template structure is lost.
         val templateById = state.checklist.items.associateBy { it.id }
         val templateByText = state.checklist.items.associateBy { it.text }
-        val consumedTemplateIds = mutableSetOf<String>()
-        val reorderedTemplateUnchecked = reorderedUnchecked.mapNotNull { fillItem ->
-            val template = fillItem.templateItemId?.let { templateById[it] } ?: templateByText[fillItem.text]
-            if (template != null && consumedTemplateIds.add(template.id)) template else null
+        val reorderedTemplateInOrder = orderedItemIds.mapNotNull { id ->
+            val fillItem = fillItemsById[id] ?: return@mapNotNull null
+            fillItem.templateItemId?.let { templateById[it] } ?: templateByText[fillItem.text]
+        }.distinctBy { it.id }
+        val reorderedTemplateQueue = ArrayDeque(reorderedTemplateInOrder)
+        val reorderedTemplateIds = reorderedTemplateInOrder.map { it.id }.toSet()
+        val newTemplateItems = state.checklist.items.map { templateItem ->
+            if (templateItem.id in reorderedTemplateIds && reorderedTemplateQueue.isNotEmpty()) {
+                reorderedTemplateQueue.removeFirst()
+            } else {
+                templateItem
+            }
         }
-        val completedTemplateItems = if (state.separateCompleted) {
-            state.checklist.items.filter { it.id !in consumedTemplateIds }
-        } else {
-            emptyList()
-        }
-
-        val updatedChecklist = state.checklist.copy(items = reorderedTemplateUnchecked + completedTemplateItems)
+        val updatedChecklist = state.checklist.copy(items = newTemplateItems)
         updateContentState { it.copy(checklist = updatedChecklist) }
 
         viewModelScope.launch {

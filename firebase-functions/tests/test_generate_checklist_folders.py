@@ -42,6 +42,16 @@ def test_nested_folder_preserved_within_depth():
     assert out[1] == {"text": "Standalone", "checked": False}
 
 
+def _all_texts(nodes):
+    """Collect every node's text across the (possibly nested) sanitized tree."""
+    acc = []
+    for n in nodes:
+        acc.append(n["text"])
+        if n.get("type") == "folder":
+            acc.extend(_all_texts(n["children"]))
+    return acc
+
+
 def test_depth_beyond_cap_is_flattened_to_leaf():
     node = {"text": "leaf", "checked": False}
     for i in range(MAX_FOLDER_DEPTH + 2):
@@ -56,6 +66,32 @@ def test_depth_beyond_cap_is_flattened_to_leaf():
         return m
 
     assert measured_depth(out) <= MAX_FOLDER_DEPTH
+
+    # Regression: a folder past the depth cap must FLATTEN, not DROP, its contents. The deepest
+    # leaf and every folder label must survive as promoted leaves (previously they vanished).
+    texts = _all_texts(out)
+    assert "leaf" in texts, "deep leaf was dropped instead of flattened: %s" % texts
+    for i in range(MAX_FOLDER_DEPTH + 2):
+        assert "f%d" % i in texts, "folder label f%d was dropped: %s" % (i, texts)
+
+
+def test_folder_at_cap_flattens_all_descendants():
+    # A folder sitting EXACTLY at the depth cap must promote ALL its descendants (including those
+    # under a nested sub-folder) to leaves at the deepest level — not silently drop them.
+    deep = {"text": "capfolder", "type": "folder", "children": [
+        {"text": "child1", "checked": False},
+        {"text": "subfolder", "type": "folder", "children": [
+            {"text": "grandchild", "checked": False},
+        ]},
+    ]}
+    node = deep
+    for i in range(MAX_FOLDER_DEPTH):  # wrap so `deep` lands at depth == MAX_FOLDER_DEPTH
+        node = {"text": "w%d" % i, "type": "folder", "children": [node]}
+    out = sanitize_generated_items([node])
+
+    texts = _all_texts(out)
+    assert "child1" in texts, "direct child of a capped folder was dropped: %s" % texts
+    assert "grandchild" in texts, "nested descendant of a capped folder was dropped: %s" % texts
 
 
 def test_total_count_capped():

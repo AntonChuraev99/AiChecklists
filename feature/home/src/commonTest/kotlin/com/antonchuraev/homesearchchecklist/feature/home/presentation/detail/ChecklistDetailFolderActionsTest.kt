@@ -283,6 +283,75 @@ class ChecklistDetailFolderActionsTest {
         assertNull(state.folderActionsSheetFor)
     }
 
+    // ── Reorder (off-level data-loss regression) ────────────────────────────
+
+    @Test
+    fun finalizeReorder_atRoot_preservesFoldersAndNestedItems() = runTest {
+        // Root shows only leafRoot in the reorderable list (folders render separately; nested leaves
+        // live inside them). Before the fix, finalizeReorder rebuilt the whole fill/template from
+        // just that visible id → every folder + nested item was silently deleted and synced.
+        val vm = createViewModel(folderId = null)
+        vm.onIntent(ChecklistDetailIntent.OnFinalizeReorder(listOf(fillLeafRoot.id)))
+
+        val savedFill = repository.lastUpdatedFill
+        assertNotNull(savedFill, "fill must persist")
+        assertEquals(
+            testFill.items.map { it.id }.toSet(),
+            savedFill.items.map { it.id }.toSet(),
+            "no fill row may be dropped by a single-level reorder",
+        )
+
+        val savedTemplate = repository.lastUpdatedTemplate
+        assertNotNull(savedTemplate, "template must persist")
+        assertEquals(
+            templateItems.map { it.id }.toSet(),
+            savedTemplate.items.map { it.id }.toSet(),
+            "no template node (folder or nested item) may be dropped",
+        )
+    }
+
+    @Test
+    fun finalizeReorder_insideFolder_preservesOtherLevels() = runTest {
+        // Standing inside folderA, only leafA1 is visible. A reorder here must not touch sibling
+        // folders, the folder containers, root items, or the other folder's subtree.
+        val vm = createViewModel(folderId = folderA.id)
+        vm.onIntent(ChecklistDetailIntent.OnFinalizeReorder(listOf(fillLeafA1.id)))
+
+        val savedFill = repository.lastUpdatedFill
+        assertNotNull(savedFill)
+        assertEquals(testFill.items.map { it.id }.toSet(), savedFill.items.map { it.id }.toSet())
+
+        val savedTemplate = repository.lastUpdatedTemplate
+        assertNotNull(savedTemplate)
+        assertEquals(templateItems.map { it.id }.toSet(), savedTemplate.items.map { it.id }.toSet())
+    }
+
+    @Test
+    fun finalizeReorder_reordersVisibleSlice_keepsOffLevelInPlace() = runTest {
+        // Two leaves directly under folderA so the reorder actually changes order. Off-level rows
+        // (folderB, leafRoot, folderAChild subtree) must survive AND keep their slots.
+        val leafA2 = ChecklistItem(text = "Leaf A2", parentId = folderA.id)
+        val fillLeafA2 = ChecklistFillItem("Leaf A2", checked = false, templateItemId = leafA2.id)
+        val customFill = testFill.copy(items = testFill.items + fillLeafA2)
+        repository.storedChecklist = testChecklist.copy(items = templateItems + leafA2)
+        repository.defaultFillFlow.value = customFill
+
+        val vm = createViewModel(folderId = folderA.id)
+        // Visible inside folderA: leafA1, leafA2 → reverse them.
+        vm.onIntent(ChecklistDetailIntent.OnFinalizeReorder(listOf(fillLeafA2.id, fillLeafA1.id)))
+
+        val savedFill = repository.lastUpdatedFill
+        assertNotNull(savedFill)
+        assertEquals(
+            customFill.items.map { it.id }.toSet(),
+            savedFill.items.map { it.id }.toSet(),
+            "reorder must not drop any off-level row",
+        )
+        val a1Index = savedFill.items.indexOfFirst { it.id == fillLeafA1.id }
+        val a2Index = savedFill.items.indexOfFirst { it.id == fillLeafA2.id }
+        assertTrue(a2Index < a1Index, "the visible slice must actually be reordered (A2 before A1)")
+    }
+
     // ── Rename ────────────────────────────────────────────────────────────
 
     @Test
