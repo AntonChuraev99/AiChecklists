@@ -343,6 +343,7 @@
     <string name="detail_item_sheet_action_note">Заметка</string>
     <string name="detail_item_sheet_action_edit_note">Редактировать заметку</string>
     <string name="detail_item_sheet_action_delete">Удалить элемент</string>
+    <string name="detail_item_sheet_action_open_link">Открыть ссылку</string>
     <string name="detail_item_sheet_subtitle_no_reminder">Нажмите, чтобы установить</string>
     <string name="detail_item_sheet_subtitle_no_note">Нажмите, чтобы добавить</string>
 

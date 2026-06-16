@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
@@ -51,10 +52,14 @@ import androidx.compose.material3.TopAppBarDefaults
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonText
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppItemMetaChip
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppTextField
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import com.antonchuraev.homesearchchecklist.desingsystem.util.asWholeUrl
+import com.antonchuraev.homesearchchecklist.desingsystem.util.displayDomain
+import com.antonchuraev.homesearchchecklist.desingsystem.util.rememberLinkifiedText
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
 import aichecklists.core.designsystem.generated.resources.Res
@@ -325,17 +330,35 @@ private fun FillItemCard(
                     checked = item.checked,
                     onCheckedChange = onCheckedChange
                 )
-                Text(
-                    text = item.text,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = if (item.checked) {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    },
-                    textDecoration = if (item.checked) TextDecoration.LineThrough else null,
-                    modifier = Modifier.weight(1f)
-                )
+                // Read-only pretty link rendering. Whole-url line → compact "🔗 domain" tag;
+                // url among words → inline colored domain token. NOT clickable — the card's
+                // onClick toggles the checkbox, so a clickable link would conflict. Opening a
+                // link from this fill screen has no sheet yet (deferred).
+                val textWholeUrl = item.text.asWholeUrl()
+                if (textWholeUrl != null) {
+                    AppItemMetaChip(
+                        icon = Icons.Filled.Link,
+                        label = displayDomain(textWholeUrl),
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.weight(1f)
+                    )
+                } else {
+                    Text(
+                        text = rememberLinkifiedText(
+                            raw = item.text,
+                            linkColor = MaterialTheme.colorScheme.primary,
+                        ),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = if (item.checked) {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
+                        textDecoration = if (item.checked) TextDecoration.LineThrough else null,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
                 IconButton(onClick = onNoteClick) {
                     Icon(
                         Icons.Outlined.NoteAdd,
@@ -351,14 +374,28 @@ private fun FillItemCard(
             }
 
             item.note?.let { note ->
-                Text(
-                    text = note,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(start = 48.dp, end = 48.dp, bottom = AppDimens.SpacingSm)
-                )
+                val noteWholeUrl = note.asWholeUrl()
+                if (noteWholeUrl != null) {
+                    AppItemMetaChip(
+                        icon = Icons.Filled.Link,
+                        label = displayDomain(noteWholeUrl),
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.padding(start = 48.dp, end = 48.dp, bottom = AppDimens.SpacingSm)
+                    )
+                } else {
+                    Text(
+                        text = rememberLinkifiedText(
+                            raw = note,
+                            linkColor = MaterialTheme.colorScheme.primary,
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(start = 48.dp, end = 48.dp, bottom = AppDimens.SpacingSm)
+                    )
+                }
             }
         }
     }

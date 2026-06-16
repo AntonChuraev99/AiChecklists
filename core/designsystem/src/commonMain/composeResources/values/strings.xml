@@ -382,6 +382,7 @@
     <string name="detail_item_sheet_action_note">Note</string>
     <string name="detail_item_sheet_action_edit_note">Edit note</string>
     <string name="detail_item_sheet_action_delete">Delete item</string>
+    <string name="detail_item_sheet_action_open_link">Open link</string>
     <string name="detail_item_sheet_subtitle_no_reminder">Tap to set</string>
     <string name="detail_item_sheet_subtitle_no_note">Tap to add</string>
     <string name="detail_item_sheet_edit_text_hint">Item text</string>

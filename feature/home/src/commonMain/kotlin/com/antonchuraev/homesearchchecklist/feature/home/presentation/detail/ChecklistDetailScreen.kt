@@ -69,6 +69,7 @@ import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.PlaylistRemove
 import androidx.compose.material3.SwipeToDismissBox
@@ -148,6 +149,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
@@ -171,6 +173,10 @@ import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
+import com.antonchuraev.homesearchchecklist.desingsystem.util.asWholeUrl
+import com.antonchuraev.homesearchchecklist.desingsystem.util.displayDomain
+import com.antonchuraev.homesearchchecklist.desingsystem.util.extractUrls
+import com.antonchuraev.homesearchchecklist.desingsystem.util.rememberLinkifiedText
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistViewMode
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
@@ -194,6 +200,7 @@ import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsScreens
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.PlatformCapabilities
 import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.picker.FilePickerType
 import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.picker.rememberFilePickerLauncher
@@ -1634,30 +1641,61 @@ internal fun ChecklistItemCard(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs)
                 ) {
-                    Text(
-                        text = item.text,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = if (item.checked) {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
-                        },
-                        textDecoration = if (item.checked) TextDecoration.LineThrough else null,
-                        modifier = Modifier.fillMaxWidth().padding(
-                            start = if (isEditMode) AppDimens.SpacingSm else 0.dp
+                    // Item text. If the whole line is a single URL, show a compact read-only
+                    // "🔗 domain" tag instead of the long raw URL; if a URL sits among words,
+                    // render it inline as a colored domain token (read-only — opening is offered
+                    // in ItemDetailsSheet, never on the card per the 30/70 hit-zone rule).
+                    val textWholeUrl = item.text.asWholeUrl()
+                    val textStartPadding =
+                        Modifier.padding(start = if (isEditMode) AppDimens.SpacingSm else 0.dp)
+                    if (textWholeUrl != null) {
+                        AppItemMetaChip(
+                            icon = Icons.Filled.Link,
+                            label = displayDomain(textWholeUrl),
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = textStartPadding,
                         )
-                    )
+                    } else {
+                        Text(
+                            text = rememberLinkifiedText(
+                                raw = item.text,
+                                linkColor = MaterialTheme.colorScheme.primary,
+                            ),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = if (item.checked) {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            },
+                            textDecoration = if (item.checked) TextDecoration.LineThrough else null,
+                            modifier = Modifier.fillMaxWidth().then(textStartPadding)
+                        )
+                    }
 
                     if (!isEditMode) {
                         item.note?.let { note ->
-                            Text(
-                                text = note,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.fillMaxWidth()
-                            )
+                            val noteWholeUrl = note.asWholeUrl()
+                            if (noteWholeUrl != null) {
+                                AppItemMetaChip(
+                                    icon = Icons.Filled.Link,
+                                    label = displayDomain(noteWholeUrl),
+                                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                )
+                            } else {
+                                Text(
+                                    text = rememberLinkifiedText(
+                                        raw = note,
+                                        linkColor = MaterialTheme.colorScheme.primary,
+                                    ),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
                         }
                     }
 
@@ -1768,6 +1806,13 @@ internal fun ItemDetailsSheet(
     showMoveAction: Boolean = false,
     onMoveClick: () -> Unit = {},
 ) {
+    val uriHandler = LocalUriHandler.current
+    val logger = koinInject<AppLogger>()
+    // URLs found in the item text + note (deduped). Each gets its own "Open link" action row.
+    val itemUrls = remember(item.text, item.note) {
+        (extractUrls(item.text) + extractUrls(item.note)).distinct()
+    }
+
     AdaptiveSheetOrDialog(
         onDismiss = onDismiss,
         title = { Text(item.text, style = MaterialTheme.typography.titleMedium) },
@@ -1870,7 +1915,8 @@ internal fun ItemDetailsSheet(
                 if (hasNote) Res.string.detail_item_sheet_action_edit_note
                 else Res.string.detail_item_sheet_action_note
             )
-            val noteSubtitle = item.note
+            // If the note is just a pasted URL, show its domain instead of the long raw link.
+            val noteSubtitle = item.note?.let { note -> note.asWholeUrl()?.let(::displayDomain) ?: note }
                 ?: stringResource(Res.string.detail_item_sheet_subtitle_no_note)
             val noteIconTint = if (hasNote)
                 MaterialTheme.colorScheme.primary
@@ -1887,6 +1933,26 @@ internal fun ItemDetailsSheet(
             )
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+            // ── Open link row(s) — one per URL detected in the text/note ──
+            // openUri is called synchronously from onClick (NOT a coroutine) so the web build
+            // doesn't get the window.open blocked as a popup. runCatching guards a malformed URL.
+            val openLinkTitle = stringResource(Res.string.detail_item_sheet_action_open_link)
+            itemUrls.forEach { url ->
+                ItemDetailsSheetRow(
+                    icon = Icons.Filled.Link,
+                    iconTint = MaterialTheme.colorScheme.primary,
+                    title = openLinkTitle,
+                    subtitle = displayDomain(url),
+                    showChevron = true,
+                    onClick = {
+                        runCatching { uriHandler.openUri(url) }
+                            .onFailure { logger.warning("OpenLink", "openUri failed for $url: ${it.message}") }
+                    },
+                )
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            }
 
             // ── Attachments section (Android only — gated via PlatformCapabilities) ──
             if (PlatformCapabilities.attachmentsSupported) {
