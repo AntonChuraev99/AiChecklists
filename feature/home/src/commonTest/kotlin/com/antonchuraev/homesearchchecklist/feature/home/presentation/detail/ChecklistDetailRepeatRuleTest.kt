@@ -131,6 +131,7 @@ class ChecklistDetailRepeatRuleTest {
             datastore = datastore,
             smartDateParser = FakeSmartDateParser(),
             attachmentStorage = FakeAttachmentStorage(),
+            calendarEventLauncher = FakeCalendarEventLauncher(),
         )
     }
 
@@ -418,7 +419,7 @@ class ChecklistDetailRepeatRuleTest {
 
     @Test
     fun onRepeatRuleClick_freeUser_withExistingRecurring_navigatesToPaywall() = runTest {
-        repository.repeatScheduleCount = 1 // Already at limit
+        repository.repeatScheduleCount = 10 // Already at limit (free RC default = 10)
         val navigator = FakeAppNavigator()
         val vm = createViewModel(navigator = navigator)
         vm.onIntent(ChecklistDetailIntent.OnReminderClick)
@@ -493,7 +494,7 @@ class ChecklistDetailRepeatRuleTest {
 
     @Test
     fun onRepeatRuleClick_limitHit_tracksAnalytics() = runTest {
-        repository.repeatScheduleCount = 1
+        repository.repeatScheduleCount = 10
         val tracker = FakeAnalyticsTracker()
         val vm = createViewModel(analyticsTracker = tracker)
         vm.onIntent(ChecklistDetailIntent.OnReminderClick)

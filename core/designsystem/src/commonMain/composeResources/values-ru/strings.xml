@@ -920,7 +920,7 @@
     <string name="weekly_paywall_locked_message">Бесплатным пользователям доступен 1 еженедельный чек-лист. Перейдите на Премиум для безлимитных еженедельных чек-листов.</string>
     <string name="weekly_overdue_section_title">Просрочено</string>
     <string name="reminder_paywall_locked_title">Функция Премиум</string>
-    <string name="reminder_paywall_locked_message">Бесплатным пользователям доступно 1 активное напоминание. Перейдите на Премиум для безлимитных напоминаний на чек-листах и элементах.</string>
+    <string name="reminder_paywall_locked_message">Бесплатным пользователям доступно 10 активных напоминаний. Перейдите на Премиум для безлимитных напоминаний на чек-листах и элементах.</string>
     <string name="reminder_paywall_locked_cta">Стать Про</string>
 
     <!-- Экран «Сегодня» -->

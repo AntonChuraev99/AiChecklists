@@ -569,7 +569,7 @@ private fun CompareBody(
     //   - AI requests: Free gets 100 starter credits ONCE (no daily refill), Pro gets 300/day
     //     (firebase-functions/main.py: DEFAULT_INITIAL_CREDITS=100, refill only for premium).
     //   - Checklists / fills / recurring reminders: hard caps on Free, unlimited on Pro
-    //     (RemoteConfig: MAX_CHECKLISTS_FREE=4, MAX_FILLS_FREE=5, MAX_FREE_REPEAT_SCHEDULES=1).
+    //     (RemoteConfig: MAX_CHECKLISTS_FREE=4, MAX_FILLS_FREE=5, MAX_RECURRING_REMINDERS_FREE=10).
     // Removed lies: photo/voice/PDF/link rows (all accessible on Free) and "best AI model"
     // (server uses gemini-2.5-flash-lite for everyone).
     val unlimited = stringResource(Res.string.paywall_v1_compare_value_unlimited)

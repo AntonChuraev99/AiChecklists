@@ -125,6 +125,7 @@ class ChecklistDetailPriorityTest {
             datastore = datastore,
             smartDateParser = FakeSmartDateParser(),
             attachmentStorage = FakeAttachmentStorage(),
+            calendarEventLauncher = FakeCalendarEventLauncher(),
         )
     }
 

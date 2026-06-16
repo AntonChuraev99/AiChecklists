@@ -169,6 +169,7 @@ class ChecklistDetailAttachmentsTest {
             datastore = datastore,
             smartDateParser = FakeSmartDateParser(),
             attachmentStorage = attachmentStorage,
+            calendarEventLauncher = FakeCalendarEventLauncher(),
         )
     }
 

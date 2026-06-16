@@ -59,7 +59,7 @@ object RemoteConfigDefaults {
     // Free user limits
     const val MAX_CHECKLISTS_FREE = 4L
     const val MAX_FILLS_FREE = 5L
-    const val MAX_RECURRING_REMINDERS_FREE = 1L
+    const val MAX_RECURRING_REMINDERS_FREE = 10L
     const val MAX_WEEKLY_CHECKLISTS_FREE = 1L
 
     // Templates - default empty, populated from Remote Config

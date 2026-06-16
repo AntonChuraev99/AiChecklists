@@ -1956,18 +1956,15 @@ class ChecklistDetailViewModel(
                 return@launch
             }
 
-            // New repeat schedule — check free user limit
-            val isPremium = awaitUserLimits()?.isPremium ?: false
-            if (!isPremium) {
-                val activeCount = repository.countActiveRepeatSchedules()
-                if (activeCount >= MAX_FREE_REPEAT_SCHEDULES) {
-                    analyticsTracker.event(AnalyticsEvents.Reminder.RECURRING_LIMIT_HIT)
-                    navigator.navigateToPaywall(source = "detail_recurring_limit")
-                } else {
-                    updateContentState {
-                        it.copy(activeReminderTab = ReminderTab.REPEAT, pendingRepeatConfig = PendingRepeatConfig())
-                    }
-                }
+            // New repeat schedule — check free user limit (RC-driven via UserLimits).
+            val limits = awaitUserLimits()
+            val activeCount = repository.countActiveRepeatSchedules()
+            // limits == null only on a rare 2s RC/DataStore stall — don't block, let the user proceed
+            // (mirrors awaitUserLimits' intent of never falsely flipping a user to the gated path).
+            val canCreate = limits?.canCreateRecurringReminder(activeCount) ?: true
+            if (!canCreate) {
+                analyticsTracker.event(AnalyticsEvents.Reminder.RECURRING_LIMIT_HIT)
+                navigator.navigateToPaywall(source = "detail_recurring_limit")
             } else {
                 updateContentState {
                     it.copy(activeReminderTab = ReminderTab.REPEAT, pendingRepeatConfig = PendingRepeatConfig())
@@ -2853,8 +2850,6 @@ class ChecklistDetailViewModel(
         const val PREF_EXACT_ALARM_DONT_SHOW = "exact_alarm_dont_show"
         const val SNACKBAR_EXACT_GRANTED = "exact_alarm_granted"
         const val SNACKBAR_EXACT_DENIED = "exact_alarm_denied"
-        /** Max independent repeat schedules for free users. Matches Remote Config default. */
-        const val MAX_FREE_REPEAT_SCHEDULES = 1
         /**
          * Smart Add hint: user typed only the trigger phrase (no item text), or all non-trigger
          * text was stripped to blank. Tell them to add actual task text.

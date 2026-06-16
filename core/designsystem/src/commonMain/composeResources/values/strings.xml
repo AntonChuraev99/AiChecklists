@@ -1011,7 +1011,7 @@
     <string name="weekly_paywall_locked_message">Free users can have 1 weekly checklist. Upgrade to Premium for unlimited weekly checklists.</string>
     <string name="weekly_overdue_section_title">Overdue</string>
     <string name="reminder_paywall_locked_title">Premium feature</string>
-    <string name="reminder_paywall_locked_message">Free users can have 1 active reminder. Upgrade to Premium for unlimited reminders on checklists and items.</string>
+    <string name="reminder_paywall_locked_message">Free users can have 10 active reminders. Upgrade to Premium for unlimited reminders on checklists and items.</string>
     <string name="reminder_paywall_locked_cta">Become Pro</string>
 
     <!-- Today Screen -->

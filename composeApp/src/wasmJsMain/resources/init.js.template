@@ -133,7 +133,7 @@ rc.defaultConfig = {
     ai_daily_limit_premium: 300,
     max_checklists_free: 4,
     max_fills_free: 5,
-    max_recurring_reminders_free: 1,
+    max_recurring_reminders_free: 10,
     max_weekly_checklists_free: 1,
     templates_json: "[]",
     onboarding: "interactive",

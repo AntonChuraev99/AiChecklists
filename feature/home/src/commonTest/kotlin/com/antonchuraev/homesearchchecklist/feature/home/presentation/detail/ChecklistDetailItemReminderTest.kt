@@ -157,6 +157,7 @@ class ChecklistDetailItemReminderTest {
             datastore = datastore,
             smartDateParser = FakeSmartDateParser(),
             attachmentStorage = FakeAttachmentStorage(),
+            calendarEventLauncher = FakeCalendarEventLauncher(),
         )
     }
 
