@@ -64,6 +64,9 @@ graphify-out/
 # Google Play store translation archives (binary zips, not source)
 google_play_translate/
 
+# Local design prototypes / mockups (not portfolio source)
+claude_design/
+
 # Local design scratch / worktree helper
 .design-tmp/
 .worktreeinclude
