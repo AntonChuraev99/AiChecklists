@@ -142,4 +142,26 @@ interface ChecklistRepository {
     suspend fun addFill(fill: ChecklistFill): Long
     suspend fun updateFill(fill: ChecklistFill)
     suspend fun deleteFill(fill: ChecklistFill)
+
+    /**
+     * Persists a drag-to-reorder atomically: the reordered [fill] and its [checklist] template
+     * are written in ONE database transaction with a single shared `updatedAt`.
+     *
+     * This is the dedicated path for reorder (instead of [updateFill] + [updateChecklistTemplate])
+     * to close a sync race: those two calls do separate writes — and [updateFill] additionally
+     * dirties the parent checklist with the OLD items before the template write — so a sync push
+     * triggered by the parent-table emission could read the stale half, upload it, and stamp it
+     * with a fresh `updatedAt`; the real-time listener echo then merged that stale snapshot back
+     * over the just-made local order (old order resurrected after leaving the screen).
+     *
+     * Contract:
+     * - Both rows are marked PENDING_UPLOAD with the SAME, monotonic `updatedAt` (>= any value a
+     *   concurrent push could have stamped), so the parent's timestamp never goes backwards.
+     * - The transaction makes the parent (`checklists`) table emit exactly once, AFTER commit,
+     *   already carrying the new order — a push can never observe an intermediate stale state.
+     *
+     * No fill-id regeneration happens (unlike [updateChecklist]); the caller passes already
+     * reconciled fill + template, matching the [updateChecklistTemplate] contract.
+     */
+    suspend fun reorderItems(fill: ChecklistFill, checklist: Checklist)
 }

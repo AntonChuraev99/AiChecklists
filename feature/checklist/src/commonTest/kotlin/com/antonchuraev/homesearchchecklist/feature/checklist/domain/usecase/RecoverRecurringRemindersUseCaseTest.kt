@@ -81,6 +81,7 @@ class RecoverRecurringRemindersUseCaseTest {
         override suspend fun addFill(fill: ChecklistFill): Long = 0L
         override suspend fun updateFill(fill: ChecklistFill) {}
         override suspend fun deleteFill(fill: ChecklistFill) {}
+        override suspend fun reorderItems(fill: ChecklistFill, checklist: Checklist) {}
         override suspend fun getTotalAdditionalFillCount(): Int = 0
         override suspend fun getWeeklyChecklistCount(): Int = 0
         override val weeklyChecklistCount: Flow<Int> = flowOf(0)

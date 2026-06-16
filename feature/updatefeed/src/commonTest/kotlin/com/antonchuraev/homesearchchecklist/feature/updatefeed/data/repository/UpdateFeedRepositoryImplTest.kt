@@ -24,13 +24,13 @@ class UpdateFeedRepositoryImplTest {
     // ---- getReleases() — default JSON ----
 
     @Test
-    fun `getReleases_withDefaultJson_returnsElevenReleaseGroups`() = runTest {
+    fun `getReleases_withDefaultJson_returnsTwelveReleaseGroups`() = runTest {
         val repository = buildRepository(UpdateFeedContent.JSON)
 
         val releases = repository.getReleases()
 
-        // 29 posts across 11 main-versions (v1.6–v1.16)
-        assertEquals(11, releases.size)
+        // 31 posts across 12 main-versions (v1.6–v1.17)
+        assertEquals(12, releases.size)
     }
 
     @Test
@@ -39,8 +39,8 @@ class UpdateFeedRepositoryImplTest {
 
         val releases = repository.getReleases()
 
-        // Newest release first (v1.16 has the highest post timestamp)
-        assertEquals("1.16", releases.first().version)
+        // Newest release first (v1.17 has the highest post timestamp)
+        assertEquals("1.17", releases.first().version)
         // Oldest release last (v1.6)
         assertEquals("1.6", releases.last().version)
     }
@@ -52,7 +52,7 @@ class UpdateFeedRepositoryImplTest {
         val releases = repository.getReleases()
 
         assertEquals(
-            listOf("1.16", "1.15", "1.14", "1.13", "1.12", "1.11", "1.10", "1.9", "1.8", "1.7", "1.6"),
+            listOf("1.17", "1.16", "1.15", "1.14", "1.13", "1.12", "1.11", "1.10", "1.9", "1.8", "1.7", "1.6"),
             releases.map { it.version }
         )
     }
@@ -291,13 +291,13 @@ class UpdateFeedRepositoryImplTest {
     }
 
     @Test
-    fun `getReleases_withDefaultJson_totalPostCountIsTwentyNine`() = runTest {
+    fun `getReleases_withDefaultJson_totalPostCountIsThirtyOne`() = runTest {
         val repository = buildRepository(UpdateFeedContent.JSON)
 
         val releases = repository.getReleases()
         val totalPosts = releases.sumOf { it.posts.size }
 
-        assertEquals(29, totalPosts)
+        assertEquals(31, totalPosts)
     }
 
     @Test

@@ -154,6 +154,7 @@ class AnalyzeRepositoryFoldersTest {
         override suspend fun addFill(fill: ChecklistFill): Long = 1L
         override suspend fun updateFill(fill: ChecklistFill) {}
         override suspend fun deleteFill(fill: ChecklistFill) {}
+        override suspend fun reorderItems(fill: ChecklistFill, checklist: Checklist) {}
     }
 
     private class FakeUserDataRepository : UserDataRepository {

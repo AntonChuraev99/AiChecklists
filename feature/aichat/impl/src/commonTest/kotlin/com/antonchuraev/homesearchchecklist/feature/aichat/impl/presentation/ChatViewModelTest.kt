@@ -193,6 +193,7 @@ private class FakeChecklistRepository(
     override suspend fun addFill(fill: com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill): Long = 0L
     override suspend fun updateFill(fill: com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill) = Unit
     override suspend fun deleteFill(fill: com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill) = Unit
+    override suspend fun reorderItems(fill: com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill, checklist: com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist) = Unit
 }
 
 private class FakeToolCallDispatcher(

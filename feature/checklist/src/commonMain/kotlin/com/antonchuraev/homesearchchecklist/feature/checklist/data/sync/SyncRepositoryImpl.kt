@@ -359,6 +359,22 @@ class SyncRepositoryImpl(
             for (fillData in remote.fills) {
                 fillDao.insert(fillData.toInsertEntity(checklistId = localId))
             }
+        } else if (local.syncStatus == SyncStatus.PENDING_UPLOAD.value) {
+            // Local has UNSYNCED edits that have not yet reached the cloud. The remote
+            // snapshot we are merging is necessarily older than (or, in a sync race, an echo
+            // of a partial state behind) these edits — the next pushPendingChanges() carries
+            // the local changes up and the cloud catches up. Overwriting here would clobber a
+            // just-made local change (e.g. a reorder) with a stale cloud document.
+            //
+            // This is the safety net for the reorder race: finalizeReorder writes the new
+            // order PENDING_UPLOAD; if a push stamped a fresh updatedAt onto an intermediate
+            // stale state and the real-time listener echoed it back, remote.updatedAt could be
+            // >= local.updatedAt with STALE items. LWW alone would then pick the stale remote.
+            // Gating on PENDING_UPLOAD keeps the local unsynced order until it is pushed.
+            //
+            // SYNCED rows are unaffected: a genuinely newer remote from ANOTHER device still
+            // wins via the LWW branch below, so cross-device edits are not lost.
+            log("merge: SKIP '${remote.name}' (local has pending unsynced edits)")
         } else if (remote.updatedAt > local.updatedAt) {
             log("merge: UPDATE '${remote.name}' remote=${remote.updatedAt} > local=${local.updatedAt}")
             val updated = remote.toDomain().toUpdateEntity(localId = local.id)
@@ -369,7 +385,13 @@ class SyncRepositoryImpl(
                 val existingFill = fillDao.getByCloudId(fillData.cloudId)
                 if (existingFill == null) {
                     fillDao.insert(fillData.toInsertEntity(checklistId = local.id))
-                } else if (fillData.updatedAt > existingFill.updatedAt) {
+                } else if (
+                    existingFill.syncStatus != SyncStatus.PENDING_UPLOAD.value &&
+                    fillData.updatedAt > existingFill.updatedAt
+                ) {
+                    // Same PENDING_UPLOAD guard at the per-fill level: an in-place fill edit
+                    // (checkbox/note/attachment) not yet pushed must not be overwritten by an
+                    // older/echoed remote fill. SYNCED fills still take a genuinely newer remote.
                     fillDao.insert(fillData.toUpdateEntity(localId = existingFill.id, checklistId = local.id))
                 }
             }

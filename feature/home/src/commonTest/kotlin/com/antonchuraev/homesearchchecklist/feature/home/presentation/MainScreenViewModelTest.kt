@@ -157,6 +157,7 @@ private class FakeChecklistRepository : ChecklistRepository {
     override suspend fun addFill(fill: ChecklistFill): Long = 0L
     override suspend fun updateFill(fill: ChecklistFill) {}
     override suspend fun deleteFill(fill: ChecklistFill) {}
+    override suspend fun reorderItems(fill: ChecklistFill, checklist: Checklist) {}
     override fun observeRemindersInRange(fromMs: Long, toMs: Long): Flow<List<TodayReminderInfo>> = flowOf(emptyList())
     override suspend fun getRemindersInRange(fromMs: Long, toMs: Long): List<TodayReminderInfo> = emptyList()
     override suspend fun togglePriority(fillId: Long, itemId: String): Result<Unit> = Result.success(Unit)

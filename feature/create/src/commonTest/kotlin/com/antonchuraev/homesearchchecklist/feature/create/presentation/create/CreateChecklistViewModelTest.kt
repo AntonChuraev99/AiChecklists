@@ -382,6 +382,7 @@ class CreateChecklistViewModelTest {
         override suspend fun addFill(fill: ChecklistFill): Long = 0L
         override suspend fun updateFill(fill: ChecklistFill) = notUsed()
         override suspend fun deleteFill(fill: ChecklistFill) = notUsed()
+        override suspend fun reorderItems(fill: ChecklistFill, checklist: Checklist) = notUsed()
 
         private fun notUsed(): Nothing = error("FakeChecklistRepository: method not wired for this test")
     }

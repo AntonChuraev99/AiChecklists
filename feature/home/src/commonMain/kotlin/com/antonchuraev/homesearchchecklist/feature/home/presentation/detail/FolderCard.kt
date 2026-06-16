@@ -1,7 +1,5 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation.detail
 
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
@@ -60,7 +58,6 @@ import org.jetbrains.compose.resources.stringResource
  * @param isEditMode When true the card becomes a drag handle and tap/long-press are suppressed.
  * @param cardDragModifier The reorderable drag-handle modifier applied to the card in edit mode.
  */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun FolderCard(
     name: String,
@@ -75,19 +72,12 @@ internal fun FolderCard(
     cardDragModifier: Modifier = Modifier,
     wiggleAngle: Float = 0f,
 ) {
-    // AppCard with no onClick (so it stays a plain surface) + combinedClickable on its modifier,
-    // because AppCard's built-in onClick can't carry a long-press. The default-indication overload
-    // keeps the tap ripple; visuals (elevation/border/shape) are unchanged.
+    // Tap (open) / long-press (actions) are handed to AppCard, which applies combinedClickable to
+    // its INNER content — so the Card clips the ripple to its rounded [shape] and no rectangle
+    // bleeds past the corners. Drag/wiggle/zIndex stay on the OUTER modifier so the elevation
+    // shadow and reorder transform are not clipped.
     //   • Normal mode: the whole card surface is the tap (open) / long-press (actions) target.
     //   • Edit mode: the card surface becomes the reorder drag handle; tap/long-press are dropped.
-    val interactionModifier = if (isEditMode) {
-        cardDragModifier
-    } else {
-        Modifier.combinedClickable(
-            onClick = onOpen,
-            onLongClick = onLongPress,
-        )
-    }
     AppCard(
         modifier = modifier
             .then(if (isDragging) Modifier.zIndex(1f) else Modifier)
@@ -97,7 +87,9 @@ internal fun FolderCard(
                     rotationZ = wiggleAngle
                 }
             }
-            .then(interactionModifier),
+            .then(if (isEditMode) cardDragModifier else Modifier),
+        onClick = if (isEditMode) null else onOpen,
+        onLongClick = if (isEditMode) null else onLongPress,
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,

@@ -2193,8 +2193,13 @@ class ChecklistDetailViewModel(
         updateContentState { it.copy(checklist = updatedChecklist) }
 
         viewModelScope.launch {
-            repository.updateFill(updatedFill)
-            repository.updateChecklistTemplate(updatedChecklist)
+            // Persist the reordered fill + template ATOMICALLY (one transaction, one shared
+            // updatedAt). Using the dedicated reorderItems() — instead of updateFill() +
+            // updateChecklistTemplate() — closes a sync race: those two separate writes (the
+            // first of which dirtied the parent checklist with the OLD items before the second)
+            // let a triggered push upload the stale half and stamp it newer, whose real-time
+            // listener echo then clobbered this just-made local order on the next merge.
+            repository.reorderItems(updatedFill, updatedChecklist)
         }
     }
 

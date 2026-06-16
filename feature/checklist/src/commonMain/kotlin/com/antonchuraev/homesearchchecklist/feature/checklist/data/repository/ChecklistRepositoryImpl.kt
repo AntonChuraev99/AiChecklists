@@ -7,6 +7,7 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistD
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistEntity
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistFillDao
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistFillEntity
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistTransactionRunner
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ReminderConverters
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.toDomain
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.toEntity
@@ -33,6 +34,7 @@ class ChecklistRepositoryImpl(
     private val checklistDao: ChecklistDao,
     private val fillDao: ChecklistFillDao,
     private val attachmentStorage: AttachmentStoragePort,
+    private val transactionRunner: ChecklistTransactionRunner,
 ) : ChecklistRepository {
 
     // Checklists (templates)
@@ -428,6 +430,34 @@ class ChecklistRepositoryImpl(
         // must be re-uploaded (now missing this fill) for other devices' per-fill
         // reconciliation to drop it too. Bump the parent so pushPendingChanges picks it up.
         checklistDao.touchForSync(fill.checklistId, currentTimeMillis())
+    }
+
+    override suspend fun reorderItems(fill: ChecklistFill, checklist: Checklist) {
+        // ONE shared timestamp for both rows: keeps the parent's updatedAt monotonic and equal to
+        // the fill's, so neither half looks "older" to a later merge.
+        val now = currentTimeMillis()
+
+        // Atomic: both writes commit together, so Room's InvalidationTracker fires the `checklists`
+        // observer (which drives the sync push in MainScreenViewModel) only ONCE, post-commit, with
+        // the new order already in place. Critically we do NOT call updateFill() here: that path
+        // also touchForSync()es the parent with the OLD items before the template write, opening the
+        // exact window where a push could upload the stale snapshot and have its echo clobber the
+        // local reorder. Writing the fill row (which does not touch the `checklists` table) and the
+        // template row (new items) inside one transaction removes that window entirely.
+        transactionRunner.withTransaction {
+            fillDao.insert(
+                fill.toEntity().copy(
+                    updatedAt = now,
+                    syncStatus = SyncStatus.PENDING_UPLOAD.value,
+                )
+            )
+            checklistDao.update(
+                checklist.toEntity().copy(
+                    updatedAt = now,
+                    syncStatus = SyncStatus.PENDING_UPLOAD.value,
+                )
+            )
+        }
     }
 
     override suspend fun reorderChecklists(orderedIds: List<Long>) {

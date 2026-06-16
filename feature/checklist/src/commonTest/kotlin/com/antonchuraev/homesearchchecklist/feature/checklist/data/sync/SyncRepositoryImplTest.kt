@@ -10,6 +10,7 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistE
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistFillDao
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistFillEntity
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistRepeatInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.SyncStatus
@@ -22,6 +23,8 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -69,6 +72,44 @@ class SyncRepositoryImplTest {
             itemsJson = "[]",
             updatedAt = updatedAt,
         )
+
+    // ── Item-aware builders (for the PENDING_UPLOAD merge-guard tests) ──
+    // Items are serialized exactly as production does (the same JSON + serializer the
+    // SUT uses), so the round-trip through ChecklistSyncData.toDomain() is faithful.
+
+    private val itemsJson = Json { ignoreUnknownKeys = true }
+
+    /** Template items with the given texts (stable ids derived from text so order is comparable). */
+    private fun items(vararg texts: String): List<ChecklistItem> =
+        texts.map { ChecklistItem(text = it).withId("id-$it") }
+
+    /** Fill items with the given texts (stable ids derived from text). */
+    private fun fillItems(vararg texts: String): List<ChecklistFillItem> =
+        texts.map { ChecklistFillItem(text = it, checked = false) }
+
+    private fun remoteWithItems(
+        cloudId: String,
+        name: String,
+        updatedAt: Long,
+        items: List<ChecklistItem>,
+    ) = ChecklistSyncData(
+        cloudId = cloudId,
+        name = name,
+        itemsJson = itemsJson.encodeToString(ListSerializer(ChecklistItem.serializer()), items),
+        updatedAt = updatedAt,
+        fills = emptyList(),
+    )
+
+    private fun remoteFillWithItems(
+        cloudId: String,
+        updatedAt: Long,
+        items: List<ChecklistFillItem>,
+    ) = FillSyncData(
+        cloudId = cloudId,
+        name = "",
+        itemsJson = itemsJson.encodeToString(ListSerializer(ChecklistFillItem.serializer()), items),
+        updatedAt = updatedAt,
+    )
 
     private fun localSynced(
         id: Long,
@@ -366,6 +407,144 @@ class SyncRepositoryImplTest {
         repo.pullAndMerge()
 
         assertEquals("LocalWins", dao.checklists.single { it.cloudId == "c1" }.name)
+    }
+
+    // ─── Tests: PENDING_UPLOAD merge guard (the reorder-clobber race) ────
+    //
+    // Root cause of "reorder reverts after leaving the screen": finalizeReorder persisted the
+    // new order PENDING_UPLOAD, but a sync push triggered between its two old writes uploaded an
+    // intermediate STALE snapshot and stamped it with a fresh updatedAt. The real-time listener
+    // echoed that stale-but-newer snapshot back, and the merge — keyed only on LWW — UPDATEd the
+    // local row, overwriting the unsynced reorder with the old order. The guard: a PENDING_UPLOAD
+    // local row keeps its unsynced edits until the next push carries them up; a newer remote may
+    // only win over a SYNCED local row (a genuine cross-device edit).
+
+    @Test
+    fun mergeRemote_doesNotOverwritePendingUploadWithNewerStaleRemote() = runTest {
+        // Local: the just-reordered order [B, A], still PENDING_UPLOAD (not yet pushed).
+        // Remote: the STALE pre-reorder order [A, B], but carrying a NEWER updatedAt — exactly the
+        // echo a racing push produced (stamped now=...094 onto the stale half, local=...058).
+        val localOrder = items("B", "A")
+        dao.checklists.add(
+            localPendingUpload(1L, "c1", "List", updatedAt = 58L).copy(items = localOrder),
+        )
+        firestore.fetchResult = AppResult.Success(
+            listOf(remoteWithItems("c1", "List", updatedAt = 94L, items = items("A", "B"))),
+        )
+
+        val repo = newRepo()
+        auth.currentUserOverride = testUser
+
+        repo.pullAndMerge()
+
+        val merged = dao.checklists.single { it.cloudId == "c1" }
+        assertEquals(
+            listOf("B", "A"),
+            merged.items.map { it.text },
+            "a PENDING_UPLOAD local reorder must NOT be overwritten by a newer-but-stale remote echo",
+        )
+        assertEquals(
+            SyncStatus.PENDING_UPLOAD.value,
+            merged.syncStatus,
+            "the local row must remain PENDING_UPLOAD so the next push carries the reorder up",
+        )
+    }
+
+    @Test
+    fun mergeRemote_doesNotOverwritePendingUploadWithEqualTimestampStaleRemote() = runTest {
+        // Same race, the boundary case: remote updatedAt EQUAL to local. LWW ('>') would SKIP this
+        // anyway, but the explicit PENDING_UPLOAD guard makes the intent unambiguous and durable.
+        dao.checklists.add(
+            localPendingUpload(1L, "c1", "List", updatedAt = 70L).copy(items = items("B", "A")),
+        )
+        firestore.fetchResult = AppResult.Success(
+            listOf(remoteWithItems("c1", "List", updatedAt = 70L, items = items("A", "B"))),
+        )
+
+        val repo = newRepo()
+        auth.currentUserOverride = testUser
+
+        repo.pullAndMerge()
+
+        assertEquals(
+            listOf("B", "A"),
+            dao.checklists.single { it.cloudId == "c1" }.items.map { it.text },
+            "equal-timestamp stale remote must not overwrite a pending local reorder either",
+        )
+    }
+
+    @Test
+    fun mergeRemote_stillAppliesNewerRemoteWhenLocalSynced() = runTest {
+        // The guard must NOT break genuine cross-device LWW: when the local row is SYNCED, a newer
+        // remote from another device still wins (the reorder there is the latest truth).
+        dao.checklists.add(
+            localSynced(1L, "c1", "List", updatedAt = 58L).copy(items = items("A", "B")),
+        )
+        firestore.fetchResult = AppResult.Success(
+            listOf(remoteWithItems("c1", "List", updatedAt = 94L, items = items("B", "A"))),
+        )
+
+        val repo = newRepo()
+        auth.currentUserOverride = testUser
+
+        repo.pullAndMerge()
+
+        assertEquals(
+            listOf("B", "A"),
+            dao.checklists.single { it.cloudId == "c1" }.items.map { it.text },
+            "a newer remote from another device must still win over a SYNCED local row",
+        )
+    }
+
+    @Test
+    fun mergeFills_doesNotOverwritePendingUploadFillWithNewerRemote() = runTest {
+        // Per-fill analogue: the checklist is SYNCED and gets a newer remote (UPDATE branch), but
+        // one of its fills was edited locally (PENDING_UPLOAD) and not yet pushed. That fill must
+        // not be overwritten by the remote fill, while a SYNCED sibling fill still takes the
+        // newer remote version.
+        dao.checklists.add(localSynced(1L, "c1", "List", updatedAt = 100L))
+        fillDao.fills.addAll(
+            listOf(
+                fillEntity(id = 10L, checklistId = 1L, cloudId = "f1", updatedAt = 100L)
+                    .copy(items = fillItems("synced-old")),
+                fillEntity(
+                    id = 11L,
+                    checklistId = 1L,
+                    cloudId = "f2",
+                    syncStatus = SyncStatus.PENDING_UPLOAD.value,
+                    updatedAt = 150L,
+                ).copy(items = fillItems("local-edit")),
+            ),
+        )
+        firestore.fetchResult = AppResult.Success(
+            listOf(
+                remote(
+                    "c1",
+                    "List",
+                    updatedAt = 200L,
+                    fills = listOf(
+                        remoteFillWithItems("f1", updatedAt = 200L, items = fillItems("synced-new")),
+                        remoteFillWithItems("f2", updatedAt = 200L, items = fillItems("stale-remote")),
+                    ),
+                ),
+            ),
+        )
+
+        val repo = newRepo()
+        auth.currentUserOverride = testUser
+
+        repo.pullAndMerge()
+
+        assertEquals(
+            listOf("synced-new"),
+            fillDao.fills.single { it.cloudId == "f1" }.items.map { it.text },
+            "a SYNCED fill must take the newer remote version",
+        )
+        assertEquals(
+            listOf("local-edit"),
+            fillDao.fills.single { it.cloudId == "f2" }.items.map { it.text },
+            "a PENDING_UPLOAD fill must keep its unsynced local edit, not the stale remote",
+        )
     }
 
     // ─── Tests: initial-upload gate (resurrection root cause #2) ─────────

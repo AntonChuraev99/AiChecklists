@@ -3,6 +3,7 @@ package com.antonchuraev.homesearchchecklist.feature.checklist.di
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePort
 import com.antonchuraev.homesearchchecklist.core.common.api.getDatabaseBuilder
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistDatabase
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.RoomChecklistTransactionRunner
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.repository.ChecklistRepositoryImpl
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 
@@ -18,6 +19,7 @@ internal fun createChecklistRepository(attachmentStorage: AttachmentStoragePort)
         checklistDao = database.checklistDao(),
         fillDao = database.checklistFillDao(),
         attachmentStorage = attachmentStorage,
+        transactionRunner = RoomChecklistTransactionRunner(database),
     )
 
 /**

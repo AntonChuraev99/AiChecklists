@@ -5,8 +5,10 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistD
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistEntity
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistFillDao
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistFillEntity
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistTransactionRunner
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Attachment
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistReminderInfo
@@ -154,16 +156,74 @@ class ChecklistRepositoryImplTest {
         assertEquals(templateItem.id, savedItem.templateItemId, "template link must survive reset")
     }
 
+    // ─── Tests: reorderItems persists atomically + monotonically ─────────────
+
+    @Test
+    fun reorderItems_marksBothRowsPendingUploadWithOneSharedTimestamp() = runTest {
+        // A reorder swaps [A, B] -> [B, A] on both the template and the fill.
+        val a = ChecklistItem(text = "A")
+        val b = ChecklistItem(text = "B")
+        val checklist = Checklist(id = 1L, name = "List", items = listOf(a, b))
+        // Pre-existing SYNCED rows with an OLD updatedAt (so we can assert the bump is forward).
+        checklistDao.checklists.add(checklist.toEntityRow().copy(updatedAt = 100L))
+        val fillA = ChecklistFillItem(text = "A", checked = false, templateItemId = a.id)
+        val fillB = ChecklistFillItem(text = "B", checked = false, templateItemId = b.id)
+        fillDao.fills.add(
+            defaultFillRow(id = 10L, checklistId = 1L, items = listOf(fillA, fillB)).copy(updatedAt = 100L),
+        )
+
+        val reorderedChecklist = checklist.copy(items = listOf(b, a))
+        val reorderedFill = ChecklistFill(
+            id = 10L,
+            checklistId = 1L,
+            name = "",
+            items = listOf(fillB, fillA),
+            isDefault = true,
+        )
+
+        newRepo().reorderItems(reorderedFill, reorderedChecklist)
+
+        val savedChecklist = checklistDao.checklists.single { it.id == 1L }
+        val savedFill = fillDao.fills.single { it.id == 10L }
+
+        // New order persisted on both.
+        assertEquals(listOf("B", "A"), savedChecklist.items.map { it.text }, "template order persisted")
+        assertEquals(listOf("B", "A"), savedFill.items.map { it.text }, "fill order persisted")
+
+        // Both dirtied for sync.
+        assertEquals(SyncStatus.PENDING_UPLOAD.value, savedChecklist.syncStatus, "template marked PENDING_UPLOAD")
+        assertEquals(SyncStatus.PENDING_UPLOAD.value, savedFill.syncStatus, "fill marked PENDING_UPLOAD")
+
+        // ONE shared timestamp, and it is monotonic (strictly newer than the prior 100L) — so the
+        // parent's updatedAt can never look "older" than the fill's to a later push/merge.
+        assertEquals(
+            savedChecklist.updatedAt,
+            savedFill.updatedAt,
+            "the reorder must stamp the SAME updatedAt on the fill and the template",
+        )
+        assertTrue(
+            savedChecklist.updatedAt >= 100L,
+            "the reordered checklist updatedAt must be monotonic (never move backwards)",
+        )
+    }
+
     // ─── System under test factory + fakes ───────────────────────────────────
 
     private val checklistDao = FakeChecklistDao()
     private val fillDao = FakeFillDao()
     private val attachmentStorage = NoopAttachmentStorage
 
+    // Pass-through transaction runner: a real Room transaction would just commit both writes
+    // together, so for unit purposes invoking the block directly is faithful (the atomicity that
+    // matters for the sync race — a single post-commit emission — is a Room-runtime property and
+    // is covered by the on-device reorder verification, not the in-memory fakes).
+    private val transactionRunner = ChecklistTransactionRunner { block -> block() }
+
     private fun newRepo() = ChecklistRepositoryImpl(
         checklistDao = checklistDao,
         fillDao = fillDao,
         attachmentStorage = attachmentStorage,
+        transactionRunner = transactionRunner,
     )
 
     private fun sampleAttachment(id: String) = Attachment(

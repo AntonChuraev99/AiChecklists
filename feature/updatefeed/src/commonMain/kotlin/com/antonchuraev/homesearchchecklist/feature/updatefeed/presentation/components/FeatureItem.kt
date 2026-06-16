@@ -15,6 +15,7 @@ import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.Campaign
 import androidx.compose.material.icons.outlined.Celebration
+import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Replay
@@ -134,5 +135,6 @@ internal fun iconForName(name: String?): ImageVector = when (name) {
     "PlaylistAddCheck" -> Icons.AutoMirrored.Outlined.PlaylistAddCheck
     "Tune" -> Icons.Outlined.Tune
     "Celebration" -> Icons.Outlined.Celebration
+    "Folder" -> Icons.Outlined.Folder
     else -> Icons.AutoMirrored.Outlined.Article
 }

@@ -1048,6 +1048,13 @@ class ChecklistDetailFolderActionsTest {
         override suspend fun addFill(fill: ChecklistFill): Long = 1L
         override suspend fun updateFill(fill: ChecklistFill) { lastUpdatedFill = fill }
         override suspend fun deleteFill(fill: ChecklistFill) {}
+        override suspend fun reorderItems(fill: ChecklistFill, checklist: Checklist) {
+            // reorderItems atomically persists BOTH the fill and the template, so it records the
+            // same two fields the old updateFill()/updateChecklistTemplate() pair did — the
+            // off-level-data-loss reorder assertions read these.
+            lastUpdatedFill = fill
+            lastUpdatedTemplate = checklist
+        }
         override suspend fun reorderChecklists(orderedIds: List<Long>) {}
         override suspend fun setRepeatSchedule(checklistId: Long, rule: ReminderRepeatRule, timeOfDayMinutes: Int, firstTriggerAt: Long) {}
         override suspend fun advanceRepeatSchedule(checklistId: Long, nextAt: Long?, newCount: Int) {}
