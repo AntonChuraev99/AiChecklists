@@ -558,6 +558,9 @@
     <string name="reminder_tomorrow_evening">Tomorrow evening</string>
     <string name="reminder_pick_date_time">Pick date &amp; time</string>
     <string name="reminder_remove">Remove Reminder</string>
+    <!-- Add to Google Calendar (one-way export, no OAuth) -->
+    <string name="add_to_google_calendar">Add to Google Calendar</string>
+    <string name="calendar_app_not_found">Couldn't open calendar</string>
     <string name="reminder_select_time">Select Time</string>
     <string name="reminder_next">Next</string>
     <string name="reminder_all_completed">All items completed!</string>

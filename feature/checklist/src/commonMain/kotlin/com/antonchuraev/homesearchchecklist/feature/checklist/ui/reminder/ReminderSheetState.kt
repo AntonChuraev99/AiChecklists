@@ -73,6 +73,10 @@ data class ReminderSheetCallbacks(
     val onDismissEndCondition: () -> Unit,
     val onSaveRepeat: () -> Unit,
     val onRemoveRepeat: () -> Unit,
+    // Export the current reminder/repeat to the device calendar (one-way). Defaults to no-op so
+    // existing call-sites (e.g. onboarding) don't need to change. The row is only shown when a
+    // reminder/repeat is already configured (there is something to export).
+    val onAddToCalendar: () -> Unit = {},
     // Sheet
     val onDismiss: () -> Unit,
     // Locked paywall banner

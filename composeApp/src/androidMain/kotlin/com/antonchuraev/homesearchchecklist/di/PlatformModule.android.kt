@@ -4,6 +4,7 @@ import com.antonchuraev.homesearchchecklist.Analytics
 import com.antonchuraev.homesearchchecklist.AppBuildConfig
 import com.antonchuraev.homesearchchecklist.CrashlyticsAppLogger
 import com.antonchuraev.homesearchchecklist.appupdate.AppUpdateController
+import com.antonchuraev.homesearchchecklist.calendar.AndroidCalendarEventLauncher
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppContextHolder
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
@@ -15,6 +16,7 @@ import com.antonchuraev.homesearchchecklist.core.common.impl.AndroidAppLogger
 import com.antonchuraev.homesearchchecklist.csat.ObservableAnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.datastore.api.UserAppDatastoreProvider
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.FirestoreSyncDataSource
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.calendar.CalendarEventLauncher
 import com.antonchuraev.homesearchchecklist.feature.user.data.device.DeviceIdProvider
 import com.antonchuraev.homesearchchecklist.push.PushTokenRepositoryAndroid
 import com.antonchuraev.homesearchchecklist.sync.AndroidFirestoreSyncDataSource
@@ -62,4 +64,10 @@ actual fun platformModule(): Module = module {
     // Google Play in-app update controller (Android-only). Observed by AppUpdateLauncher;
     // get() resolves Context (AppContextHolder.context), AppLogger and AnalyticsTracker above.
     single { AppUpdateController(get(), get(), get()) }
+
+    // One-way calendar export (ACTION_INSERT into the system calendar). Lives here in
+    // composeApp/androidMain (not :androidApp) — unlike ReminderScheduler it needs no
+    // BroadcastReceiver/repository, so there is no circular dependency. get() resolves the
+    // AppLogger override above.
+    single<CalendarEventLauncher> { AndroidCalendarEventLauncher(AppContextHolder.context, get()) }
 }

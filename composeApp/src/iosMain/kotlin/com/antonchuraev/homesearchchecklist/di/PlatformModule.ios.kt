@@ -8,6 +8,8 @@ import com.antonchuraev.homesearchchecklist.csat.ObservableAnalyticsTracker
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.FirestoreSyncDataSource
 import com.antonchuraev.homesearchchecklist.sync.IosFirestoreSyncDataSource
 import com.antonchuraev.homesearchchecklist.core.datastore.api.UserAppDatastoreProvider
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.calendar.CalendarEvent
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.calendar.CalendarEventLauncher
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
 import com.antonchuraev.homesearchchecklist.feature.user.data.device.DeviceIdProvider
 import org.koin.core.module.Module
@@ -34,10 +36,16 @@ private object StubReminderScheduler : ChecklistReminderScheduler {
     override fun cancelItemRepeat(checklistId: Long, fillId: Long, itemId: String) = Unit
 }
 
+// iOS one-way calendar export is not wired yet (iOS not released) — EventKit stub returns false.
+private object IosCalendarEventLauncher : CalendarEventLauncher {
+    override fun addEvent(event: CalendarEvent): Boolean = false
+}
+
 actual fun platformModule(): Module = module {
     single { DeviceIdProvider(UserAppDatastoreProvider.instance) }
     single<AnalyticsTracker> { ObservableAnalyticsTracker(StubAnalyticsTracker) }
     single<ChecklistReminderScheduler> { StubReminderScheduler }
+    single<CalendarEventLauncher> { IosCalendarEventLauncher }
 
     // AttachmentStorage: iOS stub — throws NotImplementedError (gated by PlatformCapabilities).
     // Bound as AttachmentStoragePort so ViewModel stays platform-agnostic in commonMain.

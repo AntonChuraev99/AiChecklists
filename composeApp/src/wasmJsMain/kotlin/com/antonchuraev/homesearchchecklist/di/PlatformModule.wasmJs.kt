@@ -5,9 +5,11 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentOpener
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStorage
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePort
+import com.antonchuraev.homesearchchecklist.calendar.WasmCalendarEventLauncher
 import com.antonchuraev.homesearchchecklist.csat.ObservableAnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.datastore.api.UserAppDatastoreProvider
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.FirestoreSyncDataSource
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.calendar.CalendarEventLauncher
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
 import com.antonchuraev.homesearchchecklist.feature.user.data.device.DeviceIdProvider
 import com.antonchuraev.homesearchchecklist.sync.WasmFirestoreSyncDataSource
@@ -32,6 +34,7 @@ actual fun platformModule(): Module = module {
     single { DeviceIdProvider(UserAppDatastoreProvider.instance) }
     single<AnalyticsTracker> { ObservableAnalyticsTracker(WasmAnalyticsTracker()) }
     single<ChecklistReminderScheduler> { StubReminderScheduler }
+    single<CalendarEventLauncher> { WasmCalendarEventLauncher() }
 
     // AttachmentStorage: wasmJs stub — all methods are no-op / return null.
     // Bound as AttachmentStoragePort so ViewModel stays platform-agnostic in commonMain.

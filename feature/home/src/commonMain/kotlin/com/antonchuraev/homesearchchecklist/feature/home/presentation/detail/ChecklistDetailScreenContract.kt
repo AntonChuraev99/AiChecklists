@@ -448,4 +448,12 @@ sealed interface ChecklistDetailIntent : Intent {
     data class OnRemoveItemReminder(val itemId: String) : ChecklistDetailIntent
     data object OnDismissItemReminderSheet : ChecklistDetailIntent
     data class OnItemReminderTabSelected(val tab: ReminderTab) : ChecklistDetailIntent
+
+    // Calendar export (one-way) — fired from the "Add to Google Calendar" row in the reminder sheet.
+    // Synchronous handler (Web popup-safety): the calendar launch must happen inside the click
+    // call stack, so the VM reads already-loaded state and calls the launcher without suspending.
+    /** Export the checklist-level reminder/repeat to the device calendar. */
+    data object OnAddToCalendar : ChecklistDetailIntent
+    /** Export a single item's reminder/repeat to the device calendar. */
+    data class OnAddItemToCalendar(val itemId: String) : ChecklistDetailIntent
 }

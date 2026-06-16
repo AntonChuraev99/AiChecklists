@@ -386,6 +386,7 @@ private fun ChecklistDetailContent(
     val attachmentTooLargeMsg = stringResource(Res.string.attachment_size_too_large_snackbar)
     val attachmentDeletedMsg = stringResource(Res.string.attachment_deleted_snackbar)
     val folderReminderUnavailableMsg = stringResource(Res.string.folder_reminder_unavailable)
+    val calendarAppNotFoundMsg = stringResource(Res.string.calendar_app_not_found)
     LaunchedEffect(state.snackbarMessage) {
         val message = state.snackbarMessage ?: return@LaunchedEffect
         val isSmartAddHint = message == ChecklistDetailViewModel.SNACKBAR_SMART_ADD_HINT_ADD_TEXT ||
@@ -400,6 +401,7 @@ private fun ChecklistDetailContent(
             ChecklistDetailViewModel.SNACKBAR_ATTACHMENT_TOO_LARGE -> attachmentTooLargeMsg
             ChecklistDetailViewModel.SNACKBAR_ATTACHMENT_DELETED -> attachmentDeletedMsg
             ChecklistDetailViewModel.SNACKBAR_FOLDER_REMINDER_UNAVAILABLE -> folderReminderUnavailableMsg
+            ChecklistDetailViewModel.SNACKBAR_CALENDAR_APP_NOT_FOUND -> calendarAppNotFoundMsg
             else -> message
         }
         smartAddHintActive.value = isSmartAddHint
@@ -1256,6 +1258,7 @@ private fun ChecklistDetailContent(
                 onDismissEndCondition = { onIntent(ChecklistDetailIntent.OnDismissEndConditionPicker) },
                 onSaveRepeat = { onIntent(ChecklistDetailIntent.OnSaveRepeatSchedule) },
                 onRemoveRepeat = { onIntent(ChecklistDetailIntent.OnRemoveRepeatSchedule) },
+                onAddToCalendar = { onIntent(ChecklistDetailIntent.OnAddToCalendar) },
                 onDismiss = { onIntent(ChecklistDetailIntent.OnDismissReminderUI) },
                 onUpgradeClick = { onIntent(ChecklistDetailIntent.OnReminderUpgradeClick) },
             )
@@ -1317,6 +1320,11 @@ private fun ChecklistDetailContent(
                 onRemoveRepeat = {
                     if (itemReminderItem != null) {
                         onIntent(ChecklistDetailIntent.OnRemoveItemReminder(itemReminderItem.id))
+                    }
+                },
+                onAddToCalendar = {
+                    if (itemReminderItem != null) {
+                        onIntent(ChecklistDetailIntent.OnAddItemToCalendar(itemReminderItem.id))
                     }
                 },
                 onDismiss = { onIntent(ChecklistDetailIntent.OnDismissItemReminderSheet) },

@@ -9,6 +9,8 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePor
 import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppDatastore
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.calendar.CalendarEventLauncher
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.calendar.buildCalendarEvent
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Attachment
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
@@ -61,6 +63,7 @@ class ChecklistDetailViewModel(
     private val datastore: AppDatastore,
     private val smartDateParser: SmartDateParser,
     private val attachmentStorage: AttachmentStoragePort,
+    private val calendarEventLauncher: CalendarEventLauncher,
 ) : AppViewModel<ChecklistDetailState, ChecklistDetailIntent, Nothing>() {
 
     private val _screenState = MutableStateFlow<ChecklistDetailState>(ChecklistDetailState.Loading)
@@ -664,7 +667,87 @@ class ChecklistDetailViewModel(
                     if (itemId != null) initItemRepeatTabIfNeeded(itemId)
                 }
             }
+
+            // Calendar export — handlers are SYNCHRONOUS (no viewModelScope.launch around the
+            // launcher call) so the launch happens inside the click call stack (Web popup-safety).
+            ChecklistDetailIntent.OnAddToCalendar -> handleAddToCalendar()
+            is ChecklistDetailIntent.OnAddItemToCalendar -> handleAddItemToCalendar(intent.itemId)
         }
+    }
+
+    /**
+     * Exports the checklist-level reminder/repeat to the device calendar (one-way).
+     *
+     * Synchronous on purpose: [CalendarEventLauncher.addEvent] must run inside the user-gesture
+     * call stack (the Web actual uses `window.open`, which the browser blocks after a suspend).
+     * All inputs are read from already-loaded [ChecklistDetailState.Content] — no repository/suspend
+     * calls. The only suspending step is resolving the snackbar string, which happens AFTER the
+     * launch via [showCalendarSnackbar] (a string-key marker resolved in the Composable).
+     */
+    private fun handleAddToCalendar() {
+        val content = _screenState.value as? ChecklistDetailState.Content ?: return
+        val checklist = content.checklist
+        // Prefer the one-shot reminder; fall back to the next recurring fire time. May be null —
+        // then the calendar opens with no pre-set time for the user to pick.
+        val start = checklist.reminderAt ?: checklist.repeatNextAt
+        val event = buildCalendarEvent(
+            title = checklist.name,
+            startMillis = start,
+            rule = checklist.repeatRule,
+        )
+        val launched = calendarEventLauncher.addEvent(event)
+        if (!launched) {
+            showCalendarSnackbar(SNACKBAR_CALENDAR_APP_NOT_FOUND)
+        } else {
+            analyticsTracker.event(
+                "add_to_calendar",
+                mapOf(
+                    "recurring" to (checklist.repeatRule != null).toString(),
+                    "has_time" to (start != null).toString(),
+                    "level" to "checklist",
+                ),
+            )
+        }
+    }
+
+    /**
+     * Exports a single item's reminder/repeat to the device calendar (one-way).
+     * Same synchronous contract as [handleAddToCalendar]; the item is looked up in the already
+     * loaded default fill by [itemId]. With no reminder set, the event is exported without a
+     * pre-set time (the user picks it in the calendar app).
+     */
+    private fun handleAddItemToCalendar(itemId: String) {
+        val content = _screenState.value as? ChecklistDetailState.Content ?: return
+        val item = content.defaultFill?.items?.firstOrNull { it.id == itemId } ?: return
+        val start = item.reminderAt ?: item.repeatNextAt
+        val event = buildCalendarEvent(
+            title = item.text,
+            startMillis = start,
+            rule = item.repeatRule,
+        )
+        val launched = calendarEventLauncher.addEvent(event)
+        if (!launched) {
+            showCalendarSnackbar(SNACKBAR_CALENDAR_APP_NOT_FOUND)
+        } else {
+            analyticsTracker.event(
+                "add_to_calendar",
+                mapOf(
+                    "recurring" to (item.repeatRule != null).toString(),
+                    "has_time" to (start != null).toString(),
+                    "level" to "item",
+                ),
+            )
+        }
+    }
+
+    /**
+     * Posts a calendar-feedback snackbar. [messageKey] is a string-key marker (the codebase's
+     * snackbar convention — resolved to a real string in the Composable's `when(message)` block),
+     * so this never touches Compose Resources / suspend `getString` and stays callable from the
+     * synchronous calendar handlers.
+     */
+    private fun showCalendarSnackbar(messageKey: String) {
+        updateContentState { it.copy(snackbarMessage = messageKey) }
     }
 
     private fun openNoteDialog(itemId: String) {
@@ -2814,5 +2897,12 @@ class ChecklistDetailViewModel(
          * deleted/moved elsewhere). Surfaced instead of silently doing nothing.
          */
         const val SNACKBAR_FOLDER_REMINDER_UNAVAILABLE = "folder_reminder_unavailable"
+
+        /**
+         * No app handled the calendar ACTION_INSERT (or the Web popup was blocked) — the launcher
+         * returned false. Resolved to
+         * [aichecklists.core.designsystem.generated.resources.Res.string.calendar_app_not_found].
+         */
+        const val SNACKBAR_CALENDAR_APP_NOT_FOUND = "calendar_app_not_found"
     }
 }

@@ -136,7 +136,8 @@ fun ReminderSheet(
                         currentReminder = state.currentReminder,
                         onPresetSelected = callbacks.onPresetSelected,
                         onCustomDateRequested = callbacks.onCustomDateRequested,
-                        onRemoveReminder = callbacks.onRemoveReminder
+                        onRemoveReminder = callbacks.onRemoveReminder,
+                        onAddToCalendar = callbacks.onAddToCalendar
                     )
                     ReminderTab.REPEAT -> RepeatTabContent(
                         config = state.pendingRepeatConfig ?: PendingRepeatConfig(),
@@ -153,7 +154,8 @@ fun ReminderSheet(
                         onEndConditionSelected = callbacks.onEndConditionSelected,
                         onDismissEndCondition = callbacks.onDismissEndCondition,
                         onSave = callbacks.onSaveRepeat,
-                        onRemove = callbacks.onRemoveRepeat
+                        onRemove = callbacks.onRemoveRepeat,
+                        onAddToCalendar = callbacks.onAddToCalendar
                     )
                 }
             }
@@ -209,7 +211,8 @@ private fun OnceTabContent(
     currentReminder: Long?,
     onPresetSelected: (Long) -> Unit,
     onCustomDateRequested: () -> Unit,
-    onRemoveReminder: () -> Unit
+    onRemoveReminder: () -> Unit,
+    onAddToCalendar: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -247,8 +250,12 @@ private fun OnceTabContent(
             onClick = onCustomDateRequested
         )
 
+        // Always available — exports the checklist to Google Calendar. With a reminder set, its
+        // time/repeat is pre-filled; without one, the calendar opens for the user to pick a time.
+        HorizontalDivider(modifier = Modifier.padding(vertical = AppDimens.SpacingSm))
+        CalendarActionRow(onClick = onAddToCalendar)
+
         if (currentReminder != null) {
-            HorizontalDivider(modifier = Modifier.padding(vertical = AppDimens.SpacingSm))
             AppButtonText(
                 text = stringResource(Res.string.reminder_remove),
                 onClick = onRemoveReminder
@@ -273,7 +280,8 @@ private fun RepeatTabContent(
     onEndConditionSelected: (RepeatEndCondition) -> Unit,
     onDismissEndCondition: () -> Unit,
     onSave: () -> Unit,
-    onRemove: () -> Unit
+    onRemove: () -> Unit,
+    onAddToCalendar: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -446,6 +454,11 @@ private fun RepeatTabContent(
             )
         }
 
+        // Always available — exports the checklist to Google Calendar (pre-filled with the saved
+        // repeat schedule, or opens the calendar to pick a time if none is set yet).
+        HorizontalDivider(modifier = Modifier.padding(vertical = AppDimens.SpacingSm))
+        CalendarActionRow(onClick = onAddToCalendar)
+
         Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
 
         // Save button
@@ -497,6 +510,34 @@ private fun ReminderPresetRow(
             )
             Text(
                 text = text,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+/**
+ * Single tappable row that exports the checklist/item to the device calendar (one-way). Always
+ * shown: if a reminder/repeat is set its time is pre-filled, otherwise the calendar opens with no
+ * pre-set time so the user can pick one. The tint matches [ReminderPresetRow] for consistency.
+ */
+@Composable
+private fun CalendarActionRow(onClick: () -> Unit) {
+    AppCard(onClick = onClick) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.CalendarMonth,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp)
+            )
+            Text(
+                text = stringResource(Res.string.add_to_google_calendar),
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.weight(1f)
             )
