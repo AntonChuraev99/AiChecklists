@@ -20,12 +20,12 @@ Guidance for Claude Code in this repo. Keep this file **≤200 lines** (Anthropi
 
 ## Repository Visibility & Security
 
-Repo is **private** (was public until a 2026-05-24 Gemini key leak). Old leaked secrets stay in git history forever — treat **everything ever committed** as potentially public. Full playbook: `docs/security-playbook.md`.
+Repo is **PUBLIC** since 2026-06-16 (history was rewritten with `git filter-repo` to purge every secret/IP before going public — audit: `docs/completed/repo-public-preparation-2026-06-16.md`; playbook: `docs/security-playbook.md`). **Public = every push is instantly world-visible and indexed; there is no undo.** Treat each commit as a permanent publication.
 
-- **NEVER commit:** API keys/tokens/passwords; `google-services.json` / `GoogleService-Info.plist`; service-account JSON; `.env` with real values; security docs referencing real credentials. Before committing a new file, verify no `AIzaSy*` / hardcoded tokens (`.gitleaks.toml` is configured).
-- **Already gitignored:** `.claude/`, `docs/`, `commonMain/` (stubs), `SECURITY.md`, `hosting/.firebase/`.
-- **Safe to commit** (public by design): Firebase project id `aichecklists-40230`, `.firebaserc`, `firebase.json` (no keys).
-- Firebase API keys restricted by package + SHA-1; Gemini key only in Google Cloud Secret Manager (`gemini-api-key:latest`), never in client/env/BuildConfig.
+- **NEVER commit:** API keys/tokens/passwords; `google-services.json` / `GoogleService-Info.plist`; service-account JSON; `.env` with real values; security docs referencing real credentials. Before committing a new file, verify no `AIzaSy*` / hardcoded tokens (`.gitleaks.toml` + pre-commit configured).
+- **Server AI prompts are IP — keep them OUT of git.** The 8 prompts live in gitignored `firebase-functions/prompts_private.py` (redacted `prompts_private_example.py` is tracked); `main.py` imports via `try/except ImportError` fallback. ⚠️ `prompts_private.py` MUST exist locally at `firebase deploy` — otherwise stub prompts deploy and the AI breaks.
+- **Already gitignored (NOT in public):** `.claude/`, `docs/`, `commonMain/` (stubs), `SECURITY.md`, `hosting/.firebase/`, `prompts_private.py`, `.firebaserc`, `extensions/*.env`, `graphify-out/`, `claude_design/`, `google_play_translate/` — each ships a tracked `*.example` where a template helps.
+- **Safe to commit** (semi-public by design): Firebase project id `aichecklists-40230`, `firebase.json`, Cloud Functions base URL — defended by App Check + key restrictions (package + SHA-1), not by secrecy. Gemini key only in Google Cloud Secret Manager (`gemini-api-key:latest`), never in client/env/BuildConfig.
 
 ## Project Language
 
