@@ -49,13 +49,32 @@ composeApp/src/wasmJsMain/resources/init.js
 service-account*.json
 aichecklists-*.json
 
+# Firebase project bindings — real ids stay local; public repo ships .firebaserc.example
+.firebaserc
+# Firebase Extensions runtime config (holds Secret Manager references)
+extensions/*.env
+!extensions/*.env.example
+
 # Claude Code local config
 .claude/
+
+# graphify knowledge graph — local dev-tool output, not portfolio code
+graphify-out/
+
+# Google Play store translation archives (binary zips, not source)
+google_play_translate/
+
+# Local design scratch / worktree helper
+.design-tmp/
+.worktreeinclude
 
 # Python virtual environment
 venv/
 __pycache__/
 *.pyc
+
+# Proprietary server-side AI prompts (public repo ships prompts_private_example.py stubs)
+firebase-functions/prompts_private.py
 
 # Release builds (signed APKs/AABs)
 composeApp/release/
