@@ -17,15 +17,16 @@ import com.antonchuraev.homesearchchecklist.csat.CsatViewModel
 import com.antonchuraev.homesearchchecklist.csat.InAppReviewLauncher
 import com.antonchuraev.homesearchchecklist.appupdate.AppUpdateLauncher
 import com.antonchuraev.homesearchchecklist.sync.UserCreditsSync
-import com.antonchuraev.homesearchchecklist.core.datastore.api.AppLanguage
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppThemeMode
 import com.antonchuraev.homesearchchecklist.core.datastore.api.LanguageRepository
 import com.antonchuraev.homesearchchecklist.core.datastore.api.ThemeRepository
+import kotlinx.coroutines.flow.distinctUntilChanged
 import com.antonchuraev.homesearchchecklist.desingsystem.emoji.LocalEmojiFont
 import com.antonchuraev.homesearchchecklist.desingsystem.emoji.rememberEmojiFont
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppLocaleEnvironment
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppTheme
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.customAppLocale
+import com.antonchuraev.homesearchchecklist.desingsystem.theme.persistAppLocale
 import com.antonchuraev.homesearchchecklist.feature.user.data.device.getPlatformName
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.UserData
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
@@ -234,13 +235,28 @@ fun App() {
         }
 
         val languageRepository: LanguageRepository = remember { koin.get<LanguageRepository>() }
-        val language by languageRepository.language.collectAsStateWithLifecycle(initialValue = AppLanguage.System)
-        LaunchedEffect(language) { customAppLocale = language.tag }
-        // NOTE: re-asserting the locale on foreground return (after the Google Play
-        // Billing sheet resets the process-global Locale.getDefault()) is handled in
-        // MainActivity.onResume — synchronously, BEFORE Compose draws the next frame,
-        // so there is no device-language flash. A Compose LifecycleEventEffect here
-        // would run a frame too late (effects fire after composition) and flicker.
+        // Collect the language DIRECTLY — do NOT use collectAsStateWithLifecycle(initialValue = …).
+        // An initialValue placeholder caused an infinite Activity-recreate loop on Android 33+:
+        // each (re)composition first sees the placeholder (System → empty LocaleList) and only then
+        // the real value (e.g. English → [en]). Because persistAppLocale() → setApplicationLocales()
+        // RECREATES the Activity, the placeholder and the real value kept flipping the system locale
+        // [] ↔ [en], each flip triggering another recreate → it never settled. A raw Flow collect
+        // emits the real DataStore value first, so persistAppLocale converges after at most one
+        // (migration) recreate; distinctUntilChanged drops duplicate emissions within a session.
+        LaunchedEffect(Unit) {
+            languageRepository.language.distinctUntilChanged().collect { lang ->
+                customAppLocale = lang.tag    // drives Compose string resources immediately (all platforms)
+                persistAppLocale(lang.tag)    // Android 33+: durable system per-app locale (no-op elsewhere)
+            }
+        }
+        // Two complementary layers protect the chosen language against the Google Play
+        // Billing sheet resetting the process-global Locale.getDefault():
+        //  • Android 33+ — persistAppLocale() hands the locale to the OS, which keeps our
+        //    process locale correct across the whole billing round-trip → no flash at all.
+        //  • Android <33 — no system per-app-locale API, so MainActivity.onResume re-asserts
+        //    synchronously before the next frame. That kills the "stuck in device language
+        //    until restart" bug, but a residual one-frame flash on sheet close remains
+        //    (accepted, deferred: docs/todos/2026-06-15-locale-flash-on-billing-cmp-limitation.md).
 
         val googleAuthRepository: GoogleAuthRepository = remember { koin.get<GoogleAuthRepository>() }
         val userDataRepository: UserDataRepository = remember { koin.get<UserDataRepository>() }

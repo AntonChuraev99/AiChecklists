@@ -185,12 +185,17 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        // External Activities (the Google Play Billing sheet, system pickers, OAuth) reset
-        // the process-global Locale.getDefault() back to the device language WITHOUT
-        // recreating us (onResume, not onCreate). Re-apply the chosen language so Compose
-        // string resources — which on Android follow the global Locale, not LocalConfiguration
-        // (Google issue 240191036) — don't stay reverted to the device language. The staleness
-        // gate keeps a normal resume (no drift) from recomposing the tree.
+        // Fallback path for Android < 33 (no system per-app-locale API). External Activities
+        // (the Google Play Billing sheet, system pickers, OAuth) reset the process-global
+        // Locale.getDefault() back to the device language WITHOUT recreating us (onResume, not
+        // onCreate). Re-apply the chosen language so Compose string resources — which on Android
+        // follow the global Locale, not LocalConfiguration (Google issue 240191036) — don't stay
+        // reverted. The staleness gate keeps a normal resume (no drift) from recomposing the tree.
+        //
+        // On Android 33+ the language is persisted via LocaleManager (see persistAppLocale in
+        // App.kt): the OS keeps our process locale correct across the billing round-trip, so by
+        // the time we resume the locale is already restored, isAppLocaleOverrideStale() returns
+        // false, and this block is a harmless no-op (the visible flash is gone there entirely).
         if (isAppLocaleOverrideStale()) {
             reapplyAppLocaleNow()
             reassertAppLocale()

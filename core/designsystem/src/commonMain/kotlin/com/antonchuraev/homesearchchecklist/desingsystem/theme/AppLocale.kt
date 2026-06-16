@@ -79,6 +79,35 @@ expect fun isAppLocaleOverrideStale(): Boolean
 expect fun reapplyAppLocaleNow()
 
 /**
+ * Persists [tag] as the platform's **per-app** locale, so it survives external
+ * processes resetting the JVM-global `Locale.getDefault()` (the Google Play Billing
+ * sheet). Unlike [reapplyAppLocaleNow] — which reactively restores the global locale
+ * AFTER an external reset, one frame late — this proactively hands the locale to the
+ * OS, which then keeps the process locale correct across the whole billing round-trip.
+ * That is what removes the visible `ru → en` flash, not just the "stuck until restart" bug.
+ *
+ * Platform behaviour:
+ * - **Android API 33+ (Tiramisu):** `LocaleManager.setApplicationLocales`. The system
+ *   owns the per-app locale; the billing sheet's process can no longer perturb ours, so
+ *   the flash disappears. `null` (System mode) → empty `LocaleList` → follow device.
+ * - **Android < 33:** no-op — there is no system per-app-locale API; the existing
+ *   [reapplyAppLocaleNow] + [reassertAppLocale] onResume path stays as the fallback
+ *   (the residual one-frame flash there is an accepted, deferred limitation).
+ * - **iOS / wasmJs:** no-op — their locale already persists through `provides()`
+ *   (`NSUserDefaults["AppleLanguages"]` / `globalThis.__customLocale`) and no Google
+ *   Play Billing sheet exists to perturb it.
+ *
+ * Call from the same place that writes [customAppLocale] (the root `LaunchedEffect`
+ * keyed on the chosen [AppLanguage]); the two are complementary — [customAppLocale]
+ * drives Compose immediately, [persistAppLocale] makes the choice durable in the OS.
+ *
+ * Note (Android 33+): when the value actually changes, the system recreates the
+ * Activity (standard per-app-locale behaviour). The actual no-ops when the locale is
+ * unchanged, so app start (DataStore value already applied) does not trigger a recreate.
+ */
+expect fun persistAppLocale(tag: String?)
+
+/**
  * Platform-specific override that flips:
  *   1. Compose Resources' `Locale.current` (drives `stringResource()`)
  *   2. The platform-level locale APIs (so `Locale.getDefault()` on JVM, etc.)

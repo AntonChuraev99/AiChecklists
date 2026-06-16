@@ -71,3 +71,9 @@ actual fun isAppLocaleOverrideStale(): Boolean = false
  * + a globalThis slot), and no Google Play Billing sheet on the web. No-op.
  */
 actual fun reapplyAppLocaleNow() {}
+
+/**
+ * wasmJs: the locale already persists via the `globalThis.__customLocale` slot (written in
+ * [LocalAppLocale.provides]) and there is no Google Play Billing sheet on the web. No-op.
+ */
+actual fun persistAppLocale(tag: String?) {}

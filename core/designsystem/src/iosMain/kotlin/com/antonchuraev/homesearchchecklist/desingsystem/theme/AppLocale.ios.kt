@@ -49,3 +49,9 @@ actual fun isAppLocaleOverrideStale(): Boolean = false
  * + NSUserDefaults), and no Google Play Billing sheet to perturb it. No-op.
  */
 actual fun reapplyAppLocaleNow() {}
+
+/**
+ * iOS: the locale already persists via `NSUserDefaults["AppleLanguages"]` (written in
+ * [LocalAppLocale.provides]) and there is no Google Play Billing sheet to reset it. No-op.
+ */
+actual fun persistAppLocale(tag: String?) {}

@@ -1,10 +1,14 @@
 package com.antonchuraev.homesearchchecklist.desingsystem.theme
 
+import android.app.LocaleManager
 import android.content.res.Configuration
+import android.os.Build
+import android.os.LocaleList
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ProvidedValue
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import com.antonchuraev.homesearchchecklist.core.common.api.AppContextHolder
 import java.util.Locale
 
 /**
@@ -96,4 +100,35 @@ actual fun reapplyAppLocaleNow() {
     @Suppress("DEPRECATION")
     val target = customAppLocale?.let { Locale(it) } ?: LocalAppLocale.deviceDefault()
     Locale.setDefault(target)
+}
+
+/**
+ * Android API 33+: hand the chosen language to the system per-app-locale store
+ * (`LocaleManager.setApplicationLocales`). The OS then keeps OUR process locale correct
+ * across the entire Google Play Billing round-trip, so closing the sheet no longer flashes
+ * the device language for a frame — the [reapplyAppLocaleNow]/[reassertAppLocale] onResume
+ * path is inherently one frame late and cannot kill that flash on its own.
+ *
+ * `null` (System mode) → empty `LocaleList` → follow the device locale.
+ *
+ * Below API 33 there is no system per-app-locale API, so this is a no-op and the onResume
+ * fallback remains the only mechanism (its residual one-frame flash is the deferred
+ * limitation tracked in docs/todos/2026-06-15-locale-flash-on-billing-cmp-limitation.md).
+ *
+ * The unchanged-value guard matters: assigning `applicationLocales` recreates the Activity,
+ * and `LaunchedEffect(language)` replays the persisted DataStore value on every app start —
+ * without the guard every launch would needlessly recreate.
+ */
+actual fun persistAppLocale(tag: String?) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+    val localeManager = AppContextHolder.context.getSystemService(LocaleManager::class.java)
+        ?: return
+    val target = if (tag == null) {
+        LocaleList.getEmptyLocaleList()
+    } else {
+        LocaleList.forLanguageTags(tag)
+    }
+    if (localeManager.applicationLocales != target) {
+        localeManager.applicationLocales = target
+    }
 }
