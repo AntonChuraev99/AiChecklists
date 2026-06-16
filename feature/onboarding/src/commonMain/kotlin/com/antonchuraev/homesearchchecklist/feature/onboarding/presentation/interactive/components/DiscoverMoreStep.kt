@@ -27,10 +27,7 @@ import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Widgets
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.Card
-import androidx.compose.material3.OutlinedCard
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -52,8 +49,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCardDefaults
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
-import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderDateTimePicker
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderSheet
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderSheetCallbacks
@@ -288,7 +285,6 @@ private fun ActionCard(
         label = "icon_tint"
     )
 
-    val isDark = LocalIsDarkTheme.current
     val cardShape = RoundedCornerShape(AppDimens.SpacingMd)
     val cardContent: @Composable () -> Unit = {
         Row(
@@ -348,33 +344,17 @@ private fun ActionCard(
         }
     }
 
-    if (isDark) {
-        OutlinedCard(
-            modifier = modifier
-                .fillMaxWidth()
-                .graphicsLayer(scaleX = scale, scaleY = scale)
-                .clip(cardShape)
-                .clickable(enabled = !isCompleted, onClick = onClick),
-            shape = cardShape,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-            colors = CardDefaults.outlinedCardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            )
-        ) { cardContent() }
-    } else {
-        Card(
-            modifier = modifier
-                .fillMaxWidth()
-                .graphicsLayer(scaleX = scale, scaleY = scale)
-                .clip(cardShape)
-                .clickable(enabled = !isCompleted, onClick = onClick),
-            shape = cardShape,
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = AppDimens.CardElevation)
-        ) { cardContent() }
-    }
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .graphicsLayer(scaleX = scale, scaleY = scale)
+            .clip(cardShape)
+            .clickable(enabled = !isCompleted, onClick = onClick),
+        shape = cardShape,
+        colors = AppCardDefaults.colors(),
+        border = AppCardDefaults.border(),
+        elevation = AppCardDefaults.flatElevation()
+    ) { cardContent() }
 }
 
 @Composable

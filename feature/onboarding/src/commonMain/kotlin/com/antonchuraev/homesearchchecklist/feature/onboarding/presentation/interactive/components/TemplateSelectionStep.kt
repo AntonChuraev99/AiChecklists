@@ -18,10 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.Card
-import androidx.compose.material3.OutlinedCard
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -32,8 +29,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCardDefaults
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
-import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
 import com.antonchuraev.homesearchchecklist.feature.create.domain.model.ChecklistTemplate
 import org.jetbrains.compose.resources.stringResource
 
@@ -94,7 +91,6 @@ private fun TemplateCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val isDark = LocalIsDarkTheme.current
     val shape = RoundedCornerShape(AppDimens.SpacingMd)
     val cardContent: @Composable () -> Unit = {
         Row(
@@ -127,29 +123,14 @@ private fun TemplateCard(
         }
     }
 
-    if (isDark) {
-        OutlinedCard(
-            modifier = modifier
-                .fillMaxWidth()
-                .clip(shape)
-                .clickable(onClick = onClick),
-            shape = shape,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-            colors = CardDefaults.outlinedCardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            )
-        ) { cardContent() }
-    } else {
-        Card(
-            modifier = modifier
-                .fillMaxWidth()
-                .clip(shape)
-                .clickable(onClick = onClick),
-            shape = shape,
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = AppDimens.CardElevation)
-        ) { cardContent() }
-    }
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .clickable(onClick = onClick),
+        shape = shape,
+        colors = AppCardDefaults.colors(),
+        border = AppCardDefaults.border(),
+        elevation = AppCardDefaults.flatElevation()
+    ) { cardContent() }
 }

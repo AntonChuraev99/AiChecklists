@@ -1,6 +1,5 @@
 package com.antonchuraev.homesearchchecklist.desingsystem.components.gisti
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -13,9 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -25,10 +22,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCardDefaults
 import com.antonchuraev.homesearchchecklist.desingsystem.emoji.LocalEmojiFont
-import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.GistiColors
-import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
 
 /**
  * Rich list-card for a checklist entry on the Home screen.
@@ -59,13 +55,14 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
  *       Text(editedLabel, 11.5sp, faint = onSurfaceVariant 75% alpha)
  * ```
  *
- * Card style matches the existing [AppCard] pattern:
- * - **Light**: elevated [Card] with [AppDimens.CardElevation]
- * - **Dark**: [OutlinedCard] with 1dp `outline` border
+ * Card style matches the shared [AppCard] / [AppCardDefaults] "filled + hairline" pattern:
+ * - Flat tonal container (light `surfaceContainerLowest` / dark `surfaceContainerLow`), 1dp
+ *   `outlineVariant` border, and NO shadow elevation — identical in both themes.
  * - Corner radius: `MaterialTheme.shapes.medium` (12dp per AppShapes)
  *
  * Token mapping:
- * - Container: `colorScheme.surfaceContainerLowest` (white card)
+ * - Container: [AppCardDefaults.containerColor] (light `surfaceContainerLowest` / dark
+ *   `surfaceContainerLow`)
  * - Name: `colorScheme.onSurface` / `typography.titleMedium`
  * - Progress accent: [GistiColors.success] at 100%, else `colorScheme.primary`
  * - Progress track: `colorScheme.surfaceContainerHigh`
@@ -92,10 +89,8 @@ fun ChecklistListCard(
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
 ) {
-    val isDark = LocalIsDarkTheme.current
     val shape = MaterialTheme.shapes.medium
     val isComplete = totalItems > 0 && checkedItems >= totalItems
-    val containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
 
     val cardContent: @Composable () -> Unit = {
         Row(
@@ -178,21 +173,13 @@ fun ChecklistListCard(
         }
     }
 
-    if (isDark) {
-        OutlinedCard(
-            modifier = modifier.fillMaxWidth(),
-            shape = shape,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-            colors = CardDefaults.outlinedCardColors(containerColor = containerColor),
-        ) { cardContent() }
-    } else {
-        Card(
-            modifier = modifier.fillMaxWidth(),
-            shape = shape,
-            colors = CardDefaults.cardColors(containerColor = containerColor),
-            elevation = CardDefaults.cardElevation(defaultElevation = AppDimens.CardElevation),
-        ) { cardContent() }
-    }
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = shape,
+        colors = AppCardDefaults.colors(),
+        border = AppCardDefaults.border(),
+        elevation = AppCardDefaults.flatElevation(),
+    ) { cardContent() }
 }
 
 @Composable

@@ -21,10 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.Folder
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.Card
-import androidx.compose.material3.OutlinedCard
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -46,11 +43,11 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.TopAppBarDefaults
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AddItemInputField
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCardDefaults
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppTextField
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
-import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistNodeType
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.tree.ChecklistTree
@@ -188,7 +185,6 @@ private fun AnalyzeResultPreviewContent(
         // Summary
         state.summary?.let { summary ->
             item {
-                val isDarkSummary = LocalIsDarkTheme.current
                 val summaryShape = RoundedCornerShape(12.dp)
                 val summaryContent: @Composable () -> Unit = {
                     Text(
@@ -198,25 +194,18 @@ private fun AnalyzeResultPreviewContent(
                         modifier = Modifier.padding(AppDimens.SpacingMd)
                     )
                 }
-                if (isDarkSummary) {
-                    OutlinedCard(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = summaryShape,
-                        colors = CardDefaults.outlinedCardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                        ),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
-                    ) { summaryContent() }
-                } else {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = summaryShape,
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                        ),
-                        elevation = CardDefaults.cardElevation(defaultElevation = AppDimens.CardElevation)
-                    ) { summaryContent() }
-                }
+                // Summary card intentionally tints its surface with a faint primary wash to set it
+                // apart from the item list; the rest of the style (hairline border, no shadow) follows
+                // the shared flat card defaults.
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = summaryShape,
+                    colors = AppCardDefaults.colors(
+                        container = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                    ),
+                    border = AppCardDefaults.border(),
+                    elevation = AppCardDefaults.flatElevation()
+                ) { summaryContent() }
                 Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
             }
         }
@@ -311,7 +300,6 @@ private fun ChecklistItemCard(
     onRemove: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val isDark = LocalIsDarkTheme.current
     val shape = RoundedCornerShape(12.dp)
     val cardContent: @Composable () -> Unit = {
         Row(
@@ -353,25 +341,13 @@ private fun ChecklistItemCard(
         }
     }
 
-    if (isDark) {
-        OutlinedCard(
-            modifier = modifier.fillMaxWidth(),
-            shape = shape,
-            colors = CardDefaults.outlinedCardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            ),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
-        ) { cardContent() }
-    } else {
-        Card(
-            modifier = modifier.fillMaxWidth(),
-            shape = shape,
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = AppDimens.CardElevation)
-        ) { cardContent() }
-    }
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = shape,
+        colors = AppCardDefaults.colors(),
+        border = AppCardDefaults.border(),
+        elevation = AppCardDefaults.flatElevation()
+    ) { cardContent() }
 }
 
 /**
@@ -385,7 +361,6 @@ private fun StructuredItemCard(
     depth: Int,
     modifier: Modifier = Modifier
 ) {
-    val isDark = LocalIsDarkTheme.current
     val shape = RoundedCornerShape(12.dp)
     val isFolder = item.type == ChecklistNodeType.FOLDER
     val cardContent: @Composable () -> Unit = {
@@ -429,24 +404,12 @@ private fun StructuredItemCard(
         }
     }
 
-    if (isDark) {
-        OutlinedCard(
-            modifier = modifier.fillMaxWidth(),
-            shape = shape,
-            colors = CardDefaults.outlinedCardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            ),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
-        ) { cardContent() }
-    } else {
-        Card(
-            modifier = modifier.fillMaxWidth(),
-            shape = shape,
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = AppDimens.CardElevation)
-        ) { cardContent() }
-    }
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = shape,
+        colors = AppCardDefaults.colors(),
+        border = AppCardDefaults.border(),
+        elevation = AppCardDefaults.flatElevation()
+    ) { cardContent() }
 }
 

@@ -16,11 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.border
 import androidx.compose.material3.Card
-import androidx.compose.material3.OutlinedCard
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,9 +31,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCardDefaults
 import com.antonchuraev.homesearchchecklist.desingsystem.emoji.LocalEmojiFont
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
-import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
 import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive.OrganizingStyle
 import org.jetbrains.compose.resources.stringResource
 
@@ -107,12 +103,21 @@ private fun StyleCard(
     val title = stringResource(style.titleRes)
     val description = stringResource(style.descriptionRes)
 
-    val isDark = LocalIsDarkTheme.current
     val shape = RoundedCornerShape(AppDimens.SpacingMd)
     val containerColor = if (isSelected) {
-        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)
+        AppCardDefaults.selectedContainerColor()
     } else {
-        MaterialTheme.colorScheme.surface
+        AppCardDefaults.containerColor()
+    }
+    val titleColor = if (isSelected) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+    val descriptionColor = if (isSelected) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
     }
     val cardContent: @Composable () -> Unit = {
         Column(
@@ -127,51 +132,29 @@ private fun StyleCard(
                 text = title,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = titleColor
             )
             Text(
                 text = description,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = descriptionColor
             )
         }
     }
 
-    if (isDark) {
-        OutlinedCard(
-            modifier = modifier
-                .fillMaxWidth()
-                .heightIn(min = 80.dp)
-                .clip(shape)
-                .graphicsLayer(scaleX = scale, scaleY = scale)
-                .clickable(onClick = onClick)
-                .semantics { contentDescription = title },
-            shape = shape,
-            border = BorderStroke(
-                width = if (isSelected) 2.dp else 1.dp,
-                color = if (isSelected) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.outline
-            ),
-            colors = CardDefaults.outlinedCardColors(containerColor = containerColor)
-        ) { cardContent() }
-    } else {
-        Card(
-            modifier = modifier
-                .fillMaxWidth()
-                .heightIn(min = 80.dp)
-                .clip(shape)
-                .graphicsLayer(scaleX = scale, scaleY = scale)
-                .then(
-                    if (isSelected) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, shape)
-                    else Modifier
-                )
-                .clickable(onClick = onClick)
-                .semantics { contentDescription = title },
-            shape = shape,
-            colors = CardDefaults.cardColors(containerColor = containerColor),
-            elevation = CardDefaults.cardElevation(
-                defaultElevation = if (isSelected) 0.dp else AppDimens.CardElevation
-            )
-        ) { cardContent() }
-    }
+    // Selectable card, shared flat style: selected = accent ring + filled primaryContainer,
+    // unselected = hairline; no shadow in either state (the ring shows selection).
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = 80.dp)
+            .clip(shape)
+            .graphicsLayer(scaleX = scale, scaleY = scale)
+            .clickable(onClick = onClick)
+            .semantics { contentDescription = title },
+        shape = shape,
+        colors = AppCardDefaults.colors(container = containerColor),
+        border = if (isSelected) AppCardDefaults.selectedBorder() else AppCardDefaults.border(),
+        elevation = AppCardDefaults.flatElevation()
+    ) { cardContent() }
 }

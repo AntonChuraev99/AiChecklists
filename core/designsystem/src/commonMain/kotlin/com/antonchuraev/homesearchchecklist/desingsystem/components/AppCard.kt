@@ -1,6 +1,5 @@
 package com.antonchuraev.homesearchchecklist.desingsystem.components
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
@@ -8,14 +7,10 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedCard
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
-import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -26,18 +21,24 @@ fun AppCard(
     contentPadding: PaddingValues = PaddingValues(AppDimens.CardPadding),
     content: @Composable () -> Unit
 ) {
-    val isDark = LocalIsDarkTheme.current
     val shape = MaterialTheme.shapes.medium
     val containerModifier = modifier.fillMaxWidth()
 
+    // Material 3 "filled + hairline" card style — flat tonal container, 1dp outline, no shadow in any
+    // interaction state. All five tokens come from [AppCardDefaults] so this is the single source of
+    // truth shared with every feature card that can't delegate to AppCard. See AppCardDefaults for the
+    // rationale behind dropping the old elevated look.
+    val colors = AppCardDefaults.colors()
+    val border = AppCardDefaults.border()
+    val elevation = AppCardDefaults.flatElevation()
+
     // Native Card.onClick is used only for tap-only cards: it carries correct button semantics and
     // its ripple is already clipped to [shape] by the Card. But Card.onClick can't carry a
-    // long-press — so when [onLongClick] is supplied we drop to a plain Card and apply
+    // long-press — so when [onLongClick] is supplied we drop the native onClick and apply
     // combinedClickable to the INNER content box (above contentPadding). The Card clips its content
     // slot to [shape], so the tap ripple stays inside the rounded form while the whole surface
-    // (padding included) stays tappable, and the elevation shadow — drawn by the outer Card — is
-    // untouched. Putting clickable on the outer [modifier] would draw the ripple OUTSIDE the clip,
-    // bleeding a rectangle past the rounded corners.
+    // (padding included) stays tappable. Putting clickable on the outer [modifier] would draw the
+    // ripple OUTSIDE the clip, bleeding a rectangle past the rounded corners.
     val cardClick: (() -> Unit)? = if (onLongClick == null) onClick else null
     val contentBox: @Composable () -> Unit = {
         Box(
@@ -55,49 +56,22 @@ fun AppCard(
         }
     }
 
-    if (isDark) {
-        val border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
-        val colors = CardDefaults.outlinedCardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
-        if (cardClick != null) {
-            OutlinedCard(
-                onClick = cardClick,
-                modifier = containerModifier,
-                shape = shape,
-                border = border,
-                colors = colors,
-            ) { contentBox() }
-        } else {
-            OutlinedCard(
-                modifier = containerModifier,
-                shape = shape,
-                border = border,
-                colors = colors,
-            ) { contentBox() }
-        }
+    if (cardClick != null) {
+        Card(
+            onClick = cardClick,
+            modifier = containerModifier,
+            shape = shape,
+            colors = colors,
+            elevation = elevation,
+            border = border,
+        ) { contentBox() }
     } else {
-        val colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
-        val elevation = CardDefaults.cardElevation(
-            defaultElevation = AppDimens.CardElevation
-        )
-        if (cardClick != null) {
-            Card(
-                onClick = cardClick,
-                modifier = containerModifier,
-                shape = shape,
-                colors = colors,
-                elevation = elevation,
-            ) { contentBox() }
-        } else {
-            Card(
-                modifier = containerModifier,
-                shape = shape,
-                colors = colors,
-                elevation = elevation,
-            ) { contentBox() }
-        }
+        Card(
+            modifier = containerModifier,
+            shape = shape,
+            colors = colors,
+            elevation = elevation,
+            border = border,
+        ) { contentBox() }
     }
 }

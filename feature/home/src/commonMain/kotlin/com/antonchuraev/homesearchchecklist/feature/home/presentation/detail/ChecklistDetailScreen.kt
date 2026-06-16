@@ -105,8 +105,6 @@ import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.material3.Card
-import androidx.compose.material3.OutlinedCard
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -166,13 +164,13 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiC
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiPromptChips
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiChecklistPromptChips
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCardDefaults
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppItemMetaChip
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppTextField
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AdaptiveSheetOrDialog
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
-import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
 import com.antonchuraev.homesearchchecklist.desingsystem.util.asWholeUrl
 import com.antonchuraev.homesearchchecklist.desingsystem.util.displayDomain
 import com.antonchuraev.homesearchchecklist.desingsystem.util.extractUrls
@@ -1589,8 +1587,6 @@ internal fun ChecklistItemCard(
     cardDragModifier: Modifier = Modifier,
     modifier: Modifier = Modifier
 ) {
-    val isDark = LocalIsDarkTheme.current
-
     // Highlight animation: flash primaryContainer for ~1 s when navigated from Calendar.
     // animateColorAsState provides a smooth fade-in/out over 280 ms on both edges.
     val highlightColor by animateColorAsState(
@@ -1741,38 +1737,28 @@ internal fun ChecklistItemCard(
         }
     }
 
-    if (isDark) {
-        val borderColor by animateColorAsState(
-            targetValue = if (isDragging) MaterialTheme.colorScheme.primary
-            else MaterialTheme.colorScheme.outline,
-            label = "border_color"
-        )
-        val borderWidth by animateDpAsState(
-            targetValue = if (isDragging) 2.dp else 1.dp,
-            label = "border_width"
-        )
-        OutlinedCard(
-            modifier = cardModifier,
-            shape = MaterialTheme.shapes.medium,
-            colors = CardDefaults.outlinedCardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            ),
-            border = BorderStroke(borderWidth, borderColor)
-        ) { cardContent() }
-    } else {
-        val elevation by animateDpAsState(
-            targetValue = if (isDragging) 8.dp else AppDimens.CardElevation,
-            label = "card_elevation"
-        )
-        Card(
-            modifier = cardModifier,
-            shape = MaterialTheme.shapes.medium,
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = elevation)
-        ) { cardContent() }
-    }
+    // Shared "filled + hairline" card in both themes (see AppCardDefaults). "Lifted while dragging"
+    // is shown by an accent ring — the border animates to primary at 2dp — NOT by a shadow, so there
+    // is no side-ear artifact and the visual is identical on Android and Web.
+    val borderColor by animateColorAsState(
+        targetValue = if (isDragging) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.outlineVariant
+        },
+        label = "border_color"
+    )
+    val borderWidth by animateDpAsState(
+        targetValue = if (isDragging) 2.dp else 1.dp,
+        label = "border_width"
+    )
+    Card(
+        modifier = cardModifier,
+        shape = MaterialTheme.shapes.medium,
+        colors = AppCardDefaults.colors(),
+        border = BorderStroke(borderWidth, borderColor),
+        elevation = AppCardDefaults.flatElevation()
+    ) { cardContent() }
 }
 
 /**

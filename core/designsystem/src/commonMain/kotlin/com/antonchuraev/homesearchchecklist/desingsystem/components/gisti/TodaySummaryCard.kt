@@ -1,6 +1,5 @@
 package com.antonchuraev.homesearchchecklist.desingsystem.components.gisti
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,10 +11,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Today
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,8 +21,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCardDefaults
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
-import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
 
 /**
  * Compact tappable card showing the "Today" focus summary row on the home screen.
@@ -33,14 +30,15 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.LocalIsDarkTheme
  * Visual spec (from gisti-screens.jsx RxHome today card):
  *  - Padding: 13dp vertical, 16dp horizontal
  *  - Corner radius: 14dp
- *  - Card style: light = elevated (`shadow`), dark = outlined (1dp `outlineVariant`)
+ *  - Card style: shared [AppCardDefaults] "filled + hairline" — flat tonal container, 1dp
+ *    `outlineVariant` border, no shadow, identical in light and dark.
  *  - Left icon tile: 40dp, radius 11dp, background `primaryContainer`, icon [Icons.Outlined.Today] tint `primary`
  *  - Center: title (15.5sp / 600 / `onSurface`) + subtitle (13sp / `onSurfaceVariant`)
  *  - Right: [Icons.AutoMirrored.Filled.KeyboardArrowRight] tint `onSurfaceVariant` 75% alpha ("faint")
  *
  * Token mapping:
- * - Container: `colorScheme.surfaceContainerLowest`
- * - Border (dark): `colorScheme.outlineVariant`
+ * - Container: [AppCardDefaults.containerColor]
+ * - Border: [AppCardDefaults.border] (`outlineVariant`)
  * - Icon tile: `colorScheme.primaryContainer` / `colorScheme.primary`
  * - Title: `colorScheme.onSurface`
  * - Subtitle: `colorScheme.onSurfaceVariant`
@@ -57,9 +55,7 @@ fun TodaySummaryCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val isDark = LocalIsDarkTheme.current
     val shape = RoundedCornerShape(14.dp)
-    val containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
 
     val cardContent: @Composable () -> Unit = {
         Row(
@@ -117,21 +113,12 @@ fun TodaySummaryCard(
         }
     }
 
-    if (isDark) {
-        OutlinedCard(
-            onClick = onClick,
-            modifier = modifier.fillMaxWidth(),
-            shape = shape,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-            colors = CardDefaults.outlinedCardColors(containerColor = containerColor),
-        ) { cardContent() }
-    } else {
-        Card(
-            onClick = onClick,
-            modifier = modifier.fillMaxWidth(),
-            shape = shape,
-            colors = CardDefaults.cardColors(containerColor = containerColor),
-            elevation = CardDefaults.cardElevation(defaultElevation = AppDimens.CardElevation),
-        ) { cardContent() }
-    }
+    Card(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
+        shape = shape,
+        colors = AppCardDefaults.colors(),
+        border = AppCardDefaults.border(),
+        elevation = AppCardDefaults.flatElevation(),
+    ) { cardContent() }
 }

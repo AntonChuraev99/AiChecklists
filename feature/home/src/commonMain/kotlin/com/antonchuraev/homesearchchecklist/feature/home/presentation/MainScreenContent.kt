@@ -169,7 +169,7 @@ private fun MainScreenContentLazyColumn(
             top = AppDimens.SpacingLg,
             bottom = contentBottomPadding
         ),
-        verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
+        verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
     ) {
         if (!screenState.isGoogleLinked) {
             item(key = "sync_banner") {
