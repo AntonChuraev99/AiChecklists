@@ -40,14 +40,11 @@ kotlin {
             implementation(projects.core.navigation.api)
             implementation(projects.core.designsystem)
             implementation(projects.core.auth.api)
+            implementation(projects.core.filepicker.api)
 
             implementation(projects.feature.checklist)
             implementation(projects.feature.paywall)
             implementation(projects.feature.user)
-            // Pending: docs/todos/2026-05-15-extract-filepicker-to-core.md
-            // FilePicker currently lives under feature:analyze; sharing it across features
-            // creates a lateral coupling. Extract to core/common/api or new core/filepicker.
-            implementation(projects.feature.analyze)
 
             implementation(compose.runtime)
             implementation(compose.foundation)

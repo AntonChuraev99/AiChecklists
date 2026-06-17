@@ -57,9 +57,9 @@ import aichecklists.core.designsystem.generated.resources.chat_preview_cancelled
 import aichecklists.core.designsystem.generated.resources.chat_agent_round_limit
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AttachmentSource
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatAttachment
-import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.picker.FilePickerType
-import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.picker.rememberFilePickerLauncher
-import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.recorder.rememberAudioRecorderLauncher
+import com.antonchuraev.homesearchchecklist.core.filepicker.api.picker.FilePickerType
+import com.antonchuraev.homesearchchecklist.core.filepicker.api.picker.rememberFilePickerLauncher
+import com.antonchuraev.homesearchchecklist.core.filepicker.api.recorder.rememberAudioRecorderLauncher
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 

@@ -34,6 +34,7 @@ kotlin {
             implementation(projects.core.common.api)
             implementation(projects.core.designsystem)
             implementation(projects.core.navigation.api)
+            implementation(projects.core.filepicker.api)
 
             implementation(projects.feature.checklist)
             implementation(projects.feature.user)

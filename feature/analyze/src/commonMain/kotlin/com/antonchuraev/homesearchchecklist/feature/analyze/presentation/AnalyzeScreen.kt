@@ -55,10 +55,10 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.AppTextField
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.InputDataType
-import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.picker.FilePickerType
-import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.picker.rememberFilePickerLauncher
-import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.recorder.rememberAudioRecorderLauncher
-import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.recorder.rememberAudioPlayerLauncher
+import com.antonchuraev.homesearchchecklist.core.filepicker.api.picker.FilePickerType
+import com.antonchuraev.homesearchchecklist.core.filepicker.api.picker.rememberFilePickerLauncher
+import com.antonchuraev.homesearchchecklist.core.filepicker.api.recorder.rememberAudioRecorderLauncher
+import com.antonchuraev.homesearchchecklist.core.filepicker.api.recorder.rememberAudioPlayerLauncher
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
 import org.jetbrains.compose.resources.stringResource

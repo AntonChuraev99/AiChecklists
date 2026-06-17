@@ -200,8 +200,8 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsScreens
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.PlatformCapabilities
-import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.picker.FilePickerType
-import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.picker.rememberFilePickerLauncher
+import com.antonchuraev.homesearchchecklist.core.filepicker.api.picker.FilePickerType
+import com.antonchuraev.homesearchchecklist.core.filepicker.api.picker.rememberFilePickerLauncher
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlinx.coroutines.launch

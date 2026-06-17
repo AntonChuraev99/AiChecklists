@@ -153,9 +153,9 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.com
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatRole
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiInlineChatPanel
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatAttachmentSourceSheet
-import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.picker.FilePickerType
-import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.picker.rememberFilePickerLauncher
-import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.recorder.rememberAudioRecorderLauncher
+import com.antonchuraev.homesearchchecklist.core.filepicker.api.picker.FilePickerType
+import com.antonchuraev.homesearchchecklist.core.filepicker.api.picker.rememberFilePickerLauncher
+import com.antonchuraev.homesearchchecklist.core.filepicker.api.recorder.rememberAudioRecorderLauncher
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatAttachment
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AttachmentSource
 import androidx.compose.foundation.rememberScrollState

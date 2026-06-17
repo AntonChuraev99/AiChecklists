@@ -88,9 +88,16 @@ kotlin {
             // the base artifact ships the Kotlin APIs. Version resolved by firebase-bom below.
             implementation(libs.firebase.messaging)
         }
+        wasmJsMain.dependencies {
+            // Coil 3 — needed for the OPFS image Fetcher/Keyer registered in main.kt
+            // (coil3.fetch.*, coil3.decode.ImageSource, okio.Buffer come transitively).
+            // Feature modules declare coil as `implementation`, so it does not leak here.
+            implementation(libs.coil3.compose)
+        }
         commonMain.dependencies {
             implementation(projects.core.common.api)
             implementation(projects.core.common.impl)
+            implementation(projects.core.filepicker.api)
             implementation(projects.core.datastore.api)
             implementation(projects.core.designsystem)
             implementation(projects.core.datastore.api)

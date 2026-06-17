@@ -35,10 +35,10 @@ kotlin {
             implementation(projects.core.datastore.api)
             implementation(projects.core.designsystem)
             implementation(projects.core.remoteconfig.api)
+            implementation(projects.core.filepicker.api)
             implementation(projects.feature.checklist)
             implementation(projects.feature.user)
             // FilePicker + AudioRecorder expect/actual for attachment + voice input (Phase 3)
-            implementation(projects.feature.analyze)
             // Coil 3 for attachment image thumbnails in chat chips and message bubbles (Phase 3)
             implementation(libs.coil3.compose)
 
