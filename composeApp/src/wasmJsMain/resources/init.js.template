@@ -381,6 +381,237 @@ globalThis.__deleteStagedBytes = (path) => {
     }
 };
 
+// === OPFS Attachment storage bridge ===
+// Durable per-fill/per-item file storage via the Origin Private File System.
+// Uses the ASYNC main-thread OPFS API (getDirectory + createWritable + getFile) —
+// it does NOT require SharedArrayBuffer / COOP / COEP (confirmed: prod _headers ships
+// none and Room's SAH Pool VFS already proves OPFS is available in this origin).
+//
+// Pseudo-path contract (also stored in the Room DB as Attachment.path):
+//   opfs://attachments/<fillId>/<itemId>/<attachmentId>.<ext>
+// The "opfs://" prefix is stripped to derive the real OPFS segment chain.
+//
+// All helpers are async (return a Promise) and resolve to a sentinel on failure
+// (null / false / 0 / {w:null,h:null}) — they NEVER reject, so the Kotlin coroutine
+// side can treat them as plain suspend calls without try/catch ceremony.
+
+// Split "opfs://attachments/<fillId>/<itemId>/<file>.<ext>" → ["attachments","<fillId>","<itemId>","<file>.<ext>"].
+function _opfsSegments(opfsPath) {
+    const raw = (opfsPath || '').replace(/^opfs:\/\//, '');
+    return raw.split('/').filter((s) => s.length > 0);
+}
+
+// Walk/create the directory chain for all-but-last segments; return the leaf dir handle.
+// create=true → mkdir -p semantics; create=false → returns null if any segment is missing.
+async function _opfsDirForFile(segments, create) {
+    let dir = await navigator.storage.getDirectory();
+    for (let i = 0; i < segments.length - 1; i++) {
+        dir = await dir.getDirectoryHandle(segments[i], { create: create });
+    }
+    return dir;
+}
+
+// Copy bytes from the file-picker staging map (key = "wasm-blob://<uuid>") into an
+// OPFS file at opfsPath. Returns Promise<boolean> (true on success).
+globalThis.__opfsStore = (sourceKey, opfsPath) => new Promise((resolve) => {
+    (async () => {
+        try {
+            const buf = globalThis.__filePickerStaging.get(sourceKey);
+            if (!buf) {
+                console.error('[OPFS] __opfsStore: no staged bytes for', sourceKey);
+                resolve(false);
+                return;
+            }
+            const bytes = (buf instanceof Uint8Array) ? buf : new Uint8Array(buf);
+            const segments = _opfsSegments(opfsPath);
+            if (segments.length === 0) { resolve(false); return; }
+            const dir = await _opfsDirForFile(segments, true);
+            const fileHandle = await dir.getFileHandle(segments[segments.length - 1], { create: true });
+            const writable = await fileHandle.createWritable();
+            // Pass a copy of the underlying ArrayBuffer slice so a detached/shared
+            // wasm-memory view can't trip the structured-clone write.
+            await writable.write(bytes);
+            await writable.close();
+            resolve(true);
+        } catch (err) {
+            console.error('[OPFS] __opfsStore failed:', opfsPath, err);
+            resolve(false);
+        }
+    })();
+});
+
+// Delete a single OPFS file. Returns Promise<boolean> (true if a file was removed;
+// false if missing or on error — both are acceptable for a delete).
+globalThis.__opfsDeleteFile = (opfsPath) => new Promise((resolve) => {
+    (async () => {
+        try {
+            const segments = _opfsSegments(opfsPath);
+            if (segments.length === 0) { resolve(false); return; }
+            const dir = await _opfsDirForFile(segments, false);
+            if (!dir) { resolve(false); return; }
+            await dir.removeEntry(segments[segments.length - 1]);
+            resolve(true);
+        } catch (err) {
+            // NotFoundError is expected when the file was already gone.
+            if (err && err.name !== 'NotFoundError') {
+                console.warn('[OPFS] __opfsDeleteFile:', opfsPath, err);
+            }
+            resolve(false);
+        }
+    })();
+});
+
+// Recursively delete an OPFS directory subtree (e.g. opfs://attachments/<fillId>
+// or opfs://attachments/<fillId>/<itemId>). Returns Promise<boolean>.
+globalThis.__opfsDeleteDir = (opfsPath) => new Promise((resolve) => {
+    (async () => {
+        try {
+            const segments = _opfsSegments(opfsPath);
+            if (segments.length === 0) { resolve(false); return; }
+            // Parent dir holds the entry we remove with { recursive: true }.
+            let dir = await navigator.storage.getDirectory();
+            for (let i = 0; i < segments.length - 1; i++) {
+                dir = await dir.getDirectoryHandle(segments[i], { create: false });
+            }
+            await dir.removeEntry(segments[segments.length - 1], { recursive: true });
+            resolve(true);
+        } catch (err) {
+            if (err && err.name !== 'NotFoundError') {
+                console.warn('[OPFS] __opfsDeleteDir:', opfsPath, err);
+            }
+            resolve(false);
+        }
+    })();
+});
+
+// Byte size of an OPFS file. Returns Promise<number> (0 if missing / on error).
+globalThis.__opfsStat = (opfsPath) => new Promise((resolve) => {
+    (async () => {
+        try {
+            const segments = _opfsSegments(opfsPath);
+            if (segments.length === 0) { resolve(0); return; }
+            const dir = await _opfsDirForFile(segments, false);
+            if (!dir) { resolve(0); return; }
+            const fileHandle = await dir.getFileHandle(segments[segments.length - 1], { create: false });
+            const file = await fileHandle.getFile();
+            resolve(file.size || 0);
+        } catch (err) {
+            resolve(0);
+        }
+    })();
+});
+
+// Read an OPFS file as a fresh object URL ("blob:..."). Returns Promise<string|null>.
+// Caller is responsible for URL.revokeObjectURL() via __opfsRevokeUrl when done.
+globalThis.__opfsReadAsUrl = (opfsPath) => new Promise((resolve) => {
+    (async () => {
+        try {
+            const segments = _opfsSegments(opfsPath);
+            if (segments.length === 0) { resolve(null); return; }
+            const dir = await _opfsDirForFile(segments, false);
+            if (!dir) { resolve(null); return; }
+            const fileHandle = await dir.getFileHandle(segments[segments.length - 1], { create: false });
+            const file = await fileHandle.getFile();
+            resolve(URL.createObjectURL(file));
+        } catch (err) {
+            console.warn('[OPFS] __opfsReadAsUrl:', opfsPath, err);
+            resolve(null);
+        }
+    })();
+});
+
+globalThis.__opfsRevokeUrl = (url) => {
+    try { if (url) URL.revokeObjectURL(url); } catch (_) {}
+};
+
+// Read an OPFS file's raw bytes as a Uint8Array (for the Coil image Fetcher, which
+// decodes from an in-memory okio Buffer). Returns Promise<Uint8Array|null>.
+globalThis.__opfsReadBytes = (opfsPath) => new Promise((resolve) => {
+    (async () => {
+        try {
+            const segments = _opfsSegments(opfsPath);
+            if (segments.length === 0) { resolve(null); return; }
+            const dir = await _opfsDirForFile(segments, false);
+            if (!dir) { resolve(null); return; }
+            const fileHandle = await dir.getFileHandle(segments[segments.length - 1], { create: false });
+            const file = await fileHandle.getFile();
+            const buf = await file.arrayBuffer();
+            resolve(new Uint8Array(buf));
+        } catch (err) {
+            console.warn('[OPFS] __opfsReadBytes:', opfsPath, err);
+            resolve(null);
+        }
+    })();
+});
+
+// Probe image pixel dimensions of an OPFS file via createImageBitmap (decodes header
+// only enough to expose width/height, then closes the bitmap). Returns
+// Promise<{w:number|null, h:number|null}> — {null,null} for non-images / on error.
+globalThis.__opfsProbeImage = (opfsPath, mimeType) => new Promise((resolve) => {
+    (async () => {
+        const fail = () => resolve({ w: null, h: null });
+        try {
+            if (!mimeType || mimeType.indexOf('image/') !== 0) { fail(); return; }
+            const segments = _opfsSegments(opfsPath);
+            if (segments.length === 0) { fail(); return; }
+            const dir = await _opfsDirForFile(segments, false);
+            if (!dir) { fail(); return; }
+            const fileHandle = await dir.getFileHandle(segments[segments.length - 1], { create: false });
+            const file = await fileHandle.getFile();
+            if (typeof createImageBitmap !== 'function') { fail(); return; }
+            const bitmap = await createImageBitmap(file);
+            const w = bitmap.width || null;
+            const h = bitmap.height || null;
+            try { bitmap.close(); } catch (_) {}
+            resolve({ w: w, h: h });
+        } catch (err) {
+            console.warn('[OPFS] __opfsProbeImage:', opfsPath, err);
+            fail();
+        }
+    })();
+});
+
+// Synchronous accessor pair for the probe result object (Kotlin reads fields via @JsFun).
+globalThis.__opfsProbeW = (obj) => (obj && obj.w != null) ? obj.w : null;
+globalThis.__opfsProbeH = (obj) => (obj && obj.h != null) ? obj.h : null;
+
+// Popup-safe open of an OPFS file in an external viewer / download. Reads the file
+// (async) then triggers a synthetic anchor click. Anchor-driven open/download is
+// permitted by browsers even outside a fresh user-activation frame (unlike
+// window.open, which is popup-blocked after an await). Returns Promise<boolean>.
+globalThis.__opfsOpenExternally = (opfsPath, fileName, mimeType) => new Promise((resolve) => {
+    (async () => {
+        let url = null;
+        try {
+            url = await globalThis.__opfsReadAsUrl(opfsPath);
+            if (!url) { resolve(false); return; }
+            const a = document.createElement('a');
+            a.href = url;
+            a.rel = 'noopener';
+            const isImage = !!mimeType && mimeType.indexOf('image/') === 0;
+            const isPdf = mimeType === 'application/pdf';
+            if (isImage || isPdf) {
+                // Inline-viewable types: open in a new tab (browser shows native viewer).
+                a.target = '_blank';
+            } else {
+                // Everything else: download with the original filename.
+                a.download = fileName || 'attachment';
+            }
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            // Revoke after a delay so the new tab / download has time to consume the URL.
+            setTimeout(() => globalThis.__opfsRevokeUrl(url), 60000);
+            resolve(true);
+        } catch (err) {
+            console.error('[OPFS] __opfsOpenExternally failed:', opfsPath, err);
+            if (url) globalThis.__opfsRevokeUrl(url);
+            resolve(false);
+        }
+    })();
+});
+
 // === Audio Recording bridge (MediaRecorder + getUserMedia) ===
 // State singleton — holds the active recording session.
 globalThis.__audioRecordingState = {

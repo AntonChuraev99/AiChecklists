@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.core.common.api
 
 actual object PlatformCapabilities {
-    // Web attachments deferred to v2 (OPFS file API + UI scope). Pending: docs/todos/
-    actual val attachmentsSupported: Boolean = false
+    // Web attachments are durable via OPFS (AttachmentStorage.wasmJs → globalThis.__opfs*).
+    // OPFS needs no COOP/COEP (async main-thread API) and survives page reloads.
+    actual val attachmentsSupported: Boolean = true
 }

@@ -36,11 +36,11 @@ actual fun platformModule(): Module = module {
     single<ChecklistReminderScheduler> { StubReminderScheduler }
     single<CalendarEventLauncher> { WasmCalendarEventLauncher() }
 
-    // AttachmentStorage: wasmJs stub — all methods are no-op / return null.
+    // AttachmentStorage: wasmJs OPFS-backed durable storage (globalThis.__opfs* bridges).
     // Bound as AttachmentStoragePort so ViewModel stays platform-agnostic in commonMain.
     single<AttachmentStoragePort> { AttachmentStorage() }
 
-    // AttachmentOpener: wasmJs stub — openExternally always returns false.
+    // AttachmentOpener: wasmJs OPFS read → blob URL → popup-safe anchor open/download.
     single { AttachmentOpener() }
 
     // wasmJs builds are always production (no debug menu), so isDebugBuild = false.
