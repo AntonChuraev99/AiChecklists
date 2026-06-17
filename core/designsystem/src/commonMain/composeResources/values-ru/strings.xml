@@ -1024,7 +1024,7 @@
     <string name="chat_settings_balance_label">Баланс кредитов</string>
     <string name="chat_settings_get_more">Получить больше</string>
     <string name="chat_settings_deep_thinking_title">Глубокое мышление</string>
-    <string name="chat_settings_deep_thinking_subtitle">Все запросы идут сразу к продвинутой модели (3 кредита за ответ). Без локального роутинга.</string>
+    <string name="chat_settings_deep_thinking_subtitle">Все запросы идут сразу к продвинутой модели (3 кредита за ответ). Без локального роутинга. Чтобы отвечать на вопросы о ваших списках, она также отправляет названия чек-листов и текст нескольких недавно добавленных пунктов.</string>
     <string name="chat_settings_clear_chat">Очистить историю чата</string>
 
     <!-- AI-чат: навигация и snackbar-сообщения -->

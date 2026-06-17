@@ -131,7 +131,7 @@
         <ul>
             <li><strong>Your typed messages</strong> — the natural-language commands or questions you send in the chat.</li>
             <li><strong>Conversation history</strong> — when you ask an open question (planning, summary, "what should I do this week?"), we send the last few exchanges of the current conversation so the AI can keep context.</li>
-            <li><strong>Optional checklist summary</strong> — for open questions, we may send the <em>names</em> and <em>completion counts</em> (e.g. "Shopping — 5 items, 2 done") of your most recent checklists so the AI can refer to them in its answer. <strong>We never send the full text of your checklist items.</strong></li>
+            <li><strong>Optional checklist summary</strong> — for open questions, we may send the <em>names</em> and <em>completion counts</em> (e.g. "Shopping — 5 items, 2 done") of your most recent checklists, together with the <em>text of a small number of your most recently added items</em> from those checklists (capped at a few items per list and a small overall limit), so the AI can answer questions such as "what did I add recently?" or "find the task about X". This item text is sent only when you ask an open (Deep Thinking) question; routine in-app actions and the on-device parser never send it. We do not send attachments, notes, or the full contents of large lists.</li>
             <li><strong>System locale and timezone offset</strong> — so the AI can answer in your language and resolve relative dates ("tomorrow", "Friday at 6pm") into your local time.</li>
         </ul>
         <p>This data is processed by Google's Gemini AI through our serverless functions (Google Cloud Functions) hosted in the United States (us-central1). It is not stored permanently on our servers; it is forwarded to Gemini, which under the Gemini API terms does not use API-key requests for model training by default.</p>
@@ -158,7 +158,7 @@
         <ul>
             <li><strong>Create / Fill checklists from content</strong> — photos, PDFs, links, text, voice recordings you intentionally upload.</li>
             <li><strong>AI Chat — intent classification</strong> — your typed chat command, when our on-device parser is unsure how to handle it.</li>
-            <li><strong>AI Chat — free-form answers</strong> — the recent conversation history plus an optional summary of your checklist names and completion counts, when you ask an open question.</li>
+            <li><strong>AI Chat — free-form answers</strong> — the recent conversation history plus an optional summary of your checklist names, completion counts, and the text of a small number of your most recently added items, when you ask an open question.</li>
         </ul>
         <p>All AI requests go through our serverless functions in Google Cloud (us-central1) so the API key is never exposed to your device. We do not store the request bodies; we keep only anonymized usage statistics (number of calls, intent labels) and a credit-deduction audit log keyed by your anonymous device identifier.</p>
         <p>Privacy Policy: <a href="https://policies.google.com/privacy" target="_blank">policies.google.com/privacy</a></p>

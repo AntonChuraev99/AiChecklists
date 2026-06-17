@@ -87,8 +87,15 @@ internal class ChatCompletionApiServiceImpl(
                     messages = messages.map { MessageDto(role = it.role.toApiString(), content = it.content) },
                     locale = locale.toApiString(),
                     timezoneOffsetMinutes = currentTimezoneOffsetMinutes(),
-                    checklistsSummary = checklistsSummary.map {
-                        ChecklistSummaryDto(name = it.name, totalItems = it.totalItems, doneItems = it.doneItems)
+                    checklistsSummary = checklistsSummary.map { ctx ->
+                        ChecklistSummaryDto(
+                            name = ctx.name,
+                            totalItems = ctx.totalItems,
+                            doneItems = ctx.doneItems,
+                            recentItems = ctx.recentItems.map {
+                                ChecklistItemSummaryDto(text = it.text, checked = it.checked, position = it.position)
+                            },
+                        )
                     },
                 )
             )
@@ -147,6 +154,14 @@ internal class ChatCompletionApiServiceImpl(
         val name: String,
         @SerialName("totalItems") val totalItems: Int,
         @SerialName("doneItems") val doneItems: Int,
+        @SerialName("recentItems") val recentItems: List<ChecklistItemSummaryDto> = emptyList(),
+    )
+
+    @Serializable
+    private data class ChecklistItemSummaryDto(
+        val text: String,
+        val checked: Boolean,
+        val position: Int,
     )
 
     @Serializable

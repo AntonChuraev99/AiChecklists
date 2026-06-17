@@ -17,12 +17,15 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AgentS
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AiChatRepository
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatHistoryRepository
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChecklistContext
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChecklistItemContext
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.RemoteCompletionResult
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.TranscriptionOutcome
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.preview.ToolCallPreviewRenderer
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistNodeType
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.RegistrationData
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.UserData
@@ -77,6 +80,8 @@ private class FakeAiChatRepository(
     val agentStepTranscripts = mutableListOf<List<AgentTranscriptEntry>>()
     /** Captures the contextChecklistName forwarded to each agentStep call (P5 bias). */
     val agentStepContextNames = mutableListOf<String?>()
+    /** Captures the checklistsSummary forwarded to each agentStep call (recent-items context). */
+    val agentStepChecklists = mutableListOf<List<ChecklistContext>>()
 
     override suspend fun agentStep(
         transcript: List<AgentTranscriptEntry>,
@@ -87,6 +92,7 @@ private class FakeAiChatRepository(
         agentStepCallCount++
         agentStepTranscripts.add(transcript.toList())
         agentStepContextNames.add(contextChecklistName)
+        agentStepChecklists.add(checklistsSummary.toList())
         val index = (agentStepCallCount - 1).coerceAtMost(agentStepResults.lastIndex.coerceAtLeast(0))
         return agentStepResults.getOrElse(index) { AgentStepResult.ServiceError }
     }
@@ -2237,5 +2243,122 @@ class ChatViewModelTest {
         val messages = vm.screenState.value.messages
         assertEquals(2, messages.size, "Persisted history must be seeded after a flaky load recovers")
         assertEquals(listOf("buy milk", "Added milk."), messages.map { it.content })
+    }
+
+    // ── Layer 3 recent-items context (buildChecklistsSummary) ─────────────────
+    //
+    // The summary forwarded to the agent (chat_agent CF) must now carry the text of recent
+    // items + their checked state + a positional recency proxy, so the model can answer
+    // "what did I add recently / find the task about X". Asserted via the agentStep capture.
+
+    private fun freeFormRepo(creditsRemaining: Int = 100) = FakeAiChatRepository(
+        classifyResult = IntentClassification(
+            intent = ChatIntent.FreeForm,
+            confidence = 1.0f,
+            layer = RoutingLayer.FullChat,
+        ),
+        agentStepResults = listOf(
+            AgentStepResult.Final(content = "ok", creditsRemaining = creditsRemaining),
+        ),
+    )
+
+    @Test
+    fun buildChecklistsSummary_freeFormTurn_includesRecentItemTextAndCounts() = runTest {
+        val checklist = Checklist(
+            id = 7L,
+            name = "Shopping",
+            items = listOf(
+                ChecklistItem(text = "milk", checked = true),
+                ChecklistItem(text = "bread", checked = false),
+                ChecklistItem(text = "eggs", checked = false),
+            ),
+        )
+        val repo = freeFormRepo()
+        val vm = makeVm(repo = repo, checklistRepo = FakeChecklistRepository(seed = listOf(checklist)))
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("what did I add to shopping?"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(1, repo.agentStepCallCount, "FreeForm must route through agentStep")
+        val summary = repo.agentStepChecklists.first()
+        assertEquals(1, summary.size)
+        val ctx = summary.first()
+        assertEquals("Shopping", ctx.name)
+        assertEquals(3, ctx.totalItems, "totalItems counts leaf items")
+        assertEquals(1, ctx.doneItems, "doneItems counts checked leaf items")
+        // Item text must now be present (the whole point of this feature).
+        assertEquals(
+            listOf("milk", "bread", "eggs"),
+            ctx.recentItems.map { it.text },
+            "Recent items must carry the actual item text",
+        )
+        assertEquals(
+            listOf(true, false, false),
+            ctx.recentItems.map { it.checked },
+            "Recent items must carry the checked state",
+        )
+        assertEquals(
+            listOf(0, 1, 2),
+            ctx.recentItems.map { it.position },
+            "Recent items must carry the 0-based list position (recency proxy)",
+        )
+    }
+
+    @Test
+    fun buildChecklistsSummary_excludesFolderNodes_keepsFreshestTail() = runTest {
+        // 8 leaves + 1 folder. Folders must be excluded from recentItems AND from the counts;
+        // only the freshest RECENT_ITEMS_PER_CHECKLIST (6) leaves are sent, preserving real position.
+        val items = buildList {
+            add(ChecklistItem(text = "Produce", checked = false, type = ChecklistNodeType.FOLDER))
+            repeat(8) { i -> add(ChecklistItem(text = "item$i", checked = i % 2 == 0)) }
+        }
+        val checklist = Checklist(id = 1L, name = "Big", items = items)
+        val repo = freeFormRepo()
+        val vm = makeVm(repo = repo, checklistRepo = FakeChecklistRepository(seed = listOf(checklist)))
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("summarize"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        val ctx = repo.agentStepChecklists.first().first()
+        assertEquals(8, ctx.totalItems, "Folder node must not be counted as an item")
+        // Freshest 6 of the 8 leaves: item2..item7 (the folder at index 0 shifts leaves to 1..8).
+        assertEquals(
+            listOf("item2", "item3", "item4", "item5", "item6", "item7"),
+            ctx.recentItems.map { it.text },
+            "Must keep the last 6 leaf items (the freshest tail), folders excluded",
+        )
+        // Positions reflect the FULL list index (folder occupies index 0), not the leaf index.
+        assertEquals(listOf(3, 4, 5, 6, 7, 8), ctx.recentItems.map { it.position })
+        assertTrue(ctx.recentItems.none { it.text == "Produce" }, "Folder text must never be sent")
+    }
+
+    @Test
+    fun buildChecklistsSummary_respectsGlobalItemBudget() = runTest {
+        // 8 checklists × 6 items each = 48 candidate item lines, but the global budget caps the
+        // total at RECENT_ITEMS_TOTAL_BUDGET (30). Earlier checklists fill the budget first.
+        val checklists = (0 until 8).map { c ->
+            Checklist(
+                id = c.toLong(),
+                name = "List$c",
+                items = (0 until 6).map { i -> ChecklistItem(text = "c${c}i$i", checked = false) },
+            )
+        }
+        val repo = freeFormRepo()
+        val vm = makeVm(repo = repo, checklistRepo = FakeChecklistRepository(seed = checklists))
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("what's on my lists"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        val summary = repo.agentStepChecklists.first()
+        assertEquals(8, summary.size, "All 8 checklists are still summarized (name + counts)")
+        val totalRecent = summary.sumOf { it.recentItems.size }
+        assertEquals(30, totalRecent, "Total recent items across all lists must not exceed the budget")
+        // The 6th checklist onward should be starved of item text once the budget is spent
+        // (5 lists × 6 = 30), even though their name + counts are still present.
+        assertTrue(summary[0].recentItems.isNotEmpty(), "Earliest list keeps its items")
+        assertTrue(summary.last().recentItems.isEmpty(), "Budget-exhausted list sends no item text")
     }
 }

@@ -1094,7 +1094,7 @@
     <string name="chat_settings_balance_label">Credit balance</string>
     <string name="chat_settings_get_more">Get more</string>
     <string name="chat_settings_deep_thinking_title">Deep Thinking</string>
-    <string name="chat_settings_deep_thinking_subtitle">All queries skip the local router and go straight to the advanced model (3 credits per reply).</string>
+    <string name="chat_settings_deep_thinking_subtitle">All queries skip the local router and go straight to the advanced model (3 credits per reply). To answer questions about your lists, it also sends your checklist names and the text of a few recently added items.</string>
     <string name="chat_settings_clear_chat">Clear Chat History</string>
 
     <!-- AI Chat navigation / snackbar messages -->

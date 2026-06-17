@@ -27,11 +27,13 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AiChatRepository
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChecklistContext
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChecklistItemContext
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatHistoryRepository
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.TranscriptionOutcome
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.agent.AgentToolCallMapper
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.agent.AgentToolResultSerializer
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.preview.ToolCallPreviewRenderer
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistNodeType
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import kotlin.concurrent.Volatile
@@ -441,10 +443,10 @@ class ChatViewModel(
         _screenState.value = state.copy(isSubmittingFeedback = true)
 
         viewModelScope.launch {
-            // MVP: emit an Amplitude/Firebase event with the question/answer/feedback
-            // triplet so the team can mine it offline. Real per-feedback Cloud Function
-            // endpoint will be swapped in later (event remains in addition / as a backup).
-            // Pending: docs/todos/2026-05-17-chat-feedback-real-endpoint.md
+            // Emit an Amplitude/Firebase event with the question/answer/feedback triplet
+            // so the team can mine it offline (skill /ai-chat-feedback-fixer). A dedicated
+            // per-feedback Cloud Function endpoint was intentionally NOT built — Amplitude
+            // `ai_chat_feedback` already covers the knowledge-base goal (decision 2026-06-17).
             // Deep Thinking toggle state is included so analytics can correlate
             // feedback complaints with the toggle. Real-world: most "didn't parse"
             // feedbacks have been from users who left Deep Thinking ON between
@@ -1024,17 +1026,52 @@ class ChatViewModel(
     // ─── Layer 3 checklist context ─────────────────────────────────────────────
 
     /**
-     * Builds a compact summary of user's top [CHECKLIST_SUMMARY_LIMIT] checklists.
-     * Only names + item counts are included — no item text (privacy by design).
+     * Builds a compact summary of the user's top [CHECKLIST_SUMMARY_LIMIT] checklists for Layer 3.
+     *
+     * Each entry carries the name + counts AND a bounded tail-of-list slice of item text
+     * ([ChecklistContext.recentItems]) so the model can answer "what did I add recently /
+     * find the task about X". This is the ONLY place item text leaves the device (Layer 3 only).
+     *
+     * Token budgeting (keeps the request small — see CLAUDE.md unit-economics):
+     *  - Only leaf items are sent; FOLDER nodes are skipped (they carry no user task text).
+     *  - Per checklist we take the LAST [RECENT_ITEMS_PER_CHECKLIST] leaves (the freshest — items
+     *    are appended, so the tail is the most-recently-added end).
+     *  - A global cap of [RECENT_ITEMS_TOTAL_BUDGET] items across ALL checklists bounds the worst
+     *    case regardless of how many lists the user has.
+     *
+     * Recency is POSITIONAL, not wall-clock: the domain [ChecklistItem] has no add-timestamp, so
+     * [ChecklistItemContext.position] (list index) is the best available recency proxy. Answering
+     * an absolute "when did I add X" would require a schema change (a per-item createdAt column).
      */
     private suspend fun buildChecklistsSummary(): List<ChecklistContext> = runCatching {
+        var remainingBudget = RECENT_ITEMS_TOTAL_BUDGET
         checklistRepository.checklists.first()
             .take(CHECKLIST_SUMMARY_LIMIT)
             .map { checklist ->
+                // Index the FULL item list first so position reflects the real list order,
+                // then keep only leaves, then take the freshest tail within the global budget.
+                val perListCap = minOf(RECENT_ITEMS_PER_CHECKLIST, remainingBudget).coerceAtLeast(0)
+                val recent = if (perListCap == 0) {
+                    emptyList()
+                } else {
+                    checklist.items
+                        .mapIndexed { index, item -> index to item }
+                        .filter { (_, item) -> item.type == ChecklistNodeType.ITEM }
+                        .takeLast(perListCap)
+                        .map { (index, item) ->
+                            ChecklistItemContext(
+                                text = item.text,
+                                checked = item.checked,
+                                position = index,
+                            )
+                        }
+                }
+                remainingBudget -= recent.size
                 ChecklistContext(
                     name = checklist.name,
-                    totalItems = checklist.items.size,
-                    doneItems = checklist.items.count { it.checked },
+                    totalItems = checklist.items.count { it.type == ChecklistNodeType.ITEM },
+                    doneItems = checklist.items.count { it.type == ChecklistNodeType.ITEM && it.checked },
+                    recentItems = recent,
                 )
             }
     }.getOrElse { e ->
@@ -1737,6 +1774,16 @@ class ChatViewModel(
         const val HISTORY_LOAD_RETRY_DELAY_MS = 400L
         /** Max checklists to include in Layer 3 context summary. */
         const val CHECKLIST_SUMMARY_LIMIT = 8
+        /**
+         * Max recent items sent PER checklist in the Layer 3 context (the freshest tail of the list).
+         * Small by design — the goal is "what did I add recently", not a full export.
+         */
+        const val RECENT_ITEMS_PER_CHECKLIST = 6
+        /**
+         * Global cap on recent items sent across ALL checklists in one request. Bounds token cost
+         * (and the amount of item text leaving the device) no matter how many lists the user has.
+         */
+        const val RECENT_ITEMS_TOTAL_BUDGET = 30
         /** Free-tier attachment limit per chat message (mirrors item-attachments FREE_LIMIT = 3). */
         const val MAX_ATTACHMENTS_FREE = 3
         /** Premium users: generous cap to prevent accidental runaway picks. */

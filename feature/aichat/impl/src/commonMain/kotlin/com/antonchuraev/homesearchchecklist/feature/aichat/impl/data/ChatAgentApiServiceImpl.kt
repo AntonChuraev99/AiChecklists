@@ -85,8 +85,15 @@ internal class ChatAgentApiServiceImpl(
                     transcript = transcript.map { it.toDto() },
                     locale = locale.toApiString(),
                     timezoneOffsetMinutes = currentTimezoneOffsetMinutes(),
-                    checklistsSummary = checklistsSummary.map {
-                        ChecklistSummaryDto(name = it.name, totalItems = it.totalItems, doneItems = it.doneItems)
+                    checklistsSummary = checklistsSummary.map { ctx ->
+                        ChecklistSummaryDto(
+                            name = ctx.name,
+                            totalItems = ctx.totalItems,
+                            doneItems = ctx.doneItems,
+                            recentItems = ctx.recentItems.map {
+                                ChecklistItemSummaryDto(text = it.text, checked = it.checked, position = it.position)
+                            },
+                        )
                     },
                     // Only send the context object when a checklist is actually focused.
                     // explicitNulls=false drops the field entirely when null, so the server
@@ -218,6 +225,18 @@ internal class ChatAgentApiServiceImpl(
         val name: String,
         @SerialName("totalItems") val totalItems: Int,
         @SerialName("doneItems") val doneItems: Int,
+        // Bounded tail-of-list slice of recent item text — lets Layer 3 answer
+        // "what did I add recently / find the task about X". Omitted when empty
+        // (explicitNulls=false drops it; the server treats absent as no recent items).
+        @SerialName("recentItems") val recentItems: List<ChecklistItemSummaryDto> = emptyList(),
+    )
+
+    @Serializable
+    private data class ChecklistItemSummaryDto(
+        val text: String,
+        val checked: Boolean,
+        // 0-based list index — recency proxy (no per-item timestamp in the domain model).
+        val position: Int,
     )
 
     @Serializable

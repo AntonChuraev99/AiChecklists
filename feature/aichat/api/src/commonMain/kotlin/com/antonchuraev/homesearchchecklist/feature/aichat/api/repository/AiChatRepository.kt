@@ -53,8 +53,9 @@ interface AiChatRepository {
      * One round of the stateless agent loop. Delegates to the `chat_agent` Cloud Function.
      *
      * The caller is responsible for building and extending the [transcript] between rounds.
-     * [checklistsSummary] provides checklist context so the agent can reason over list names
-     * without carrying item text (privacy by design — same pattern as [completeFreeForm]).
+     * [checklistsSummary] provides checklist context (names, counts, and a bounded window of
+     * recent item text) so the agent can answer "what did I add recently / find the task about X".
+     * Item text leaves the device only on this Layer 3 path — same payload as [completeFreeForm].
      *
      * [contextChecklistName] is the name of the checklist the user currently has open
      * (the dock was launched from [ChecklistDetailScreen]). When non-null it is forwarded to

@@ -6,6 +6,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Agen
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.ChatLocale
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AgentStepResult
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChecklistContext
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChecklistItemContext
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -408,7 +409,14 @@ class ChatAgentApiServiceImplTest {
             transcript = emptyList(),
             locale = ChatLocale.Ru,
             checklistsSummary = listOf(
-                ChecklistContext(name = "Поход", totalItems = 7, doneItems = 1),
+                ChecklistContext(
+                    name = "Поход",
+                    totalItems = 7,
+                    doneItems = 1,
+                    recentItems = listOf(
+                        ChecklistItemContext(text = "палатка", checked = false, position = 5),
+                    ),
+                ),
             ),
         )
 
@@ -417,6 +425,9 @@ class ChatAgentApiServiceImplTest {
         assertContains(body, "Поход")
         assertContains(body, "totalItems")
         assertContains(body, "doneItems")
+        // Recent item text must reach the wire on the LIVE agent path (the new feature).
+        assertContains(body, "recentItems")
+        assertContains(body, "палатка")
     }
 
     @Test

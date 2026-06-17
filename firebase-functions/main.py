@@ -1826,6 +1826,11 @@ CHAT_COMPLETION_COST = 3                   # Layer 3 — Flash full model
 CHAT_COMPLETION_MAX_MESSAGES = 12          # sliding window — oldest dropped
 CHAT_COMPLETION_MAX_TOTAL_CHARS = 6000     # combined across all messages
 CHAT_COMPLETION_MAX_CHECKLISTS = 8         # context items from client
+# Recent-items context (shared by chat_completion + chat_agent). The CLIENT already bounds the
+# payload (RECENT_ITEMS_PER_CHECKLIST=6, RECENT_ITEMS_TOTAL_BUDGET=30 in ChatViewModel); these are
+# defense-in-depth caps so a malformed/oversized request can never bloat the prompt or token cost.
+CHAT_CONTEXT_RECENT_ITEMS_PER_CHECKLIST = 6   # max recent item lines rendered per checklist
+CHAT_CONTEXT_ITEM_TEXT_MAX_CHARS = 200        # clamp a single item's text length
 
 # ----------------------------------------------------------------------------
 # Feature catalog — single source of truth for "what the app can do".
@@ -1909,7 +1914,16 @@ def _call_gemini_flash(prompt: str) -> str:
 
 
 def _format_checklists_summary(items) -> str:
-    """Render the optional client-provided checklists into a plain bullet list."""
+    """Render the optional client-provided checklists into a plain bullet list.
+
+    Each checklist line is "- <name> (<total> items, <done> done)". When the client
+    includes a `recentItems` slice (the most-recently-added tail of the list — the client
+    bounds the size), the items are rendered as an indented sub-list so the model can answer
+    "what did I add recently / find the task about X". Recency is positional (list order), not
+    wall-clock: the client has no per-item timestamp, so we never claim an exact add-time.
+    Defensive caps below mirror the client budget so a malformed/oversized payload can't bloat
+    the prompt.
+    """
     if not items or not isinstance(items, list):
         return "(no recent checklists provided)"
     lines = []
@@ -1920,6 +1934,20 @@ def _format_checklists_summary(items) -> str:
         total = int(item.get("totalItems") or 0)
         done = int(item.get("doneItems") or 0)
         lines.append(f"- {name} ({total} items, {done} done)")
+
+        recent = item.get("recentItems")
+        if isinstance(recent, list) and recent:
+            # Server-side guard: cap per-list rendering even if the client sent more.
+            for entry in recent[:CHAT_CONTEXT_RECENT_ITEMS_PER_CHECKLIST]:
+                if not isinstance(entry, dict):
+                    continue
+                text = (entry.get("text") or "").strip()
+                if not text:
+                    continue
+                # Clamp very long item text so one giant item can't dominate the prompt.
+                text = text[:CHAT_CONTEXT_ITEM_TEXT_MAX_CHARS]
+                mark = "x" if entry.get("checked") else " "
+                lines.append(f"    - [{mark}] {text}")
     return "\n".join(lines) if lines else "(no recent checklists provided)"
 
 
