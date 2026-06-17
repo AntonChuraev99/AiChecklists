@@ -163,6 +163,8 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.FillOp
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiChecklistAction
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiPromptChips
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiChecklistPromptChips
+import com.antonchuraev.homesearchchecklist.desingsystem.adaptive.AppWindowSizeClass
+import com.antonchuraev.homesearchchecklist.desingsystem.adaptive.rememberAppWindowSizeClass
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCardDefaults
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppItemMetaChip
@@ -1807,15 +1809,23 @@ internal fun ItemDetailsSheet(
         (extractUrls(item.text) + extractUrls(item.note)).distinct()
     }
 
+    // Compact → ModalBottomSheet (phone / narrow web); wider → AlertDialog (desktop web / tablet).
+    val isDialog = rememberAppWindowSizeClass() != AppWindowSizeClass.Compact
+
     AdaptiveSheetOrDialog(
         onDismiss = onDismiss,
-        title = { Text(item.text, style = MaterialTheme.typography.titleMedium) },
+        // No small title: the editable headline below is the only item name. On Expanded/web the
+        // AlertDialog would otherwise also render this title, duplicating the name (user-reported;
+        // same fix already applied to FolderActionsSheet).
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
-                .padding(bottom = AppDimens.SpacingXxl)
+                // The bottom sheet sits flush to the screen edge → keep full breathing room.
+                // The AlertDialog already adds Material's own bottom padding; stacking ours on top
+                // is what produced the oversized gap on web, so drop it in the dialog branch.
+                .padding(bottom = if (isDialog) 0.dp else AppDimens.SpacingXxl)
         ) {
             // Item name as sheet title — tap to enter inline edit mode
             if (isEditingText) {
