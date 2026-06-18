@@ -16,7 +16,7 @@ Guidance for Claude Code in this repo. Keep this file **≤200 lines** (Anthropi
 
 **Product:** the AI Chat Assistant is the flagship interaction layer; secondary AI flows (Create/Fill) turn content into checklists. Full feature catalog, tiers, platform-parity matrix: `docs/product-features.md`.
 
-**Business model:** Free (4 checklists, 5 fills each, 10 AI credits/day, 1 recurring reminder) · Premium $1.99/mo (unlimited + 300 credits/day + Calendar + Weekly) · 3-day trial.
+**Business model:** Free (5 checklists, 5 fills each, 10 AI credits/day, 10 recurring reminders) · Premium $1.99/mo (unlimited + 300 credits/day + Calendar + Weekly) · 3-day trial.
 
 ## Repository Visibility & Security
 
@@ -113,9 +113,9 @@ All dependency versions live in `gradle/libs.versions.toml` — the single sourc
 | Limit (Remote Config) | Free | Premium |
 |---|---|---|
 | AI requests/day | 10 | 300 |
-| Max checklists | 4 | unlimited |
+| Max checklists | 5 | unlimited |
 | Max fills/checklist | 5 | unlimited |
-| Recurring reminders | 1 | unlimited |
+| Recurring reminders | 10 | unlimited |
 
 ## `.claude/rules/` map (file-scoped, auto-loaded on matching edits)
 
