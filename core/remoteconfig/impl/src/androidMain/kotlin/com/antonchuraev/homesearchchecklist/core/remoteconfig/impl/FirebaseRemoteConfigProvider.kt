@@ -26,6 +26,12 @@ class FirebaseRemoteConfigProvider : RemoteConfigProvider {
         }
         val configSettings = FirebaseRemoteConfigSettings.Builder()
             .setMinimumFetchIntervalInSeconds(if (isDebuggable) 0L else 3600L)
+            // Dead-network safety ceiling for a SINGLE fetch. Onboarding awaits fetchAndActivate()
+            // reactively (no external timeout in SplashViewModel), so this is the only bound on how
+            // long the first launch can wait: an unreachable network fails after 15s instead of the
+            // 60s SDK default — short enough not to hang splash, long enough for a slow real-device
+            // cold start to still receive its A/B experiment assignment.
+            .setFetchTimeoutInSeconds(15L)
             .build()
         remoteConfig.setConfigSettingsAsync(configSettings)
         remoteConfig.setDefaultsAsync(getDefaultsMap())

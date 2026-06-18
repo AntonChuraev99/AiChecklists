@@ -3,6 +3,7 @@ package com.antonchuraev.homesearchchecklist.feature.splash.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigKeys
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.repository.PaywallRepository
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.RestorePurchasesUseCase
@@ -31,8 +32,6 @@ import org.jetbrains.compose.resources.getString
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
-import kotlin.time.Duration.Companion.seconds
 import kotlin.time.measureTimedValue
 
 class SplashViewModel(
@@ -82,11 +81,31 @@ class SplashViewModel(
                 newUserData
             }
 
+            var rcActivated: Boolean? = null
+            var rcFetchMs: Long? = null
             if (!userData.isOnboardingPassed) {
-                val activated = withTimeoutOrNull(REMOTE_CONFIG_FETCH_TIMEOUT) {
+                // Reactively await the real fetch — NO fixed timeout cap. fetchAndActivate()
+                // suspends exactly until the fetch completes: fast network ~1s, slow cold-start
+                // network longer. The "dead network" ceiling lives in Firebase RC's own
+                // fetchTimeout (FirebaseRemoteConfigProvider.setFetchTimeoutInSeconds), not in a
+                // guessed constant here. The previous hard 3s cap aborted slow first-launch
+                // fetches on real devices, so the A/B experiment assignment never arrived and the
+                // onboarding variant silently fell back to the empty client default (slides) —
+                // collapsing the live split to 0% "none" in production while emulators (instant
+                // fetch) looked fine.
+                val (activated, fetchDuration) = measureTimedValue {
                     runCatching { remoteConfigProvider.fetchAndActivate() }.getOrDefault(false)
                 }
-                log("fetchAndActivate (onboarding pending) activated=$activated, hasUserId=${userData.userId.isNotBlank()}")
+                rcActivated = activated
+                rcFetchMs = fetchDuration.inWholeMilliseconds
+                if (!activated) {
+                    logger.warning(
+                        TAG,
+                        "RC fetchAndActivate did not complete before onboarding (network slow/unreachable) — " +
+                            "variant falls back to client default",
+                    )
+                }
+                log("fetchAndActivate (onboarding pending) activated=$activated took ${fetchDuration.inWholeMilliseconds}ms, hasUserId=${userData.userId.isNotBlank()}")
             }
 
             // First-checklist A/B experiment: cohort attribution (all users) + auto-create
@@ -95,7 +114,7 @@ class SplashViewModel(
             // already carries the `first_checklist_variant` user property.
             applyFirstChecklistExperiment(userData, isNewUser)
 
-            navigateTo(userData.isOnboardingPassed)
+            navigateTo(userData.isOnboardingPassed, rcActivated, rcFetchMs)
         }
     }
 
@@ -114,7 +133,11 @@ class SplashViewModel(
         }
     }
 
-    private fun navigateTo(isOnboardingPassed: Boolean) {
+    private fun navigateTo(
+        isOnboardingPassed: Boolean,
+        rcActivated: Boolean? = null,
+        rcFetchMs: Long? = null,
+    ) {
         try {
             with(appNavigator) {
                 if (isOnboardingPassed) {
@@ -127,6 +150,21 @@ class SplashViewModel(
                         OnboardingVariant.NONE -> "none"
                     }
                     analyticsTracker.setUserProperties(mapOf("onboarding_type" to variantName))
+                    // Surface RC resolution health so a future "experiment never assigns" bug
+                    // (slow-network fetch miss → empty default → forced slides) shows up in
+                    // analytics, not only in user reports. RC_VALUE_EMPTY=true means the fetch
+                    // returned nothing and we fell back to the client default — the exact signal
+                    // that silently collapsed the A/B split to 0% none in prod.
+                    val rawRcValue = remoteConfigProvider.getString(RemoteConfigKeys.ONBOARDING, "")
+                    analyticsTracker.event(
+                        AnalyticsEvents.Onboarding.RC_RESOLVED,
+                        buildMap {
+                            put(AnalyticsParams.VARIANT, variantName)
+                            put(AnalyticsParams.RC_VALUE_EMPTY, rawRcValue.isEmpty())
+                            rcActivated?.let { put(AnalyticsParams.RC_ACTIVATED, it) }
+                            rcFetchMs?.let { put(AnalyticsParams.FETCH_MS, it) }
+                        },
+                    )
                     when (variant) {
                         OnboardingVariant.INTERACTIVE -> navigateToInteractiveOnboarding()
                         OnboardingVariant.DEFAULT -> navigateToOnboarding()
@@ -234,6 +272,5 @@ class SplashViewModel(
 
     companion object {
         private const val TAG = "SplashViewModel"
-        private val REMOTE_CONFIG_FETCH_TIMEOUT = 3.seconds
     }
 }

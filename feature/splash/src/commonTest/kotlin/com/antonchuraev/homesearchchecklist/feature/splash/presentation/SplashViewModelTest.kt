@@ -329,6 +329,45 @@ class SplashViewModelTest {
         )
     }
 
+    /**
+     * Regression guard for the prod A/B-collapse bug (2026-06-18): a slow first-launch fetch that
+     * exceeds the OLD hard 3s cap must still route by the SERVER variant, not silently fall back to
+     * slides. The fetch here takes 5s — longer than the removed 3s timeout would have allowed.
+     * With the reactive await (no external timeout) the ViewModel waits for the real fetch and
+     * routes to main (server variant "none"). Under the old withTimeoutOrNull(3s) the fetch was
+     * aborted at 3s, the empty client default was read, and the user was wrongly sent to slide
+     * onboarding — which is exactly why production saw 0% "none" while the experiment ran 50/50.
+     */
+    @Test
+    fun navigateTo_newUser_slowFetchBeyondOldCap_stillRoutesByServerVariant() = testScope.runTest {
+        val rc = SlowOrderTrackingRemoteConfig(
+            onboardingValueAfterFetch = "none",
+            fetchDelayMillis = 5_000L,
+        )
+        val nav = RecordingNavigator()
+
+        fakeUserData.nextRegistration = RegistrationData(
+            userData = UserData(userId = "new-uuid", isOnboardingPassed = false),
+            isNewUser = true,
+        )
+
+        createViewModel(
+            userId = "",
+            isOnboardingPassed = false,
+            remoteConfig = rc,
+            navigator = nav,
+        )
+
+        advanceUntilIdle()
+
+        assertTrue(rc.fetchInvoked, "fetchAndActivate must be invoked for the new user")
+        assertEquals(
+            listOf("main"),
+            nav.routes,
+            "slow 5s fetch must still resolve server variant 'none' → main, not the slides fallback",
+        )
+    }
+
     // ============================================================
     // First-checklist A/B experiment
     // ============================================================

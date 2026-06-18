@@ -32,6 +32,17 @@ object AnalyticsEvents {
         const val SKIPPED = "onboarding_skipped"
         const val COMPLETED = "onboarding_completed"
         const val FIRST_CHECKLIST_AUTO_CREATED = "first_checklist_auto_created"
+
+        /**
+         * Fired once per launch when the onboarding variant is resolved from Remote Config
+         * (only while onboarding is still pending). Params: VARIANT (slides/none/interactive),
+         * RC_ACTIVATED (did fetchAndActivate succeed), RC_VALUE_EMPTY (true = RC returned nothing
+         * and we fell back to the client default — the smoking gun for "experiment never assigned",
+         * the exact failure that silently collapsed the A/B split to 0% none in prod), FETCH_MS
+         * (how long the fetch took — flags slow-network cold starts). Lets a future distribution
+         * collapse surface in analytics instead of via user reports.
+         */
+        const val RC_RESOLVED = "onboarding_rc_resolved"
     }
 
     // ─── Checklist & fill lifecycle ──────────────────────────────────────────
@@ -214,6 +225,11 @@ object AnalyticsParams {
     // CSAT
     const val RATING = "rating"
     const val HAD_RATING = "had_rating"
+
+    // Onboarding Remote Config resolution (diagnostics for A/B assignment health)
+    const val RC_ACTIVATED = "rc_activated"
+    const val RC_VALUE_EMPTY = "rc_value_empty"
+    const val FETCH_MS = "fetch_ms"
 }
 
 /**
