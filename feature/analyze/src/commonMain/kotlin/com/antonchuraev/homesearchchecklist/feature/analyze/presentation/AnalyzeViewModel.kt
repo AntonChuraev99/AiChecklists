@@ -26,6 +26,7 @@ class AnalyzeViewModel(
     private val checklistId: Long?,
     private val fillDefault: Boolean = false,
     private val initialText: String? = null,
+    private val autoAnalyze: Boolean = false,
     private val analyzeRepository: AnalyzeRepository,
     private val checklistRepository: ChecklistRepository,
     private val appNavigator: AppNavigator,
@@ -37,8 +38,10 @@ class AnalyzeViewModel(
     private val _screenState = MutableStateFlow(
         run {
             // Prefill from shared/selected text (ACTION_PROCESS_TEXT "Checklist from text" /
-            // "Fill (AI)" actions): pre-select RAW_TEXT and populate the input. Analysis is
-            // NOT auto-run — the user taps Analyze themselves (protects the AI-credit budget).
+            // "Fill (AI)" actions): pre-select RAW_TEXT and populate the input. By default
+            // analysis is NOT auto-run — the user taps Analyze themselves (protects the
+            // AI-credit budget). The [autoAnalyze] flag (new-user activation hero) flips this:
+            // the chip tap / typed topic IS the explicit intent, so analysis runs once on init.
             val prefill = initialText?.takeIf { it.isNotBlank() }
             AnalyzeScreenState(
                 isFillMode = checklistId != null,
@@ -58,6 +61,14 @@ class AnalyzeViewModel(
             loadChecklists()
         }
         observeUserData()
+
+        // New-user activation hero: the chip tap / typed topic already expressed the intent to
+        // generate, so kick off analysis immediately (RAW_TEXT input was prefilled above). On
+        // success analyzeInput() navigates to the AI-item preview; on failure it surfaces an error
+        // and the user stays on this screen to retry. Only fires when text is present.
+        if (autoAnalyze && !initialText.isNullOrBlank()) {
+            analyzeInput()
+        }
     }
 
     private fun loadTargetChecklist(checklistId: Long) {
@@ -249,17 +260,30 @@ class AnalyzeViewModel(
                         )
                     }
 
-                    // Store result in holder and navigate to preview screen
+                    // Store result in holder and navigate to preview screen. For the new-checklist
+                    // path, prefer the AI-suggested name (the CF `checklist_name`) so each generated
+                    // checklist keeps its own title; fall back to the localized default only when the
+                    // server omitted it. Fill mode always uses the default fill name.
+                    val resolvedName = if (state.isFillMode) {
+                        getString(Res.string.default_fill_name)
+                    } else {
+                        result.suggestedName?.takeIf { it.isNotBlank() }
+                            ?: getString(Res.string.default_checklist_name)
+                    }
                     AnalyzeResultHolder.set(
                         items = result.suggestedItems,
-                        suggestedName = if (state.isFillMode) getString(Res.string.default_fill_name) else getString(Res.string.default_checklist_name),
+                        suggestedName = resolvedName,
                         summary = result.summary,
                         isFillMode = state.isFillMode,
                         fillDefault = state.fillDefault,
                         targetChecklistId = state.selectedChecklistId,
                         targetChecklistName = targetChecklist?.name,
                         fillDefaultItems = if (state.isFillMode) result.fillItems else null,
-                        hasFolders = !state.isFillMode && result.hasFolders
+                        hasFolders = !state.isFillMode && result.hasFolders,
+                        // Activation funnel: only the new-user hero path (autoAnalyze, new
+                        // checklist — never fill) carries this so the preview confirm can fire
+                        // FIRST_AI_CHECKLIST_CREATED + the reminder opt-in.
+                        fromActivation = autoAnalyze && !state.isFillMode
                     )
                     appNavigator.navigateToAnalyzeResultPreview()
                 }

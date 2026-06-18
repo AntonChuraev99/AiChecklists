@@ -5,15 +5,21 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -21,11 +27,17 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,12 +48,18 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.desingsystem.adaptive.AppWindowSizeClass
 import com.antonchuraev.homesearchchecklist.desingsystem.adaptive.rememberAppWindowSizeClass
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppTextField
 import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
 import com.antonchuraev.homesearchchecklist.desingsystem.components.SyncAccountBanner
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
@@ -51,6 +69,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.Checkl
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
@@ -70,6 +89,14 @@ fun MainScreenContent(
     onExitEditMode: () -> Unit,
     onReorderChecklists: (List<Long>) -> Unit = {},
     onSignInClick: () -> Unit = {},
+    // Activation bundle (RC flag activation_bundle_v1): when true AND the list is empty, the empty
+    // state is replaced by the AI first-run hero (prompt + template chips). When false the plain
+    // EmptyState is shown (legacy behavior). Wired from App.kt.
+    activationEnabled: Boolean = false,
+    // Typed hero input → send as an AI create prompt (App.kt opens the dock + prefills/sends).
+    onActivationGenerate: (String) -> Unit = {},
+    // Hero template chip tapped → (chipKey for analytics, resolved prompt to send).
+    onActivationChipTapped: (String, String) -> Unit = { _, _ -> },
     // Bottom contentPadding for the list/grid so the last item scrolls clear of the floating
     // chat-dock overlay (the host measures the dock height and passes it here). Defaults to the
     // plain bottom spacing when no dock is shown.
@@ -88,6 +115,9 @@ fun MainScreenContent(
             onEnterEditMode = onEnterEditMode,
             onReorderChecklists = onReorderChecklists,
             onSignInClick = onSignInClick,
+            activationEnabled = activationEnabled,
+            onActivationGenerate = onActivationGenerate,
+            onActivationChipTapped = onActivationChipTapped,
             contentBottomPadding = contentBottomPadding,
         )
     } else {
@@ -96,6 +126,9 @@ fun MainScreenContent(
             onChecklistClick = onChecklistClick,
             onAddChecklistClick = onAddChecklistClick,
             onPremiumBannerClick = onPremiumBannerClick,
+            activationEnabled = activationEnabled,
+            onActivationGenerate = onActivationGenerate,
+            onActivationChipTapped = onActivationChipTapped,
             contentBottomPadding = contentBottomPadding,
         )
     }
@@ -117,6 +150,9 @@ private fun MainScreenContentLazyColumn(
     onEnterEditMode: () -> Unit,
     onReorderChecklists: (List<Long>) -> Unit,
     onSignInClick: () -> Unit = {},
+    activationEnabled: Boolean = false,
+    onActivationGenerate: (String) -> Unit = {},
+    onActivationChipTapped: (String, String) -> Unit = { _, _ -> },
     contentBottomPadding: Dp = AppDimens.SpacingXxl,
 ) {
     val hapticFeedback = LocalHapticFeedback.current
@@ -183,17 +219,24 @@ private fun MainScreenContentLazyColumn(
                     modifier = Modifier.fillParentMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    EmptyState(
-                        icon = Icons.Outlined.Checklist,
-                        title = stringResource(Res.string.main_empty_title),
-                        description = stringResource(Res.string.main_empty_description),
-                        action = {
-                            AppButton(
-                                text = stringResource(Res.string.main_empty_cta),
-                                onClick = onAddChecklistClick,
-                            )
-                        }
-                    )
+                    if (activationEnabled) {
+                        ActivationHero(
+                            onGenerate = onActivationGenerate,
+                            onChipTapped = onActivationChipTapped,
+                        )
+                    } else {
+                        EmptyState(
+                            icon = Icons.Outlined.Checklist,
+                            title = stringResource(Res.string.main_empty_title),
+                            description = stringResource(Res.string.main_empty_description),
+                            action = {
+                                AppButton(
+                                    text = stringResource(Res.string.main_empty_cta),
+                                    onClick = onAddChecklistClick,
+                                )
+                            }
+                        )
+                    }
                 }
             }
         } else {
@@ -294,6 +337,9 @@ private fun MainScreenContentLazyGrid(
     onChecklistClick: (ChecklistWithProgress) -> Unit,
     onAddChecklistClick: () -> Unit,
     onPremiumBannerClick: () -> Unit,
+    activationEnabled: Boolean = false,
+    onActivationGenerate: (String) -> Unit = {},
+    onActivationChipTapped: (String, String) -> Unit = { _, _ -> },
     contentBottomPadding: Dp = AppDimens.SpacingXxl,
 ) {
     if (screenState.checklists.isEmpty()) {
@@ -302,17 +348,24 @@ private fun MainScreenContentLazyGrid(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center,
         ) {
-            EmptyState(
-                icon = Icons.Outlined.Checklist,
-                title = stringResource(Res.string.main_empty_title),
-                description = stringResource(Res.string.main_empty_description),
-                action = {
-                    AppButton(
-                        text = stringResource(Res.string.main_empty_cta),
-                        onClick = onAddChecklistClick,
-                    )
-                }
-            )
+            if (activationEnabled) {
+                ActivationHero(
+                    onGenerate = onActivationGenerate,
+                    onChipTapped = onActivationChipTapped,
+                )
+            } else {
+                EmptyState(
+                    icon = Icons.Outlined.Checklist,
+                    title = stringResource(Res.string.main_empty_title),
+                    description = stringResource(Res.string.main_empty_description),
+                    action = {
+                        AppButton(
+                            text = stringResource(Res.string.main_empty_cta),
+                            onClick = onAddChecklistClick,
+                        )
+                    }
+                )
+            }
         }
         return
     }
@@ -425,4 +478,152 @@ private fun ChecklistCard(
         onClick = onClick,
         onLongClick = onLongClick,
     )
+}
+
+/**
+ * A single hero template chip (chipKey + localized prompt + label). The chipKey is stable for
+ * analytics; the prompt is the resolved create-instruction sent to the AI; the label is the
+ * short user-facing text.
+ */
+private data class ActivationChip(
+    val key: String,
+    val label: String,
+    val prompt: String,
+)
+
+/**
+ * New-user AI first-run hero — replaces the plain [EmptyState] on the empty MainScreen when the
+ * `activation_bundle_v1` bundle is ON. Shows a short prompt, a free-text input ("Describe anything
+ * — I'll build a checklist"), a primary "Build my checklist" action, and a curated row of template
+ * chips. Typed text and chips both flow up to the host (App.kt), which routes to the Analyze screen
+ * with autoAnalyze = true so the AI GENERATES the checklist items and the user lands on the result
+ * preview (AI-generated items → edit → Create) — the flagship "turn anything into a checklist" flow.
+ *
+ * Fires [AnalyticsEvents.Activation.FIRST_RUN_SHOWN] once on first composition (this branch only
+ * renders under the treatment arm). Chip taps are reported by the host via [onChipTapped].
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ActivationHero(
+    onGenerate: (String) -> Unit,
+    onChipTapped: (String, String) -> Unit,
+) {
+    val analyticsTracker: AnalyticsTracker = koinInject()
+    LaunchedEffect(Unit) {
+        analyticsTracker.event(AnalyticsEvents.Activation.FIRST_RUN_SHOWN)
+    }
+
+    // Each chip / typed topic sends "Create a checklist for <topic>" as the analysis input; the
+    // host routes it to the Analyze screen (autoAnalyze) where generate_checklist turns it into
+    // AI-generated items shown in a preview the user confirms. The create-prefix is resolved once;
+    // labels per chip are localized.
+    val createPrefix = stringResource(Res.string.main_create_with_ai_prefill)
+    val chips = listOf(
+        ActivationChip("trip", stringResource(Res.string.activation_chip_trip), createPrefix + stringResource(Res.string.activation_chip_trip)),
+        ActivationChip("groceries", stringResource(Res.string.activation_chip_groceries), createPrefix + stringResource(Res.string.activation_chip_groceries)),
+        ActivationChip("morning", stringResource(Res.string.activation_chip_morning), createPrefix + stringResource(Res.string.activation_chip_morning)),
+        ActivationChip("work", stringResource(Res.string.activation_chip_work), createPrefix + stringResource(Res.string.activation_chip_work)),
+        ActivationChip("workout", stringResource(Res.string.activation_chip_workout), createPrefix + stringResource(Res.string.activation_chip_workout)),
+        ActivationChip("party", stringResource(Res.string.activation_chip_party), createPrefix + stringResource(Res.string.activation_chip_party)),
+    )
+
+    var input by remember { mutableStateOf("") }
+    val canSend = input.isNotBlank()
+    val submit: () -> Unit = {
+        val trimmed = input.trim()
+        if (trimmed.isNotEmpty()) {
+            onGenerate(createPrefix + trimmed)
+            input = ""
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .widthIn(max = 480.dp)
+            .padding(horizontal = AppDimens.ScreenPaddingHorizontal),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = stringResource(Res.string.activation_hero_title),
+            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
+        Text(
+            text = stringResource(Res.string.activation_hero_subtitle),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(modifier = Modifier.height(AppDimens.SpacingXl))
+
+        AppTextField(
+            value = input,
+            onValueChange = { input = it },
+            placeholder = stringResource(Res.string.activation_hero_input_placeholder),
+            singleLine = false,
+            maxLines = 3,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+            keyboardActions = KeyboardActions(onSend = { submit() }),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
+        AppButton(
+            text = stringResource(Res.string.activation_hero_send),
+            onClick = submit,
+            enabled = canSend,
+            icon = Icons.Outlined.AutoAwesome,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        Spacer(modifier = Modifier.height(AppDimens.SpacingXl))
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm, Alignment.CenterHorizontally),
+            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
+        ) {
+            chips.forEach { chip ->
+                ActivationHeroChip(
+                    label = chip.label,
+                    onClick = { onChipTapped(chip.key, chip.prompt) },
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Hero template chip — mirrors the design-system [com.antonchuraev.homesearchchecklist.desingsystem.components.gisti]
+ * prompt-chip look (full-pill Surface, surfaceContainerLowest + outlineVariant hairline, ripple
+ * clipped to the pill). Local to the hero because its semantics (create-with-topic) differ from the
+ * GistiQuickAction chip set.
+ */
+@Composable
+private fun ActivationHeroChip(
+    label: String,
+    onClick: () -> Unit,
+) {
+    val shape = RoundedCornerShape(19.dp)
+    Surface(
+        onClick = onClick,
+        shape = shape,
+        color = MaterialTheme.colorScheme.surfaceContainerLowest,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        modifier = Modifier.height(38.dp),
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge.copy(
+                fontSize = 13.5.sp,
+                fontWeight = FontWeight.SemiBold,
+            ),
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
+        )
+    }
 }

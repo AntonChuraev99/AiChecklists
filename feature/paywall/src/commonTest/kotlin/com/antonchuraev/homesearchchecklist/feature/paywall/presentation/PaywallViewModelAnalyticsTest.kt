@@ -250,6 +250,7 @@ class PaywallViewModelAnalyticsTest {
             checklistId: Long?,
             fillDefault: Boolean,
             initialText: String?,
+            autoAnalyze: Boolean,
         ) {}
         override fun navigateToAnalyzeResultPreview() {}
         override fun navigateToChecklistDetail(

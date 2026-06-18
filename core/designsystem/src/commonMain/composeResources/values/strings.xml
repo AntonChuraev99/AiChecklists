@@ -138,6 +138,17 @@
     <string name="main_create_with_ai_action">Create with AI</string>
     <string name="main_create_with_ai_prefill">Create a checklist for </string>
     <string name="main_prompt_plan_day_query">What should I do today?</string>
+    <!-- Activation hero (new-user first run, RC flag activation_bundle_v1) -->
+    <string name="activation_hero_title">What can I help you organize?</string>
+    <string name="activation_hero_subtitle">Describe anything and I'll build a checklist for you. Or start from one of these:</string>
+    <string name="activation_hero_input_placeholder">Describe anything — I'll build a checklist</string>
+    <string name="activation_hero_send">Build my checklist</string>
+    <string name="activation_chip_trip">Trip packing</string>
+    <string name="activation_chip_groceries">Groceries</string>
+    <string name="activation_chip_morning">Morning routine</string>
+    <string name="activation_chip_work">Work tasks</string>
+    <string name="activation_chip_workout">Workout plan</string>
+    <string name="activation_chip_party">Party planning</string>
     <string name="checklist_prompt_whats_missing">What's missing?</string>
     <string name="checklist_prompt_generate_ideas">Generate ideas</string>
     <string name="checklist_prompt_add_items">Add items</string>
@@ -214,6 +225,13 @@
     <string name="analyze_preview_add_item">Add item</string>
     <string name="analyze_preview_add_item_hint">Add new item...</string>
     <string name="analyze_preview_folder_hint">AI organized this into folders. You can rename and rearrange after creating.</string>
+    <string name="analyze_preview_use_folders_label">Use folders</string>
+    <string name="analyze_preview_use_folders_helper">Group items into the folders AI suggested. Off keeps a simple flat list.</string>
+    <string name="analyze_preview_soft_cap_hint">Shorter lists get finished more often — we kept the top 10. Add more below if you need.</string>
+    <string name="analyze_preview_show_more">Show %1$d more</string>
+    <string name="analyze_preview_show_less">Show less</string>
+    <string name="analyze_preview_add_all">Add all</string>
+    <string name="analyze_preview_add_overflow_item">Add item</string>
 
     <!-- Analyze Screen -->
     <string name="analyze_title">AI Analysis</string>

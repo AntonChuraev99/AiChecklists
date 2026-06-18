@@ -62,12 +62,16 @@ interface AppNavigator {
 
     /**
      * @param initialText optional prefilled raw text (e.g. from ACTION_PROCESS_TEXT). When
-     *   non-null the screen pre-selects RAW_TEXT and fills the input WITHOUT auto-analyzing.
+     *   non-null the screen pre-selects RAW_TEXT and fills the input.
+     * @param autoAnalyze when true AND [initialText] is non-blank, the screen runs analysis
+     *   automatically once on mount (no manual Analyze tap). Used by the new-user activation
+     *   hero. Default false keeps the ACTION_PROCESS_TEXT prefill-only contract.
      */
     fun navigateToAnalyzeScreen(
         checklistId: Long? = null,
         fillDefault: Boolean = false,
         initialText: String? = null,
+        autoAnalyze: Boolean = false,
     )
 
     fun navigateToAnalyzeResultPreview()

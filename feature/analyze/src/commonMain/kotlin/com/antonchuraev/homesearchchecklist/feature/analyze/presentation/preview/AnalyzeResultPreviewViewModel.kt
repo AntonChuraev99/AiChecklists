@@ -1,16 +1,21 @@
 package com.antonchuraev.homesearchchecklist.feature.analyze.presentation.preview
 
 import androidx.lifecycle.viewModelScope
+import com.antonchuraev.homesearchchecklist.core.common.api.ActivationCoordinator
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDefaults
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigKeys
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeResultHolder
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistNodeType
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
@@ -25,13 +30,18 @@ import kotlinx.coroutines.launch
 class AnalyzeResultPreviewViewModel(
     private val appNavigator: AppNavigator,
     private val checklistRepository: ChecklistRepository,
-    private val analyticsTracker: AnalyticsTracker
+    private val analyticsTracker: AnalyticsTracker,
+    private val activationCoordinator: ActivationCoordinator,
+    private val remoteConfigProvider: RemoteConfigProvider
 ) : AppViewModel<AnalyzeResultPreviewScreenState, AnalyzeResultPreviewScreenIntent, Nothing>() {
 
     private val _screenState = MutableStateFlow(AnalyzeResultPreviewScreenState())
     override val screenState: StateFlow<AnalyzeResultPreviewScreenState> = _screenState.asStateFlow()
 
     private var targetChecklistId: Long? = null
+
+    /** True when this preview came from the new-user activation hero (drives the activation funnel on confirm). */
+    private var fromActivation: Boolean = false
 
     init {
         loadData()
@@ -49,6 +59,10 @@ class AnalyzeResultPreviewViewModel(
             AnalyzeResultPreviewScreenIntent.OnAddItem -> addItem()
             AnalyzeResultPreviewScreenIntent.OnCreateChecklist -> createChecklist()
             AnalyzeResultPreviewScreenIntent.OnDismissError -> dismissError()
+            is AnalyzeResultPreviewScreenIntent.OnUseFoldersChanged -> setUseFolders(intent.enabled)
+            AnalyzeResultPreviewScreenIntent.OnToggleOverflowExpanded -> toggleOverflowExpanded()
+            is AnalyzeResultPreviewScreenIntent.OnAddOverflowItem -> addOverflowItem(intent.index)
+            AnalyzeResultPreviewScreenIntent.OnAddAllOverflowItems -> addAllOverflowItems()
         }
     }
 
@@ -62,28 +76,81 @@ class AnalyzeResultPreviewViewModel(
         }
 
         targetChecklistId = data.targetChecklistId
+        fromActivation = data.fromActivation
 
-        // Folders only apply to the new-checklist path (never fill mode). When present we keep
-        // the structured items (parentId/type) so the structure survives to creation and the
-        // preview can render the tree.
-        val hasFolders = data.hasFolders && !data.isFillMode
+        // "Did the AI return a structure?" — drives ONLY whether the "Use folders" toggle is
+        // offered. Folders never apply in fill mode. Whether folders are actually USED defaults to
+        // OFF (useFolders) — the user opts in. We always keep the structured items so toggling on
+        // can render/create the tree without re-fetching.
+        val aiReturnedFolders = data.hasFolders && !data.isFillMode
+
+        // Flat editable text list. In folder mode the flat list is the checkable LEAVES only
+        // (folders aren't checklist items); for a flat response it's every item. This is the list
+        // shown/created on the folders-off path.
+        val flatTexts: List<String> = when {
+            data.isFillMode && data.fillDefaultItems != null -> data.fillDefaultItems.map { it.text }
+            aiReturnedFolders -> data.items.filter { it.type == ChecklistNodeType.ITEM }.map { it.text }
+            else -> data.items.map { it.text }
+        }
+
+        // Soft 10-item recommendation — flat NEW-checklist path only. We include the first
+        // MAX_RECOMMENDED_ITEMS by default and hold the rest in an expandable section (nothing is
+        // lost). Skip the split in fill mode: there the editable list is index-aligned with
+        // fillDefaultItems, so dropping rows would desync checked/note state.
+        val applySoftCap = !data.isFillMode && flatTexts.size > MAX_RECOMMENDED_ITEMS
+        val included = if (applySoftCap) flatTexts.take(MAX_RECOMMENDED_ITEMS) else flatTexts
+        val overflow = if (applySoftCap) flatTexts.drop(MAX_RECOMMENDED_ITEMS) else emptyList()
 
         _screenState.update {
             it.copy(
                 isLoading = false,
                 checklistName = data.suggestedName,
-                editableItems = if (data.isFillMode && data.fillDefaultItems != null) {
-                    data.fillDefaultItems.map { item -> item.text }
-                } else {
-                    data.items.map { item -> item.text }
-                },
+                editableItems = included,
+                overflowItems = overflow,
+                isOverflowExpanded = false,
                 summary = data.summary,
                 isFillMode = data.isFillMode,
                 fillDefault = data.fillDefault,
                 fillDefaultItems = data.fillDefaultItems ?: emptyList(),
                 targetChecklistName = data.targetChecklistName,
-                hasFolders = hasFolders,
-                structuredItems = if (hasFolders) data.items.toList() else emptyList()
+                aiReturnedFolders = aiReturnedFolders,
+                useFolders = false,
+                structuredItems = data.items.toList()
+            )
+        }
+    }
+
+    private fun setUseFolders(enabled: Boolean) {
+        // Only meaningful when the AI returned a structure; ignore otherwise.
+        if (!_screenState.value.aiReturnedFolders) return
+        _screenState.update { it.copy(useFolders = enabled) }
+    }
+
+    private fun toggleOverflowExpanded() {
+        _screenState.update { it.copy(isOverflowExpanded = !it.isOverflowExpanded) }
+    }
+
+    private fun addOverflowItem(index: Int) {
+        _screenState.update { state ->
+            val overflow = state.overflowItems.toMutableList()
+            if (index !in overflow.indices) return@update state
+            val moved = overflow.removeAt(index)
+            state.copy(
+                editableItems = state.editableItems + moved,
+                overflowItems = overflow,
+                // Collapse the section once it empties so the UI doesn't show an empty expander.
+                isOverflowExpanded = if (overflow.isEmpty()) false else state.isOverflowExpanded
+            )
+        }
+    }
+
+    private fun addAllOverflowItems() {
+        _screenState.update { state ->
+            if (state.overflowItems.isEmpty()) return@update state
+            state.copy(
+                editableItems = state.editableItems + state.overflowItems,
+                overflowItems = emptyList(),
+                isOverflowExpanded = false
             )
         }
     }
@@ -95,7 +162,7 @@ class AnalyzeResultPreviewViewModel(
     private fun removeItem(index: Int) {
         // In folder mode the preview is read-only: editing a flat index would desync the tree
         // (structuredItems). The user restructures after creation.
-        if (_screenState.value.hasFolders) return
+        if (_screenState.value.useFolders) return
         _screenState.update { state ->
             val newItems = state.editableItems.toMutableList().apply {
                 if (index in indices) removeAt(index)
@@ -113,7 +180,7 @@ class AnalyzeResultPreviewViewModel(
 
     private fun addItem() {
         // Adding a flat row in folder mode would land it outside the tree; disabled for v1.
-        if (_screenState.value.hasFolders) return
+        if (_screenState.value.useFolders) return
         val text = _screenState.value.newItemText.trim()
         if (text.isNotEmpty()) {
             _screenState.update { state ->
@@ -179,12 +246,14 @@ class AnalyzeResultPreviewViewModel(
                     AnalyzeResultHolder.clear()
                     appNavigator.navigateToFillDetail(fillId, clearBackStack = true)
                 } else {
-                    // Create new checklist. In folder mode use the structured items verbatim so
-                    // parentId/type reach the template and set foldersEnabled; the default fill
-                    // (created by addChecklist) gets a linked row for every node — folders too —
-                    // so folder reminders/progress resolve. In the flat path build plain items
-                    // from the (editable) text list as before.
-                    val checklist = if (state.hasFolders) {
+                    // Create new checklist. Only when the user opted IN to folders (useFolders)
+                    // do we use the structured items verbatim so parentId/type reach the template
+                    // and set foldersEnabled; the default fill (created by addChecklist) then gets a
+                    // linked row for every node — folders too — so folder reminders/progress
+                    // resolve. By DEFAULT (folders off) we create a FLAT checklist from the
+                    // included (soft-capped) editable text list — the folder structure is
+                    // intentionally flattened away.
+                    val checklist = if (state.useFolders) {
                         Checklist(
                             name = state.checklistName,
                             items = state.structuredItems,
@@ -201,8 +270,19 @@ class AnalyzeResultPreviewViewModel(
                     analyticsTracker.event(AnalyticsEvents.Checklist.CREATED, mapOf(
                         "source" to "ai",
                         "item_count" to checklist.items.size,
-                        "has_folders" to state.hasFolders
+                        "has_folders" to state.useFolders
                     ))
+                    // New-user activation funnel: when this create came from the hero, hand the
+                    // new checklist to the coordinator (it owns the new-user / show-once gating)
+                    // so FIRST_AI_CHECKLIST_CREATED + the reminder opt-in still fire — the chat
+                    // dispatcher used to be the only create path that did this.
+                    if (fromActivation) {
+                        val activationEnabled = remoteConfigProvider.getBoolean(
+                            RemoteConfigKeys.ACTIVATION_BUNDLE_V1,
+                            RemoteConfigDefaults.ACTIVATION_BUNDLE_V1,
+                        )
+                        activationCoordinator.onAiChecklistCreated(checklistId, activationEnabled)
+                    }
                     _screenState.update { it.copy(isCreating = false) }
                     AnalyzeResultHolder.clear()
                     appNavigator.navigateToChecklistDetail(checklistId, clearBackStack = true)

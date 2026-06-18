@@ -29,12 +29,13 @@ val analyzeFeatureModule = module {
     // attachment flows (CreateChecklistFromAttachment).
     single<AiAnalyzer> { FirebaseAiAnalyzerAdapter(analyzeRepository = get()) }
 
-    // ViewModel with optional checklistId, fillDefault and initialText parameters
-    viewModel { (checklistId: Long?, fillDefault: Boolean, initialText: String?) ->
+    // ViewModel with optional checklistId, fillDefault, initialText and autoAnalyze parameters
+    viewModel { (checklistId: Long?, fillDefault: Boolean, initialText: String?, autoAnalyze: Boolean) ->
         AnalyzeViewModel(
             checklistId = checklistId,
             fillDefault = fillDefault,
             initialText = initialText,
+            autoAnalyze = autoAnalyze,
             analyzeRepository = get(),
             checklistRepository = get(),
             appNavigator = get(),
@@ -49,7 +50,9 @@ val analyzeFeatureModule = module {
         AnalyzeResultPreviewViewModel(
             appNavigator = get(),
             checklistRepository = get(),
-            analyticsTracker = get()
+            analyticsTracker = get(),
+            activationCoordinator = get(),
+            remoteConfigProvider = get()
         )
     }
 }

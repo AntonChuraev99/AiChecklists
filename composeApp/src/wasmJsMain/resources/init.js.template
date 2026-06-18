@@ -138,6 +138,7 @@ rc.defaultConfig = {
     templates_json: "[]",
     onboarding: "interactive",
     paywall_variant: "features_v1",
+    activation_bundle_v1: true,
 };
 
 // Synchronous helpers — safe to call after __rcFetchPromise resolves (or immediately for defaults)

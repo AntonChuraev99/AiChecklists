@@ -77,9 +77,10 @@ fun AnalyzeScreen(
     checklistId: Long? = null,
     fillDefault: Boolean = false,
     initialText: String? = null,
+    autoAnalyze: Boolean = false,
     viewModel: AnalyzeViewModel = koinViewModel(
-        key = "analyze_${checklistId}_${fillDefault}_${initialText?.hashCode()}"
-    ) { parametersOf(checklistId, fillDefault, initialText) }
+        key = "analyze_${checklistId}_${fillDefault}_${initialText?.hashCode()}_$autoAnalyze"
+    ) { parametersOf(checklistId, fillDefault, initialText, autoAnalyze) }
 ) {
     val analyticsTracker: AnalyticsTracker = koinInject()
     LaunchedEffect(Unit) { analyticsTracker.screenView(AnalyticsScreens.ANALYZE) }

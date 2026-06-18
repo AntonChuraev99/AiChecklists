@@ -60,6 +60,11 @@ sealed interface AppNavRoute : NavKey {
         // pre-selects RAW_TEXT input and fills inputText WITHOUT auto-running analysis
         // (protects the AI-credit budget — the user taps Analyze themselves). null = no prefill.
         val initialText: String? = null,
+        // When true AND [initialText] is non-blank, analysis runs automatically once on mount
+        // (no manual Analyze tap). Used by the new-user activation hero where the chip tap /
+        // typed topic IS the explicit intent to generate. Default false preserves the
+        // ACTION_PROCESS_TEXT contract (prefill only, user taps Analyze).
+        val autoAnalyze: Boolean = false,
     ) : AppNavRoute
 
     @Serializable

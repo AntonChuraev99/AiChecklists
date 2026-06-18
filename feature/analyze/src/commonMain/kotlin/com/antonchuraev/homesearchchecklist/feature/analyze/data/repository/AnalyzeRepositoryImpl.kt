@@ -103,6 +103,7 @@ class AnalyzeRepositoryImpl(
                                 suggestedItems = response.data.items,
                                 confidence = response.data.confidence,
                                 summary = response.data.summary,
+                                suggestedName = response.data.checklistName,
                                 hasFolders = response.data.hasFolders
                             )
                         )

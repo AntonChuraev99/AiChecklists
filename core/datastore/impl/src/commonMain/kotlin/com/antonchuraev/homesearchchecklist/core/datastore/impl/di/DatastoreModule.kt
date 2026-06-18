@@ -1,10 +1,12 @@
 package com.antonchuraev.homesearchchecklist.core.datastore.impl.di
 
+import com.antonchuraev.homesearchchecklist.core.datastore.api.ActivationPrefsRepository
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AiChatPreferencesRepository
 import com.antonchuraev.homesearchchecklist.core.datastore.api.FirstChecklistRepository
 import com.antonchuraev.homesearchchecklist.core.datastore.api.HintsRepository
 import com.antonchuraev.homesearchchecklist.core.datastore.api.LanguageRepository
 import com.antonchuraev.homesearchchecklist.core.datastore.api.ThemeRepository
+import com.antonchuraev.homesearchchecklist.core.datastore.impl.ActivationPrefsRepositoryImpl
 import com.antonchuraev.homesearchchecklist.core.datastore.impl.AiChatPreferencesRepositoryImpl
 import com.antonchuraev.homesearchchecklist.core.datastore.impl.FirstChecklistRepositoryImpl
 import com.antonchuraev.homesearchchecklist.core.datastore.impl.HintsRepositoryImpl
@@ -18,4 +20,5 @@ val datastoreModule = module {
     single<AiChatPreferencesRepository> { AiChatPreferencesRepositoryImpl(dataStore = get()) }
     single<HintsRepository> { HintsRepositoryImpl(dataStore = get()) }
     single<FirstChecklistRepository> { FirstChecklistRepositoryImpl(dataStore = get()) }
+    single<ActivationPrefsRepository> { ActivationPrefsRepositoryImpl(dataStore = get()) }
 }

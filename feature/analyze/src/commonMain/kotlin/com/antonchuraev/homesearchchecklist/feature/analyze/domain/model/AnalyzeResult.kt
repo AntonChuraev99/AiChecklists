@@ -27,6 +27,14 @@ data class AnalyzeResult(
     val summary: String? = null,
 
     /**
+     * AI-suggested name for the generated checklist (the `checklist_name` field of the
+     * `generate_checklist` response). Null/blank in fill mode and whenever the server omitted it;
+     * presentation falls back to the localized default name in that case. Carrying it here is what
+     * lets each generated checklist keep its own title instead of all sharing the generic default.
+     */
+    val suggestedName: String? = null,
+
+    /**
      * Any warnings or notes from the analysis
      */
     val warnings: List<String> = emptyList(),

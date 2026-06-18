@@ -178,13 +178,63 @@ import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.Paywall
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.SubscriptionStatusScreen
 import com.antonchuraev.homesearchchecklist.feature.sharing.presentation.ShareScreen
 import com.antonchuraev.homesearchchecklist.feature.updatefeed.presentation.UpdateFeedScreen
+import com.antonchuraev.homesearchchecklist.core.common.api.ActivationCoordinator
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDefaults
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigKeys
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
+import com.antonchuraev.homesearchchecklist.activation.ActivationReminderSheet
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.plus
+import kotlinx.datetime.toInstant
+import kotlinx.datetime.toLocalDateTime
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import org.koin.compose.KoinContext
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.context.GlobalContext
+
+/**
+ * Default trigger time for the new-user activation reminder: TODAY at 20:00 local time, or — if it
+ * is already past 20:00 — TOMORROW at 09:00 local time. Returns epoch millis. Kept top-level (pure)
+ * + epoch-millis in/out so it is unit-testable without a Composable scope.
+ */
+internal fun nextActivationReminderTrigger(
+    nowEpochMs: Long = kotlin.time.Clock.System.now().toEpochMilliseconds(),
+    timeZone: TimeZone = TimeZone.currentSystemDefault(),
+): Long {
+    val now = Instant.fromEpochMilliseconds(nowEpochMs)
+    val nowLocal = now.toLocalDateTime(timeZone)
+    val todayEvening = LocalDateTime(
+        year = nowLocal.year,
+        monthNumber = nowLocal.monthNumber,
+        dayOfMonth = nowLocal.dayOfMonth,
+        hour = 20,
+        minute = 0,
+    )
+    val target = if (nowLocal < todayEvening) {
+        todayEvening
+    } else {
+        val tomorrow = now.plus(1, DateTimeUnit.DAY, timeZone).toLocalDateTime(timeZone)
+        LocalDateTime(
+            year = tomorrow.year,
+            monthNumber = tomorrow.monthNumber,
+            dayOfMonth = tomorrow.dayOfMonth,
+            hour = 9,
+            minute = 0,
+        )
+    }
+    return target.toInstant(timeZone).toEpochMilliseconds()
+}
 
 /**
  * Substitutes `%1$s`, `%2$s`, … placeholders with the given args (positional).
@@ -489,6 +539,41 @@ fun App() {
                     GistiQuickAction.PLAN_DAY ->
                         chatViewModel.sendIntent(ChatScreenIntent.OnPrefillAndSend(quickPlanDayQuery))
                 }
+            }
+
+            // ── New-user activation bundle (RC flag activation_bundle_v1) ──────────
+            // Resolved once per composition. Read AFTER SplashViewModel awaited fetchAndActivate(),
+            // so by the time MainScreen mounts the flag is fresh. Fail-open default ON.
+            val remoteConfigProvider: RemoteConfigProvider = koinInject()
+            val activationBundleEnabled = remember {
+                remoteConfigProvider.getBoolean(
+                    RemoteConfigKeys.ACTIVATION_BUNDLE_V1,
+                    RemoteConfigDefaults.ACTIVATION_BUNDLE_V1,
+                )
+            }
+            val activationAnalytics: AnalyticsTracker = koinInject()
+
+            // Hero typed input / chip → the flagship "turn anything into a checklist with AI"
+            // flow: route to the Analyze screen with the topic prefilled and autoAnalyze = true,
+            // so Gemini GENERATES the checklist items and the user lands on the result preview
+            // (AI-generated items → edit → Create). This is the reliable item-generating path
+            // (generate_checklist CF via AnalyzeRepository); the old Layer-1 local CreateChecklist
+            // parser produced a title-only EMPTY checklist (no items) and was the wrong logic.
+            // FIRST_AI_CHECKLIST_CREATED still fires from AnalyzeResultPreviewViewModel on confirm
+            // (fromActivation flag), so the activation funnel is unbroken.
+            val onActivationGenerate: (String) -> Unit = { prompt ->
+                navigator.navigateToAnalyzeScreen(
+                    initialText = prompt,
+                    fillDefault = false,
+                    autoAnalyze = true,
+                )
+            }
+            val onActivationChipTapped: (String, String) -> Unit = { chipKey, prompt ->
+                activationAnalytics.event(
+                    AnalyticsEvents.Activation.CHIP_TAPPED,
+                    mapOf(AnalyticsParams.CHIP_KEY to chipKey),
+                )
+                onActivationGenerate(prompt)
             }
 
             // Maps a checklist-detail contextual prompt chip [GistiChecklistAction] to its chat flow,
@@ -871,6 +956,11 @@ fun App() {
                                 // "Choose from template" button. Creation moved to the top of
                                 // the screen; the bottom is a clean chat dock.
                                 onCreateFromTemplatesClick = { navigator.navigateToCreateChecklistScreen() },
+                                // New-user activation hero (empty MainScreen, flag ON). Typed text +
+                                // template chips drive the AI create flow via the inline dock.
+                                activationEnabled = activationBundleEnabled,
+                                onActivationGenerate = onActivationGenerate,
+                                onActivationChipTapped = onActivationChipTapped,
                             )
                         }
                     }
@@ -923,6 +1013,7 @@ fun App() {
                             checklistId = route.checklistId,
                             fillDefault = route.fillDefault,
                             initialText = route.initialText,
+                            autoAnalyze = route.autoAnalyze,
                         )
                     }
 
@@ -1242,6 +1333,49 @@ fun App() {
                         onDone = { showWidgetInstruction = false }
                     )
                 }
+            }
+
+            // ── Activation reminder opt-in (RC flag activation_bundle_v1) ─────────
+            // The ActivationCoordinator (driven by the AI create paths — the chat tool-call
+            // dispatcher AND the Analyze result-preview VM for the hero flow) emits the id of the
+            // new user's FIRST AI checklist. We show a one-time soft-ask; on enable→grant we
+            // schedule a default reminder for this checklist; the coordinator records the outcome
+            // and marks it shown so it never reappears. Singleton coordinator — same instance the
+            // create paths emit on.
+            val activationCoordinator: ActivationCoordinator = koinInject()
+            val checklistRepository: ChecklistRepository = koinInject()
+            val reminderScheduler: ChecklistReminderScheduler = koinInject()
+            var activationReminderChecklistId by rememberSaveable { mutableStateOf<Long?>(null) }
+            LaunchedEffect(Unit) {
+                activationCoordinator.reminderOptInRequests.collect { checklistId ->
+                    activationReminderChecklistId = checklistId
+                }
+            }
+            activationReminderChecklistId?.let { reminderChecklistId ->
+                ActivationReminderSheet(
+                    onEnableGranted = {
+                        val triggerAt = nextActivationReminderTrigger()
+                        scope.launch {
+                            runCatching {
+                                checklistRepository.setReminder(reminderChecklistId, triggerAt)
+                                reminderScheduler.scheduleReminder(reminderChecklistId, triggerAt)
+                            }.onFailure { e ->
+                                logger.error("Activation", "schedule activation reminder failed: ${e.message}", e)
+                            }
+                            activationCoordinator.reportReminderOptInOutcome(granted = true)
+                        }
+                        activationReminderChecklistId = null
+                    },
+                    onSkip = {
+                        scope.launch { activationCoordinator.reportReminderOptInOutcome(granted = false) }
+                        activationReminderChecklistId = null
+                    },
+                    onDismiss = {
+                        // Dismiss (scrim/back) counts as skip — never re-ask.
+                        scope.launch { activationCoordinator.reportReminderOptInOutcome(granted = false) }
+                        activationReminderChecklistId = null
+                    },
+                )
             }
 
             // In-App Review launcher — side-effect composable, no UI

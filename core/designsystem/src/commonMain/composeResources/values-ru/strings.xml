@@ -207,6 +207,13 @@
     <string name="analyze_preview_add_item">Добавить элемент</string>
     <string name="analyze_preview_add_item_hint">Добавить элемент...</string>
     <string name="analyze_preview_folder_hint">ИИ распределил элементы по папкам. Переименовать и переставить можно после создания.</string>
+    <string name="analyze_preview_use_folders_label">Использовать папки</string>
+    <string name="analyze_preview_use_folders_helper">Сгруппировать элементы по папкам, предложенным ИИ. Без папок — простой плоский список.</string>
+    <string name="analyze_preview_soft_cap_hint">Короткие списки чаще доводят до конца — мы оставили первые 10. Добавьте больше ниже, если нужно.</string>
+    <string name="analyze_preview_show_more">Показать ещё %1$d</string>
+    <string name="analyze_preview_show_less">Свернуть</string>
+    <string name="analyze_preview_add_all">Добавить все</string>
+    <string name="analyze_preview_add_overflow_item">Добавить элемент</string>
 
     <!-- Экран анализа -->
     <string name="analyze_title">ИИ-анализ</string>

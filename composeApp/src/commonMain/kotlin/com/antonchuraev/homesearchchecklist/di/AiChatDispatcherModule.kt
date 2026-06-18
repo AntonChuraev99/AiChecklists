@@ -1,7 +1,9 @@
 package com.antonchuraev.homesearchchecklist.di
 
+import com.antonchuraev.homesearchchecklist.aichat.ActivationCoordinatorImpl
 import com.antonchuraev.homesearchchecklist.aichat.AndroidChatLocaleProvider
 import com.antonchuraev.homesearchchecklist.aichat.ToolCallDispatcherImpl
+import com.antonchuraev.homesearchchecklist.core.common.api.ActivationCoordinator
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePort
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.dispatcher.ToolCallDispatcher
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.locale.ChatLocaleProvider
@@ -18,6 +20,16 @@ import org.koin.dsl.module
  * Registered as part of [appModule] via includes().
  */
 val aiChatDispatcherModule = module {
+    // Activation funnel coordinator — shared between the dispatcher (data) and App.kt (UI).
+    // Singleton so its reminderOptInRequests SharedFlow is the same instance on both sides.
+    single<ActivationCoordinator> {
+        ActivationCoordinatorImpl(
+            activationPrefs = get(),
+            userDataRepository = get(),
+            analytics = get(),
+            logger = get(),
+        )
+    }
     single<ToolCallDispatcher> {
         ToolCallDispatcherImpl(
             checklistRepository = get(),
@@ -25,6 +37,8 @@ val aiChatDispatcherModule = module {
             aiAnalyzer = get<AiAnalyzer>(),
             attachmentStorage = get<AttachmentStoragePort>(),
             logger = get(),
+            activationCoordinator = get(),
+            remoteConfigProvider = get(),
         )
     }
     single<ChatLocaleProvider> {

@@ -135,7 +135,11 @@ class FirebaseAiServiceImpl(
             AiServiceResponse(
                 success = true,
                 data = GenerateChecklistResult(
-                    checklistName = responseBody.checklistName ?: "New Checklist",
+                    // Pass the server name through as-is (may be null/blank); the presentation
+                    // layer owns the LOCALIZED fallback. Hardcoding an English "New Checklist"
+                    // here would defeat that fallback (non-blank → would win over the localized
+                    // default on non-EN UIs).
+                    checklistName = responseBody.checklistName,
                     items = flatItems,
                     summary = responseBody.summary ?: "",
                     confidence = responseBody.confidence ?: 0.8f,

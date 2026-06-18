@@ -56,7 +56,12 @@ data class FilledItem(
  * so the presentation layer knows to create the checklist with `foldersEnabled = true`.
  */
 data class GenerateChecklistResult(
-    val checklistName: String,
+    /**
+     * AI-suggested checklist name (CF `checklist_name`). Nullable: the server may omit it, in
+     * which case the presentation layer applies the localized default. NOT defaulted to an
+     * English literal here — that would suppress the localized fallback.
+     */
+    val checklistName: String?,
     val items: List<ChecklistItem>,
     val summary: String,
     val confidence: Float,

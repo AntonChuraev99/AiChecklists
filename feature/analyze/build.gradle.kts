@@ -35,6 +35,7 @@ kotlin {
             implementation(projects.core.designsystem)
             implementation(projects.core.navigation.api)
             implementation(projects.core.filepicker.api)
+            implementation(projects.core.remoteconfig.api)
 
             implementation(projects.feature.checklist)
             implementation(projects.feature.user)

@@ -41,6 +41,14 @@ object RemoteConfigKeys {
     // "auto_create" (the default) seeds a "Your first checklist" template on first launch
     // for new users; "current" keeps the existing empty-state flow.
     const val FIRST_CHECKLIST_VARIANT = "first_checklist_variant"
+
+    // New-user activation bundle master switch (boolean). When ON (the default):
+    //   - SKIP the static first-checklist auto-seed so the user lands on the AI first-run hero,
+    //   - render the activation hero (prompt + chips) on the empty MainScreen,
+    //   - show the one-time reminder opt-in after the new user's first AI checklist.
+    // When OFF: the EXACT pre-activation behavior (static auto-create + first_checklist_variant
+    // A/B + plain EmptyState). Remotely toggleable so the whole bundle can be A/B-tested later.
+    const val ACTIVATION_BUNDLE_V1 = "activation_bundle_v1"
 }
 
 /**
@@ -94,4 +102,12 @@ object RemoteConfigDefaults {
     // can still override per-cohort — set the parameter to "current" to opt a control group
     // out of auto-create. Keep this in sync with the Firebase Console parameter default.
     const val FIRST_CHECKLIST_VARIANT = "auto_create"
+
+    // Activation bundle ON by default — this is the desired baseline product behavior (AI
+    // first-run instead of a static seed). Default-ON is fail-open BY DESIGN: a failed/slow
+    // Remote Config fetch keeps the bundle ON. The read MUST NOT be wrapped in a withTimeout
+    // (SplashViewModel already reactively awaits fetchAndActivate() before reading flags), so a
+    // slow-network cold start can never silently flip it off. Set to false in the Console to opt
+    // a control cohort back into the legacy static-auto-create flow for the A/B comparison.
+    const val ACTIVATION_BUNDLE_V1 = true
 }

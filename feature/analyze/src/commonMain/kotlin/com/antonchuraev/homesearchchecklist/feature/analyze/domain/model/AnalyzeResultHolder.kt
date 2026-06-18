@@ -19,7 +19,8 @@ object AnalyzeResultHolder {
         targetChecklistId: Long? = null,
         targetChecklistName: String? = null,
         fillDefaultItems: List<ChecklistFillItem>? = null,
-        hasFolders: Boolean = false
+        hasFolders: Boolean = false,
+        fromActivation: Boolean = false
     ) {
         data = AnalyzeResultData(
             items = items.toMutableList(),
@@ -30,7 +31,8 @@ object AnalyzeResultHolder {
             targetChecklistId = targetChecklistId,
             targetChecklistName = targetChecklistName,
             fillDefaultItems = fillDefaultItems,
-            hasFolders = hasFolders
+            hasFolders = hasFolders,
+            fromActivation = fromActivation
         )
     }
 
@@ -55,5 +57,13 @@ data class AnalyzeResultData(
      * shows the tree read-only and creates the checklist with foldersEnabled = true. Always
      * false in fill mode and for flat responses.
      */
-    val hasFolders: Boolean = false
+    val hasFolders: Boolean = false,
+    /**
+     * True when this analysis was kicked off by the new-user activation hero (chip / typed
+     * topic with autoAnalyze). The preview VM fires the activation funnel
+     * (FIRST_AI_CHECKLIST_CREATED + reminder opt-in) on confirm, so the activation analytics
+     * keep flowing even though creation now goes through the Analyze path (not the chat
+     * dispatcher). Always false for the normal Analyze / ACTION_PROCESS_TEXT flows.
+     */
+    val fromActivation: Boolean = false
 )

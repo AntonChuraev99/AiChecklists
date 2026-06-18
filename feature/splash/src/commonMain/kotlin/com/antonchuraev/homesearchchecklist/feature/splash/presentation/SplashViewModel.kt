@@ -13,7 +13,9 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
+import com.antonchuraev.homesearchchecklist.core.datastore.api.ActivationPrefsRepository
 import com.antonchuraev.homesearchchecklist.core.datastore.api.FirstChecklistRepository
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDefaults
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
@@ -48,6 +50,7 @@ class SplashViewModel(
     private val getFirstChecklistVariant: GetFirstChecklistVariantUseCase,
     private val checklistRepository: ChecklistRepository,
     private val firstChecklistRepository: FirstChecklistRepository,
+    private val activationPrefsRepository: ActivationPrefsRepository,
 ) : ViewModel() {
 
     init {
@@ -223,13 +226,21 @@ class SplashViewModel(
     }
 
     /**
-     * Applies the first-checklist A/B experiment.
+     * Applies the first-checklist experiment, branching on the `activation_bundle_v1` RC flag.
      *
-     * Always sets the `first_checklist_variant` user property (so analytics can split
-     * cohorts), and — only for brand-new users in the `auto_create` treatment — seeds a
-     * one-time "Your first checklist" starter template.
+     * Always sets the `first_checklist_variant` user property (so the legacy A/B cohort attribution
+     * survives in both arms). Then:
      *
-     * The whole block is guarded so a failure here never blocks or crashes the splash flow.
+     *  - **Activation bundle ON (default):** SKIP the static auto-seed entirely so the new user
+     *    lands on the empty MainScreen and gets the AI first-run hero instead. For a brand-new
+     *    registration, persist the new-user-pending flag so the user's FIRST AI checklist triggers
+     *    the activation funnel (FIRST_AI_CHECKLIST_CREATED + reminder opt-in) downstream.
+     *  - **Activation bundle OFF:** EXACT pre-activation behavior — seed the one-time "Your first
+     *    checklist" starter template for brand-new users in the `auto_create` treatment. Fully
+     *    reversible: flipping the flag back to false restores the legacy flow with no code change.
+     *
+     * Read AFTER fetchAndActivate() (see init), so the flag is fresh. The whole block is guarded so
+     * a failure here never blocks or crashes the splash flow.
      */
     private suspend fun applyFirstChecklistExperiment(userData: UserData, isNewUser: Boolean) {
         runCatching {
@@ -237,8 +248,23 @@ class SplashViewModel(
             analyticsTracker.setUserProperties(mapOf("first_checklist_variant" to variant.name))
 
             val uid = userData.userId
-            val alreadyCreated = uid.isNotBlank() && firstChecklistRepository.isFirstChecklistCreated(uid)
+            val activationBundleEnabled = remoteConfigProvider.getBoolean(
+                RemoteConfigKeys.ACTIVATION_BUNDLE_V1,
+                RemoteConfigDefaults.ACTIVATION_BUNDLE_V1,
+            )
 
+            if (activationBundleEnabled) {
+                // Treatment arm: no static seed. Mark a brand-new user as awaiting their first AI
+                // checklist so the dispatcher-driven activation funnel can fire exactly once.
+                if (isNewUser && uid.isNotBlank()) {
+                    log("activation bundle ON — skip static auto-create, mark new-user-pending uid=${uid.take(8)}")
+                    activationPrefsRepository.setNewUserPending(uid)
+                }
+                return@runCatching
+            }
+
+            // Control arm: legacy static auto-create (unchanged behavior).
+            val alreadyCreated = uid.isNotBlank() && firstChecklistRepository.isFirstChecklistCreated(uid)
             if (isNewUser && variant == FirstChecklistVariant.AUTO_CREATE && uid.isNotBlank() && !alreadyCreated) {
                 // New users have 0 checklists, so they are always under the Free tier limit (4).
                 // Splash has no UserLimits access; skipping the gate here is safe by construction.

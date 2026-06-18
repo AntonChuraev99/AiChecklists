@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.analyze.presentation.preview
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,6 +45,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AddItemInputField
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCardDefaults
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppSwitch
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppTextField
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
@@ -92,9 +94,10 @@ fun AnalyzeResultPreviewScreen(
                             .padding(vertical = AppDimens.SpacingLg)
                             .navigationBarsPadding()
                     ) {
-                        // In folder mode the count reflects checkable leaves (folders aren't items),
-                        // matching the count shown above the list.
-                        val createCount = if (state.hasFolders) {
+                        // When folders are used the count reflects checkable leaves (folders aren't
+                        // items), matching the count shown above the list. On the flat path it's the
+                        // included (soft-capped) editable list.
+                        val createCount = if (state.useFolders) {
                             state.structuredItems.count { it.type == ChecklistNodeType.ITEM }
                         } else {
                             state.editableItems.size
@@ -131,7 +134,11 @@ fun AnalyzeResultPreviewScreen(
                         onChecklistNameChanged = { viewModel.sendIntent(AnalyzeResultPreviewScreenIntent.OnChecklistNameChanged(it)) },
                         onRemoveItem = { viewModel.sendIntent(AnalyzeResultPreviewScreenIntent.OnRemoveItem(it)) },
                         onNewItemTextChange = { viewModel.sendIntent(AnalyzeResultPreviewScreenIntent.OnNewItemTextChange(it)) },
-                        onAddItem = { viewModel.sendIntent(AnalyzeResultPreviewScreenIntent.OnAddItem) }
+                        onAddItem = { viewModel.sendIntent(AnalyzeResultPreviewScreenIntent.OnAddItem) },
+                        onUseFoldersChanged = { viewModel.sendIntent(AnalyzeResultPreviewScreenIntent.OnUseFoldersChanged(it)) },
+                        onToggleOverflowExpanded = { viewModel.sendIntent(AnalyzeResultPreviewScreenIntent.OnToggleOverflowExpanded) },
+                        onAddOverflowItem = { viewModel.sendIntent(AnalyzeResultPreviewScreenIntent.OnAddOverflowItem(it)) },
+                        onAddAllOverflowItems = { viewModel.sendIntent(AnalyzeResultPreviewScreenIntent.OnAddAllOverflowItems) }
                     )
                 }
             }
@@ -160,7 +167,11 @@ private fun AnalyzeResultPreviewContent(
     onChecklistNameChanged: (String) -> Unit,
     onRemoveItem: (Int) -> Unit,
     onNewItemTextChange: (String) -> Unit,
-    onAddItem: () -> Unit
+    onAddItem: () -> Unit,
+    onUseFoldersChanged: (Boolean) -> Unit,
+    onToggleOverflowExpanded: () -> Unit,
+    onAddOverflowItem: (Int) -> Unit,
+    onAddAllOverflowItems: () -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().adaptiveContentWidth(),
@@ -227,8 +238,21 @@ private fun AnalyzeResultPreviewContent(
             }
         }
 
-        // Items count. In folder mode count only checkable leaves (folders aren't items).
-        val displayCount = if (state.hasFolders) {
+        // "Use folders" opt-in. Only offered when the AI actually returned a structure (nothing to
+        // fold otherwise). Default OFF — a flat checklist unless the user opts in.
+        if (state.aiReturnedFolders) {
+            item {
+                UseFoldersToggle(
+                    checked = state.useFolders,
+                    onCheckedChange = onUseFoldersChanged
+                )
+                Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
+            }
+        }
+
+        // Items count. When folders are used count only checkable leaves (folders aren't items);
+        // on the flat path count the included (soft-capped) items.
+        val displayCount = if (state.useFolders) {
             state.structuredItems.count { it.type == ChecklistNodeType.ITEM }
         } else {
             state.editableItems.size
@@ -243,7 +267,7 @@ private fun AnalyzeResultPreviewContent(
             )
         }
 
-        if (state.hasFolders) {
+        if (state.useFolders) {
             // Folder mode: read-only hierarchical preview. Editing a flat row would desync the
             // tree, so add/remove are hidden; the user restructures after creation.
             item {
@@ -263,6 +287,19 @@ private fun AnalyzeResultPreviewContent(
                 StructuredItemCard(item = item, depth = depth)
             }
         } else {
+            // Soft 10-item recommendation. Shown only when the cap actually held items back; the
+            // held-back items live in the "Show N more" section below (nothing is lost).
+            if (state.hasOverflow) {
+                item {
+                    Text(
+                        text = stringResource(Res.string.analyze_preview_soft_cap_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = AppDimens.SpacingSm)
+                    )
+                }
+            }
+
             // Add new item field (at top, new items appear below)
             item {
                 AddItemInputField(
@@ -274,7 +311,7 @@ private fun AnalyzeResultPreviewContent(
                 Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
             }
 
-            // Editable items list (new items appear at top)
+            // Included (editable) items list
             itemsIndexed(
                 items = state.editableItems,
                 key = { index, item -> "$index-${item.hashCode()}" }
@@ -285,6 +322,32 @@ private fun AnalyzeResultPreviewContent(
                     modifier = Modifier.animateItem()
                 )
             }
+
+            // Soft-cap overflow: a collapsed expander revealing the held-back items, each with an
+            // "add" affordance, plus an "Add all". Fully recoverable — nothing was truncated.
+            if (state.hasOverflow) {
+                item {
+                    Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
+                    OverflowHeader(
+                        count = state.overflowItems.size,
+                        expanded = state.isOverflowExpanded,
+                        onToggle = onToggleOverflowExpanded,
+                        onAddAll = onAddAllOverflowItems
+                    )
+                }
+                if (state.isOverflowExpanded) {
+                    itemsIndexed(
+                        items = state.overflowItems,
+                        key = { index, item -> "overflow-$index-${item.hashCode()}" }
+                    ) { index, item ->
+                        OverflowItemCard(
+                            text = item,
+                            onAdd = { onAddOverflowItem(index) },
+                            modifier = Modifier.animateItem()
+                        )
+                    }
+                }
+            }
         }
 
         // Bottom padding for button
@@ -292,6 +355,124 @@ private fun AnalyzeResultPreviewContent(
             Spacer(modifier = Modifier.height(80.dp))
         }
     }
+}
+
+/**
+ * "Use folders" opt-in row. Per the design-system rule the [AppSwitch] takes a null
+ * `onCheckedChange` and the surrounding clickable Row owns the toggle (avoids the double-toggle
+ * bug). Label + helper on the left, switch on the right.
+ */
+@Composable
+private fun UseFoldersToggle(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable { onCheckedChange(!checked) }
+            .padding(vertical = AppDimens.SpacingXs),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = stringResource(Res.string.analyze_preview_use_folders_label),
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = stringResource(Res.string.analyze_preview_use_folders_helper),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Spacer(modifier = Modifier.width(AppDimens.SpacingMd))
+        AppSwitch(
+            checked = checked,
+            onCheckedChange = null
+        )
+    }
+}
+
+/**
+ * Header for the soft-cap overflow section: a "Show N more" / "Show less" expander on the left and
+ * an "Add all" shortcut on the right.
+ */
+@Composable
+private fun OverflowHeader(
+    count: Int,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    onAddAll: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        TextButton(onClick = onToggle) {
+            Text(
+                text = if (expanded)
+                    stringResource(Res.string.analyze_preview_show_less)
+                else
+                    stringResource(Res.string.analyze_preview_show_more, count)
+            )
+        }
+        Spacer(modifier = Modifier.weight(1f))
+        TextButton(onClick = onAddAll) {
+            Text(text = stringResource(Res.string.analyze_preview_add_all))
+        }
+    }
+}
+
+/**
+ * A held-back overflow item (folders-off soft cap). Read-only text with an "add" button that moves
+ * it into the included list. Distinguished from [ChecklistItemCard] by the trailing Add icon.
+ */
+@Composable
+private fun OverflowItemCard(
+    text: String,
+    onAdd: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val shape = RoundedCornerShape(12.dp)
+    val cardContent: @Composable () -> Unit = {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = AppDimens.SpacingMd, vertical = AppDimens.SpacingSm),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f)
+            )
+            IconButton(
+                onClick = onAdd,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = stringResource(Res.string.analyze_preview_add_overflow_item),
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = shape,
+        colors = AppCardDefaults.colors(),
+        border = AppCardDefaults.border(),
+        elevation = AppCardDefaults.flatElevation()
+    ) { cardContent() }
 }
 
 @Composable

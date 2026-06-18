@@ -177,6 +177,32 @@ object AnalyticsEvents {
     object UpdateFeed {
         const val ACTION_CLICK = "update_feed_action_click"
     }
+
+    /**
+     * New-user activation bundle (behind RC flag `activation_bundle_v1`).
+     *
+     * These events ALWAYS fire (even when the flag is OFF) so the later A/B test can
+     * compare both arms — except [FIRST_RUN_SHOWN], which is only meaningful when the
+     * hero is actually rendered (flag ON). Every event carries [AnalyticsParams.VARIANT]
+     * = the flag value ("true"/"false") so funnels are filterable by arm.
+     */
+    object Activation {
+        /** The activation hero (prompt + chips) was shown on the empty MainScreen. Flag ON only. */
+        const val FIRST_RUN_SHOWN = "activation_first_run_shown"
+
+        /** A hero template chip was tapped. Param: [AnalyticsParams.CHIP_KEY] = chip id (e.g. "trip"). */
+        const val CHIP_TAPPED = "activation_chip_tapped"
+
+        /**
+         * A new user's FIRST checklist was created through the AI path (chat create / preview-
+         * confirmed / attachment). Distinct from [Checklist.CREATED] — fires at most once per user,
+         * in BOTH arms, so the activation funnel can compare static-seed vs AI-first-run cohorts.
+         */
+        const val FIRST_AI_CHECKLIST_CREATED = "activation_first_ai_checklist_created"
+
+        /** The one-time reminder opt-in was resolved. Param: [AnalyticsParams.OUTCOME] = "granted" | "skipped". */
+        const val REMINDER_OPTIN = "activation_reminder_optin"
+    }
 }
 
 /**
@@ -230,6 +256,9 @@ object AnalyticsParams {
     const val RC_ACTIVATED = "rc_activated"
     const val RC_VALUE_EMPTY = "rc_value_empty"
     const val FETCH_MS = "fetch_ms"
+
+    // Activation bundle — which hero template chip was tapped (e.g. "trip", "groceries").
+    const val CHIP_KEY = "chip_key"
 }
 
 /**

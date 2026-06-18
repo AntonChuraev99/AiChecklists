@@ -1,7 +1,11 @@
 package com.antonchuraev.homesearchchecklist.aichat
 
+import com.antonchuraev.homesearchchecklist.core.common.api.ActivationCoordinator
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePort
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDefaults
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigKeys
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.dispatcher.ToolCallDispatcher
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AttachmentSource
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatAttachment
@@ -53,6 +57,8 @@ class ToolCallDispatcherImpl(
     private val aiAnalyzer: AiAnalyzer,
     private val attachmentStorage: AttachmentStoragePort,
     private val logger: AppLogger,
+    private val activationCoordinator: ActivationCoordinator,
+    private val remoteConfigProvider: RemoteConfigProvider,
 ) : ToolCallDispatcher {
 
     companion object {
@@ -168,6 +174,7 @@ class ToolCallDispatcherImpl(
             items = items,
         )
         val newChecklistId = checklistRepository.addChecklist(newChecklist)
+        notifyActivation(newChecklistId)
 
         return when (toolCall.initialItems.size) {
             0 -> DispatchOutcome.Success("chat_dispatch_created_empty", listOf(toolCall.name), linkedChecklistId = newChecklistId)
@@ -311,6 +318,7 @@ class ToolCallDispatcherImpl(
 
                 val newChecklist = Checklist(id = 0L, name = checklistName, items = items)
                 val newId = checklistRepository.addChecklist(newChecklist)
+                notifyActivation(newId)
                 logger.info(TAG, "CreateChecklistFromAttachment: created checklist '$checklistName' id=$newId items=${items.size}")
                 DispatchOutcome.Success(
                     "chat_dispatch_created_from_attachment",
@@ -528,6 +536,22 @@ class ToolCallDispatcherImpl(
 
     private fun generateAttachmentId(): String =
         "chat_attach_${kotlin.time.Clock.System.now().toEpochMilliseconds()}_${(0..99999).random()}"
+
+    // ─── Activation funnel ────────────────────────────────────────────────────
+
+    /**
+     * Notifies the [ActivationCoordinator] that an AI-path checklist was created. The coordinator
+     * owns the new-user / show-once gating, so this is a fire-and-forget hand-off from every create
+     * path. Reads the `activation_bundle_v1` RC flag here (fail-open default ON — see
+     * [RemoteConfigKeys.ACTIVATION_BUNDLE_V1]); never wrapped in a timeout.
+     */
+    private suspend fun notifyActivation(checklistId: Long) {
+        val activationEnabled = remoteConfigProvider.getBoolean(
+            RemoteConfigKeys.ACTIVATION_BUNDLE_V1,
+            RemoteConfigDefaults.ACTIVATION_BUNDLE_V1,
+        )
+        activationCoordinator.onAiChecklistCreated(checklistId, activationEnabled)
+    }
 
     // ─── Resolution helpers ───────────────────────────────────────────────────
 

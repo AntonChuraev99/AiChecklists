@@ -4,6 +4,7 @@ import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
+import com.antonchuraev.homesearchchecklist.core.datastore.api.ActivationPrefsRepository
 import com.antonchuraev.homesearchchecklist.core.datastore.api.FirstChecklistRepository
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AddToChecklistPurpose
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
@@ -78,6 +79,7 @@ class SplashViewModelTest {
     private lateinit var fakeUserData: FakeUserDataRepository
     private lateinit var fakeChecklist: FakeChecklistRepository
     private lateinit var fakeFirstChecklist: FakeFirstChecklistRepository
+    private lateinit var fakeActivationPrefs: FakeActivationPrefsRepository
     private lateinit var fakeAnalytics: RecordingAnalyticsTracker
 
     @BeforeTest
@@ -87,6 +89,7 @@ class SplashViewModelTest {
         fakeUserData = FakeUserDataRepository()
         fakeChecklist = FakeChecklistRepository()
         fakeFirstChecklist = FakeFirstChecklistRepository()
+        fakeActivationPrefs = FakeActivationPrefsRepository()
         fakeAnalytics = RecordingAnalyticsTracker()
     }
 
@@ -106,7 +109,9 @@ class SplashViewModelTest {
         isOnboardingPassed: Boolean = true,
         isPaywallLinked: Boolean = false,
         paywallConfigured: Boolean = true,
-        remoteConfig: RemoteConfigProvider = NoOpRemoteConfigProvider(),
+        // Legacy first-checklist A/B tests assert the CONTROL arm (static auto-create), so the
+        // activation bundle defaults OFF here. The activation tests pass an RC fake with it ON.
+        remoteConfig: RemoteConfigProvider = NoOpRemoteConfigProvider(activationBundleEnabled = false),
         navigator: AppNavigator = NoOpNavigator(),
     ): SplashViewModel {
         fakeUserData.currentUser = UserData(userId = userId, isOnboardingPassed = isOnboardingPassed)
@@ -133,6 +138,7 @@ class SplashViewModelTest {
             getFirstChecklistVariant = GetFirstChecklistVariantUseCase(remoteConfig, NoOpLogger()),
             checklistRepository = fakeChecklist,
             firstChecklistRepository = fakeFirstChecklist,
+            activationPrefsRepository = fakeActivationPrefs,
         )
     }
 
@@ -476,6 +482,74 @@ class SplashViewModelTest {
     }
 
     // ============================================================
+    // Activation bundle (activation_bundle_v1) — auto-create gating
+    // ============================================================
+
+    /**
+     * Activation bundle ON: a brand-new user must NOT get the static starter checklist (they land
+     * on the empty MainScreen → AI first-run hero instead), and must be marked new-user-pending so
+     * the first AI checklist later triggers the activation funnel.
+     */
+    @Test
+    fun applyFirstChecklistExperiment_activationOn_newUser_skipsAutoCreate_marksPending() = testScope.runTest {
+        fakeUserData.nextRegistration = RegistrationData(
+            userData = UserData(userId = "new-uuid", isOnboardingPassed = true),
+            isNewUser = true,
+        )
+
+        createViewModel(
+            userId = "",
+            isOnboardingPassed = true,
+            remoteConfig = NoOpRemoteConfigProvider(activationBundleEnabled = true),
+        )
+        advanceUntilIdle()
+
+        assertTrue(
+            fakeChecklist.addedChecklists.isEmpty(),
+            "activation bundle ON must SKIP the static auto-create starter checklist",
+        )
+        assertFalse(
+            fakeFirstChecklist.markedUids.contains("new-uuid"),
+            "activation bundle ON must not mark the legacy first-checklist seed flag",
+        )
+        assertTrue(
+            fakeActivationPrefs.pendingUids.contains("new-uuid"),
+            "activation bundle ON must mark the new user pending for the first-AI-checklist funnel",
+        )
+    }
+
+    /**
+     * Activation bundle OFF (control arm): the EXACT legacy behavior — a brand-new user in the
+     * AUTO_CREATE treatment enters the static auto-create branch (consults the per-uid seed gate),
+     * and is NOT marked new-user-pending. Proves the flag is a clean reversible switch.
+     */
+    @Test
+    fun applyFirstChecklistExperiment_activationOff_newUser_performsLegacyAutoCreate() = testScope.runTest {
+        fakeUserData.nextRegistration = RegistrationData(
+            userData = UserData(userId = "new-uuid", isOnboardingPassed = true),
+            isNewUser = true,
+        )
+
+        createViewModel(
+            userId = "",
+            isOnboardingPassed = true,
+            remoteConfig = NoOpRemoteConfigProvider(activationBundleEnabled = false),
+        )
+        advanceUntilIdle()
+
+        // Same observable as the legacy auto-create test: the seed gate is consulted before the
+        // (resource-touching) buildFirstChecklist() call, which is the deepest deterministic signal.
+        assertTrue(
+            fakeFirstChecklist.seedCheckedUids.contains("new-uuid"),
+            "activation bundle OFF must enter the legacy auto-create branch (consult the seed gate)",
+        )
+        assertFalse(
+            fakeActivationPrefs.pendingUids.contains("new-uuid"),
+            "activation bundle OFF must NOT mark new-user-pending (no AI-first-run funnel in control arm)",
+        )
+    }
+
+    // ============================================================
     // Test doubles
     // ============================================================
 
@@ -655,7 +729,7 @@ class SplashViewModelTest {
         override fun navigateToEditChecklist(checklistId: Long) {}
         override fun navigateToTemplatesScreen() {}
         override fun navigateToTemplatePreview(templateId: String) {}
-        override fun navigateToAnalyzeScreen(checklistId: Long?, fillDefault: Boolean, initialText: String?) {}
+        override fun navigateToAnalyzeScreen(checklistId: Long?, fillDefault: Boolean, initialText: String?, autoAnalyze: Boolean) {}
         override fun navigateToAnalyzeResultPreview() {}
         override fun navigateToChecklistDetail(checklistId: Long, focusItemId: String?, clearBackStack: Boolean) {}
         override fun navigateToFillDetail(fillId: Long, clearBackStack: Boolean) {}
@@ -695,7 +769,7 @@ class SplashViewModelTest {
         override fun navigateToEditChecklist(checklistId: Long) {}
         override fun navigateToTemplatesScreen() {}
         override fun navigateToTemplatePreview(templateId: String) {}
-        override fun navigateToAnalyzeScreen(checklistId: Long?, fillDefault: Boolean, initialText: String?) {}
+        override fun navigateToAnalyzeScreen(checklistId: Long?, fillDefault: Boolean, initialText: String?, autoAnalyze: Boolean) {}
         override fun navigateToAnalyzeResultPreview() {}
         override fun navigateToChecklistDetail(checklistId: Long, focusItemId: String?, clearBackStack: Boolean) {}
         override fun navigateToFillDetail(fillId: Long, clearBackStack: Boolean) {}
@@ -736,11 +810,25 @@ class SplashViewModelTest {
         override fun event(name: String, params: Map<String, Any>) {}
     }
 
-    private class NoOpRemoteConfigProvider : RemoteConfigProvider {
+    private class NoOpRemoteConfigProvider(
+        private val activationBundleEnabled: Boolean = false,
+    ) : RemoteConfigProvider {
         override suspend fun fetchAndActivate(): Boolean = true
         override fun getString(key: String, defaultValue: String): String = defaultValue
-        override fun getBoolean(key: String, defaultValue: Boolean): Boolean = defaultValue
+        override fun getBoolean(key: String, defaultValue: Boolean): Boolean =
+            if (key == RemoteConfigKeys.ACTIVATION_BUNDLE_V1) activationBundleEnabled else defaultValue
         override fun getLong(key: String, defaultValue: Long): Long = defaultValue
+    }
+
+    private class FakeActivationPrefsRepository : ActivationPrefsRepository {
+        val pendingUids = mutableSetOf<String>()
+        val shownUids = mutableSetOf<String>()
+
+        override suspend fun isNewUserPending(uid: String): Boolean = uid in pendingUids
+        override suspend fun setNewUserPending(uid: String) { pendingUids += uid }
+        override suspend fun clearNewUserPending(uid: String) { pendingUids -= uid }
+        override suspend fun isReminderOptInShown(uid: String): Boolean = uid in shownUids
+        override suspend fun markReminderOptInShown(uid: String) { shownUids += uid }
     }
 
     /**
