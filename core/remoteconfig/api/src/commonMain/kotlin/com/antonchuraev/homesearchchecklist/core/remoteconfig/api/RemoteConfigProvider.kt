@@ -15,6 +15,16 @@ interface RemoteConfigProvider {
     suspend fun fetchAndActivate(): Boolean
 
     /**
+     * The exception from the most recent [fetchAndActivate] call, or null if it succeeded.
+     *
+     * Surfaced into onboarding analytics so a production-only RC fetch failure — e.g. a
+     * Google-Play-signed build whose SHA is unknown to App Check / API-key restrictions,
+     * which never reproduces on a debug/emulator build — is diagnosable without device logcat.
+     * Default null for platforms and test fakes that don't track it.
+     */
+    fun lastFetchError(): Throwable? = null
+
+    /**
      * Gets a boolean feature flag value.
      */
     fun getBoolean(key: String, defaultValue: Boolean = false): Boolean

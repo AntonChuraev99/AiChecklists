@@ -1,6 +1,8 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation
 
 import com.antonchuraev.homesearchchecklist.core.auth.api.GoogleAuthRepository
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
@@ -208,13 +210,35 @@ class MainScreenViewModel(
 
     private fun handleSignInClick() {
         viewModelScope.launch {
+            // Click — the funnel entry. Pairs with login_success / login_failed so the drop-off
+            // and the exact failure (error_code + error_message) are visible in analytics instead
+            // of only as a "couldn't sign in" snackbar with no cause.
+            analyticsTracker.event(AnalyticsEvents.Auth.LOGIN_STARTED)
             val result = googleAuthRepository.signInWithGoogle()
             result.onSuccess { googleUser ->
-                val idToken = googleAuthRepository.getIdToken() ?: return@launch
+                val idToken = googleAuthRepository.getIdToken()
+                if (idToken == null) {
+                    // Google credential obtained but Firebase token missing — a distinct failure
+                    // from a cancelled/blocked sign-in; surface it rather than returning silently.
+                    analyticsTracker.event(
+                        AnalyticsEvents.Auth.LOGIN_FAILED,
+                        mapOf(AnalyticsParams.ERROR_CODE to "null_id_token"),
+                    )
+                    _sideEffect.emit(MainScreenSideEffect.ShowSnackbar("google_sign_in_failed"))
+                    return@launch
+                }
                 val platform = getPlatformName()
                 userDataRepository.linkGoogleAccount(idToken, platform)
+                analyticsTracker.event(AnalyticsEvents.Auth.LOGIN_SUCCESS)
                 _sideEffect.emit(MainScreenSideEffect.ShowSnackbar("google_sign_in_success"))
-            }.onFailure {
+            }.onFailure { e ->
+                analyticsTracker.event(
+                    AnalyticsEvents.Auth.LOGIN_FAILED,
+                    buildMap {
+                        put(AnalyticsParams.ERROR_CODE, e::class.simpleName ?: "unknown")
+                        e.message?.let { put(AnalyticsParams.ERROR_MESSAGE, it) }
+                    },
+                )
                 _sideEffect.emit(MainScreenSideEffect.ShowSnackbar("google_sign_in_failed"))
             }
         }

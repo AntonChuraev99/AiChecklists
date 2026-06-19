@@ -86,6 +86,7 @@ class SplashViewModel(
 
             var rcActivated: Boolean? = null
             var rcFetchMs: Long? = null
+            var rcError: String? = null
             if (!userData.isOnboardingPassed) {
                 // Reactively await the real fetch — NO fixed timeout cap. fetchAndActivate()
                 // suspends exactly until the fetch completes: fast network ~1s, slow cold-start
@@ -101,11 +102,17 @@ class SplashViewModel(
                 }
                 rcActivated = activated
                 rcFetchMs = fetchDuration.inWholeMilliseconds
+                val fetchError = remoteConfigProvider.lastFetchError()
+                rcError = fetchError?.let { "${it::class.simpleName}: ${it.message}" }
                 if (!activated) {
-                    logger.warning(
+                    // Not swallowed anymore: record the real exception so a prod-only signing /
+                    // App Check fetch rejection lands in Crashlytics AND in the
+                    // onboarding_rc_resolved.rc_error analytics param. Reproducible on the Play
+                    // internal-test track, which is signed with the Google Play App Signing key.
+                    logger.error(
                         TAG,
-                        "RC fetchAndActivate did not complete before onboarding (network slow/unreachable) — " +
-                            "variant falls back to client default",
+                        "RC fetchAndActivate failed before onboarding (variant falls back to client default) — rcError=$rcError",
+                        fetchError,
                     )
                 }
                 log("fetchAndActivate (onboarding pending) activated=$activated took ${fetchDuration.inWholeMilliseconds}ms, hasUserId=${userData.userId.isNotBlank()}")
@@ -117,7 +124,7 @@ class SplashViewModel(
             // already carries the `first_checklist_variant` user property.
             applyFirstChecklistExperiment(userData, isNewUser)
 
-            navigateTo(userData.isOnboardingPassed, rcActivated, rcFetchMs)
+            navigateTo(userData.isOnboardingPassed, rcActivated, rcFetchMs, rcError)
         }
     }
 
@@ -140,6 +147,7 @@ class SplashViewModel(
         isOnboardingPassed: Boolean,
         rcActivated: Boolean? = null,
         rcFetchMs: Long? = null,
+        rcError: String? = null,
     ) {
         try {
             with(appNavigator) {
@@ -166,6 +174,7 @@ class SplashViewModel(
                             put(AnalyticsParams.RC_VALUE_EMPTY, rawRcValue.isEmpty())
                             rcActivated?.let { put(AnalyticsParams.RC_ACTIVATED, it) }
                             rcFetchMs?.let { put(AnalyticsParams.FETCH_MS, it) }
+                            rcError?.let { put(AnalyticsParams.RC_ERROR, it) }
                         },
                     )
                     when (variant) {

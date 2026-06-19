@@ -45,6 +45,15 @@ object AnalyticsEvents {
         const val RC_RESOLVED = "onboarding_rc_resolved"
     }
 
+    // ─── Authentication (Google Sign-In) ─────────────────────────────────────
+    object Auth {
+        const val LOGIN_STARTED = "login_started"   // user tapped "Sign in with Google"
+        const val LOGIN_SUCCESS = "login_success"   // Firebase signInWithCredential succeeded
+        // Carries ERROR_CODE (stable Credential Manager type / exception class) + ERROR_MESSAGE.
+        // A Play-signed build whose SHA-1 isn't a registered OAuth client fails here.
+        const val LOGIN_FAILED = "login_failed"
+    }
+
     // ─── Checklist & fill lifecycle ──────────────────────────────────────────
     object Checklist {
         const val CREATED = "checklist_created"
@@ -256,9 +265,15 @@ object AnalyticsParams {
     const val RC_ACTIVATED = "rc_activated"
     const val RC_VALUE_EMPTY = "rc_value_empty"
     const val FETCH_MS = "fetch_ms"
+    // Exception class + message when fetchAndActivate() fails (prod-only signing/App Check fetch failure)
+    const val RC_ERROR = "rc_error"
 
     // Activation bundle — which hero template chip was tapped (e.g. "trip", "groceries").
     const val CHIP_KEY = "chip_key"
+
+    // Generic error diagnostics (login_failed etc.): code = stable type/class id, message = human text.
+    const val ERROR_CODE = "error_code"
+    const val ERROR_MESSAGE = "error_message"
 }
 
 /**

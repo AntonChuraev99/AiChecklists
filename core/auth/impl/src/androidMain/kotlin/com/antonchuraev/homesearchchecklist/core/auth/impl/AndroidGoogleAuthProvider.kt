@@ -92,8 +92,12 @@ internal class AndroidGoogleAuthProvider(
                 Result.failure(IllegalStateException(err))
             }
         } catch (e: GetCredentialException) {
+            // Carry the STABLE Credential Manager type (e.type is a constant string id, NOT
+            // obfuscated by R8) + the human message up to the ViewModel, so login_failed analytics
+            // are diagnosable on a release/Play build. A Play-signed binary whose SHA-1 isn't a
+            // registered OAuth client typically surfaces here as a no-credential / provider-config type.
             _authState.value = GoogleAuthState.NotAuthenticated
-            Result.failure(e)
+            Result.failure(Exception("${e.type}: ${e.errorMessage ?: e.message ?: "no message"}", e))
         } catch (e: Exception) {
             _authState.value = GoogleAuthState.Error(e.message ?: "Sign-in failed")
             Result.failure(e)

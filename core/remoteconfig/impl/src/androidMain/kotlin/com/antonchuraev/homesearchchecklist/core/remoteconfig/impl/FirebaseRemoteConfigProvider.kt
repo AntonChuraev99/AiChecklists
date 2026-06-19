@@ -56,10 +56,20 @@ class FirebaseRemoteConfigProvider : RemoteConfigProvider {
         RemoteConfigKeys.ACTIVATION_BUNDLE_V1 to RemoteConfigDefaults.ACTIVATION_BUNDLE_V1,
     )
 
+    @Volatile
+    private var lastError: Throwable? = null
+
+    override fun lastFetchError(): Throwable? = lastError
+
     override suspend fun fetchAndActivate(): Boolean {
         return try {
-            remoteConfig.fetchAndActivate().await()
+            remoteConfig.fetchAndActivate().await().also { lastError = null }
         } catch (e: Exception) {
+            // Do NOT swallow: capture the real cause so onboarding diagnostics can report it.
+            // A Play-signed build rejected by App Check / API-key SHA restrictions fails here
+            // with a 403-class FirebaseRemoteConfigServerException; without this the onboarding
+            // A/B silently collapses to the empty client default (always "slides").
+            lastError = e
             false
         }
     }
