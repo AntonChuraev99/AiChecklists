@@ -315,6 +315,9 @@ fun MainScreen(
                             onSignInClick = {
                                 viewModel.sendIntent(MainScreenIntent.OnSignInClick)
                             },
+                            onDismissSyncBanner = {
+                                viewModel.sendIntent(MainScreenIntent.OnDismissSyncBanner)
+                            },
                             activationEnabled = activationEnabled,
                             onActivationGenerate = { prompt -> onActivationGenerate?.invoke(prompt) },
                             onActivationChipTapped = { key, prompt -> onActivationChipTapped?.invoke(key, prompt) },

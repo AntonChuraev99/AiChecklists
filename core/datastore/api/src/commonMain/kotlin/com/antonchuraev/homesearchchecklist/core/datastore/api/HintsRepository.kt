@@ -19,4 +19,15 @@ interface HintsRepository {
 
     /** Mark the hamburger-pulse hint as permanently shown. Idempotent. */
     suspend fun markHamburgerHintShown()
+
+    /**
+     * Emits the lifetime number of times the user has dismissed the sync-account
+     * banner. While the count is below the permanent-hide threshold the banner can
+     * reappear after a process restart; once the user has dismissed it enough times
+     * it is hidden forever. Defaults to `0` for new installs. Never throws.
+     */
+    val syncBannerDismissCount: Flow<Int>
+
+    /** Increment the persistent sync-banner dismiss count by one. */
+    suspend fun incrementSyncBannerDismissCount()
 }

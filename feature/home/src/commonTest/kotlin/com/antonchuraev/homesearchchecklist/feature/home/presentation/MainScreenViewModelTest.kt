@@ -59,13 +59,23 @@ import kotlin.test.assertTrue
 
 // ─── Fakes ───────────────────────────────────────────────────────────────────
 
-private class FakeHintsRepository(initialShown: Boolean = false) : HintsRepository {
+private class FakeHintsRepository(
+    initialShown: Boolean = false,
+    initialDismissCount: Int = 0,
+) : HintsRepository {
     var marked = false
     private val _state = MutableStateFlow(initialShown)
     override val hamburgerHintShown: Flow<Boolean> = _state
     override suspend fun markHamburgerHintShown() {
         marked = true
         _state.value = true
+    }
+
+    private val _dismissCount = MutableStateFlow(initialDismissCount)
+    override val syncBannerDismissCount: Flow<Int> = _dismissCount
+    val dismissCountValue: Int get() = _dismissCount.value
+    override suspend fun incrementSyncBannerDismissCount() {
+        _dismissCount.value += 1
     }
 }
 
@@ -123,8 +133,10 @@ private class FakeNavigator : AppNavigator {
     override fun navigateToAddToChecklistPicker(text: String, purpose: com.antonchuraev.homesearchchecklist.core.navigation.api.AddToChecklistPurpose) {}
 }
 
-private class FakeChecklistRepository : ChecklistRepository {
-    override val checklists: Flow<List<Checklist>> = flowOf(emptyList())
+private class FakeChecklistRepository(
+    initialChecklists: List<Checklist> = emptyList(),
+) : ChecklistRepository {
+    override val checklists: Flow<List<Checklist>> = flowOf(initialChecklists)
     override val weeklyChecklistCount: Flow<Int> = flowOf(0)
     override suspend fun addChecklist(checklist: Checklist): Long = 0L
     override suspend fun updateChecklist(checklist: Checklist) {}
@@ -210,8 +222,11 @@ private class FakeAnalyticsTracker : AnalyticsTracker {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalCoroutinesApi::class)
-private fun makeViewModel(hintsRepository: HintsRepository): MainScreenViewModel {
-    val fakeChecklistRepo = FakeChecklistRepository()
+private fun makeViewModel(
+    hintsRepository: HintsRepository,
+    checklists: List<Checklist> = emptyList(),
+): MainScreenViewModel {
+    val fakeChecklistRepo = FakeChecklistRepository(checklists)
     val fakePaywallRepo = FakePaywallRepository()
     val fakeUserDataRepo = FakeUserDataRepository()
     val fakeRemoteConfig = FakeRemoteConfigProvider()
@@ -299,4 +314,71 @@ class MainScreenViewModelTest {
             "After OnHamburgerHintCompleted, hint should be hidden in subsequent state"
         )
     }
+
+    // ─── Sync banner visibility ──────────────────────────────────────────────
+
+    @Test
+    fun syncBanner_hidden_whenChecklistListEmpty() = runTest {
+        val vm = makeViewModel(FakeHintsRepository(), checklists = emptyList())
+
+        val state = vm.awaitSuccess()
+
+        assertFalse(state.showSyncBanner, "New user with an empty list must not see the sync banner")
+    }
+
+    @Test
+    fun syncBanner_hidden_whenSingleChecklist() = runTest {
+        val vm = makeViewModel(FakeHintsRepository(), checklists = checklists(1))
+
+        val state = vm.awaitSuccess()
+
+        assertFalse(
+            state.showSyncBanner,
+            "A single (typically auto-created) checklist isn't worth syncing — banner stays hidden"
+        )
+    }
+
+    @Test
+    fun syncBanner_shown_whenMoreThanOneChecklist_andNotGoogleLinked() = runTest {
+        val vm = makeViewModel(FakeHintsRepository(), checklists = checklists(2))
+
+        val state = vm.awaitSuccess()
+
+        assertTrue(
+            state.showSyncBanner,
+            "Once the user has >1 checklist and isn't signed in, the sync banner should appear"
+        )
+    }
+
+    @Test
+    fun syncBanner_hidden_whenDismissCountAtPermanentThreshold() = runTest {
+        // 3 lifetime dismissals = permanent hide, even with multiple checklists and a fresh session.
+        val vm = makeViewModel(
+            FakeHintsRepository(initialDismissCount = 3),
+            checklists = checklists(2),
+        )
+
+        val state = vm.awaitSuccess()
+
+        assertFalse(state.showSyncBanner, "After 3 lifetime dismissals the banner never shows again")
+    }
+
+    @Test
+    fun onDismissSyncBanner_hidesBannerThisSession_andIncrementsCount() = runTest {
+        val hints = FakeHintsRepository(initialDismissCount = 0)
+        val vm = makeViewModel(hints, checklists = checklists(2))
+
+        val before = vm.awaitSuccess()
+        assertTrue(before.showSyncBanner, "Precondition: banner visible before dismiss")
+
+        vm.sendIntent(MainScreenIntent.OnDismissSyncBanner)
+
+        val after = vm.awaitSuccess()
+        assertFalse(after.showSyncBanner, "Dismiss hides the banner for the rest of this session")
+        assertEquals(1, hints.dismissCountValue, "Dismiss must bump the persistent lifetime count")
+    }
 }
+
+/** Builds [count] minimal checklists for sync-banner visibility tests. */
+private fun checklists(count: Int): List<Checklist> =
+    (1..count).map { Checklist(id = it.toLong(), name = "List $it", items = emptyList()) }

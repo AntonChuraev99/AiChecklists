@@ -1149,6 +1149,7 @@
     <!-- Google Auth / Sync -->
     <string name="sync_banner_title">Синхронизируйте чеклисты</string>
     <string name="sync_banner_description">Войдите через Google, чтобы открывать списки с любого устройства</string>
+    <string name="sync_banner_dismiss">Скрыть баннер синхронизации</string>
     <string name="web_credits_banner_title">Получите 100 бесплатных AI-кредитов</string>
     <string name="web_credits_banner_description">Войдите через Google, чтобы использовать AI</string>
     <string name="drawer_sign_in">Войти</string>

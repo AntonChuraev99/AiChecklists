@@ -89,6 +89,9 @@ private fun previewSuccessState(
         isPremium = isPremium,
     ),
     isGoogleLinked = false,
+    // Mirror the ViewModel's derived condition so the free-user preview keeps showing the banner:
+    // not linked + more than one checklist (a brand-new single-list user wouldn't see it).
+    showSyncBanner = checklists.size > 1,
 )
 
 private fun previewChecklists(): List<ChecklistWithProgress> = listOf(

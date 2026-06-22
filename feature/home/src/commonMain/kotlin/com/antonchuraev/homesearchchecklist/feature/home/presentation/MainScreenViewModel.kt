@@ -47,6 +47,14 @@ class MainScreenViewModel(
 
     private val _showLimitDialog = MutableStateFlow(false)
 
+    /**
+     * Session-only "hide until restart" for the sync banner. Set when the user dismisses the
+     * banner; it resets to false on process restart because the ViewModel is recreated — that
+     * is exactly the desired "1 dismiss hides it until the next launch" behavior. The lifetime
+     * dismiss count that drives the permanent hide lives in [HintsRepository].
+     */
+    private val _syncBannerDismissedThisSession = MutableStateFlow(false)
+
     private val _sideEffect = MutableSharedFlow<MainScreenSideEffect>(extraBufferCapacity = 16)
     val sideEffect: Flow<MainScreenSideEffect> = _sideEffect.asSharedFlow()
 
@@ -95,10 +103,20 @@ class MainScreenViewModel(
             getUserLimitsUseCase(),
             _showLimitDialog,
             hintsRepository.hamburgerHintShown,
-        ) { userLimits, showLimitDialog, hintShown ->
-            Triple(userLimits, showLimitDialog, hintShown)
+            hintsRepository.syncBannerDismissCount,
+            _syncBannerDismissedThisSession,
+        ) { userLimits, showLimitDialog, hintShown, syncDismissCount, syncDismissedThisSession ->
+            HomeFlags(userLimits, showLimitDialog, hintShown, syncDismissCount, syncDismissedThisSession)
         }
-    ) { (checklists, subscriptionStatus, userData), (userLimits, showLimitDialog, hintShown) ->
+    ) { (checklists, subscriptionStatus, userData), flags ->
+        // The sync banner is for users with something worth syncing: shown only once the user has
+        // more than one checklist (an empty list / single auto-created checklist isn't nagged),
+        // never when already Google-linked, suppressed for this session once dismissed, and hidden
+        // forever after enough lifetime dismissals.
+        val showSyncBanner = !userData.isGoogleLinked &&
+            checklists.size > SYNC_BANNER_MIN_CHECKLISTS &&
+            flags.syncBannerDismissCount < SYNC_BANNER_MAX_DISMISSALS &&
+            !flags.syncBannerDismissedThisSession
         MainScreenState.Success(
             checklists = checklists,
             subscriptionStatus = subscriptionStatus,
@@ -106,12 +124,13 @@ class MainScreenViewModel(
                 formatExpirationDate(it)
             },
             aiCredits = userData.aiCredits,
-            userLimits = userLimits,
-            showLimitReachedDialog = showLimitDialog,
-            showHamburgerHint = !hintShown,
+            userLimits = flags.userLimits,
+            showLimitReachedDialog = flags.showLimitDialog,
+            showHamburgerHint = !flags.hamburgerHintShown,
             isGoogleLinked = userData.isGoogleLinked,
             googleEmail = userData.googleEmail,
             googleDisplayName = userData.googleDisplayName,
+            showSyncBanner = showSyncBanner,
         )
     }.defaultStateIn(MainScreenState.Loading)
 
@@ -140,7 +159,18 @@ class MainScreenViewModel(
             }
             MainScreenIntent.OnSignInClick -> handleSignInClick()
             MainScreenIntent.OnSignOutClick -> handleSignOutClick()
+            MainScreenIntent.OnDismissSyncBanner -> handleDismissSyncBanner()
         }
+    }
+
+    /**
+     * Dismiss the sync banner: hide it for this session (in-memory, resets on restart) and bump
+     * the persistent lifetime count so that after [SYNC_BANNER_MAX_DISMISSALS] dismissals it never
+     * shows again. The banner vanishing from the list is the visible feedback for the tap.
+     */
+    private fun handleDismissSyncBanner() {
+        _syncBannerDismissedThisSession.update { true }
+        viewModelScope.launch { hintsRepository.incrementSyncBannerDismissCount() }
     }
 
     /**
@@ -251,6 +281,30 @@ class MainScreenViewModel(
             userDataRepository.clearGoogleAccountData()
         }
     }
+
+    private companion object {
+        /**
+         * The sync banner stays hidden until the user has MORE than this many checklists. At 1 the
+         * user typically only has the auto-created starter list (or none at all and sees the
+         * activation hero), so there is nothing worth syncing yet — keep the first-run quiet.
+         */
+        const val SYNC_BANNER_MIN_CHECKLISTS = 1
+
+        /** After this many lifetime dismissals the sync banner never appears again. */
+        const val SYNC_BANNER_MAX_DISMISSALS = 3
+    }
 }
+
+/**
+ * Second flow group for [MainScreenViewModel.screenState] — Kotlin has no 5-arity tuple, so the
+ * five UX/limit flows are folded into a named holder for a readable `combine` transform.
+ */
+private data class HomeFlags(
+    val userLimits: UserLimits?,
+    val showLimitDialog: Boolean,
+    val hamburgerHintShown: Boolean,
+    val syncBannerDismissCount: Int,
+    val syncBannerDismissedThisSession: Boolean,
+)
 
 

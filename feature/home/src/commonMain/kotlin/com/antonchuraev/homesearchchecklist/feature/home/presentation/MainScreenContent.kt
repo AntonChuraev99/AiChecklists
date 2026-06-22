@@ -89,6 +89,7 @@ fun MainScreenContent(
     onExitEditMode: () -> Unit,
     onReorderChecklists: (List<Long>) -> Unit = {},
     onSignInClick: () -> Unit = {},
+    onDismissSyncBanner: () -> Unit = {},
     // Activation bundle (RC flag activation_bundle_v1): when true AND the list is empty, the empty
     // state is replaced by the AI first-run hero (prompt + template chips). When false the plain
     // EmptyState is shown (legacy behavior). Wired from App.kt.
@@ -115,6 +116,7 @@ fun MainScreenContent(
             onEnterEditMode = onEnterEditMode,
             onReorderChecklists = onReorderChecklists,
             onSignInClick = onSignInClick,
+            onDismissSyncBanner = onDismissSyncBanner,
             activationEnabled = activationEnabled,
             onActivationGenerate = onActivationGenerate,
             onActivationChipTapped = onActivationChipTapped,
@@ -150,6 +152,7 @@ private fun MainScreenContentLazyColumn(
     onEnterEditMode: () -> Unit,
     onReorderChecklists: (List<Long>) -> Unit,
     onSignInClick: () -> Unit = {},
+    onDismissSyncBanner: () -> Unit = {},
     activationEnabled: Boolean = false,
     onActivationGenerate: (String) -> Unit = {},
     onActivationChipTapped: (String, String) -> Unit = { _, _ -> },
@@ -169,7 +172,11 @@ private fun MainScreenContentLazyColumn(
     // always precedes the cards when the list is non-empty.
     // The loud "Premium Member" status banner was removed — premium is now shown as a
     // "PRO" prefix on the credits chip (top bar). Free users still get the upgrade banner below.
-    val headerItemCount = (if (screenState.isGoogleLinked) 0 else 1) +
+    // The sync banner occupies the first index only when shown (showSyncBanner gates it on
+    // not-linked + >1 checklist + not dismissed), so the reorder offset must track that exact
+    // condition — using isGoogleLinked here would mis-offset drag indices once the banner is
+    // dismissed or suppressed for new users.
+    val headerItemCount = (if (screenState.showSyncBanner) 1 else 0) +
         1 // "My lists" section header
 
     val reorderableState = rememberReorderableLazyListState(lazyListState) { from, to ->
@@ -207,9 +214,12 @@ private fun MainScreenContentLazyColumn(
         ),
         verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
     ) {
-        if (!screenState.isGoogleLinked) {
+        if (screenState.showSyncBanner) {
             item(key = "sync_banner") {
-                SyncAccountBanner(onSignInClick = onSignInClick)
+                SyncAccountBanner(
+                    onSignInClick = onSignInClick,
+                    onDismiss = onDismissSyncBanner,
+                )
             }
         }
 

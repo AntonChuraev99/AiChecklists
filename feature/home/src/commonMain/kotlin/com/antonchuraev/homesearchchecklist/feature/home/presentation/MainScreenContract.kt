@@ -38,6 +38,13 @@ sealed interface MainScreenState : State {
         val isGoogleLinked: Boolean = false,
         val googleEmail: String? = null,
         val googleDisplayName: String? = null,
+        /**
+         * True when the sign-in/sync banner should be shown. Derived in the ViewModel from:
+         * not Google-linked, more than one checklist (a brand-new user with an empty list or a
+         * single auto-created checklist is not nagged), the lifetime dismiss count is below the
+         * permanent-hide threshold, and the banner wasn't dismissed in this session.
+         */
+        val showSyncBanner: Boolean = false,
     ) : MainScreenState
 }
 
@@ -72,6 +79,10 @@ sealed interface MainScreenIntent : Intent {
     data object OnSignOutClick : MainScreenIntent
 
     data object OnAiChatClick : MainScreenIntent
+
+    /** Emitted when the user taps the sync-banner close button. Hides it for this session
+     *  (in-memory) and increments the persistent lifetime dismiss count. */
+    data object OnDismissSyncBanner : MainScreenIntent
 }
 
 sealed interface MainScreenSideEffect : SideEffect {

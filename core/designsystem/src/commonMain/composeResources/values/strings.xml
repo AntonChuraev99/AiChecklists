@@ -1295,6 +1295,7 @@
     <!-- Google Auth / Sync -->
     <string name="sync_banner_title">Sync your checklists</string>
     <string name="sync_banner_description">Sign in with Google to access your lists from any device</string>
+    <string name="sync_banner_dismiss">Dismiss sync banner</string>
     <string name="web_credits_banner_title">Get 100 free AI credits</string>
     <string name="web_credits_banner_description">Sign in with Google to unlock AI features</string>
     <string name="drawer_sign_in">Sign In</string>
