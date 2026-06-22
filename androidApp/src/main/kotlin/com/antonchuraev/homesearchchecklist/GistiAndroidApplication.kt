@@ -12,8 +12,8 @@ import org.koin.core.context.startKoin
  * Android-specific Application subclass for the :androidApp module.
  *
  * Extends [GistiApplication] (which lives in :composeApp's androidMain) and
- * adds androidApp-specific Koin bindings:
- *   - widgetModule (WidgetRepository, WidgetStateManager)
+ * adds androidApp-specific Koin bindings via [androidAppModule]:
+ *   - WidgetRepository, WidgetStateManager (home-screen widget)
  *   - ChecklistReminderScheduler → ReminderScheduler binding
  *
  * Also initializes Amplitude with the build-type API key from BuildConfig

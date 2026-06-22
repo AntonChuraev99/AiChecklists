@@ -66,6 +66,10 @@ class AppNavigatorImpl : AppNavigator {
         replaceStack(AppNavRoute.InteractiveOnboarding)
     }
 
+    override fun navigateToWelcomeOnboarding() {
+        replaceStack(AppNavRoute.WelcomeOnboarding)
+    }
+
     override fun navigateToMainScreen(clearBackStack: Boolean) {
         if (clearBackStack) {
             replaceStack(AppNavRoute.Main)

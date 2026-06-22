@@ -9,12 +9,16 @@ import kotlin.test.assertEquals
 
 class GetOnboardingVariantUseCaseTest {
 
-    private fun createUseCase(onboardingValue: String): GetOnboardingVariantUseCase {
+    private fun createUseCase(
+        onboardingValue: String,
+        isAndroid: Boolean = true,
+    ): GetOnboardingVariantUseCase {
         return GetOnboardingVariantUseCase(
             remoteConfigProvider = FakeRemoteConfigProvider(
                 onboardingValue = onboardingValue
             ),
             logger = NoOpLogger(),
+            isAndroid = isAndroid,
         )
     }
 
@@ -63,6 +67,26 @@ class GetOnboardingVariantUseCaseTest {
         assertEquals(GetOnboardingVariantUseCase.OnboardingVariant.NONE, result)
     }
 
+    @Test
+    fun invoke_aiWelcomeValue_onAndroid_returnsAiWelcome() {
+        val useCase = createUseCase("ai_welcome", isAndroid = true)
+
+        val result = useCase()
+
+        assertEquals(GetOnboardingVariantUseCase.OnboardingVariant.AI_WELCOME, result)
+    }
+
+    @Test
+    fun invoke_aiWelcomeValue_onNonAndroid_fallsBackToDefault() {
+        // The "ai_welcome" flow is Android-only — web/iOS must degrade to slides so the RC value
+        // can ship globally without breaking platforms that have no WelcomeOnboarding route.
+        val useCase = createUseCase("ai_welcome", isAndroid = false)
+
+        val result = useCase()
+
+        assertEquals(GetOnboardingVariantUseCase.OnboardingVariant.DEFAULT, result)
+    }
+
     /**
      * Guards against the historical bug where the client default was "interactive":
      * every user with stale Remote Config silently landed in the interactive treatment,
@@ -78,6 +102,7 @@ class GetOnboardingVariantUseCaseTest {
         val useCase = GetOnboardingVariantUseCase(
             remoteConfigProvider = PassThroughDefaultProvider(),
             logger = NoOpLogger(),
+            isAndroid = true,
         )
 
         val result = useCase()

@@ -528,6 +528,7 @@ class ChecklistDetailSmartAddTest {
         override fun onBack() {}
         override fun navigateToOnboarding() {}
         override fun navigateToInteractiveOnboarding() {}
+        override fun navigateToWelcomeOnboarding() {}
         override fun navigateToMainScreen(clearBackStack: Boolean) {}
         override fun navigateToDebugMenu() {}
         override fun navigateToStoreScreenshot() {}

@@ -46,6 +46,9 @@ actual fun platformModule(): Module = module {
     // wasmJs builds are always production (no debug menu), so isDebugBuild = false.
     single(named("isDebugBuild")) { false }
 
+    // Not Android — the "ai_welcome" onboarding is Android-only; web degrades to slides.
+    single(named("isAndroid")) { false }
+
     // Firestore sync data source backed by globalThis.__firestore* bridges in init.js.
     single<FirestoreSyncDataSource> { WasmFirestoreSyncDataSource() }
 }

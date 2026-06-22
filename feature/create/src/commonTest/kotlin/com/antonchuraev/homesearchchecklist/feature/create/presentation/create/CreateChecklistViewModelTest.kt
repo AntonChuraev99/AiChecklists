@@ -402,6 +402,7 @@ class CreateChecklistViewModelTest {
         override fun onBack() { backInvoked = true }
         override fun navigateToOnboarding() {}
         override fun navigateToInteractiveOnboarding() {}
+        override fun navigateToWelcomeOnboarding() {}
         override fun navigateToMainScreen(clearBackStack: Boolean) { navigatedToMainScreen = true }
         override fun navigateToDebugMenu() {}
         override fun navigateToStoreScreenshot() {}

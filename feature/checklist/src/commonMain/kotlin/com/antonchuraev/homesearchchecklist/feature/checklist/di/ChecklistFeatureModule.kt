@@ -4,6 +4,8 @@ import com.antonchuraev.homesearchchecklist.core.auth.api.GoogleAuthRepository
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePort
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChatHistoryDao
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistDao
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistFillDao
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.FirestoreSyncDataSource
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.InitialUploadGate
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.SyncRepositoryImpl
@@ -22,6 +24,13 @@ val checklistFeatureModule = module {
     single { RecoverRecurringRemindersUseCase(get(), get(), getOrNull()) }
     single<SmartDateParser> { SmartDateParserImpl(get()) }
     single<ChatHistoryDao> { getChecklistDatabase(get<AttachmentStoragePort>()).chatHistoryDao() }
+    // DAOs exposed as first-class DI definitions so non-repository consumers can
+    // resolve them directly. The Android home-screen widget's WidgetRepository
+    // requires get<ChecklistDao>() / get<ChecklistFillDao>(); without these the
+    // widget crashed at provideGlance with NoDefinitionFoundException → the system
+    // rendered "Couldn't load widget". Same single source as the repositories above.
+    single<ChecklistDao> { getChecklistDatabase(get<AttachmentStoragePort>()).checklistDao() }
+    single<ChecklistFillDao> { getChecklistDatabase(get<AttachmentStoragePort>()).checklistFillDao() }
     single<SyncRepository> {
         val db = getChecklistDatabase(get<AttachmentStoragePort>())
         SyncRepositoryImpl(

@@ -108,7 +108,7 @@ Simple, clear, benefit-focused, action-oriented. Do: "Create Checklist", "Fill v
 
 ## Dependencies & Economics
 
-All dependency versions live in `gradle/libs.versions.toml` — the single source of truth; check it, don't trust a number duplicated in prose. **Gemini SDK is intentionally NOT a client dependency** — all AI inference is server-side. Unit economics: `docs/unit-economics.md` (gemini-2.5-flash-lite ~$0.0002/req, positive at max usage).
+All dependency versions live in `gradle/libs.versions.toml` — the single source of truth; check it, don't trust a number duplicated in prose. **Gemini SDK is intentionally NOT a client dependency** — all AI inference is server-side. Unit economics: `docs/unit-economics.md` (gemini-2.5-flash-lite ~$0.0002/req, positive at max usage). Geo-tiered pricing & organic-growth strategy (India + low-ARPU markets priced at minimal markup to drive organic installs/ratings; **gitignored, business-sensitive**): `docs/pricing-strategy.md`.
 
 | Limit (Remote Config) | Free | Premium |
 |---|---|---|

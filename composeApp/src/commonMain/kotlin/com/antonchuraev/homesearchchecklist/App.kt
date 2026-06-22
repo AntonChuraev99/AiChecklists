@@ -167,6 +167,7 @@ import com.antonchuraev.homesearchchecklist.feature.home.presentation.calendar.C
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.today.TodayRoute
 import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.OnboardingScreen
 import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.interactive.InteractiveOnboardingScreen
+import com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.welcome.WelcomeOnboardingScreen
 import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.AnalyzeScreen
 import com.antonchuraev.homesearchchecklist.feature.analyze.presentation.preview.AnalyzeResultPreviewScreen
 import com.antonchuraev.homesearchchecklist.feature.splash.presentation.SplashScreen
@@ -923,6 +924,10 @@ fun App() {
 
                     entry<AppNavRoute.InteractiveOnboarding> {
                         InteractiveOnboardingScreen()
+                    }
+
+                    entry<AppNavRoute.WelcomeOnboarding> {
+                        WelcomeOnboardingScreen()
                     }
 
                     entry<AppNavRoute.Main>(

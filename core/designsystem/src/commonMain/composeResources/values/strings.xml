@@ -97,6 +97,68 @@
     <string name="onboarding_discover_maybe_later">Maybe Later</string>
     <string name="onboarding_discover_completed">%1$d of %2$d completed</string>
 
+    <!-- AI Welcome onboarding (Toki style) — Android-only variant -->
+    <string name="onboarding_welcome_continue">Continue</string>
+    <string name="onboarding_welcome_create_cta">Create my first list</string>
+    <string name="onboarding_welcome_create_error">Couldn't create your list. Try again.</string>
+    <string name="onboarding_welcome_default_checklist_name">My Checklist</string>
+    <!-- Step 1: Welcome -->
+    <string name="onboarding_welcome_title_lead">Meet your AI</string>
+    <string name="onboarding_welcome_title_accent">checklist assistant</string>
+    <string name="onboarding_welcome_testimonial_quote">"It plans my whole week in one message. I just talk, it organizes."</string>
+    <string name="onboarding_welcome_testimonial_author">Maya, early user</string>
+    <!-- Step 2: Capture -->
+    <string name="onboarding_welcome_capture_title_lead">Just chat.</string>
+    <string name="onboarding_welcome_capture_title_accent">It's done.</string>
+    <string name="onboarding_welcome_capture_lead">Tell Gisti what you need in plain words. It builds the list, sets reminders, and keeps everything in order.</string>
+    <string name="onboarding_welcome_chat_bubble_user">Plan my weekend trip to the coast</string>
+    <string name="onboarding_welcome_chat_bubble_done">Trip checklist ready</string>
+    <!-- Step 3: Value -->
+    <string name="onboarding_welcome_value_title_lead">Snap it.</string>
+    <string name="onboarding_welcome_value_title_accent">List it.</string>
+    <string name="onboarding_welcome_value_lead">Turn a photo, a PDF, or a quick note into a ready-to-use checklist in seconds.</string>
+    <!-- Step 4: First checklist -->
+    <string name="onboarding_welcome_first_title_lead">What should I</string>
+    <string name="onboarding_welcome_first_title_accent">organize first?</string>
+    <string name="onboarding_welcome_first_lead">Type a topic or pick a starter — you can always change it later.</string>
+    <string name="onboarding_welcome_first_input_placeholder">e.g. Weekend groceries</string>
+    <string name="onboarding_welcome_chip_groceries">Groceries</string>
+    <string name="onboarding_welcome_chip_trip">Trip packing</string>
+    <string name="onboarding_welcome_chip_workout">Workout plan</string>
+    <string name="onboarding_welcome_chip_todo">To-do list</string>
+    <string name="onboarding_welcome_checklist_groceries">Groceries</string>
+    <string name="onboarding_welcome_checklist_trip">Trip Packing</string>
+    <string name="onboarding_welcome_checklist_workout">Workout Plan</string>
+    <string name="onboarding_welcome_checklist_todo">To-Do List</string>
+    <!-- Step 4 starter items: pre-filled checklist contents per chip (no AI). -->
+    <string name="onboarding_welcome_items_trip_1">Passport &amp; tickets</string>
+    <string name="onboarding_welcome_items_trip_2">Phone &amp; charger</string>
+    <string name="onboarding_welcome_items_trip_3">Toiletries</string>
+    <string name="onboarding_welcome_items_trip_4">Medications</string>
+    <string name="onboarding_welcome_items_trip_5">Clothes</string>
+    <string name="onboarding_welcome_items_trip_6">Power bank &amp; adapter</string>
+    <string name="onboarding_welcome_items_groceries_1">Milk</string>
+    <string name="onboarding_welcome_items_groceries_2">Bread</string>
+    <string name="onboarding_welcome_items_groceries_3">Eggs</string>
+    <string name="onboarding_welcome_items_groceries_4">Fruits</string>
+    <string name="onboarding_welcome_items_groceries_5">Vegetables</string>
+    <string name="onboarding_welcome_items_groceries_6">Coffee</string>
+    <string name="onboarding_welcome_items_workout_1">Warm-up</string>
+    <string name="onboarding_welcome_items_workout_2">Cardio</string>
+    <string name="onboarding_welcome_items_workout_3">Strength training</string>
+    <string name="onboarding_welcome_items_workout_4">Stretching</string>
+    <string name="onboarding_welcome_items_workout_5">Cool-down</string>
+    <string name="onboarding_welcome_items_todo_1">Top priority task</string>
+    <string name="onboarding_welcome_items_todo_2">Reply to emails</string>
+    <string name="onboarding_welcome_items_todo_3">Plan the day</string>
+    <string name="onboarding_welcome_items_todo_4">Quick break</string>
+    <string name="onboarding_welcome_items_todo_5">Review tomorrow</string>
+    <!-- Default starter items (empty input, no chip): getting-started tips. -->
+    <string name="onboarding_welcome_default_item_1">Tap + to add your own item</string>
+    <string name="onboarding_welcome_default_item_2">Swipe to check things off</string>
+    <string name="onboarding_welcome_default_item_3">Set a reminder so you don't forget</string>
+    <string name="onboarding_welcome_default_item_4">Try AI to fill a list for you</string>
+
     <!-- Navigation Drawer -->
     <string name="drawer_section_navigate">Navigate</string>
     <string name="drawer_section_help">Help &amp; Feedback</string>
@@ -819,6 +881,8 @@
     <string name="debug_onboardings_interactive_desc">Multi-step: category → style → template</string>
     <string name="debug_onboardings_slides_title">Slides Onboarding</string>
     <string name="debug_onboardings_slides_desc">3 pager slides + paywall</string>
+    <string name="debug_onboardings_ai_welcome_title">AI Welcome (Toki)</string>
+    <string name="debug_onboardings_ai_welcome_desc">4 steps: AI-agent hook → create first list</string>
 
     <!-- Screen Catalog -->
     <string name="debug_catalog_title">Screen Catalog</string>

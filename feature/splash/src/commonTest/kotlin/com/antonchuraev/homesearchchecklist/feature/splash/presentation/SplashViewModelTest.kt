@@ -132,7 +132,7 @@ class SplashViewModelTest {
             appScope = testScope,
             logger = NoOpLogger(),
             analyticsTracker = fakeAnalytics,
-            getOnboardingVariant = GetOnboardingVariantUseCase(remoteConfig, NoOpLogger()),
+            getOnboardingVariant = GetOnboardingVariantUseCase(remoteConfig, NoOpLogger(), isAndroid = true),
             completeOnboardingUseCase = CompleteOnboardingUseCase(fakeUserData),
             remoteConfigProvider = remoteConfig,
             getFirstChecklistVariant = GetFirstChecklistVariantUseCase(remoteConfig, NoOpLogger()),
@@ -722,6 +722,7 @@ class SplashViewModelTest {
         override fun onBack() {}
         override fun navigateToOnboarding() {}
         override fun navigateToInteractiveOnboarding() {}
+        override fun navigateToWelcomeOnboarding() {}
         override fun navigateToMainScreen(clearBackStack: Boolean) {}
         override fun navigateToDebugMenu() {}
         override fun navigateToStoreScreenshot() {}
@@ -762,6 +763,7 @@ class SplashViewModelTest {
         override fun onBack() {}
         override fun navigateToOnboarding() { routes += "onboarding" }
         override fun navigateToInteractiveOnboarding() { routes += "interactive_onboarding" }
+        override fun navigateToWelcomeOnboarding() { routes += "welcome_onboarding" }
         override fun navigateToMainScreen(clearBackStack: Boolean) { routes += "main" }
         override fun navigateToDebugMenu() {}
         override fun navigateToStoreScreenshot() {}

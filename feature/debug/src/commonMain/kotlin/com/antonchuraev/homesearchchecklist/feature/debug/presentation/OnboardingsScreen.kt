@@ -53,6 +53,14 @@ fun OnboardingsScreen(
                 isDisabled = false,
                 onClick = { viewModel.sendIntent(OnboardingsIntent.LaunchVariant(OnboardingVariant.Slides)) }
             )
+
+            CatalogItem(
+                testTag = "onboardings_variant_ai_welcome",
+                title = stringResource(Res.string.debug_onboardings_ai_welcome_title),
+                subtitle = stringResource(Res.string.debug_onboardings_ai_welcome_desc),
+                isDisabled = false,
+                onClick = { viewModel.sendIntent(OnboardingsIntent.LaunchVariant(OnboardingVariant.AiWelcome)) }
+            )
         }
     }
 }

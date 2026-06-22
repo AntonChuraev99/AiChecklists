@@ -37,6 +37,9 @@ interface AppNavigator {
 
     fun navigateToInteractiveOnboarding()
 
+    /** Navigate to the Android-only "AI Welcome" onboarding (replaces the splash entry stack). */
+    fun navigateToWelcomeOnboarding()
+
     /**
      * Navigate to main screen, optionally clearing all screens from back stack.
      */

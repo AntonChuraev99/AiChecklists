@@ -11,6 +11,7 @@ data class OnboardingsState(
 enum class OnboardingVariant {
     Interactive,
     Slides,
+    AiWelcome,
 }
 
 sealed interface OnboardingsIntent : Intent {

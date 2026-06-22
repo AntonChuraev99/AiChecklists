@@ -292,6 +292,7 @@ object AnalyticsScreens {
     const val CHAT = "chat"
     const val ONBOARDING = "onboarding"
     const val INTERACTIVE_ONBOARDING = "interactive_onboarding"
+    const val WELCOME_ONBOARDING = "welcome_onboarding"
     const val PAYWALL = "paywall"
     const val PAYWALL_WEB_INSTALL = "paywall_web_install"
     const val SHARE = "share"

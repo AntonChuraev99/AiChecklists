@@ -159,6 +159,7 @@ class SplashViewModel(
                         OnboardingVariant.INTERACTIVE -> "interactive"
                         OnboardingVariant.DEFAULT -> "slides"
                         OnboardingVariant.NONE -> "none"
+                        OnboardingVariant.AI_WELCOME -> "ai_welcome"
                     }
                     analyticsTracker.setUserProperties(mapOf("onboarding_type" to variantName))
                     // Surface RC resolution health so a future "experiment never assigns" bug
@@ -180,6 +181,7 @@ class SplashViewModel(
                     when (variant) {
                         OnboardingVariant.INTERACTIVE -> navigateToInteractiveOnboarding()
                         OnboardingVariant.DEFAULT -> navigateToOnboarding()
+                        OnboardingVariant.AI_WELCOME -> navigateToWelcomeOnboarding()
                         OnboardingVariant.NONE -> {
                             // Skip onboarding entirely; persist as passed so future launches
                             // bypass the variant check even if RC flips back to interactive/default.

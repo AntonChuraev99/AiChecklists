@@ -1236,6 +1236,7 @@ class InteractiveOnboardingViewModelTest {
         override fun onBack() {}
         override fun navigateToOnboarding() {}
         override fun navigateToInteractiveOnboarding() {}
+        override fun navigateToWelcomeOnboarding() {}
         override fun navigateToMainScreen(clearBackStack: Boolean) {
             navigatedToMainScreen = true
             lastMainClearBackStack = clearBackStack

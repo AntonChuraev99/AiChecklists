@@ -27,9 +27,10 @@ import org.koin.dsl.module
 /**
  * Platform-level Koin bindings for composeApp KMP library.
  *
- * NOTE: widgetModule and ReminderScheduler are intentionally NOT included here —
- * they live in :androidApp to avoid circular dependency. GistiAndroidApplication's
- * startKoin{} loads an additional androidAppModule providing those bindings.
+ * NOTE: the widget bindings (WidgetRepository, WidgetStateManager) and
+ * ReminderScheduler are intentionally NOT included here — they live in :androidApp
+ * to avoid a circular dependency. GistiAndroidApplication's startKoin{} loads an
+ * additional androidAppModule providing those bindings.
  */
 actual fun platformModule(): Module = module {
     single { AppContextHolder.context }
@@ -52,6 +53,11 @@ actual fun platformModule(): Module = module {
     // Used by OnboardingViewModel / InteractiveOnboardingViewModel to suppress
     // analytics events when launched from the debug menu.
     single(named("isDebugBuild")) { AppBuildConfig.isDebug }
+
+    // Platform flag for feature modules in commonMain that need to gate Android-only behavior
+    // without depending on the :composeApp expect object. Used by GetOnboardingVariantUseCase to
+    // resolve the Android-only "ai_welcome" onboarding (falls back to slides elsewhere).
+    single(named("isAndroid")) { true }
 
     // Firestore sync data source — Android implementation using the Firebase Android SDK.
     single<FirestoreSyncDataSource> { AndroidFirestoreSyncDataSource() }

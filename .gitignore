@@ -87,6 +87,8 @@ hosting/.firebase/
 
 # Docs (local working notes, some contain API keys)
 docs/
+# Business-sensitive pricing/geo-growth strategy — keep out of public repo even if docs/ is ever un-ignored
+docs/pricing-strategy.md
 SECURITY.md
 SECURITY_DELIVERY_SUMMARY.txt
 

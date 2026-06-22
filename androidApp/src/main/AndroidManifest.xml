@@ -167,6 +167,17 @@
                 <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
             </intent-filter>
         </activity>
+
+        <!-- Invisible activity that toggles a checklist item from the widget. Used via
+             actionStartActivity to avoid the Glance LazyColumn list-adapter trampoline
+             crash (Crashlytics babbf348). Transparent + no history/recents so the user
+             only ever sees the widget update. -->
+        <activity
+            android:name="com.antonchuraev.homesearchchecklist.widget.ToggleItemActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
     </application>
 
 </manifest>

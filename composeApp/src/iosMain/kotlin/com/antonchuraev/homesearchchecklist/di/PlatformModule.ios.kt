@@ -57,5 +57,8 @@ actual fun platformModule(): Module = module {
     // iOS builds are always production (no debug menu), so isDebugBuild = false.
     single(named("isDebugBuild")) { false }
 
+    // Not Android — the "ai_welcome" onboarding is Android-only; iOS degrades to slides.
+    single(named("isAndroid")) { false }
+
     single<FirestoreSyncDataSource> { IosFirestoreSyncDataSource() }
 }
