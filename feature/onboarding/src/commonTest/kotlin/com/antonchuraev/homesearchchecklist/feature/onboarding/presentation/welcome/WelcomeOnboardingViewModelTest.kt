@@ -20,6 +20,7 @@ import com.antonchuraev.homesearchchecklist.feature.user.domain.model.Registrati
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.UserData
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.CompleteOnboardingUseCase
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -290,6 +291,54 @@ class WelcomeOnboardingViewModelTest {
         assertFalse(fakeNavigator.navigatedToChecklistDetail)
     }
 
+    // --- More ways to start (multimodal → Analyze hub) ---
+
+    @Test
+    fun onMoreWaysToStart_completesOnboardingAndOpensAnalyzeHubWithDefaults() = runTest {
+        val vm = createViewModel()
+        // Even with text typed, the card opens the Analyze hub (no prompt forwarded) — it is a
+        // separate entry from the typed/chip CTA branches.
+        vm.onIntent(WelcomeOnboardingIntent.OnInputChanged("ignored by the card"))
+
+        vm.onIntent(WelcomeOnboardingIntent.OnMoreWaysToStart)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Onboarding completed BEFORE the hand-off (user can't return to onboarding from Analyze).
+        assertTrue(fakeUserDataRepository.onboardingMarkedPassed)
+        // Opened the Analyze hub with ALL defaults: no prompt, no auto-analyze, default-fill off —
+        // the hub lets the user pick the input type (Photo/PDF/voice/link) themselves.
+        assertTrue(fakeNavigator.navigatedToAnalyzeScreen)
+        assertNull(fakeNavigator.lastAnalyzeInitialText)
+        assertFalse(fakeNavigator.lastAnalyzeAutoAnalyze)
+        assertFalse(fakeNavigator.lastAnalyzeFillDefault)
+        // The card never creates a checklist itself and never routes to a detail/main screen.
+        assertEquals(0, fakeChecklistRepository.addChecklistCallCount)
+        assertFalse(fakeNavigator.navigatedToChecklistDetail)
+        assertFalse(fakeNavigator.navigatedToMainScreen)
+    }
+
+    @Test
+    fun onMoreWaysToStart_whileCreating_isNoOp() = runTest {
+        // The in-flight guard mirrors handleCreateFirstChecklist: a second trigger while a create is
+        // already running must not double-complete onboarding or fire a second navigation.
+        fakeChecklistRepository.blockAddUntilReleased = true
+        val vm = createViewModel()
+        // Start a create to flip isCreating=true (the fake repo suspends inside addChecklist).
+        vm.onIntent(WelcomeOnboardingIntent.OnCreateFirstChecklist)
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertTrue(vm.screenState.value.isCreating)
+
+        vm.onIntent(WelcomeOnboardingIntent.OnMoreWaysToStart)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Guard held: the card path did not run while a create was in flight.
+        assertFalse(fakeNavigator.navigatedToAnalyzeScreen)
+
+        // Let the parked create finish so no coroutine is left suspended at test teardown.
+        fakeChecklistRepository.releaseAddGate.complete(Unit)
+        testDispatcher.scheduler.advanceUntilIdle()
+    }
+
     // --- Skip ---
 
     @Test
@@ -319,11 +368,17 @@ class WelcomeOnboardingViewModelTest {
         var lastAddedChecklist: Checklist? = null
         private var savedChecklistId: Long? = null
 
+        // When set, addChecklist suspends until [releaseAddGate] completes — lets a test hold the VM
+        // in its isCreating=true window to exercise the in-flight guard.
+        var blockAddUntilReleased = false
+        val releaseAddGate = CompletableDeferred<Unit>()
+
         override val checklists: Flow<List<Checklist>> = flowOf(emptyList())
 
         override suspend fun addChecklist(checklist: Checklist): Long {
             addChecklistCallCount++
             if (shouldThrowOnAdd) throw RuntimeException("Room write error")
+            if (blockAddUntilReleased) releaseAddGate.await()
             lastAddedChecklist = checklist
             savedChecklistId = 1L
             return 1L

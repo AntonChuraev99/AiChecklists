@@ -172,6 +172,13 @@ sealed interface WelcomeOnboardingIntent : Intent {
     data class OnInputChanged(val text: String) : WelcomeOnboardingIntent
     data class OnTemplateSelected(val key: String) : WelcomeOnboardingIntent
     data object OnCreateFirstChecklist : WelcomeOnboardingIntent
+
+    /**
+     * "More ways to start" card on the final step — opens the Analyze hub (Photo/PDF/voice/link)
+     * so the user can seed the first checklist from richer input. Completes onboarding first, then
+     * hands off (mirrors the AI-Analyze branch of [OnCreateFirstChecklist]).
+     */
+    data object OnMoreWaysToStart : WelcomeOnboardingIntent
 }
 
 sealed interface WelcomeOnboardingSideEffect : SideEffect {

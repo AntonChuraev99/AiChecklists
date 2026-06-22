@@ -10,11 +10,17 @@ import aichecklists.core.designsystem.generated.resources.onboarding_welcome_cha
 import aichecklists.core.designsystem.generated.resources.onboarding_welcome_chat_bubble_user
 import aichecklists.core.designsystem.generated.resources.onboarding_welcome_continue
 import aichecklists.core.designsystem.generated.resources.onboarding_welcome_create_cta
+import aichecklists.core.designsystem.generated.resources.onboarding_welcome_create_cta_ai
+import aichecklists.core.designsystem.generated.resources.onboarding_welcome_create_cta_chip
 import aichecklists.core.designsystem.generated.resources.onboarding_welcome_create_error
+import aichecklists.core.designsystem.generated.resources.onboarding_welcome_first_hint_empty
+import aichecklists.core.designsystem.generated.resources.onboarding_welcome_first_hint_typed
 import aichecklists.core.designsystem.generated.resources.onboarding_welcome_first_input_placeholder
 import aichecklists.core.designsystem.generated.resources.onboarding_welcome_first_lead
 import aichecklists.core.designsystem.generated.resources.onboarding_welcome_first_title_accent
 import aichecklists.core.designsystem.generated.resources.onboarding_welcome_first_title_lead
+import aichecklists.core.designsystem.generated.resources.onboarding_welcome_more_ways_sub
+import aichecklists.core.designsystem.generated.resources.onboarding_welcome_more_ways_title
 import aichecklists.core.designsystem.generated.resources.onboarding_welcome_testimonial_author
 import aichecklists.core.designsystem.generated.resources.onboarding_welcome_testimonial_quote
 import aichecklists.core.designsystem.generated.resources.onboarding_welcome_title_accent
@@ -24,6 +30,7 @@ import aichecklists.core.designsystem.generated.resources.onboarding_welcome_val
 import aichecklists.core.designsystem.generated.resources.onboarding_welcome_value_title_lead
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -49,9 +56,9 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -63,6 +70,10 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -83,6 +94,9 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -209,6 +223,9 @@ fun WelcomeOnboardingScreen(
                         onTemplateSelected = {
                             viewModel.sendIntent(WelcomeOnboardingIntent.OnTemplateSelected(it))
                         },
+                        onMoreWays = {
+                            viewModel.sendIntent(WelcomeOnboardingIntent.OnMoreWaysToStart)
+                        },
                     )
                 }
             }
@@ -216,6 +233,8 @@ fun WelcomeOnboardingScreen(
             WelcomeFooter(
                 step = state.currentStep,
                 isCreating = state.isCreating,
+                inputText = state.inputText,
+                selectedTemplateKey = state.selectedTemplateKey,
                 onPrimary = {
                     if (state.currentStep == WelcomeOnboardingStep.FirstChecklist) {
                         viewModel.sendIntent(WelcomeOnboardingIntent.OnCreateFirstChecklist)
@@ -324,25 +343,50 @@ private fun WelcomeProgressBar(
 private fun WelcomeFooter(
     step: WelcomeOnboardingStep,
     isCreating: Boolean,
+    inputText: String,
+    selectedTemplateKey: String?,
     onPrimary: () -> Unit,
 ) {
-    val ctaText = if (step == WelcomeOnboardingStep.FirstChecklist) {
-        stringResource(Res.string.onboarding_welcome_create_cta)
-    } else {
-        stringResource(Res.string.onboarding_welcome_continue)
+    // The final-step CTA label adapts to what the user has chosen (chip / typed text / nothing yet);
+    // every other step keeps the static "Continue". `.isNotBlank()` mirrors the ViewModel's `.trim()`
+    // so the "Create with AI" wording shows exactly when the typed branch will run.
+    val ctaState: WelcomeCtaState = when {
+        step != WelcomeOnboardingStep.FirstChecklist -> WelcomeCtaState.Continue
+        selectedTemplateKey != null -> WelcomeCtaState.CreateChip
+        inputText.isNotBlank() -> WelcomeCtaState.CreateAi
+        else -> WelcomeCtaState.CreateDefault
     }
     Column(modifier = Modifier.padding(AppDimens.SpacingLg)) {
-        AppButton(
-            text = ctaText,
-            onClick = onPrimary,
-            modifier = Modifier.fillMaxWidth(),
-            // Pill CTA — large shape (16dp) per design spec (default AppButton shape is small/8dp).
-            shape = MaterialTheme.shapes.large,
-            // Final step CTA stays enabled even with empty input (the default name keeps the
-            // mandatory step actionable); only the in-flight spinner swallows taps.
-            loading = isCreating,
-        )
+        // Crossfade the label swap (150ms) so the CTA wording changes smoothly as the user types or
+        // picks a chip. `loading` is NOT part of the key — the spinner is owned by AppButton, so an
+        // in-flight create never re-triggers the crossfade.
+        Crossfade(
+            targetState = ctaState,
+            animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing),
+            label = "welcome_cta_label",
+        ) { state ->
+            AppButton(
+                text = stringResource(state.textRes),
+                onClick = onPrimary,
+                modifier = Modifier.fillMaxWidth(),
+                // Spark in the button only on the AI (typed) branch, reinforcing "this goes to AI".
+                icon = if (state == WelcomeCtaState.CreateAi) Icons.Filled.AutoAwesome else null,
+                // Pill CTA — large shape (16dp) per design spec (default AppButton shape is small/8dp).
+                shape = MaterialTheme.shapes.large,
+                // Final step CTA stays enabled even with empty input (the default name keeps the
+                // mandatory step actionable); only the in-flight spinner swallows taps.
+                loading = isCreating,
+            )
+        }
     }
+}
+
+/** The footer CTA's wording variants — drives the [Crossfade] label swap in [WelcomeFooter]. */
+private enum class WelcomeCtaState(val textRes: StringResource) {
+    Continue(Res.string.onboarding_welcome_continue),
+    CreateChip(Res.string.onboarding_welcome_create_cta_chip),
+    CreateAi(Res.string.onboarding_welcome_create_cta_ai),
+    CreateDefault(Res.string.onboarding_welcome_create_cta),
 }
 
 // ---------------------------------------------------------------------------
@@ -441,6 +485,7 @@ private fun FirstChecklistStep(
     selectedTemplateKey: String?,
     onInputChanged: (String) -> Unit,
     onTemplateSelected: (String) -> Unit,
+    onMoreWays: () -> Unit,
 ) {
     // Scrollable: this step has the text field, so when the IME opens the content must scroll to
     // keep the field + chips reachable above the keyboard (the root Column already imePadding()s).
@@ -454,9 +499,9 @@ private fun FirstChecklistStep(
         Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
         LeadText(Res.string.onboarding_welcome_first_lead)
         Spacer(modifier = Modifier.height(AppDimens.SpacingXl))
-        // The free-text field hides when a starter chip is picked (the chip becomes the unambiguous
-        // seed) and reappears when the chip is deselected. Animated height (expand/shrink + fade) so
-        // the swap is smooth — no jump in the column's height.
+        // The free-text field (and its hint) hide when a starter chip is picked (the chip becomes the
+        // unambiguous seed) and reappear when the chip is deselected. Animated height (expand/shrink
+        // + fade) so the swap is smooth — no jump in the column's height.
         AnimatedVisibility(
             visible = selectedTemplateKey == null,
             enter = fadeIn(tween(durationMillis = 220, easing = FastOutSlowInEasing)) +
@@ -464,8 +509,8 @@ private fun FirstChecklistStep(
             exit = fadeOut(tween(durationMillis = 180, easing = FastOutSlowInEasing)) +
                 shrinkVertically(tween(durationMillis = 180, easing = FastOutSlowInEasing)),
         ) {
-            // Field + the gap below it animate together so deselecting/selecting never leaves a
-            // dangling Spacer above the chips.
+            // Field + hint + the gap below them animate together so deselecting/selecting never
+            // leaves a dangling Spacer above the chips.
             Column(modifier = Modifier.fillMaxWidth()) {
                 AppTextField(
                     value = inputText,
@@ -474,7 +519,19 @@ private fun FirstChecklistStep(
                     placeholder = stringResource(Res.string.onboarding_welcome_first_input_placeholder),
                     singleLine = true,
                     showClearButton = true,
+                    // Spark hints the field feeds AI. Brand tint (not theme) — same AI identity as the
+                    // hero/spark marks; AppTextField hardcodes shape=small (8dp), left untouched.
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Filled.AutoAwesome,
+                            contentDescription = null,
+                            tint = BrandIndigo,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    },
                 )
+                Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
+                InputHintRow(inputBlank = inputText.isBlank())
                 Spacer(modifier = Modifier.height(AppDimens.SpacingLg))
             }
         }
@@ -482,6 +539,121 @@ private fun FirstChecklistStep(
             selectedTemplateKey = selectedTemplateKey,
             onTemplateSelected = onTemplateSelected,
         )
+        Spacer(modifier = Modifier.height(AppDimens.SpacingLg))
+        // Visible in every state (incl. chip-selected): the multimodal entry never depends on the
+        // text/chip choice above.
+        MultimodalStartCard(onMoreWays = onMoreWays)
+    }
+}
+
+/**
+ * Helper line under the input field. Before the user types it teases concrete example prompts;
+ * once they start typing it promises the AI generation. Lives inside the field's [AnimatedVisibility]
+ * so it animates in/out together with the field (never a dangling line above the chips).
+ */
+@Composable
+private fun InputHintRow(inputBlank: Boolean) {
+    val hintRes = if (inputBlank) {
+        Res.string.onboarding_welcome_first_hint_empty
+    } else {
+        Res.string.onboarding_welcome_first_hint_typed
+    }
+    Text(
+        text = stringResource(hintRes),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
+/**
+ * "More ways to start" affordance — a tappable card that opens the Analyze hub (Photo/PDF/voice/
+ * link). The four thumbnails on the left are purely decorative (the whole card is one button); the
+ * card is merged into a single Button node for screen readers.
+ */
+@Composable
+private fun MultimodalStartCard(onMoreWays: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.medium)
+            .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.medium)
+            .clickable(onClick = onMoreWays)
+            .semantics(mergeDescendants = true) { role = Role.Button }
+            .padding(AppDimens.SpacingLg),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd),
+    ) {
+        MultimodalThumbnailStack()
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = stringResource(Res.string.onboarding_welcome_more_ways_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Spacer(modifier = Modifier.width(AppDimens.SpacingXs))
+                // Small spark badge — brand gradient, marks this as the AI-powered entry.
+                Box(
+                    modifier = Modifier
+                        .size(20.dp)
+                        .clip(CircleShape)
+                        .background(BrandGradient),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.AutoAwesome,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
+            }
+            Text(
+                text = stringResource(Res.string.onboarding_welcome_more_ways_sub),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+            )
+        }
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            modifier = Modifier.size(20.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** Decorative overlapping stack of four input-type thumbnails (photo / PDF / voice / link). */
+@Composable
+private fun MultimodalThumbnailStack() {
+    val thumbs = listOf(
+        Icons.Filled.PhotoCamera to MaterialTheme.colorScheme.primaryContainer,
+        Icons.Filled.Description to MaterialTheme.colorScheme.surfaceContainerHighest,
+        Icons.Filled.Mic to MaterialTheme.colorScheme.secondaryContainer,
+        Icons.Filled.Link to MaterialTheme.colorScheme.surfaceContainerHigh,
+    )
+    // Negative spacing overlaps each thumb 8dp over its left neighbour (the first sits flush).
+    Row(horizontalArrangement = Arrangement.spacedBy((-8).dp)) {
+        thumbs.forEach { (icon, bg) ->
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(MaterialTheme.shapes.small)
+                    .background(bg),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+        }
     }
 }
 
@@ -745,8 +917,9 @@ private fun StarterChip(
             )
             .border(1.dp, borderColor, MaterialTheme.shapes.large)
             .clickable(onClick = onClick)
-            .padding(horizontal = AppDimens.SpacingLg, vertical = AppDimens.SpacingSm)
-            .wrapContentHeight(),
+            // Guarantee a >=48dp touch target (the vertical padding alone can fall short).
+            .sizeIn(minHeight = 48.dp)
+            .padding(horizontal = AppDimens.SpacingLg, vertical = AppDimens.SpacingSm),
         contentAlignment = Alignment.Center,
     ) {
         Text(

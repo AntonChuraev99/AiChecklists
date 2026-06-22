@@ -120,8 +120,14 @@
     <!-- Step 4: First checklist -->
     <string name="onboarding_welcome_first_title_lead">What should I</string>
     <string name="onboarding_welcome_first_title_accent">organize first?</string>
-    <string name="onboarding_welcome_first_lead">Type a topic or pick a starter — you can always change it later.</string>
-    <string name="onboarding_welcome_first_input_placeholder">e.g. Weekend groceries</string>
+    <string name="onboarding_welcome_first_lead">Type a topic or pick a starter — I'll build it right now.</string>
+    <string name="onboarding_welcome_first_input_placeholder">e.g. Plan a weekend in the mountains…</string>
+    <string name="onboarding_welcome_first_hint_empty">Try: "Pack for a 3-day trip" · "Weekly meal plan"</string>
+    <string name="onboarding_welcome_first_hint_typed">I'll generate this with AI in a few seconds</string>
+    <string name="onboarding_welcome_more_ways_title">More ways to start</string>
+    <string name="onboarding_welcome_more_ways_sub">Photo, PDF, voice or a link — I'll read it into a list</string>
+    <string name="onboarding_welcome_create_cta_ai">Create with AI</string>
+    <string name="onboarding_welcome_create_cta_chip">Create my list</string>
     <string name="onboarding_welcome_chip_groceries">Groceries</string>
     <string name="onboarding_welcome_chip_trip">Trip packing</string>
     <string name="onboarding_welcome_chip_workout">Workout plan</string>
