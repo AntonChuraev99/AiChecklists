@@ -10,11 +10,7 @@ import aichecklists.core.designsystem.generated.resources.onboarding_welcome_cha
 import aichecklists.core.designsystem.generated.resources.onboarding_welcome_chat_bubble_user
 import aichecklists.core.designsystem.generated.resources.onboarding_welcome_continue
 import aichecklists.core.designsystem.generated.resources.onboarding_welcome_create_cta
-import aichecklists.core.designsystem.generated.resources.onboarding_welcome_create_cta_ai
-import aichecklists.core.designsystem.generated.resources.onboarding_welcome_create_cta_chip
 import aichecklists.core.designsystem.generated.resources.onboarding_welcome_create_error
-import aichecklists.core.designsystem.generated.resources.onboarding_welcome_first_hint_empty
-import aichecklists.core.designsystem.generated.resources.onboarding_welcome_first_hint_typed
 import aichecklists.core.designsystem.generated.resources.onboarding_welcome_first_input_placeholder
 import aichecklists.core.designsystem.generated.resources.onboarding_welcome_first_lead
 import aichecklists.core.designsystem.generated.resources.onboarding_welcome_first_title_accent
@@ -47,6 +43,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -94,6 +91,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
@@ -233,8 +231,6 @@ fun WelcomeOnboardingScreen(
             WelcomeFooter(
                 step = state.currentStep,
                 isCreating = state.isCreating,
-                inputText = state.inputText,
-                selectedTemplateKey = state.selectedTemplateKey,
                 onPrimary = {
                     if (state.currentStep == WelcomeOnboardingStep.FirstChecklist) {
                         viewModel.sendIntent(WelcomeOnboardingIntent.OnCreateFirstChecklist)
@@ -343,23 +339,18 @@ private fun WelcomeProgressBar(
 private fun WelcomeFooter(
     step: WelcomeOnboardingStep,
     isCreating: Boolean,
-    inputText: String,
-    selectedTemplateKey: String?,
     onPrimary: () -> Unit,
 ) {
-    // The final-step CTA label adapts to what the user has chosen (chip / typed text / nothing yet);
-    // every other step keeps the static "Continue". `.isNotBlank()` mirrors the ViewModel's `.trim()`
-    // so the "Create with AI" wording shows exactly when the typed branch will run.
-    val ctaState: WelcomeCtaState = when {
-        step != WelcomeOnboardingStep.FirstChecklist -> WelcomeCtaState.Continue
-        selectedTemplateKey != null -> WelcomeCtaState.CreateChip
-        inputText.isNotBlank() -> WelcomeCtaState.CreateAi
-        else -> WelcomeCtaState.CreateDefault
+    // The final step shows a single fixed CTA ("Create my first list"); every other step shows
+    // "Continue". The label intentionally no longer reacts to typed text / picked chip — one stable
+    // wording across the whole step (the ViewModel still routes create-by-text / chip / default name).
+    val ctaState: WelcomeCtaState = when (step) {
+        WelcomeOnboardingStep.FirstChecklist -> WelcomeCtaState.Create
+        else -> WelcomeCtaState.Continue
     }
     Column(modifier = Modifier.padding(AppDimens.SpacingLg)) {
-        // Crossfade the label swap (150ms) so the CTA wording changes smoothly as the user types or
-        // picks a chip. `loading` is NOT part of the key — the spinner is owned by AppButton, so an
-        // in-flight create never re-triggers the crossfade.
+        // Crossfade only the Continue→Create swap on step change (150ms). `loading` is NOT part of the
+        // key — the spinner is owned by AppButton, so an in-flight create never re-triggers the fade.
         Crossfade(
             targetState = ctaState,
             animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing),
@@ -369,8 +360,6 @@ private fun WelcomeFooter(
                 text = stringResource(state.textRes),
                 onClick = onPrimary,
                 modifier = Modifier.fillMaxWidth(),
-                // Spark in the button only on the AI (typed) branch, reinforcing "this goes to AI".
-                icon = if (state == WelcomeCtaState.CreateAi) Icons.Filled.AutoAwesome else null,
                 // Pill CTA — large shape (16dp) per design spec (default AppButton shape is small/8dp).
                 shape = MaterialTheme.shapes.large,
                 // Final step CTA stays enabled even with empty input (the default name keeps the
@@ -381,12 +370,10 @@ private fun WelcomeFooter(
     }
 }
 
-/** The footer CTA's wording variants — drives the [Crossfade] label swap in [WelcomeFooter]. */
+/** The footer CTA's wording — "Continue" on the lead steps, one fixed "Create" on the final step. */
 private enum class WelcomeCtaState(val textRes: StringResource) {
     Continue(Res.string.onboarding_welcome_continue),
-    CreateChip(Res.string.onboarding_welcome_create_cta_chip),
-    CreateAi(Res.string.onboarding_welcome_create_cta_ai),
-    CreateDefault(Res.string.onboarding_welcome_create_cta),
+    Create(Res.string.onboarding_welcome_create_cta),
 }
 
 // ---------------------------------------------------------------------------
@@ -499,9 +486,9 @@ private fun FirstChecklistStep(
         Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
         LeadText(Res.string.onboarding_welcome_first_lead)
         Spacer(modifier = Modifier.height(AppDimens.SpacingXl))
-        // The free-text field (and its hint) hide when a starter chip is picked (the chip becomes the
-        // unambiguous seed) and reappear when the chip is deselected. Animated height (expand/shrink
-        // + fade) so the swap is smooth — no jump in the column's height.
+        // The free-text field hides when a starter chip is picked (the chip becomes the unambiguous
+        // seed) and reappears when the chip is deselected. Animated height (expand/shrink + fade) so
+        // the swap is smooth — no jump in the column's height.
         AnimatedVisibility(
             visible = selectedTemplateKey == null,
             enter = fadeIn(tween(durationMillis = 220, easing = FastOutSlowInEasing)) +
@@ -509,8 +496,8 @@ private fun FirstChecklistStep(
             exit = fadeOut(tween(durationMillis = 180, easing = FastOutSlowInEasing)) +
                 shrinkVertically(tween(durationMillis = 180, easing = FastOutSlowInEasing)),
         ) {
-            // Field + hint + the gap below them animate together so deselecting/selecting never
-            // leaves a dangling Spacer above the chips.
+            // Field + the gap below it animate together so deselecting/selecting never leaves a
+            // dangling Spacer above the chips.
             Column(modifier = Modifier.fillMaxWidth()) {
                 AppTextField(
                     value = inputText,
@@ -530,8 +517,6 @@ private fun FirstChecklistStep(
                         )
                     },
                 )
-                Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
-                InputHintRow(inputBlank = inputText.isBlank())
                 Spacer(modifier = Modifier.height(AppDimens.SpacingLg))
             }
         }
@@ -544,26 +529,6 @@ private fun FirstChecklistStep(
         // text/chip choice above.
         MultimodalStartCard(onMoreWays = onMoreWays)
     }
-}
-
-/**
- * Helper line under the input field. Before the user types it teases concrete example prompts;
- * once they start typing it promises the AI generation. Lives inside the field's [AnimatedVisibility]
- * so it animates in/out together with the field (never a dangling line above the chips).
- */
-@Composable
-private fun InputHintRow(inputBlank: Boolean) {
-    val hintRes = if (inputBlank) {
-        Res.string.onboarding_welcome_first_hint_empty
-    } else {
-        Res.string.onboarding_welcome_first_hint_typed
-    }
-    Text(
-        text = stringResource(hintRes),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.fillMaxWidth(),
-    )
 }
 
 /**
@@ -878,8 +843,27 @@ private fun StarterChipsRow(
     selectedTemplateKey: String?,
     onTemplateSelected: (String) -> Unit,
 ) {
+    // Full-bleed: the chips sit inside StepScaffold's horizontal screen padding, which would clip the
+    // row at that inset — chips vanish short of the screen edge, and a chip wider than the remaining
+    // space looks cut off (the reported bug). The layout modifier stretches the row by 2× the screen
+    // padding and shifts it left so it spans edge-to-edge; contentPadding re-inserts the same inset so
+    // the resting first/last chip still lines up with the rest of the content, while scrolling now runs
+    // chips cleanly off the real screen edges.
+    val screenPadding = AppDimens.ScreenPaddingHorizontal
     LazyRow(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.layout { measurable, constraints ->
+            val pad = screenPadding.roundToPx()
+            val fullWidth = constraints.maxWidth + pad * 2
+            val placeable = measurable.measure(
+                constraints.copy(minWidth = fullWidth, maxWidth = fullWidth),
+            )
+            // Report the original (padded) width up so the parent Column still lays out normally,
+            // but draw the row shifted left by one inset so it bleeds to both screen edges.
+            layout(constraints.maxWidth, placeable.height) {
+                placeable.place(-pad, 0)
+            }
+        },
+        contentPadding = PaddingValues(horizontal = screenPadding),
         horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
     ) {
         items(WelcomeStarterTemplate.entries.size) { index ->

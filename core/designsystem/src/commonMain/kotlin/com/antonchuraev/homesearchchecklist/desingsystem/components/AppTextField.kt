@@ -14,6 +14,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -61,7 +62,12 @@ fun AppTextField(
             {
                 Text(
                     text = it,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    // A single-line field's placeholder must never wrap: a long hint would otherwise grow
+                    // the decoration box to two lines (a too-tall field). Honor singleLine here; multi-line
+                    // fields keep unbounded placeholder wrapping.
+                    maxLines = if (singleLine) 1 else Int.MAX_VALUE,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         },
