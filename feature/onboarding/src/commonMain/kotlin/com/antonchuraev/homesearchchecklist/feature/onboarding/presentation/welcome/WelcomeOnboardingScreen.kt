@@ -15,6 +15,7 @@ import aichecklists.core.designsystem.generated.resources.onboarding_welcome_fir
 import aichecklists.core.designsystem.generated.resources.onboarding_welcome_first_lead
 import aichecklists.core.designsystem.generated.resources.onboarding_welcome_first_title_accent
 import aichecklists.core.designsystem.generated.resources.onboarding_welcome_first_title_lead
+import aichecklists.core.designsystem.generated.resources.onboarding_welcome_generating
 import aichecklists.core.designsystem.generated.resources.onboarding_welcome_more_ways_sub
 import aichecklists.core.designsystem.generated.resources.onboarding_welcome_more_ways_title
 import aichecklists.core.designsystem.generated.resources.onboarding_welcome_testimonial_author
@@ -72,6 +73,7 @@ import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -154,91 +156,105 @@ fun WelcomeOnboardingScreen(
     }
 
     // Button-driven back (no swipe pager). On the Welcome step there is no previous step, so the
-    // handler is disabled there and the OS/browser owns back (exits the app on Android root).
-    PlatformBackHandler(enabled = state.currentStep != WelcomeOnboardingStep.Welcome) {
-        viewModel.sendIntent(WelcomeOnboardingIntent.OnBack)
+    // handler is disabled there and the OS/browser owns back (exits the app on Android root). While
+    // the AI loader is up, the handler stays enabled but SWALLOWS back (no-op) so the user can't leave
+    // mid-generation and strand an in-flight create that will then navigate over them.
+    PlatformBackHandler(
+        enabled = state.isGeneratingAi || state.currentStep != WelcomeOnboardingStep.Welcome,
+    ) {
+        if (!state.isGeneratingAi) {
+            viewModel.sendIntent(WelcomeOnboardingIntent.OnBack)
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
-                .statusBarsPadding()
-                .navigationBarsPadding()
-                .imePadding(),
-        ) {
-            WelcomeTopBar(
-                step = state.currentStep,
-                onBack = { viewModel.sendIntent(WelcomeOnboardingIntent.OnBack) },
-                onSkip = { viewModel.sendIntent(WelcomeOnboardingIntent.OnSkip) },
-            )
-
-            WelcomeProgressBar(
-                currentStep = state.currentStep.ordinal,
-                totalSteps = WelcomeOnboardingStep.entries.size,
-                modifier = Modifier.padding(horizontal = AppDimens.ScreenPaddingHorizontal),
-            )
-
-            AnimatedContent(
-                targetState = state.currentStep,
+        // While the typed-text branch generates the first checklist via AI, replace the entire
+        // onboarding chrome (top bar / progress / steps / footer) with a full-screen, non-dismissible
+        // loader — the user must not be able to skip, go back, or re-trigger mid-generation. On
+        // success the VM navigates away; on failure it clears the flag (back to the step) + snackbars.
+        if (state.isGeneratingAi) {
+            GeneratingChecklistLoader()
+        } else {
+            Column(
                 modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                transitionSpec = {
-                    val forward = targetState.ordinal > initialState.ordinal
-                    val duration = 300
-                    if (forward) {
-                        (
-                            slideInHorizontally(tween(duration, easing = FastOutSlowInEasing)) { it } +
-                                fadeIn(tween(duration, easing = FastOutSlowInEasing))
-                        ) togetherWith (
-                            slideOutHorizontally(tween(duration, easing = FastOutSlowInEasing)) { -it } +
-                                fadeOut(tween(duration, easing = FastOutSlowInEasing))
-                        )
-                    } else {
-                        (
-                            slideInHorizontally(tween(duration, easing = FastOutSlowInEasing)) { -it } +
-                                fadeIn(tween(duration, easing = FastOutSlowInEasing))
-                        ) togetherWith (
-                            slideOutHorizontally(tween(duration, easing = FastOutSlowInEasing)) { it } +
-                                fadeOut(tween(duration, easing = FastOutSlowInEasing))
-                        )
-                    }
-                },
-                label = "welcome_onboarding_step",
-            ) { step ->
-                when (step) {
-                    WelcomeOnboardingStep.Welcome -> WelcomeStep()
-                    WelcomeOnboardingStep.Capture -> CaptureStep()
-                    WelcomeOnboardingStep.Value -> ValueStep()
-                    WelcomeOnboardingStep.FirstChecklist -> FirstChecklistStep(
-                        inputText = state.inputText,
-                        selectedTemplateKey = state.selectedTemplateKey,
-                        onInputChanged = {
-                            viewModel.sendIntent(WelcomeOnboardingIntent.OnInputChanged(it))
-                        },
-                        onTemplateSelected = {
-                            viewModel.sendIntent(WelcomeOnboardingIntent.OnTemplateSelected(it))
-                        },
-                        onMoreWays = {
-                            viewModel.sendIntent(WelcomeOnboardingIntent.OnMoreWaysToStart)
-                        },
-                    )
-                }
-            }
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background)
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+                    .imePadding(),
+            ) {
+                WelcomeTopBar(
+                    step = state.currentStep,
+                    onBack = { viewModel.sendIntent(WelcomeOnboardingIntent.OnBack) },
+                    onSkip = { viewModel.sendIntent(WelcomeOnboardingIntent.OnSkip) },
+                )
 
-            WelcomeFooter(
-                step = state.currentStep,
-                isCreating = state.isCreating,
-                onPrimary = {
-                    if (state.currentStep == WelcomeOnboardingStep.FirstChecklist) {
-                        viewModel.sendIntent(WelcomeOnboardingIntent.OnCreateFirstChecklist)
-                    } else {
-                        viewModel.sendIntent(WelcomeOnboardingIntent.OnNext)
+                WelcomeProgressBar(
+                    currentStep = state.currentStep.ordinal,
+                    totalSteps = WelcomeOnboardingStep.entries.size,
+                    modifier = Modifier.padding(horizontal = AppDimens.ScreenPaddingHorizontal),
+                )
+
+                AnimatedContent(
+                    targetState = state.currentStep,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    transitionSpec = {
+                        val forward = targetState.ordinal > initialState.ordinal
+                        val duration = 300
+                        if (forward) {
+                            (
+                                slideInHorizontally(tween(duration, easing = FastOutSlowInEasing)) { it } +
+                                    fadeIn(tween(duration, easing = FastOutSlowInEasing))
+                            ) togetherWith (
+                                slideOutHorizontally(tween(duration, easing = FastOutSlowInEasing)) { -it } +
+                                    fadeOut(tween(duration, easing = FastOutSlowInEasing))
+                            )
+                        } else {
+                            (
+                                slideInHorizontally(tween(duration, easing = FastOutSlowInEasing)) { -it } +
+                                    fadeIn(tween(duration, easing = FastOutSlowInEasing))
+                            ) togetherWith (
+                                slideOutHorizontally(tween(duration, easing = FastOutSlowInEasing)) { it } +
+                                    fadeOut(tween(duration, easing = FastOutSlowInEasing))
+                            )
+                        }
+                    },
+                    label = "welcome_onboarding_step",
+                ) { step ->
+                    when (step) {
+                        WelcomeOnboardingStep.Welcome -> WelcomeStep()
+                        WelcomeOnboardingStep.Capture -> CaptureStep()
+                        WelcomeOnboardingStep.Value -> ValueStep()
+                        WelcomeOnboardingStep.FirstChecklist -> FirstChecklistStep(
+                            inputText = state.inputText,
+                            selectedTemplateKey = state.selectedTemplateKey,
+                            onInputChanged = {
+                                viewModel.sendIntent(WelcomeOnboardingIntent.OnInputChanged(it))
+                            },
+                            onTemplateSelected = {
+                                viewModel.sendIntent(WelcomeOnboardingIntent.OnTemplateSelected(it))
+                            },
+                            onMoreWays = {
+                                viewModel.sendIntent(WelcomeOnboardingIntent.OnMoreWaysToStart)
+                            },
+                        )
                     }
-                },
-            )
+                }
+
+                WelcomeFooter(
+                    step = state.currentStep,
+                    isCreating = state.isCreating,
+                    onPrimary = {
+                        if (state.currentStep == WelcomeOnboardingStep.FirstChecklist) {
+                            viewModel.sendIntent(WelcomeOnboardingIntent.OnCreateFirstChecklist)
+                        } else {
+                            viewModel.sendIntent(WelcomeOnboardingIntent.OnNext)
+                        }
+                    },
+                )
+            }
         }
 
         SnackbarHost(
@@ -246,6 +262,42 @@ fun WelcomeOnboardingScreen(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .navigationBarsPadding(),
+        )
+    }
+}
+
+/**
+ * Full-screen AI-generation loader for the typed-text final-step branch: the brand spark hero (same
+ * gradient identity as [HeroGradientBadge]) over a spinner + "Creating your checklist…". Owns its
+ * own background + system-bar insets (it fully replaces the onboarding chrome). Intentionally has NO
+ * back/skip affordance — the generation must run to completion (the VM navigates away on success or
+ * returns to the step on failure).
+ */
+@Composable
+private fun GeneratingChecklistLoader() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .padding(horizontal = AppDimens.ScreenPaddingHorizontal),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        HeroGradientBadge()
+        Spacer(modifier = Modifier.height(AppDimens.SpacingXl))
+        CircularProgressIndicator(
+            modifier = Modifier.size(32.dp),
+            color = MaterialTheme.colorScheme.primary,
+            strokeWidth = 3.dp,
+        )
+        Spacer(modifier = Modifier.height(AppDimens.SpacingLg))
+        Text(
+            text = stringResource(Res.string.onboarding_welcome_generating),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
         )
     }
 }

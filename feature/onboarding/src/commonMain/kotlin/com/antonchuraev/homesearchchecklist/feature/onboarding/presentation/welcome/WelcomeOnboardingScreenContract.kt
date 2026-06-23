@@ -53,6 +53,14 @@ data class WelcomeOnboardingState(
     val inputText: String = "",
     val selectedTemplateKey: String? = null,
     val isCreating: Boolean = false,
+    /**
+     * True while the typed-text final-step branch is generating the first checklist via AI (branch 2
+     * of `handleCreateFirstChecklist`). Drives a full-screen, non-dismissible loader that replaces the
+     * whole onboarding chrome (top bar / progress / footer hidden) so the user can't navigate away or
+     * re-trigger while the AI request is in flight. Distinct from [isCreating], which is the quick
+     * chip/default-seed path's CTA spinner.
+     */
+    val isGeneratingAi: Boolean = false,
     val error: String? = null,
 ) : State
 

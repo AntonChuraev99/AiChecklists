@@ -2,12 +2,18 @@ package com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.wel
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
+import com.antonchuraev.homesearchchecklist.core.common.api.ActivationCoordinator
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDefaults
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigKeys
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
+import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeInputData
+import com.antonchuraev.homesearchchecklist.feature.analyze.domain.repository.AnalyzeRepository
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
@@ -29,6 +35,9 @@ class WelcomeOnboardingViewModel(
     private val navigator: AppNavigator,
     private val completeOnboardingUseCase: CompleteOnboardingUseCase,
     private val checklistRepository: ChecklistRepository,
+    private val analyzeRepository: AnalyzeRepository,
+    private val activationCoordinator: ActivationCoordinator,
+    private val remoteConfigProvider: RemoteConfigProvider,
     private val analyticsTracker: AnalyticsTracker,
     private val logger: AppLogger,
     private val isDebugBuild: Boolean = false,
@@ -125,12 +134,14 @@ class WelcomeOnboardingViewModel(
 
     /**
      * Final step. Resolves the user's intent and either creates a pre-seeded checklist (chip or
-     * default starter) or hands a free-text prompt to the AI Analyze flow, then completes onboarding
-     * and drops the user into the result (the activation "aha" moment). Three branches:
+     * default starter) or generates one from a free-text prompt via AI, then completes onboarding
+     * and drops the user into the freshly created checklist (the activation "aha" moment). Three
+     * branches:
      *  1. A starter chip is selected → create a checklist pre-filled from the chip's hardcoded
      *     preset items (NO AI — fast, no credit/network), land on its detail screen.
-     *  2. No chip, but text was typed → run the AI Analyze flow on that text (it generates the
-     *     checklist via AI, shows a preview, and creates it). We do NOT create a checklist here.
+     *  2. No chip, but text was typed → generate a checklist from that text via AI *in place*
+     *     (full-screen loading, no Analyze hand-off, no preview), create it, and land on its detail
+     *     screen — see [generateFirstChecklistFromText].
      *  3. No chip, empty text → create a checklist from the default getting-started starter so the
      *     mandatory final step is never blank.
      *
@@ -138,49 +149,115 @@ class WelcomeOnboardingViewModel(
      * closing the no-checklist activation leak). Because the input field is hidden once a chip is
      * selected (see the Screen), the "chip + typed text" combination is unreachable from the UI —
      * the branches are mutually exclusive.
+     *
+     * The in-flight guard covers BOTH loading states: [WelcomeOnboardingState.isCreating] (the chip/
+     * default seed path's CTA spinner) and [WelcomeOnboardingState.isGeneratingAi] (the full-screen
+     * AI loader). Either being true means a create is already running.
      */
     private fun handleCreateFirstChecklist() {
-        if (_screenState.value.isCreating) return
+        val state = _screenState.value
+        if (state.isCreating || state.isGeneratingAi) return
         viewModelScope.launch {
-            _screenState.update { it.copy(isCreating = true, error = null) }
-            try {
-                when (val action = resolveFirstChecklist()) {
-                    is FirstChecklistAction.Seed -> {
-                        // addChecklist creates the default fill automatically (same path as the
-                        // splash auto-seed and the interactive onboarding), so the starter items
-                        // show up checked-off-able on the detail screen we land on next.
-                        val checklistId = checklistRepository.addChecklist(
-                            Checklist(name = action.name, items = action.items),
-                        )
-                        trackCompleted(checklistCreated = true)
-                        completeOnboardingUseCase()
-                        // Land on the freshly created checklist with a cleared back stack so system
-                        // back exits to home, not back into onboarding.
-                        navigator.navigateToChecklistDetail(checklistId, clearBackStack = true)
-                    }
-                    is FirstChecklistAction.AiAnalyze -> {
-                        // The Analyze flow generates + previews + creates the checklist via AI, so
-                        // we do NOT create one here. Complete onboarding FIRST (the user must not
-                        // be able to return to onboarding from the Analyze result), then hand off.
-                        // checklist_created=false: the AI funnel fires its own creation event from
-                        // AnalyzeResultPreview on confirm (mirrors App.onActivationGenerate).
-                        trackCompleted(checklistCreated = false)
-                        completeOnboardingUseCase()
-                        navigator.navigateToAnalyzeScreen(
-                            initialText = action.prompt,
-                            fillDefault = false,
-                            autoAnalyze = true,
-                        )
-                    }
-                }
-            } catch (e: Exception) {
-                logger.error(TAG, "first checklist creation failed: ${e.message}", e)
-                _screenState.update {
-                    it.copy(isCreating = false, error = ERROR_KEY)
-                }
-                _sideEffect.emit(WelcomeOnboardingSideEffect.ShowSnackbar(ERROR_KEY))
+            when (val action = resolveFirstChecklist()) {
+                is FirstChecklistAction.Seed -> createSeededChecklist(action)
+                is FirstChecklistAction.AiAnalyze -> generateFirstChecklistFromText(action.prompt)
             }
         }
+    }
+
+    /**
+     * Branches 1 & 3: create a checklist from a hardcoded preset (chip) or the default getting-started
+     * starter (empty input). No AI/network — uses the CTA spinner ([WelcomeOnboardingState.isCreating]),
+     * then lands on the created checklist's detail screen.
+     */
+    private suspend fun createSeededChecklist(action: FirstChecklistAction.Seed) {
+        _screenState.update { it.copy(isCreating = true, error = null) }
+        try {
+            // addChecklist creates the default fill automatically (same path as the splash auto-seed
+            // and the interactive onboarding), so the starter items show up checked-off-able on the
+            // detail screen we land on next.
+            val checklistId = checklistRepository.addChecklist(
+                Checklist(name = action.name, items = action.items),
+            )
+            trackCompleted(checklistCreated = true)
+            completeOnboardingUseCase()
+            // Land on the freshly created checklist with a cleared back stack so system back exits
+            // to home, not back into onboarding.
+            navigator.navigateToChecklistDetail(checklistId, clearBackStack = true)
+        } catch (e: Exception) {
+            logger.error(TAG, "seeded first checklist creation failed: ${e.message}", e)
+            _screenState.update { it.copy(isCreating = false, error = ERROR_KEY) }
+            _sideEffect.emit(WelcomeOnboardingSideEffect.ShowSnackbar(ERROR_KEY))
+        }
+    }
+
+    /**
+     * Branch 2: generate the first checklist from the user's free text via AI, in place. Shows a
+     * full-screen loader ([WelcomeOnboardingState.isGeneratingAi], which hides the top bar / progress
+     * / footer so the user can't navigate away mid-generation), runs the AI generation + creation
+     * itself, fires the activation funnel, then lands on the created checklist's detail screen.
+     *
+     * This replaces the old hand-off to the Analyze screen (generate → preview → manual confirm →
+     * create). Because we skip the Analyze preview, we MUST reproduce what its confirm step did for
+     * the activation funnel: hand the new checklist to [ActivationCoordinator.onAiChecklistCreated],
+     * which fires `FIRST_AI_CHECKLIST_CREATED` and (in the treatment arm) drives the one-time reminder
+     * opt-in soft-ask. That soft-ask is shown by the App shell (App.kt collects
+     * `reminderOptInRequests`), so it surfaces over the detail screen we navigate to — no extra wiring
+     * needed here.
+     *
+     * On any failure (generation or creation) we drop the loader, stay on the final step, log the
+     * error, and show the create-failure snackbar — never a dead/blank screen.
+     */
+    private suspend fun generateFirstChecklistFromText(prompt: String) {
+        _screenState.update { it.copy(isGeneratingAi = true, error = null) }
+        try {
+            val result = analyzeRepository.analyzeData(AnalyzeInputData.RawText(prompt))
+                .getOrElse { e ->
+                    failAiGeneration("AI generation failed", e)
+                    return
+                }
+
+            // Prefer the AI-suggested name (the CF `checklist_name`) so the generated checklist keeps
+            // its own title; fall back to the localized default when the server omitted it (mirrors
+            // AnalyzeViewModel.analyzeInput).
+            val name = result.suggestedName?.takeIf { it.isNotBlank() }
+                ?: stringResolver.resolve(Res.string.onboarding_welcome_default_checklist_name)
+
+            val checklist = analyzeRepository.createChecklistFromResult(name, result)
+                .getOrElse { e ->
+                    failAiGeneration("AI checklist creation failed", e)
+                    return
+                }
+
+            // Reproduce the Analyze-preview confirm's activation side effects (we skipped the preview):
+            // fire FIRST_AI_CHECKLIST_CREATED + drive the reminder opt-in via the coordinator. It owns
+            // the new-user / show-once gating, so this is safe to always call. Read the RC flag the same
+            // way AnalyzeResultPreviewViewModel does.
+            val activationEnabled = remoteConfigProvider.getBoolean(
+                RemoteConfigKeys.ACTIVATION_BUNDLE_V1,
+                RemoteConfigDefaults.ACTIVATION_BUNDLE_V1,
+            )
+            activationCoordinator.onAiChecklistCreated(checklist.id, activationEnabled)
+
+            // checklist_created=true: unlike the old hand-off (where the Analyze funnel fired its own
+            // event on confirm), this branch now creates the checklist itself.
+            trackCompleted(checklistCreated = true)
+            completeOnboardingUseCase()
+            // Keep the full-screen loader visible right up to navigation. clearBackStack tears this
+            // screen (and VM) down, so the loader is replaced DIRECTLY by the checklist detail with no
+            // intermediate frame. Do NOT reset isGeneratingAi here: that recomposes the final step for
+            // one frame — the "preview flash" the user sees before the detail opens.
+            navigator.navigateToChecklistDetail(checklist.id, clearBackStack = true)
+        } catch (e: Exception) {
+            failAiGeneration("AI first checklist flow failed", e)
+        }
+    }
+
+    /** Common AI-generation failure path: log, drop the full-screen loader, surface the snackbar. */
+    private suspend fun failAiGeneration(context: String, e: Throwable) {
+        logger.error(TAG, "$context: ${e.message}", e)
+        _screenState.update { it.copy(isGeneratingAi = false, error = ERROR_KEY) }
+        _sideEffect.emit(WelcomeOnboardingSideEffect.ShowSnackbar(ERROR_KEY))
     }
 
     /**
@@ -193,7 +270,8 @@ class WelcomeOnboardingViewModel(
      * card-driven entry from the typed/chip/default seeds in the funnel analytics.
      */
     private fun handleMoreWaysToStart() {
-        if (_screenState.value.isCreating) return
+        val state = _screenState.value
+        if (state.isCreating || state.isGeneratingAi) return
         viewModelScope.launch {
             trackCompleted(checklistCreated = false, seedOverride = SEED_MULTIMODAL)
             completeOnboardingUseCase()

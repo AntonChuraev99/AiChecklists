@@ -38,12 +38,19 @@ kotlin {
             implementation(projects.core.navigation.api)
             implementation(projects.core.common.api)
             implementation(projects.core.designsystem)
+            // Welcome onboarding reads the activation_bundle_v1 flag to drive the activation funnel
+            // after creating the first AI checklist (mirrors AnalyzeResultPreviewViewModel).
+            implementation(projects.core.remoteconfig.api)
             implementation(projects.feature.updatefeed)
             implementation(projects.feature.user)
             implementation(projects.feature.paywall)
             implementation(projects.feature.create)
             implementation(projects.feature.checklist)
             implementation(projects.feature.sharing)
+            // AI generation for the Welcome onboarding's typed-text final-step branch (analyzeData +
+            // createChecklistFromResult). analyze depends on checklist/paywall/user (NOT onboarding),
+            // so there is no dependency cycle.
+            implementation(projects.feature.analyze)
 
             implementation(compose.runtime)
             implementation(compose.foundation)

@@ -102,6 +102,7 @@
     <string name="onboarding_welcome_create_cta">Create my first list</string>
     <string name="onboarding_welcome_create_error">Couldn't create your list. Try again.</string>
     <string name="onboarding_welcome_default_checklist_name">My Checklist</string>
+    <string name="onboarding_welcome_generating">Creating your checklist…</string>
     <!-- Step 1: Welcome -->
     <string name="onboarding_welcome_title_lead">Meet your AI</string>
     <string name="onboarding_welcome_title_accent">checklist assistant</string>

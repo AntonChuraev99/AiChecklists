@@ -3,11 +3,16 @@ package com.antonchuraev.homesearchchecklist.feature.onboarding.presentation.wel
 import androidx.lifecycle.SavedStateHandle
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
+import com.antonchuraev.homesearchchecklist.core.common.api.ActivationCoordinator
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AddToChecklistPurpose
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
+import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeInputData
+import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeResult
+import com.antonchuraev.homesearchchecklist.feature.analyze.domain.repository.AnalyzeRepository
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
@@ -23,6 +28,7 @@ import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.Complete
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,6 +44,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -58,6 +65,9 @@ class WelcomeOnboardingViewModelTest {
 
     private lateinit var fakeNavigator: FakeAppNavigator
     private lateinit var fakeChecklistRepository: FakeChecklistRepository
+    private lateinit var fakeAnalyzeRepository: FakeAnalyzeRepository
+    private lateinit var fakeActivationCoordinator: RecordingActivationCoordinator
+    private lateinit var fakeRemoteConfigProvider: FakeRemoteConfigProvider
     private lateinit var fakeAnalyticsTracker: RecordingAnalyticsTracker
     private lateinit var fakeUserDataRepository: FakeUserDataRepository
 
@@ -69,6 +79,9 @@ class WelcomeOnboardingViewModelTest {
         Dispatchers.setMain(testDispatcher)
         fakeNavigator = FakeAppNavigator()
         fakeChecklistRepository = FakeChecklistRepository()
+        fakeAnalyzeRepository = FakeAnalyzeRepository()
+        fakeActivationCoordinator = RecordingActivationCoordinator()
+        fakeRemoteConfigProvider = FakeRemoteConfigProvider()
         fakeAnalyticsTracker = RecordingAnalyticsTracker()
         fakeUserDataRepository = FakeUserDataRepository()
     }
@@ -83,6 +96,9 @@ class WelcomeOnboardingViewModelTest {
         navigator = fakeNavigator,
         completeOnboardingUseCase = CompleteOnboardingUseCase(fakeUserDataRepository),
         checklistRepository = fakeChecklistRepository,
+        analyzeRepository = fakeAnalyzeRepository,
+        activationCoordinator = fakeActivationCoordinator,
+        remoteConfigProvider = fakeRemoteConfigProvider,
         analyticsTracker = fakeAnalyticsTracker,
         logger = NoOpLogger(),
         isDebugBuild = true,
@@ -213,25 +229,97 @@ class WelcomeOnboardingViewModelTest {
     }
 
     @Test
-    fun createFirstChecklist_typedNoChip_runsAiAnalyzeFlowDoesNotCreateChecklist() = runTest {
+    fun createFirstChecklist_typedNoChip_generatesViaAiAndOpensCreatedChecklistDetail() = runTest {
+        // Branch 2: free text with no chip generates the checklist via AI IN PLACE (no Analyze
+        // hand-off, no preview) and lands on the created checklist's detail screen.
+        fakeAnalyzeRepository.resultName = "Birthday Party"
         val vm = createViewModel()
         vm.onIntent(WelcomeOnboardingIntent.OnInputChanged("Birthday party prep"))
 
         vm.onIntent(WelcomeOnboardingIntent.OnCreateFirstChecklist)
         testDispatcher.scheduler.advanceUntilIdle()
 
-        // Branch 2: free text with no chip hands off to the AI Analyze flow — the ViewModel must NOT
-        // create a checklist itself (Analyze generates + previews + creates it via AI).
-        assertEquals(0, fakeChecklistRepository.addChecklistCallCount)
-        assertNull(fakeChecklistRepository.lastAddedChecklist)
-        // Onboarding is completed BEFORE the hand-off so the user can't return to onboarding.
+        // analyzeData was called with the typed prompt as RawText.
+        assertEquals(1, fakeAnalyzeRepository.analyzeCallCount)
+        val rawText = assertIs<AnalyzeInputData.RawText>(fakeAnalyzeRepository.lastInput)
+        assertEquals("Birthday party prep", rawText.text)
+        // createChecklistFromResult was called with the AI-suggested name.
+        assertEquals(1, fakeAnalyzeRepository.createCallCount)
+        assertEquals("Birthday Party", fakeAnalyzeRepository.lastCreateName)
+        // Onboarding completed; landed on the CREATED checklist's detail with a cleared back stack.
         assertTrue(fakeUserDataRepository.onboardingMarkedPassed)
-        // Navigated to Analyze with the typed prompt + auto-analyze on; NOT to a checklist detail.
-        assertTrue(fakeNavigator.navigatedToAnalyzeScreen)
-        assertEquals("Birthday party prep", fakeNavigator.lastAnalyzeInitialText)
-        assertTrue(fakeNavigator.lastAnalyzeAutoAnalyze)
-        assertFalse(fakeNavigator.lastAnalyzeFillDefault)
+        assertTrue(fakeNavigator.navigatedToChecklistDetail)
+        assertTrue(fakeNavigator.lastDetailClearBackStack)
+        assertEquals(FakeAnalyzeRepository.CREATED_ID, fakeNavigator.lastDetailChecklistId)
+        // It does NOT divert to the Analyze screen anymore.
+        assertFalse(fakeNavigator.navigatedToAnalyzeScreen)
+        // Activation funnel reproduced (the Analyze preview confirm used to do this): the created
+        // checklist id was handed to the coordinator.
+        assertEquals(FakeAnalyzeRepository.CREATED_ID, fakeActivationCoordinator.lastChecklistId)
+        // The loader stays raised through navigation by design: clearBackStack tears the onboarding
+        // screen/VM down, so the loader is replaced directly by the checklist detail (resetting it
+        // here would flash the final step for one frame). Navigation happening — asserted above — is
+        // the success signal.
+    }
+
+    @Test
+    fun createFirstChecklist_typedNoChip_blankAiName_fallsBackToDefaultName() = runTest {
+        // The server omitted a name → the VM falls back to the localized default (the fake resolver
+        // echoes "resolved_text" for any key, including the default-name resource).
+        fakeAnalyzeRepository.resultName = null
+        val vm = createViewModel()
+        vm.onIntent(WelcomeOnboardingIntent.OnInputChanged("Some topic"))
+
+        vm.onIntent(WelcomeOnboardingIntent.OnCreateFirstChecklist)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("resolved_text", fakeAnalyzeRepository.lastCreateName)
+        assertTrue(fakeNavigator.navigatedToChecklistDetail)
+    }
+
+    @Test
+    fun createFirstChecklist_typedNoChip_analyzeError_snackbarsAndStaysOnStep() = runTest {
+        fakeAnalyzeRepository.analyzeShouldFail = true
+        val vm = createViewModel()
+        vm.onIntent(WelcomeOnboardingIntent.OnInputChanged("Birthday party prep"))
+
+        val effects = mutableListOf<WelcomeOnboardingSideEffect>()
+        val collectJob = launch { vm.sideEffect.collect { effects.add(it) } }
+
+        vm.onIntent(WelcomeOnboardingIntent.OnCreateFirstChecklist)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Generation failed → no checklist created, no navigation, loader cleared, snackbar shown.
+        assertEquals(0, fakeAnalyzeRepository.createCallCount)
         assertFalse(fakeNavigator.navigatedToChecklistDetail)
+        assertFalse(vm.screenState.value.isGeneratingAi)
+        assertEquals(WelcomeOnboardingViewModel.ERROR_KEY, vm.screenState.value.error)
+        assertTrue(
+            effects.any {
+                it is WelcomeOnboardingSideEffect.ShowSnackbar &&
+                    it.messageKey == WelcomeOnboardingViewModel.ERROR_KEY
+            },
+        )
+        collectJob.cancel()
+    }
+
+    @Test
+    fun createFirstChecklist_typedNoChip_createError_snackbarsAndStaysOnStep() = runTest {
+        // analyzeData succeeds but createChecklistFromResult fails → same error handling.
+        fakeAnalyzeRepository.createShouldFail = true
+        val vm = createViewModel()
+        vm.onIntent(WelcomeOnboardingIntent.OnInputChanged("Birthday party prep"))
+
+        vm.onIntent(WelcomeOnboardingIntent.OnCreateFirstChecklist)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(1, fakeAnalyzeRepository.analyzeCallCount)
+        assertEquals(1, fakeAnalyzeRepository.createCallCount)
+        assertFalse(fakeNavigator.navigatedToChecklistDetail)
+        assertFalse(vm.screenState.value.isGeneratingAi)
+        assertEquals(WelcomeOnboardingViewModel.ERROR_KEY, vm.screenState.value.error)
+        // Activation funnel must NOT fire when creation failed.
+        assertNull(fakeActivationCoordinator.lastChecklistId)
     }
 
     @Test
@@ -520,5 +608,78 @@ class WelcomeOnboardingViewModelTest {
         override fun event(name: String, params: Map<String, Any>) {
             events.add(name to params)
         }
+    }
+
+    /**
+     * Drives the typed-text AI branch: [analyzeData] returns an empty-item [AnalyzeResult] (the count
+     * isn't asserted — only the name flow + side effects matter), [createChecklistFromResult] returns
+     * a checklist with [CREATED_ID]. Either step can be made to fail to exercise the error path.
+     */
+    private class FakeAnalyzeRepository : AnalyzeRepository {
+        var analyzeShouldFail = false
+        var createShouldFail = false
+        var resultName: String? = "AI Name"
+
+        var analyzeCallCount = 0
+        var createCallCount = 0
+        var lastInput: AnalyzeInputData? = null
+        var lastCreateName: String? = null
+
+        override suspend fun analyzeData(
+            inputData: AnalyzeInputData,
+            targetChecklist: Checklist?,
+        ): Result<AnalyzeResult> {
+            analyzeCallCount++
+            lastInput = inputData
+            if (analyzeShouldFail) return Result.failure(RuntimeException("analyze failed"))
+            return Result.success(AnalyzeResult(suggestedItems = emptyList(), suggestedName = resultName))
+        }
+
+        override suspend fun createChecklistFromResult(
+            name: String,
+            result: AnalyzeResult,
+        ): Result<Checklist> {
+            createCallCount++
+            lastCreateName = name
+            if (createShouldFail) return Result.failure(RuntimeException("create failed"))
+            return Result.success(Checklist(id = CREATED_ID, name = name, items = emptyList()))
+        }
+
+        override suspend fun applyToChecklist(checklistId: Long, result: AnalyzeResult): Result<Checklist> =
+            Result.failure(NotImplementedError())
+
+        override suspend fun createFillFromResult(
+            checklistId: Long,
+            fillName: String,
+            result: AnalyzeResult,
+        ): Result<Long> = Result.failure(NotImplementedError())
+
+        override suspend fun isAnalyzerAvailable(): Boolean = true
+
+        companion object {
+            const val CREATED_ID = 42L
+        }
+    }
+
+    /** Records the checklist id handed to the activation funnel (or null if never called). */
+    private class RecordingActivationCoordinator : ActivationCoordinator {
+        var lastChecklistId: Long? = null
+        var lastBundleEnabled: Boolean? = null
+
+        override val reminderOptInRequests: SharedFlow<Long> = MutableSharedFlow()
+
+        override suspend fun onAiChecklistCreated(checklistId: Long, activationBundleEnabled: Boolean) {
+            lastChecklistId = checklistId
+            lastBundleEnabled = activationBundleEnabled
+        }
+
+        override suspend fun reportReminderOptInOutcome(granted: Boolean) {}
+    }
+
+    private class FakeRemoteConfigProvider : RemoteConfigProvider {
+        override suspend fun fetchAndActivate(): Boolean = true
+        override fun getBoolean(key: String, defaultValue: Boolean): Boolean = defaultValue
+        override fun getString(key: String, defaultValue: String): String = defaultValue
+        override fun getLong(key: String, defaultValue: Long): Long = defaultValue
     }
 }

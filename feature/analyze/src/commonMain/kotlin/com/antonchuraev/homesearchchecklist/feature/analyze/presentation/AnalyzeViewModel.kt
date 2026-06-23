@@ -1,12 +1,17 @@
 package com.antonchuraev.homesearchchecklist.feature.analyze.presentation
 
 import androidx.lifecycle.viewModelScope
+import com.antonchuraev.homesearchchecklist.core.common.api.ActivationCoordinator
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDefaults
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigKeys
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeInputData
+import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeResult
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeResultHolder
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.InputDataType
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.repository.AnalyzeRepository
@@ -32,7 +37,9 @@ class AnalyzeViewModel(
     private val appNavigator: AppNavigator,
     private val userDataRepository: UserDataRepository,
     private val getSubscriptionStatusUseCase: GetSubscriptionStatusUseCase,
-    private val analyticsTracker: AnalyticsTracker
+    private val analyticsTracker: AnalyticsTracker,
+    private val activationCoordinator: ActivationCoordinator,
+    private val remoteConfigProvider: RemoteConfigProvider
 ) : AppViewModel<AnalyzeScreenState, AnalyzeScreenIntent, Nothing>() {
 
     private val _screenState = MutableStateFlow(
@@ -253,39 +260,30 @@ class AnalyzeViewModel(
                         AnalyticsParams.INPUT_TYPE to inputType,
                         "item_count" to result.suggestedItems.size
                     ))
-                    _screenState.update {
-                        it.copy(
-                            isAnalyzing = false,
-                            analyzeResult = result
-                        )
-                    }
 
-                    // Store result in holder and navigate to preview screen. For the new-checklist
-                    // path, prefer the AI-suggested name (the CF `checklist_name`) so each generated
-                    // checklist keeps its own title; fall back to the localized default only when the
-                    // server omitted it. Fill mode always uses the default fill name.
-                    val resolvedName = if (state.isFillMode) {
-                        getString(Res.string.default_fill_name)
+                    // FILL flows (fill an existing checklist / apply to its default fill) keep going
+                    // through the editable preview — there the user confirms which AI items land in
+                    // the EXISTING checklist. Creating a NEW checklist skips the preview entirely: per
+                    // product decision an AI "create" drops the user straight onto the finished
+                    // checklist (no manual confirm/edit step) — see [createChecklistDirectly].
+                    if (state.isFillMode || state.fillDefault) {
+                        _screenState.update { it.copy(isAnalyzing = false, analyzeResult = result) }
+                        AnalyzeResultHolder.set(
+                            items = result.suggestedItems,
+                            suggestedName = getString(Res.string.default_fill_name),
+                            summary = result.summary,
+                            isFillMode = state.isFillMode,
+                            fillDefault = state.fillDefault,
+                            targetChecklistId = state.selectedChecklistId,
+                            targetChecklistName = targetChecklist?.name,
+                            fillDefaultItems = result.fillItems,
+                            hasFolders = false,
+                            fromActivation = false
+                        )
+                        appNavigator.navigateToAnalyzeResultPreview()
                     } else {
-                        result.suggestedName?.takeIf { it.isNotBlank() }
-                            ?: getString(Res.string.default_checklist_name)
+                        createChecklistDirectly(result)
                     }
-                    AnalyzeResultHolder.set(
-                        items = result.suggestedItems,
-                        suggestedName = resolvedName,
-                        summary = result.summary,
-                        isFillMode = state.isFillMode,
-                        fillDefault = state.fillDefault,
-                        targetChecklistId = state.selectedChecklistId,
-                        targetChecklistName = targetChecklist?.name,
-                        fillDefaultItems = if (state.isFillMode) result.fillItems else null,
-                        hasFolders = !state.isFillMode && result.hasFolders,
-                        // Activation funnel: only the new-user hero path (autoAnalyze, new
-                        // checklist — never fill) carries this so the preview confirm can fire
-                        // FIRST_AI_CHECKLIST_CREATED + the reminder opt-in.
-                        fromActivation = autoAnalyze && !state.isFillMode
-                    )
-                    appNavigator.navigateToAnalyzeResultPreview()
                 }
                 .onFailure { error ->
                     analyticsTracker.event(AnalyticsEvents.Analyze.FAILED, mapOf(
@@ -300,6 +298,59 @@ class AnalyzeViewModel(
                     }
                 }
         }
+    }
+
+    /**
+     * New-checklist AI path: skip the editable preview and create + open the checklist directly. Per
+     * product decision an AI "create" lands the user straight on the finished checklist — the old
+     * preview/confirm step is now reserved for FILL flows only. Reproduces what the preview's confirm
+     * did so nothing regresses:
+     *  - the CHECKLIST_CREATED analytics event (source=ai), and
+     *  - when this came from the activation hero (autoAnalyze), the activation funnel via
+     *    [ActivationCoordinator.onAiChecklistCreated] (it owns the new-user / show-once gating, so
+     *    FIRST_AI_CHECKLIST_CREATED + the reminder opt-in still fire).
+     *
+     * [AnalyzeRepository.createChecklistFromResult] keeps the AI folder structure verbatim
+     * (foldersEnabled = result.hasFolders), so structured responses still land as folders — only the
+     * preview's soft 10-item cap and manual edits are intentionally dropped. On failure we clear the
+     * loader and surface the create error; the user stays on the Analyze screen to retry.
+     */
+    private suspend fun createChecklistDirectly(result: AnalyzeResult) {
+        val name = result.suggestedName?.takeIf { it.isNotBlank() }
+            ?: getString(Res.string.default_checklist_name)
+        analyzeRepository.createChecklistFromResult(name, result)
+            .onSuccess { checklist ->
+                analyticsTracker.event(
+                    AnalyticsEvents.Checklist.CREATED,
+                    mapOf(
+                        "source" to "ai",
+                        "item_count" to result.suggestedItems.size,
+                        "has_folders" to result.hasFolders
+                    )
+                )
+                // Only the activation hero (autoAnalyze) drives the funnel; the coordinator gates it
+                // to new users / show-once. Mirrors AnalyzeResultPreviewViewModel's confirm path.
+                if (autoAnalyze) {
+                    val activationEnabled = remoteConfigProvider.getBoolean(
+                        RemoteConfigKeys.ACTIVATION_BUNDLE_V1,
+                        RemoteConfigDefaults.ACTIVATION_BUNDLE_V1,
+                    )
+                    activationCoordinator.onAiChecklistCreated(checklist.id, activationEnabled)
+                }
+                // Keep the loader visible until navigation: clearBackStack replaces this screen with
+                // the checklist detail directly, so resetting isAnalyzing here would flash the Analyze
+                // input screen for one frame before the detail opens.
+                AnalyzeResultHolder.clear()
+                appNavigator.navigateToChecklistDetail(checklist.id, clearBackStack = true)
+            }
+            .onFailure { error ->
+                _screenState.update {
+                    it.copy(
+                        isAnalyzing = false,
+                        error = error.message ?: getString(Res.string.error_create_checklist_failed)
+                    )
+                }
+            }
     }
 
     private fun buildInputData(state: AnalyzeScreenState): AnalyzeInputData? {

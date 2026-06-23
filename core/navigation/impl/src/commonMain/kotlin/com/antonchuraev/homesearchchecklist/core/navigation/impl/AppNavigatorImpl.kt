@@ -182,7 +182,13 @@ class AppNavigatorImpl : AppNavigator {
         if (mainIdx >= 0) {
             while (backStack.size > mainIdx + 1) backStack.removeAt(backStack.size - 1)
         } else {
-            replaceStack(route)
+            // No Main in the stack — e.g. arriving straight from onboarding/splash, which replaced
+            // the stack with the onboarding route. Seed Main as the ROOT under the pushed route so
+            // back/Up from it lands on home instead of dead-ending: with a single-entry stack onBack
+            // is a no-op (NavDisplay must stay non-empty), which is the "back does nothing" bug.
+            backStack[0] = AppNavRoute.Main
+            while (backStack.size > 1) backStack.removeAt(backStack.size - 1)
+            backStack.add(route)
             return
         }
         backStack.add(route)
