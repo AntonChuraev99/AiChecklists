@@ -198,6 +198,10 @@ val firebaseWebProps: Map<String, String> = run {
         // GA4 measurementId (G-XXXXXXX). Empty string when unset → Analytics inits but
         // sends nothing to GA4 (graceful: no throw, just no data). Required for web analytics.
         "FIREBASE_MEASUREMENT_ID" to props.getProperty("FIREBASE_WEB_MEASUREMENT_ID", ""),
+        // Amplitude PROD browser ingestion key (project 786722 — same as Android).
+        // Public by design (browser key), like the Firebase web apiKey above. Empty when
+        // unset → init.js detects the placeholder and skips Amplitude init (GA4 still works).
+        "AMPLITUDE_API_KEY" to props.getProperty("AMPLITUDE_KEY", ""),
     )
 }
 

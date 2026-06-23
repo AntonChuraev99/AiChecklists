@@ -49,6 +49,11 @@ import {
     setUserProperties as fbSetUserProperties,
     isSupported as analyticsIsSupported,
 } from 'https://www.gstatic.com/firebasejs/12.11.0/firebase-analytics.js';
+// Amplitude Browser SDK 2 (ESM via esm.sh). Static import — resolved before the app
+// starts, same as the Firebase modules above (no CSP on this origin: verified _headers
+// + index.html). `init`, `track`, `setUserId`, `identify` and the `Identify` class are
+// all named exports of the package's main entry, so the namespace import exposes them.
+import * as amplitude from 'https://esm.sh/@amplitude/analytics-browser@2.44.1';
 
 // If ?clear-data is active, the page is reloading — don't start the app
 if (window.__clearingData) {
@@ -88,33 +93,104 @@ analyticsIsSupported().then((ok) => {
     }
 }).catch((e) => console.warn('[Analytics] isSupported() rejected', e));
 
+// === Amplitude Analytics (dual-sends alongside Firebase GA4) ===
+// Web telemetry must reach the SAME Amplitude project as Android (786722). The
+// existing __analytics* bridges below now also forward to Amplitude; GA4 and
+// Amplitude are independent (a failure in one never affects the other).
+//
+// Key is the PROD Amplitude browser ingestion key — public by design (like the
+// Firebase web apiKey), so embedding it in init.js is fine.
+//
+// autocapture: ONLY sessions, to match Android's trackingSessionEvents=true.
+// ⚠ Amplitude SDK 2.x semantics (verified against amplitude/Amplitude-TypeScript
+// default-tracking.ts `isTrackingEnabled`): a PARTIAL autocapture object does NOT
+// disable the unspecified features — each is OFF only on an EXPLICIT `false`; an
+// `undefined` field falls through to "enabled" in a normal (non-extension) browser.
+// So `{ sessions: true }` alone would silently turn ON pageViews / attribution /
+// formInteractions / fileDownloads / elementInteractions (events Android never
+// sends → breaks parity + pollutes the project). We therefore set every non-session
+// field to `false` explicitly. Keep this exhaustive list in sync with the SDK's
+// AutocaptureOptions if a new default-on capture is added upstream.
+//
+// No-throw: a failed init leaves __amplitudeReady=false and the Amplitude branch of
+// every bridge no-ops (GA4 keeps working).
+let __amplitudeReady = false;
+(function () {
+    const AMPLITUDE_KEY = '__AMPLITUDE_API_KEY__';
+    if (!AMPLITUDE_KEY || AMPLITUDE_KEY.indexOf('__AMPLITUDE') === 0) {
+        console.warn('[Amplitude] no key in init.js — skipping init (GA4 unaffected)');
+        return;
+    }
+    try {
+        amplitude.init(AMPLITUDE_KEY, {
+            serverZone: 'US', // US data residency (explicit; matches the project)
+            autocapture: {
+                sessions: true,            // parity w/ Android trackingSessionEvents
+                pageViews: false,
+                attribution: false,
+                formInteractions: false,
+                fileDownloads: false,
+                elementInteractions: false,
+            },
+        });
+        __amplitudeReady = true;
+        console.log('[Amplitude] init OK');
+    } catch (e) {
+        console.warn('[Amplitude] init failed', e);
+    }
+})();
+
 globalThis.__analyticsLogEvent = (name, paramsJson) => {
     try {
-        if (!__fbAnalytics) return;
-        const p = paramsJson ? JSON.parse(paramsJson) : {};
-        logEvent(__fbAnalytics, name, p);
+        if (__fbAnalytics) {
+            const p = paramsJson ? JSON.parse(paramsJson) : {};
+            logEvent(__fbAnalytics, name, p);
+        }
     } catch (e) { console.warn('[Analytics] logEvent', e); }
+    if (__amplitudeReady) {
+        try {
+            amplitude.track(name, paramsJson ? JSON.parse(paramsJson) : {});
+        } catch (e) { console.warn('[Amplitude] track', e); }
+    }
 };
 
 globalThis.__analyticsScreenView = (name) => {
     try {
-        if (!__fbAnalytics) return;
-        logEvent(__fbAnalytics, 'screen_view', { screen_name: name });
+        if (__fbAnalytics) logEvent(__fbAnalytics, 'screen_view', { screen_name: name });
     } catch (e) { console.warn('[Analytics] screenView', e); }
+    if (__amplitudeReady) {
+        try {
+            amplitude.track('screen_view', { screen_name: name });
+        } catch (e) { console.warn('[Amplitude] screenView', e); }
+    }
 };
 
 globalThis.__analyticsSetUserId = (id) => {
     try {
         if (__fbAnalytics) fbSetUserId(__fbAnalytics, id);
     } catch (e) { console.warn('[Analytics] setUserId', e); }
+    if (__amplitudeReady) {
+        try {
+            amplitude.setUserId(id);
+        } catch (e) { console.warn('[Amplitude] setUserId', e); }
+    }
 };
 
 globalThis.__analyticsSetUserProperties = (propsJson) => {
     try {
-        if (!__fbAnalytics) return;
-        const p = propsJson ? JSON.parse(propsJson) : {};
-        fbSetUserProperties(__fbAnalytics, p);
+        if (__fbAnalytics) {
+            const p = propsJson ? JSON.parse(propsJson) : {};
+            fbSetUserProperties(__fbAnalytics, p);
+        }
     } catch (e) { console.warn('[Analytics] setUserProperties', e); }
+    if (__amplitudeReady) {
+        try {
+            const idy = new amplitude.Identify();
+            const p = propsJson ? JSON.parse(propsJson) : {};
+            Object.keys(p).forEach((k) => idy.set(k, p[k]));
+            amplitude.identify(idy);
+        } catch (e) { console.warn('[Amplitude] identify', e); }
+    }
 };
 
 // === Firebase Remote Config ===

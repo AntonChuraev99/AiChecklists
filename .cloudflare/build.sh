@@ -66,6 +66,7 @@ cat > local.properties <<EOF
 sdk.dir=/dev/null
 FIREBASE_WEB_API_KEY=${FIREBASE_WEB_API_KEY:-}
 FIREBASE_WEB_APP_ID=${FIREBASE_WEB_APP_ID:-}
+AMPLITUDE_KEY=${AMPLITUDE_KEY:-}
 FIREBASE_WEB_PROJECT_ID=aichecklists-40230
 FIREBASE_WEB_AUTH_DOMAIN=aichecklists-40230.firebaseapp.com
 FIREBASE_WEB_STORAGE_BUCKET=aichecklists-40230.firebasestorage.app
@@ -82,6 +83,7 @@ log_secret() {
 }
 log_secret FIREBASE_WEB_API_KEY
 log_secret FIREBASE_WEB_APP_ID
+log_secret AMPLITUDE_KEY
 echo "::endgroup::"
 
 echo "::group::Gradle :composeApp:wasmJsBrowserDistribution"
