@@ -76,6 +76,7 @@ class WelcomeOnboardingViewModel(
                 _screenState.update { it.copy(inputText = intent.text) }
             is WelcomeOnboardingIntent.OnTemplateSelected -> handleTemplateSelected(intent.key)
             WelcomeOnboardingIntent.OnCreateFirstChecklist -> handleCreateFirstChecklist()
+            WelcomeOnboardingIntent.OnMoreWaysToStart -> handleMoreWaysToStart()
         }
     }
 
@@ -182,14 +183,32 @@ class WelcomeOnboardingViewModel(
         }
     }
 
-    private fun trackCompleted(checklistCreated: Boolean) {
+    /**
+     * "More ways to start" card on the final step. Opens the Analyze hub with all-default arguments
+     * (no prompt, no auto-analyze) so the user picks the input type (Photo/PDF/voice/link) themselves.
+     * Symmetric to the [FirstChecklistAction.AiAnalyze] branch: complete onboarding FIRST (the user
+     * must not be able to return to onboarding from the Analyze result), then hand off. We do NOT
+     * create a checklist here — the Analyze flow generates + previews + creates it via AI and fires
+     * its own creation event, so `checklist_created=false`; seed="multimodal" distinguishes this
+     * card-driven entry from the typed/chip/default seeds in the funnel analytics.
+     */
+    private fun handleMoreWaysToStart() {
+        if (_screenState.value.isCreating) return
+        viewModelScope.launch {
+            trackCompleted(checklistCreated = false, seedOverride = SEED_MULTIMODAL)
+            completeOnboardingUseCase()
+            navigator.navigateToAnalyzeScreen()
+        }
+    }
+
+    private fun trackCompleted(checklistCreated: Boolean, seedOverride: String? = null) {
         if (isDebugBuild) return
         analyticsTracker.event(
             AnalyticsEvents.Onboarding.COMPLETED,
             mapOf(
                 AnalyticsParams.VARIANT to VARIANT,
                 "checklist_created" to checklistCreated.toString(),
-                "seed" to seedKind(),
+                "seed" to (seedOverride ?: seedKind()),
             ),
         )
     }
@@ -265,6 +284,9 @@ class WelcomeOnboardingViewModel(
         private const val TAG = "WelcomeOnboarding"
         private const val VARIANT = "ai_welcome"
         private const val KEY_STARTED_TRACKED = "onboarding_started_tracked"
+        // Funnel "seed" value for the "More ways to start" card (Analyze hub); the typed/chip/default
+        // seeds come from seedKind(), which reads state — this card path has neither chip nor text.
+        private const val SEED_MULTIMODAL = "multimodal"
         // Resolved to onboarding_welcome_create_error in the Screen (string-key indirection so the
         // ViewModel never imports Compose Resources for snackbar text).
         const val ERROR_KEY = "onboarding_welcome_create_error"
