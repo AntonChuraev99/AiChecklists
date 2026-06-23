@@ -52,15 +52,12 @@ iOS: open `iosApp/iosApp.xcodeproj` in Xcode. Emulators: `Pixel_9`, `Medium_Phon
 
 **Deploy Web:** `./gradlew composeApp:wasmJsBrowserDistribution` then `npx wrangler@4 deploy`. CI: push to `master` → prod, other branches → preview. Needs `local.properties` `FIREBASE_WEB_API_KEY` + `FIREBASE_WEB_APP_ID`; CFs must deploy with CORS handlers. Config in `wrangler.jsonc`.
 
-### ⛔ ABSOLUTE RULE: NEVER `adb uninstall` before installing — permanent data loss
+### `adb uninstall` — acceptable now that data is Google-synced
 
-On 2026-05-24 an `adb uninstall` "for a clean state" **wiped a user's real Room database** (all checklists/fills/reminders gone). Auto-Backup does NOT cover the Room DB (`backup_rules.xml` includes only `files/user/`). Any uninstall = permanent loss.
+Google-account sync (Firestore) makes a reinstall recoverable: for a **signed-in** user, checklists/fills/reminders restore from the cloud by `google_uid`. So `adb uninstall` for a clean slate is fine on a dev device you're signed into. This supersedes the old absolute ban (after the 2026-05-24 Room-wipe incident, before sync covered the data).
 
-- ❌ NEVER `adb uninstall` / `pm uninstall` / `pm clear` / factory-reset a device holding real data.
-- ✅ Re-install with `adb install -r <apk>` (what `installDebug` and `/install-device` do).
-- ✅ Uninstall only when ADB demands it (`INSTALL_FAILED_VERSION_DOWNGRADE` / `UPDATE_INCOMPATIBLE`) — and **first ask via `AskUserQuestion`**, naming the side effect. Need a clean slate? Use an emulator, never the user's device.
-
-> P0 backlog: widen `backup_rules.xml` to include `databases/checklist_database` — until then this rule is the only safeguard.
+- ⚠️ Sync restores by **Google identity only**. An anonymous (not-signed-in) install keys data to a device-registration id that changes on reinstall — its local-only data does NOT come back. On a device holding real *anonymous* data, confirm sign-in first (or accept the loss).
+- `adb install -r <apk>` still preserves data with no caveats — the default for `/install-device`.
 
 ## Architecture
 
