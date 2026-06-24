@@ -369,6 +369,9 @@ private fun ChecklistDetailContent(
     onChecklistQuickAction: ((GistiChecklistAction) -> Unit)? = null,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
+    // Diagnostic logger for the attachment add path (picker callbacks below). On web these go to
+    // the browser console as [D]/[W] Attachments: ...
+    val logger: AppLogger = koinInject()
     // Controls the FillOptionsSheet opened from the TopAppBar "Fill checklist" action.
     // The two Fill buttons used to live in the bottom bar; they now live in this sheet.
     var showFillSheet by remember { mutableStateOf(false) }
@@ -447,9 +450,20 @@ private fun ChecklistDetailContent(
     // ── Attachment: FilePicker launchers ────────────────────────────────────────
     // Two static pickers (IMAGE + PDF) — avoids re-keying a single picker on type change.
     val imagePicker = rememberFilePickerLauncher(type = FilePickerType.IMAGE) { result ->
-        val itemId = state.pendingAttachmentItemId ?: return@rememberFilePickerLauncher
+        logger.debug(
+            "Attachments",
+            "picker callback: result=${result != null}, pendingItemId=${state.pendingAttachmentItemId}",
+        )
+        val itemId = state.pendingAttachmentItemId ?: run {
+            logger.warning("Attachments", "picker callback: pendingAttachmentItemId is null — drop result")
+            return@rememberFilePickerLauncher
+        }
         onIntent(ChecklistDetailIntent.OnImagePickerLaunched)
-        if (result == null) return@rememberFilePickerLauncher
+        if (result == null) {
+            logger.debug("Attachments", "picker callback: result null (cancelled)")
+            return@rememberFilePickerLauncher
+        }
+        logger.debug("Attachments", "picker callback: dispatching OnAttachmentPicked path=${result.filePath}")
         onIntent(
             ChecklistDetailIntent.OnAttachmentPicked(
                 itemId = itemId,
@@ -460,9 +474,20 @@ private fun ChecklistDetailContent(
         )
     }
     val filePicker = rememberFilePickerLauncher(type = FilePickerType.PDF) { result ->
-        val itemId = state.pendingAttachmentItemId ?: return@rememberFilePickerLauncher
+        logger.debug(
+            "Attachments",
+            "picker callback: result=${result != null}, pendingItemId=${state.pendingAttachmentItemId}",
+        )
+        val itemId = state.pendingAttachmentItemId ?: run {
+            logger.warning("Attachments", "picker callback: pendingAttachmentItemId is null — drop result")
+            return@rememberFilePickerLauncher
+        }
         onIntent(ChecklistDetailIntent.OnFilePickerLaunched)
-        if (result == null) return@rememberFilePickerLauncher
+        if (result == null) {
+            logger.debug("Attachments", "picker callback: result null (cancelled)")
+            return@rememberFilePickerLauncher
+        }
+        logger.debug("Attachments", "picker callback: dispatching OnAttachmentPicked path=${result.filePath}")
         onIntent(
             ChecklistDetailIntent.OnAttachmentPicked(
                 itemId = itemId,

@@ -126,6 +126,7 @@ class ChecklistDetailReminderGateTest {
             smartDateParser = FakeSmartDateParser(),
             attachmentStorage = FakeAttachmentStorage(),
             calendarEventLauncher = FakeCalendarEventLauncher(),
+            logger = NoOpAppLogger,
         )
     }
 

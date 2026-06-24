@@ -4,6 +4,7 @@ import androidx.lifecycle.viewModelScope
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePort
 import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
@@ -64,6 +65,7 @@ class ChecklistDetailViewModel(
     private val smartDateParser: SmartDateParser,
     private val attachmentStorage: AttachmentStoragePort,
     private val calendarEventLauncher: CalendarEventLauncher,
+    private val logger: AppLogger,
 ) : AppViewModel<ChecklistDetailState, ChecklistDetailIntent, Nothing>() {
 
     private val _screenState = MutableStateFlow<ChecklistDetailState>(ChecklistDetailState.Loading)
@@ -2726,8 +2728,15 @@ class ChecklistDetailViewModel(
     // ── Attachment handlers ──────────────────────────────────────────────────────
 
     private fun handleAddAttachment(itemId: String, isImage: Boolean) {
-        val content = _screenState.value as? ChecklistDetailState.Content ?: return
-        val item = content.defaultFill?.items?.firstOrNull { it.id == itemId } ?: return
+        logger.debug(TAG, "addAttachment: itemId=$itemId isImage=$isImage")
+        val content = _screenState.value as? ChecklistDetailState.Content ?: run {
+            logger.warning(TAG, "addAttachment: no Content state — bail")
+            return
+        }
+        val item = content.defaultFill?.items?.firstOrNull { it.id == itemId } ?: run {
+            logger.warning(TAG, "addAttachment: item $itemId not in defaultFill — bail")
+            return
+        }
         val limits = content.userLimits
         val blocked = if (limits != null) {
             !limits.canAddAttachment(item.attachments.size)
@@ -2736,9 +2745,15 @@ class ChecklistDetailViewModel(
             item.attachments.size >= FREE_ATTACHMENT_LIMIT_PER_ITEM
         }
         if (blocked) {
+            logger.warning(
+                TAG,
+                "addAttachment: blocked by limit (size=${item.attachments.size}, " +
+                    "limits=${limits?.maxAttachmentsPerItem}, premium=${limits?.isPremium})",
+            )
             updateContentState { it.copy(snackbarMessage = SNACKBAR_ATTACHMENT_PREMIUM_LIMIT) }
             return
         }
+        logger.debug(TAG, "addAttachment: launching picker for $itemId")
         updateContentState {
             it.copy(
                 pendingAttachmentItemId = itemId,
@@ -2750,8 +2765,19 @@ class ChecklistDetailViewModel(
 
     private fun handleAttachmentPicked(intent: ChecklistDetailIntent.OnAttachmentPicked) =
         viewModelScope.launch {
-            val content = _screenState.value as? ChecklistDetailState.Content ?: return@launch
-            val fillId = content.defaultFill?.id ?: return@launch
+            logger.debug(
+                TAG,
+                "picked: itemId=${intent.itemId} source=${intent.sourcePath} " +
+                    "name=${intent.fileName} mime=${intent.mimeType}",
+            )
+            val content = _screenState.value as? ChecklistDetailState.Content ?: run {
+                logger.warning(TAG, "picked: no Content state — bail")
+                return@launch
+            }
+            val fillId = content.defaultFill?.id ?: run {
+                logger.warning(TAG, "picked: defaultFill is null — bail (itemId=${intent.itemId})")
+                return@launch
+            }
 
             val attachmentId = Attachment.generateId()
             val storedPath = attachmentStorage.storeAttachment(
@@ -2761,7 +2787,9 @@ class ChecklistDetailViewModel(
                 attachmentId = attachmentId,
                 originalFileName = intent.fileName,
             )
+            logger.debug(TAG, "picked: storeAttachment -> ${storedPath ?: "NULL"}")
             if (storedPath == null) {
+                logger.warning(TAG, "picked: storeAttachment returned null — load error")
                 updateContentState {
                     it.copy(
                         pendingAttachmentItemId = null,
@@ -2772,7 +2800,9 @@ class ChecklistDetailViewModel(
             }
 
             val sizeBytes = attachmentStorage.sizeOf(storedPath)
+            logger.debug(TAG, "picked: size=$sizeBytes")
             if (sizeBytes > MAX_ATTACHMENT_SIZE_BYTES) {
+                logger.warning(TAG, "picked: too large $sizeBytes > $MAX_ATTACHMENT_SIZE_BYTES")
                 attachmentStorage.deleteAttachment(storedPath)
                 updateContentState {
                     it.copy(
@@ -2795,6 +2825,10 @@ class ChecklistDetailViewModel(
                 height = h,
             )
             repository.addAttachment(fillId, intent.itemId, attachment)
+            logger.debug(
+                TAG,
+                "picked: addAttachment done fill=$fillId item=${intent.itemId} att=$attachmentId",
+            )
             updateContentState { it.copy(pendingAttachmentItemId = null) }
             // Repository emits a Flow update; combine() in loadData() picks up the new fill state.
         }
@@ -2853,6 +2887,9 @@ class ChecklistDetailViewModel(
     }
 
     companion object {
+        /** Log tag for the attachment add + display path (diagnostic observability). */
+        private const val TAG = "Attachments"
+
         const val PREF_EXACT_ALARM_DONT_SHOW = "exact_alarm_dont_show"
         const val SNACKBAR_EXACT_GRANTED = "exact_alarm_granted"
         const val SNACKBAR_EXACT_DENIED = "exact_alarm_denied"

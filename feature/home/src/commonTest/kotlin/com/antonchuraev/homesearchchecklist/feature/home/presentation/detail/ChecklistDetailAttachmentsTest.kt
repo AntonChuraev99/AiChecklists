@@ -170,6 +170,7 @@ class ChecklistDetailAttachmentsTest {
             smartDateParser = FakeSmartDateParser(),
             attachmentStorage = attachmentStorage,
             calendarEventLauncher = FakeCalendarEventLauncher(),
+            logger = NoOpAppLogger,
         )
     }
 

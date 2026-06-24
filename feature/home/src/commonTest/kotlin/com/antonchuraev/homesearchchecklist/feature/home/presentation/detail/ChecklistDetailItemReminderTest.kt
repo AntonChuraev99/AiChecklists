@@ -158,6 +158,7 @@ class ChecklistDetailItemReminderTest {
             smartDateParser = FakeSmartDateParser(),
             attachmentStorage = FakeAttachmentStorage(),
             calendarEventLauncher = FakeCalendarEventLauncher(),
+            logger = NoOpAppLogger,
         )
     }
 

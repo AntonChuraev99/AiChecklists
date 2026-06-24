@@ -145,6 +145,7 @@ class ChecklistDetailSmartAddTest {
             smartDateParser = parser,
             attachmentStorage = FakeAttachmentStorage(),
             calendarEventLauncher = FakeCalendarEventLauncher(),
+            logger = NoOpAppLogger,
         )
     }
 

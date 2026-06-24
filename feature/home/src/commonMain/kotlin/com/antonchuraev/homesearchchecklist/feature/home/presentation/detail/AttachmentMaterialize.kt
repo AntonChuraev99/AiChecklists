@@ -6,6 +6,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.AppResult
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentCloudStoragePort
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePort
@@ -41,11 +42,24 @@ internal suspend fun ensureAttachmentLocal(
     attachment: Attachment,
     local: AttachmentStoragePort,
     cloud: AttachmentCloudStoragePort,
+    logger: AppLogger? = null,
 ): Boolean {
-    if (local.sizeOf(attachment.path) > 0) return true
-    val storagePath = attachment.storagePath ?: return true // no cloud copy; let the loader try path as-is
-    return cloud.download(storagePath, attachment.path) is AppResult.Success
+    logger?.debug(TAG, "materialize: path=${attachment.path} storagePath=${attachment.storagePath}")
+    val localSize = local.sizeOf(attachment.path)
+    logger?.debug(TAG, "materialize: localSize=$localSize")
+    if (localSize > 0) return true
+    val storagePath = attachment.storagePath ?: run {
+        logger?.debug(TAG, "materialize: no storagePath — let loader try path as-is")
+        return true // no cloud copy; let the loader try path as-is
+    }
+    logger?.debug(TAG, "materialize: downloading $storagePath")
+    val ok = cloud.download(storagePath, attachment.path) is AppResult.Success
+    if (!ok) logger?.warning(TAG, "materialize: download failed for $storagePath")
+    return ok
 }
+
+/** Log tag for the attachment materialize/display path (diagnostic observability). */
+private const val TAG = "Attachments"
 
 /**
  * Composable wrapper around [ensureAttachmentLocal]: probes/downloads when the attachment first
@@ -60,16 +74,18 @@ internal suspend fun ensureAttachmentLocal(
 internal fun rememberMaterializedAttachment(attachment: Attachment): AttachmentMaterializeState {
     val local = koinInject<AttachmentStoragePort>()
     val cloud = koinInject<AttachmentCloudStoragePort>()
+    val logger = koinInject<AppLogger>()
     var state by remember(attachment.path, attachment.storagePath) {
         mutableStateOf<AttachmentMaterializeState>(AttachmentMaterializeState.Loading)
     }
     LaunchedEffect(attachment.path, attachment.storagePath) {
         state = AttachmentMaterializeState.Loading
-        state = if (ensureAttachmentLocal(attachment, local, cloud)) {
+        state = if (ensureAttachmentLocal(attachment, local, cloud, logger)) {
             AttachmentMaterializeState.Ready
         } else {
             AttachmentMaterializeState.Error
         }
+        logger.debug(TAG, "materialize: -> $state")
     }
     return state
 }
