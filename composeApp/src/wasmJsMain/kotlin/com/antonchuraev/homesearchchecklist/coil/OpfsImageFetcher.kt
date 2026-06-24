@@ -3,6 +3,7 @@
 package com.antonchuraev.homesearchchecklist.coil
 
 import coil3.ImageLoader
+import coil3.Uri
 import coil3.decode.DataSource
 import coil3.decode.ImageSource
 import coil3.fetch.FetchResult
@@ -51,24 +52,30 @@ class OpfsImageFetcher(
         )
     }
 
-    class Factory : Fetcher.Factory<String> {
-        override fun create(data: String, options: Options, imageLoader: ImageLoader): Fetcher? {
-            if (!data.startsWith(OPFS_SCHEME)) return null
-            return OpfsImageFetcher(data, options)
+    // Factory is keyed on [Uri], NOT String: Coil 3 runs the model String through its built-in
+    // String->Uri mapper before fetcher resolution, so by the time fetchers are matched the data
+    // is a coil3.Uri. A Fetcher.Factory<String> is never consulted for it ("Unable to create a
+    // fetcher that supports: opfs://..."). Match on the parsed scheme instead.
+    class Factory : Fetcher.Factory<Uri> {
+        override fun create(data: Uri, options: Options, imageLoader: ImageLoader): Fetcher? {
+            if (data.scheme != OPFS_SCHEME_NAME) return null
+            return OpfsImageFetcher(data.toString(), options)
         }
     }
 }
 
 /**
  * Cache key for "opfs://" data. The pseudo-path is stable and unique per attachment
- * (contains attachmentId), so it doubles as both memory- and disk-cache key.
+ * (contains attachmentId), so it doubles as both memory- and disk-cache key. Keyed on [Uri]
+ * for the same String->Uri mapping reason as [OpfsImageFetcher.Factory].
  */
-class OpfsKeyer : Keyer<String> {
-    override fun key(data: String, options: Options): String? =
-        if (data.startsWith(OPFS_SCHEME)) data else null
+class OpfsKeyer : Keyer<Uri> {
+    override fun key(data: Uri, options: Options): String? =
+        if (data.scheme == OPFS_SCHEME_NAME) data.toString() else null
 }
 
-private const val OPFS_SCHEME = "opfs://"
+// coil3.Uri.scheme for an "opfs://…" path is "opfs" (no slashes).
+private const val OPFS_SCHEME_NAME = "opfs"
 
 // ---------------------------------------------------------------------------
 // JS bridge — reads OPFS bytes as a Uint8Array via globalThis.__opfsReadBytes.
