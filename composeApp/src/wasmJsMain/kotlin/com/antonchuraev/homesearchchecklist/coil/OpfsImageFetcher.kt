@@ -34,7 +34,15 @@ class OpfsImageFetcher(
 ) : Fetcher {
 
     override suspend fun fetch(): FetchResult? {
-        val bytes = readOpfsBytes(data) ?: return null
+        val bytes = readOpfsBytes(data)
+        if (bytes == null) {
+            println("[OpfsFetcher] readOpfsBytes returned NULL for $data")
+            return null
+        }
+        // Diagnostic: confirm the bytes Kotlin actually read (size + magic header) — a valid
+        // JPEG starts FF D8 FF, PNG 89 50 4E 47. Pinpoints byte corruption vs Coil decode failure.
+        val magic = bytes.take(4).joinToString(" ") { (it.toInt() and 0xFF).toString(16).padStart(2, '0') }
+        println("[OpfsFetcher] read $data size=${bytes.size} magic=$magic")
         val buffer = Buffer().apply { write(bytes) }
         return SourceFetchResult(
             source = ImageSource(source = buffer, fileSystem = options.fileSystem),

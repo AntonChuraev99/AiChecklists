@@ -25,6 +25,9 @@ fun main() {
                 add(OpfsImageFetcher.Factory())
                 add(OpfsKeyer())
             }
+            // Diagnostic: surface Coil's decode/fetch errors to the browser console so a failed
+            // OPFS image preview (BrokenImage) shows WHY (decoder error vs missing fetcher).
+            .logger(coil3.util.DebugLogger())
             .build()
     }
 
