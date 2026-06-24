@@ -1,5 +1,8 @@
 package com.antonchuraev.homesearchchecklist.feature.checklist.data.repository
 
+import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
+import com.antonchuraev.homesearchchecklist.core.common.api.AppResult
+import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentCloudStoragePort
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePort
 import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.SyncStatus
@@ -34,7 +37,9 @@ class ChecklistRepositoryImpl(
     private val checklistDao: ChecklistDao,
     private val fillDao: ChecklistFillDao,
     private val attachmentStorage: AttachmentStoragePort,
+    private val attachmentCloudStorage: AttachmentCloudStoragePort,
     private val transactionRunner: ChecklistTransactionRunner,
+    private val logger: AppLogger,
 ) : ChecklistRepository {
 
     // Checklists (templates)
@@ -122,6 +127,10 @@ class ChecklistRepositoryImpl(
     override suspend fun deleteChecklist(checklist: Checklist) {
         val fillsForChecklist = fillDao.getAllFillsByChecklistId(checklist.id)
         for (fill in fillsForChecklist) {
+            // Delete cloud objects before the local files: a cloud orphan silently consumes the
+            // user's Storage quota forever, whereas a stray local file is reclaimed on the next
+            // delete. fill.items is List<ChecklistFillItem>, same shape on entity and domain.
+            deleteCloudObjects(fill.items.flatMap { it.attachments })
             attachmentStorage.deleteAttachmentsForFill(fill.id)
         }
 
@@ -343,7 +352,13 @@ class ChecklistRepositoryImpl(
         // so we can clean up the file. File delete happens first — DB orphan (if persist
         // fails) is safer than file orphan (silently consumes user storage forever).
         val targetItem = fillEntity.items.firstOrNull { it.id == itemId }
-        val attachmentPath = targetItem?.attachments?.firstOrNull { it.id == attachmentId }?.path
+        val targetAttachment = targetItem?.attachments?.firstOrNull { it.id == attachmentId }
+        // Cloud object first (orphan there leaks Storage quota), then the local cache.
+        val storagePath = targetAttachment?.storagePath
+        if (storagePath != null) {
+            deleteCloudObject(storagePath)
+        }
+        val attachmentPath = targetAttachment?.path
         if (attachmentPath != null) {
             attachmentStorage.deleteAttachment(attachmentPath)
         }
@@ -358,6 +373,34 @@ class ChecklistRepositoryImpl(
             syncStatus = SyncStatus.PENDING_UPLOAD.value,
         ))
         checklistDao.touchForSync(fillEntity.checklistId, now)
+    }
+
+    /**
+     * Best-effort cloud cleanup for a set of attachments: delete the Storage object behind every
+     * attachment that has already been uploaded ([Attachment.storagePath] != null). Idempotent at
+     * the port (a missing object is Success), so re-deletes are safe.
+     *
+     * A failed cloud delete is logged but never propagated — local deletion and the DB write must
+     * still proceed (the user expects the item gone locally even if the network is down). The
+     * accepted v1 trade-off: an offline delete can strand the object in the cloud, because we do
+     * not yet keep a pending-cloud-delete queue.
+     */
+    private suspend fun deleteCloudObjects(attachments: List<Attachment>) {
+        attachments.forEach { attachment ->
+            attachment.storagePath?.let { deleteCloudObject(it) }
+        }
+    }
+
+    /** Single-object variant of [deleteCloudObjects]; logs on [AppResult.Error], never throws. */
+    private suspend fun deleteCloudObject(storagePath: String) {
+        when (val result = attachmentCloudStorage.delete(storagePath)) {
+            is AppResult.Error -> logger.error(
+                TAG,
+                "Failed to delete cloud attachment object: $storagePath",
+                result.exception,
+            )
+            else -> Unit
+        }
     }
 
     // Weekly mode
@@ -421,8 +464,10 @@ class ChecklistRepositoryImpl(
     }
 
     override suspend fun deleteFill(fill: ChecklistFill) {
-        // Clean up attachment files before removing the DB row.
-        // File delete first — a DB orphan is recoverable on next delete; a file orphan is not.
+        // Clean up attachments before removing the DB row.
+        // Cloud objects first (orphan there leaks the user's Storage quota), then the local files.
+        // A DB orphan is recoverable on the next delete; a file/cloud orphan is not.
+        deleteCloudObjects(fill.items.flatMap { it.attachments })
         attachmentStorage.deleteAttachmentsForFill(fill.id)
         fillDao.deleteById(fill.id)
         // Fills live inside the parent checklist's Firestore document. A hard local delete
@@ -505,6 +550,8 @@ class ChecklistRepositoryImpl(
      * rather than a separate DB query.
      */
     companion object {
+        private const val TAG = "ChecklistRepository"
+
         @OptIn(ExperimentalUuidApi::class)
         fun generateCloudId(): String = Uuid.random().toString()
     }

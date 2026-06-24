@@ -2,6 +2,7 @@ package com.antonchuraev.homesearchchecklist.feature.checklist.di
 
 import com.antonchuraev.homesearchchecklist.core.auth.api.GoogleAuthRepository
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
+import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentCloudStoragePort
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePort
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChatHistoryDao
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistDao
@@ -20,7 +21,13 @@ import kotlinx.coroutines.SupervisorJob
 import org.koin.dsl.module
 
 val checklistFeatureModule = module {
-    single<ChecklistRepository> { createChecklistRepository(get<AttachmentStoragePort>()) }
+    single<ChecklistRepository> {
+        createChecklistRepository(
+            attachmentStorage = get<AttachmentStoragePort>(),
+            attachmentCloudStorage = get<AttachmentCloudStoragePort>(),
+            logger = get<AppLogger>(),
+        )
+    }
     single { RecoverRecurringRemindersUseCase(get(), get(), getOrNull()) }
     single<SmartDateParser> { SmartDateParserImpl(get()) }
     single<ChatHistoryDao> { getChecklistDatabase(get<AttachmentStoragePort>()).chatHistoryDao() }
@@ -39,6 +46,7 @@ val checklistFeatureModule = module {
             firestoreDataSource = get<FirestoreSyncDataSource>(),
             authRepository = get<GoogleAuthRepository>(),
             initialUploadGate = get<InitialUploadGate>(),
+            attachmentCloudStorage = get<AttachmentCloudStoragePort>(),
             scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
             logger = get<AppLogger>(),
         )

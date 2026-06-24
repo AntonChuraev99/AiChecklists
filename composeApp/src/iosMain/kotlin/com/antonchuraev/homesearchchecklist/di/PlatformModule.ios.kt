@@ -1,6 +1,8 @@
 package com.antonchuraev.homesearchchecklist.di
 
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentCloudStorage
+import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentCloudStoragePort
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentOpener
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStorage
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePort
@@ -50,6 +52,9 @@ actual fun platformModule(): Module = module {
     // AttachmentStorage: iOS stub — throws NotImplementedError (gated by PlatformCapabilities).
     // Bound as AttachmentStoragePort so ViewModel stays platform-agnostic in commonMain.
     single<AttachmentStoragePort> { AttachmentStorage() }
+
+    // AttachmentCloudStorage: iOS stub — ops return AppResult.Error (attachments not released on iOS).
+    single<AttachmentCloudStoragePort> { AttachmentCloudStorage() }
 
     // AttachmentOpener: iOS stub — openExternally always returns false (Phase 5).
     single { AttachmentOpener() }

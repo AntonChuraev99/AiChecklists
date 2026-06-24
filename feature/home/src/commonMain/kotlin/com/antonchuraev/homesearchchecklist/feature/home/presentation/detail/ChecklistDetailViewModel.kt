@@ -2728,8 +2728,14 @@ class ChecklistDetailViewModel(
     private fun handleAddAttachment(itemId: String, isImage: Boolean) {
         val content = _screenState.value as? ChecklistDetailState.Content ?: return
         val item = content.defaultFill?.items?.firstOrNull { it.id == itemId } ?: return
-        val isPremium = content.userLimits?.isPremium ?: false
-        if (!isPremium && item.attachments.size >= FREE_ATTACHMENT_LIMIT_PER_ITEM) {
+        val limits = content.userLimits
+        val blocked = if (limits != null) {
+            !limits.canAddAttachment(item.attachments.size)
+        } else {
+            // userLimits not loaded yet — fall back to the static free-tier default.
+            item.attachments.size >= FREE_ATTACHMENT_LIMIT_PER_ITEM
+        }
+        if (blocked) {
             updateContentState { it.copy(snackbarMessage = SNACKBAR_ATTACHMENT_PREMIUM_LIMIT) }
             return
         }
@@ -2869,7 +2875,10 @@ class ChecklistDetailViewModel(
         val STRANDED_TIME_PREPOSITIONS = setOf("в", "во", "at")
 
         // ── Attachment limits and snackbar keys ──────────────────────────────
-        /** Max attachments per item for free-tier users. */
+        /**
+         * Fallback max attachments per item for free-tier users, used only when userLimits is
+         * not yet loaded. Source of truth = RC max_attachments_per_item_free via UserLimits.
+         */
         const val FREE_ATTACHMENT_LIMIT_PER_ITEM = 3
 
         /** Max file size accepted during store (10 MB). Oversized files are deleted immediately. */

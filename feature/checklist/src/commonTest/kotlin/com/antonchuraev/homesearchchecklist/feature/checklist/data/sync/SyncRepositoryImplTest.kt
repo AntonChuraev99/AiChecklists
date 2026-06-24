@@ -5,10 +5,12 @@ import com.antonchuraev.homesearchchecklist.core.auth.api.GoogleAuthState
 import com.antonchuraev.homesearchchecklist.core.auth.api.GoogleUser
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.AppResult
+import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentCloudStoragePort
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistDao
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistEntity
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistFillDao
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistFillEntity
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Attachment
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistReminderInfo
@@ -29,6 +31,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SyncRepositoryImplTest {
@@ -45,6 +48,7 @@ class SyncRepositoryImplTest {
             firestoreDataSource = firestore,
             authRepository = auth,
             initialUploadGate = gate,
+            attachmentCloudStorage = attachmentCloud,
             scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler)),
             logger = NoopLogger,
         )
@@ -720,6 +724,108 @@ class SyncRepositoryImplTest {
         assertTrue(gate.doneUids.contains("other-uid"))
     }
 
+    // ─── Tests: attachment-bytes upload on push (cross-device sync, Phase 3) ──
+    //
+    // When a fill carries an attachment whose bytes have not yet reached Firebase Storage
+    // (storagePath == null && path is a real local handle), pushing the parent checklist must
+    // upload those bytes and stamp the attachment's storagePath — the cross-device anchor that
+    // lets another device of the same user lazily download the file. A failed byte-upload must
+    // leave storagePath null (so it retries next push) WITHOUT failing the whole push, and the
+    // Firestore document must still be uploaded so the rest of the change syncs.
+
+    @Test
+    fun pushPendingChanges_fillHasAttachmentWithoutStoragePath_uploadsBytesAndStampsStoragePath() = runTest {
+        // Parent PENDING_UPLOAD so uploadChecklistEntity runs; one active fill holds one item
+        // with an un-uploaded attachment (storagePath = null, local path present).
+        dao.checklists.add(localPendingUpload(1L, "c1", "List"))
+        val att = attachment(id = "att1", path = "/local/photo.jpg", fileName = "photo.jpg", storagePath = null)
+        val fill = fillEntityWithItem(id = 10L, checklistId = 1L, cloudId = "f1", attachment = att)
+        val itemId = fill.items.single().id
+        fillDao.fills.add(fill)
+
+        val repo = newRepo()
+        auth.currentUserOverride = testUser
+
+        repo.pushPendingChanges()
+
+        val expectedKey = "users/$uid/attachments/10/$itemId/att1.jpg"
+        assertEquals(
+            listOf("/local/photo.jpg" to expectedKey),
+            attachmentCloud.uploadCalls,
+            "the un-uploaded attachment's bytes must be uploaded exactly once, to the AttachmentCloudPaths key",
+        )
+
+        // Persisted fill in Room carries the stamped storagePath.
+        val persisted = fillDao.fills.single { it.cloudId == "f1" }
+        assertEquals(
+            expectedKey,
+            persisted.items.single().attachments.single().storagePath,
+            "the persisted fill's attachment must be stamped with the cloud key",
+        )
+
+        // The uploaded Firestore document's embedded fill itemsJson must carry the storagePath too,
+        // so the cross-device anchor actually reaches the cloud.
+        val uploadedFill = firestore.uploaded.single { it.cloudId == "c1" }.fills.single { it.cloudId == "f1" }
+        val uploadedItems = itemsJson.decodeFromString(
+            ListSerializer(ChecklistFillItem.serializer()),
+            uploadedFill.itemsJson,
+        )
+        assertEquals(
+            expectedKey,
+            uploadedItems.single().attachments.single().storagePath,
+            "the uploaded Firestore document must embed the attachment's storagePath",
+        )
+    }
+
+    @Test
+    fun pushPendingChanges_attachmentAlreadyHasStoragePath_skipsUpload() = runTest {
+        // Attachment already uploaded on a previous push (storagePath set) → no re-upload.
+        dao.checklists.add(localPendingUpload(1L, "c1", "List"))
+        val att = attachment(
+            id = "att1",
+            path = "/local/photo.jpg",
+            fileName = "photo.jpg",
+            storagePath = "users/$uid/attachments/10/already/att1.jpg",
+        )
+        fillDao.fills.add(fillEntityWithItem(id = 10L, checklistId = 1L, cloudId = "f1", attachment = att))
+
+        val repo = newRepo()
+        auth.currentUserOverride = testUser
+
+        repo.pushPendingChanges()
+
+        assertTrue(
+            attachmentCloud.uploadCalls.isEmpty(),
+            "an attachment that already has a storagePath must NOT be re-uploaded",
+        )
+    }
+
+    @Test
+    fun pushPendingChanges_uploadFails_keepsStoragePathNull_andDoesNotFailPush() = runTest {
+        // The byte-upload to Storage fails. The attachment must stay storagePath = null (retry next
+        // push), push must still succeed, and the Firestore document must still be uploaded.
+        dao.checklists.add(localPendingUpload(1L, "c1", "List"))
+        val att = attachment(id = "att1", path = "/local/photo.jpg", fileName = "photo.jpg", storagePath = null)
+        fillDao.fills.add(fillEntityWithItem(id = 10L, checklistId = 1L, cloudId = "f1", attachment = att))
+        attachmentCloud.uploadResult = AppResult.Error(Exception("storage upload failed"))
+
+        val repo = newRepo()
+        auth.currentUserOverride = testUser
+
+        val result = repo.pushPendingChanges()
+
+        assertTrue(result is AppResult.Success, "a failed attachment byte-upload must not fail the whole push")
+        assertEquals(1, attachmentCloud.uploadCalls.size, "the upload was attempted once")
+        assertNull(
+            fillDao.fills.single { it.cloudId == "f1" }.items.single().attachments.single().storagePath,
+            "a failed upload must leave storagePath null so it retries on the next push",
+        )
+        assertTrue(
+            firestore.uploaded.any { it.cloudId == "c1" },
+            "the checklist document must still be uploaded even when an attachment byte-upload fails",
+        )
+    }
+
     // ─── Fakes ───────────────────────────────────────────────────────────
 
     private val dao = FakeChecklistDao()
@@ -727,6 +833,7 @@ class SyncRepositoryImplTest {
     private val firestore = FakeFirestore()
     private val gate = FakeGate()
     private val auth = FakeAuth()
+    private val attachmentCloud = FakeAttachmentCloudStorage()
 
     private fun fillEntity(
         id: Long,
@@ -748,6 +855,40 @@ class SyncRepositoryImplTest {
             syncStatus = syncStatus,
             isDeleted = false,
         )
+
+    /** Attachment fixture with controllable id/path/fileName/storagePath for the upload tests. */
+    private fun attachment(
+        id: String,
+        path: String,
+        fileName: String,
+        storagePath: String?,
+    ) = Attachment(
+        id = id,
+        path = path,
+        fileName = fileName,
+        mimeType = "image/jpeg",
+        sizeBytes = 1_024L,
+        createdAt = 0L,
+        storagePath = storagePath,
+    )
+
+    /**
+     * A fill carrying a single item holding one [attachment]. [ChecklistFillItem] auto-generates
+     * its id (no setter), so the caller reads the generated id off the returned entity to build the
+     * expected cloud key — the SUT uses that same id, so the key assertion stays faithful.
+     */
+    private fun fillEntityWithItem(
+        id: Long,
+        checklistId: Long,
+        cloudId: String?,
+        attachment: Attachment,
+        syncStatus: Int = SyncStatus.SYNCED.value,
+        updatedAt: Long = 100L,
+    ): ChecklistFillEntity {
+        val item = ChecklistFillItem(text = "item", checked = false)
+            .withAttachmentAdded(attachment)
+        return fillEntity(id, checklistId, cloudId, syncStatus, updatedAt).copy(items = listOf(item))
+    }
 
     /**
      * In-memory [ChecklistDao]. Only the methods exercised by the sync pipeline carry
@@ -912,6 +1053,25 @@ class SyncRepositoryImplTest {
         override suspend fun markInitialUploadDone(uid: String) {
             doneUids.add(uid)
         }
+    }
+
+    /**
+     * In-memory cloud storage. Records every [upload] call as a (localPath, storagePath) pair so
+     * tests can assert what bytes were transferred and to which cloud key. [uploadResult] defaults
+     * to Success (existing tests have no attachments, so the path is never hit); the attachment
+     * tests flip it to Error to exercise the failed-upload branch.
+     */
+    private class FakeAttachmentCloudStorage : AttachmentCloudStoragePort {
+        val uploadCalls = mutableListOf<Pair<String, String>>()
+        var uploadResult: AppResult<Unit> = AppResult.Success(Unit)
+
+        override suspend fun upload(localPath: String, storagePath: String): AppResult<Unit> {
+            uploadCalls.add(localPath to storagePath)
+            return uploadResult
+        }
+
+        override suspend fun download(storagePath: String, localPath: String): AppResult<Unit> = AppResult.Success(Unit)
+        override suspend fun delete(storagePath: String): AppResult<Unit> = AppResult.Success(Unit)
     }
 
     private class FakeAuth : GoogleAuthRepository {

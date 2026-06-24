@@ -13,7 +13,9 @@ data class UserLimits(
     val maxWeeklyChecklists: Int = if (isPremium) Int.MAX_VALUE else 1,
     val currentWeeklyChecklistCount: Int = 0,
     // Recurring reminder limit (RC-driven: max_recurring_reminders_free). Premium = unlimited.
-    val maxRecurringReminders: Int = if (isPremium) Int.MAX_VALUE else 1
+    val maxRecurringReminders: Int = if (isPremium) Int.MAX_VALUE else 1,
+    // Per-item attachment limit (RC-driven: max_attachments_per_item_free). Premium = unlimited.
+    val maxAttachmentsPerItem: Int = if (isPremium) Int.MAX_VALUE else 3
 ) {
     val canCreateChecklist: Boolean
         get() = isPremium || currentChecklistCount < maxChecklists
@@ -28,6 +30,10 @@ data class UserLimits(
     /** Whether the user can create another recurring reminder. Free users: RC limit, Premium: unlimited. */
     fun canCreateRecurringReminder(currentReminderCount: Int): Boolean =
         isPremium || currentReminderCount < maxRecurringReminders
+
+    /** Whether the user can add another attachment to an item. Free: RC limit, Premium: unlimited. */
+    fun canAddAttachment(currentAttachmentCount: Int): Boolean =
+        isPremium || currentAttachmentCount < maxAttachmentsPerItem
 
     fun canCreateFill(currentFillCount: Int): Boolean =
         isPremium || currentFillCount < maxFillsPerChecklist

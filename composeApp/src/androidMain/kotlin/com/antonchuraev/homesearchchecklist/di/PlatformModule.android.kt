@@ -8,6 +8,8 @@ import com.antonchuraev.homesearchchecklist.calendar.AndroidCalendarEventLaunche
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppContextHolder
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
+import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentCloudStorage
+import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentCloudStoragePort
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentOpener
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStorage
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePort
@@ -43,6 +45,10 @@ actual fun platformModule(): Module = module {
     // AttachmentStorage: Android-only real implementation (Phase 2).
     // Bound as AttachmentStoragePort so ViewModel stays platform-agnostic in commonMain.
     single<AttachmentStoragePort> { AttachmentStorage() }
+
+    // AttachmentCloudStorage: Firebase Storage transfer for attachment bytes (cross-device sync).
+    // Bound as AttachmentCloudStoragePort so commonMain callers stay platform-agnostic.
+    single<AttachmentCloudStoragePort> { AttachmentCloudStorage() }
 
     // AttachmentOpener: Android implementation uses FileProvider + Intent.ACTION_VIEW.
     // iOS/wasmJs stubs return false (attachments unsupported until Phase 5/v2).

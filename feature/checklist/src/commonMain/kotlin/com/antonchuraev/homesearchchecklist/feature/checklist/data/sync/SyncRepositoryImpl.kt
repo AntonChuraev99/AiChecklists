@@ -4,9 +4,12 @@ import com.antonchuraev.homesearchchecklist.core.auth.api.GoogleAuthRepository
 import com.antonchuraev.homesearchchecklist.core.auth.api.GoogleAuthState
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.AppResult
+import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentCloudPaths
+import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentCloudStoragePort
 import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistDao
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistFillDao
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistFillEntity
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.toDomain
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
@@ -38,6 +41,7 @@ class SyncRepositoryImpl(
     private val firestoreDataSource: FirestoreSyncDataSource,
     private val authRepository: GoogleAuthRepository,
     private val initialUploadGate: InitialUploadGate,
+    private val attachmentCloudStorage: AttachmentCloudStoragePort,
     private val scope: CoroutineScope,
     private val logger: AppLogger,
 ) : SyncRepository {
@@ -169,6 +173,49 @@ class SyncRepositoryImpl(
     }
 
     /**
+     * Uploads any not-yet-uploaded attachment bytes for [fill] to Firebase Storage, stamping
+     * [com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Attachment.storagePath].
+     * Returns the fill with updated items (persisted to Room) so the synced itemsJson carries the
+     * cloud keys. A failed upload leaves storagePath null — that attachment retries on the next push
+     * while the rest of the document still syncs.
+     *
+     * Only fields inside the items JSON change here; updatedAt/syncStatus are intentionally left as
+     * they are so the caller still bumps/marks them exactly as before. fillDao.insert() is an upsert
+     * on the existing id, so the row identity (and thus the subsequent markSynced(id)) is preserved.
+     */
+    private suspend fun uploadPendingAttachments(uid: String, fill: ChecklistFillEntity): ChecklistFillEntity {
+        val hasPending = fill.items.any { item ->
+            item.attachments.any { a -> a.storagePath == null && a.path.isNotBlank() }
+        }
+        if (!hasPending) return fill
+        var changed = false
+        val updatedItems = fill.items.map { item ->
+            if (item.attachments.none { it.storagePath == null && it.path.isNotBlank() }) return@map item
+            val updatedAtts = item.attachments.map { att ->
+                if (att.storagePath != null || att.path.isBlank()) return@map att
+                val key = AttachmentCloudPaths.forAttachment(uid, fill.id, item.id, att.id, att.fileName)
+                when (val r = attachmentCloudStorage.upload(att.path, key)) {
+                    is AppResult.Success -> {
+                        changed = true
+                        att.copy(storagePath = key)
+                    }
+                    is AppResult.Error -> {
+                        logError("attachment upload failed id=${att.id}: ${r.exception.message}", r.exception)
+                        att
+                    }
+                    is AppResult.Loading -> att
+                }
+            }
+            item.withAttachments(updatedAtts)
+        }
+        if (!changed) return fill
+        val updatedFill = fill.copy(items = updatedItems)
+        // Persist the stamped storagePath; updatedAt/syncStatus untouched (caller bumps/marks).
+        fillDao.insert(updatedFill)
+        return updatedFill
+    }
+
+    /**
      * Uploads one checklist (with its active fills embedded) to Firestore and, on
      * success, marks the checklist and those fills SYNCED.
      *
@@ -191,7 +238,12 @@ class SyncRepositoryImpl(
             logInfo("push: backfilling missing cloudId for '${entity.name}' -> $newId")
             checklistDao.assignCloudId(entity.id, newId)
         }
-        val fills = fillDao.getActiveFillsByChecklistId(entity.id)
+        // Upload not-yet-uploaded attachment bytes BEFORE serializing fills, so the
+        // itemsJson embedded in the cloud document carries each attachment's storagePath
+        // (the cross-device anchor). Stamping persists to Room too — id is preserved, so
+        // the markSynced(it.id) below still targets the same rows.
+        val rawFills = fillDao.getActiveFillsByChecklistId(entity.id)
+        val fills = rawFills.map { uploadPendingAttachments(uid, it) }
         val fillSyncData = fills.map { fill ->
             val fillCid = fill.cloudId ?: generateCloudId().also { newId ->
                 fillDao.assignCloudId(fill.id, newId)
@@ -225,6 +277,7 @@ class SyncRepositoryImpl(
             log("initialUpload: ${allChecklists.size} active checklists to upload")
             val syncDataList = allChecklists.map { entity ->
                 val fills = fillDao.getActiveFillsByChecklistId(entity.id)
+                    .map { uploadPendingAttachments(uid, it) }
                 entity.toSyncData(fills.map { it.toFillSyncData() })
             }
 

@@ -41,6 +41,14 @@ kotlin {
         androidMain.dependencies {
             // BundledSQLiteDriver for Android (non-framework SQLite, matches sqlite-bundled KMP)
             implementation(libs.sqlite3.bundled)
+
+            // Firebase Storage SDK for AttachmentCloudStorage.android.kt (cross-device attachment sync).
+            // firebase-storage-ktx is gone in BOM 34+ — the base artifact ships the Kotlin APIs.
+            // Version pinned by the Firebase BOM added via dependencies{} below.
+            implementation(libs.firebase.storage)
+
+            // .await() on Play Services Task<T> for Storage put/get/delete (import kotlinx.coroutines.tasks.await).
+            implementation(libs.kotlinx.coroutines.play.services)
         }
 
         val iosMain by creating {
@@ -66,4 +74,10 @@ kotlin {
             implementation(libs.kotlin.test)
         }
     }
+}
+
+dependencies {
+    // Firebase BOM — pins the firebase-storage version in androidMain.
+    // platform() is deprecated in KMP source-set blocks (KT-58759), so we pin via dependencies{}.
+    add("androidMainImplementation", platform(libs.firebase.bom))
 }

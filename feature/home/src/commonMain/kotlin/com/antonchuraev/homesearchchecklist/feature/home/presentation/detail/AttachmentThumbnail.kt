@@ -3,6 +3,7 @@ package com.antonchuraev.homesearchchecklist.feature.home.presentation.detail
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -12,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
@@ -75,20 +77,47 @@ internal fun AttachmentThumbnail(
 
 @Composable
 private fun ImageThumbnailContent(attachment: Attachment) {
-    val context = LocalPlatformContext.current
-    val request = ImageRequest.Builder(context)
-        .data(attachment.path)
-        .crossfade(true)
-        .build()
+    when (rememberMaterializedAttachment(attachment)) {
+        AttachmentMaterializeState.Loading -> {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(20.dp))
+            }
+        }
 
-    AsyncImage(
-        model = request,
-        contentDescription = attachment.fileName,
-        contentScale = ContentScale.Crop,
-        modifier = Modifier.fillMaxSize(),
-        placeholder = rememberVectorPainter(Icons.AutoMirrored.Filled.InsertDriveFile),
-        error = rememberVectorPainter(Icons.Filled.BrokenImage),
-    )
+        AttachmentMaterializeState.Error -> {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.BrokenImage,
+                    contentDescription = attachment.fileName,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(28.dp),
+                )
+            }
+        }
+
+        AttachmentMaterializeState.Ready -> {
+            val context = LocalPlatformContext.current
+            val request = ImageRequest.Builder(context)
+                .data(attachment.path)
+                .crossfade(true)
+                .build()
+
+            AsyncImage(
+                model = request,
+                contentDescription = attachment.fileName,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+                placeholder = rememberVectorPainter(Icons.AutoMirrored.Filled.InsertDriveFile),
+                error = rememberVectorPainter(Icons.Filled.BrokenImage),
+            )
+        }
+    }
 }
 
 @Composable

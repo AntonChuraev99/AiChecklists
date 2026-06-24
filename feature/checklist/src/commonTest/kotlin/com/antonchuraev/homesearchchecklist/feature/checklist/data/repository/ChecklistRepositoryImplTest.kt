@@ -1,5 +1,8 @@
 package com.antonchuraev.homesearchchecklist.feature.checklist.data.repository
 
+import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
+import com.antonchuraev.homesearchchecklist.core.common.api.AppResult
+import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentCloudStoragePort
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePort
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistDao
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistEntity
@@ -156,6 +159,52 @@ class ChecklistRepositoryImplTest {
         assertEquals(templateItem.id, savedItem.templateItemId, "template link must survive reset")
     }
 
+    // ─── Tests: removeAttachment cleans up the cloud object ──────────────────
+
+    @Test
+    fun removeAttachment_attachmentHasStoragePath_deletesCloudObject() = runTest {
+        val checklist = Checklist(id = 1L, name = "Trip", items = emptyList())
+        checklistDao.checklists.add(checklist.toEntityRow())
+
+        // One item carrying an attachment that has already been uploaded (storagePath != null).
+        val storagePath = "users/uid-1/attachments/10/item-1/att_3.jpg"
+        val attachment = sampleAttachment("att_3", storagePath = storagePath)
+        val fillItem = ChecklistFillItem(text = "Pack", checked = false)
+            .withAttachmentAdded(attachment)
+        fillDao.fills.add(defaultFillRow(id = 10L, checklistId = 1L, items = listOf(fillItem)))
+
+        newRepo().removeAttachment(fillId = 10L, itemId = fillItem.id, attachmentId = attachment.id)
+
+        // The cloud object behind the removed attachment must be deleted exactly once.
+        assertEquals(
+            listOf(storagePath),
+            attachmentCloudStorage.deletedPaths,
+            "removeAttachment must delete the uploaded attachment's cloud object",
+        )
+        // And the attachment is gone from the persisted fill.
+        val savedItem = fillDao.fills.single { it.id == 10L }.items.single { it.id == fillItem.id }
+        assertTrue(savedItem.attachments.isEmpty(), "attachment must be removed from the fill")
+    }
+
+    @Test
+    fun removeAttachment_attachmentWithoutStoragePath_skipsCloudDelete() = runTest {
+        val checklist = Checklist(id = 1L, name = "Trip", items = emptyList())
+        checklistDao.checklists.add(checklist.toEntityRow())
+
+        // Attachment never uploaded (storagePath == null): nothing to delete in the cloud.
+        val attachment = sampleAttachment("att_4", storagePath = null)
+        val fillItem = ChecklistFillItem(text = "Pack", checked = false)
+            .withAttachmentAdded(attachment)
+        fillDao.fills.add(defaultFillRow(id = 10L, checklistId = 1L, items = listOf(fillItem)))
+
+        newRepo().removeAttachment(fillId = 10L, itemId = fillItem.id, attachmentId = attachment.id)
+
+        assertTrue(
+            attachmentCloudStorage.deletedPaths.isEmpty(),
+            "a never-uploaded attachment (null storagePath) must not trigger a cloud delete",
+        )
+    }
+
     // ─── Tests: reorderItems persists atomically + monotonically ─────────────
 
     @Test
@@ -212,6 +261,8 @@ class ChecklistRepositoryImplTest {
     private val checklistDao = FakeChecklistDao()
     private val fillDao = FakeFillDao()
     private val attachmentStorage = NoopAttachmentStorage
+    private val attachmentCloudStorage = RecordingAttachmentCloudStorage()
+    private val logger = NoopLogger
 
     // Pass-through transaction runner: a real Room transaction would just commit both writes
     // together, so for unit purposes invoking the block directly is faithful (the atomicity that
@@ -223,16 +274,19 @@ class ChecklistRepositoryImplTest {
         checklistDao = checklistDao,
         fillDao = fillDao,
         attachmentStorage = attachmentStorage,
+        attachmentCloudStorage = attachmentCloudStorage,
         transactionRunner = transactionRunner,
+        logger = logger,
     )
 
-    private fun sampleAttachment(id: String) = Attachment(
+    private fun sampleAttachment(id: String, storagePath: String? = null) = Attachment(
         id = id,
         path = "/data/attachments/$id.jpg",
         fileName = "photo.jpg",
         mimeType = "image/jpeg",
         sizeBytes = 1_000L,
         createdAt = 0L,
+        storagePath = storagePath,
     )
 
     private fun Checklist.toEntityRow() = ChecklistEntity(
@@ -382,5 +436,25 @@ class ChecklistRepositoryImplTest {
         override suspend fun deleteAttachmentsForFill(fillId: Long) {}
         override suspend fun probeImage(path: String, mimeType: String?): Pair<Int?, Int?> = null to null
         override suspend fun sizeOf(path: String): Long = 0L
+    }
+
+    /** Records the storagePaths passed to delete() so tests can assert cloud cleanup fired. */
+    private class RecordingAttachmentCloudStorage : AttachmentCloudStoragePort {
+        val deletedPaths = mutableListOf<String>()
+
+        override suspend fun upload(localPath: String, storagePath: String): AppResult<Unit> = AppResult.Success(Unit)
+        override suspend fun download(storagePath: String, localPath: String): AppResult<Unit> = AppResult.Success(Unit)
+        override suspend fun delete(storagePath: String): AppResult<Unit> {
+            deletedPaths.add(storagePath)
+            return AppResult.Success(Unit)
+        }
+    }
+
+    /** Swallows logs — error paths are best-effort and not asserted here. */
+    private object NoopLogger : AppLogger {
+        override fun debug(tag: String, message: String) {}
+        override fun info(tag: String, message: String) {}
+        override fun warning(tag: String, message: String) {}
+        override fun error(tag: String, message: String, throwable: Throwable?) {}
     }
 }

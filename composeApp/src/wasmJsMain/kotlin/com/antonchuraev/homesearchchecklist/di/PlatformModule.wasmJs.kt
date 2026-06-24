@@ -2,6 +2,8 @@ package com.antonchuraev.homesearchchecklist.di
 
 import com.antonchuraev.homesearchchecklist.analytics.WasmAnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentCloudStorage
+import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentCloudStoragePort
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentOpener
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStorage
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePort
@@ -39,6 +41,10 @@ actual fun platformModule(): Module = module {
     // AttachmentStorage: wasmJs OPFS-backed durable storage (globalThis.__opfs* bridges).
     // Bound as AttachmentStoragePort so ViewModel stays platform-agnostic in commonMain.
     single<AttachmentStoragePort> { AttachmentStorage() }
+
+    // AttachmentCloudStorage: wasmJs Firebase JS Storage transfer (globalThis.__storage* bridges).
+    // Cross-device half of attachment sync — moves OPFS bytes to/from the cloud bucket.
+    single<AttachmentCloudStoragePort> { AttachmentCloudStorage() }
 
     // AttachmentOpener: wasmJs OPFS read → blob URL → popup-safe anchor open/download.
     single { AttachmentOpener() }

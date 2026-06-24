@@ -86,6 +86,8 @@ sqlite3-bundled = { module = "androidx.sqlite:sqlite-bundled", version.ref = "sq
 sqlite3-web = { module = "androidx.sqlite:sqlite-web", version.ref = "sqlite3" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinxCoroutines" }
+# .await() extension for Play Services Task<T> (Firebase Storage put/get/delete). Same version as coroutines-core.
+kotlinx-coroutines-play-services = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-play-services", version.ref = "kotlinxCoroutines" }
 datastore-preferences-core = { module = "androidx.datastore:datastore-preferences-core", version.ref = "datastore" }
 datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
 datastore-core-okio = { module = "androidx.datastore:datastore-core-okio", version.ref = "datastore" }
@@ -103,6 +105,8 @@ firebase-config = { module = "com.google.firebase:firebase-config" }
 firebase-auth = { module = "com.google.firebase:firebase-auth" }
 firebase-firestore = { module = "com.google.firebase:firebase-firestore" }
 firebase-messaging = { module = "com.google.firebase:firebase-messaging" }
+# firebase-storage-ktx is gone in BOM 34+ — the base artifact ships the Kotlin APIs. Version from firebase-bom.
+firebase-storage = { module = "com.google.firebase:firebase-storage" }
 
 # Credential Manager (Google Sign-In)
 credentials = { module = "androidx.credentials:credentials", version.ref = "credentialManager" }

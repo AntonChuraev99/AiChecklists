@@ -39,6 +39,11 @@ class GetUserLimitsUseCase(
             RemoteConfigDefaults.MAX_RECURRING_REMINDERS_FREE
         ).toInt()
 
+        val maxAttachmentsPerItemFree = remoteConfigProvider.getLong(
+            RemoteConfigKeys.MAX_ATTACHMENTS_PER_ITEM_FREE,
+            RemoteConfigDefaults.MAX_ATTACHMENTS_PER_ITEM_FREE
+        ).toInt()
+
         return combine(
             checklistRepository.checklists.map { it.size },
             paywallRepository.subscriptionStatus,
@@ -54,7 +59,8 @@ class GetUserLimitsUseCase(
                 isPremium = isPremium,
                 maxWeeklyChecklists = if (isPremium) Int.MAX_VALUE else maxWeeklyChecklistsFree,
                 currentWeeklyChecklistCount = weeklyCount,
-                maxRecurringReminders = if (isPremium) Int.MAX_VALUE else maxRecurringRemindersFree
+                maxRecurringReminders = if (isPremium) Int.MAX_VALUE else maxRecurringRemindersFree,
+                maxAttachmentsPerItem = if (isPremium) Int.MAX_VALUE else maxAttachmentsPerItemFree
             )
         }
     }

@@ -1,5 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.checklist.di
 
+import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
+import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentCloudStoragePort
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePort
 import com.antonchuraev.homesearchchecklist.core.common.api.getDatabaseBuilder
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistDatabase
@@ -14,12 +16,18 @@ private val database: ChecklistDatabase by lazy {
     )
 }
 
-internal fun createChecklistRepository(attachmentStorage: AttachmentStoragePort): ChecklistRepository =
+internal fun createChecklistRepository(
+    attachmentStorage: AttachmentStoragePort,
+    attachmentCloudStorage: AttachmentCloudStoragePort,
+    logger: AppLogger,
+): ChecklistRepository =
     ChecklistRepositoryImpl(
         checklistDao = database.checklistDao(),
         fillDao = database.checklistFillDao(),
         attachmentStorage = attachmentStorage,
+        attachmentCloudStorage = attachmentCloudStorage,
         transactionRunner = RoomChecklistTransactionRunner(database),
+        logger = logger,
     )
 
 /**

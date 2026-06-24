@@ -18,7 +18,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -31,7 +33,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,6 +52,8 @@ import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentCloudStoragePort
+import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePort
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Attachment
@@ -56,7 +62,9 @@ import aichecklists.core.designsystem.generated.resources.attachment_fullscreen_
 import aichecklists.core.designsystem.generated.resources.attachment_fullscreen_counter
 import aichecklists.core.designsystem.generated.resources.attachment_fullscreen_delete_cd
 import aichecklists.core.designsystem.generated.resources.attachment_open_external_button
+import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 
 /**
  * Full-screen overlay for browsing, zooming, and managing [attachments].
@@ -248,11 +256,7 @@ private fun ZoomableImagePage(
         }
     }
 
-    val context = LocalPlatformContext.current
-    val request = ImageRequest.Builder(context)
-        .data(attachment.path)
-        .crossfade(true)
-        .build()
+    val materializeState = rememberMaterializedAttachment(attachment)
 
     Box(
         modifier = Modifier
@@ -276,20 +280,39 @@ private fun ZoomableImagePage(
             ),
         contentAlignment = Alignment.Center,
     ) {
-        AsyncImage(
-            model = request,
-            contentDescription = attachment.fileName,
-            contentScale = ContentScale.Fit,
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer(
-                    scaleX = scale,
-                    scaleY = scale,
-                    translationX = offsetX,
-                    translationY = offsetY,
-                ),
-            placeholder = rememberVectorPainter(Icons.AutoMirrored.Filled.InsertDriveFile),
-        )
+        when (materializeState) {
+            AttachmentMaterializeState.Loading -> CircularProgressIndicator()
+
+            AttachmentMaterializeState.Error -> Icon(
+                imageVector = Icons.Filled.BrokenImage,
+                contentDescription = attachment.fileName,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(72.dp),
+            )
+
+            AttachmentMaterializeState.Ready -> {
+                val context = LocalPlatformContext.current
+                val request = ImageRequest.Builder(context)
+                    .data(attachment.path)
+                    .crossfade(true)
+                    .build()
+
+                AsyncImage(
+                    model = request,
+                    contentDescription = attachment.fileName,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer(
+                            scaleX = scale,
+                            scaleY = scale,
+                            translationX = offsetX,
+                            translationY = offsetY,
+                        ),
+                    placeholder = rememberVectorPainter(Icons.AutoMirrored.Filled.InsertDriveFile),
+                )
+            }
+        }
     }
 }
 
@@ -302,6 +325,11 @@ private fun FileDetailPage(
     attachment: Attachment,
     onOpenExternally: () -> Unit,
 ) {
+    val local = koinInject<AttachmentStoragePort>()
+    val cloud = koinInject<AttachmentCloudStoragePort>()
+    val scope = rememberCoroutineScope()
+    var downloading by remember { mutableStateOf(false) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -345,8 +373,20 @@ private fun FileDetailPage(
         Spacer(Modifier.height(AppDimens.SpacingXl))
         AppButton(
             text = stringResource(Res.string.attachment_open_external_button),
-            onClick = onOpenExternally,
+            onClick = {
+                scope.launch {
+                    downloading = true
+                    // Best-effort: pull the bytes locally if this device only has the cloud copy.
+                    // ensureAttachmentLocal never throws; if it fails the opener simply reports
+                    // back that it could not open the file.
+                    ensureAttachmentLocal(attachment, local, cloud)
+                    downloading = false
+                    onOpenExternally()
+                }
+            },
             icon = Icons.AutoMirrored.Filled.OpenInNew,
+            enabled = !downloading,
+            loading = downloading,
         )
     }
 }

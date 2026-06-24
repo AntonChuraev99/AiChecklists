@@ -43,6 +43,13 @@ import {
     writeBatch,
 } from 'https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js';
 import {
+    getStorage,
+    ref as storageRef,
+    uploadBytes,
+    getBytes,
+    deleteObject,
+} from 'https://www.gstatic.com/firebasejs/12.11.0/firebase-storage.js';
+import {
     getAnalytics,
     logEvent,
     setUserId as fbSetUserId,
@@ -74,6 +81,11 @@ const app = initializeApp(firebaseConfig);
 
 // === Firestore database instance ===
 const firestoreDb = getFirestore(app);
+
+// === Firebase Storage instance (attachment bytes) ===
+// storageBucket already lives in firebaseConfig (__FIREBASE_STORAGE_BUCKET__, default
+// aichecklists-40230.firebasestorage.app) so getStorage(app) targets the right bucket.
+const storage = getStorage(app);
 
 // === Firebase Analytics (GA4) ===
 // getAnalytics() throws in unsupported environments (no cookies, some WebViews,
@@ -211,6 +223,7 @@ rc.defaultConfig = {
     max_fills_free: 5,
     max_recurring_reminders_free: 10,
     max_weekly_checklists_free: 1,
+    max_attachments_per_item_free: 3,
     templates_json: "[]",
     onboarding: "interactive",
     paywall_variant: "features_v1",
@@ -621,6 +634,28 @@ globalThis.__opfsReadBytes = (opfsPath) => new Promise((resolve) => {
     })();
 });
 
+// Write raw bytes (Uint8Array) into an OPFS file at opfsPath, creating the directory
+// chain as needed (mkdir -p). Used by the cloud-download path to materialize bytes
+// fetched from Firebase Storage. Returns Promise<boolean> (true on success).
+globalThis.__opfsWriteBytes = (opfsPath, u8) => new Promise((resolve) => {
+    (async () => {
+        try {
+            if (!u8) { resolve(false); return; }
+            const segments = _opfsSegments(opfsPath);
+            if (segments.length === 0) { resolve(false); return; }
+            const dir = await _opfsDirForFile(segments, true);
+            const fileHandle = await dir.getFileHandle(segments[segments.length - 1], { create: true });
+            const writable = await fileHandle.createWritable();
+            await writable.write(u8);
+            await writable.close();
+            resolve(true);
+        } catch (err) {
+            console.error('[OPFS] __opfsWriteBytes failed:', opfsPath, err);
+            resolve(false);
+        }
+    })();
+});
+
 // Probe image pixel dimensions of an OPFS file via createImageBitmap (decodes header
 // only enough to expose width/height, then closes the bitmap). Returns
 // Promise<{w:number|null, h:number|null}> — {null,null} for non-images / on error.
@@ -688,6 +723,61 @@ globalThis.__opfsOpenExternally = (opfsPath, fileName, mimeType) => new Promise(
         }
     })();
 });
+
+// === Firebase Storage attachment bridge (cross-device attachment sync) ===
+// Moves attachment bytes between durable OPFS (local) and the Firebase Storage bucket
+// (cloud). Each bridge is async and ALWAYS resolves to a JSON string envelope
+// {ok: boolean, error?: string} — never rejects — matching the __firestore* bridges so
+// the Kotlin AttachmentCloudStorage.wasmJs actual can parse a uniform {ok,error} shape.
+//
+// ⚠ CORS: getBytes() (download) is a browser fetch against the bucket and REQUIRES a CORS
+// config on the bucket (manual `gsutil cors set`). Without it, download rejects with a CORS
+// error → {ok:false}. Upload/delete go through the SDK's own endpoints and are unaffected.
+
+// Upload the OPFS bytes at opfsPath to the cloud object storagePath (overwrites if present).
+globalThis.__storageUpload = async (opfsPath, storagePath) => {
+    try {
+        const bytes = await globalThis.__opfsReadBytes(opfsPath);
+        if (!bytes) {
+            return JSON.stringify({ ok: false, error: 'no local bytes' });
+        }
+        await uploadBytes(storageRef(storage, storagePath), bytes);
+        return JSON.stringify({ ok: true });
+    } catch (err) {
+        console.error('[Storage] __storageUpload error:', storagePath, err);
+        return JSON.stringify({ ok: false, error: err?.message ?? String(err) });
+    }
+};
+
+// Download the cloud object storagePath and write its bytes into OPFS at opfsPath.
+globalThis.__storageDownload = async (storagePath, opfsPath) => {
+    try {
+        const buf = await getBytes(storageRef(storage, storagePath));
+        const u8 = new Uint8Array(buf);
+        const wrote = await globalThis.__opfsWriteBytes(opfsPath, u8);
+        if (!wrote) {
+            return JSON.stringify({ ok: false, error: 'failed to write OPFS bytes' });
+        }
+        return JSON.stringify({ ok: true });
+    } catch (err) {
+        console.error('[Storage] __storageDownload error:', storagePath, err);
+        return JSON.stringify({ ok: false, error: err?.message ?? String(err) });
+    }
+};
+
+// Delete the cloud object storagePath. A missing object is idempotently a success.
+globalThis.__storageDelete = async (storagePath) => {
+    try {
+        await deleteObject(storageRef(storage, storagePath));
+        return JSON.stringify({ ok: true });
+    } catch (err) {
+        if (err?.code === 'storage/object-not-found') {
+            return JSON.stringify({ ok: true });
+        }
+        console.error('[Storage] __storageDelete error:', storagePath, err);
+        return JSON.stringify({ ok: false, error: err?.message ?? String(err) });
+    }
+};
 
 // === Audio Recording bridge (MediaRecorder + getUserMedia) ===
 // State singleton — holds the active recording session.
