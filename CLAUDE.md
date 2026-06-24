@@ -52,6 +52,8 @@ iOS: open `iosApp/iosApp.xcodeproj` in Xcode. Emulators: `Pixel_9`, `Medium_Phon
 
 **Deploy Web:** `./gradlew composeApp:wasmJsBrowserDistribution` then `npx wrangler@4 deploy`. CI: push to `master` → prod, other branches → preview. Needs `local.properties` `FIREBASE_WEB_API_KEY` + `FIREBASE_WEB_APP_ID`; CFs must deploy with CORS handlers. Config in `wrangler.jsonc`.
 
+**Web (wasmJs): verify on :9090 BEFORE pushing — never debug via prod CI (recurring time-sink, 2026-06-24).** For any wasmJs feature/bugfix, run `/web-dev-run` (:9090) and exercise the **real** path (open screen, pick file, render, click) before `git push`. `compile*` + `commonTest` do **NOT** cover Compose-runtime / Coil / JS-interop — they stay green while the live path is broken. Each prod CI deploy is **~12–15 min**; never push to add a log or test a fix — diagnose locally. Precedent: attachment add shipped compiling + tests-green but the FilePicker callback AND the Coil `opfs://` fetcher were both broken, surfaced only on the first real run → ~5 wasted prod deploys. Coil/FilePicker traps: project memory `coil3-custom-scheme-fetcher-uri-not-string`, `filepicker-rememberupdatedstate-closure-trap`.
+
 ### `adb uninstall` — acceptable now that data is Google-synced
 
 Google-account sync (Firestore) makes a reinstall recoverable: for a **signed-in** user, checklists/fills/reminders restore from the cloud by `google_uid`. So `adb uninstall` for a clean slate is fine on a dev device you're signed into. This supersedes the old absolute ban (after the 2026-05-24 Room-wipe incident, before sync covered the data).
