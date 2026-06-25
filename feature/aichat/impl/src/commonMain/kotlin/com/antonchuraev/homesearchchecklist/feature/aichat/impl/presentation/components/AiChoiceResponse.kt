@@ -60,7 +60,7 @@ import org.jetbrains.compose.resources.stringResource
  * ┌──────────────────┐   prompt bubble: surfaceContainerLowest + 1dp outlineVariant
  * │  prompt / batch  │   shape 20-20-20-4 (tail bottom-left), ChatMarkdownText
  * └──────────────────┘
- * [chip] [chip] [chip]   FlowRow (short ≤2) or Column-fillMaxWidth (≥3 / long / narrow)
+ * [chip] [chip] [chip]   wrapping FlowRow (all-short) or Column-fillMaxWidth (any long label)
  * [escape chip]          separate row
  * ```
  * When [PendingChoice.editText] is non-null, the chip row is replaced by an inline
@@ -171,8 +171,10 @@ fun AiChoiceResponse(
 }
 
 /**
- * Layout-switching chip container. Short labels (≤ [SHORT_LABEL_MAX] chars) AND ≤ 2 options →
- * [FlowRow]; otherwise a vertical [Column] with full-width chips so long labels wrap cleanly.
+ * Adaptive chip container. When every label is short (≤ [SHORT_LABEL_MAX] chars) the chips flow
+ * in a wrapping [FlowRow] with NO fixed row count — content-sized chips wrap by width, so the
+ * layout self-adapts to N options (2, 3, … 6) by spilling onto as many rows as it needs. When ANY
+ * label is long, fall back to a vertical [Column] of full-width chips so the long text isn't cramped.
  * Width is dictated by the parent (one composable, no separate dock variant).
  */
 @OptIn(ExperimentalLayoutApi::class)
@@ -184,15 +186,17 @@ private fun ChoiceChips(
     blockInteractive: Boolean,
     onSelect: (String) -> Unit,
 ) {
-    val allShort = options.all { it.label.length <= SHORT_LABEL_MAX }
-    val useFlow = allShort && options.size <= 2
+    // FlowRow wraps by width (maxItemsInEachRow unlimited) → rows auto-adapt to the option count.
+    // Only drop to a Column when a label is long enough that a content-sized chip would cramp it.
+    val useFlow = options.all { it.label.length <= SHORT_LABEL_MAX }
     val fallbackLoading = stringResource(Res.string.chat_choice_executing_default)
 
     if (useFlow) {
         FlowRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
-            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
+            // Tighter vertical rhythm between wrapped chip rows (4dp) than the horizontal gap (8dp).
+            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
         ) {
             options.forEach { option ->
                 ChoiceChipFor(option, executingId, executingLabel, fallbackLoading, blockInteractive, onSelect, fillWidth = false)

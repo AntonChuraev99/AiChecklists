@@ -2149,6 +2149,8 @@ CHAT_AGENT_MAX_ROUNDS = 5               # server-side defense-in-depth (client c
 CHAT_AGENT_MAX_TRANSCRIPT_ENTRIES = 60  # hard cap on transcript size
 CHAT_AGENT_MAX_TOTAL_CHARS = 12000      # combined chars across all transcript text
 CHAT_AGENT_MAX_CHECKLISTS = 8           # context summary items from client
+CHAT_AGENT_MAX_OPTIONS = 6              # present_options chip cap (mirrors client MAX_CHOICE_OPTIONS)
+CHAT_AGENT_MIN_OPTIONS = 2             # present_options needs >=2 usable labels to render chips
 
 # Tool names the agent may emit. The client's ToolCallDispatcher MUST be able to
 # execute every name here (server catalog == client capability). Phase 2 core set
@@ -2283,7 +2285,7 @@ def _build_chat_agent_tools(include_options: bool = False) -> "list[types.Tool]"
         declarations.append(types.FunctionDeclaration(
             name="present_options",
             description=(
-                "Offer the user 2-4 short tappable options instead of guessing or asking an "
+                "Offer the user 2-6 short tappable options instead of guessing or asking an "
                 "open-ended question. Use when the request is ambiguous, when a clarification "
                 "would help, or when proposing useful next steps. Do NOT use it for destructive "
                 "confirmations (delete) — the client confirms those automatically. The client "
@@ -2294,7 +2296,7 @@ def _build_chat_agent_tools(include_options: bool = False) -> "list[types.Tool]"
                 type=OBJ,
                 properties={
                     "prompt": s(STR, "Short question shown above the options, in the user's language."),
-                    "options": s(ARR, "2-4 concise option labels in the user's language.", items=s(STR)),
+                    "options": s(ARR, "2-6 concise option labels in the user's language.", items=s(STR)),
                 },
                 required=["prompt", "options"],
             ),
@@ -2412,9 +2414,9 @@ def _extract_present_options(parts) -> dict | None:
                 continue
             seen.add(label.lower())
             options.append(label)
-            if len(options) >= 4:
+            if len(options) >= CHAT_AGENT_MAX_OPTIONS:
                 break
-        if prompt and len(options) >= 2:
+        if prompt and len(options) >= CHAT_AGENT_MIN_OPTIONS:
             return {"prompt": prompt, "options": options}
         return None
     return None

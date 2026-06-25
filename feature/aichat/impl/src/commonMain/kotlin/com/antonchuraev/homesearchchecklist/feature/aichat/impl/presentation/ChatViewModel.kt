@@ -841,7 +841,7 @@ class ChatViewModel(
         names: List<String>,
         sourceLayer: RoutingLayer?,
     ) {
-        val options = names.take(4).mapIndexedNotNull { index, name ->
+        val options = names.take(MAX_CHOICE_OPTIONS).mapIndexedNotNull { index, name ->
             val tc = sourceToolCall.withHint(name) ?: return@mapIndexedNotNull null
             ChoiceOption(
                 id = "$CHOICE_CANDIDATE_PREFIX$index",
@@ -1929,10 +1929,12 @@ class ChatViewModel(
                 logger.debug(TAG, "ChecklistContent inline (agent): ${outcome.checklistName} — $summary$suffix")
             }
             is DispatchOutcome.AmbiguousMatch -> {
-                val withHint = sourceToolCall?.let { tc -> outcome.candidates.take(4).mapNotNull { tc.withHint(it) } }
+                val withHint = sourceToolCall?.let { tc ->
+                    outcome.candidates.take(MAX_CHOICE_OPTIONS).mapNotNull { tc.withHint(it) }
+                }
                 if (withHint.isNullOrEmpty()) {
                     // No swappable hint (read path) → keep the old text clarification.
-                    val candidates = outcome.candidates.take(3).joinToString(", ")
+                    val candidates = outcome.candidates.take(MAX_CHOICE_OPTIONS).joinToString(", ")
                     _sideEffect.emit(
                         ChatScreenSideEffect.ShowAssistantMessage(
                             messageKey = "chat_ambiguous_match",
@@ -2377,6 +2379,11 @@ class ChatViewModel(
         const val CHOICE_ESCAPE = "escape"
         const val CHOICE_CANDIDATE_PREFIX = "candidate_"
         const val CHOICE_OPTION_PREFIX = "option_"
+        /**
+         * Max tappable options shown in a choice block ("which list?" / ambiguous-match chips).
+         * The adaptive FlowRow wraps to as many rows as needed, so 6 stays readable on a phone dock.
+         */
+        const val MAX_CHOICE_OPTIONS = 6
         /** Max messages to display from persisted history on screen open. */
         const val HISTORY_DISPLAY_LIMIT = 20
         /** Retries for the startup history seed when the DB driver isn't ready yet (wasmJs OPFS race). */

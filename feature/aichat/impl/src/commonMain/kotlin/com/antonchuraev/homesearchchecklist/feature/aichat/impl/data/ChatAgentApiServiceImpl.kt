@@ -51,8 +51,9 @@ internal class ChatAgentApiServiceImpl(
 
         /** Render chips only when the server returns at least this many valid options. */
         private const val MIN_OPTIONS = 2
-        /** Cap the chips shown — server contract is 2-4; extra are dropped. */
-        private const val MAX_OPTIONS = 4
+        /** Cap the chips shown — server contract is 2-6; extra are dropped. Mirrors the UI
+         *  choice-chip cap (ChatViewModel.MAX_CHOICE_OPTIONS); the adaptive FlowRow wraps. */
+        private const val MAX_OPTIONS = 6
 
         private val sharedJson = Json {
             ignoreUnknownKeys = true
@@ -283,7 +284,7 @@ internal class ChatAgentApiServiceImpl(
         val type: String? = null,
         @SerialName("tool_calls") val toolCalls: List<ToolCallDto>? = null,
         val content: String? = null,
-        // type:"options" — the assistant question + tappable answer labels (2-4).
+        // type:"options" — the assistant question + tappable answer labels (2-6).
         val prompt: String? = null,
         val options: List<String>? = null,
         @SerialName("credits_remaining") val creditsRemaining: Int = 0,

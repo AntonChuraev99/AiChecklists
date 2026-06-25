@@ -40,7 +40,7 @@ import kotlinx.datetime.toLocalDateTime
  *   1. hint != null → fuzzy name match (substring, case-insensitive) in all checklists.
  *      - 0 matches → [DispatchOutcome.NotFound]
  *      - 1 match → proceed
- *      - >1 matches → [DispatchOutcome.AmbiguousMatch] with top-3 names
+ *      - >1 matches → [DispatchOutcome.AmbiguousMatch] with up to [MAX_AMBIGUOUS_CANDIDATES] names
  *   2. hint == null → use first checklist in the list (most recently positioned).
  *      If no checklists exist → [DispatchOutcome.NotFound].
  *
@@ -67,6 +67,11 @@ class ToolCallDispatcherImpl(
         private const val MAX_FIND_RESULTS = 10
         /** Free-tier max attachments per item (mirrors item-attachments FREE_ATTACHMENT_LIMIT_PER_ITEM). */
         private const val FREE_ATTACH_LIMIT_PER_ITEM = 3
+        /**
+         * Max candidate names returned on an ambiguous match — mirrors the UI choice-chip cap
+         * (ChatViewModel.MAX_CHOICE_OPTIONS). The adaptive FlowRow wraps, so 6 stays readable.
+         */
+        private const val MAX_AMBIGUOUS_CANDIDATES = 6
     }
 
     override suspend fun dispatch(toolCall: ToolCall): DispatchOutcome = runCatching {
@@ -365,7 +370,7 @@ class ToolCallDispatcherImpl(
                 listOf(toolCall.itemText, checklist.name),
             )
             matches.size > 1 -> return DispatchOutcome.AmbiguousMatch(
-                matches.take(3).map { it.text },
+                matches.take(MAX_AMBIGUOUS_CANDIDATES).map { it.text },
             )
             else -> matches.first()
         }
@@ -495,7 +500,7 @@ class ToolCallDispatcherImpl(
                 listOf(toolCall.checklistHint),
             )
             matches.size == 1 -> matches.first()
-            else -> return DispatchOutcome.AmbiguousMatch(matches.take(3).map { it.name })
+            else -> return DispatchOutcome.AmbiguousMatch(matches.take(MAX_AMBIGUOUS_CANDIDATES).map { it.name })
         }
 
         val oldName = checklist.name
@@ -590,7 +595,7 @@ class ToolCallDispatcherImpl(
         val matches = allChecklists.filter { it.name.contains(hint, ignoreCase = true) }
         return when {
             matches.isEmpty() -> DispatchOutcome.NotFound("chat_dispatch_no_checklist_match", listOf(hint))
-            matches.size > 1 -> DispatchOutcome.AmbiguousMatch(matches.take(3).map { it.name })
+            matches.size > 1 -> DispatchOutcome.AmbiguousMatch(matches.take(MAX_AMBIGUOUS_CANDIDATES).map { it.name })
             else -> DispatchOutcome.NotFound("chat_dispatch_fill_load_failed", listOf(matches.first().name))
         }
     }
