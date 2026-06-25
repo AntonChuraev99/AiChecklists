@@ -413,8 +413,9 @@ private fun ChecklistDetailContent(
     // Diagnostic logger for the attachment add path (picker callbacks below). On web these go to
     // the browser console as [D]/[W] Attachments: ...
     val logger: AppLogger = koinInject()
-    // Controls the FillOptionsSheet opened from the TopAppBar "Fill checklist" action.
-    // The two Fill buttons used to live in the bottom bar; they now live in this sheet.
+    // Controls the FillOptionsSheet opened from the "Fill checklist" row inside the settings sheet
+    // (OverflowMenuSheet). The two Fill buttons used to live in the bottom bar, then the toolbar;
+    // they now live in this sheet.
     var showFillSheet by remember { mutableStateOf(false) }
     val smartAddHintActive = remember { mutableStateOf(false) }
     // Normalized snapshot of the input at the moment the hint snackbar was shown.
@@ -562,8 +563,8 @@ private fun ChecklistDetailContent(
     var addItemActive by remember { mutableStateOf(false) }
     var isEditMode by rememberSaveable { mutableStateOf(false) }
     val listState = rememberLazyListState()
-    // Pinned (not exitUntilCollapsed): the toolbar action icons (add / fill / reminder / share /
-    // edit / overflow) must stay reachable while the list scrolls. exitUntilCollapsed on the
+    // Pinned (not exitUntilCollapsed): the toolbar action icons (share / add / reminder /
+    // overflow-settings) must stay reachable while the list scrolls. exitUntilCollapsed on the
     // single-row CenterAlignedTopAppBar (Compact) treats the whole bar height as collapsible and
     // scrolls it fully off-screen ("collapses"). Pinned keeps it fixed while still swapping in the
     // scrolledContainerColor as content passes under it.
@@ -685,7 +686,15 @@ private fun ChecklistDetailContent(
                     )
                 }
             } else {
-                // Normal mode: regular toolbar actions
+                // Normal mode: regular toolbar actions.
+                // Visual order right→left (as the user reads the bar): settings · notifications ·
+                // add item · share. Compose lays the actions Row out left→right, so the source order
+                // below is the reverse: share, add, notifications, overflow(settings).
+                // Fill + Edit no longer live here — they are rows inside the settings sheet
+                // (OverflowMenuSheet) opened by the overflow icon.
+                IconButton(onClick = { onIntent(ChecklistDetailIntent.OnShareClick) }) {
+                    Icon(Icons.Outlined.Share, contentDescription = stringResource(Res.string.share))
+                }
                 IconButton(
                     onClick = {
                         if (addItemActive) {
@@ -705,12 +714,6 @@ private fun ChecklistDetailContent(
                         contentDescription = stringResource(Res.string.add_item)
                     )
                 }
-                IconButton(onClick = { showFillSheet = true }) {
-                    Icon(
-                        Icons.Outlined.NoteAdd,
-                        contentDescription = stringResource(Res.string.fill_options_open)
-                    )
-                }
                 IconButton(onClick = { onIntent(ChecklistDetailIntent.OnReminderClick) }) {
                     val hasActiveSchedule = state.checklist.reminderAt != null
                             || state.checklist.repeatRule != null
@@ -725,12 +728,6 @@ private fun ChecklistDetailContent(
                         else
                             MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                }
-                IconButton(onClick = { onIntent(ChecklistDetailIntent.OnShareClick) }) {
-                    Icon(Icons.Outlined.Share, contentDescription = stringResource(Res.string.share))
-                }
-                IconButton(onClick = { onIntent(ChecklistDetailIntent.OnEditChecklistClick) }) {
-                    Icon(Icons.Outlined.Edit, contentDescription = stringResource(Res.string.checklist_edit))
                 }
                 IconButton(onClick = { onIntent(ChecklistDetailIntent.OnOverflowMenuClick) }) {
                     Icon(
@@ -1476,6 +1473,16 @@ private fun ChecklistDetailContent(
             hasCompletedItems = state.defaultFill?.items?.any { it.checked } == true,
             foldersEnabled = state.foldersEnabled,
             isWeeklyMode = state.checklist.viewMode == ChecklistViewMode.Weekly,
+            onEditClick = {
+                // Edit moved here from the toolbar — close this sheet, then navigate to edit.
+                onIntent(ChecklistDetailIntent.OnDismissOverflowSheet)
+                onIntent(ChecklistDetailIntent.OnEditChecklistClick)
+            },
+            onFillClick = {
+                // Fill moved here from the toolbar — close this sheet, then open the Fill options sheet.
+                onIntent(ChecklistDetailIntent.OnDismissOverflowSheet)
+                showFillSheet = true
+            },
             onCreateFolder = {
                 onIntent(ChecklistDetailIntent.OnDismissOverflowSheet)
                 onIntent(ChecklistDetailIntent.OnCreateFolder)
@@ -1492,7 +1499,7 @@ private fun ChecklistDetailContent(
         )
     }
 
-    // Fill options sheet — opened from the TopAppBar "Fill checklist" action.
+    // Fill options sheet — opened from the "Fill checklist" row in the settings sheet.
     // Hosts the two Fill actions (manual / via AI) that previously lived in the bottom bar.
     if (showFillSheet) {
         FillOptionsSheet(
@@ -3024,6 +3031,8 @@ private fun OverflowMenuSheet(
     hasCompletedItems: Boolean,
     foldersEnabled: Boolean,
     isWeeklyMode: Boolean,
+    onEditClick: () -> Unit,
+    onFillClick: () -> Unit,
     onCreateFolder: () -> Unit,
     onToggleFoldersEnabled: () -> Unit,
     onDeleteCompletedItems: () -> Unit,
@@ -3042,6 +3051,56 @@ private fun OverflowMenuSheet(
                 .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
                 .padding(bottom = AppDimens.SpacingXxl)
         ) {
+            // Edit checklist — navigates to the edit screen. Moved here from the toolbar so the bar
+            // stays at three primary actions (add / reminder / share + overflow).
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onEditClick() }
+                    .padding(vertical = AppDimens.SpacingMd),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Edit,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(AppDimens.SpacingMd))
+                Text(
+                    text = stringResource(Res.string.checklist_edit_title),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+
+            HorizontalDivider()
+
+            // Fill checklist — opens the Fill options sheet (manual / via AI). Moved here from the
+            // toolbar; toggles the local showFillSheet flag at the call site.
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onFillClick() }
+                    .padding(vertical = AppDimens.SpacingMd),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.NoteAdd,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(AppDimens.SpacingMd))
+                Text(
+                    text = stringResource(Res.string.fill_options_open),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+
+            HorizontalDivider()
+
             // Folders master toggle. Mutually exclusive with Weekly view: disabled (greyed, with a
             // hint) while the checklist is in Weekly mode, since both are alternative groupings of
             // the same flat list.
