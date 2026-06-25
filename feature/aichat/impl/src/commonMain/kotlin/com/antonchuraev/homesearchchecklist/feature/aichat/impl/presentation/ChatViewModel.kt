@@ -867,6 +867,9 @@ class ChatViewModel(
             ),
             isProcessing = false,
         )
+        // PREVIEW_SHOWN keeps the shown->confirmed funnel intact for the which-list picker: a chip
+        // tap fires PREVIEW_CONFIRMED via executeChoice, so without this the confirms are orphaned.
+        trackPreviewShown(sourceToolCall)
         if (sourceLayer != null) trackResponseReceived(sourceLayer, outcome = "preview")
     }
 
@@ -894,7 +897,10 @@ class ChatViewModel(
             is ChoiceAction.FreeForm -> {
                 analytics.event(
                     name = AnalyticsEvents.Chat.PREVIEW_REJECTED,
-                    params = mapOf(AnalyticsParams.ACTION_TYPE to "freeform"),
+                    params = mapOf(
+                        AnalyticsParams.ACTION_TYPE to "freeform",
+                        AnalyticsParams.ROUTED_LAYER to (_choiceSourceLayer?.name ?: "unknown"),
+                    ),
                 )
                 escalateChoice(action.text)
             }
@@ -1044,6 +1050,9 @@ class ChatViewModel(
                     isOptions -> "options"
                     else -> "dismiss"
                 },
+                // Layer the cancelled surface came from, so a which-list cancel is segmentable
+                // from a write-preview cancel (both otherwise log action_type="dismiss").
+                AnalyticsParams.ROUTED_LAYER to (_choiceSourceLayer?.name ?: "unknown"),
             ),
         )
 
