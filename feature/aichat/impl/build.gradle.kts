@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.jetbrains.kotlin.serialization)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
+    alias(libs.plugins.roborazzi)
 }
 
 kotlin {
@@ -13,7 +14,11 @@ kotlin {
         namespace = "com.antonchuraev.homesearchchecklist.feature.aichat.impl"
         compileSdk = libs.versions.android.compileSdk.get().toInt()
         minSdk = libs.versions.android.minSdk.get().toInt()
-        withHostTest {}
+        // isIncludeAndroidResources lets Robolectric resolve the Compose-Resources strings the
+        // choice chips read from core/designsystem (Res.string.chat_choice_*) in screenshot tests.
+        withHostTest {
+            isIncludeAndroidResources = true
+        }
     }
 
     listOf(iosArm64(), iosSimulatorArm64()).forEach {
@@ -85,5 +90,24 @@ kotlin {
         wasmJsMain.dependencies {
             implementation(libs.ktor.client.js)
         }
+
+        // androidHostTest: JVM/Robolectric Roborazzi screenshot (golden) tests for the choice chips.
+        //   ./gradlew :feature:aichat:impl:recordRoborazziAndroidHostTest  (record golden)
+        //   ./gradlew :feature:aichat:impl:verifyRoborazziAndroidHostTest  (verify)
+        getByName("androidHostTest").dependencies {
+            implementation(libs.junit)
+            implementation(libs.robolectric)
+            implementation(libs.roborazzi)
+            implementation(libs.roborazzi.compose)
+            implementation(libs.roborazzi.junit.rule)
+            implementation(libs.androidx.compose.ui.tooling)
+            implementation(libs.androidx.compose.ui.test.junit4)
+            implementation(libs.androidx.compose.ui.test.manifest)
+        }
     }
+}
+
+roborazzi {
+    // Golden PNGs versioned alongside the test code (record writes, verify compares).
+    outputDir.set(file("src/androidHostTest/roborazzi"))
 }
