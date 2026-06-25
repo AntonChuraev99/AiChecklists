@@ -253,9 +253,12 @@ fun ChatMessageBubble(
 /**
  * AI sender label — 24dp circle avatar (`primaryContainer` background, sparkle icon
  * in `primary`) + "AI-ассистент" labelSmall. Sits directly above the assistant bubble.
+ *
+ * `internal` so [AiChoiceResponse] can reuse the exact same label above its prompt bubble
+ * (the choice block is a styled assistant turn) — do not duplicate it.
  */
 @Composable
-private fun AiSenderLabel(modifier: Modifier = Modifier) {
+internal fun AiSenderLabel(modifier: Modifier = Modifier) {
     Row(
         modifier = modifier.padding(start = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,

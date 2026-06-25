@@ -40,6 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.chat_panel_collapse
@@ -124,6 +125,12 @@ fun GistiInlineChatPanel(
     modifier: Modifier = Modifier,
     contextLabel: String? = null,
     recordingOverlay: (@Composable () -> Unit)? = null,
+    // Max height of the answer frame. Defaults to 210dp (~30% taller than the original 160dp,
+    // per user request to give the expanded chat sheet more room) so a long assistant answer
+    // scrolls inside the frame instead of growing the dock. App.kt raises this further for an
+    // interactive choice block (prompt + chips + escape) so its escape/cancel chip is not
+    // clipped below the fold — a bounded block, unlike an unbounded text answer.
+    answerMaxHeight: Dp = 210.dp,
 ) {
     val isDark = LocalIsDarkTheme.current
     // Layout-anchor Box only: no background, no clickable → taps outside the panel
@@ -200,7 +207,7 @@ fun GistiInlineChatPanel(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .heightIn(min = 96.dp, max = 160.dp),
+                                .heightIn(min = 125.dp, max = answerMaxHeight),
                         ) {
                             if (hasLastAnswer) {
                                 lastAnswerContent()

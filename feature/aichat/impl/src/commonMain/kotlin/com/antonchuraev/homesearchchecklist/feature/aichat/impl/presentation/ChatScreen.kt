@@ -35,8 +35,12 @@ import aichecklists.core.designsystem.generated.resources.chat_assistant_welcome
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AttachmentSource
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatChoice
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatRole
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceAction
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceOption
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceRole
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.RoutingLayer
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ToolCall
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.AiChatFeaturesHelpSheet
@@ -50,8 +54,7 @@ import org.jetbrains.compose.resources.stringResource
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatHeader
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatInputRow
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatMessageBubble
-import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.AgentPlanCard
-import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatPreviewCard
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.AiChoiceResponse
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatPricingRow
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatTypingIndicator
 import kotlinx.coroutines.delay
@@ -73,7 +76,7 @@ import kotlinx.datetime.toLocalDateTime
  * ───────────────────────────────────────────────────────
  * LazyColumn (messages, weight=1f)
  *   ↳ ChatMessageBubble per message
- *   ↳ ChatPreviewCard  (if state.pendingPreview != null, as last sticky item)
+ *   ↳ AiChoiceResponse (if state.pendingChoice != null, as last sticky item)
  * ───────────────────────────────────────────────────────
  * ChatRecordingOverlay (AnimatedVisibility, above chip strip)
  * ChatAttachmentChipStrip (AnimatedVisibility, above input)
@@ -137,9 +140,8 @@ fun ChatScreen(
 
     // Total item count for scroll / IME anchor fix (passed to ChatContent).
     val totalItemCount = state.messages.size +
-        (if (state.pendingPreview != null) 1 else 0) +
-        (if (state.pendingAgentPlan != null) 1 else 0) +
-        (if (state.isProcessing && state.pendingPreview == null && state.pendingAgentPlan == null) 1 else 0)
+        (if (state.pendingChoice != null) 1 else 0) +
+        (if (state.isProcessing && state.pendingChoice == null) 1 else 0)
 
     Scaffold(
         modifier = modifier
@@ -333,32 +335,19 @@ fun ChatContent(
             ),
             verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd),
         ) {
-            if (state.isProcessing && state.pendingPreview == null && state.pendingAgentPlan == null) {
+            if (state.isProcessing && state.pendingChoice == null) {
                 item(key = "__typing") {
                     ChatTypingIndicator()
                 }
             }
 
-            state.pendingAgentPlan?.let { plan ->
-                item(key = "agent_plan_card") {
-                    AgentPlanCard(
-                        plan = plan,
-                        onApply = { onIntent(ChatScreenIntent.OnAgentPlanApply) },
-                        onCancel = { onIntent(ChatScreenIntent.OnAgentPlanCancel) },
-                        modifier = Modifier.padding(bottom = AppDimens.SpacingSm),
-                    )
-                }
-            }
-
-            state.pendingPreview?.let { preview ->
-                item(key = "preview_card") {
-                    ChatPreviewCard(
-                        preview = preview,
-                        onApply = { onIntent(ChatScreenIntent.OnPreviewApply) },
-                        onCancel = { onIntent(ChatScreenIntent.OnPreviewCancel) },
-                        onReject = { onIntent(ChatScreenIntent.OnPreviewReject) },
-                        onItemTextChange = { onIntent(ChatScreenIntent.OnPreviewItemTextChange(it)) },
-                        showRejectButton = preview.toolCall !is ToolCall.CreateChecklistFromAttachment,
+            state.pendingChoice?.let { pending ->
+                item(key = "choice_block") {
+                    AiChoiceResponse(
+                        pending = pending,
+                        onSelect = { id -> onIntent(ChatScreenIntent.OnChoiceSelected(id)) },
+                        onEditChange = { onIntent(ChatScreenIntent.OnChoiceEditChange(it)) },
+                        onEditConfirm = { onIntent(ChatScreenIntent.OnChoiceEditConfirmed) },
                         modifier = Modifier.padding(bottom = AppDimens.SpacingSm),
                     )
                 }
@@ -409,30 +398,34 @@ fun ChatContent(
             onRemove = { path -> onIntent(ChatScreenIntent.OnRemoveAttachment(path)) },
         )
 
-        // Input row — always pinned above the keyboard
-        ChatInputRow(
-            text = state.inputText,
-            onTextChange = { onIntent(ChatScreenIntent.OnInputChange(it)) },
-            onSend = { onIntent(ChatScreenIntent.OnSendClick) },
-            onAttachFileClick = onAttachmentSourceSheet,
-            onVoiceRecordingStarted = {
-                onIntent(ChatScreenIntent.OnVoiceRecordingStarted)
-                onVoiceRecordingStarted?.invoke()
-            },
-            onVoiceRecordingStopped = {
-                onVoiceRecordingStopped?.invoke()
-            },
-            onVoiceRecordingCancelled = {
-                onVoiceRecordingCancelled?.invoke()
-            },
-            onHelpClick = { onIntent(ChatScreenIntent.OnFeaturesHelpClick) },
-            hasAttachments = state.pendingAttachments.isNotEmpty(),
-            isEnabled = !state.isProcessing && state.pendingAgentPlan == null,
-            canSend = state.canSend,
-            isRecording = state.isRecording,
-            isTranscribing = state.isTranscribing,
-            onDragCancelChanged = onDragCancelChanged,
-        )
+        // Input row — pinned above the keyboard. Hidden while a choice block is shown:
+        // the chips (incl. "Something else" escape, which dismisses → input returns) are the
+        // only interaction during a pending choice, so a parallel text field is noise.
+        if (state.pendingChoice == null) {
+            ChatInputRow(
+                text = state.inputText,
+                onTextChange = { onIntent(ChatScreenIntent.OnInputChange(it)) },
+                onSend = { onIntent(ChatScreenIntent.OnSendClick) },
+                onAttachFileClick = onAttachmentSourceSheet,
+                onVoiceRecordingStarted = {
+                    onIntent(ChatScreenIntent.OnVoiceRecordingStarted)
+                    onVoiceRecordingStarted?.invoke()
+                },
+                onVoiceRecordingStopped = {
+                    onVoiceRecordingStopped?.invoke()
+                },
+                onVoiceRecordingCancelled = {
+                    onVoiceRecordingCancelled?.invoke()
+                },
+                onHelpClick = { onIntent(ChatScreenIntent.OnFeaturesHelpClick) },
+                hasAttachments = state.pendingAttachments.isNotEmpty(),
+                isEnabled = !state.isProcessing,
+                canSend = state.canSend,
+                isRecording = state.isRecording,
+                isTranscribing = state.isTranscribing,
+                onDragCancelChanged = onDragCancelChanged,
+            )
+        }
     }
 }
 
@@ -463,12 +456,30 @@ private val mockMessages = listOf(
     ),
 )
 
-private val mockPreview = PendingPreview(
-    toolCall = ToolCall.AddItem(
-        checklistHint = "Shopping",
-        itemText = "milk",
+private val mockChoice = PendingChoice(
+    choice = ChatChoice(
+        prompt = "Add to Shopping?",
+        options = listOf(
+            ChoiceOption(
+                id = "execute",
+                label = "Add",
+                role = ChoiceRole.Primary,
+                action = ChoiceAction.Execute(ToolCall.AddItem(checklistHint = "Shopping", itemText = "milk")),
+            ),
+            ChoiceOption(
+                id = "edit",
+                label = "Edit",
+                role = ChoiceRole.Default,
+                action = ChoiceAction.Edit,
+            ),
+        ),
+        escape = ChoiceOption(
+            id = "escape",
+            label = "Something else",
+            role = ChoiceRole.Escape,
+            action = ChoiceAction.FreeForm("add milk to shopping"),
+        ),
     ),
-    humanReadable = "• milk → Shopping",
 )
 
 // Pending: docs/todos/2026-05-13-ai-chat-assistant.md — @Preview annotations require
@@ -484,7 +495,7 @@ fun ChatScreenPreviewMessages(): ChatScreenState = ChatScreenState(
 
 fun ChatScreenPreviewWithPreviewCard(): ChatScreenState = ChatScreenState(
     messages = mockMessages,
-    pendingPreview = mockPreview,
+    pendingChoice = mockChoice,
     creditBalance = 3,
 )
 

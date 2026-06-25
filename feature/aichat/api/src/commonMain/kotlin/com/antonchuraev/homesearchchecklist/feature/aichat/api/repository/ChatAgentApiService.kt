@@ -29,6 +29,19 @@ interface ChatAgentApiService {
 sealed interface AgentStepResult {
     data class ToolCalls(val calls: List<AgentToolCall>, val creditsRemaining: Int) : AgentStepResult
     data class Final(val content: String, val creditsRemaining: Int) : AgentStepResult
+
+    /**
+     * Terminal turn result (like [Final]) but with AI-generated tappable answer options.
+     * The server returns `type:"options"` with a [prompt] question and 2-4 short [options]
+     * labels. Tapping an option sends its label back as a fresh agent turn (forceAgent) —
+     * it is NOT re-classified. Credits are already deducted server-side this round.
+     */
+    data class Options(
+        val prompt: String,
+        val options: List<String>,
+        val creditsRemaining: Int,
+    ) : AgentStepResult
+
     data object InsufficientCredits : AgentStepResult   // 402
     data object NetworkError : AgentStepResult           // timeout / connection / parse failure
     data object ServiceError : AgentStepResult           // non-402 error, success=false, or malformed body

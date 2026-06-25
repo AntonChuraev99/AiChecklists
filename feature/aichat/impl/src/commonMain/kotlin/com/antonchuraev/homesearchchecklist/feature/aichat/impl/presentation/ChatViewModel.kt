@@ -11,9 +11,13 @@ import com.antonchuraev.homesearchchecklist.core.datastore.api.AiChatPreferences
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.dispatcher.ToolCallDispatcher
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AttachmentSource
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatAttachment
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatChoice
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatIntent
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatRole
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceAction
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceOption
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceRole
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.DispatchOutcome
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.RoutingLayer
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ToolCall
@@ -50,15 +54,48 @@ import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.random.Random
+import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.chat_choice_action_add
+import aichecklists.core.designsystem.generated.resources.chat_choice_action_attach
+import aichecklists.core.designsystem.generated.resources.chat_choice_action_complete
+import aichecklists.core.designsystem.generated.resources.chat_choice_action_create
+import aichecklists.core.designsystem.generated.resources.chat_choice_action_delete
+import aichecklists.core.designsystem.generated.resources.chat_choice_action_move
+import aichecklists.core.designsystem.generated.resources.chat_choice_action_set_reminder
+import aichecklists.core.designsystem.generated.resources.chat_choice_add_default_list
+import aichecklists.core.designsystem.generated.resources.chat_choice_add_to_list
+import aichecklists.core.designsystem.generated.resources.chat_choice_apply_actions
+import aichecklists.core.designsystem.generated.resources.chat_choice_attach
+import aichecklists.core.designsystem.generated.resources.chat_choice_cancel
+import aichecklists.core.designsystem.generated.resources.chat_choice_complete
+import aichecklists.core.designsystem.generated.resources.chat_choice_create
+import aichecklists.core.designsystem.generated.resources.chat_choice_create_from_file
+import aichecklists.core.designsystem.generated.resources.chat_choice_delete
+import aichecklists.core.designsystem.generated.resources.chat_choice_edit
+import aichecklists.core.designsystem.generated.resources.chat_choice_execute_all
+import aichecklists.core.designsystem.generated.resources.chat_choice_executing_add
+import aichecklists.core.designsystem.generated.resources.chat_choice_executing_attach
+import aichecklists.core.designsystem.generated.resources.chat_choice_executing_complete
+import aichecklists.core.designsystem.generated.resources.chat_choice_executing_create
+import aichecklists.core.designsystem.generated.resources.chat_choice_executing_default
+import aichecklists.core.designsystem.generated.resources.chat_choice_executing_delete
+import aichecklists.core.designsystem.generated.resources.chat_choice_executing_move
+import aichecklists.core.designsystem.generated.resources.chat_choice_executing_set_reminder
+import aichecklists.core.designsystem.generated.resources.chat_choice_move_reminders
+import aichecklists.core.designsystem.generated.resources.chat_choice_other
+import aichecklists.core.designsystem.generated.resources.chat_choice_set_reminder
+import aichecklists.core.designsystem.generated.resources.chat_choice_which_list
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.getString
 
 /**
  * ViewModel for the AI Chat screen.
  *
  * State machine (idle ↔ processing ↔ preview):
- *   1. idle: [ChatScreenState.isProcessing]=false, pendingPreview=null
- *   2. OnSendClick → blank check → classify intent → resolve to preview (write) or inline (read)
- *   3. OnPreviewApply → dispatch ToolCall → success message
- *   4. OnPreviewCancel → back to idle, no snackbar
+ *   1. idle: [ChatScreenState.isProcessing]=false, pendingChoice=null
+ *   2. OnSendClick → blank check → classify intent → resolve to a choice block (write) or inline (read)
+ *   3. OnChoiceSelected(Execute) → dispatch ToolCall → success message
+ *   4. OnChoiceDismissed → back to idle, with a visible "cancelled" reply
  *
  * Phase C additions:
  *   - [ChatIntent.FreeForm] → [runAgentTurn] (Layer 3 via chat_agent CF)
@@ -88,16 +125,25 @@ class ChatViewModel(
     val sideEffect: Flow<ChatScreenSideEffect> = _sideEffect.asSharedFlow()
 
     /**
-     * Pause/resume mechanism for the agent loop plan-card.
+     * Pause/resume mechanism for the agent loop choice block.
      *
      * When the agent returns mutating tool calls, [runAgentTurn] sets this to a new
-     * [CompletableDeferred] and suspends on [await()]. The intent handlers for
-     * [ChatScreenIntent.OnAgentPlanApply] and [ChatScreenIntent.OnAgentPlanCancel]
-     * complete it with true/false respectively. The loop resumes after the user decides.
-     * Cleared to null at the start of each new turn so stale completions are ignored.
+     * [CompletableDeferred] and suspends on [await()]. The choice handlers
+     * ([handleChoiceSelected] for the ExecuteAll chip / [handleChoiceDismissed] for the
+     * escape chip) complete it with true/false respectively. The loop resumes after the
+     * user decides. Cleared to null at the start of each new turn so stale completions are ignored.
      */
     @Volatile
     private var _pendingAgentDecision: CompletableDeferred<Boolean>? = null
+
+    /**
+     * Escalation context for the currently-shown write-intent choice block. Captured when the
+     * choice is built (write-intent preview path) so the FreeForm ("Something else") chip can
+     * reproduce the old reject-escalation by source layer (Local → Classifier → FullChat).
+     * Null when no write-intent choice is shown (e.g. agent batch / ambiguous match).
+     */
+    @Volatile
+    private var _choiceSourceLayer: RoutingLayer? = null
 
     /**
      * Wall-clock millis captured when the user taps Send (start of a turn). Read back when the
@@ -196,12 +242,18 @@ class ChatViewModel(
 
             ChatScreenIntent.OnSendClick -> handleSend()
 
-            is ChatScreenIntent.OnPreviewItemTextChange -> {
-                val current = _screenState.value.pendingPreview ?: return
+            is ChatScreenIntent.OnChoiceEditChange -> {
+                val current = _screenState.value.pendingChoice ?: return
                 _screenState.value = _screenState.value.copy(
-                    pendingPreview = current.copy(editableItemText = intent.text)
+                    pendingChoice = current.copy(editText = intent.text),
                 )
             }
+
+            is ChatScreenIntent.OnChoiceSelected -> handleChoiceSelected(intent.optionId)
+
+            ChatScreenIntent.OnChoiceDismissed -> handleChoiceDismissed()
+
+            ChatScreenIntent.OnChoiceEditConfirmed -> handleChoiceEditConfirmed()
 
             is ChatScreenIntent.AppendAssistantMessage -> {
                 // ChatRoute resolved a localised messageKey and is round-tripping
@@ -214,25 +266,6 @@ class ChatViewModel(
                     askAiForText = intent.askAiForText,
                 )
             }
-
-            ChatScreenIntent.OnPreviewApply -> handlePreviewApply()
-
-            ChatScreenIntent.OnPreviewCancel -> {
-                _screenState.value.pendingPreview?.let { preview ->
-                    analytics.event(
-                        name = AnalyticsEvents.Chat.PREVIEW_REJECTED,
-                        params = mapOf(AnalyticsParams.ACTION_TYPE to (preview.toolCall::class.simpleName ?: "unknown")),
-                    )
-                }
-                _screenState.value = _screenState.value.copy(pendingPreview = null)
-                // Emit assistant message to confirm cancellation — silent dismiss is FORBIDDEN
-                // (CLAUDE.md rule). The message appears in chat history as an inline reply.
-                viewModelScope.launch {
-                    _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_preview_cancelled_message"))
-                }
-            }
-
-            ChatScreenIntent.OnPreviewReject -> handlePreviewReject()
 
             ChatScreenIntent.OnHelpClick -> {
                 _screenState.value = _screenState.value.copy(showPricingSheet = true)
@@ -286,27 +319,6 @@ class ChatViewModel(
             }
 
             is ChatScreenIntent.OnAskAiFallback -> handleAskAiFallback(intent.text)
-
-            // ── Agent plan-card intents (Phase 2d) ────────────────────────────
-            // The agent plan-card is the Layer-3 equivalent of the preview confirm funnel,
-            // so it emits the same PREVIEW_CONFIRMED / PREVIEW_REJECTED events. ACTION_TYPE
-            // is "agent_plan" (the card batches N mutating calls; per-call action types were
-            // already emitted as PREVIEW_SHOWN when the card appeared).
-            ChatScreenIntent.OnAgentPlanApply -> {
-                analytics.event(
-                    name = AnalyticsEvents.Chat.PREVIEW_CONFIRMED,
-                    params = mapOf(AnalyticsParams.ACTION_TYPE to "agent_plan"),
-                )
-                _pendingAgentDecision?.complete(true)
-            }
-
-            ChatScreenIntent.OnAgentPlanCancel -> {
-                analytics.event(
-                    name = AnalyticsEvents.Chat.PREVIEW_REJECTED,
-                    params = mapOf(AnalyticsParams.ACTION_TYPE to "agent_plan"),
-                )
-                _pendingAgentDecision?.complete(false)
-            }
 
             // ── Attachment intents ────────────────────────────────────────────
 
@@ -564,6 +576,12 @@ class ChatViewModel(
             routedLayer = null,
             attachments = attachments,
         )
+        // Capture the pending attachments BEFORE clearing them off the state below. The
+        // AttachToItem branch (in the when-block) needs this list to build its ToolCall —
+        // reading _screenState.value.pendingAttachments there would see the cleared (empty)
+        // field and wrongly emit a "no files" snackbar. (These are the same files attached to
+        // userMsg.attachments above; we keep an explicit local for clarity.)
+        val sentAttachments = attachments
         updateMessages { it + userMsg }
         _screenState.value = _screenState.value.copy(
             inputText = "",
@@ -684,53 +702,53 @@ class ChatViewModel(
                         // the checklist name (not id) so it flows through the dispatcher's existing
                         // hint → name-match path. Explicit hints are preserved (user choice wins).
                         val toolCall = biasToolCallToContext(builtToolCall)
-                        val humanReadable = previewRenderer.render(toolCall)
-                        _screenState.value = _screenState.value.copy(
-                            pendingPreview = PendingPreview(
-                                toolCall = toolCall,
-                                humanReadable = humanReadable,
-                                targetChecklistHint = extractHint(toolCall),
-                                editableItemText = extractItemText(toolCall),
-                                originalText = text,
-                                sourceLayer = classification.layer,
-                            ),
-                            isProcessing = false,
-                        )
-                        trackPreviewShown(toolCall)
-                        trackResponseReceived(classification.layer, outcome = "preview")
+                        // Generic-target "add to a checklist" with no resolvable list AND no open
+                        // checklist (hint still null after context-bias) → ask "which list?" up front
+                        // when 2+ lists exist (ambiguous). With 0 or 1 list there is nothing to pick,
+                        // so fall through — the dispatcher resolves a null hint to the single/none list.
+                        // Covers both single (AddItem) and multi (AddItems) adds; withHint() handles both.
+                        val hintlessAdd = (toolCall is ToolCall.AddItem && toolCall.checklistHint == null) ||
+                            (toolCall is ToolCall.AddItems && toolCall.checklistHint == null)
+                        if (hintlessAdd) {
+                            val names = runCatching {
+                                checklistRepository.checklists.first().map { it.name }
+                            }.getOrDefault(emptyList())
+                            if (names.size >= 2) {
+                                showWhichListChoice(toolCall, names, sourceLayer = classification.layer)
+                                return@runCatching
+                            }
+                        }
+                        showWriteChoice(toolCall, originalText = text, sourceLayer = classification.layer)
                     }
 
                     // AttachToItem — show preview only if attachments are present;
                     // otherwise emit a snackbar (silent-skip is forbidden).
                     is ChatIntent.AttachToItem -> {
-                        val currentAttachments = _screenState.value.pendingAttachments
+                        // Use the attachments captured at send time (sentAttachments), NOT the
+                        // live pendingAttachments — the latter was cleared above before this branch.
+                        val currentAttachments = sentAttachments
                         if (currentAttachments.isEmpty()) {
                             _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_attach_no_files"))
                             trackResponseReceived(classification.layer, outcome = "answer")
                             _screenState.value = _screenState.value.copy(isProcessing = false)
                             return@runCatching
                         }
-                        val builtToolCall = ToolCall.AttachToItem(
-                            checklistHint = intent.checklistHint,
-                            itemText = intent.itemText,
-                            attachments = currentAttachments,
-                        )
+                        // "attach this" with no real target item ("this"/"это"/blank) → the user just
+                        // wants the file turned into a checklist, not pinned to a named item → build a
+                        // CreateChecklistFromAttachment. A real item name ("attach this to milk") is NOT
+                        // referential → stays an AttachToItem.
+                        val builtToolCall = if (isReferentialAttachTarget(intent.itemText, locale)) {
+                            ToolCall.CreateChecklistFromAttachment(attachments = currentAttachments)
+                        } else {
+                            ToolCall.AttachToItem(
+                                checklistHint = intent.checklistHint,
+                                itemText = intent.itemText,
+                                attachments = currentAttachments,
+                            )
+                        }
                         // P5: bias to the open checklist when the user didn't name a list.
                         val toolCall = biasToolCallToContext(builtToolCall)
-                        val humanReadable = previewRenderer.render(toolCall)
-                        _screenState.value = _screenState.value.copy(
-                            pendingPreview = PendingPreview(
-                                toolCall = toolCall,
-                                humanReadable = humanReadable,
-                                targetChecklistHint = extractHint(toolCall),
-                                editableItemText = intent.itemText,
-                                originalText = text,
-                                sourceLayer = classification.layer,
-                            ),
-                            isProcessing = false,
-                        )
-                        trackPreviewShown(toolCall)
-                        trackResponseReceived(classification.layer, outcome = "preview")
+                        showWriteChoice(toolCall, originalText = text, sourceLayer = classification.layer)
                     }
                 }
             }.onFailure { e ->
@@ -742,102 +760,379 @@ class ChatViewModel(
         }
     }
 
-    // ─── Preview apply flow ───────────────────────────────────────────────────
+    // ─── Choice block — build (write-intent path) ─────────────────────────────
 
-    private fun handlePreviewApply() {
-        val preview = _screenState.value.pendingPreview ?: return
+    /**
+     * Builds and shows an [AiChoiceResponse] for a single write-intent [toolCall] (the old
+     * write-intent preview card). Caller must be in a suspend context (getString).
+     *
+     * Options:
+     *  - Primary [ChoiceAction.Execute] (Add / Delete / Create / …; Destructive role for delete).
+     *  - Default [ChoiceAction.Edit] (only when the tool call has editable text).
+     *  - Escape: for CreateChecklistFromAttachment → [ChoiceAction.Dismiss] (no original text to
+     *    re-classify). Otherwise → [ChoiceAction.FreeForm] ("Something else") which reproduces the
+     *    old reject-escalation by [sourceLayer]; a separate Dismiss cancel is not added for
+     *    destructive intents (Dismiss IS the safe option) and is folded into FreeForm otherwise.
+     */
+    private suspend fun showWriteChoice(toolCall: ToolCall, originalText: String, sourceLayer: RoutingLayer) {
+        val isDelete = toolCall is ToolCall.DeleteItem
+        val editable = extractItemText(toolCall).isNotBlank()
+        val isFromAttachment = toolCall is ToolCall.CreateChecklistFromAttachment
+
+        val options = buildList {
+            add(
+                ChoiceOption(
+                    id = CHOICE_EXECUTE,
+                    label = choiceString(toolCall.primaryActionLabel()),
+                    role = if (isDelete) ChoiceRole.Destructive else ChoiceRole.Primary,
+                    action = ChoiceAction.Execute(toolCall),
+                ),
+            )
+            if (editable) {
+                add(
+                    ChoiceOption(
+                        id = CHOICE_EDIT,
+                        label = choiceString(Res.string.chat_choice_edit),
+                        role = ChoiceRole.Default,
+                        action = ChoiceAction.Edit,
+                    ),
+                )
+            }
+        }
+
+        val escape = if (isFromAttachment) {
+            ChoiceOption(
+                id = CHOICE_ESCAPE,
+                label = choiceString(Res.string.chat_choice_cancel),
+                role = ChoiceRole.Escape,
+                action = ChoiceAction.Dismiss,
+            )
+        } else {
+            ChoiceOption(
+                id = CHOICE_ESCAPE,
+                label = choiceString(Res.string.chat_choice_other),
+                role = ChoiceRole.Escape,
+                action = ChoiceAction.FreeForm(originalText),
+            )
+        }
+
+        val prompt = choiceString(toolCall.promptRes(), *toolCall.promptArgs())
+        _choiceSourceLayer = sourceLayer
+        _screenState.value = _screenState.value.copy(
+            pendingChoice = PendingChoice(
+                choice = ChatChoice(prompt = prompt, options = options, escape = escape),
+            ),
+            isProcessing = false,
+        )
+        trackPreviewShown(toolCall)
+        trackResponseReceived(sourceLayer, outcome = "preview")
+    }
+
+    /**
+     * Shows a "Which list?" choice: one Default Execute chip per candidate list (each re-runs
+     * [sourceToolCall] with that list's name as the hint), plus a Dismiss escape.
+     *
+     * Used both up-front (a generic "add to a checklist" with 2+ lists, no resolvable target)
+     * and post-dispatch (an [DispatchOutcome.AmbiguousMatch] where a hint matched several lists).
+     * Candidates whose tool call carries no per-list hint are skipped (see [ToolCall.withHint]).
+     */
+    private suspend fun showWhichListChoice(
+        sourceToolCall: ToolCall,
+        names: List<String>,
+        sourceLayer: RoutingLayer?,
+    ) {
+        val options = names.take(4).mapIndexedNotNull { index, name ->
+            val tc = sourceToolCall.withHint(name) ?: return@mapIndexedNotNull null
+            ChoiceOption(
+                id = "$CHOICE_CANDIDATE_PREFIX$index",
+                label = name,
+                role = ChoiceRole.Default,
+                action = ChoiceAction.Execute(tc),
+            )
+        }
+        val escape = ChoiceOption(
+            id = CHOICE_ESCAPE,
+            label = choiceString(Res.string.chat_choice_cancel),
+            role = ChoiceRole.Escape,
+            action = ChoiceAction.Dismiss,
+        )
+        _choiceSourceLayer = sourceLayer
+        _screenState.value = _screenState.value.copy(
+            pendingChoice = PendingChoice(
+                choice = ChatChoice(
+                    prompt = choiceString(Res.string.chat_choice_which_list),
+                    options = options,
+                    escape = escape,
+                ),
+            ),
+            isProcessing = false,
+        )
+        if (sourceLayer != null) trackResponseReceived(sourceLayer, outcome = "preview")
+    }
+
+    // ─── Choice block — handlers ──────────────────────────────────────────────
+
+    /** Resolves the tapped chip id to its [ChoiceAction] and runs it. */
+    private fun handleChoiceSelected(optionId: String) {
+        val pending = _screenState.value.pendingChoice ?: return
+        // Block double-taps while a chip is already executing.
+        if (pending.executingId != null) return
+        val option = pending.choice.options.firstOrNull { it.id == optionId }
+            ?: pending.choice.escape?.takeIf { it.id == optionId }
+            ?: return
+
+        when (val action = option.action) {
+            is ChoiceAction.Execute -> executeChoice(option, action.toolCall)
+            ChoiceAction.ExecuteAll -> {
+                analytics.event(
+                    name = AnalyticsEvents.Chat.PREVIEW_CONFIRMED,
+                    params = mapOf(AnalyticsParams.ACTION_TYPE to "agent_plan"),
+                )
+                // Resume the suspended agent loop (runAgentTurn clears pendingChoice itself).
+                _pendingAgentDecision?.complete(true)
+            }
+            is ChoiceAction.FreeForm -> {
+                analytics.event(
+                    name = AnalyticsEvents.Chat.PREVIEW_REJECTED,
+                    params = mapOf(AnalyticsParams.ACTION_TYPE to "freeform"),
+                )
+                escalateChoice(action.text)
+            }
+            is ChoiceAction.SendMessage -> {
+                analytics.event(
+                    name = AnalyticsEvents.Chat.PREVIEW_CONFIRMED,
+                    params = mapOf(AnalyticsParams.ACTION_TYPE to "option"),
+                )
+                sendOptionAsTurn(option, action.text)
+            }
+            ChoiceAction.Edit -> {
+                // Open the inline edit field seeded with the current editable text.
+                val seed = (pending.choice.options
+                    .firstOrNull { it.action is ChoiceAction.Execute }
+                    ?.action as? ChoiceAction.Execute)
+                    ?.let { extractItemText(it.toolCall) }
+                    ?: ""
+                _screenState.value = _screenState.value.copy(
+                    pendingChoice = pending.copy(editText = seed),
+                )
+            }
+            ChoiceAction.Dismiss -> handleChoiceDismissed()
+        }
+    }
+
+    /** Dispatches a single Execute choice (the old Apply path), with a per-chip loading state. */
+    private fun executeChoice(option: ChoiceOption, toolCall: ToolCall) {
         analytics.event(
             name = AnalyticsEvents.Chat.PREVIEW_CONFIRMED,
-            params = mapOf(AnalyticsParams.ACTION_TYPE to (preview.toolCall::class.simpleName ?: "unknown")),
+            params = mapOf(AnalyticsParams.ACTION_TYPE to (toolCall::class.simpleName ?: "unknown")),
         )
+        viewModelScope.launch {
+            // Mark the chip loading (whole block goes non-interactive in the UI).
+            val loadingLabel = choiceString(toolCall.executingLabel())
+            _screenState.value.pendingChoice?.let { current ->
+                _screenState.value = _screenState.value.copy(
+                    pendingChoice = current.copy(executingId = option.id, executingLabel = loadingLabel),
+                )
+            }
+            runCatching {
+                val outcome = toolCallDispatcher.dispatch(toolCall)
+                // Clear first; handleOutcomeInline may set a NEW choice (AmbiguousMatch → "Which list?").
+                clearChoice()
+                handleOutcomeInline(outcome, sourceToolCall = toolCall)
+            }.onFailure { e ->
+                logger.error(TAG, "executeChoice failed", e)
+                clearChoice()
+                _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_apply_error"))
+            }
+        }
+    }
+
+    /**
+     * User tapped an AI-generated answer option. Sends the chip's [text] as a fresh agent turn
+     * (forceAgent semantics). The label text is NOT re-classified — it goes straight to the agent.
+     *
+     * History order [...assistant: question][user: label][assistant: answer]: the options question
+     * lives only inside the choice block until now, so we persist it as an assistant message HERE
+     * (before the user label) so it (a) stays visible in history and (b) is in the next turn's
+     * transcript context. Credits were already charged server-side — costCredits=3 is display-only.
+     */
+    private fun sendOptionAsTurn(option: ChoiceOption, text: String) {
+        // Capture the question prompt before clearing the choice block.
+        val questionPrompt = _screenState.value.pendingChoice?.choice?.prompt?.takeIf { it.isNotBlank() }
+        // Visible feedback: mark the tapped chip loading.
+        _screenState.value.pendingChoice?.let { current ->
+            _screenState.value = _screenState.value.copy(
+                pendingChoice = current.copy(executingId = option.id),
+            )
+        }
+        val userMsg = ChatMessage(
+            id = generateId(),
+            role = ChatRole.User,
+            content = text,
+            timestamp = nowMillis(),
+            costCredits = 0,
+            routedLayer = RoutingLayer.FullChat,
+        )
+        clearChoice()
+        _screenState.value = _screenState.value.copy(isProcessing = true)
+        _turnStartMs = nowMillis()
+
+        viewModelScope.launch {
+            runCatching {
+                // Persist the question first (assistant), then the tapped label (user) — preserves
+                // [assistant: question][user: label] order in both in-memory state and Room.
+                if (questionPrompt != null) {
+                    addAndPersistAssistantMessage(
+                        content = questionPrompt,
+                        routedLayer = RoutingLayer.FullChat,
+                        costCredits = 3,
+                    )
+                }
+                updateMessages { it + userMsg }
+                withContext(NonCancellable) { chatHistoryRepository.append(userMsg) }
+                val locale = localeProvider.current()
+                runAgentTurn(text, locale)
+            }.onFailure { e ->
+                logger.error(TAG, "sendOptionAsTurn failed", e)
+                _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_generic_error"))
+                trackResponseReceived(RoutingLayer.FullChat, outcome = "error")
+                _screenState.value = _screenState.value.copy(isProcessing = false)
+            }
+        }
+    }
+
+    /** User confirmed the inline edit — apply the edited text to the Execute tool call and dispatch. */
+    private fun handleChoiceEditConfirmed() {
+        val pending = _screenState.value.pendingChoice ?: return
+        val executeOption = pending.choice.options.firstOrNull { it.action is ChoiceAction.Execute }
+        val baseToolCall = (executeOption?.action as? ChoiceAction.Execute)?.toolCall ?: return
+        val edited = pending.editText?.trim().orEmpty()
+
+        // Silent-skip guard (CLAUDE.md): a blank edit must not drop quietly.
+        if (edited.isEmpty()) {
+            viewModelScope.launch {
+                _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_choice_edit_empty_hint"))
+            }
+            return
+        }
+
+        val finalToolCall = applyEditedText(baseToolCall, edited)
+        // Close the edit field, then dispatch via the standard execute path.
+        _screenState.value = _screenState.value.copy(pendingChoice = pending.copy(editText = null))
+        executeChoice(executeOption, finalToolCall)
+    }
+
+    /**
+     * User dismissed the choice (escape chip / back). Clears it with a visible response.
+     * For an agent-batch choice this also resolves the suspended agent decision with `false`.
+     * For an AI-options choice the question only lived inside the choice block, so we persist it
+     * as an assistant message BEFORE clearing — the question stays visible in history and no extra
+     * "cancelled" reply is needed.
+     */
+    private fun handleChoiceDismissed() {
+        val pending = _screenState.value.pendingChoice ?: return
+        if (pending.executingId != null) return
+
+        val isAgentBatch = pending.batchItems != null
+        // AI-options choice: chips are SendMessage (a fresh turn), not a write-intent confirm.
+        val isOptions = pending.choice.options.any { it.action is ChoiceAction.SendMessage }
+        analytics.event(
+            name = AnalyticsEvents.Chat.PREVIEW_REJECTED,
+            params = mapOf(
+                AnalyticsParams.ACTION_TYPE to when {
+                    isAgentBatch -> "agent_plan"
+                    isOptions -> "options"
+                    else -> "dismiss"
+                },
+            ),
+        )
+
+        if (isAgentBatch) {
+            // The agent loop owns clearing pendingChoice after the deferred resolves (it sends
+            // declined results then continues). Just resolve the decision with "declined".
+            _pendingAgentDecision?.complete(false)
+            return
+        }
+
+        if (isOptions) {
+            // Persist the question (it only lived inside the choice block) so it stays visible,
+            // then clear — no extra "cancelled" reply (the question itself is the visible response).
+            val questionPrompt = pending.choice.prompt.takeIf { it.isNotBlank() }
+            clearChoice()
+            if (questionPrompt != null) {
+                viewModelScope.launch {
+                    addAndPersistAssistantMessage(
+                        content = questionPrompt,
+                        routedLayer = RoutingLayer.FullChat,
+                        costCredits = 3,
+                    )
+                }
+            }
+            return
+        }
+
+        clearChoice()
+        // Write-intent dismiss must reply (silent dismiss FORBIDDEN — CLAUDE.md).
+        viewModelScope.launch {
+            _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_choice_dismissed_message"))
+        }
+    }
+
+    /** Clears the pending choice + its escalation context. */
+    private fun clearChoice() {
+        _choiceSourceLayer = null
+        _screenState.value = _screenState.value.copy(pendingChoice = null)
+    }
+
+    // ─── Choice escalation flow ("Something else") ────────────────────────────
+
+    /**
+     * User tapped "Something else" — re-classify the original input in the next pipeline layer.
+     * Reproduces the old reject-escalation by [_choiceSourceLayer]:
+     * - Local → re-classify with skipLayer1=true (Layer 2); write-intent → new choice, else agent.
+     * - Classifier → straight to Layer 3 (agent).
+     * - FullChat → safety fallback (Layer 3 never produces a choice).
+     *
+     * The user message already lives in Room from [handleSend] — not re-persisted.
+     */
+    private fun escalateChoice(originalText: String) {
+        val sourceLayer = _choiceSourceLayer ?: RoutingLayer.Local
+
+        if (originalText.isBlank()) {
+            viewModelScope.launch {
+                _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_extract_fail"))
+            }
+            clearChoice()
+            return
+        }
+
+        clearChoice()
         _screenState.value = _screenState.value.copy(isProcessing = true)
 
         viewModelScope.launch {
             runCatching {
-                // Apply user's edits (if any) before dispatching.
-                val finalToolCall = applyEditedText(preview.toolCall, preview.editableItemText)
-                val outcome = toolCallDispatcher.dispatch(finalToolCall)
-                _screenState.value = _screenState.value.copy(pendingPreview = null)
-                handleOutcomeInline(outcome)
-            }.onFailure { e ->
-                logger.error(TAG, "handlePreviewApply failed", e)
-                _screenState.value = _screenState.value.copy(pendingPreview = null)
-                _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_apply_error"))
-            }
-            _screenState.value = _screenState.value.copy(isProcessing = false)
-        }
-    }
-
-    // ─── Preview reject flow ("I meant something else") ─────────────────────
-
-    /**
-     * User rejected the pending preview and wants the input re-classified in the next layer.
-     *
-     * Escalation logic:
-     * - Source = [RoutingLayer.Local]  → re-classify with [skipLayer1=true] (Layer 2, 1 credit).
-     *   If Layer 2 returns a command-intent → show a NEW preview with [sourceLayer=Classifier].
-     *   If Layer 2 returns FreeForm / Unknown → delegate to [runAgentTurn].
-     * - Source = [RoutingLayer.Classifier] → skip straight to Layer 3 via [runAgentTurn].
-     * - Source = [RoutingLayer.FullChat] → safety fallback: Layer 3 never produces a preview
-     *   card, so this branch should not occur in practice.
-     *
-     * The user message is NOT re-persisted — it already lives in Room from [handleSend].
-     * Credits for Layer 2 are deducted server-side; credit balance is reconciled via
-     * [userDataRepository.getUserDataFlow] collector in init.
-     */
-    private fun handlePreviewReject() {
-        val preview = _screenState.value.pendingPreview ?: return
-        analytics.event(
-            name = AnalyticsEvents.Chat.PREVIEW_REJECTED,
-            params = mapOf(AnalyticsParams.ACTION_TYPE to (preview.toolCall::class.simpleName ?: "unknown")),
-        )
-
-        // Guard: attachment-only previews have no original text to re-classify.
-        // The UI hides the Reject button for CreateChecklistFromAttachment, but
-        // defensive check here prevents a silent mis-classification.
-        if (preview.originalText.isBlank()) {
-            viewModelScope.launch {
-                _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_extract_fail"))
-            }
-            _screenState.value = _screenState.value.copy(pendingPreview = null)
-            return
-        }
-
-        _screenState.value = _screenState.value.copy(
-            pendingPreview = null,
-            isProcessing = true,
-        )
-
-        viewModelScope.launch {
-            runCatching {
                 val locale = localeProvider.current()
-                when (preview.sourceLayer) {
+                when (sourceLayer) {
                     RoutingLayer.Local -> {
-                        // Layer 1 → Layer 2 escalation
-                        logger.info(TAG, "handlePreviewReject: Layer1 source → escalating to Layer2 (skipLayer1=true)")
+                        logger.info(TAG, "escalateChoice: Layer1 source → escalating to Layer2 (skipLayer1=true)")
                         val classification = aiChatRepository.classify(
-                            input = preview.originalText,
+                            input = originalText,
                             locale = locale,
                             skipLayer1 = true,
                         )
-                        logger.debug(TAG, "Reject re-classify → ${classification.intent::class.simpleName} layer=${classification.layer}")
+                        logger.debug(TAG, "Escalate re-classify → ${classification.intent::class.simpleName} layer=${classification.layer}")
 
                         when (val intent = classification.intent) {
-                            // FreeForm / Unknown from Layer 2 → escalate to Layer 3 (agent)
                             ChatIntent.FreeForm,
-                            is ChatIntent.Unknown -> {
-                                runAgentTurn(preview.originalText, locale)
-                            }
+                            is ChatIntent.Unknown -> runAgentTurn(originalText, locale)
 
-                            // FindItems is a read-intent inline result, no preview card
                             ChatIntent.FindItems -> {
-                                val query = extractQuery(preview.originalText)
+                                val query = extractQuery(originalText)
                                 val outcome = toolCallDispatcher.dispatch(ToolCall.FindItemsQuery(query))
                                 handleOutcomeInline(outcome)
                                 _screenState.value = _screenState.value.copy(isProcessing = false)
                             }
 
-                            // Write-intent → build a new preview with sourceLayer=Classifier
                             ChatIntent.CreateItem,
                             ChatIntent.DeleteItem,
                             ChatIntent.CompleteItem,
@@ -845,30 +1140,16 @@ class ChatViewModel(
                             ChatIntent.SetReminder,
                             ChatIntent.MoveReminders -> {
                                 val builtToolCall = classification.preBuiltToolCall
-                                    ?: buildToolCall(intent, preview.originalText, locale)
+                                    ?: buildToolCall(intent, originalText, locale)
                                 if (builtToolCall == null) {
                                     _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_extract_fail"))
                                     _screenState.value = _screenState.value.copy(isProcessing = false)
                                     return@runCatching
                                 }
-                                // P5: bias list-less commands to the open checklist (same as the
-                                // initial send path), so the re-classified preview stays on context.
                                 val toolCall = biasToolCallToContext(builtToolCall)
-                                val humanReadable = previewRenderer.render(toolCall)
-                                _screenState.value = _screenState.value.copy(
-                                    pendingPreview = PendingPreview(
-                                        toolCall = toolCall,
-                                        humanReadable = humanReadable,
-                                        targetChecklistHint = extractHint(toolCall),
-                                        editableItemText = extractItemText(toolCall),
-                                        originalText = preview.originalText,
-                                        sourceLayer = classification.layer,
-                                    ),
-                                    isProcessing = false,
-                                )
+                                showWriteChoice(toolCall, originalText = originalText, sourceLayer = classification.layer)
                             }
 
-                            // AttachToItem without active attachments → can't re-build
                             is ChatIntent.AttachToItem -> {
                                 _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_attach_no_files"))
                                 _screenState.value = _screenState.value.copy(isProcessing = false)
@@ -877,21 +1158,18 @@ class ChatViewModel(
                     }
 
                     RoutingLayer.Classifier -> {
-                        // Layer 2 → Layer 3 escalation (agent)
-                        logger.info(TAG, "handlePreviewReject: Classifier source → escalating to Layer3 (agent)")
-                        runAgentTurn(preview.originalText, locale)
+                        logger.info(TAG, "escalateChoice: Classifier source → escalating to Layer3 (agent)")
+                        runAgentTurn(originalText, locale)
                     }
 
                     RoutingLayer.FullChat -> {
-                        // Safety fallback: Layer 3 never produces preview cards, so this
-                        // branch should not be reachable. Show a generic hint.
-                        logger.warning(TAG, "handlePreviewReject: unexpected FullChat sourceLayer — ignoring")
+                        logger.warning(TAG, "escalateChoice: unexpected FullChat sourceLayer — ignoring")
                         _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_unknown_intent_hint"))
                         _screenState.value = _screenState.value.copy(isProcessing = false)
                     }
                 }
             }.onFailure { e ->
-                logger.error(TAG, "handlePreviewReject failed", e)
+                logger.error(TAG, "escalateChoice failed", e)
                 _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_generic_error"))
                 _screenState.value = _screenState.value.copy(isProcessing = false)
             }
@@ -939,18 +1217,8 @@ class ChatViewModel(
             runCatching {
                 withContext(NonCancellable) { chatHistoryRepository.append(userMsg) }
                 val toolCall = ToolCall.CreateChecklistFromAttachment(attachments)
-                val humanReadable = previewRenderer.render(toolCall)
-                _screenState.value = _screenState.value.copy(
-                    pendingPreview = PendingPreview(
-                        toolCall = toolCall,
-                        humanReadable = humanReadable,
-                        targetChecklistHint = null,
-                        editableItemText = "",
-                    ),
-                    isProcessing = false,
-                )
-                trackPreviewShown(toolCall)
-                trackResponseReceived(RoutingLayer.Local, outcome = "preview")
+                // No original text → escape is Dismiss (handled inside showWriteChoice).
+                showWriteChoice(toolCall, originalText = "", sourceLayer = RoutingLayer.Local)
             }.onFailure { e ->
                 logger.error(TAG, "handleSendAttachmentsOnly failed", e)
                 trackResponseReceived(RoutingLayer.Local, outcome = "error")
@@ -1093,8 +1361,8 @@ class ChatViewModel(
      *    a. Call [AiChatRepository.agentStep] with current transcript.
      *    b. On [AgentStepResult.ToolCalls]: split into readOnly / mutating.
      *       - Read-only (find_items, read_checklist) are dispatched immediately without a plan-card.
-     *       - Mutating calls → build [AgentPlan], show plan-card, suspend until user decides
-     *         ([OnAgentPlanApply] → dispatch; [OnAgentPlanCancel] → declined results).
+     *       - Mutating calls → build a batch [PendingChoice], show the choice block, suspend until
+     *         user decides (ExecuteAll chip → dispatch; escape/Dismiss chip → declined results).
      *       - COUNT INVARIANT: allResults.size == calls.size (one result per call, in order).
      *    c. Append [ModelToolCalls] + [ToolResults] to transcript, increment round, continue.
      *    d. On [AgentStepResult.Final]: persist assistant message, return.
@@ -1168,19 +1436,18 @@ class ChatViewModel(
                         readOnlyResults.add(AgentToolResult(call.id, call.name, resultJson))
                     }
 
-                    // Dispatch mutating calls — show plan-card if any.
+                    // Dispatch mutating calls — show choice block if any.
                     val mutatingResults = mutableListOf<AgentToolResult>()
                     if (mutatingCalls.isNotEmpty()) {
-                        // Build plan items for the card.
+                        // Build numbered batch items for the prompt bubble.
                         val planItems = mutatingCalls.map { call ->
                             val toolCall = AgentToolCallMapper.map(call)
                             val text = if (toolCall != null) previewRenderer.render(toolCall) else call.name
                             AgentPlanItem(text = text, isDestructive = call.name == "delete_item")
                         }
-                        val plan = AgentPlan(items = planItems)
 
-                        // Suspend the loop — show plan-card, wait for user.
-                        // The plan-card is the agent's preview funnel: emit PREVIEW_SHOWN per
+                        // Suspend the loop — show the choice block, wait for user.
+                        // The choice block is the agent's preview funnel: emit PREVIEW_SHOWN per
                         // mutating action, plus a single response_received(outcome="preview") so the
                         // latency-to-first-response is captured here (the later Final is a follow-up).
                         mutatingCalls.forEach { call ->
@@ -1192,17 +1459,35 @@ class ChatViewModel(
                         trackResponseReceived(RoutingLayer.FullChat, outcome = "preview")
                         val decision = CompletableDeferred<Boolean>()
                         _pendingAgentDecision = decision
+                        // Agent batch choice: one Primary "Do it all" (ExecuteAll) + Dismiss escape.
+                        val batchChoice = ChatChoice(
+                            prompt = choiceString(Res.string.chat_choice_apply_actions),
+                            options = listOf(
+                                ChoiceOption(
+                                    id = CHOICE_EXECUTE_ALL,
+                                    label = choiceString(Res.string.chat_choice_execute_all),
+                                    role = ChoiceRole.Primary,
+                                    action = ChoiceAction.ExecuteAll,
+                                ),
+                            ),
+                            escape = ChoiceOption(
+                                id = CHOICE_ESCAPE,
+                                label = choiceString(Res.string.chat_choice_cancel),
+                                role = ChoiceRole.Escape,
+                                action = ChoiceAction.Dismiss,
+                            ),
+                        )
                         _screenState.value = _screenState.value.copy(
                             isProcessing = false,
-                            pendingAgentPlan = plan,
+                            pendingChoice = PendingChoice(choice = batchChoice, batchItems = planItems),
                         )
 
                         val approved = decision.await()
 
-                        // Clear plan-card and resume processing.
+                        // Clear choice block and resume processing.
                         _pendingAgentDecision = null
                         _screenState.value = _screenState.value.copy(
-                            pendingAgentPlan = null,
+                            pendingChoice = null,
                             isProcessing = true,
                         )
 
@@ -1262,6 +1547,52 @@ class ChatViewModel(
                         content = stepResult.content,
                         routedLayer = RoutingLayer.FullChat,
                         costCredits = 3,
+                    )
+                    return
+                }
+
+                is AgentStepResult.Options -> {
+                    // Terminal turn (like Final) with AI-generated tappable answer options.
+                    // Persist the optimistic credit balance.
+                    _screenState.value = _screenState.value.copy(
+                        creditBalance = stepResult.creditsRemaining,
+                        isProcessing = false,
+                    )
+                    runCatching {
+                        val currentUserData = userDataRepository.getUserData()
+                        userDataRepository.update(currentUserData.copy(aiCredits = stepResult.creditsRemaining))
+                    }.onFailure { e ->
+                        logger.error(TAG, "runAgentTurn: failed to persist credit balance — ${e.message}", e)
+                    }
+                    trackResponseReceived(RoutingLayer.FullChat, outcome = "options")
+                    // The question lives INSIDE the choice block (ChatChoice.prompt), NOT as a
+                    // separate persisted message: the inline dock overlays only the pendingChoice
+                    // over the last message, so a separately-persisted question would be hidden.
+                    // We persist it as an assistant message only on RESOLVE (chip tap / dismiss) —
+                    // see [sendOptionAsTurn] / [handleChoiceDismissed] — so history + next-turn
+                    // transcript get it without double-rendering it here.
+                    val options = stepResult.options.mapIndexed { index, label ->
+                        ChoiceOption(
+                            id = "$CHOICE_OPTION_PREFIX$index",
+                            label = label,
+                            role = ChoiceRole.Default,
+                            action = ChoiceAction.SendMessage(label),
+                        )
+                    }
+                    _choiceSourceLayer = null
+                    _screenState.value = _screenState.value.copy(
+                        pendingChoice = PendingChoice(
+                            choice = ChatChoice(
+                                prompt = stepResult.prompt,
+                                options = options,
+                                escape = ChoiceOption(
+                                    id = CHOICE_ESCAPE,
+                                    label = choiceString(Res.string.chat_choice_cancel),
+                                    role = ChoiceRole.Escape,
+                                    action = ChoiceAction.Dismiss,
+                                ),
+                            ),
+                        ),
                     )
                     return
                 }
@@ -1444,6 +1775,106 @@ class ChatViewModel(
     }
 
     /**
+     * Resolves a choice-copy string resource, tolerating the unit-test host environment where
+     * Compose Resources `getString` throws "Resources.getSystem not mocked" (plain Android host
+     * test, no Robolectric — see AnalyzeViewModelTest note). On-device this is a normal getString;
+     * in tests it falls back to a stable non-blank token so the choice block still builds with the
+     * correct structure (the tests assert on the tool call / roles / ids, not the resolved copy).
+     */
+    private suspend fun choiceString(res: StringResource, vararg args: Any): String =
+        runCatching { if (args.isEmpty()) getString(res) else getString(res, *args) }
+            .getOrElse { e ->
+                logger.warning(TAG, "choiceString: resource resolution failed (test env?) — ${e.message}")
+                "…"
+            }
+
+    // ─── Choice copy helpers (write-intent prompt / chip / loading labels) ─────
+
+    /**
+     * The prompt string resource + its positional args for a write-intent choice.
+     * e.g. AddItem → "Add to %1$s?" with the target list name (or a generic prompt when
+     * the list is unspecified). Strings are localized via [getString] at the call site.
+     */
+    private fun ToolCall.promptRes(): StringResource = when (this) {
+        is ToolCall.AddItem -> if (checklistHint.isNullOrBlank()) Res.string.chat_choice_add_default_list else Res.string.chat_choice_add_to_list
+        is ToolCall.DeleteItem -> Res.string.chat_choice_delete
+        is ToolCall.CompleteItem -> Res.string.chat_choice_complete
+        is ToolCall.CreateChecklist -> Res.string.chat_choice_create
+        is ToolCall.SetItemReminder -> Res.string.chat_choice_set_reminder
+        is ToolCall.MoveAllReminders -> Res.string.chat_choice_move_reminders
+        is ToolCall.AttachToItem -> Res.string.chat_choice_attach
+        is ToolCall.CreateChecklistFromAttachment -> Res.string.chat_choice_create_from_file
+        // Agent-only / read variants never produce a write-intent choice; safe fallback.
+        is ToolCall.FindItemsQuery,
+        is ToolCall.AddItems,
+        is ToolCall.ReadChecklist,
+        is ToolCall.RenameChecklist -> Res.string.chat_choice_apply_actions
+    }
+
+    /** Positional args for [promptRes] — the item/list name highlighted in the prompt. */
+    private fun ToolCall.promptArgs(): Array<Any> = when (this) {
+        is ToolCall.AddItem -> if (checklistHint.isNullOrBlank()) emptyArray() else arrayOf(checklistHint!!)
+        is ToolCall.DeleteItem -> arrayOf(itemText)
+        is ToolCall.CompleteItem -> arrayOf(itemText)
+        is ToolCall.CreateChecklist -> arrayOf(name)
+        is ToolCall.SetItemReminder -> arrayOf(itemText)
+        is ToolCall.AttachToItem -> arrayOf(itemText)
+        is ToolCall.MoveAllReminders,
+        is ToolCall.CreateChecklistFromAttachment,
+        is ToolCall.FindItemsQuery,
+        is ToolCall.AddItems,
+        is ToolCall.ReadChecklist,
+        is ToolCall.RenameChecklist -> emptyArray()
+    }
+
+    /** Primary-chip label resource for a write-intent ("Add" / "Delete" / "Create" / …). */
+    private fun ToolCall.primaryActionLabel(): StringResource = when (this) {
+        is ToolCall.AddItem, is ToolCall.AddItems -> Res.string.chat_choice_action_add
+        is ToolCall.DeleteItem -> Res.string.chat_choice_action_delete
+        is ToolCall.CompleteItem -> Res.string.chat_choice_action_complete
+        is ToolCall.CreateChecklist, is ToolCall.CreateChecklistFromAttachment -> Res.string.chat_choice_action_create
+        is ToolCall.SetItemReminder -> Res.string.chat_choice_action_set_reminder
+        is ToolCall.MoveAllReminders -> Res.string.chat_choice_action_move
+        is ToolCall.AttachToItem -> Res.string.chat_choice_action_attach
+        is ToolCall.FindItemsQuery,
+        is ToolCall.ReadChecklist,
+        is ToolCall.RenameChecklist -> Res.string.chat_choice_action_create
+    }
+
+    /** Loading label resource for a write-intent ("Adding…" / "Deleting…" / …). */
+    private fun ToolCall.executingLabel(): StringResource = when (this) {
+        is ToolCall.AddItem, is ToolCall.AddItems -> Res.string.chat_choice_executing_add
+        is ToolCall.DeleteItem -> Res.string.chat_choice_executing_delete
+        is ToolCall.CompleteItem -> Res.string.chat_choice_executing_complete
+        is ToolCall.CreateChecklist, is ToolCall.CreateChecklistFromAttachment -> Res.string.chat_choice_executing_create
+        is ToolCall.SetItemReminder -> Res.string.chat_choice_executing_set_reminder
+        is ToolCall.MoveAllReminders -> Res.string.chat_choice_executing_move
+        is ToolCall.AttachToItem -> Res.string.chat_choice_executing_attach
+        is ToolCall.FindItemsQuery,
+        is ToolCall.ReadChecklist,
+        is ToolCall.RenameChecklist -> Res.string.chat_choice_executing_default
+    }
+
+    /**
+     * Returns a copy of this tool call with its checklist hint set to [name], for the
+     * AmbiguousMatch "Which list?" choice. Null for tool calls that carry no per-list hint.
+     */
+    private fun ToolCall.withHint(name: String): ToolCall? = when (this) {
+        is ToolCall.AddItem -> copy(checklistHint = name)
+        is ToolCall.DeleteItem -> copy(checklistHint = name)
+        is ToolCall.CompleteItem -> copy(checklistHint = name)
+        is ToolCall.SetItemReminder -> copy(checklistHint = name)
+        is ToolCall.AttachToItem -> copy(checklistHint = name)
+        is ToolCall.AddItems -> copy(checklistHint = name)
+        is ToolCall.CreateChecklist,
+        is ToolCall.CreateChecklistFromAttachment,
+        is ToolCall.MoveAllReminders,
+        is ToolCall.FindItemsQuery,
+        is ToolCall.ReadChecklist,
+        is ToolCall.RenameChecklist -> null
+    }
+
+    /**
      * Extracts the user-editable text (item name or new list name) for preview's text field.
      */
     private fun extractItemText(toolCall: ToolCall): String = when (toolCall) {
@@ -1464,7 +1895,15 @@ class ChatViewModel(
 
     // ─── Outcome handlers ─────────────────────────────────────────────────────
 
-    private suspend fun handleOutcomeInline(outcome: DispatchOutcome) {
+    /**
+     * Renders a [DispatchOutcome] inline.
+     *
+     * @param sourceToolCall The tool call that produced [outcome], when available. Used to turn
+     *   an [DispatchOutcome.AmbiguousMatch] into a "Which list?" choice block whose chips re-run
+     *   the same command against a specific candidate (hint swapped). Null on read-only paths
+     *   (FindItemsQuery) where there is no per-list hint to swap → falls back to a text hint.
+     */
+    private suspend fun handleOutcomeInline(outcome: DispatchOutcome, sourceToolCall: ToolCall? = null) {
         when (outcome) {
             is DispatchOutcome.Success -> {
                 _sideEffect.emit(
@@ -1490,13 +1929,23 @@ class ChatViewModel(
                 logger.debug(TAG, "ChecklistContent inline (agent): ${outcome.checklistName} — $summary$suffix")
             }
             is DispatchOutcome.AmbiguousMatch -> {
-                val candidates = outcome.candidates.take(3).joinToString(", ")
-                _sideEffect.emit(
-                    ChatScreenSideEffect.ShowAssistantMessage(
-                        messageKey = "chat_ambiguous_match",
-                        args = listOf(candidates),
+                val withHint = sourceToolCall?.let { tc -> outcome.candidates.take(4).mapNotNull { tc.withHint(it) } }
+                if (withHint.isNullOrEmpty()) {
+                    // No swappable hint (read path) → keep the old text clarification.
+                    val candidates = outcome.candidates.take(3).joinToString(", ")
+                    _sideEffect.emit(
+                        ChatScreenSideEffect.ShowAssistantMessage(
+                            messageKey = "chat_ambiguous_match",
+                            args = listOf(candidates),
+                        )
                     )
-                )
+                } else {
+                    // Build a "Which list?" choice: one Default chip per candidate that re-runs the
+                    // command against that specific list, plus a Dismiss escape. sourceLayer = null
+                    // keeps the post-dispatch behaviour (no extra response_received, _choiceSourceLayer
+                    // cleared) — the original turn already tracked its outcome.
+                    showWhichListChoice(sourceToolCall, outcome.candidates, sourceLayer = null)
+                }
             }
             is DispatchOutcome.NotFound -> {
                 _sideEffect.emit(
@@ -1530,8 +1979,19 @@ class ChatViewModel(
         return when (intent) {
             ChatIntent.CreateItem -> {
                 val (itemText, hint) = extractItemAndHint(lower, locale)
-                if (itemText.isNullOrBlank()) null
-                else ToolCall.AddItem(checklistHint = hint, itemText = itemText)
+                if (itemText.isNullOrBlank()) {
+                    null
+                } else {
+                    // Multi-item add: "add milk, eggs and bread to shopping" → AddItems(3).
+                    // splitItems only splits comma-lists (single items like "mac and cheese"
+                    // stay intact), so a 1-element result keeps the existing single-AddItem path.
+                    val items = splitItems(itemText, locale)
+                    if (items.size > 1) {
+                        ToolCall.AddItems(checklistHint = hint, itemTexts = items)
+                    } else {
+                        ToolCall.AddItem(checklistHint = hint, itemText = itemText)
+                    }
+                }
             }
 
             ChatIntent.DeleteItem -> {
@@ -1551,8 +2011,30 @@ class ChatViewModel(
                 // or from Layer 2 server-side). Falls back to fuzzy extraction from raw text
                 // only when the intent didn't carry a name (edge case).
                 val name = intent.name ?: extractChecklistName(lower, locale)
-                if (name.isNullOrBlank()) null
-                else ToolCall.CreateChecklist(name = name, initialItems = emptyList())
+                if (name.isNullOrBlank()) {
+                    null
+                } else {
+                    // Create-with-items: "create a trip list with passport, tickets, charger" →
+                    // CreateChecklist(name="trip list", initialItems=[passport, tickets, charger]).
+                    // Split on " with " (EN) / " с "/" со " (RU); items go through splitItems.
+                    val withSeparators = if (locale == ChatLocale.Ru) listOf(" с ", " со ") else listOf(" with ")
+                    val separator = withSeparators.firstOrNull { name.contains(it) }
+                    if (separator != null) {
+                        val splitIdx = name.indexOf(separator)
+                        val rawNamePart = name.substring(0, splitIdx).trim()
+                        val itemsStr = name.substring(splitIdx + separator.length).trim()
+                        val namePart = stripLeadingArticleEn(rawNamePart, locale)
+                        val items = splitItems(itemsStr, locale)
+                        if (namePart.isBlank() || items.isEmpty()) {
+                            // Couldn't cleanly split → keep the whole string as the name.
+                            ToolCall.CreateChecklist(name = name, initialItems = emptyList())
+                        } else {
+                            ToolCall.CreateChecklist(name = namePart, initialItems = items)
+                        }
+                    } else {
+                        ToolCall.CreateChecklist(name = name, initialItems = emptyList())
+                    }
+                }
             }
 
             ChatIntent.SetReminder -> {
@@ -1589,6 +2071,40 @@ class ChatViewModel(
     // ─── Text entity extraction helpers ──────────────────────────────────────
 
     /**
+     * Splits a multi-item payload into individual item strings.
+     *
+     * Rule (deliberately conservative to avoid false-splits like "mac and cheese"):
+     *  - If [text] contains a comma → split on commas, then split ONLY the LAST segment again
+     *    on " and " (EN) / " и " (RU) — that's where the trailing conjunction lives in natural
+     *    lists ("milk, eggs and bread" → [milk, eggs, bread]).
+     *  - If NO comma → return the whole text as a single item; a bare "and"/"и" is NOT a split
+     *    point ("mac and cheese" stays one item).
+     * Each result is trimmed; blanks are dropped.
+     */
+    private fun splitItems(text: String, locale: ChatLocale): List<String> {
+        val trimmed = text.trim()
+        if (trimmed.isEmpty()) return emptyList()
+        if (!trimmed.contains(',')) return listOf(trimmed)
+
+        val conjunction = if (locale == ChatLocale.Ru) " и " else " and "
+        val segments = trimmed.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+        if (segments.isEmpty()) return emptyList()
+
+        val result = mutableListOf<String>()
+        segments.forEachIndexed { index, segment ->
+            if (index == segments.lastIndex && segment.contains(conjunction)) {
+                segment.split(conjunction)
+                    .map { it.trim() }
+                    .filter { it.isNotEmpty() }
+                    .forEach { result += it }
+            } else {
+                result += segment
+            }
+        }
+        return result
+    }
+
+    /**
      * Extracts [itemText, checklistHint] from a command like "add milk to shopping".
      * Returns [null, null] when no item text can be found.
      */
@@ -1620,12 +2136,22 @@ class ChatViewModel(
                 if (afterPrep.isEmpty()) return Pair(null, null)
                 val firstSpace = afterPrep.indexOf(' ')
                 return if (firstSpace > 0) {
-                    val hint = afterPrep.substring(0, firstSpace).trim().ifBlank { null }
-                    val itemText = afterPrep.substring(firstSpace + 1).trim().ifBlank { null }
-                    Pair(itemText, hint)
+                    val hintCandidate = afterPrep.substring(0, firstSpace).trim().ifBlank { null }
+                    val itemCandidate = afterPrep.substring(firstSpace + 1).trim().ifBlank { null }
+                    // Generic-target detection: "в чеклист пункт молоко" / "in a checklist milk"
+                    // → the "hint" is a bare generic word ("чеклист"/"checklist"), not a real list
+                    // name. Drop it (so the caller offers a "which list?" choice) and strip any
+                    // leading filler item-word ("пункт"/"item") off the item text.
+                    if (isGenericTarget(hintCandidate, locale)) {
+                        Pair(stripLeadingFiller(itemCandidate, locale), null)
+                    } else {
+                        Pair(itemCandidate, hintCandidate)
+                    }
                 } else {
-                    // single word after prep → treat as hint only; user didn't name an item
-                    Pair(null, afterPrep.trim().ifBlank { null })
+                    // single word after prep → treat as hint only; user didn't name an item.
+                    // A bare generic word ("в чеклист") is no real hint → null, null.
+                    val single = afterPrep.trim().ifBlank { null }
+                    if (isGenericTarget(single, locale)) Pair(null, null) else Pair(null, single)
                 }
             }
         }
@@ -1640,11 +2166,89 @@ class ChatViewModel(
             if (idx > 0) {
                 val itemText = remainder.substring(0, idx).trim()
                 val hint = remainder.substring(idx + prep.length).trim().ifBlank { null }
-                if (itemText.isNotBlank()) return Pair(itemText, hint)
+                if (itemText.isNotBlank()) {
+                    // Generic-target detection: "add milk to a checklist" → hint="a checklist"
+                    // is a bare generic word, not a real list. Drop it (→ "which list?" choice)
+                    // and strip any leading filler item-word off the item text.
+                    return if (isGenericTarget(hint, locale)) {
+                        Pair(stripLeadingFiller(itemText, locale), null)
+                    } else {
+                        Pair(itemText, hint)
+                    }
+                }
             }
         }
 
         return Pair(remainder.trim(), null)
+    }
+
+    /**
+     * True when [hint] is a bare GENERIC target word ("checklist"/"list" / "чеклист"/"список"),
+     * not a real list name. Such a hint must be dropped so the caller offers a "which list?"
+     * choice instead of trying to match a non-existent list literally named "checklist".
+     *
+     * Matching is EXACT after trimming a leading EN article ("a "/"an "/"the "): "shopping list"
+     * is a real list name and must NOT count as generic — only the bare word "list"/"checklist".
+     */
+    private fun isGenericTarget(hint: String?, locale: ChatLocale): Boolean {
+        val candidate = hint?.trim()?.lowercase()?.let { stripLeadingArticleEn(it, locale) } ?: return false
+        val generics = if (locale == ChatLocale.Ru) {
+            setOf("чеклист", "чек-лист", "список")
+        } else {
+            setOf("checklist", "list")
+        }
+        return candidate in generics
+    }
+
+    /**
+     * Strips a leading EN article ("a "/"an "/"the ") while preserving the case of the rest.
+     * Used for generic-target matching (lowercased input) and for create-with-items name parts
+     * (case-preserved input like "A Trip List" → "Trip List"). RU has no articles.
+     */
+    private fun stripLeadingArticleEn(text: String, locale: ChatLocale): String {
+        if (locale == ChatLocale.Ru) return text
+        val lower = text.lowercase()
+        for (article in listOf("the ", "an ", "a ")) {
+            if (lower.startsWith(article)) return text.substring(article.length).trim()
+        }
+        return text
+    }
+
+    /**
+     * Strips a leading FILLER item-word ("пункт"/"item"/"task") off [itemText] — the noise word
+     * a user adds when naming a generic target ("добавь в чеклист ПУНКТ молоко" → item "молоко").
+     */
+    private fun stripLeadingFiller(itemText: String?, locale: ChatLocale): String? {
+        val text = itemText?.trim()?.ifBlank { null } ?: return null
+        val fillers = if (locale == ChatLocale.Ru) {
+            setOf("пункт", "пунктом", "задачу")
+        } else {
+            setOf("item", "task", "entry")
+        }
+        val firstSpace = text.indexOf(' ')
+        val firstWord = if (firstSpace > 0) text.substring(0, firstSpace) else text
+        return if (firstWord.lowercase() in fillers && firstSpace > 0) {
+            text.substring(firstSpace + 1).trim().ifBlank { null }
+        } else {
+            text
+        }
+    }
+
+    /**
+     * True when an attach command's target [itemText] is a bare referential pronoun ("attach THIS")
+     * or blank — i.e. it points at the attachment itself, not a named existing item. Such a command
+     * means "turn this file into a checklist" → [ToolCall.CreateChecklistFromAttachment]. A real item
+     * name ("attach this to milk") is NOT referential and stays an [ToolCall.AttachToItem].
+     */
+    private fun isReferentialAttachTarget(itemText: String, locale: ChatLocale): Boolean {
+        val target = itemText.trim().lowercase()
+        if (target.isBlank()) return true
+        val referents = if (locale == ChatLocale.Ru) {
+            setOf("это", "этого", "всё", "все", "их")
+        } else {
+            setOf("this", "that", "it", "these", "those")
+        }
+        return target in referents
     }
 
     private fun extractChecklistName(lower: String, locale: ChatLocale): String? {
@@ -1766,6 +2370,13 @@ class ChatViewModel(
 
     private companion object {
         const val TAG = "ChatViewModel"
+        // Stable chip ids for the AiChoiceResponse block.
+        const val CHOICE_EXECUTE = "execute"
+        const val CHOICE_EXECUTE_ALL = "execute_all"
+        const val CHOICE_EDIT = "edit"
+        const val CHOICE_ESCAPE = "escape"
+        const val CHOICE_CANDIDATE_PREFIX = "candidate_"
+        const val CHOICE_OPTION_PREFIX = "option_"
         /** Max messages to display from persisted history on screen open. */
         const val HISTORY_DISPLAY_LIMIT = 20
         /** Retries for the startup history seed when the DB driver isn't ready yet (wasmJs OPFS race). */

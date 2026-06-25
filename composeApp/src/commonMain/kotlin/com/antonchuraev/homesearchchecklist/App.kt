@@ -144,10 +144,9 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.Cha
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.ChatScreenSideEffect
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.ChatViewModel
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.AiChatFeaturesHelpSheet
-import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.AgentPlanCard
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.AiChoiceResponse
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatInputRow
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatMessageBubble
-import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatPreviewCard
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatTypingIndicator
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatRecordingOverlay
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatRole
@@ -162,6 +161,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.calendar.CalendarRoute
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.today.TodayRoute
@@ -1175,14 +1175,17 @@ fun App() {
             // hasLastAnswer drives the panel's answer-frame vs empty-state switch.
             // Order matches the lastAnswerContent when-branches below: a pending
             // confirm card / typing indicator / last assistant bubble all count.
-            val hasLastAnswer = chatUiState.pendingPreview != null ||
-                chatUiState.pendingAgentPlan != null ||
+            val hasLastAnswer = chatUiState.pendingChoice != null ||
                 chatUiState.isProcessing ||
                 lastAssistantMessage != null
 
             GistiInlineChatPanel(
                 isVisible = chatSheetOpen,
                 hasLastAnswer = hasLastAnswer,
+                // A pending choice block (prompt + chips + escape) is taller than a one-line
+                // answer; raise the frame cap so its escape/cancel chip isn't clipped below the
+                // 160dp fold. Bounded content (2-4 chips), so the dock still won't fill the screen.
+                answerMaxHeight = if (chatUiState.pendingChoice != null) 360.dp else 160.dp,
                 contextLabel = resolvedContextLabel,
                 onDismiss = { chatSheetOpen = false },
                 onExpandClick = {
@@ -1205,22 +1208,12 @@ fun App() {
                             ),
                     ) {
                         when {
-                            chatUiState.pendingAgentPlan != null -> {
-                                AgentPlanCard(
-                                    plan = chatUiState.pendingAgentPlan!!,
-                                    onApply = { chatViewModel.sendIntent(ChatScreenIntent.OnAgentPlanApply) },
-                                    onCancel = { chatViewModel.sendIntent(ChatScreenIntent.OnAgentPlanCancel) },
-                                )
-                            }
-                            chatUiState.pendingPreview != null -> {
-                                val preview = chatUiState.pendingPreview!!
-                                ChatPreviewCard(
-                                    preview = preview,
-                                    onApply = { chatViewModel.sendIntent(ChatScreenIntent.OnPreviewApply) },
-                                    onCancel = { chatViewModel.sendIntent(ChatScreenIntent.OnPreviewCancel) },
-                                    onReject = { chatViewModel.sendIntent(ChatScreenIntent.OnPreviewReject) },
-                                    onItemTextChange = { chatViewModel.sendIntent(ChatScreenIntent.OnPreviewItemTextChange(it)) },
-                                    showRejectButton = preview.toolCall !is com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ToolCall.CreateChecklistFromAttachment,
+                            chatUiState.pendingChoice != null -> {
+                                AiChoiceResponse(
+                                    pending = chatUiState.pendingChoice!!,
+                                    onSelect = { id -> chatViewModel.sendIntent(ChatScreenIntent.OnChoiceSelected(id)) },
+                                    onEditChange = { chatViewModel.sendIntent(ChatScreenIntent.OnChoiceEditChange(it)) },
+                                    onEditConfirm = { chatViewModel.sendIntent(ChatScreenIntent.OnChoiceEditConfirmed) },
                                 )
                             }
                             chatUiState.isProcessing -> {
@@ -1272,23 +1265,28 @@ fun App() {
                     }
                 },
                 inputContent = {
-                    ChatInputRow(
-                        text = chatUiState.inputText,
-                        onTextChange = { chatViewModel.sendIntent(ChatScreenIntent.OnInputChange(it)) },
-                        onSend = { chatViewModel.sendIntent(ChatScreenIntent.OnSendClick) },
-                        onAttachFileClick = { chatSheetAttachmentSheet = true },
-                        onVoiceRecordingStarted = { sheetAudioRecorder.start() },
-                        onVoiceRecordingStopped = { sheetAudioRecorder.stop() },
-                        onVoiceRecordingCancelled = { sheetAudioRecorder.cancel() },
-                        onHelpClick = { chatPanelHelpSheetOpen = true },
-                        hasAttachments = chatUiState.pendingAttachments.isNotEmpty(),
-                        isEnabled = !chatUiState.isProcessing,
-                        canSend = chatUiState.canSend,
-                        isRecording = chatUiState.isRecording,
-                        isTranscribing = chatUiState.isTranscribing,
-                        onDragCancelChanged = { chatSheetDragCancel = it },
-                        focusRequester = chatInputFocusRequester,
-                    )
+                    // Hidden while a choice block is shown — the chips (incl. "Something else"
+                    // escape, which dismisses → input returns) are the only interaction during a
+                    // pending choice, so a parallel text field is noise.
+                    if (chatUiState.pendingChoice == null) {
+                        ChatInputRow(
+                            text = chatUiState.inputText,
+                            onTextChange = { chatViewModel.sendIntent(ChatScreenIntent.OnInputChange(it)) },
+                            onSend = { chatViewModel.sendIntent(ChatScreenIntent.OnSendClick) },
+                            onAttachFileClick = { chatSheetAttachmentSheet = true },
+                            onVoiceRecordingStarted = { sheetAudioRecorder.start() },
+                            onVoiceRecordingStopped = { sheetAudioRecorder.stop() },
+                            onVoiceRecordingCancelled = { sheetAudioRecorder.cancel() },
+                            onHelpClick = { chatPanelHelpSheetOpen = true },
+                            hasAttachments = chatUiState.pendingAttachments.isNotEmpty(),
+                            isEnabled = !chatUiState.isProcessing,
+                            canSend = chatUiState.canSend,
+                            isRecording = chatUiState.isRecording,
+                            isTranscribing = chatUiState.isTranscribing,
+                            onDragCancelChanged = { chatSheetDragCancel = it },
+                            focusRequester = chatInputFocusRequester,
+                        )
+                    }
                 },
                 // Same pink "Recording…" surface as the full ChatScreen, hosted in the dock.
                 // The overlay animates itself in/out via isRecording — no height when idle.

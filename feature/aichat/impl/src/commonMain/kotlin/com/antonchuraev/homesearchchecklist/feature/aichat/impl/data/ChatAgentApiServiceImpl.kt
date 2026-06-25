@@ -49,6 +49,11 @@ internal class ChatAgentApiServiceImpl(
         internal const val AGENT_URL =
             "https://us-central1-aichecklists-40230.cloudfunctions.net/chat_agent"
 
+        /** Render chips only when the server returns at least this many valid options. */
+        private const val MIN_OPTIONS = 2
+        /** Cap the chips shown — server contract is 2-4; extra are dropped. */
+        private const val MAX_OPTIONS = 4
+
         private val sharedJson = Json {
             ignoreUnknownKeys = true
             isLenient = true
@@ -99,6 +104,10 @@ internal class ChatAgentApiServiceImpl(
                     // explicitNulls=false drops the field entirely when null, so the server
                     // sees no `context_checklist` key (treated as "home screen, no focus").
                     contextChecklist = contextChecklistName?.let { ContextChecklistDto(name = it) },
+                    // Backward-compat gate: the server only emits type:"options" (present_options
+                    // tool) when the client advertises support. Older clients omit this flag and
+                    // never receive an "options" response they couldn't render.
+                    supportsOptions = true,
                 )
             )
         }
@@ -141,6 +150,33 @@ internal class ChatAgentApiServiceImpl(
                             content = content,
                             creditsRemaining = dto.creditsRemaining,
                         )
+                    }
+                    "options" -> {
+                        // AI-generated tappable answer options. Sanitize: trim, drop blanks,
+                        // dedup (case-insensitive, first-wins), keep at most 4.
+                        val prompt = dto.prompt ?: dto.content
+                        val cleaned = (dto.options ?: emptyList())
+                            .map { it.trim() }
+                            .filter { it.isNotEmpty() }
+                            .distinctBy { it.lowercase() }
+                            .take(MAX_OPTIONS)
+                        when {
+                            prompt.isNullOrBlank() -> {
+                                logger.warning(TAG, "step: type=options but prompt is null/blank — ServiceError")
+                                AgentStepResult.ServiceError
+                            }
+                            cleaned.size < MIN_OPTIONS -> {
+                                // Not enough valid options to render chips → degrade gracefully to a
+                                // plain final answer instead of failing the turn.
+                                logger.warning(TAG, "step: type=options but only ${cleaned.size} valid option(s) — falling back to Final")
+                                AgentStepResult.Final(content = prompt, creditsRemaining = dto.creditsRemaining)
+                            }
+                            else -> AgentStepResult.Options(
+                                prompt = prompt,
+                                options = cleaned,
+                                creditsRemaining = dto.creditsRemaining,
+                            )
+                        }
                     }
                     else -> {
                         logger.warning(TAG, "step: unknown type=${dto.type} — ServiceError")
@@ -191,6 +227,8 @@ internal class ChatAgentApiServiceImpl(
         // Optional: present only when the dock was opened with a checklist in focus.
         // Server contract: top-level `context_checklist: { name: "<name>" }`.
         @SerialName("context_checklist") val contextChecklist: ContextChecklistDto? = null,
+        // Backward-compat gate: when true the server may return type:"options" (present_options).
+        @SerialName("supports_options") val supportsOptions: Boolean = false,
     )
 
     @Serializable
@@ -245,6 +283,9 @@ internal class ChatAgentApiServiceImpl(
         val type: String? = null,
         @SerialName("tool_calls") val toolCalls: List<ToolCallDto>? = null,
         val content: String? = null,
+        // type:"options" — the assistant question + tappable answer labels (2-4).
+        val prompt: String? = null,
+        val options: List<String>? = null,
         @SerialName("credits_remaining") val creditsRemaining: Int = 0,
         val error: String? = null,
     )

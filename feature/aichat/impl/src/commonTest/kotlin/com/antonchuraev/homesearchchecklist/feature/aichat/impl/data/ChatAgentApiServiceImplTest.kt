@@ -552,4 +552,122 @@ class ChatAgentApiServiceImplTest {
             "context_checklist must be omitted when no checklist is focused, got: $body",
         )
     }
+
+    // ── Phase 2: type=options ──────────────────────────────────────────────────
+
+    @Test
+    fun step_200Options_returnsOptionsWithPromptAndLabels() = runTest {
+        val service = makeService {
+            respond(
+                content = """{"success":true,"type":"options","prompt":"What kind of trip?","options":["Beach","City","Hiking"],"credits_remaining":4}""",
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+            )
+        }
+
+        val result = service.step(
+            userId = "u1",
+            transcript = sampleTranscript(),
+            locale = ChatLocale.En,
+            checklistsSummary = sampleChecklists(),
+        )
+
+        assertIs<AgentStepResult.Options>(result)
+        assertEquals("What kind of trip?", result.prompt)
+        assertEquals(listOf("Beach", "City", "Hiking"), result.options)
+        assertEquals(4, result.creditsRemaining)
+    }
+
+    @Test
+    fun step_200Options_sanitizesTrimsDedupsAndCapsAtFour() = runTest {
+        val service = makeService {
+            respond(
+                // Whitespace, a blank, a case-insensitive dup ("beach"/"Beach"), and 5 candidates.
+                content = """{"success":true,"type":"options","prompt":"Pick one","options":["  Beach ","","beach","City","Hiking","Roadtrip"],"credits_remaining":3}""",
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+            )
+        }
+
+        val result = service.step(
+            userId = "u1",
+            transcript = emptyList(),
+            locale = ChatLocale.En,
+            checklistsSummary = emptyList(),
+        )
+
+        assertIs<AgentStepResult.Options>(result)
+        // Trimmed, blank dropped, "beach" deduped (first-wins "Beach"), capped at 4.
+        assertEquals(listOf("Beach", "City", "Hiking", "Roadtrip"), result.options)
+    }
+
+    @Test
+    fun step_200Options_tooFewValidOptions_fallsBackToFinal() = runTest {
+        val service = makeService {
+            respond(
+                // Only one valid option after sanitizing → not enough to render chips.
+                content = """{"success":true,"type":"options","prompt":"Only one choice here","options":["Beach","",""],"credits_remaining":2}""",
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+            )
+        }
+
+        val result = service.step(
+            userId = "u1",
+            transcript = emptyList(),
+            locale = ChatLocale.En,
+            checklistsSummary = emptyList(),
+        )
+
+        // Degrades gracefully to a plain final answer carrying the prompt — never fails the turn.
+        assertIs<AgentStepResult.Final>(result)
+        assertEquals("Only one choice here", result.content)
+        assertEquals(2, result.creditsRemaining)
+    }
+
+    @Test
+    fun step_request_advertisesSupportsOptions() = runTest {
+        var capturedBody: String? = null
+
+        val service = makeService { request ->
+            capturedBody = request.body.toByteArray().decodeToString()
+            respond(
+                content = """{"success":true,"type":"final","content":"ok","credits_remaining":5}""",
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+            )
+        }
+
+        service.step(
+            userId = "u1",
+            transcript = emptyList(),
+            locale = ChatLocale.En,
+            checklistsSummary = emptyList(),
+        )
+
+        val body = capturedBody ?: ""
+        // The backward-compat gate flag must be present and true so the server may emit options.
+        assertContains(body, "supports_options")
+        assertContains(body, "\"supports_options\":true")
+    }
+
+    @Test
+    fun step_200Options_blankPrompt_isServiceError() = runTest {
+        val service = makeService {
+            respond(
+                content = """{"success":true,"type":"options","prompt":"","options":["A","B"],"credits_remaining":1}""",
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+            )
+        }
+
+        val result = service.step(
+            userId = "u1",
+            transcript = emptyList(),
+            locale = ChatLocale.En,
+            checklistsSummary = emptyList(),
+        )
+
+        assertIs<AgentStepResult.ServiceError>(result)
+    }
 }

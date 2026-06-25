@@ -42,7 +42,11 @@ internal object EnIntentLexicon {
     )
 
     // ─── CompleteItem ─────────────────────────────────────────────────────────
-    // "mark milk done", "check off eggs", "completed: butter"
+    // "mark milk done", "check off eggs", "completed: butter", "I bought milk", "got eggs"
+    // "bought"/"got" mirror the RU "купил" past-tense acquisition signal: buying/getting an
+    // item is the user reporting it done. They sit here (NOT in createItem) so "I bought milk"
+    // checks the item off rather than adding a new one. No conflict with createItem's "buy"/"get"
+    // — matching is word-boundary, so "bought"/"got" never collide with "buy"/"get".
     val completeItem: Set<String> = setOf(
         "check off",
         "mark done",
@@ -57,6 +61,8 @@ internal object EnIntentLexicon {
         "finished",
         "tick off",
         "tick",
+        "bought",
+        "got",
     )
 
     // ─── SetReminder ──────────────────────────────────────────────────────────

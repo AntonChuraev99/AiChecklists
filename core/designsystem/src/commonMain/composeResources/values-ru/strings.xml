@@ -1009,6 +1009,41 @@
     <string name="chat_preview_no_checklist_hint">Чек-лист не указан — добавим в первый.</string>
     <string name="chat_preview_item_label">Текст пункта</string>
     <string name="chat_preview_new_list_label">Название списка</string>
+    <!-- AI choice response (Claude-style prompt + choice chips) -->
+    <string name="chat_choice_add_to_list">Добавить в %1$s?</string>
+    <string name="chat_choice_add_default_list">Добавить в список?</string>
+    <string name="chat_choice_delete">Удалить %1$s?</string>
+    <string name="chat_choice_complete">Отметить %1$s выполненным?</string>
+    <string name="chat_choice_create">Создать список %1$s?</string>
+    <string name="chat_choice_set_reminder">Поставить напоминание для %1$s?</string>
+    <string name="chat_choice_move_reminders">Перенести все напоминания?</string>
+    <string name="chat_choice_attach">Прикрепить к %1$s?</string>
+    <string name="chat_choice_create_from_file">Создать список из этого файла?</string>
+    <string name="chat_choice_which_list">В какой список?</string>
+    <string name="chat_choice_apply_actions">Выполнить эти действия?</string>
+    <string name="chat_choice_action_add">Добавить</string>
+    <string name="chat_choice_action_delete">Удалить</string>
+    <string name="chat_choice_action_complete">Готово</string>
+    <string name="chat_choice_action_create">Создать</string>
+    <string name="chat_choice_action_set_reminder">Напомнить</string>
+    <string name="chat_choice_action_move">Перенести</string>
+    <string name="chat_choice_action_attach">Прикрепить</string>
+    <string name="chat_choice_execute_all">Выполнить всё</string>
+    <string name="chat_choice_edit">Изменить</string>
+    <string name="chat_choice_save">Сохранить</string>
+    <string name="chat_choice_other">Другое</string>
+    <string name="chat_choice_cancel">Отмена</string>
+    <string name="chat_choice_dismissed_message">Хорошо, отменил.</string>
+    <string name="chat_choice_edit_empty_hint">Сначала введите текст.</string>
+    <string name="chat_choice_edit_label">Изменить</string>
+    <string name="chat_choice_executing_add">Добавляю…</string>
+    <string name="chat_choice_executing_delete">Удаляю…</string>
+    <string name="chat_choice_executing_complete">Обновляю…</string>
+    <string name="chat_choice_executing_create">Создаю…</string>
+    <string name="chat_choice_executing_set_reminder">Ставлю напоминание…</string>
+    <string name="chat_choice_executing_move">Переношу…</string>
+    <string name="chat_choice_executing_attach">Прикрепляю…</string>
+    <string name="chat_choice_executing_default">Работаю…</string>
 
     <!-- AI-чат: подсказки и сообщения -->
     <string name="chat_unknown_intent_hint">Не понял запрос. Попробуйте «добавь молоко в покупки» или «напомни в пятницу в 18».</string>

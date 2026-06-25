@@ -46,6 +46,45 @@ db = firestore.client()
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 gemini_client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
+# ----------------------------------------------------------------------------
+# Test-only Gemini model override (cost-gated).
+#
+# Lets an offline evaluation harness (firebase-functions/tests/ai_model_eval.py)
+# run the same scenarios across multiple Gemini models to compare quality, WITHOUT
+# changing the production defaults. This is the ONLY supported way to swap models
+# per request and it is locked down three ways because the CF is public:
+#   1. MODEL_OVERRIDE_TEST_SECRET must be configured in the CF environment. When it
+#      is empty/unset, the override is fully DISABLED — prod behaves exactly as before.
+#   2. The request must present a matching `test_secret`.
+#   3. The requested model must be in MODEL_OVERRIDE_ALLOWLIST (bounds cost — no
+#      arbitrary/expensive model can be forced by a hostile caller).
+# Any check failing → the endpoint's normal default model is used, silently.
+MODEL_OVERRIDE_TEST_SECRET = os.environ.get("MODEL_OVERRIDE_TEST_SECRET", "")
+MODEL_OVERRIDE_ALLOWLIST = {
+    "gemini-2.5-flash-lite",
+    "gemini-2.5-flash",
+    "gemini-2.5-pro",
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-lite",
+}
+
+
+def resolve_model(default_model: str, requested_model, provided_secret) -> str:
+    """Return [requested_model] only when the test-override gate fully passes; else [default_model].
+
+    See MODEL_OVERRIDE_TEST_SECRET docs above for the three-part gate. Prod-safe by
+    construction: with no secret configured this always returns [default_model].
+    """
+    if not requested_model:
+        return default_model
+    if not MODEL_OVERRIDE_TEST_SECRET:
+        return default_model  # override disabled (no secret configured in CF env)
+    if not provided_secret or provided_secret != MODEL_OVERRIDE_TEST_SECRET:
+        return default_model  # unauthorized caller
+    if requested_model not in MODEL_OVERRIDE_ALLOWLIST:
+        return default_model  # not an allow-listed test model
+    return requested_model
+
 # RevenueCat verification (V1 Secret key, NOT public key)
 REVENUECAT_API_KEY = os.environ.get("REVENUECAT_API_KEY")
 
@@ -497,15 +536,18 @@ def reserve_credits(user_id: str) -> int | None:
 # Shared AI helpers
 # ============================================================================
 
-def call_gemini(prompt: str, input_type: str, input_data: str, audio_mime_type: str = "audio/mp4"):
+def call_gemini(prompt: str, input_type: str, input_data: str, audio_mime_type: str = "audio/mp4", model_id: str = None):
     """Call Gemini API with appropriate content type.
 
     [audio_mime_type] is honored only when input_type == "audio_base64".
     Allowed by Gemini: audio/mp4, audio/mpeg, audio/wav, audio/webm, audio/flac, audio/ogg.
     Callers must normalize browser variants (e.g. "audio/m4a", "audio/webm;codecs=opus")
     before invoking this function.
+
+    [model_id] defaults to gemini-2.5-flash-lite. Callers may pass a test-override value
+    already resolved via [resolve_model]; never pass an unvalidated client value here.
     """
-    model_id = "gemini-2.5-flash-lite"
+    model_id = model_id or "gemini-2.5-flash-lite"
     if input_type == "image_base64" and input_data:
         return gemini_client.models.generate_content(
             model=model_id,
@@ -1636,6 +1678,9 @@ def classify_chat_intent(request: Request):
 
     user_id = data["user_id"]
 
+    # Test-only model override (gated; see resolve_model). Prod default = flash-lite.
+    model_id = resolve_model("gemini-2.5-flash-lite", data.get("model_override"), data.get("test_secret"))
+
     # Server is authoritative for credit accounting — client cannot bypass.
     # Deduct BEFORE the AI call so concurrent requests can't oversell.
     new_credits = reserve_chat_credit(user_id)
@@ -1650,7 +1695,7 @@ def classify_chat_intent(request: Request):
     )
 
     try:
-        response = call_gemini(prompt, "text", "")
+        response = call_gemini(prompt, "text", "", model_id=model_id)
         result = parse_gemini_json(response.text)
 
         # Light validation — never trust LLM output blindly
@@ -1907,9 +1952,13 @@ def refund_chat_completion_credits(user_id: str, reason: str) -> bool:
         return False
 
 
-def _call_gemini_flash(prompt: str) -> str:
-    """Call gemini-2.5-flash (NOT lite) for free-form reasoning."""
-    response = gemini_client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
+def _call_gemini_flash(prompt: str, model_id: str = None) -> str:
+    """Call gemini-2.5-flash (NOT lite) for free-form reasoning.
+
+    [model_id] defaults to gemini-2.5-flash. Callers may pass a test-override value
+    already resolved via [resolve_model]; never pass an unvalidated client value here.
+    """
+    response = gemini_client.models.generate_content(model=model_id or "gemini-2.5-flash", contents=prompt)
     return (response.text or "").strip()
 
 
@@ -1982,6 +2031,9 @@ def chat_completion(request: Request):
     if not user_id:
         return create_error_response("user_id is required", 400)
 
+    # Test-only model override (gated; see resolve_model). Prod default = flash.
+    model_id = resolve_model("gemini-2.5-flash", data.get("model_override"), data.get("test_secret"))
+
     messages_raw = data.get("messages")
     if not isinstance(messages_raw, list) or not messages_raw:
         return create_error_response("messages must be a non-empty list", 400)
@@ -2042,7 +2094,7 @@ def chat_completion(request: Request):
     )
 
     try:
-        content = _call_gemini_flash(prompt)
+        content = _call_gemini_flash(prompt, model_id=model_id)
         if not content:
             raise ValueError("Gemini returned empty response")
 
@@ -2108,12 +2160,15 @@ CHAT_AGENT_TOOL_NAMES = {
 }
 
 
-def _build_chat_agent_tools() -> "list[types.Tool]":
+def _build_chat_agent_tools(include_options: bool = False) -> "list[types.Tool]":
     """Build the Gemini function-declaration catalog (Phase 2 core).
 
-    Built once at module load. Read-only tools (find_items, read_checklist) are
-    auto-run by the client; mutating tools are batched into a plan-card the user
-    confirms once; delete_item is destructive and always gets its own confirm.
+    Built once at module load (two variants). Read-only tools (find_items, read_checklist)
+    are auto-run by the client; mutating tools are batched into a plan-card the user confirms
+    once; delete_item is destructive and always gets its own confirm.
+
+    [include_options] appends present_options — gated behind the client's `supports_options`
+    capability so older clients (which can't render type:"options") never receive it.
     """
     STR = types.Type.STRING
     OBJ = types.Type.OBJECT
@@ -2224,11 +2279,33 @@ def _build_chat_agent_tools() -> "list[types.Tool]":
             ),
         ),
     ]
+    if include_options:
+        declarations.append(types.FunctionDeclaration(
+            name="present_options",
+            description=(
+                "Offer the user 2-4 short tappable options instead of guessing or asking an "
+                "open-ended question. Use when the request is ambiguous, when a clarification "
+                "would help, or when proposing useful next steps. Do NOT use it for destructive "
+                "confirmations (delete) — the client confirms those automatically. The client "
+                "shows each option as a chip; tapping one sends that option's label back as the "
+                "user's next message. Terminal for this turn — do not combine with other tools."
+            ),
+            parameters=types.Schema(
+                type=OBJ,
+                properties={
+                    "prompt": s(STR, "Short question shown above the options, in the user's language."),
+                    "options": s(ARR, "2-4 concise option labels in the user's language.", items=s(STR)),
+                },
+                required=["prompt", "options"],
+            ),
+        ))
     return [types.Tool(function_declarations=declarations)]
 
 
-# Built once — function declarations are static and locale-independent.
-CHAT_AGENT_TOOLS = _build_chat_agent_tools()
+# Built once — function declarations are static and locale-independent. Two variants:
+# the base set, and one with present_options for clients that advertise `supports_options`.
+CHAT_AGENT_TOOLS = _build_chat_agent_tools(include_options=False)
+CHAT_AGENT_TOOLS_WITH_OPTIONS = _build_chat_agent_tools(include_options=True)
 
 
 
@@ -2293,11 +2370,16 @@ def _reconstruct_agent_contents(transcript: list) -> "list[types.Content]":
 
 
 def _serialize_function_calls(parts) -> list:
-    """Extract function_call parts into the client-facing {id, name, args} list."""
+    """Extract function_call parts into the client-facing {id, name, args} list.
+
+    `present_options` is excluded — it is a SERVER-TERMINAL tool intercepted upstream
+    (the client renders chips, it is never dispatched via ToolCallDispatcher). Skipping
+    it here means a malformed present_options call can't leak as an undispatchable tool.
+    """
     calls = []
     for i, part in enumerate(parts or []):
         fc = getattr(part, "function_call", None)
-        if fc is None or not getattr(fc, "name", None):
+        if fc is None or not getattr(fc, "name", None) or fc.name == "present_options":
             continue
         calls.append({
             "id": fc.id or f"call_{i}",
@@ -2305,6 +2387,37 @@ def _serialize_function_calls(parts) -> list:
             "args": dict(fc.args or {}),
         })
     return calls
+
+
+def _extract_present_options(parts) -> dict | None:
+    """If the model called present_options, return {"prompt", "options"[]}; else None.
+
+    present_options is server-terminal: the client renders the labels as tappable chips
+    and sends the chosen label back as the next user message. chat_agent intercepts it
+    before serializing the generic (client-dispatched) tool calls. Returns None when the
+    call is absent or malformed (no prompt, or fewer than 2 usable labels) so the caller
+    falls through to normal tool/final handling.
+    """
+    for part in parts or []:
+        fc = getattr(part, "function_call", None)
+        if fc is None or getattr(fc, "name", None) != "present_options":
+            continue
+        args = dict(fc.args or {})
+        prompt = (str(args.get("prompt") or "")).strip()
+        options: list[str] = []
+        seen: set[str] = set()
+        for raw in (args.get("options") or []):
+            label = (str(raw) or "").strip()
+            if not label or label.lower() in seen:
+                continue
+            seen.add(label.lower())
+            options.append(label)
+            if len(options) >= 4:
+                break
+        if prompt and len(options) >= 2:
+            return {"prompt": prompt, "options": options}
+        return None
+    return None
 
 
 def _extract_final_text(response, parts) -> str:
@@ -2338,6 +2451,8 @@ def chat_agent(request: Request):
     Response:
         200 -> {"success": true, "type": "tool_calls", "tool_calls": [...], "credits_remaining": int}
             -> {"success": true, "type": "final",      "content": "...",   "credits_remaining": int}
+            -> {"success": true, "type": "options",     "prompt": "...", "options": ["...", ...], "credits_remaining": int}
+                 (model called present_options — client renders tappable choice chips)
         400 -> invalid payload
         402 -> insufficient credits (first round only)
         500 -> Gemini failure (credits refunded if reserved this round)
@@ -2355,6 +2470,9 @@ def chat_agent(request: Request):
     user_id = (data.get("user_id") or "").strip()
     if not user_id:
         return create_error_response("user_id is required", 400)
+
+    # Test-only model override (gated; see resolve_model). Prod default = CHAT_AGENT_MODEL.
+    model_id = resolve_model(CHAT_AGENT_MODEL, data.get("model_override"), data.get("test_secret"))
 
     transcript = data.get("transcript")
     if not isinstance(transcript, list) or not transcript:
@@ -2472,6 +2590,11 @@ def chat_agent(request: Request):
         features=features_block,
     )
 
+    # Capability gate: only clients that advertise `supports_options` can render type:"options",
+    # so only they get the present_options tool. Absent/false → base tools (old-client safe).
+    supports_options = data.get("supports_options") is True
+    agent_tools = CHAT_AGENT_TOOLS_WITH_OPTIONS if supports_options else CHAT_AGENT_TOOLS
+
     try:
         contents = _reconstruct_agent_contents(transcript)
         if not contents:
@@ -2479,7 +2602,7 @@ def chat_agent(request: Request):
 
         config = types.GenerateContentConfig(
             system_instruction=system_instruction,
-            tools=CHAT_AGENT_TOOLS,
+            tools=agent_tools,
             # thinking_budget=0 → no thought_signature blobs to round-trip through
             # the stateless transcript (see plan §6). Verified on the stable model.
             thinking_config=types.ThinkingConfig(thinking_budget=0),
@@ -2490,13 +2613,29 @@ def chat_agent(request: Request):
         )
 
         response = gemini_client.models.generate_content(
-            model=CHAT_AGENT_MODEL,
+            model=model_id,
             contents=contents,
             config=config,
         )
 
         candidate = (response.candidates or [None])[0]
         parts = candidate.content.parts if (candidate and candidate.content) else []
+
+        # present_options is server-terminal: if the model offered the user a choice, return
+        # it as type:"options" (the client renders chips) BEFORE serializing client-dispatched
+        # tool calls. Mirrors the tool_calls / final usage bump.
+        present = _extract_present_options(parts)
+        if present is not None:
+            try:
+                increment_usage(user_id, "chat_agent", "text")
+            except Exception:
+                pass
+            return create_success_response({
+                "type": "options",
+                "prompt": present["prompt"],
+                "options": present["options"],
+                "credits_remaining": credits_remaining,
+            })
 
         tool_calls = _serialize_function_calls(parts)
 

@@ -5,9 +5,8 @@ import com.antonchuraev.homesearchchecklist.core.common.api.SideEffect
 import com.antonchuraev.homesearchchecklist.core.common.api.State
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AttachmentSource
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatAttachment
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatChoice
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
-import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.RoutingLayer
-import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ToolCall
 
 // ---------------------------------------------------------------------------
 // State
@@ -18,7 +17,9 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Tool
  *
  * @param messages     Ordered chat history (ascending by timestamp).
  * @param inputText    Current text in the input field.
- * @param pendingPreview  Non-null when a write-intent preview card should be shown.
+ * @param pendingChoice  Non-null when an [AiChoiceResponse] (prompt + choice chips) should be
+ *                       shown as the last item — replaces the old write-intent preview card AND
+ *                       the agent plan card with one Claude-style choice block.
  * @param creditBalance  User's remaining AI credits. Live value from [UserDataRepository.getUserDataFlow],
  *                       updated optimistically from server API responses on Layer 2/3 success.
  *                       Hidden in UI when ≤ 0 (loading state or genuinely empty).
@@ -46,7 +47,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Tool
 data class ChatScreenState(
     val messages: List<ChatMessage> = emptyList(),
     val inputText: String = "",
-    val pendingPreview: PendingPreview? = null,
+    val pendingChoice: PendingChoice? = null,
     val creditBalance: Int = 0,
     val isPremium: Boolean = false,
     val showPricingSheet: Boolean = false,
@@ -64,12 +65,6 @@ data class ChatScreenState(
     val voiceRecordingError: String? = null,
     val isTranscribing: Boolean = false,
     /**
-     * Non-null while the agent loop has proposed a batch of mutating actions and is
-     * waiting for user approval before proceeding. Set to null on apply or cancel.
-     * [isProcessing] is false while this is shown so the card is interactive.
-     */
-    val pendingAgentPlan: AgentPlan? = null,
-    /**
      * Checklist ID that was active when the sheet was opened from [ChecklistDetailScreen].
      * Used to bias Layer-1/Layer-2/Layer-3 requests to this checklist by default.
      * Null when the sheet is opened from [MainScreen] with no focus context.
@@ -81,46 +76,38 @@ data class ChatScreenState(
 }
 
 /**
- * A batch of mutating actions proposed by the agent loop, awaiting user confirmation.
- * Shown as [AgentPlanCard] — analogous to [ChatPreviewCard] for single-tool Layer-1 previews.
+ * Presentation wrapper around a [ChatChoice] with the transient interaction state that the
+ * [AiChoiceResponse] composable needs. The domain [ChatChoice] is built by the ViewModel
+ * (strings already resolved); this adds the per-render UI state.
+ *
+ * @param choice      The localized prompt + choice chips (and optional escape chip).
+ * @param executingId Non-null while a chip is being executed — the matching chip shows a
+ *                    spinner and the whole block becomes non-interactive (one tap only).
+ * @param executingLabel Localized loading label for the executing chip ("Creating…" / "Deleting…"),
+ *                    resolved by the ViewModel where the action type is known. Null until a chip
+ *                    is tapped; the chip falls back to a generic "Working…" if absent.
+ * @param editText    Non-null when the inline edit field is open (replaces the chips with an
+ *                    [OutlinedTextField]; the primary chip relabels to "confirm"). Null = chips.
+ * @param batchItems  Non-null for the agent-batch choice: the numbered list of proposed actions
+ *                    rendered inside the prompt bubble (destructive lines error-tinted). Null for
+ *                    single-action / ambiguous-match choices.
  */
-data class AgentPlan(val items: List<AgentPlanItem>)
+data class PendingChoice(
+    val choice: ChatChoice,
+    val executingId: String? = null,
+    val executingLabel: String? = null,
+    val editText: String? = null,
+    val batchItems: List<AgentPlanItem>? = null,
+)
 
 /**
- * One line in the agent plan card.
+ * One line in the agent-batch choice prompt.
  *
  * @param text         Human-readable description of the action (from [ToolCallPreviewRenderer]).
- * @param isDestructive When true (e.g. delete_item), the item is tinted red / prefixed with a
+ * @param isDestructive When true (e.g. delete_item), the line is tinted red / prefixed with a
  *                      warning icon so the user can spot irreversible operations at a glance.
  */
 data class AgentPlanItem(val text: String, val isDestructive: Boolean = false)
-
-/**
- * A pending write-intent that has been classified and awaits user approval.
- *
- * @param toolCall              The structured action to execute on [OnPreviewApply].
- * @param humanReadable         Pre-rendered description string (used for AddAssistantMessage fallback).
- * @param targetChecklistHint   Resolved checklist hint extracted from the user phrase
- *                              (e.g. «апки» for «добавь в апки тест»). May be null when
- *                              the user didn't specify a target list.
- * @param editableItemText      The current item text shown in the preview's text field.
- *                              Initially equals the item parsed from user input. The user
- *                              can edit before tapping Apply — final dispatch uses this value.
- * @param originalText          The original raw user input that produced this preview.
- *                              Used by [OnPreviewReject] to re-classify the text in the next layer.
- *                              Empty string for attachment-only previews (reject is hidden in that case).
- * @param sourceLayer           The routing layer that produced this preview.
- *                              Used to decide which layer to escalate to on [OnPreviewReject]:
- *                              Local → Classifier (Layer 2), Classifier → FullChat (Layer 3).
- */
-data class PendingPreview(
-    val toolCall: ToolCall,
-    val humanReadable: String,
-    val targetChecklistHint: String? = null,
-    val editableItemText: String = "",
-    val originalText: String = "",
-    val sourceLayer: RoutingLayer = RoutingLayer.Local,
-)
 
 // ---------------------------------------------------------------------------
 // Intent
@@ -174,8 +161,30 @@ sealed interface ChatScreenIntent : Intent {
     /** User dismissed the features help bottom sheet. */
     data object OnFeaturesHelpDismiss : ChatScreenIntent
 
-    /** User edited the item text inside the preview card. */
-    data class OnPreviewItemTextChange(val text: String) : ChatScreenIntent
+    /**
+     * User tapped a choice chip in the [AiChoiceResponse] block. [optionId] is the id of the
+     * tapped [ChoiceOption] (either one of [ChatChoice.options] or [ChatChoice.escape]). The
+     * ViewModel resolves it to a [ChoiceAction] and executes immediately (Execute / ExecuteAll /
+     * FreeForm / Edit / Dismiss).
+     */
+    data class OnChoiceSelected(val optionId: String) : ChatScreenIntent
+
+    /**
+     * User dismissed the pending choice (escape chip, or back gesture). Clears the choice and
+     * emits a visible response — silent dismiss is FORBIDDEN (CLAUDE.md). For an agent-batch
+     * choice this also resolves the suspended agent decision with `false` (declined).
+     */
+    data object OnChoiceDismissed : ChatScreenIntent
+
+    /** User edited the text inside the inline edit field of the pending choice. */
+    data class OnChoiceEditChange(val text: String) : ChatScreenIntent
+
+    /**
+     * User confirmed the inline edit (tapped the relabelled primary chip). Applies the edited
+     * text to the choice's Execute tool call and dispatches it. A blank edit shows a hint
+     * snackbar instead of silently dropping (CLAUDE.md silent-skip guard).
+     */
+    data object OnChoiceEditConfirmed : ChatScreenIntent
 
     /**
      * ChatRoute round-trip for localised assistant messages: ViewModel emits
@@ -192,23 +201,6 @@ sealed interface ChatScreenIntent : Intent {
         val linkedChecklistId: Long? = null,
         val askAiForText: String? = null,
     ) : ChatScreenIntent
-
-    /** User approved the pending write-intent preview. */
-    data object OnPreviewApply : ChatScreenIntent
-
-    /** User cancelled the pending write-intent preview. */
-    data object OnPreviewCancel : ChatScreenIntent
-
-    /**
-     * User tapped the "I meant something else" button on the pending preview.
-     *
-     * Escalates the original user input to the next pipeline layer:
-     * - [RoutingLayer.Local] preview → re-classify with [skipLayer1=true] (Layer 2, 1 credit)
-     * - [RoutingLayer.Classifier] preview → escalate directly to Layer 3 via [completeFreeForm] (3 credits)
-     *
-     * Hidden for [ToolCall.CreateChecklistFromAttachment] (no original text to re-classify).
-     */
-    data object OnPreviewReject : ChatScreenIntent
 
     /** User tapped the back / navigation icon. */
     data object OnBackClick : ChatScreenIntent
@@ -296,22 +288,6 @@ sealed interface ChatScreenIntent : Intent {
         val recordingPath: String?,
         val mimeType: String = "audio/m4a",
     ) : ChatScreenIntent
-
-    // ── Agent plan-card intents (Phase 2d: agentic loop) ──────────────────────
-
-    /**
-     * User confirmed all mutating actions in the agent plan-card.
-     * The ViewModel resumes the agent loop, dispatches all pending mutating calls,
-     * and sends the results back as [AgentTranscriptEntry.ToolResults].
-     */
-    data object OnAgentPlanApply : ChatScreenIntent
-
-    /**
-     * User cancelled the agent plan-card (tapped "Cancel").
-     * The ViewModel sends [AgentToolResultSerializer.declinedResult()] for each pending
-     * mutating call so the count-invariant is preserved, then continues the loop.
-     */
-    data object OnAgentPlanCancel : ChatScreenIntent
 
     /**
      * Seed the chat session with the checklist context that triggered the sheet.

@@ -4,6 +4,8 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AiChatPreferencesRepository
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.dispatcher.ToolCallDispatcher
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatIntent
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceAction
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceRole
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.DispatchOutcome
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.IntentClassification
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.RoutingLayer
@@ -308,6 +310,24 @@ private fun makeVm(
     logger = NoOpLogger,
 )
 
+// ─── Choice-block test helpers ──────────────────────────────────────────────
+//
+// The write-intent preview card and agent plan card were replaced by a single
+// AiChoiceResponse block (PendingChoice). These helpers read the new structure so the
+// migrated tests stay readable: the Execute tool call is carried by the primary chip's
+// ChoiceAction.Execute; the escape chip id is "escape"; ExecuteAll chip id is "execute_all".
+
+/** The ToolCall behind the (single) Execute option of the pending choice, or null. */
+private fun ChatScreenState.executeToolCall(): ToolCall? =
+    pendingChoice?.choice?.options
+        ?.firstNotNullOfOrNull { (it.action as? com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceAction.Execute)?.toolCall }
+
+/** The candidate-list (Execute) tool calls of an AmbiguousMatch "Which list?" choice. */
+private fun ChatScreenState.candidateToolCalls(): List<ToolCall> =
+    pendingChoice?.choice?.options
+        ?.mapNotNull { (it.action as? com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceAction.Execute)?.toolCall }
+        ?: emptyList()
+
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -334,7 +354,7 @@ class ChatViewModelTest {
         val vm = makeVm()
         val state = vm.screenState.value
         assertEquals(0, state.messages.size)
-        assertNull(state.pendingPreview)
+        assertNull(state.pendingChoice)
         assertEquals("", state.inputText)
     }
 
@@ -382,7 +402,7 @@ class ChatViewModelTest {
         // User message is added to state; assistant message arrives via ChatRoute round-trip
         val state = vm.screenState.value
         assertEquals(1, state.messages.size)
-        assertNull(state.pendingPreview)
+        assertNull(state.pendingChoice)
         assertEquals(false, state.isProcessing)
 
         // The ShowAssistantMessage side effect carries the localisation key
@@ -407,9 +427,8 @@ class ChatViewModelTest {
         vm.sendIntent(ChatScreenIntent.OnSendClick)
 
         val state = vm.screenState.value
-        val preview = state.pendingPreview
-        assertIs<PendingPreview>(preview)
-        assertIs<ToolCall.AddItem>(preview.toolCall)
+        assertNotNull(state.pendingChoice, "CreateItem must produce a choice block")
+        assertIs<ToolCall.AddItem>(state.executeToolCall())
         assertEquals(false, state.isProcessing)
     }
 
@@ -436,7 +455,7 @@ class ChatViewModelTest {
         vm.sendIntent(ChatScreenIntent.OnInputChange("find milk"))
         vm.sendIntent(ChatScreenIntent.OnSendClick)
 
-        assertNull(vm.screenState.value.pendingPreview)
+        assertNull(vm.screenState.value.pendingChoice)
         assertIs<ToolCall.FindItemsQuery>(fakeDispatcher.lastDispatched)
 
         val effect = effectDeferred.await()
@@ -461,20 +480,20 @@ class ChatViewModelTest {
         )
         val vm = makeVm(repo = repo, dispatcher = fakeDispatcher)
 
-        // Build a preview
+        // Build a choice block
         vm.sendIntent(ChatScreenIntent.OnInputChange("add milk to shopping"))
         vm.sendIntent(ChatScreenIntent.OnSendClick)
-        assertIs<PendingPreview>(vm.screenState.value.pendingPreview)
+        assertNotNull(vm.screenState.value.pendingChoice)
 
-        // Collect the SideEffect emitted on Apply
+        // Collect the SideEffect emitted on execute
         val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
             vm.sideEffect.first()
         }
 
-        // Apply it
-        vm.sendIntent(ChatScreenIntent.OnPreviewApply)
+        // Tap the primary "execute" chip
+        vm.sendIntent(ChatScreenIntent.OnChoiceSelected("execute"))
 
-        assertNull(vm.screenState.value.pendingPreview)
+        assertNull(vm.screenState.value.pendingChoice)
         assertIs<ToolCall.AddItem>(fakeDispatcher.lastDispatched)
 
         // Success outcome emits ShowAssistantMessage with the dispatch key
@@ -498,20 +517,20 @@ class ChatViewModelTest {
         val vm = makeVm(repo = repo)
         vm.sendIntent(ChatScreenIntent.OnInputChange("add milk to shopping"))
         vm.sendIntent(ChatScreenIntent.OnSendClick)
-        assertIs<PendingPreview>(vm.screenState.value.pendingPreview)
+        assertNotNull(vm.screenState.value.pendingChoice)
 
         val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
             vm.sideEffect.first()
         }
 
-        vm.sendIntent(ChatScreenIntent.OnPreviewCancel)
+        vm.sendIntent(ChatScreenIntent.OnChoiceDismissed)
 
-        // Preview must be cleared
-        assertNull(vm.screenState.value.pendingPreview)
+        // Choice must be cleared
+        assertNull(vm.screenState.value.pendingChoice)
         // Assistant cancelled message must be emitted (silent dismiss FORBIDDEN per CLAUDE.md)
         val effect = effectDeferred.await()
         assertIs<ChatScreenSideEffect.ShowAssistantMessage>(effect)
-        assertEquals("chat_preview_cancelled_message", effect.messageKey)
+        assertEquals("chat_choice_dismissed_message", effect.messageKey)
     }
 
     // ── 8. Layer 1 (Local) → user message costCredits == 0 ───────────────────
@@ -574,7 +593,7 @@ class ChatViewModelTest {
         vm.sendIntent(ChatScreenIntent.OnSendClick)
 
         val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) { vm.sideEffect.first() }
-        vm.sendIntent(ChatScreenIntent.OnPreviewApply)
+        vm.sendIntent(ChatScreenIntent.OnChoiceSelected("execute"))
 
         val effect = effectDeferred.await()
         assertIs<ChatScreenSideEffect.ShowSnackbar>(effect)
@@ -725,7 +744,7 @@ class ChatViewModelTest {
             vm.sideEffect.first()
         }
 
-        vm.sendIntent(ChatScreenIntent.OnPreviewApply)
+        vm.sendIntent(ChatScreenIntent.OnChoiceSelected("execute"))
 
         val effect = effectDeferred.await()
         assertIs<ChatScreenSideEffect.ShowAssistantMessage>(effect)
@@ -867,27 +886,27 @@ class ChatViewModelTest {
         )
         val vm = makeVm(repo = repo)
 
-        // Send to get a preview from Layer 1
+        // Send to get a choice block from Layer 1
         vm.sendIntent(ChatScreenIntent.OnInputChange("add milk to shopping"))
         vm.sendIntent(ChatScreenIntent.OnSendClick)
-        assertNotNull(vm.screenState.value.pendingPreview)
-        assertEquals(RoutingLayer.Local, vm.screenState.value.pendingPreview?.sourceLayer)
+        assertNotNull(vm.screenState.value.pendingChoice)
 
         // Reset call count after initial classify (for initial OnSendClick)
         val initialCallCount = repo.classifyCallCount
 
-        // Collect the next sideEffect before reject
+        // Collect the next sideEffect before escalating
         val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
             vm.sideEffect.first()
         }
 
-        vm.sendIntent(ChatScreenIntent.OnPreviewReject)
+        // Tap the escape "Something else" chip → FreeForm escalation
+        vm.sendIntent(ChatScreenIntent.OnChoiceSelected("escape"))
 
-        // Preview must be cleared immediately
-        assertNull(vm.screenState.value.pendingPreview)
+        // Choice must be cleared immediately
+        assertNull(vm.screenState.value.pendingChoice)
         // classify must have been called with skipLayer1=true
-        assertEquals(initialCallCount + 1, repo.classifyCallCount, "classify must be called once more on reject")
-        assertEquals(true, repo.lastSkipLayer1, "Reject from Local source must set skipLayer1=true")
+        assertEquals(initialCallCount + 1, repo.classifyCallCount, "classify must be called once more on escalate")
+        assertEquals(true, repo.lastSkipLayer1, "Escalate from Local source must set skipLayer1=true")
         // Since Layer 2 returned FreeForm, the agent loop runs (no legacy completeFreeForm).
         assertTrue(repo.agentStepCallCount >= 1, "agentStep must be called when Layer2 returns FreeForm on reject")
         assertEquals(0, repo.completeFreeFormCallCount, "completeFreeForm must NOT be called anymore")
@@ -915,8 +934,7 @@ class ChatViewModelTest {
 
         vm.sendIntent(ChatScreenIntent.OnInputChange("add milk to shopping"))
         vm.sendIntent(ChatScreenIntent.OnSendClick)
-        assertNotNull(vm.screenState.value.pendingPreview)
-        assertEquals(RoutingLayer.Classifier, vm.screenState.value.pendingPreview?.sourceLayer)
+        assertNotNull(vm.screenState.value.pendingChoice)
 
         val initialClassifyCount = repo.classifyCallCount
 
@@ -924,9 +942,9 @@ class ChatViewModelTest {
             vm.sideEffect.first()
         }
 
-        vm.sendIntent(ChatScreenIntent.OnPreviewReject)
+        vm.sendIntent(ChatScreenIntent.OnChoiceSelected("escape"))
 
-        assertNull(vm.screenState.value.pendingPreview)
+        assertNull(vm.screenState.value.pendingChoice)
         // classify must NOT be called again — Classifier source escalates directly to Layer 3
         assertEquals(initialClassifyCount, repo.classifyCallCount, "classify must NOT be called on Classifier→Layer3 escalation")
         assertEquals(false, repo.lastSkipLayer1, "skipLayer1 must not have been set for this branch")
@@ -1181,8 +1199,8 @@ class ChatViewModelTest {
             "agentStep must be called — FreeForm always routes through the agent loop")
         assertEquals(0, repo.completeFreeFormCallCount,
             "completeFreeForm must NOT be called from the FreeForm path anymore")
-        assertNull(vm.screenState.value.pendingAgentPlan,
-            "pendingAgentPlan must be null after a Final result")
+        assertNull(vm.screenState.value.pendingChoice,
+            "pendingChoice must be null after a Final result")
         val assistantMsgs = vm.screenState.value.messages.filter { it.role == ChatRole.Assistant }
         assertEquals(1, assistantMsgs.size)
         assertEquals("Here is your week.", assistantMsgs.first().content)
@@ -1230,8 +1248,8 @@ class ChatViewModelTest {
 
         assertEquals(2, repo.agentStepCallCount,
             "agentStep must be called twice (ToolCalls + Final rounds)")
-        assertNull(vm.screenState.value.pendingAgentPlan,
-            "No plan-card for read-only tools")
+        assertNull(vm.screenState.value.pendingChoice,
+            "No choice block for read-only tools")
         assertFalse(vm.screenState.value.isProcessing,
             "isProcessing must be false after Final")
         // The assistant message from Final is appended directly (no ShowAssistantMessage side-effect).
@@ -1274,18 +1292,18 @@ class ChatViewModelTest {
         vm.sendIntent(ChatScreenIntent.OnInputChange("add milk to shopping"))
         vm.sendIntent(ChatScreenIntent.OnSendClick)
 
-        // After first agentStep returns ToolCalls, the plan-card should be visible.
+        // After first agentStep returns ToolCalls, the choice block should be visible.
         testScheduler.advanceUntilIdle()
-        val planAfterStep1 = vm.screenState.value.pendingAgentPlan
-        assertNotNull(planAfterStep1, "pendingAgentPlan must be set after ToolCalls result")
-        assertEquals(1, planAfterStep1.items.size, "One plan item expected")
+        val choiceAfterStep1 = vm.screenState.value.pendingChoice
+        assertNotNull(choiceAfterStep1, "pendingChoice must be set after ToolCalls result")
+        assertEquals(1, choiceAfterStep1.batchItems?.size, "One batch item expected")
         assertFalse(vm.screenState.value.isProcessing,
-            "isProcessing must be false while plan-card is shown")
+            "isProcessing must be false while choice block is shown")
         assertEquals(0, fakeDispatcher.dispatchCount,
             "Dispatcher must NOT be called before user approves")
 
-        // User approves → loop resumes
-        vm.sendIntent(ChatScreenIntent.OnAgentPlanApply)
+        // User taps "Do it all" → loop resumes
+        vm.sendIntent(ChatScreenIntent.OnChoiceSelected("execute_all"))
         testScheduler.advanceUntilIdle()
 
         // Dispatcher was called once for the approved add_item call
@@ -1305,8 +1323,8 @@ class ChatViewModelTest {
         assertEquals(1, toolResultsEntry.first().results.size,
             "ToolResults.results.size must equal calls.size (COUNT INVARIANT)")
 
-        // Plan-card is cleared and Final message is persisted.
-        assertNull(vm.screenState.value.pendingAgentPlan, "Plan-card must be cleared after Final")
+        // Choice block is cleared and Final message is persisted.
+        assertNull(vm.screenState.value.pendingChoice, "Choice block must be cleared after Final")
         val assistantMsgs = vm.screenState.value.messages.filter { it.role == ChatRole.Assistant }
         assertEquals(1, assistantMsgs.size)
         assertEquals("Done, added milk.", assistantMsgs.first().content)
@@ -1345,13 +1363,13 @@ class ChatViewModelTest {
         vm.sendIntent(ChatScreenIntent.OnSendClick)
         testScheduler.advanceUntilIdle()
 
-        // Plan-card visible with destructive item
-        val plan = vm.screenState.value.pendingAgentPlan
-        assertNotNull(plan)
-        assertTrue(plan.items.first().isDestructive, "delete_item must be flagged as destructive")
+        // Choice block visible with destructive batch item
+        val pending = vm.screenState.value.pendingChoice
+        assertNotNull(pending)
+        assertTrue(pending.batchItems?.first()?.isDestructive == true, "delete_item must be flagged as destructive")
 
-        // User cancels
-        vm.sendIntent(ChatScreenIntent.OnAgentPlanCancel)
+        // User cancels (escape chip)
+        vm.sendIntent(ChatScreenIntent.OnChoiceDismissed)
         testScheduler.advanceUntilIdle()
 
         // Dispatcher must NOT have been called (declined path)
@@ -1370,8 +1388,8 @@ class ChatViewModelTest {
         assertEquals("declined", resultJson["status"]?.toString()?.trim('"'),
             "Declined result must have status=declined")
 
-        // Final message received after cancelled plan
-        assertNull(vm.screenState.value.pendingAgentPlan)
+        // Final message received after cancelled batch
+        assertNull(vm.screenState.value.pendingChoice)
         val assistantMsgs = vm.screenState.value.messages.filter { it.role == ChatRole.Assistant }
         assertEquals(1, assistantMsgs.size)
     }
@@ -1422,8 +1440,8 @@ class ChatViewModelTest {
             "agentStep must be called at most 5 times (AGENT_MAX_ROUNDS), was ${repo.agentStepCallCount}")
         assertFalse(vm.screenState.value.isProcessing,
             "isProcessing must be false after round-cap")
-        assertNull(vm.screenState.value.pendingAgentPlan,
-            "pendingAgentPlan must be null after round-cap")
+        assertNull(vm.screenState.value.pendingChoice,
+            "pendingChoice must be null after round-cap")
     }
 
     // ── 40. Mixed read-only + mutating in one ToolCalls: COUNT INVARIANT holds ──
@@ -1466,12 +1484,12 @@ class ChatViewModelTest {
         vm.sendIntent(ChatScreenIntent.OnSendClick)
         testScheduler.advanceUntilIdle()
 
-        // read_checklist should auto-execute, add_item should show plan-card
-        val plan = vm.screenState.value.pendingAgentPlan
-        assertNotNull(plan, "Plan-card must be shown for the mutating add_item call")
-        assertEquals(1, plan.items.size, "Only mutating calls appear in plan-card")
+        // read_checklist should auto-execute, add_item should show the choice block
+        val pending = vm.screenState.value.pendingChoice
+        assertNotNull(pending, "Choice block must be shown for the mutating add_item call")
+        assertEquals(1, pending.batchItems?.size, "Only mutating calls appear in the batch list")
 
-        vm.sendIntent(ChatScreenIntent.OnAgentPlanApply)
+        vm.sendIntent(ChatScreenIntent.OnChoiceSelected("execute_all"))
         testScheduler.advanceUntilIdle()
 
         // COUNT INVARIANT: transcript ToolResults must have size == 2 (both calls)
@@ -1485,6 +1503,363 @@ class ChatViewModelTest {
         val resultIds = toolResults.first().results.map { it.id }
         assertEquals(listOf("read-1", "add-1"), resultIds,
             "Results must be in the same order as calls")
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // AiChoiceResponse mapping — write-intent / ambiguous / edit / dismiss
+    // ══════════════════════════════════════════════════════════════════════════
+
+    // ── C1. Write-intent choice carries a primary Execute chip with the tool call ──
+    @Test
+    fun writeIntent_choiceHasPrimaryExecuteChip() = runTest {
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.CreateItem,
+                confidence = 1.0f,
+                layer = RoutingLayer.Local,
+            )
+        )
+        val vm = makeVm(repo = repo)
+        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk to shopping"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+
+        val choice = vm.screenState.value.pendingChoice?.choice
+        assertNotNull(choice, "Write intent must produce a choice block")
+        // There is exactly one Execute option and it is the Primary chip.
+        val executeOption = choice.options.first { it.id == "execute" }
+        assertEquals(ChoiceRole.Primary, executeOption.role, "Add is a Primary (non-destructive) action")
+        assertIs<ChoiceAction.Execute>(executeOption.action)
+        assertIs<ToolCall.AddItem>((executeOption.action as ChoiceAction.Execute).toolCall)
+        // Escape chip re-classifies (FreeForm), carrying the original text.
+        assertEquals("escape", choice.escape?.id)
+        assertIs<ChoiceAction.FreeForm>(choice.escape?.action)
+    }
+
+    // ── C2. Delete intent → Execute chip uses the Destructive role ──
+    @Test
+    fun deleteIntent_executeChipIsDestructive() = runTest {
+        val preBuilt = ToolCall.DeleteItem(checklistHint = "shopping", itemText = "milk")
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.DeleteItem,
+                confidence = 1.0f,
+                layer = RoutingLayer.Classifier,
+                preBuiltToolCall = preBuilt,
+            )
+        )
+        val vm = makeVm(repo = repo)
+        vm.sendIntent(ChatScreenIntent.OnInputChange("delete milk from shopping"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+
+        val executeOption = vm.screenState.value.pendingChoice?.choice?.options?.first { it.id == "execute" }
+        assertNotNull(executeOption)
+        assertEquals(ChoiceRole.Destructive, executeOption.role, "Delete must be a Destructive chip")
+    }
+
+    // ── C3. AmbiguousMatch → "Which list?" choice with one Execute chip per candidate ──
+    @Test
+    fun executeChoice_ambiguousMatch_buildsCandidateChips() = runTest {
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.CreateItem,
+                confidence = 1.0f,
+                layer = RoutingLayer.Local,
+            )
+        )
+        // First dispatch (on execute) returns AmbiguousMatch → ViewModel rebuilds a candidate choice.
+        val fakeDispatcher = FakeToolCallDispatcher(
+            outcome = DispatchOutcome.AmbiguousMatch(candidates = listOf("Shopping", "Snacks")),
+        )
+        val vm = makeVm(repo = repo, dispatcher = fakeDispatcher)
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        assertNotNull(vm.screenState.value.pendingChoice)
+
+        // Tap execute → dispatcher returns AmbiguousMatch → a "Which list?" choice replaces it.
+        vm.sendIntent(ChatScreenIntent.OnChoiceSelected("execute"))
+
+        val candidateCalls = vm.screenState.value.candidateToolCalls()
+        assertEquals(2, candidateCalls.size, "One Execute chip per candidate list")
+        val hints = candidateCalls.filterIsInstance<ToolCall.AddItem>().map { it.checklistHint }
+        assertEquals(listOf("Shopping", "Snacks"), hints,
+            "Each candidate chip re-runs the command against that specific list")
+    }
+
+    // ── C4. OnChoiceDismissed (single choice) → choice cleared + visible reply ──
+    @Test
+    fun choiceDismissed_singleChoice_clearsAndEmitsMessage() = runTest {
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.CreateItem,
+                confidence = 1.0f,
+                layer = RoutingLayer.Local,
+            )
+        )
+        val vm = makeVm(repo = repo)
+        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk to shopping"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        assertNotNull(vm.screenState.value.pendingChoice)
+
+        val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            vm.sideEffect.first()
+        }
+        vm.sendIntent(ChatScreenIntent.OnChoiceDismissed)
+
+        assertNull(vm.screenState.value.pendingChoice, "Dismiss must clear the choice")
+        val effect = effectDeferred.await()
+        assertIs<ChatScreenSideEffect.ShowAssistantMessage>(effect)
+        assertEquals("chat_choice_dismissed_message", effect.messageKey,
+            "Silent dismiss is FORBIDDEN — a visible reply must be emitted")
+    }
+
+    // ── C5. Edit then confirm → applyEditedText replaces item text before dispatch ──
+    @Test
+    fun choiceEdit_confirm_dispatchesEditedText() = runTest {
+        val preBuilt = ToolCall.AddItem(checklistHint = "shopping", itemText = "milk")
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.CreateItem,
+                confidence = 1.0f,
+                layer = RoutingLayer.Classifier,
+                preBuiltToolCall = preBuilt,
+            )
+        )
+        val fakeDispatcher = FakeToolCallDispatcher(
+            outcome = DispatchOutcome.Success("chat_dispatch_added", listOf("oat milk")),
+        )
+        val vm = makeVm(repo = repo, dispatcher = fakeDispatcher)
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk to shopping"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        assertNotNull(vm.screenState.value.pendingChoice)
+
+        // Open the inline edit field.
+        vm.sendIntent(ChatScreenIntent.OnChoiceSelected("edit"))
+        assertNotNull(vm.screenState.value.pendingChoice?.editText, "Edit must open the inline field")
+
+        // Type a new value and confirm.
+        vm.sendIntent(ChatScreenIntent.OnChoiceEditChange("oat milk"))
+        vm.sendIntent(ChatScreenIntent.OnChoiceEditConfirmed)
+
+        val dispatched = fakeDispatcher.lastDispatched
+        assertIs<ToolCall.AddItem>(dispatched)
+        assertEquals("oat milk", dispatched.itemText, "Edited text must be applied before dispatch")
+        assertNull(vm.screenState.value.pendingChoice, "Choice cleared after the edited dispatch")
+    }
+
+    // ── C6. Edit confirm with blank text → hint snackbar, no dispatch ──
+    @Test
+    fun choiceEdit_blankConfirm_emitsHintNoDispatch() = runTest {
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.CreateItem,
+                confidence = 1.0f,
+                layer = RoutingLayer.Local,
+            )
+        )
+        val fakeDispatcher = FakeToolCallDispatcher()
+        val vm = makeVm(repo = repo, dispatcher = fakeDispatcher)
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk to shopping"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        vm.sendIntent(ChatScreenIntent.OnChoiceSelected("edit"))
+
+        val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            vm.sideEffect.first()
+        }
+        vm.sendIntent(ChatScreenIntent.OnChoiceEditChange("   "))
+        vm.sendIntent(ChatScreenIntent.OnChoiceEditConfirmed)
+
+        val effect = effectDeferred.await()
+        assertIs<ChatScreenSideEffect.ShowSnackbar>(effect)
+        assertEquals("chat_choice_edit_empty_hint", effect.messageKey,
+            "Blank edit must hint, not silently drop (CLAUDE.md silent-skip guard)")
+        assertEquals(0, fakeDispatcher.dispatchCount, "Blank edit must NOT dispatch")
+    }
+
+    // ── C7. Agent batch ExecuteAll resolves the deferred and dispatches ──
+    @Test
+    fun agentBatch_executeAllChip_resolvesDeferredAndDispatches() = runTest {
+        val addItemCall = AgentToolCall(
+            id = "call-x",
+            name = "add_item",
+            args = buildJsonObject {
+                put("item_text", "milk")
+                put("checklist_hint", "Shopping")
+            },
+        )
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.FreeForm,
+                confidence = 1.0f,
+                layer = RoutingLayer.FullChat,
+            ),
+            agentStepResults = listOf(
+                AgentStepResult.ToolCalls(calls = listOf(addItemCall), creditsRemaining = 297),
+                AgentStepResult.Final(content = "Done.", creditsRemaining = 297),
+            ),
+        )
+        val fakeDispatcher = FakeToolCallDispatcher(
+            outcome = DispatchOutcome.Success("chat_dispatch_added", listOf("milk")),
+        )
+        val vm = makeVm(repo = repo, dispatcher = fakeDispatcher)
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk to shopping"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        // Batch choice carries an ExecuteAll primary chip.
+        val choice = vm.screenState.value.pendingChoice?.choice
+        assertNotNull(choice)
+        val executeAll = choice.options.first { it.id == "execute_all" }
+        assertIs<ChoiceAction.ExecuteAll>(executeAll.action)
+
+        vm.sendIntent(ChatScreenIntent.OnChoiceSelected("execute_all"))
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(1, fakeDispatcher.dispatchCount, "ExecuteAll must dispatch the batched call")
+        assertNull(vm.screenState.value.pendingChoice, "Choice cleared after Final")
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Phase 2 — AI-generated answer options (AgentStepResult.Options)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    // ── C8. Options result → question lives INSIDE the choice block, NOT persisted yet ──
+    @Test
+    fun agentOptions_promptInChoiceBlock_notPersistedUntilResolve() = runTest {
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.FreeForm,
+                confidence = 1.0f,
+                layer = RoutingLayer.FullChat,
+            ),
+            agentStepResults = listOf(
+                AgentStepResult.Options(
+                    prompt = "What kind of trip is it?",
+                    options = listOf("Beach", "City", "Hiking"),
+                    creditsRemaining = 97,
+                ),
+            ),
+        )
+        val vm = makeVm(repo = repo)
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("plan a trip checklist"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        // The question is NOT persisted as a message yet — it lives inside the choice block so the
+        // inline dock (which overlays only pendingChoice) shows it. Persist happens on resolve.
+        val assistantMsgs = vm.screenState.value.messages.filter { it.role == ChatRole.Assistant }
+        assertEquals(0, assistantMsgs.size, "Options question must NOT be persisted until the user resolves it")
+
+        // The choice block carries the question as its prompt + one SendMessage chip per option.
+        val choice = vm.screenState.value.pendingChoice?.choice
+        assertNotNull(choice, "Options must produce a choice block")
+        assertEquals("What kind of trip is it?", choice.prompt, "The question must live inside the choice block")
+        assertEquals(3, choice.options.size, "One chip per option label")
+        assertEquals(
+            listOf("Beach", "City", "Hiking"),
+            choice.options.map { it.label },
+        )
+        choice.options.forEach {
+            assertIs<ChoiceAction.SendMessage>(it.action, "Each option chip sends a fresh agent turn")
+        }
+        assertFalse(vm.screenState.value.isProcessing, "Options is terminal — processing must stop")
+    }
+
+    // ── C9. Tapping an option chip → fresh agent turn with the chip label ──
+    @Test
+    fun agentOptions_tapChip_sendsLabelAsNewAgentTurn() = runTest {
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.FreeForm,
+                confidence = 1.0f,
+                layer = RoutingLayer.FullChat,
+            ),
+            agentStepResults = listOf(
+                // Round 1: produces options. Round 2 (after tapping): a Final answer.
+                AgentStepResult.Options(
+                    prompt = "What kind of trip?",
+                    options = listOf("Beach", "City"),
+                    creditsRemaining = 97,
+                ),
+                AgentStepResult.Final(content = "Here is your Beach trip checklist.", creditsRemaining = 94),
+            ),
+        )
+        val vm = makeVm(repo = repo)
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("plan a trip"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+        assertEquals(1, repo.agentStepCallCount)
+
+        // Question is not yet a message (it's inside the choice block).
+        assertEquals(0, vm.screenState.value.messages.count { it.role == ChatRole.Assistant && it.content == "What kind of trip?" })
+
+        // Tap the first option chip → sends "Beach" as a new agent turn.
+        val firstChipId = vm.screenState.value.pendingChoice!!.choice.options.first().id
+        vm.sendIntent(ChatScreenIntent.OnChoiceSelected(firstChipId))
+        testScheduler.advanceUntilIdle()
+
+        // A second agent turn ran with the label as a user message.
+        assertEquals(2, repo.agentStepCallCount, "Tapping an option must start a fresh agent turn")
+        // classify is bypassed (forceAgent semantics) — the label goes straight to the agent.
+        assertEquals(1, repo.classifyCallCount, "Only the initial send classifies; option-tap bypasses classify")
+        assertNull(vm.screenState.value.pendingChoice, "Choice cleared after the new turn's Final")
+
+        // History order: [user: "plan a trip"][assistant: question][user: "Beach"][assistant: answer].
+        val contents = vm.screenState.value.messages.map { it.role to it.content }
+        assertEquals(
+            listOf(
+                ChatRole.User to "plan a trip",
+                ChatRole.Assistant to "What kind of trip?",
+                ChatRole.User to "Beach",
+                ChatRole.Assistant to "Here is your Beach trip checklist.",
+            ),
+            contents,
+            "Resolving an option must persist [question][label][answer] in order",
+        )
+    }
+
+    // ── C10. Dismissing an Options choice → question persisted (stays visible), no 'cancelled' reply ──
+    @Test
+    fun agentOptions_dismiss_persistsQuestionNoCancelledReply() = runTest {
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.FreeForm,
+                confidence = 1.0f,
+                layer = RoutingLayer.FullChat,
+            ),
+            agentStepResults = listOf(
+                AgentStepResult.Options(
+                    prompt = "Which one?",
+                    options = listOf("A", "B"),
+                    creditsRemaining = 97,
+                ),
+            ),
+        )
+        val vm = makeVm(repo = repo)
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("ask me"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+        assertNotNull(vm.screenState.value.pendingChoice)
+        // Not yet persisted while the choice block is shown.
+        assertEquals(0, vm.screenState.value.messages.count { it.role == ChatRole.Assistant })
+
+        vm.sendIntent(ChatScreenIntent.OnChoiceDismissed)
+        testScheduler.advanceUntilIdle()
+
+        assertNull(vm.screenState.value.pendingChoice, "Dismiss must clear the options block")
+        // The question is persisted on dismiss so it stays visible in history — and it is the
+        // ONLY assistant message (no extra 'cancelled' reply is appended for the options case).
+        val assistantMsgs = vm.screenState.value.messages.filter { it.role == ChatRole.Assistant }
+        assertEquals(1, assistantMsgs.size,
+            "Dismissing options persists the question and adds NO 'cancelled' reply")
+        assertEquals("Which one?", assistantMsgs.first().content,
+            "The dismissed question must be persisted so it stays visible in history")
     }
 
     // ── Chat sheet context wiring ─────────────────────────────────────────────
@@ -1562,14 +1937,12 @@ class ChatViewModelTest {
         vm.sendIntent(ChatScreenIntent.OnInputChange("add milk"))
         vm.sendIntent(ChatScreenIntent.OnSendClick)
 
-        val preview = vm.screenState.value.pendingPreview
-        assertNotNull(preview, "Preview must be shown for CreateItem")
-        val toolCall = preview.toolCall
+        val state = vm.screenState.value
+        assertNotNull(state.pendingChoice, "Choice block must be shown for CreateItem")
+        val toolCall = state.executeToolCall()
         assertIs<ToolCall.AddItem>(toolCall)
         assertEquals("Groceries", toolCall.checklistHint,
-            "Null-hint AddItem must be biased to the open checklist name")
-        assertEquals("Groceries", preview.targetChecklistHint,
-            "Preview card must reflect the biased context list")
+            "Null-hint AddItem must be biased to the open checklist name (the prompt is built from this hint)")
     }
 
     @Test
@@ -1591,7 +1964,7 @@ class ChatViewModelTest {
         vm.sendIntent(ChatScreenIntent.OnInputChange("add milk to shopping"))
         vm.sendIntent(ChatScreenIntent.OnSendClick)
 
-        val toolCall = vm.screenState.value.pendingPreview?.toolCall
+        val toolCall = vm.screenState.value.executeToolCall()
         assertIs<ToolCall.AddItem>(toolCall)
         assertEquals("shopping", toolCall.checklistHint,
             "Explicit hint must win over the open-screen context")
@@ -1616,7 +1989,7 @@ class ChatViewModelTest {
         vm.sendIntent(ChatScreenIntent.OnInputChange("add milk"))
         vm.sendIntent(ChatScreenIntent.OnSendClick)
 
-        val toolCall = vm.screenState.value.pendingPreview?.toolCall
+        val toolCall = vm.screenState.value.executeToolCall()
         assertIs<ToolCall.AddItem>(toolCall)
         assertNull(toolCall.checklistHint,
             "Without context, a null hint must remain null (unchanged behaviour)")
@@ -1643,7 +2016,7 @@ class ChatViewModelTest {
         vm.sendIntent(ChatScreenIntent.OnInputChange("add milk"))
         vm.sendIntent(ChatScreenIntent.OnSendClick)
 
-        val toolCall = vm.screenState.value.pendingPreview?.toolCall
+        val toolCall = vm.screenState.value.executeToolCall()
         assertIs<ToolCall.AddItem>(toolCall)
         assertNull(toolCall.checklistHint,
             "Deleted context checklist must fall back to null hint")
@@ -1669,7 +2042,7 @@ class ChatViewModelTest {
         vm.sendIntent(ChatScreenIntent.OnInputChange("create checklist Party"))
         vm.sendIntent(ChatScreenIntent.OnSendClick)
 
-        val toolCall = vm.screenState.value.pendingPreview?.toolCall
+        val toolCall = vm.screenState.value.executeToolCall()
         assertIs<ToolCall.CreateChecklist>(toolCall)
         assertEquals("Party", toolCall.name,
             "CreateChecklist name must not be altered by context bias")
@@ -1912,7 +2285,8 @@ class ChatViewModelTest {
 
         assertEquals(1, repo.classifyCallCount, "Non-force prefill must classify")
         assertEquals(0, repo.agentStepCallCount, "CreateItem must NOT hit the agent loop")
-        assertIs<PendingPreview>(vm.screenState.value.pendingPreview)
+        assertNotNull(vm.screenState.value.pendingChoice)
+        assertIs<ToolCall.AddItem>(vm.screenState.value.executeToolCall())
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -2137,13 +2511,13 @@ class ChatViewModelTest {
         vm.sendIntent(ChatScreenIntent.OnInputChange("add milk to shopping"))
         vm.sendIntent(ChatScreenIntent.OnSendClick)
         testScheduler.advanceUntilIdle()
-        assertIs<PendingPreview>(vm.screenState.value.pendingPreview)
+        assertNotNull(vm.screenState.value.pendingChoice)
 
-        vm.sendIntent(ChatScreenIntent.OnPreviewApply)
+        vm.sendIntent(ChatScreenIntent.OnChoiceSelected("execute"))
         testScheduler.advanceUntilIdle()
 
         val confirmed = analytics.paramsOf("ai_chat_preview_confirmed")
-        assertNotNull(confirmed, "Apply must emit ai_chat_preview_confirmed")
+        assertNotNull(confirmed, "Tapping execute must emit ai_chat_preview_confirmed")
         assertEquals("AddItem", confirmed["action_type"])
     }
 
