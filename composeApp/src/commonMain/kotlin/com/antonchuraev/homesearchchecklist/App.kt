@@ -936,6 +936,11 @@ fun App() {
                         inputFocusRequester = chatInputFocusRequester,
                         // On blur (keyboard dismissed) the dock collapses to Peek only when blank.
                         inputBlank = chatUiState.inputText.isBlank(),
+                        // Keep the dock open while the answer frame has content (in-flight turn /
+                        // pending choice / last answer). Sending disables+blurs the input (the old
+                        // auto-collapse trigger); without this the dock slammed shut to Peek mid-turn
+                        // and hid the ChatTypingIndicator + answer. Grabber drag-down still collapses.
+                        keepExpanded = hasLastAnswer,
                         // A pending choice block (prompt + chips + escape) is taller than a one-line
                         // answer; raise the frame cap so its escape/cancel chip isn't clipped.
                         answerMaxHeight = if (chatUiState.pendingChoice != null) 360.dp else 210.dp,

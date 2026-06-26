@@ -420,6 +420,13 @@ fun GistiExpandableDockContent(
     contextLabel: String? = null,
     inputFocusRequester: FocusRequester? = null,
     inputBlank: Boolean = true,
+    // True while there is something in the answer frame to show — an in-flight turn (typing
+    // indicator), a pending choice block, or a last answer. While true the dock must NOT auto-collapse
+    // on blur: sending a message disables+blurs the input (the old auto-collapse trigger), which used
+    // to slam the dock shut to Peek mid-turn and HIDE the progress indicator/answer (the reported bug).
+    // The grabber drag-down still collapses the dock manually; blur-collapse still works in the empty
+    // state. Read as a snapshot (see keepExpandedLatest) so it never re-asserts Expanded after a drag.
+    keepExpanded: Boolean = false,
     // Height between the status bar and the keyboard top, measured by the HOST (Dp.Unspecified when
     // the keyboard is down). Used to cap the answer so the dock fits above the keyboard (FIX B).
     dockAvailableDp: Dp = Dp.Unspecified,
@@ -446,11 +453,19 @@ fun GistiExpandableDockContent(
     // hidden. On blur (BACK or IME-done both blur the field) collapse to Peek only if the input blank.
     var chatFieldFocused by remember { mutableStateOf(false) }
     val focusedLatest by rememberUpdatedState(chatFieldFocused)
+    // Snapshot (deliberately NOT a LaunchedEffect key): blocks the blur-collapse branch at the exact
+    // moment focus is lost. Keying the effect on it instead would re-assert Expanded every time the
+    // turn/answer state changes — fighting a manual grabber drag-down. As a snapshot it only suppresses
+    // the auto-collapse while there is content to show; the grabber still collapses the dock manually.
+    val keepExpandedLatest by rememberUpdatedState(keepExpanded)
     LaunchedEffect(chatFieldFocused) {
         if (state.offset.isNaN()) return@LaunchedEffect
         if (chatFieldFocused) {
             state.animateTo(DockAnchor.Expanded)
-        } else if (inputBlank) {
+        } else if (inputBlank && !keepExpandedLatest) {
+            // Collapse to Peek only when the input is blank AND there is nothing to show. Sending a
+            // message disables the field (focus lost) while isProcessing flips true → keepExpanded true
+            // here → the dock stays Expanded so the ChatTypingIndicator (and then the answer) is visible.
             state.animateTo(DockAnchor.Peek)
         }
     }
