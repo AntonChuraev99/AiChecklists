@@ -1,16 +1,21 @@
 package com.antonchuraev.homesearchchecklist.desingsystem.components.gisti
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -24,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -193,48 +199,33 @@ fun GistiGlassChatDock(
     hazeState: HazeState,
     modifier: Modifier = Modifier,
     bottomPadding: Dp = AppDimens.SpacingLg,
+    // Optional slot rendered as the TOPMOST element of the dock (above the chips) — the drag grabber.
+    grabberContent: (@Composable () -> Unit)? = null,
     chipsContent: (@Composable () -> Unit)? = null,
     pillContent: @Composable () -> Unit,
 ) {
     val dockShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
-    // Frost tint pulled toward surfaceContainerHighest (a warm grey clearly darker than the
-    // near-white #FBFAF8 background) at partial alpha: this makes the strip read as a visible glass
-    // panel over the light content while still letting the blurred list show through. A frost tinted
-    // toward the background colour would be invisible on this white UI.
-    // Tint kept near-white (surfaceContainerLowest = the lightest surface, ~white) so the frosted
-    // strip reads as light glass rather than a grey panel. Alpha < 0.65 keeps the blurred backdrop
-    // showing through instead of masking it with a flat plate.
-    val dockTint = MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.6f)
-    val backgroundColor = MaterialTheme.colorScheme.surface
+    // FIX D: ONE flat light-grey surface in ALL states (collapsed peek + expanded) — the live haze
+    // glass and the blur→opaque crossfade are GONE per the user's request ("just grey, one colour,
+    // closer to white"). surfaceContainerLow is the lightest subtle grey that still separates the
+    // dock from the near-white page background. ([hazeState] is retained for call-site/source
+    // compatibility but is no longer sampled — the dock no longer blurs the content behind it.)
+    val dockColor = MaterialTheme.colorScheme.surfaceContainerLow
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            // Working order from the production swapfaceandroid bottom-nav (Haze 1.7.2): clip the
-            // rounded corners FIRST, then hazeEffect. hazeEffect(state, style) samples the live
-            // backdrop; HazeStyle carries the blur radius + translucent tint. (No blurEffect{} lambda —
-            // that was the 2.0-alpha haze-blur API whose backdrop never rendered in this project.)
-            // No top hairline: it read as a dark line over the near-white content; the blur + tint
-            // alone are enough to separate the strip from the list.
             .clip(dockShape)
-            .hazeEffect(
-                state = hazeState,
-                style = HazeStyle(
-                    blurRadius = 16.dp,
-                    backgroundColor = backgroundColor,
-                    tint = HazeTint(dockTint),
-                ),
-            ),
+            .background(dockColor),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                // Extra top padding leaves a visible frosted-glass strip above the chips so the blur
-                // is perceivable even though the chips/pill below it are opaque cards.
-                .padding(top = AppDimens.SpacingXl, bottom = bottomPadding)
-                .navigationBarsPadding(),
+                .padding(top = AppDimens.SpacingSm, bottom = bottomPadding),
             verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
         ) {
+            // Grabber TOPMOST (above the chips), then chips, then the pill/morph content.
+            grabberContent?.invoke()
             // Contextual prompt chips — edge-to-edge (own contentPadding, NO outer horizontal
             // padding here so the last chip bleeds past the screen edge as a scroll affordance).
             chipsContent?.invoke()

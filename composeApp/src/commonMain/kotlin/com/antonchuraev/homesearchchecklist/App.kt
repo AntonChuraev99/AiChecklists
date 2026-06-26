@@ -145,12 +145,15 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.Cha
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.ChatViewModel
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.AiChatFeaturesHelpSheet
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.AiChoiceResponse
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatFeedbackSheet
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatInputRow
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatMessageBubble
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatTypingIndicator
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatRecordingOverlay
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatRole
-import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiInlineChatPanel
+import androidx.compose.foundation.gestures.AnchoredDraggableState
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.DockAnchor
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiExpandableDockContent
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatAttachmentSourceSheet
 import com.antonchuraev.homesearchchecklist.core.filepicker.api.picker.FilePickerType
 import com.antonchuraev.homesearchchecklist.core.filepicker.api.picker.rememberFilePickerLauncher
@@ -161,6 +164,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.calendar.CalendarRoute
@@ -439,9 +443,15 @@ fun App() {
             //
             // Route-gating: panel is collapsed automatically on ANY top-route change, so
             // an open dock never travels across navigation (e.g. into ChecklistDetail).
+            // chatSheetOpen is now a WRITE-ONLY MIRROR of the per-screen dock's drag state: the screen
+            // owns the AnchoredDraggableState and reports expand/collapse up via onChatExpandedChanged,
+            // which flips this. App reads it only for analytics + context-seed + the banner label. The
+            // screens never read it back (one-way), so there is no drag↔state feedback loop.
             var chatSheetOpen by rememberSaveable { mutableStateOf(false) }
             var chatSheetContextId by rememberSaveable { mutableStateOf<Long?>(null) }
             var chatSheetContextLabel by rememberSaveable { mutableStateOf<String?>(null) }
+            // Bumped on every top-route change → each screen animates its dock back to Peek.
+            var routeCollapseSignal by remember { mutableStateOf(0) }
 
             // Collapse the chat dock on ANY top-route change so an open dock never
             // "travels" with navigation — e.g. opening a checklist from Main must close
@@ -453,6 +463,8 @@ fun App() {
                 navigator.backStack.lastOrNull()
             }
             LaunchedEffect(currentTopRoute) {
+                // Tell the mounted screens to collapse their dock to Peek, and clear the mirror.
+                routeCollapseSignal++
                 if (chatSheetOpen) {
                     chatSheetOpen = false
                 }
@@ -479,17 +491,6 @@ fun App() {
                 if (chatSheetOpen) {
                     chatViewModel.sendIntent(ChatScreenIntent.OnChatOpened(source = "dock"))
                 }
-            }
-
-            // Open the dock anchored to a checklist (or null) AND start voice recording.
-            // Used by the mic button on the MainScreen / ChecklistDetail bottom bars: the dock
-            // expands and OnVoiceRecordingStarted flows to the VM, which emits
-            // RequestRecordAudioPermission → the collector calls sheetAudioRecorder.start().
-            val onOpenChatSheetMic: (Long?, String?) -> Unit = { checklistId, checklistName ->
-                chatSheetContextId = checklistId
-                chatSheetContextLabel = checklistName
-                chatSheetOpen = true
-                chatViewModel.sendIntent(ChatScreenIntent.OnVoiceRecordingStarted)
             }
 
             // Quick-action prefill seeds (resolved in Composable scope — stringResource is @Composable).
@@ -784,17 +785,10 @@ fun App() {
             // Panel help sheet flag — shown when the "?" banner icon is tapped
             var chatPanelHelpSheetOpen by remember { mutableStateOf(false) }
 
-            // Auto-focus the input when the panel expands so the keyboard rises and the
-            // cursor lands in the field immediately. The panel slides in over ~300ms; a
-            // short delay lets the TextField attach before requestFocus() (otherwise the
-            // FocusRequester throws "not attached"). runCatching guards that race.
+            // Auto-focus on expand is now owned by GistiExpandableDockContent (it focuses this
+            // requester when the dock settles to Expanded — it has the exact drag state). App only
+            // creates the shared requester and hands it to the input row.
             val chatInputFocusRequester = remember { FocusRequester() }
-            LaunchedEffect(chatSheetOpen) {
-                if (chatSheetOpen) {
-                    delay(150L)
-                    runCatching { chatInputFocusRequester.requestFocus() }
-                }
-            }
 
             // Sheet local state: recording timer, drag-cancel, attachment sheet flag
             var chatSheetDragCancel by remember { mutableStateOf(false) }
@@ -907,6 +901,164 @@ fun App() {
                 }
             }
 
+            // ── Expandable in-place chat dock content (Approach A — morph, NOT slide-on-top) ──
+            // The dock lives PER-SCREEN inside each screen's GistiGlassChatDock (so the Haze backdrop
+            // blur + per-screen chips + two-pane scoping all work). App.kt only supplies this content
+            // slot — it captures the singleton ChatViewModel and all global wiring (recorder, pickers,
+            // focusRequester) declared above. The screen passes its own (expanded, onExpand, onCollapse)
+            // so a tablet two-pane never shares a draggable state across panes (it's just a Boolean).
+            val resolvedContextLabel = chatSheetContextLabel?.let { name ->
+                chatDockAskAboutFmt.replace("%1\$s", name)
+            }
+            val lastAssistantMessage = remember(chatUiState.messages) {
+                chatUiState.messages.lastOrNull { it.role == ChatRole.Assistant }
+            }
+            // hasLastAnswer drives the expanded answer-frame vs empty-greeting switch (order mirrors
+            // the lastAnswerContent when-branches: pending choice / typing / last assistant bubble).
+            val hasLastAnswer = chatUiState.pendingChoice != null ||
+                chatUiState.isProcessing ||
+                lastAssistantMessage != null
+
+            val chatDockContent: @Composable (AnchoredDraggableState<DockAnchor>, String, Dp, @Composable () -> Unit) -> Unit =
+                { dockState, peekPlaceholder, dockAvailableDp, chips ->
+                    GistiExpandableDockContent(
+                        state = dockState,
+                        hasLastAnswer = hasLastAnswer,
+                        // Answer cap height from the host (status bar → keyboard top); Unspecified = no kb.
+                        dockAvailableDp = dockAvailableDp,
+                        // Banner ↗ → full chat route; the route change collapses the dock (signal).
+                        onExpandFull = { navigator.navigateToAiChat() },
+                        onHelpClick = { chatPanelHelpSheetOpen = true },
+                        contextLabel = resolvedContextLabel,
+                        // Chips hosted INSIDE the morph (it fades + collapses them as the dock expands).
+                        chipsContent = chips,
+                        // Focused by the morph when the dock settles to Expanded (raise the keyboard).
+                        inputFocusRequester = chatInputFocusRequester,
+                        // On blur (keyboard dismissed) the dock collapses to Peek only when blank.
+                        inputBlank = chatUiState.inputText.isBlank(),
+                        // A pending choice block (prompt + chips + escape) is taller than a one-line
+                        // answer; raise the frame cap so its escape/cancel chip isn't clipped.
+                        answerMaxHeight = if (chatUiState.pendingChoice != null) 360.dp else 210.dp,
+                        lastAnswerContent = {
+                            // Fixed-height frame: scroll a long answer inside instead of growing the
+                            // dock. Priority mirrors ChatContent so the SAME confirm cards render here.
+                            // FIX C: keep the answer pinned to the BOTTOM (latest content + input
+                            // visible), not the top/oldest. Keyed on the scroll's maxValue so it
+                            // re-anchors whenever the content grows (new message / streaming) and on
+                            // first show / expand — when maxValue is laid out we jump to it.
+                            val answerScroll = rememberScrollState()
+                            LaunchedEffect(answerScroll.maxValue) {
+                                answerScroll.animateScrollTo(answerScroll.maxValue)
+                            }
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .verticalScroll(answerScroll)
+                                    .padding(
+                                        horizontal = AppDimens.ScreenPaddingHorizontal,
+                                        vertical = AppDimens.SpacingMd,
+                                    ),
+                            ) {
+                                when {
+                                    chatUiState.pendingChoice != null -> {
+                                        AiChoiceResponse(
+                                            pending = chatUiState.pendingChoice!!,
+                                            onSelect = { id -> chatViewModel.sendIntent(ChatScreenIntent.OnChoiceSelected(id)) },
+                                            onEditChange = { chatViewModel.sendIntent(ChatScreenIntent.OnChoiceEditChange(it)) },
+                                            onEditConfirm = { chatViewModel.sendIntent(ChatScreenIntent.OnChoiceEditConfirmed) },
+                                        )
+                                    }
+                                    chatUiState.isProcessing -> {
+                                        ChatTypingIndicator()
+                                    }
+                                    lastAssistantMessage != null -> {
+                                        ChatMessageBubble(
+                                            message = lastAssistantMessage,
+                                            onFeedbackClick = { msg ->
+                                                chatViewModel.sendIntent(ChatScreenIntent.OnFeedbackOpen(msg))
+                                            },
+                                            onThumbUpClick = { msg ->
+                                                chatViewModel.sendIntent(ChatScreenIntent.OnThumbUpClick(msg))
+                                            },
+                                            onAskAiFallback = lastAssistantMessage.askAiForText?.let { text ->
+                                                { chatViewModel.sendIntent(ChatScreenIntent.OnAskAiFallback(text)) }
+                                            },
+                                            onOpenChecklist = lastAssistantMessage.linkedChecklistId?.let { id ->
+                                                {
+                                                    chatSheetOpen = false
+                                                    navigator.navigateToChecklistDetail(id)
+                                                }
+                                            },
+                                            showSenderLabel = true,
+                                        )
+                                    }
+                                }
+                            }
+                        },
+                        emptyStateContent = {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(
+                                        horizontal = AppDimens.ScreenPaddingHorizontal,
+                                        vertical = AppDimens.SpacingMd,
+                                    ),
+                                verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
+                            ) {
+                                Text(
+                                    text = chatPanelGreeting,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
+                        },
+                        inputContent = { onInputFocusChanged ->
+                            // Hidden while a choice block is pending (chips are the only interaction).
+                            if (chatUiState.pendingChoice == null) {
+                                ChatInputRow(
+                                    text = chatUiState.inputText,
+                                    onTextChange = { chatViewModel.sendIntent(ChatScreenIntent.OnInputChange(it)) },
+                                    onSend = { chatViewModel.sendIntent(ChatScreenIntent.OnSendClick) },
+                                    onAttachFileClick = { chatSheetAttachmentSheet = true },
+                                    // BUG #1 FIX: send OnVoiceRecordingStarted (flips isRecording +
+                                    // emits RequestRecordAudioPermission) like the full ChatScreen does.
+                                    // The OLD inline panel only called sheetAudioRecorder.start() with NO
+                                    // intent, so isRecording never flipped and the press-hold mic was a
+                                    // no-op in the dock. Now the SAME press-hold works in the peek.
+                                    onVoiceRecordingStarted = {
+                                        chatViewModel.sendIntent(ChatScreenIntent.OnVoiceRecordingStarted)
+                                        sheetAudioRecorder.start()
+                                    },
+                                    onVoiceRecordingStopped = { sheetAudioRecorder.stop() },
+                                    onVoiceRecordingCancelled = { sheetAudioRecorder.cancel() },
+                                    onHelpClick = { chatPanelHelpSheetOpen = true },
+                                    hasAttachments = chatUiState.pendingAttachments.isNotEmpty(),
+                                    isEnabled = !chatUiState.isProcessing,
+                                    canSend = chatUiState.canSend,
+                                    isRecording = chatUiState.isRecording,
+                                    isTranscribing = chatUiState.isTranscribing,
+                                    onDragCancelChanged = { chatSheetDragCancel = it },
+                                    focusRequester = chatInputFocusRequester,
+                                    // Report focus to the morph: focus → expand + lock the dock open
+                                    // while the keyboard is up; blur → release (collapse if blank).
+                                    onFocusChanged = onInputFocusChanged,
+                                    // Contextual peek placeholder ("Ask Gisti…" / "Ask about <name>…")
+                                    // supplied per-screen so the collapsed dock reads meaningfully.
+                                    placeholderOverride = peekPlaceholder,
+                                )
+                            }
+                        },
+                        recordingOverlay = {
+                            ChatRecordingOverlay(
+                                isRecording = chatUiState.isRecording,
+                                durationMs = chatSheetRecordingMs,
+                                isDragCancel = chatSheetDragCancel,
+                            )
+                        },
+                    )
+                }
+
             val renderNav: @Composable (DrawerState?) -> Unit = { drawerState ->
             NavDisplay(
                 backStack = navigator.backStack,
@@ -944,17 +1096,19 @@ fun App() {
                                 drawerState = drawerState,
                                 isEditMode = isEditMode,
                                 onEditModeChange = { isEditMode = it },
-                                // Open the sheet (null = no checklist context) instead
-                                // of navigating full-screen. Full-screen chat remains
-                                // reachable from the drawer (AppNavRoute.AiChat entry below).
-                                onNavigateToAiChat = { onOpenChatSheet(null, null) },
+                                // Continuous-drag dock content (MainScreen owns its own drag state).
+                                chatDockContent = chatDockContent,
+                                // When MainScreen's dock opens/closes → seed the home (null) chat context
+                                // + fire the open analytics (chatSheetOpen mirror drives those effects).
+                                onChatExpandedChanged = { expandedNow ->
+                                    if (expandedNow) onOpenChatSheet(null, null) else chatSheetOpen = false
+                                },
+                                chatInputBlank = chatUiState.inputText.isBlank(),
+                                routeCollapseSignal = routeCollapseSignal,
                                 // Each prompt chip drives its own chat flow (photo/pdf picker,
                                 // link/remind prefill, plan-day prefill+send) via the singleton
                                 // ChatViewModel + inline dock. See onQuickAction above.
                                 onQuickAction = onQuickAction,
-                                // Mic in the AskGisti bar: open the dock (no context) and start
-                                // recording immediately.
-                                onMicClick = { onOpenChatSheetMic(null, null) },
                                 // Top-bar "+" and the leading "New list" prompt chip both
                                 // route to the manual create screen (CreateChecklistScreen).
                                 // From there the user can still pick a template via the
@@ -1040,12 +1194,16 @@ fun App() {
                             // pushes a new ChecklistDetail entry carrying this; forwarded into the
                             // screen (and its keyed ViewModel) here.
                             currentFolderId = route.currentFolderId,
+                            // Called by the screen when its dock opens (seeds context + name + the
+                            // mirror for analytics/banner) / closes. The name comes from the screen's
+                            // own state (App only knows route.checklistId here).
                             onOpenChatSheet = { checklistId, checklistName ->
                                 onOpenChatSheet(checklistId, checklistName)
                             },
-                            onMicChatSheet = { checklistId, checklistName ->
-                                onOpenChatSheetMic(checklistId, checklistName)
-                            },
+                            onChatCollapse = { chatSheetOpen = false },
+                            chatDockContent = chatDockContent,
+                            chatInputBlank = chatUiState.inputText.isBlank(),
+                            routeCollapseSignal = routeCollapseSignal,
                             onChecklistQuickAction = { checklistId, checklistName, action ->
                                 onChecklistQuickAction(checklistId, checklistName, action)
                             },
@@ -1141,6 +1299,11 @@ fun App() {
                     googleDisplayName = userData.googleDisplayName,
                     onSignInClick = handleSignIn,
                     onSignOutClick = handleSignOut,
+                    // Disable the drawer's left-edge swipe-to-open while the chat dock is expanded —
+                    // that edge gesture was eating the keyboard-dismiss / dock-collapse drags in the
+                    // expanded chat. chatSheetOpen mirrors the dock's Expanded state (onChatExpandedChanged).
+                    // The hamburger button still opens the drawer; only the edge-swipe is suppressed.
+                    drawerGesturesEnabled = !chatSheetOpen,
                     content = renderNav,
                 )
             } else {
@@ -1154,150 +1317,11 @@ fun App() {
                     .navigationBarsPadding(),
             )
 
-            // ── GistiInlineChatPanel — inline bottom-anchored overlay ─────────────
-            // Rendered inside the root Box so it overlays the nav content.
-            // Panel is route-gated: auto-collapses on navigation away from dock routes
-            // (see LaunchedEffect(currentTopRoute) above).
-            // Chat history is preserved (singleton ChatViewModel survives collapse).
-            //
-            // The redesigned panel shows a single fixed-height "latest answer" frame
-            // instead of a scrolling message list. hasLastAnswer decides whether we
-            // surface the latest assistant turn / confirm card, or the empty greeting.
-            val resolvedContextLabel = chatSheetContextLabel?.let { name ->
-                chatDockAskAboutFmt.replace("%1\$s", name)
-            }
-
-            // The latest assistant turn to surface, if any (skips user messages).
-            val lastAssistantMessage = remember(chatUiState.messages) {
-                chatUiState.messages.lastOrNull { it.role == ChatRole.Assistant }
-            }
-
-            // hasLastAnswer drives the panel's answer-frame vs empty-state switch.
-            // Order matches the lastAnswerContent when-branches below: a pending
-            // confirm card / typing indicator / last assistant bubble all count.
-            val hasLastAnswer = chatUiState.pendingChoice != null ||
-                chatUiState.isProcessing ||
-                lastAssistantMessage != null
-
-            GistiInlineChatPanel(
-                isVisible = chatSheetOpen,
-                hasLastAnswer = hasLastAnswer,
-                // A pending choice block (prompt + chips + escape) is taller than a one-line
-                // answer; raise the frame cap so its escape/cancel chip isn't clipped below the
-                // 160dp fold. Bounded content (2-4 chips), so the dock still won't fill the screen.
-                answerMaxHeight = if (chatUiState.pendingChoice != null) 360.dp else 160.dp,
-                contextLabel = resolvedContextLabel,
-                onDismiss = { chatSheetOpen = false },
-                onExpandClick = {
-                    chatSheetOpen = false
-                    navigator.navigateToAiChat()
-                },
-                onHelpClick = { chatPanelHelpSheetOpen = true },
-                lastAnswerContent = {
-                    // Fixed-height frame (96..160dp set by the panel): scroll a long answer
-                    // inside instead of growing the dock. Priority mirrors ChatContent so the
-                    // SAME confirm cards render here — closing the prior dock blocker where
-                    // preview / plan cards never appeared and commands couldn't be confirmed.
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .verticalScroll(rememberScrollState())
-                            .padding(
-                                horizontal = AppDimens.ScreenPaddingHorizontal,
-                                vertical = AppDimens.SpacingMd,
-                            ),
-                    ) {
-                        when {
-                            chatUiState.pendingChoice != null -> {
-                                AiChoiceResponse(
-                                    pending = chatUiState.pendingChoice!!,
-                                    onSelect = { id -> chatViewModel.sendIntent(ChatScreenIntent.OnChoiceSelected(id)) },
-                                    onEditChange = { chatViewModel.sendIntent(ChatScreenIntent.OnChoiceEditChange(it)) },
-                                    onEditConfirm = { chatViewModel.sendIntent(ChatScreenIntent.OnChoiceEditConfirmed) },
-                                )
-                            }
-                            chatUiState.isProcessing -> {
-                                ChatTypingIndicator()
-                            }
-                            lastAssistantMessage != null -> {
-                                ChatMessageBubble(
-                                    message = lastAssistantMessage,
-                                    onFeedbackClick = { msg ->
-                                        chatViewModel.sendIntent(ChatScreenIntent.OnFeedbackOpen(msg))
-                                    },
-                                    onThumbUpClick = { msg ->
-                                        chatViewModel.sendIntent(ChatScreenIntent.OnThumbUpClick(msg))
-                                    },
-                                    onAskAiFallback = lastAssistantMessage.askAiForText?.let { text ->
-                                        { chatViewModel.sendIntent(ChatScreenIntent.OnAskAiFallback(text)) }
-                                    },
-                                    onOpenChecklist = lastAssistantMessage.linkedChecklistId?.let { id ->
-                                        {
-                                            chatSheetOpen = false
-                                            navigator.navigateToChecklistDetail(id)
-                                        }
-                                    },
-                                    showSenderLabel = true,
-                                )
-                            }
-                        }
-                    }
-                },
-                emptyStateContent = {
-                    // Greeting only. The prompt-starter chips were removed from the OPEN chat
-                    // panel: they stay above the collapsed dock on Main/Detail as entry points,
-                    // but inside an already-open chat they duplicated the input row.
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(
-                                horizontal = AppDimens.ScreenPaddingHorizontal,
-                                vertical = AppDimens.SpacingMd,
-                            ),
-                        verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
-                    ) {
-                        Text(
-                            text = chatPanelGreeting,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                },
-                inputContent = {
-                    // Hidden while a choice block is shown — the chips (incl. "Something else"
-                    // escape, which dismisses → input returns) are the only interaction during a
-                    // pending choice, so a parallel text field is noise.
-                    if (chatUiState.pendingChoice == null) {
-                        ChatInputRow(
-                            text = chatUiState.inputText,
-                            onTextChange = { chatViewModel.sendIntent(ChatScreenIntent.OnInputChange(it)) },
-                            onSend = { chatViewModel.sendIntent(ChatScreenIntent.OnSendClick) },
-                            onAttachFileClick = { chatSheetAttachmentSheet = true },
-                            onVoiceRecordingStarted = { sheetAudioRecorder.start() },
-                            onVoiceRecordingStopped = { sheetAudioRecorder.stop() },
-                            onVoiceRecordingCancelled = { sheetAudioRecorder.cancel() },
-                            onHelpClick = { chatPanelHelpSheetOpen = true },
-                            hasAttachments = chatUiState.pendingAttachments.isNotEmpty(),
-                            isEnabled = !chatUiState.isProcessing,
-                            canSend = chatUiState.canSend,
-                            isRecording = chatUiState.isRecording,
-                            isTranscribing = chatUiState.isTranscribing,
-                            onDragCancelChanged = { chatSheetDragCancel = it },
-                            focusRequester = chatInputFocusRequester,
-                        )
-                    }
-                },
-                // Same pink "Recording…" surface as the full ChatScreen, hosted in the dock.
-                // The overlay animates itself in/out via isRecording — no height when idle.
-                recordingOverlay = {
-                    ChatRecordingOverlay(
-                        isRecording = chatUiState.isRecording,
-                        durationMs = chatSheetRecordingMs,
-                        isDragCancel = chatSheetDragCancel,
-                    )
-                },
-            )
+            // The expandable chat dock is now rendered PER-SCREEN (inside MainScreen /
+            // ChecklistDetailScreen's GistiGlassChatDock) via the `chatDockContent` slot built
+            // above — NOT as an app-level slide-on-top overlay. This is Approach A (in-place morph):
+            // one surface that expands in place, preserving the Haze backdrop blur. The old
+            // GistiInlineChatPanel(AnimatedVisibility) overlay was removed here.
             } // Box
 
             // Chat attachment source sheet — shown when user taps the clip icon inside the chat sheet
@@ -1315,6 +1339,34 @@ fun App() {
             if (chatPanelHelpSheetOpen) {
                 AiChatFeaturesHelpSheet(
                     onDismiss = { chatPanelHelpSheetOpen = false },
+                )
+            }
+
+            // ── Chat feedback sheet (thumb-down) — hosted at App level ────────────
+            // Bug #2: tapping 👎 on an assistant bubble in the COLLAPSED dock sets
+            // chatUiState.feedbackTarget, but only the full ChatScreen hosted the
+            // ChatFeedbackSheet — so in the dock nothing opened. Hosting it here (a
+            // sibling of the other App-level chat sheets) makes "Leave Feedback" work
+            // from the dock too, regardless of collapsed/expanded. The full ChatScreen
+            // keeps its own host (independent render site) — both read the same singleton
+            // ViewModel state, and only one chat surface is on screen at a time, so there
+            // is no double-sheet. Mirrors ChatScreen's previousUserQuestion lookup.
+            chatUiState.feedbackTarget?.let { target ->
+                val previousUserQuestion = remember(chatUiState.messages, target.id) {
+                    val idx = chatUiState.messages.indexOfFirst { it.id == target.id }
+                    chatUiState.messages
+                        .take(idx.coerceAtLeast(0))
+                        .lastOrNull { it.role == ChatRole.User }
+                        ?.content
+                }
+                ChatFeedbackSheet(
+                    target = target,
+                    previousUserQuestion = previousUserQuestion,
+                    feedbackText = chatUiState.feedbackText,
+                    isSubmitting = chatUiState.isSubmittingFeedback,
+                    onTextChange = { chatViewModel.sendIntent(ChatScreenIntent.OnFeedbackTextChange(it)) },
+                    onSubmit = { chatViewModel.sendIntent(ChatScreenIntent.OnFeedbackSubmit) },
+                    onDismiss = { chatViewModel.sendIntent(ChatScreenIntent.OnFeedbackDismiss) },
                 )
             }
 

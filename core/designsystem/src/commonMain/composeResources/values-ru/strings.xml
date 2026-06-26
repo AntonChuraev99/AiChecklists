@@ -117,7 +117,7 @@
     <string name="main_ai_analysis">ИИ-анализ</string>
     <string name="main_no_items">Пусто</string>
     <string name="main_my_lists">Мои списки</string>
-    <string name="main_ask_gisti_placeholder">Спросите Gisti — добавить, напомнить, спланировать…</string>
+    <string name="main_ask_gisti_placeholder">Сообщение Gisti</string>
     <string name="main_ask_gisti_mic">Голосовой ввод</string>
     <string name="main_prompt_photo">Фото ➡️ список</string>
     <string name="main_prompt_add">Добавить задачи</string>
@@ -515,10 +515,10 @@
     <string name="reminder_notification_channel_desc">Уведомления о напоминаниях и дедлайнах чек-листов</string>
     <string name="reminder_notification_tap">Нажмите, чтобы открыть</string>
     <plurals name="reminder_items_remaining">
-        <item quantity="one">%d элемент остался</item>
-        <item quantity="few">%d элемента осталось</item>
-        <item quantity="many">%d элементов осталось</item>
-        <item quantity="other">%d элементов осталось</item>
+        <item quantity="one">%1$d элемент остался</item>
+        <item quantity="few">%1$d элемента осталось</item>
+        <item quantity="many">%1$d элементов осталось</item>
+        <item quantity="other">%1$d элементов осталось</item>
     </plurals>
     <plurals name="items_count">
         <item quantity="one">%1$d пункт</item>
@@ -983,7 +983,7 @@
 
     <!-- AI-чат: заголовок, ввод, действия -->
     <string name="chat_title">AI-чат</string>
-    <string name="chat_input_placeholder">Сообщение</string>
+    <string name="chat_input_placeholder">Сообщение Gisti</string>
     <string name="chat_send_action">Отправить</string>
     <string name="chat_typing_indicator_a11y">AI печатает…</string>
     <string name="chat_help_action">О стоимости</string>

@@ -46,6 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -121,6 +122,19 @@ fun ChatInputRow(
     isTranscribing: Boolean = false,
     onDragCancelChanged: ((Boolean) -> Unit)? = null,
     focusRequester: FocusRequester? = null,
+    /**
+     * Called whenever the text field's focus changes (`true` = gained, `false` = lost). Used by the
+     * in-place expandable dock: focus → expand + lock the dock open while the keyboard is up; blur →
+     * release the lock (collapse if the input is blank). No-op elsewhere (full ChatScreen passes null).
+     */
+    onFocusChanged: ((Boolean) -> Unit)? = null,
+    /**
+     * When non-null, replaces the default "Message" placeholder. Used by the in-place dock peek to
+     * show a contextual hint ("Ask Gisti…" on home, "Ask about <name>…" inside a checklist). null →
+     * the resource-driven default (the full ChatScreen is unchanged). The pending-attachment hint
+     * still takes precedence when attachments are queued.
+     */
+    placeholderOverride: String? = null,
     modifier: Modifier = Modifier,
 ) {
     // Pre-resolve strings in Composable scope (spec §10 rule 6)
@@ -129,10 +143,13 @@ fun ChatInputRow(
     val recordVoiceLabel = stringResource(Res.string.chat_record_voice)
     val sendLabel = stringResource(Res.string.chat_send_action)
     val pressHoldHint = stringResource(Res.string.chat_voice_press_hold_hint)
-    val placeholder = stringResource(
-        if (hasAttachments) Res.string.chat_input_placeholder_with_attachment
-        else Res.string.chat_input_placeholder
-    )
+    val defaultPlaceholder = stringResource(Res.string.chat_input_placeholder)
+    val attachmentPlaceholder = stringResource(Res.string.chat_input_placeholder_with_attachment)
+    val placeholder = when {
+        hasAttachments -> attachmentPlaceholder
+        placeholderOverride != null -> placeholderOverride
+        else -> defaultPlaceholder
+    }
 
     val isMic = !canSend
 
@@ -236,7 +253,8 @@ fun ChatInputRow(
             enabled = isEnabled && !isRecording && !isTranscribing,
             modifier = Modifier
                 .weight(1f)
-                .let { base -> focusRequester?.let { base.focusRequester(it) } ?: base },
+                .let { base -> focusRequester?.let { base.focusRequester(it) } ?: base }
+                .onFocusChanged { onFocusChanged?.invoke(it.isFocused) },
             keyboardOptions = KeyboardOptions(
                 imeAction = if (canSend) ImeAction.Send else ImeAction.Default,
             ),

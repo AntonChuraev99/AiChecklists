@@ -38,6 +38,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.windowInsetsBottomHeight
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -127,6 +129,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -148,6 +151,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
@@ -158,9 +162,13 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonDestructive
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonText
-import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.ChecklistDetailChatDock
+import com.antonchuraev.homesearchchecklist.desingsystem.components.PlatformBackHandler
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.FillOptionsSheet
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiChecklistAction
+import androidx.compose.foundation.gestures.AnchoredDraggableState
+import androidx.compose.foundation.gestures.animateTo
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.DockAnchor
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiGlassChatDock
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiPromptChips
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiChecklistPromptChips
 import com.antonchuraev.homesearchchecklist.desingsystem.adaptive.AppWindowSizeClass
@@ -230,11 +238,18 @@ fun ChecklistDetailScreen(
      * Wired by App.kt.
      */
     onOpenChatSheet: ((Long, String) -> Unit)? = null,
+    /** Mirror-collapse the chat context when this screen's dock closes. Wired by App.kt. */
+    onChatCollapse: () -> Unit = {},
+    /** True when the chat input is blank — drives BACK (collapse only when blank; else text holds open). */
+    chatInputBlank: Boolean = true,
+    /** Bumped by App.kt on every route change → animate the dock back to its Peek (auto-collapse). */
+    routeCollapseSignal: Int = 0,
     /**
-     * Opens the AI-chat sheet pre-anchored to this checklist AND starts voice recording.
-     * Called with (checklistId, checklistName). Wired by App.kt; used by the bottom-bar mic.
+     * App-level continuous-drag chat dock content rendered INSIDE this screen's [GistiGlassChatDock]
+     * (so the Haze backdrop blur is preserved). Invoked as `chatDockContent(dockState, placeholder,
+     * chips)` — the screen owns its own [AnchoredDraggableState]. When null, the dock is hidden.
      */
-    onMicChatSheet: ((Long, String) -> Unit)? = null,
+    chatDockContent: (@Composable (AnchoredDraggableState<DockAnchor>, String, Dp, @Composable () -> Unit) -> Unit)? = null,
     /**
      * Fires a contextual prompt-chip [GistiChecklistAction] for THIS checklist (chips above the
      * chat input). Called with (checklistId, checklistName, action) so App.kt can set the chat
@@ -268,9 +283,10 @@ fun ChecklistDetailScreen(
             onOpenChatSheet = onOpenChatSheet?.let { cb ->
                 { cb(currentState.checklist.id, currentState.checklist.name) }
             },
-            onMicChatSheet = onMicChatSheet?.let { cb ->
-                { cb(currentState.checklist.id, currentState.checklist.name) }
-            },
+            onChatCollapse = onChatCollapse,
+            chatInputBlank = chatInputBlank,
+            routeCollapseSignal = routeCollapseSignal,
+            chatDockContent = chatDockContent,
             onChecklistQuickAction = onChecklistQuickAction?.let { cb ->
                 { action -> cb(currentState.checklist.id, currentState.checklist.name, action) }
             },
@@ -365,10 +381,35 @@ private fun ChecklistDetailContent(
     onIntent: (ChecklistDetailIntent) -> Unit,
     focusItemId: String? = null,
     onOpenChatSheet: (() -> Unit)? = null,
-    onMicChatSheet: (() -> Unit)? = null,
+    onChatCollapse: () -> Unit = {},
+    chatInputBlank: Boolean = true,
+    routeCollapseSignal: Int = 0,
+    chatDockContent: (@Composable (AnchoredDraggableState<DockAnchor>, String, Dp, @Composable () -> Unit) -> Unit)? = null,
     onChecklistQuickAction: ((GistiChecklistAction) -> Unit)? = null,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // ── Continuous-drag chat dock state (per-screen; never shared across two-pane panes) ──
+    val dockState = remember { AnchoredDraggableState(initialValue = DockAnchor.Peek) }
+    val dockScope = rememberCoroutineScope()
+    val dockExpanded by remember { derivedStateOf { dockState.targetValue == DockAnchor.Expanded } }
+    val chatFocusManager = LocalFocusManager.current
+    // Tell App when THIS checklist's dock opens (seed context + name + analytics) / closes.
+    LaunchedEffect(dockExpanded) { if (dockExpanded) onOpenChatSheet?.invoke() else onChatCollapse() }
+    // Auto-collapse on any route change (App bumps the signal). animateTo needs anchors → NaN-guard.
+    LaunchedEffect(routeCollapseSignal) {
+        if (routeCollapseSignal > 0 && !dockState.offset.isNaN()) dockState.animateTo(DockAnchor.Peek)
+    }
+    // BACK while expanded: hide the keyboard, then collapse to peek ONLY if the input is blank (a
+    // non-blank draft holds the dock open). Once collapsed the handler disables → next BACK exits.
+    // PlatformBackHandler is the project's KMP-safe wrapper (no-op shape on wasmJs).
+    PlatformBackHandler(enabled = dockExpanded) {
+        chatFocusManager.clearFocus()
+        if (chatInputBlank && !dockState.offset.isNaN()) {
+            dockScope.launch { dockState.animateTo(DockAnchor.Peek) }
+        }
+    }
+
     // Diagnostic logger for the attachment add path (picker callbacks below). On web these go to
     // the browser console as [D]/[W] Attachments: ...
     val logger: AppLogger = koinInject()
@@ -726,7 +767,12 @@ private fun ChecklistDetailContent(
             val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
             // IME is "open" when its inset exceeds the nav-bar inset by a margin (closed ime == navbar).
             val imeVisible by remember { derivedStateOf { imeBottom > navBottom + 8.dp } }
-            val showDock = !isEditMode && !imeVisible && onOpenChatSheet != null
+            // Show the dock unless editing. The `!imeVisible` gate only suppresses it for the LIST's
+            // inline add-item field (dockExpanded==false): focusing the chat input expands the dock
+            // (dockExpanded==true), so the chat keeps the dock visible and lifts it above the keyboard
+            // (GistiGlassChatDock owns ime ∪ navigationBars). The add-item field never expands chat,
+            // so the dock still hides for it.
+            val showDock = !isEditMode && (dockExpanded || !imeVisible) && chatDockContent != null
             // Single owner of the bottom inset. Content now runs edge-to-edge behind the navbar, so
             // the no-dock branch (edit mode) adds the navbar inset itself; when the dock is shown its
             // measured dockHeight already includes its own navigationBarsPadding.
@@ -738,6 +784,15 @@ private fun ChecklistDetailContent(
                 imeVisible -> AppDimens.SpacingSm
                 showDock -> dockHeight + AppDimens.SpacingLg
                 else -> navBottom + AppDimens.SpacingLg
+            }
+            // FIX B: answer cap (status bar → keyboard top), computed HERE at the host where the ime
+            // inset is reliable. Unspecified when the keyboard is down (use the design cap).
+            val statusTopDp = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+            val containerHDp = with(density) { LocalWindowInfo.current.containerSize.height.toDp() }
+            val dockAvailableDp = if (imeVisible) {
+                (containerHDp - imeBottom - statusTopDp).coerceAtLeast(0.dp)
+            } else {
+                Dp.Unspecified
             }
 
             Box(modifier = Modifier.fillMaxSize()) {
@@ -1043,41 +1098,69 @@ private fun ChecklistDetailContent(
                 } // end when (state.checklist.viewMode)
               } // end hazeSource Box (live backdrop captured by the dock)
 
-              // Floating glassmorphism chat dock — a DIRECT child of the anchor Box (per Haze docs:
-              // the hazeEffect node must sit directly over the hazeSource. Wrapping it in
-              // AnimatedVisibility puts the effect inside a separate graphicsLayer, which stops Haze
-              // from sampling the backdrop — the tint draws but the blur does not). Hidden in edit
-              // mode and while the IME is up (the inline input flows inside the list instead).
+              // Nav-bar grey — same as MainScreen: paint the system navigation-bar zone with the dock's
+              // own flat-grey token so the gesture/nav strip matches the dock instead of letting the
+              // white page show through beneath it (the dock sits navbar-padded ABOVE this strip, owning
+              // ime ∪ navigationBars, so the strip can't live inside the dock — it is a sibling filling
+              // exactly the navbar inset at the screen bottom). Only while the dock is shown.
               if (showDock) {
-                  ChecklistDetailChatDock(
+                  Box(
+                      modifier = Modifier
+                          .align(Alignment.BottomCenter)
+                          .fillMaxWidth()
+                          .windowInsetsBottomHeight(WindowInsets.navigationBars)
+                          .background(MaterialTheme.colorScheme.surfaceContainerLow),
+                  )
+              }
+
+              // Floating dock — a DIRECT child of the anchor Box. FIX B: `.imePadding()` lifts the WHOLE
+              // dock above the keyboard at the HOST (the deep windowInsetsPadding(ime) inside read ≈0
+              // on the phone). Host is the single bottom-inset owner: imePadding + navigationBarsPadding
+              // (collapsed peek still clears the navbar). FIX D: flat grey dock. Hidden in edit mode and
+              // while the LIST's add-item IME is up (but not while the chat itself is expanded).
+              if (showDock && chatDockContent != null) {
+                  GistiGlassChatDock(
                       hazeState = hazeState,
-                      checklistName = state.checklist.name,
-                      onChatClick = onOpenChatSheet ?: {},
-                      // Mic opens the dock AND starts recording; falls back to plain chat-open.
-                      onMicClick = onMicChatSheet ?: onOpenChatSheet ?: {},
-                      chatPlaceholder = stringResource(Res.string.main_ask_gisti_placeholder),
-                      micContentDescription = stringResource(Res.string.main_ask_gisti_mic),
-                      // 8dp above the navbar inset (matches MainScreen); content extends behind navbar.
                       bottomPadding = AppDimens.SpacingSm,
                       modifier = Modifier
                           .align(Alignment.BottomCenter)
                           .fillMaxWidth()
-                          .onSizeChanged { dockHeightPx = it.height },
-                      // Contextual quick-action chips ABOVE the dock pill, edge-to-edge (own contentPadding).
-                      chipsContent = onChecklistQuickAction?.let { onAction ->
-                          {
-                              GistiPromptChips(
-                                  chips = gistiChecklistPromptChips(
-                                      whatsMissingLabel = stringResource(Res.string.checklist_prompt_whats_missing),
-                                      generateIdeasLabel = stringResource(Res.string.checklist_prompt_generate_ideas),
-                                      addItemsLabel = stringResource(Res.string.checklist_prompt_add_items),
-                                      summaryLabel = stringResource(Res.string.checklist_prompt_summary),
-                                      remindLabel = stringResource(Res.string.checklist_prompt_remind),
-                                  ),
-                                  onChipClick = onAction,
-                                  onNewListClick = null,
-                                  modifier = Modifier.fillMaxWidth(),
-                              )
+                          .imePadding()
+                          .navigationBarsPadding()
+                          // Freeze the measured height at PEEK so the list's bottom padding stays put;
+                          // the expanded panel grows UPWARD over the list (no list repad/jump).
+                          .onSizeChanged {
+                              if (dockState.targetValue == DockAnchor.Peek) dockHeightPx = it.height
+                          },
+                      // The morphing chat content. Peek placeholder = contextual "Ask about <name>…";
+                      // chips hosted INSIDE the morph (it fades + collapses them as the dock expands).
+                      pillContent = {
+                          chatDockContent(
+                              dockState,
+                              stringResource(Res.string.chat_dock_ask_about)
+                                  .replace("%1\$s", state.checklist.name),
+                              dockAvailableDp,
+                          ) {
+                              if (onChecklistQuickAction != null) {
+                                  GistiPromptChips(
+                                      chips = gistiChecklistPromptChips(
+                                          whatsMissingLabel = stringResource(Res.string.checklist_prompt_whats_missing),
+                                          generateIdeasLabel = stringResource(Res.string.checklist_prompt_generate_ideas),
+                                          addItemsLabel = stringResource(Res.string.checklist_prompt_add_items),
+                                          summaryLabel = stringResource(Res.string.checklist_prompt_summary),
+                                          remindLabel = stringResource(Res.string.checklist_prompt_remind),
+                                      ),
+                                      // Tapping a chip animates the dock open AND fires its chat flow.
+                                      onChipClick = { action ->
+                                          dockScope.launch {
+                                              if (!dockState.offset.isNaN()) dockState.animateTo(DockAnchor.Expanded)
+                                          }
+                                          onChecklistQuickAction(action)
+                                      },
+                                      onNewListClick = null,
+                                      modifier = Modifier.fillMaxWidth(),
+                                  )
+                              }
                           }
                       },
                   )

@@ -83,6 +83,10 @@ fun AdaptiveNavigationShell(
     googleDisplayName: String? = null,
     onSignInClick: () -> Unit = {},
     onSignOutClick: () -> Unit = {},
+    // When false, the Compact ModalNavigationDrawer's left-edge swipe-to-open is disabled (the
+    // hamburger button still works). App.kt sets this false while the chat dock is expanded so the
+    // edge gesture stops competing with the keyboard-dismiss / dock-collapse drags.
+    drawerGesturesEnabled: Boolean = true,
     content: @Composable (drawerState: DrawerState?) -> Unit,
 ) {
     // Single debounce guard for all layout variants — prevents Koin DI race on
@@ -113,6 +117,7 @@ fun AdaptiveNavigationShell(
                 googleDisplayName = googleDisplayName,
                 onSignInClick = onSignInClick,
                 onSignOutClick = onSignOutClick,
+                gesturesEnabled = drawerGesturesEnabled,
                 content = content,
             )
         }
@@ -160,6 +165,7 @@ private fun AdaptiveShellCompactModal(
     googleDisplayName: String?,
     onSignInClick: () -> Unit,
     onSignOutClick: () -> Unit,
+    gesturesEnabled: Boolean = true,
     content: @Composable (DrawerState?) -> Unit,
 ) {
     // Fresh Closed DrawerState — plain remember, not rememberDrawerState, so that
@@ -170,6 +176,10 @@ private fun AdaptiveShellCompactModal(
 
     ModalNavigationDrawer(
         drawerState = drawerState,
+        // Edge-swipe-to-open is suppressed while the chat dock is expanded (gesturesEnabled=false);
+        // the hamburger still opens it because opening is driven programmatically via drawerState.
+        // When the drawer is already OPEN we keep gestures on so it can always be swiped closed.
+        gesturesEnabled = gesturesEnabled || drawerState.isOpen,
         drawerContent = {
             ModalDrawerSheet(
                 drawerContainerColor = MaterialTheme.colorScheme.surface,

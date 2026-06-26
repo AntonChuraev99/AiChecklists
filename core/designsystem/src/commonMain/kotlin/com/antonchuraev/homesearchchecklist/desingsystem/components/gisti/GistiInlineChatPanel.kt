@@ -8,6 +8,15 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.AnchoredDraggableDefaults
+import androidx.compose.foundation.gestures.AnchoredDraggableState
+import androidx.compose.foundation.gestures.DraggableAnchors
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.anchoredDraggable
+import androidx.compose.foundation.gestures.animateTo
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,8 +31,10 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandMore
@@ -36,12 +47,35 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.isSpecified
+import kotlinx.coroutines.delay
+import kotlin.math.roundToInt
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.chat_panel_collapse
 import aichecklists.core.designsystem.generated.resources.chat_panel_help_description
@@ -331,5 +365,321 @@ private fun GistiInlinePanelBanner(
                 modifier = Modifier.size(AppDimens.IconSizeMd),
             )
         }
+    }
+}
+
+/** The two stable positions of the expandable chat dock. [Peek] is the floor (never hides further). */
+enum class DockAnchor { Peek, Expanded }
+
+/**
+ * Reveal progress of the dock: 0f at [DockAnchor.Peek] (frosted glass, collapsed) → 1f at
+ * [DockAnchor.Expanded] (opaque panel). Safe before anchors are measured (offset == NaN → 0f).
+ * Read this ONLY inside layout/draw/graphicsLayer lambdas — `offset`/`progress` are
+ * `@FrequentlyChangingValue`, so a composition read recomposes every pixel (the old jank class).
+ */
+fun AnchoredDraggableState<DockAnchor>.dockProgress(): Float =
+    if (offset.isNaN()) 0f else progress(DockAnchor.Peek, DockAnchor.Expanded)
+
+/**
+ * Continuous, finger-following AI-chat dock content (Approach A v2 — replaces the discrete
+ * `AnimatedVisibility(expanded)` morph that felt janky). Built on the [AnchoredDraggableState]
+ * primitive (what BottomSheetScaffold is built on) but with OUR layout, so there is no peek-from-top
+ * inversion: the input row stays PINNED at the bottom (the host applies its IME inset) and the
+ * banner+answer panel ABOVE it is the draggable sheet that grows continuously upward.
+ *
+ * Gesture surface:
+ *  - The slim **grabber** carries `Modifier.anchoredDraggable` → 1:1 finger drag + velocity fling to
+ *    the nearest anchor with a bouncy spring snap.
+ *  - The reveal panel carries a [NestedScrollConnection] → the expanded answer scrolls; over-drag at
+ *    its top collapses the sheet; a drag-up consumes into expansion before the inner list scrolls.
+ *  - Peek is the floor (anchors are only Peek & Expanded); a swipe-down from Expanded settles to Peek.
+ *
+ * The reveal is driven by the offset read INSIDE the panel's `Modifier.layout` (layout-phase, not a
+ * composition read) so dragging never recomposes — the jank fix. The blur→opaque crossfade (R2) is
+ * driven the same way via [dockProgress] inside the host's draw lambda.
+ *
+ * @param state            Per-screen [AnchoredDraggableState] (NOT shared across two-pane panes).
+ * @param inputContent     The pinned input row; receives `onInputFocusChanged(focused)` — wire it to
+ *                         the input's focus so the keyboard-up lock (FIX 2) is scoped to THIS field.
+ * @param inputFocusRequester Focused when the dock settles to Expanded via a non-focus path (chip).
+ * @param inputBlank       Whether the chat input is blank — on blur (keyboard dismissed) the dock
+ *                         collapses to Peek only when blank (a draft holds it open).
+ */
+@Composable
+fun GistiExpandableDockContent(
+    state: AnchoredDraggableState<DockAnchor>,
+    hasLastAnswer: Boolean,
+    onExpandFull: () -> Unit,
+    onHelpClick: () -> Unit,
+    lastAnswerContent: @Composable () -> Unit,
+    emptyStateContent: @Composable () -> Unit,
+    inputContent: @Composable (onInputFocusChanged: (Boolean) -> Unit) -> Unit,
+    modifier: Modifier = Modifier,
+    chipsContent: (@Composable () -> Unit)? = null,
+    recordingOverlay: (@Composable () -> Unit)? = null,
+    contextLabel: String? = null,
+    inputFocusRequester: FocusRequester? = null,
+    inputBlank: Boolean = true,
+    // Height between the status bar and the keyboard top, measured by the HOST (Dp.Unspecified when
+    // the keyboard is down). Used to cap the answer so the dock fits above the keyboard (FIX B).
+    dockAvailableDp: Dp = Dp.Unspecified,
+    answerMaxHeight: Dp = 210.dp,
+) {
+    val density = LocalDensity.current
+    val snapSpec = remember {
+        spring<Float>(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMediumLow,
+        )
+    }
+    // @Composable — must be called in composable scope (not inside remember). Drives the drag fling.
+    val fling = AnchoredDraggableDefaults.flingBehavior(
+        state = state,
+        positionalThreshold = { distance -> distance * 0.5f },
+        animationSpec = snapSpec,
+    )
+    val focusManager = LocalFocusManager.current
+
+    // ── FIX 2: the CHAT input's focus is the keyboard-up signal (NOT a global WindowInsets.ime — that
+    // would let ChecklistDetail's inline add-item keyboard expand/lock the chat dock). While focused
+    // the dock is LOCKED Expanded: grabber drag + nested-scroll collapse are disabled and chips are
+    // hidden. On blur (BACK or IME-done both blur the field) collapse to Peek only if the input blank.
+    var chatFieldFocused by remember { mutableStateOf(false) }
+    val focusedLatest by rememberUpdatedState(chatFieldFocused)
+    LaunchedEffect(chatFieldFocused) {
+        if (state.offset.isNaN()) return@LaunchedEffect
+        if (chatFieldFocused) {
+            state.animateTo(DockAnchor.Expanded)
+        } else if (inputBlank) {
+            state.animateTo(DockAnchor.Peek)
+        }
+    }
+
+    // Auto-focus the input once the dock settles to Expanded via a NON-focus path (chip / grabber).
+    // And — ISSUE B fix — clear focus whenever the dock heads to Peek: with the banner (and its
+    // collapse chevron) gone, the grabber is the ONLY collapse affordance, and a swipe-down that
+    // dismisses the keyboard leaves Compose focus = true (so chatFieldFocused stayed true → the old
+    // grabber was disabled → the dock got STUCK expanded). Clearing focus on the Peek target dismisses
+    // the keyboard and lets the blank-blur path settle the collapse. The grabber is now always
+    // draggable (see the drag-target overlay below), so dragging it down reliably targets Peek here.
+    LaunchedEffect(state.targetValue) {
+        when (state.targetValue) {
+            DockAnchor.Expanded -> {
+                delay(120)
+                runCatching { inputFocusRequester?.requestFocus() }
+            }
+            DockAnchor.Peek -> focusManager.clearFocus()
+        }
+    }
+
+    // ── FIX B: cap the answer so the WHOLE dock fits above the keyboard — the bottom input then stays
+    // visible. The cap uses [dockAvailableDp] (height between the status bar and the keyboard top),
+    // computed by the HOST where WindowInsets.ime is reliable. A deep in-morph ime read returns 0 once
+    // the host applies imePadding (it consumes the inset) — that 0 made the previous cap = full screen,
+    // so the 414dp answer pushed the input under the keyboard on the phone. Now: answer ≤
+    // (available − measured input − fixed chrome); it scrolls inside its frame. Unspecified ⇒ keyboard
+    // down ⇒ use the design cap [answerMaxHeight] so the dock doesn't fill the whole screen. ──
+    var inputContentPx by remember { mutableStateOf(0) }
+    // Fixed chrome above the answer that is NOT the input: the grabber zone + the dock's column gaps.
+    // The banner row was removed (2026-06-26), so it no longer contributes ~48dp here — that space now
+    // goes to the answer. (When the keyboard is up the weight layout is the real guarantee that the
+    // input fits; this cap only keeps the answer a comfortable height.)
+    val chromeFixed = DockGrabberHeight + AppDimens.SpacingSm + AppDimens.SpacingSm
+    val effectiveAnswerMax = if (dockAvailableDp.isSpecified) {
+        val inputDp = with(density) { inputContentPx.toDp() }
+        minOf(answerMaxHeight, (dockAvailableDp - inputDp - chromeFixed)).coerceAtLeast(72.dp)
+    } else {
+        answerMaxHeight
+    }
+
+    // Nested scroll: drag-up consumes into expansion before the inner answer scrolls; leftover
+    // down-drag collapses the sheet; flings settle. ALL disabled while the chat field is focused
+    // (dock locked Expanded) so the inner answer scrolls freely without collapsing the dock.
+    val nestedScroll = remember(state, snapSpec) {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                val delta = available.y
+                return if (!focusedLatest && delta < 0f && source == NestedScrollSource.UserInput && !state.offset.isNaN()) {
+                    Offset(0f, state.dispatchRawDelta(delta))
+                } else {
+                    Offset.Zero
+                }
+            }
+
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                return if (!focusedLatest && source == NestedScrollSource.UserInput && !state.offset.isNaN()) {
+                    Offset(0f, state.dispatchRawDelta(available.y))
+                } else {
+                    Offset.Zero
+                }
+            }
+
+            override suspend fun onPreFling(available: Velocity): Velocity {
+                return if (!focusedLatest && available.y < 0f && state.targetValue != DockAnchor.Expanded && !state.offset.isNaN()) {
+                    state.settle(snapSpec)
+                    available
+                } else {
+                    Velocity.Zero
+                }
+            }
+
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+                if (!focusedLatest && !state.offset.isNaN()) state.settle(snapSpec)
+                return available
+            }
+        }
+    }
+
+    Column(modifier = modifier.fillMaxWidth()) {
+        // ── Grabber: the drag gesture lives HERE, on the concrete handle (a real Column child). An
+        // earlier attempt put anchoredDraggable on a transparent sibling OVERLAY (to get a big hit zone
+        // with a thin visual) — but Compose did not route drags to that transparent overlay in this
+        // tree, so the grabber went completely dead. anchoredDraggable on the handle itself is the
+        // proven-working configuration. ISSUE B: always enabled (no !chatFieldFocused gate) so the dock
+        // can ALWAYS be collapsed — dragging down targets Peek, and the targetValue→Peek effect clears
+        // focus to dismiss the keyboard. The handle is a thin full-width bar (easy to hit). ──
+        DockGrabberHandle(
+            modifier = Modifier.anchoredDraggable(
+                state = state,
+                orientation = Orientation.Vertical,
+                enabled = true,
+                flingBehavior = fling,
+            ),
+        )
+
+        // ── Reveal panel: banner + answer. Visible height = (full − offset), read INSIDE the layout
+        // lambda so dragging relayouts (NOT recomposes). Full height feeds the anchors. ──
+        var panelFullPx by remember { mutableStateOf(0) }
+        LaunchedEffect(panelFullPx) {
+            if (panelFullPx > 0) {
+                state.updateAnchors(
+                    DraggableAnchors {
+                        DockAnchor.Expanded at 0f
+                        DockAnchor.Peek at panelFullPx.toFloat()
+                    },
+                )
+            }
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                // FIX (keyboard-up input clipping): the dock's outer Column receives a BOUNDED max height
+                // (the host applies .imePadding() → screen − IME − navbar). With every child at its natural
+                // height the grabber + banner + answer consumed that whole budget, so the pinned input —
+                // the LAST child — got ~0 remaining height and did not render above the keyboard. While the
+                // chat field is focused the dock is LOCKED Expanded and the drag is DISABLED, so the
+                // offset-driven reveal is inert and it is SAFE to flex this panel: weight(fill = false)
+                // makes the Column measure the NON-weighted input first (natural height, guaranteed), then
+                // hand the LEFTOVER bounded height to this answer panel, which scrolls internally. Not
+                // focused → no weight → the natural-height offset-driven reveal + anchor measurement below
+                // are completely unchanged (so peek/drag still works).
+                .then(if (chatFieldFocused) Modifier.weight(1f, fill = false) else Modifier)
+                .nestedScroll(nestedScroll)
+                .clipToBounds()
+                .layout { measurable, constraints ->
+                    val placeable = measurable.measure(constraints)
+                    val full = placeable.height
+                    val off = if (state.offset.isNaN()) full.toFloat() else state.offset
+                    val revealed = (full - off).roundToInt().coerceIn(0, full)
+                    layout(placeable.width, revealed) {
+                        placeable.placeRelative(0, 0)
+                    }
+                },
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    // The Peek anchor MUST equal the reveal panel's ACTUAL current height — including the
+                    // weight-constrained height while focused. This was previously guarded with
+                    // `if (!focusedLatest)`, which FROZE panelFullPx at the stale pre-focus (peek) height.
+                    // Because the dock is always focused when Expanded (reaching Expanded auto-focuses the
+                    // input) and IME-Back hides the keyboard WITHOUT clearing Compose focus, the Peek
+                    // anchor stayed far short of the real panel height — so a DOWN-drag from Expanded could
+                    // never reach Peek and the dock would not collapse, while UP-drag from the genuinely
+                    // unfocused Peek state worked (the reported asymmetry). Tracking the live height keeps
+                    // the grabber drag symmetric: drag DOWN by the panel height fully collapses to Peek.
+                    .onSizeChanged { panelFullPx = it.height },
+            ) {
+                // Banner row (Gisti label + help "?" + open-fullscreen "↗" + collapse "⌄") removed per the
+                // 2026-06-26 request to reclaim that vertical space for the chat (a key funnel area). The
+                // expanded dock now opens straight into the answer. Collapse is via the grabber (swipe
+                // down) or by dismissing the keyboard — the dock auto-collapses to Peek on blur when the
+                // input is blank. The full chat + features help remain reachable from the drawer → AI Chat.
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = minOf(125.dp, effectiveAnswerMax), max = effectiveAnswerMax),
+                ) {
+                    if (hasLastAnswer) lastAnswerContent() else emptyStateContent()
+                }
+            }
+        }
+
+        // ── Chips (peek only). FIX A: visibility derives PURELY from the dock anchor progress — chips
+        // alpha/height = (1 − progress), one source of truth. So EVERY collapse path (chevron, swipe,
+        // fling, route-change) restores them: progress → 0 ⇒ chips back. (Keyboard-up still hides them
+        // because focus animates the dock to Expanded ⇒ progress 1 ⇒ chips gone — no separate boolean
+        // gate, which is what desynced them before.) FIX 3: clipToBounds (needed for the height
+        // collapse) would clip the chips' bottom shadow at peek, so the chip row carries a few dp of
+        // bottom padding INSIDE the measured content to keep its lower edge within bounds. ──
+        if (chipsContent != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer { alpha = 1f - state.dockProgress() }
+                    .clipToBounds()
+                    .layout { measurable, constraints ->
+                        val placeable = measurable.measure(constraints)
+                        val factor = 1f - state.dockProgress()
+                        val h = (placeable.height * factor).roundToInt().coerceIn(0, placeable.height)
+                        layout(placeable.width, h) { placeable.placeRelative(0, 0) }
+                    },
+            ) {
+                Box(modifier = Modifier.padding(bottom = AppDimens.SpacingXs)) {
+                    chipsContent()
+                }
+            }
+        }
+
+        // Recording overlay slot (zero height when idle) directly above the pinned input.
+        recordingOverlay?.invoke()
+
+        // ── Pinned input. The bottom inset (ime ∪ navbar) is now owned by the HOST (GistiGlassChatDock
+        // gets .imePadding().navigationBarsPadding()), which reliably lifts the WHOLE dock above the
+        // keyboard — the previous deep windowInsetsPadding(ime) here read ≈0 on the phone. So NO inset
+        // here (single owner = host). The Box measures the input content height for the answer cap
+        // (FIX B); its focus flips the keyboard-up lock (FIX 2). ──
+        Box(modifier = Modifier.onSizeChanged { inputContentPx = it.height }) {
+            inputContent { focused -> chatFieldFocused = focused }
+        }
+    }
+}
+
+/**
+ * Height of the dock's grab handle — a thin, full-width 24dp bar with a small centered pill. The whole
+ * bar is the drag/touch target (the caller puts [Modifier.anchoredDraggable] on it), so it stays a
+ * compact visual the user liked while still being an easy full-width grab. A taller transparent overlay
+ * was tried to enlarge the hit zone without added height, but Compose did not route drags to it — so the
+ * gesture lives on this concrete handle instead. Also feeds [chromeFixed] so the answer cap stays right.
+ */
+private val DockGrabberHeight = 24.dp
+
+/** The grabber handle. The drag gesture comes from the caller's [Modifier.anchoredDraggable] applied
+ *  across this whole full-width [DockGrabberHeight] bar; the visible pill is the small centered bar. */
+@Composable
+private fun DockGrabberHandle(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(DockGrabberHeight),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .width(36.dp)
+                .height(4.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)),
+        )
     }
 }
