@@ -1134,8 +1134,7 @@ private fun ChecklistDetailContent(
                       pillContent = {
                           chatDockContent(
                               dockState,
-                              stringResource(Res.string.chat_dock_ask_about)
-                                  .replace("%1\$s", state.checklist.name),
+                              stringResource(Res.string.main_ask_gisti_placeholder),
                               dockAvailableDp,
                           ) {
                               if (onChecklistQuickAction != null) {
