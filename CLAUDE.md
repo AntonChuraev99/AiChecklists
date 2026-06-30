@@ -61,6 +61,10 @@ Google-account sync (Firestore) makes a reinstall recoverable: for a **signed-in
 - ⚠️ Sync restores by **Google identity only**. An anonymous (not-signed-in) install keys data to a device-registration id that changes on reinstall — its local-only data does NOT come back. On a device holding real *anonymous* data, confirm sign-in first (or accept the loss).
 - `adb install -r <apk>` still preserves data with no caveats — the default for `/install-device`.
 
+### Device interaction — never drive the UI yourself unless explicitly asked
+
+This **overrides** the global "do it yourself via tools" autonomy rule for the physical device. Build, install (`adb install -r`), read logs (`adb logcat`), `screencap`, and `dumpsys` are fine without asking. But do **NOT** drive the app's UI yourself — no `adb shell input tap`/`swipe`/`text`/`keyevent`, no auto-clicking buttons or navigating screens — unless the user **explicitly** asks. It is the user's device; they may be using it. To verify a change, hand the test to the user (they reproduce; you may capture `adb logcat` while they click) or ask first.
+
 ## Architecture
 
 ```

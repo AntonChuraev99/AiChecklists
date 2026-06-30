@@ -1,9 +1,14 @@
 package com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -229,8 +234,16 @@ fun ChatInputRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(0.dp),
         ) {
-        // [1] Leading help button (Telegram-style — replaces emoji slot). Hidden in item-create mode.
-        if (!simpleSendOnly) {
+        // [1] Leading help button (Telegram-style — replaces emoji slot). In item-create mode it
+        // animates OUT (width collapse + fade) so the chat→create dock change is a smooth in-place
+        // morph instead of a hard node swap; a matching inset Spacer animates IN so the field keeps
+        // a small left gap once the button is gone. (Both wrappers live in the SAME ChatInputRow node
+        // across the mode flip — that node persistence is what lets these transitions actually run.)
+        AnimatedVisibility(
+            visible = !simpleSendOnly,
+            enter = fadeIn() + expandHorizontally(),
+            exit = fadeOut() + shrinkHorizontally(),
+        ) {
             IconButton(
                 onClick = onHelpClick,
                 enabled = isEnabled && !isRecording && !isTranscribing,
@@ -246,7 +259,12 @@ fun ChatInputRow(
                         MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
                 )
             }
-        } else {
+        }
+        AnimatedVisibility(
+            visible = simpleSendOnly,
+            enter = fadeIn() + expandHorizontally(),
+            exit = fadeOut() + shrinkHorizontally(),
+        ) {
             // Keep a small leading inset so the text field doesn't butt against the pill edge.
             Spacer(modifier = Modifier.width(AppDimens.SpacingMd))
         }
@@ -304,8 +322,13 @@ fun ChatInputRow(
         )
 
         // [3] Attach file button (moved to trailing side, next to Mic/Send — Telegram pattern).
-        // Hidden in item-create mode (attachments are a chat-only feature).
-        if (!simpleSendOnly) {
+        // Animates out in item-create mode (attachments are a chat-only feature) — same morph as the
+        // leading help button so the trailing cluster collapses smoothly to a lone Send.
+        AnimatedVisibility(
+            visible = !simpleSendOnly,
+            enter = fadeIn() + expandHorizontally(),
+            exit = fadeOut() + shrinkHorizontally(),
+        ) {
             IconButton(
                 onClick = onAttachFileClick,
                 enabled = isEnabled && !isRecording && !isTranscribing,
