@@ -165,6 +165,7 @@ import androidx.compose.foundation.gestures.AnchoredDraggableState
 import androidx.compose.foundation.gestures.animateTo
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.DockAnchor
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiGlassChatDock
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiDockColor
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiPromptChips
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiChecklistPromptChips
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.ChatDockItemCreateOverride
@@ -1141,8 +1142,8 @@ private fun ChecklistDetailContent(
                 } // end when (state.checklist.viewMode)
               } // end hazeSource Box (live backdrop captured by the dock)
 
-              // Nav-bar grey — same as MainScreen: paint the system navigation-bar zone with the dock's
-              // own flat-grey token so the gesture/nav strip matches the dock instead of letting the
+              // Nav-bar strip — same as MainScreen: paint the system navigation-bar zone with the dock's
+              // own gistiDockColor() so the gesture/nav strip matches the dock instead of letting the
               // white page show through beneath it (the dock sits navbar-padded ABOVE this strip, owning
               // ime ∪ navigationBars, so the strip can't live inside the dock — it is a sibling filling
               // exactly the navbar inset at the screen bottom). Only while the dock is shown.
@@ -1152,7 +1153,7 @@ private fun ChecklistDetailContent(
                           .align(Alignment.BottomCenter)
                           .fillMaxWidth()
                           .windowInsetsBottomHeight(WindowInsets.navigationBars)
-                          .background(MaterialTheme.colorScheme.surfaceContainerLow),
+                          .background(gistiDockColor()),
                   )
               }
 

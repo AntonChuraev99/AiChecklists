@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.GridView
@@ -56,6 +57,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonText
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppSwitch
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.DockDesignDebug
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import aichecklists.core.designsystem.generated.resources.Res
@@ -152,6 +155,16 @@ fun DebugScreen(
                     title = item.title,
                     description = item.description,
                     onClick = item.onClick
+                )
+            }
+
+            item {
+                DebugToggleItem(
+                    icon = Icons.Default.Brush,
+                    title = stringResource(Res.string.debug_dock_legacy_title),
+                    description = stringResource(Res.string.debug_dock_legacy_description),
+                    checked = DockDesignDebug.useLegacyDock,
+                    onCheckedChange = { DockDesignDebug.useLegacyDock = it }
                 )
             }
         }
@@ -270,6 +283,47 @@ private fun DebugMenuItem(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun DebugToggleItem(
+    icon: ImageVector,
+    title: String,
+    description: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    AppCard(onClick = { onCheckedChange(!checked) }) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingLg),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary
+            )
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            AppSwitch(
+                checked = checked,
+                onCheckedChange = onCheckedChange
             )
         }
     }

@@ -61,6 +61,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiG
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiPromptChips
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiQuickAction
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiDefaultPromptChips
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiDockColor
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import dev.chrisbanes.haze.hazeSource
@@ -383,15 +384,15 @@ fun MainScreen(
                     // show through underneath it. The dock sits navbar-padded ABOVE this strip (its host
                     // modifier owns ime ∪ navigationBars), so the strip can't live inside the dock — it is
                     // a sibling filling exactly the navbar inset at the screen bottom. Only while the dock
-                    // is shown; behind the keyboard (harmless) when it is up. surfaceContainerLow == the
-                    // dock background (GistiGlassChatDock FIX D), so the two read as one continuous surface.
+                    // is shown; behind the keyboard (harmless) when it is up. gistiDockColor() is the
+                    // single source of the dock background, so the strip and the dock read as one surface.
                     if (showDock) {
                         Box(
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
                                 .fillMaxWidth()
                                 .windowInsetsBottomHeight(WindowInsets.navigationBars)
-                                .background(MaterialTheme.colorScheme.surfaceContainerLow),
+                                .background(gistiDockColor()),
                         )
                     }
 

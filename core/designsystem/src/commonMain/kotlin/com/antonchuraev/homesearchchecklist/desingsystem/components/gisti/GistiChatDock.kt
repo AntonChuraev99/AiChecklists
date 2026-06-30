@@ -1,10 +1,8 @@
 package com.antonchuraev.homesearchchecklist.desingsystem.components.gisti
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -26,10 +24,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -205,18 +208,45 @@ fun GistiGlassChatDock(
     pillContent: @Composable () -> Unit,
 ) {
     val dockShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
-    // FIX D: ONE flat light-grey surface in ALL states (collapsed peek + expanded) — the live haze
-    // glass and the blur→opaque crossfade are GONE per the user's request ("just grey, one colour,
-    // closer to white"). surfaceContainerLow is the lightest subtle grey that still separates the
-    // dock from the near-white page background. ([hazeState] is retained for call-site/source
-    // compatibility but is no longer sampled — the dock no longer blurs the content behind it.)
-    val dockColor = MaterialTheme.colorScheme.surfaceContainerLow
+    // Variant B "Crisp hairline": the dock reads as a distinct foreground panel via a 1dp hairline
+    // (outlineVariant) tracing its top edge + rounded corners — NOT via a tinted surface. The earlier
+    // "FIX D" used a flat grey (surfaceContainerLow) on the near-white page, but the ~2% lightness gap
+    // (dock #F6F5F2 vs page #FBFAF8) plus no border made the dock blend into the background. Now the
+    // light surface is pure white (surfaceContainerLowest) + hairline; dark keeps surfaceContainerLow
+    // (a touch lighter than the page) + hairline. Separation comes from the crisp line, so it never
+    // goes muddy-grey and renders identically on Android and Web/Skiko. ([hazeState] is retained for
+    // call-site/source compatibility but is no longer sampled — the dock no longer blurs behind it.)
+    val dockColor = gistiDockColor()
+    val hairlineColor = MaterialTheme.colorScheme.outlineVariant
+    val legacyDock = DockDesignDebug.useLegacyDock
 
-    Box(
+    Surface(
+        // Hairline traces the TOP edge + the two top corners ONLY — never the bottom. The dock sits
+        // navbar-padded directly above the (same-colour) system-nav strip, so a full border would
+        // draw a stray 1dp divider BETWEEN the dock and that strip. Stroking only the top keeps the
+        // page↔dock separation while the dock flows seamlessly into the nav strip below it.
+        // Suppressed in the legacy debug variant (the old dock had no border at all).
         modifier = modifier
             .fillMaxWidth()
-            .clip(dockShape)
-            .background(dockColor),
+            .drawWithContent {
+                drawContent()
+                if (!legacyDock) {
+                    val stroke = 1.dp.toPx()
+                    val r = 28.dp.toPx()
+                    val inset = stroke / 2f
+                    val hairline = Path().apply {
+                        moveTo(inset, size.height)
+                        lineTo(inset, r)
+                        arcTo(Rect(inset, inset, inset + 2 * r, inset + 2 * r), 180f, 90f, false)
+                        lineTo(size.width - r, inset)
+                        arcTo(Rect(size.width - inset - 2 * r, inset, size.width - inset, inset + 2 * r), 270f, 90f, false)
+                        lineTo(size.width - inset, size.height)
+                    }
+                    drawPath(hairline, color = hairlineColor, style = Stroke(width = stroke))
+                }
+            },
+        shape = dockShape,
+        color = dockColor,
     ) {
         Column(
             modifier = Modifier
@@ -233,6 +263,26 @@ fun GistiGlassChatDock(
         }
     }
 }
+
+/**
+ * Background colour of [GistiGlassChatDock] ("Crisp hairline" variant). Exposed so any system
+ * navigation-bar strip painted behind the dock (e.g. MainScreen / ChecklistDetailScreen) stays in
+ * sync with the dock surface — the strip and the dock MUST read as one continuous surface, so the
+ * colour lives in exactly ONE place. Light = pure white (surfaceContainerLowest); dark keeps
+ * surfaceContainerLow (a touch lighter than the page). Separation from the page comes from the
+ * dock's 1dp [outlineVariant][androidx.compose.material3.ColorScheme.outlineVariant] hairline.
+ */
+@Composable
+@ReadOnlyComposable
+fun gistiDockColor(): Color =
+    if (DockDesignDebug.useLegacyDock) {
+        // Legacy (pre-"Crisp hairline") flat-grey dock — same surfaceContainerLow in light & dark.
+        MaterialTheme.colorScheme.surfaceContainerLow
+    } else if (LocalIsDarkTheme.current) {
+        MaterialTheme.colorScheme.surfaceContainerLow
+    } else {
+        MaterialTheme.colorScheme.surfaceContainerLowest
+    }
 
 /**
  * Floating glassmorphism chat dock for **ChecklistDetailScreen** — a thin wrapper over

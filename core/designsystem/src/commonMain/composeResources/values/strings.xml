@@ -883,6 +883,8 @@
     <string name="debug_show_csat_description">Force show CSAT bottom sheet for testing</string>
     <string name="debug_interactive_onboarding">Interactive Onboarding</string>
     <string name="debug_interactive_onboarding_description">Open the new interactive onboarding flow</string>
+    <string name="debug_dock_legacy_title">Legacy chat dock</string>
+    <string name="debug_dock_legacy_description">Revert to the old flat-grey dock (no hairline) for comparison</string>
 
     <!-- Onboardings debug screen -->
     <string name="debug_onboardings_title">Onboardings</string>
