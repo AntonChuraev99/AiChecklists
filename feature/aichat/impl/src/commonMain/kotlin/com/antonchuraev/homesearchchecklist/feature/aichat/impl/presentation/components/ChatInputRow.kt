@@ -12,12 +12,15 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.ui.draw.clip
@@ -56,6 +59,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
@@ -135,6 +139,15 @@ fun ChatInputRow(
      * still takes precedence when attachments are queued.
      */
     placeholderOverride: String? = null,
+    /**
+     * When true the row renders in a stripped-down "send only" mode used by the checklist-detail
+     * item-create dock: the leading help button and the trailing attach button are hidden, and the
+     * trailing control is ALWAYS a Send button (never the press-and-hold mic) — disabled while the
+     * input is blank ([canSend] == false) so a blank add is impossible. Voice/attach are chat-only
+     * features that don't apply when the dock is creating a checklist item. Defaults to false so the
+     * full ChatScreen + AI-chat dock are unchanged.
+     */
+    simpleSendOnly: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     // Pre-resolve strings in Composable scope (spec §10 rule 6)
@@ -151,7 +164,8 @@ fun ChatInputRow(
         else -> defaultPlaceholder
     }
 
-    val isMic = !canSend
+    // Item-create mode never shows the mic — the trailing control is always Send (disabled when blank).
+    val isMic = !canSend && !simpleSendOnly
 
     // The host exposes the input as a plain String, but we render with a TextFieldValue so we
     // control the caret. Default String-valued TextField collapses the caret to position 0 when
@@ -215,21 +229,26 @@ fun ChatInputRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(0.dp),
         ) {
-        // [1] Leading help button (Telegram-style — replaces emoji slot)
-        IconButton(
-            onClick = onHelpClick,
-            enabled = isEnabled && !isRecording && !isTranscribing,
-            modifier = Modifier.size(48.dp),
-        ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Outlined.HelpOutline,
-                contentDescription = helpLabel,
-                modifier = Modifier.size(AppDimens.IconSizeMd),
-                tint = if (isEnabled && !isRecording)
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                else
-                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-            )
+        // [1] Leading help button (Telegram-style — replaces emoji slot). Hidden in item-create mode.
+        if (!simpleSendOnly) {
+            IconButton(
+                onClick = onHelpClick,
+                enabled = isEnabled && !isRecording && !isTranscribing,
+                modifier = Modifier.size(48.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.HelpOutline,
+                    contentDescription = helpLabel,
+                    modifier = Modifier.size(AppDimens.IconSizeMd),
+                    tint = if (isEnabled && !isRecording)
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    else
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                )
+            }
+        } else {
+            // Keep a small leading inset so the text field doesn't butt against the pill edge.
+            Spacer(modifier = Modifier.width(AppDimens.SpacingMd))
         }
 
         // [2] Center text field — borderless Telegram-style.
@@ -255,9 +274,21 @@ fun ChatInputRow(
                 .weight(1f)
                 .let { base -> focusRequester?.let { base.focusRequester(it) } ?: base }
                 .onFocusChanged { onFocusChanged?.invoke(it.isFocused) },
+            // Item-create (simpleSendOnly): Enter/Done adds the item (parity with the removed inline
+            // field) and the first letter auto-capitalizes (Sentences). AI-chat path is unchanged.
             keyboardOptions = KeyboardOptions(
-                imeAction = if (canSend) ImeAction.Send else ImeAction.Default,
+                capitalization = if (simpleSendOnly) KeyboardCapitalization.Sentences else KeyboardCapitalization.None,
+                imeAction = when {
+                    simpleSendOnly -> ImeAction.Done
+                    canSend -> ImeAction.Send
+                    else -> ImeAction.Default
+                },
             ),
+            keyboardActions = if (simpleSendOnly) {
+                KeyboardActions(onDone = { if (canSend) onSend() })
+            } else {
+                KeyboardActions.Default
+            },
             textStyle = MaterialTheme.typography.bodyLarge.copy(
                 color = MaterialTheme.colorScheme.onSurface,
             ),
@@ -272,21 +303,24 @@ fun ChatInputRow(
             ),
         )
 
-        // [3] Attach file button (moved to trailing side, next to Mic/Send — Telegram pattern)
-        IconButton(
-            onClick = onAttachFileClick,
-            enabled = isEnabled && !isRecording && !isTranscribing,
-            modifier = Modifier.size(48.dp),
-        ) {
-            Icon(
-                imageVector = Icons.Filled.AttachFile,
-                contentDescription = attachFileLabel,
-                modifier = Modifier.size(AppDimens.IconSizeMd),
-                tint = if (isEnabled && !isRecording)
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                else
-                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-            )
+        // [3] Attach file button (moved to trailing side, next to Mic/Send — Telegram pattern).
+        // Hidden in item-create mode (attachments are a chat-only feature).
+        if (!simpleSendOnly) {
+            IconButton(
+                onClick = onAttachFileClick,
+                enabled = isEnabled && !isRecording && !isTranscribing,
+                modifier = Modifier.size(48.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.AttachFile,
+                    contentDescription = attachFileLabel,
+                    modifier = Modifier.size(AppDimens.IconSizeMd),
+                    tint = if (isEnabled && !isRecording)
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    else
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                )
+            }
         }
 
         // [4] Trailing Mic / Send / Transcribing indicator
@@ -375,6 +409,8 @@ fun ChatInputRow(
         // `pointerInput` for Mic press-and-hold. Only one active at a time → no conflict.
         val interactionModifier = when {
             isTranscribing -> Modifier  // no interaction while transcription is in progress
+            // Item-create: always a Send tap, enabled only when there is text to add.
+            simpleSendOnly -> Modifier.clickable(enabled = isEnabled && canSend, onClick = onSend)
             !isMic && !isRecording -> Modifier.clickable(enabled = isEnabled, onClick = onSend)
             else -> micGestureModifier  // Mic mode: press-and-hold gesture
         }
@@ -407,9 +443,11 @@ fun ChatInputRow(
                 else -> "send"
             }
             // Icon tint: recording → error (red); idle mic → onSurfaceVariant; send → primary.
+            // Item-create Send greys out while blank (disabled) so the gating is visible.
             val iconTint = when {
                 isRecording -> MaterialTheme.colorScheme.error
                 isMic -> MaterialTheme.colorScheme.onSurfaceVariant
+                simpleSendOnly && !canSend -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                 else -> MaterialTheme.colorScheme.primary
             }
             Crossfade(

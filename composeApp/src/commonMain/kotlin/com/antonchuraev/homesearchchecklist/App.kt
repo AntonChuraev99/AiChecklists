@@ -152,6 +152,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.com
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatRecordingOverlay
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatRole
 import androidx.compose.foundation.gestures.AnchoredDraggableState
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.ChatDockItemCreateOverride
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.DockAnchor
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiExpandableDockContent
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatAttachmentSourceSheet
@@ -919,11 +920,14 @@ fun App() {
                 chatUiState.isProcessing ||
                 lastAssistantMessage != null
 
-            val chatDockContent: @Composable (AnchoredDraggableState<DockAnchor>, String, Dp, @Composable () -> Unit) -> Unit =
-                { dockState, peekPlaceholder, dockAvailableDp, chips ->
+            val chatDockContent: @Composable (AnchoredDraggableState<DockAnchor>, String, Dp, @Composable () -> Unit, ChatDockItemCreateOverride?) -> Unit =
+                { dockState, peekPlaceholder, dockAvailableDp, chips, itemCreateOverride ->
                     GistiExpandableDockContent(
                         state = dockState,
-                        hasLastAnswer = hasLastAnswer,
+                        // Item-create mode hides the chat answer/greeting frame (it shows the item-create
+                        // chips in the empty-state slot instead) and keeps the dock pinned open for rapid
+                        // multi-add. Default (null override) → unchanged AI-chat behaviour.
+                        hasLastAnswer = if (itemCreateOverride != null) false else hasLastAnswer,
                         // Answer cap height from the host (status bar → keyboard top); Unspecified = no kb.
                         dockAvailableDp = dockAvailableDp,
                         // Banner ↗ → full chat route; the route change collapses the dock (signal).
@@ -931,7 +935,9 @@ fun App() {
                         onHelpClick = { chatPanelHelpSheetOpen = true },
                         contextLabel = resolvedContextLabel,
                         // Chips hosted INSIDE the morph (it fades + collapses them as the dock expands).
-                        chipsContent = chips,
+                        // In item-create mode the peek chips are suppressed (the selectable item-create
+                        // chips render in the always-visible expanded frame via emptyStateContent).
+                        chipsContent = if (itemCreateOverride != null) null else chips,
                         // Focused by the morph when the dock settles to Expanded (raise the keyboard).
                         inputFocusRequester = chatInputFocusRequester,
                         // On blur (keyboard dismissed) the dock collapses to Peek only when blank.
@@ -940,10 +946,13 @@ fun App() {
                         // pending choice / last answer). Sending disables+blurs the input (the old
                         // auto-collapse trigger); without this the dock slammed shut to Peek mid-turn
                         // and hid the ChatTypingIndicator + answer. Grabber drag-down still collapses.
-                        keepExpanded = hasLastAnswer,
+                        keepExpanded = if (itemCreateOverride != null) true else hasLastAnswer,
                         // A pending choice block (prompt + chips + escape) is taller than a one-line
                         // answer; raise the frame cap so its escape/cancel chip isn't clipped.
                         answerMaxHeight = if (chatUiState.pendingChoice != null) 360.dp else 210.dp,
+                        // Item-create shows only a short chip row — wrap it (min 0) so there's no empty
+                        // gap between the chips and the pinned input; chat keeps the 125dp comfortable body.
+                        answerMinHeight = if (itemCreateOverride != null) 0.dp else 125.dp,
                         lastAnswerContent = {
                             // Fixed-height frame: scroll a long answer inside instead of growing the
                             // dock. Priority mirrors ChatContent so the SAME confirm cards render here.
@@ -1001,26 +1010,72 @@ fun App() {
                             }
                         },
                         emptyStateContent = {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(
-                                        horizontal = AppDimens.ScreenPaddingHorizontal,
-                                        vertical = AppDimens.SpacingMd,
-                                    ),
-                                verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
-                            ) {
-                                Text(
-                                    text = chatPanelGreeting,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.fillMaxWidth(),
-                                )
+                            if (itemCreateOverride != null) {
+                                // Item-create chips render in the always-visible expanded frame (the peek
+                                // chip slot fades out on expand). Scrollable so the chips never clip when
+                                // the keyboard shrinks the frame on a small screen.
+                                val chipScroll = rememberScrollState()
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .verticalScroll(chipScroll)
+                                        // Match the main-screen chat-dock peek chips: just a small bottom
+                                        // gap above the pinned input (the peek chip slot uses SpacingXs),
+                                        // not the large SpacingMd vertical block that left a visible gap.
+                                        .padding(bottom = AppDimens.SpacingXs),
+                                ) {
+                                    itemCreateOverride.chips()
+                                }
+                            } else {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(
+                                            horizontal = AppDimens.ScreenPaddingHorizontal,
+                                            vertical = AppDimens.SpacingMd,
+                                        ),
+                                    verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
+                                ) {
+                                    Text(
+                                        text = chatPanelGreeting,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.fillMaxWidth(),
+                                    )
+                                }
                             }
                         },
                         inputContent = { onInputFocusChanged ->
-                            // Hidden while a choice block is pending (chips are the only interaction).
-                            if (chatUiState.pendingChoice == null) {
+                            if (itemCreateOverride != null) {
+                                // Item-create mode: the dock input creates a checklist item (the AI chat
+                                // is never called). Stripped-down row — no help/attach/mic; Send is
+                                // disabled while blank.
+                                // Force focus on entering item-create: if the AI-chat dock was ALREADY
+                                // Expanded, tapping "+" doesn't change the dock's targetValue, so the
+                                // panel's targetValue-driven auto-focus never fires and the keyboard
+                                // would drop on the node swap. Keyed on Unit → runs once when this
+                                // branch enters composition (i.e. when item-create activates).
+                                LaunchedEffect(Unit) {
+                                    runCatching { chatInputFocusRequester.requestFocus() }
+                                }
+                                ChatInputRow(
+                                    text = itemCreateOverride.text,
+                                    onTextChange = itemCreateOverride.onTextChange,
+                                    onSend = itemCreateOverride.onSend,
+                                    onAttachFileClick = {},
+                                    onVoiceRecordingStarted = {},
+                                    onVoiceRecordingStopped = {},
+                                    onVoiceRecordingCancelled = {},
+                                    isEnabled = true,
+                                    canSend = itemCreateOverride.canSend,
+                                    focusRequester = chatInputFocusRequester,
+                                    onFocusChanged = onInputFocusChanged,
+                                    // The "I want to…" placeholder is passed by the screen as peekPlaceholder.
+                                    placeholderOverride = peekPlaceholder,
+                                    simpleSendOnly = true,
+                                )
+                            } else if (chatUiState.pendingChoice == null) {
+                                // Hidden while a choice block is pending (chips are the only interaction).
                                 ChatInputRow(
                                     text = chatUiState.inputText,
                                     onTextChange = { chatViewModel.sendIntent(ChatScreenIntent.OnInputChange(it)) },

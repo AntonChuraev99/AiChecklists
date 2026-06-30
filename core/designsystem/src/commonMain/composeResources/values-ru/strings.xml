@@ -141,6 +141,14 @@
     <string name="checklist_prompt_summary_query">Подведи итог моего прогресса по этому чеклисту.</string>
     <string name="checklist_prompt_add_items_query">Предложи ещё пункты для этого чеклиста.</string>
     <string name="checklist_prompt_remind_prefill">Напомни мне </string>
+    <!-- Item-create dock (checklist detail "+" reuses the chat dock input to add items) -->
+    <string name="item_create_input_placeholder">Я хочу…</string>
+    <string name="item_create_chip_in_1_hour">Через час</string>
+    <string name="item_create_chip_tomorrow_morning">Завтра утром</string>
+    <string name="item_create_chip_tonight">Сегодня вечером</string>
+    <string name="item_create_chip_pick_time">Выбрать время…</string>
+    <string name="item_create_chip_important">Важное</string>
+    <string name="item_create_chip_repeat">Повтор</string>
     <string name="main_free_lists_used">%1$d из %2$d бесплатных списков</string>
     <string name="main_menu">Меню</string>
     <string name="main_menu_support">Поддержка</string>

@@ -55,6 +55,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.adaptive.AppWindowSizeC
 import com.antonchuraev.homesearchchecklist.desingsystem.adaptive.rememberAppWindowSizeClass
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCreditsChip
 import com.antonchuraev.homesearchchecklist.desingsystem.components.PlatformBackHandler
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.ChatDockItemCreateOverride
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.DockAnchor
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiGlassChatDock
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiPromptChips
@@ -109,7 +110,7 @@ fun MainScreen(
      * `chatDockContent(dockState, peekPlaceholder, chips)` — the screen owns the per-screen
      * [AnchoredDraggableState] (no shared draggable across two-pane panes). When null, dock hidden.
      */
-    chatDockContent: (@Composable (AnchoredDraggableState<DockAnchor>, String, Dp, @Composable () -> Unit) -> Unit)? = null,
+    chatDockContent: (@Composable (AnchoredDraggableState<DockAnchor>, String, Dp, @Composable () -> Unit, ChatDockItemCreateOverride?) -> Unit)? = null,
     /** True when the chat input is blank — drives BACK (collapse only when blank; else text holds open). */
     chatInputBlank: Boolean = true,
     /** Called when this screen's dock settles to / away from Expanded (App seeds context + analytics). */
@@ -422,32 +423,35 @@ fun MainScreen(
                                     dockState,
                                     stringResource(Res.string.main_ask_gisti_placeholder),
                                     dockAvailableDp,
-                                ) {
-                                    GistiPromptChips(
-                                        chips = gistiDefaultPromptChips(
-                                            createAiLabel = stringResource(Res.string.main_create_with_ai_action),
-                                            photoLabel = stringResource(Res.string.main_prompt_photo),
-                                            remindLabel = stringResource(Res.string.main_prompt_remind),
-                                            linkLabel = stringResource(Res.string.main_prompt_link),
-                                            planDayLabel = stringResource(Res.string.main_prompt_plan_day),
-                                        ),
-                                        // Tapping a chip animates the dock open AND drives its chat flow.
-                                        onChipClick = { action ->
-                                            scope.launch {
-                                                if (!dockState.offset.isNaN()) dockState.animateTo(DockAnchor.Expanded)
-                                            }
-                                            if (onQuickAction != null) {
-                                                onQuickAction(action)
-                                            } else {
-                                                viewModel.sendIntent(MainScreenIntent.OnAiChatClick)
-                                            }
-                                        },
-                                        // Leading "➕ New list" chip → Templates (manual create).
-                                        onNewListClick = onCreateFromTemplatesClick,
-                                        newListLabel = stringResource(Res.string.main_prompt_new_list),
-                                        modifier = Modifier.fillMaxWidth(),
-                                    )
-                                }
+                                    {
+                                        GistiPromptChips(
+                                            chips = gistiDefaultPromptChips(
+                                                createAiLabel = stringResource(Res.string.main_create_with_ai_action),
+                                                photoLabel = stringResource(Res.string.main_prompt_photo),
+                                                remindLabel = stringResource(Res.string.main_prompt_remind),
+                                                linkLabel = stringResource(Res.string.main_prompt_link),
+                                                planDayLabel = stringResource(Res.string.main_prompt_plan_day),
+                                            ),
+                                            // Tapping a chip animates the dock open AND drives its chat flow.
+                                            onChipClick = { action ->
+                                                scope.launch {
+                                                    if (!dockState.offset.isNaN()) dockState.animateTo(DockAnchor.Expanded)
+                                                }
+                                                if (onQuickAction != null) {
+                                                    onQuickAction(action)
+                                                } else {
+                                                    viewModel.sendIntent(MainScreenIntent.OnAiChatClick)
+                                                }
+                                            },
+                                            // Leading "➕ New list" chip → Templates (manual create).
+                                            onNewListClick = onCreateFromTemplatesClick,
+                                            newListLabel = stringResource(Res.string.main_prompt_new_list),
+                                            modifier = Modifier.fillMaxWidth(),
+                                        )
+                                    },
+                                    // MainScreen never enters item-create mode → no override.
+                                    null,
+                                )
                             },
                         )
                     }

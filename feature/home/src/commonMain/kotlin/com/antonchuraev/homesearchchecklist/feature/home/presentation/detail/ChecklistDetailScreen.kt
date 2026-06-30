@@ -47,8 +47,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Surface
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -139,8 +137,6 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
@@ -171,6 +167,10 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.DockAn
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiGlassChatDock
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiPromptChips
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiChecklistPromptChips
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.ChatDockItemCreateOverride
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiItemCreateAction
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiSelectableChipRow
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiItemCreatePromptChips
 import com.antonchuraev.homesearchchecklist.desingsystem.adaptive.AppWindowSizeClass
 import com.antonchuraev.homesearchchecklist.desingsystem.adaptive.rememberAppWindowSizeClass
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
@@ -190,16 +190,17 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Check
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatEndCondition
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatType
-import com.antonchuraev.homesearchchecklist.feature.checklist.domain.parser.model.ParsedDateToken
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.smartadd.containsRepeat
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.smartadd.resolveChipLabel
 import com.antonchuraev.homesearchchecklist.desingsystem.components.TokenChipPreview
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.weekly.MoveToDayBottomSheet
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.detail.weekly.WeeklyChecklistDetailContent
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.PendingRepeatConfig
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.buildRepeatSummary
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderSheet
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderSheetCallbacks
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderSheetState
+import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderTab
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.ReminderDateTimePicker
 import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.formatReminderDateTime
 import aichecklists.core.designsystem.generated.resources.Res
@@ -247,9 +248,11 @@ fun ChecklistDetailScreen(
     /**
      * App-level continuous-drag chat dock content rendered INSIDE this screen's [GistiGlassChatDock]
      * (so the Haze backdrop blur is preserved). Invoked as `chatDockContent(dockState, placeholder,
-     * chips)` — the screen owns its own [AnchoredDraggableState]. When null, the dock is hidden.
+     * dockAvailableDp, chips, itemCreateOverride)` — the screen owns its own [AnchoredDraggableState].
+     * The last arg is non-null only while the dock is in item-create mode (the "+" flow); null = the
+     * default AI-chat dock, byte-for-byte unchanged. When [chatDockContent] is null the dock is hidden.
      */
-    chatDockContent: (@Composable (AnchoredDraggableState<DockAnchor>, String, Dp, @Composable () -> Unit) -> Unit)? = null,
+    chatDockContent: (@Composable (AnchoredDraggableState<DockAnchor>, String, Dp, @Composable () -> Unit, ChatDockItemCreateOverride?) -> Unit)? = null,
     /**
      * Fires a contextual prompt-chip [GistiChecklistAction] for THIS checklist (chips above the
      * chat input). Called with (checklistId, checklistName, action) so App.kt can set the chat
@@ -384,7 +387,7 @@ private fun ChecklistDetailContent(
     onChatCollapse: () -> Unit = {},
     chatInputBlank: Boolean = true,
     routeCollapseSignal: Int = 0,
-    chatDockContent: (@Composable (AnchoredDraggableState<DockAnchor>, String, Dp, @Composable () -> Unit) -> Unit)? = null,
+    chatDockContent: (@Composable (AnchoredDraggableState<DockAnchor>, String, Dp, @Composable () -> Unit, ChatDockItemCreateOverride?) -> Unit)? = null,
     onChecklistQuickAction: ((GistiChecklistAction) -> Unit)? = null,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
@@ -395,7 +398,17 @@ private fun ChecklistDetailContent(
     val dockExpanded by remember { derivedStateOf { dockState.targetValue == DockAnchor.Expanded } }
     val chatFocusManager = LocalFocusManager.current
     // Tell App when THIS checklist's dock opens (seed context + name + analytics) / closes.
-    LaunchedEffect(dockExpanded) { if (dockExpanded) onOpenChatSheet?.invoke() else onChatCollapse() }
+    // Collapsing the dock also exits item-create mode (chips + placeholder revert to the AI-chat dock).
+    // In item-create mode we do NOT seed the chat context / fire the "chat opened" event — the user
+    // opened the dock to add an item, not to chat.
+    LaunchedEffect(dockExpanded) {
+        if (dockExpanded) {
+            if (!state.itemCreateMode) onOpenChatSheet?.invoke()
+        } else {
+            onChatCollapse()
+            if (state.itemCreateMode) onIntent(ChecklistDetailIntent.OnDockItemCreateClosed)
+        }
+    }
     // Auto-collapse on any route change (App bumps the signal). animateTo needs anchors → NaN-guard.
     LaunchedEffect(routeCollapseSignal) {
         if (routeCollapseSignal > 0 && !dockState.offset.isNaN()) dockState.animateTo(DockAnchor.Peek)
@@ -403,10 +416,18 @@ private fun ChecklistDetailContent(
     // BACK while expanded: hide the keyboard, then collapse to peek ONLY if the input is blank (a
     // non-blank draft holds the dock open). Once collapsed the handler disables → next BACK exits.
     // PlatformBackHandler is the project's KMP-safe wrapper (no-op shape on wasmJs).
-    PlatformBackHandler(enabled = dockExpanded) {
+    PlatformBackHandler(enabled = dockExpanded || state.itemCreateMode) {
         chatFocusManager.clearFocus()
-        if (chatInputBlank && !dockState.offset.isNaN()) {
-            dockScope.launch { dockState.animateTo(DockAnchor.Peek) }
+        when {
+            // Item-create: Back closes the create dock and returns the screen to its OPENED (peek)
+            // state. ALWAYS collapse to Peek (regardless of the unrelated chat-input draft) — settling
+            // to Peek flips dockExpanded→false, which fires OnDockItemCreateClosed and exits the mode.
+            // Without this dedicated branch Back could leave the dock expanded as a CHAT dock.
+            state.itemCreateMode ->
+                if (!dockState.offset.isNaN()) dockScope.launch { dockState.animateTo(DockAnchor.Peek) }
+            // Chat: collapse only if the input is blank (a non-blank draft holds the dock open).
+            chatInputBlank && !dockState.offset.isNaN() ->
+                dockScope.launch { dockState.animateTo(DockAnchor.Peek) }
         }
     }
 
@@ -560,7 +581,6 @@ private fun ChecklistDetailContent(
         }
     }
 
-    var addItemActive by remember { mutableStateOf(false) }
     var isEditMode by rememberSaveable { mutableStateOf(false) }
     val listState = rememberLazyListState()
     // Pinned (not exitUntilCollapsed): the toolbar action icons (share / add / reminder /
@@ -629,7 +649,6 @@ private fun ChecklistDetailContent(
         } else {
             // Not in unchecked — look in completed section
             index += sourceUnchecked.size
-            // inline_add_item is not active on first open (addItemActive == false)
             if (state.separateCompleted && completedInState.isNotEmpty()) {
                 val completedIdx = completedInState.indexOfFirst { it.id == focusItemId }
                 if (completedIdx < 0) return@LaunchedEffect // item not found at all
@@ -643,6 +662,16 @@ private fun ChecklistDetailContent(
         listState.animateScrollToItem(index)
         highlightedItemId = focusItemId
         didFocusScroll = true
+    }
+
+    // Scroll to the freshly-added item after a dock item-create add (parity with the removed inline
+    // path, which scrolled the list to the new row). Standard view only — the Weekly pane owns its
+    // own list and scrolls itself (see WeeklyChecklistDetailContent). Keyed on the one-shot signal.
+    LaunchedEffect(state.addedItemSignal) {
+        if (state.addedItemSignal > 0 && state.checklist.viewMode == ChecklistViewMode.Standard) {
+            val target = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
+            if (listState.layoutInfo.totalItemsCount > 0) listState.animateScrollToItem(target)
+        }
     }
 
     // Wiggle animation for edit mode
@@ -695,24 +724,31 @@ private fun ChecklistDetailContent(
                 IconButton(onClick = { onIntent(ChecklistDetailIntent.OnShareClick) }) {
                     Icon(Icons.Outlined.Share, contentDescription = stringResource(Res.string.share))
                 }
-                IconButton(
-                    onClick = {
-                        if (addItemActive) {
-                            onIntent(ChecklistDetailIntent.OnQuickAddCancelled(hadText = false))
-                            addItemActive = false
-                        } else {
-                            addItemActive = true
-                            onIntent(ChecklistDetailIntent.OnQuickAddOpened)
-                            coroutineScope.launch {
-                                listState.animateScrollToItem(listState.layoutInfo.totalItemsCount - 1)
+                // Toolbar "+" only in Standard view. In Weekly view items are added via the
+                // per-day section "+" (inline WeeklyAddItemRow), which already targets the correct
+                // weekday — a toolbar "+" there would need a day to land in and is redundant.
+                if (state.checklist.viewMode != ChecklistViewMode.Weekly) {
+                    IconButton(
+                        onClick = {
+                            // Enter item-create mode in the shared chat dock. FIFO ordering: the mode flag
+                            // is set synchronously here (sendIntent → MutableStateFlow update) BEFORE the
+                            // dock animation coroutine launches, so the dock already binds to item-create
+                            // by the time it expands.
+                            // Re-tap guard: if already in item-create mode, just re-expand (don't re-open —
+                            // re-opening would wipe in-progress text).
+                            if (!state.itemCreateMode) {
+                                onIntent(ChecklistDetailIntent.OnDockItemCreateOpened(null))
+                            }
+                            dockScope.launch {
+                                if (!dockState.offset.isNaN()) dockState.animateTo(DockAnchor.Expanded)
                             }
                         }
+                    ) {
+                        Icon(
+                            Icons.Outlined.Add,
+                            contentDescription = stringResource(Res.string.add_item)
+                        )
                     }
-                ) {
-                    Icon(
-                        Icons.Outlined.Add,
-                        contentDescription = stringResource(Res.string.add_item)
-                    )
                 }
                 IconButton(onClick = { onIntent(ChecklistDetailIntent.OnReminderClick) }) {
                     val hasActiveSchedule = state.checklist.reminderAt != null
@@ -774,10 +810,17 @@ private fun ChecklistDetailContent(
             // the no-dock branch (edit mode) adds the navbar inset itself; when the dock is shown its
             // measured dockHeight already includes its own navigationBarsPadding.
             val listBottomPadding = when {
-                // IME open: the list's Modifier.imePadding() already shrinks the viewport above the
-                // keyboard (restoring the pre-dock adjustResize "content lifts" behaviour), so the
-                // contentPadding only needs breathing room here — adding imeBottom too would
-                // double-count and push the last item / inline add-input too far up.
+                // Item-create mode: the keyboard is up AND the expanded dock floats above it (its own
+                // imePadding lifts it over the keyboard). The list's Modifier.imePadding() already
+                // reserves the keyboard, so here we must ADDITIONALLY reserve the dock body height
+                // ABOVE the keyboard — the measured dock height minus the ime inset the list already
+                // handled — otherwise freshly added items render hidden under the dock.
+                imeVisible && state.itemCreateMode ->
+                    (dockHeight - imeBottom).coerceAtLeast(0.dp) + AppDimens.SpacingLg
+                // IME open (plain chat over the list): the list's Modifier.imePadding() already shrinks
+                // the viewport above the keyboard (restoring the pre-dock adjustResize "content lifts"
+                // behaviour), so the contentPadding only needs breathing room here — adding imeBottom
+                // too would double-count and push the last item too far up.
                 imeVisible -> AppDimens.SpacingSm
                 showDock -> dockHeight + AppDimens.SpacingLg
                 else -> navBottom + AppDimens.SpacingLg
@@ -817,6 +860,8 @@ private fun ChecklistDetailContent(
                         modifier = Modifier.fillMaxSize().imePadding(),
                         // Clear the floating chat-dock overlay at the bottom of the week list.
                         contentBottomPadding = listBottomPadding,
+                        // One-shot signal → scroll to the day section of the dock-added item (today).
+                        addedItemSignal = state.addedItemSignal,
                     )
                     // MoveToDayBottomSheet — sibling to WeeklyChecklistDetailContent, not inside it
                     state.moveToDayItemId?.let { itemId ->
@@ -1014,29 +1059,9 @@ private fun ChecklistDetailContent(
                     }
                 }
 
-                // Inline add item input (shown when toolbar "+" is tapped)
-                if (addItemActive && !isEditMode) {
-                    item(key = "inline_add_item") {
-                        InlineAddItemInput(
-                            text = state.pendingItemInput,
-                            onTextChange = { onIntent(ChecklistDetailIntent.OnItemInputChanged(it)) },
-                            parsedToken = state.parsedToken,
-                            onAddItem = {
-                                onIntent(ChecklistDetailIntent.OnAddItemWithParse)
-                            },
-                            onItemCommitted = {
-                                // Successful add — collapse the inline input (no cancel analytics;
-                                // the ViewModel already cleared the text).
-                                addItemActive = false
-                            },
-                            onClose = { hadText ->
-                                onIntent(ChecklistDetailIntent.OnItemInputChanged(""))
-                                onIntent(ChecklistDetailIntent.OnQuickAddCancelled(hadText = hadText))
-                                addItemActive = false
-                            }
-                        )
-                    }
-                }
+                // Add-item input moved to the shared chat dock (item-create mode, the "+" toolbar
+                // button). The former inline LazyColumn field has been removed — adding items now
+                // reuses the dock's bottom input + selectable reminder/property chips.
 
                 // Completed section (only when separateCompleted is on and there are completed items)
                 if (state.separateCompleted && completedItems.isNotEmpty()) {
@@ -1124,40 +1149,69 @@ private fun ChecklistDetailContent(
                           .fillMaxWidth()
                           .imePadding()
                           .navigationBarsPadding()
-                          // Freeze the measured height at PEEK so the list's bottom padding stays put;
-                          // the expanded panel grows UPWARD over the list (no list repad/jump).
+                          // Freeze the measured height at PEEK so the list's bottom padding stays put
+                          // while the CHAT panel expands upward over the list (no list repad/jump).
+                          // EXCEPTION — item-create mode: there the user adds items that must stay
+                          // visible, so we DO track the expanded dock height (the listBottomPadding
+                          // item-create branch subtracts the ime inset back out).
                           .onSizeChanged {
-                              if (dockState.targetValue == DockAnchor.Peek) dockHeightPx = it.height
+                              if (dockState.targetValue == DockAnchor.Peek || state.itemCreateMode) {
+                                  dockHeightPx = it.height
+                              }
                           },
                       // The morphing chat content. Peek placeholder = contextual "Ask about <name>…";
                       // chips hosted INSIDE the morph (it fades + collapses them as the dock expands).
                       pillContent = {
+                          val itemCreate = state.itemCreateMode
                           chatDockContent(
                               dockState,
-                              stringResource(Res.string.main_ask_gisti_placeholder),
+                              // Item-create mode shows the "I want to…" placeholder; AI-chat shows the
+                              // contextual "Ask Gisti…" peek placeholder.
+                              if (itemCreate) {
+                                  stringResource(Res.string.item_create_input_placeholder)
+                              } else {
+                                  stringResource(Res.string.main_ask_gisti_placeholder)
+                              },
                               dockAvailableDp,
-                          ) {
-                              if (onChecklistQuickAction != null) {
-                                  GistiPromptChips(
-                                      chips = gistiChecklistPromptChips(
-                                          whatsMissingLabel = stringResource(Res.string.checklist_prompt_whats_missing),
-                                          generateIdeasLabel = stringResource(Res.string.checklist_prompt_generate_ideas),
-                                          addItemsLabel = stringResource(Res.string.checklist_prompt_add_items),
-                                          summaryLabel = stringResource(Res.string.checklist_prompt_summary),
-                                          remindLabel = stringResource(Res.string.checklist_prompt_remind),
-                                      ),
-                                      // Tapping a chip animates the dock open AND fires its chat flow.
-                                      onChipClick = { action ->
-                                          dockScope.launch {
-                                              if (!dockState.offset.isNaN()) dockState.animateTo(DockAnchor.Expanded)
-                                          }
-                                          onChecklistQuickAction(action)
-                                      },
-                                      onNewListClick = null,
-                                      modifier = Modifier.fillMaxWidth(),
+                              {
+                                  // Peek chips = the AI-chat contextual chips. Hidden in item-create mode
+                                  // (the item-create chips render in the expanded answer frame instead).
+                                  if (!itemCreate && onChecklistQuickAction != null) {
+                                      GistiPromptChips(
+                                          chips = gistiChecklistPromptChips(
+                                              whatsMissingLabel = stringResource(Res.string.checklist_prompt_whats_missing),
+                                              generateIdeasLabel = stringResource(Res.string.checklist_prompt_generate_ideas),
+                                              addItemsLabel = stringResource(Res.string.checklist_prompt_add_items),
+                                              summaryLabel = stringResource(Res.string.checklist_prompt_summary),
+                                              remindLabel = stringResource(Res.string.checklist_prompt_remind),
+                                          ),
+                                          // Tapping a chip animates the dock open AND fires its chat flow.
+                                          onChipClick = { action ->
+                                              dockScope.launch {
+                                                  if (!dockState.offset.isNaN()) dockState.animateTo(DockAnchor.Expanded)
+                                              }
+                                              onChecklistQuickAction(action)
+                                          },
+                                          onNewListClick = null,
+                                          modifier = Modifier.fillMaxWidth(),
+                                      )
+                                  }
+                              },
+                              // Item-create override: when non-null the dock binds its input to the
+                              // checklist VM's create path (Send adds an item; the AI chat is never
+                              // called) and shows the selectable item-create chips.
+                              if (itemCreate) {
+                                  ChatDockItemCreateOverride(
+                                      text = state.pendingItemInput,
+                                      onTextChange = { onIntent(ChecklistDetailIntent.OnItemInputChanged(it)) },
+                                      onSend = { onIntent(ChecklistDetailIntent.OnAddItemWithParse) },
+                                      canSend = state.pendingItemInput.isNotBlank(),
+                                      chips = { ItemCreateChipsRow(state = state, onIntent = onIntent) },
                                   )
-                              }
-                          }
+                              } else {
+                                  null
+                              },
+                          )
                       },
                   )
               }
@@ -1435,6 +1489,43 @@ private fun ChecklistDetailContent(
                 },
                 onDismiss = { onIntent(ChecklistDetailIntent.OnDismissItemReminderSheet) },
                 onUpgradeClick = { onIntent(ChecklistDetailIntent.OnItemReminderUpgradeClick) },
+            )
+        )
+    }
+
+    // Item-create repeat / reminder sheet (opened by the "🔁 Repeat" chip in item-create mode).
+    // Reuses the shared ReminderSheet; Save stages the repeat onto the item-create chip state instead
+    // of persisting to an existing item. The ONCE tab stays functional (one-shot reminder for the new
+    // item) so neither tab is dead.
+    if (state.itemCreateRepeatSheetOpen) {
+        ReminderSheet(
+            state = ReminderSheetState(
+                activeTab = state.activeReminderTab,
+                currentReminder = state.itemCreateReminderAt,
+                currentRepeatRule = state.itemCreateRepeat?.toRule(),
+                repeatRuleSummary = state.repeatRuleSummary,
+                pendingRepeatConfig = state.pendingRepeatConfig,
+                showEndConditionPicker = state.showEndConditionPicker,
+                isLocked = state.itemCreateRepeatSheetLocked,
+            ),
+            callbacks = ReminderSheetCallbacks(
+                onTabSelected = { onIntent(ChecklistDetailIntent.OnItemCreateRepeatTabSelected(it)) },
+                onPresetSelected = { triggerAt -> onIntent(ChecklistDetailIntent.OnItemCreateReminderSet(triggerAt)) },
+                onCustomDateRequested = { onIntent(ChecklistDetailIntent.OnItemCreateReminderPickRequested) },
+                onRemoveReminder = { onIntent(ChecklistDetailIntent.OnItemCreateReminderSet(null)) },
+                onRepeatTypeSelected = { onIntent(ChecklistDetailIntent.OnRepeatTypeSelected(it)) },
+                onSmartPresetSelected = { onIntent(ChecklistDetailIntent.OnSmartPresetSelected(it)) },
+                onRepeatIntervalChanged = { onIntent(ChecklistDetailIntent.OnRepeatIntervalChanged(it)) },
+                onWeekDayToggled = { onIntent(ChecklistDetailIntent.OnWeekDayToggled(it)) },
+                onResetChecksToggled = { onIntent(ChecklistDetailIntent.OnResetChecksToggled(it)) },
+                onRepeatTimeChanged = { h, m -> onIntent(ChecklistDetailIntent.OnRepeatTimeChanged(h, m)) },
+                onEndConditionClick = { onIntent(ChecklistDetailIntent.OnEndConditionClick) },
+                onEndConditionSelected = { onIntent(ChecklistDetailIntent.OnEndConditionSelected(it)) },
+                onDismissEndCondition = { onIntent(ChecklistDetailIntent.OnDismissEndConditionPicker) },
+                onSaveRepeat = { onIntent(ChecklistDetailIntent.OnItemCreateRepeatSaved) },
+                onRemoveRepeat = { onIntent(ChecklistDetailIntent.OnItemCreateRepeatRemoved) },
+                onDismiss = { onIntent(ChecklistDetailIntent.OnDismissItemCreateRepeatSheet) },
+                onUpgradeClick = { onIntent(ChecklistDetailIntent.OnReminderUpgradeClick) },
             )
         )
     }
@@ -3318,119 +3409,79 @@ private fun CompletedSectionHeader(
     }
 }
 
+/**
+ * The selectable chip set shown in the shared chat dock while it is in item-create mode (the
+ * checklist-detail "+"). Two groups in one wrapping [GistiSelectableChipRow]: reminder presets
+ * (🔔 single-select) and independent property toggles (⭐ Important / 🔁 Repeat). The active
+ * reminder/repeat/important come from [ChecklistDetailState.Content].
+ *
+ * A live Smart-Add token preview is shown above the chips while the typed text contains a date/time
+ * AND no reminder chip overrides it (the chip wins over the parsed reminder).
+ */
 @Composable
-private fun InlineAddItemInput(
-    text: String,
-    onTextChange: (String) -> Unit,
-    parsedToken: ParsedDateToken?,
-    onAddItem: () -> Unit,
-    onItemCommitted: () -> Unit,
-    onClose: (hadText: Boolean) -> Unit,
+private fun ItemCreateChipsRow(
+    state: ChecklistDetailState.Content,
+    onIntent: (ChecklistDetailIntent) -> Unit,
 ) {
-    val focusRequester = remember { FocusRequester() }
-    val focusManager = LocalFocusManager.current
-    val keyboardController = LocalSoftwareKeyboardController.current
-    val density = LocalDensity.current
-    val imeBottom = WindowInsets.ime.getBottom(density)
-    var wasKeyboardVisible by remember { mutableStateOf(false) }
-    // Set true the instant an add gesture (IME Done or the check button) fires. The ViewModel
-    // clears [text] synchronously ONLY when the item was actually added (a trigger-only phrase
-    // like "tomorrow 7am" is rejected and keeps the text for the user to finish). So the next
-    // recomposition tells us the outcome: blank text = success, non-blank = rejected.
-    var submitAttempted by remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
-    }
-
-    // Resolve the add outcome the frame after a submit. On success collapse the inline input
-    // immediately (hide IME + remove the row) so it doesn't briefly flash empty before the
-    // IME-dismiss effect below would have caught up. On rejection do nothing — keep the keyboard
-    // and the preserved text so the user can complete it (a Smart Add hint is already showing).
-    LaunchedEffect(text, submitAttempted) {
-        if (submitAttempted) {
-            submitAttempted = false
-            if (text.isBlank()) {
-                keyboardController?.hide()
-                onItemCommitted()
-            }
-        }
-    }
-
-    // Track keyboard visibility: when keyboard hides via system back, close input
-    LaunchedEffect(imeBottom) {
-        val isKeyboardVisible = imeBottom > 0
-        if (wasKeyboardVisible && !isKeyboardVisible) {
-            focusManager.clearFocus()
-            onClose(text.isNotBlank())
-        }
-        wasKeyboardVisible = isKeyboardVisible
+    val tz = TimeZone.currentSystemDefault()
+    val pickTimeLabel = state.itemCreateReminderAt
+        ?.takeIf { state.itemCreateReminderPreset == ItemCreateReminderPreset.CUSTOM }
+        ?.let { formatReminderDateTime(Instant.fromEpochMilliseconds(it).toLocalDateTime(tz)) }
+        ?: stringResource(Res.string.item_create_chip_pick_time)
+    val repeatLabel = state.itemCreateRepeat
+        ?.let { buildRepeatSummary(it) }
+        ?: stringResource(Res.string.item_create_chip_repeat)
+    val selectedReminder = when (state.itemCreateReminderPreset) {
+        ItemCreateReminderPreset.ONE_HOUR -> GistiItemCreateAction.REMIND_1H
+        ItemCreateReminderPreset.TOMORROW_MORNING -> GistiItemCreateAction.REMIND_TOMORROW_MORNING
+        ItemCreateReminderPreset.TONIGHT -> GistiItemCreateAction.REMIND_TONIGHT
+        ItemCreateReminderPreset.CUSTOM -> GistiItemCreateAction.REMIND_PICK
+        null -> null
     }
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        // Smart Add chip — animated above the input row so it stays visible above the IME.
-        // Chip visibility is gated on parsedToken from ViewModel state, not local state,
-        // so the animation is driven by the debounced parser result (200ms after typing stops).
-        AnimatedVisibility(
-            visible = parsedToken != null,
-            enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
-            exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut(),
-        ) {
-            if (parsedToken != null) {
-                val chipLabel = resolveChipLabel(parsedToken.display)
-                val isRepeat = parsedToken.display.containsRepeat()
-                androidx.compose.foundation.layout.Box(
-                    modifier = Modifier.padding(bottom = AppDimens.SpacingSm)
-                ) {
-                    TokenChipPreview(
-                        label = chipLabel,
-                        isRepeat = isRepeat,
-                    )
-                }
-            }
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.Top
-        ) {
-            AppTextField(
-                value = text,
-                onValueChange = onTextChange,
-                placeholder = stringResource(Res.string.add_item_placeholder),
-                singleLine = false,
+        val token = state.parsedToken
+        if (token != null && state.itemCreateReminderAt == null) {
+            Box(
                 modifier = Modifier
-                    .weight(1f)
-                    .focusRequester(focusRequester),
-                keyboardOptions = KeyboardOptions(
-                    imeAction = ImeAction.Done,
-                    capitalization = KeyboardCapitalization.Sentences
-                ),
-                keyboardActions = KeyboardActions(
-                    onDone = {
-                        if (text.isNotBlank()) {
-                            submitAttempted = true
-                            onAddItem()
-                        }
-                    }
-                )
-            )
-            IconButton(
-                onClick = {
-                    if (text.isNotBlank()) {
-                        submitAttempted = true
-                        onAddItem()
-                    } else {
-                        onClose(false)
-                    }
-                }
+                    .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
+                    .padding(bottom = AppDimens.SpacingSm)
             ) {
-                Icon(
-                    imageVector = if (text.isNotBlank()) Icons.Outlined.Check else Icons.Outlined.Add,
-                    contentDescription = stringResource(Res.string.add_item)
+                TokenChipPreview(
+                    label = resolveChipLabel(token.display),
+                    isRepeat = token.display.containsRepeat(),
                 )
             }
         }
+        GistiSelectableChipRow(
+            chips = gistiItemCreatePromptChips(
+                in1HourLabel = stringResource(Res.string.item_create_chip_in_1_hour),
+                tomorrowMorningLabel = stringResource(Res.string.item_create_chip_tomorrow_morning),
+                tonightLabel = stringResource(Res.string.item_create_chip_tonight),
+                pickTimeLabel = pickTimeLabel,
+                importantLabel = stringResource(Res.string.item_create_chip_important),
+                repeatLabel = repeatLabel,
+                selectedReminder = selectedReminder,
+                importantSelected = state.itemCreateImportant,
+                repeatSelected = state.itemCreateRepeat != null,
+            ),
+            onChipClick = { action ->
+                when (action) {
+                    GistiItemCreateAction.REMIND_1H ->
+                        onIntent(ChecklistDetailIntent.OnItemCreatePresetSelected(ItemCreateReminderPreset.ONE_HOUR))
+                    GistiItemCreateAction.REMIND_TOMORROW_MORNING ->
+                        onIntent(ChecklistDetailIntent.OnItemCreatePresetSelected(ItemCreateReminderPreset.TOMORROW_MORNING))
+                    GistiItemCreateAction.REMIND_TONIGHT ->
+                        onIntent(ChecklistDetailIntent.OnItemCreatePresetSelected(ItemCreateReminderPreset.TONIGHT))
+                    GistiItemCreateAction.REMIND_PICK ->
+                        onIntent(ChecklistDetailIntent.OnItemCreateReminderPickRequested)
+                    GistiItemCreateAction.IMPORTANT ->
+                        onIntent(ChecklistDetailIntent.OnItemCreateImportantToggled)
+                    GistiItemCreateAction.REPEAT ->
+                        onIntent(ChecklistDetailIntent.OnItemCreateRepeatRequested)
+                }
+            },
+        )
     }
 }
 

@@ -224,6 +224,14 @@
     <string name="checklist_prompt_summary_query">Summarize my progress on this checklist.</string>
     <string name="checklist_prompt_add_items_query">Suggest more items for this checklist.</string>
     <string name="checklist_prompt_remind_prefill">Remind me </string>
+    <!-- Item-create dock (checklist detail "+" reuses the chat dock input to add items) -->
+    <string name="item_create_input_placeholder">I want to…</string>
+    <string name="item_create_chip_in_1_hour">In 1 hour</string>
+    <string name="item_create_chip_tomorrow_morning">Tomorrow morning</string>
+    <string name="item_create_chip_tonight">Tonight</string>
+    <string name="item_create_chip_pick_time">Pick time…</string>
+    <string name="item_create_chip_important">Important</string>
+    <string name="item_create_chip_repeat">Repeat</string>
     <string name="main_free_lists_used">%1$d of %2$d free lists used</string>
     <string name="main_menu">Menu</string>
     <string name="main_menu_support">Support</string>

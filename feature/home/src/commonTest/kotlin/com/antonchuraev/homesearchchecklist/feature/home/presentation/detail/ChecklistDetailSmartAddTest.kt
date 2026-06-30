@@ -428,6 +428,150 @@ class ChecklistDetailSmartAddTest {
         assertNull(state.parsedToken, "parsedToken must be cleared after add")
     }
 
+    // ── Item-create dock mode: chip overrides on the create path ──────────────
+
+    // (a) A reminder PRESET chip applies its reminder to the new fill item + schedules it.
+    @Test
+    fun itemCreate_presetReminderChip_appliesReminderAndSchedules() = runTest {
+        parser.nextResult = null
+        val vm = createViewModel()
+
+        vm.onIntent(ChecklistDetailIntent.OnDockItemCreateOpened())
+        vm.onIntent(ChecklistDetailIntent.OnItemCreatePresetSelected(ItemCreateReminderPreset.ONE_HOUR))
+        // Capture the staged reminder time so we can assert the exact value flows onto the item.
+        val stagedReminderAt = contentState(vm).itemCreateReminderAt
+        assertNotNull(stagedReminderAt, "preset chip must stage a reminder time")
+
+        vm.onIntent(ChecklistDetailIntent.OnItemInputChanged("call the plumber"))
+        advanceTimeBy(201)
+        vm.onIntent(ChecklistDetailIntent.OnAddItemWithParse)
+
+        val newItem = repository.lastUpdatedFill?.items?.last() ?: error("fill must be updated")
+        assertEquals("call the plumber", newItem.text)
+        assertEquals(stagedReminderAt, newItem.reminderAt, "preset reminder must be applied to the new item")
+        assertEquals(
+            stagedReminderAt,
+            scheduler.scheduledItemReminders.first().triggerAtMillis,
+            "preset reminder alarm must be scheduled with the staged time",
+        )
+    }
+
+    // (b) The "Important" chip sets priority = 1 on the new fill item.
+    @Test
+    fun itemCreate_importantChip_setsPriorityOne() = runTest {
+        parser.nextResult = null
+        val vm = createViewModel()
+
+        vm.onIntent(ChecklistDetailIntent.OnDockItemCreateOpened())
+        vm.onIntent(ChecklistDetailIntent.OnItemCreateImportantToggled)
+        vm.onIntent(ChecklistDetailIntent.OnItemInputChanged("buy gift"))
+        advanceTimeBy(201)
+        vm.onIntent(ChecklistDetailIntent.OnAddItemWithParse)
+
+        val newItem = repository.lastUpdatedFill?.items?.last() ?: error("fill must be updated")
+        assertEquals(1, newItem.priority, "Important chip must set priority = 1")
+    }
+
+    // (c) A reminder chip OVERRIDES the parsed-from-text reminder.
+    @Test
+    fun itemCreate_chipReminderOverridesParsedReminder() = runTest {
+        // Parser yields a token with reminderAt = 9_000_000L (in the past).
+        parser.nextResult = tomorrowToken
+        val vm = createViewModel()
+
+        vm.onIntent(ChecklistDetailIntent.OnDockItemCreateOpened())
+        vm.onIntent(ChecklistDetailIntent.OnItemCreatePresetSelected(ItemCreateReminderPreset.ONE_HOUR))
+        val chipReminderAt = contentState(vm).itemCreateReminderAt
+        assertNotNull(chipReminderAt)
+
+        vm.onIntent(ChecklistDetailIntent.OnItemInputChanged("купить молоко завтра 7 утра"))
+        advanceTimeBy(201) // debounce → parsedToken set in state
+        vm.onIntent(ChecklistDetailIntent.OnAddItemWithParse)
+
+        val newItem = repository.lastUpdatedFill?.items?.last() ?: error("fill must be updated")
+        // Parsed substring is still stripped from the text…
+        assertEquals("купить молоко", newItem.text, "parsed date substring must still be stripped")
+        // …but the reminder time is the CHIP value, not the parsed token value.
+        assertEquals(chipReminderAt, newItem.reminderAt, "chip reminder must override the parsed reminder")
+        assertEquals(
+            chipReminderAt,
+            scheduler.scheduledItemReminders.first().triggerAtMillis,
+            "the scheduled alarm must use the chip reminder",
+        )
+    }
+
+    // (d) The create path writes BOTH the fill and the template (dual-write contract).
+    @Test
+    fun itemCreate_dualWrite_updatesFillAndTemplate() = runTest {
+        parser.nextResult = null
+        val vm = createViewModel()
+
+        vm.onIntent(ChecklistDetailIntent.OnDockItemCreateOpened())
+        vm.onIntent(ChecklistDetailIntent.OnItemInputChanged("water the plants"))
+        advanceTimeBy(201)
+        vm.onIntent(ChecklistDetailIntent.OnAddItemWithParse)
+
+        assertNotNull(repository.lastUpdatedFill, "updateFill must be called")
+        assertNotNull(repository.lastUpdatedTemplate, "updateChecklistTemplate must be called")
+        assertEquals(3, repository.lastUpdatedFill?.items?.size)
+        assertEquals(3, repository.lastUpdatedTemplate?.items?.size)
+    }
+
+    // After a successful add, item-create mode stays ON and chip selections reset (rapid multi-add).
+    @Test
+    fun itemCreate_afterAdd_staysInModeAndResetsChips() = runTest {
+        parser.nextResult = null
+        val vm = createViewModel()
+
+        vm.onIntent(ChecklistDetailIntent.OnDockItemCreateOpened())
+        vm.onIntent(ChecklistDetailIntent.OnItemCreatePresetSelected(ItemCreateReminderPreset.ONE_HOUR))
+        vm.onIntent(ChecklistDetailIntent.OnItemCreateImportantToggled)
+        vm.onIntent(ChecklistDetailIntent.OnItemInputChanged("first task"))
+        advanceTimeBy(201)
+        vm.onIntent(ChecklistDetailIntent.OnAddItemWithParse)
+
+        val state = contentState(vm)
+        assertTrue(state.itemCreateMode, "must stay in item-create mode after add")
+        assertEquals("", state.pendingItemInput, "input must clear after add")
+        assertNull(state.itemCreateReminderAt, "reminder chip must reset after add")
+        assertNull(state.itemCreateReminderPreset, "reminder preset must reset after add")
+        assertEquals(false, state.itemCreateImportant, "important chip must reset after add")
+    }
+
+    // Weekly view: the dock add must pin the new item to its target weekday on BOTH the fill and the
+    // template, otherwise WeeklyChecklistDetailContent (which filters by weekday 1..7) never shows it.
+    @Test
+    fun itemCreate_weeklyTargetWeekday_appliedToFillAndTemplate() = runTest {
+        parser.nextResult = null
+        val vm = createViewModel()
+
+        // Enter item-create targeting Wednesday (ISO 3) — as the Weekly toolbar "+" does for today.
+        vm.onIntent(ChecklistDetailIntent.OnDockItemCreateOpened(targetWeekday = 3))
+        vm.onIntent(ChecklistDetailIntent.OnItemInputChanged("gym session"))
+        advanceTimeBy(201)
+        vm.onIntent(ChecklistDetailIntent.OnAddItemWithParse)
+
+        val newFillItem = repository.lastUpdatedFill?.items?.last() ?: error("fill must be updated")
+        val newTemplateItem = repository.lastUpdatedTemplate?.items?.last() ?: error("template must be updated")
+        assertEquals(3, newFillItem.weekday, "fill item weekday must be the target → visible in the day column")
+        assertEquals(3, newTemplateItem.weekday, "template item weekday must be the target")
+    }
+
+    // Standard view (null target weekday) keeps weekday == null — unchanged behaviour.
+    @Test
+    fun itemCreate_standardView_leavesWeekdayNull() = runTest {
+        parser.nextResult = null
+        val vm = createViewModel()
+
+        vm.onIntent(ChecklistDetailIntent.OnDockItemCreateOpened()) // null target weekday
+        vm.onIntent(ChecklistDetailIntent.OnItemInputChanged("read a book"))
+        advanceTimeBy(201)
+        vm.onIntent(ChecklistDetailIntent.OnAddItemWithParse)
+
+        val newFillItem = repository.lastUpdatedFill?.items?.last() ?: error("fill must be updated")
+        assertNull(newFillItem.weekday, "Standard add must leave weekday null")
+    }
+
     // ─── Test doubles ──────────────────────────────────────────────────────────
 
     /**
@@ -479,10 +623,13 @@ class ChecklistDetailSmartAddTest {
         /** Records the last fill passed to updateFill. Null = never called. */
         var lastUpdatedFill: ChecklistFill? = null
 
+        /** Records the last template passed to updateChecklistTemplate. Null = never called. */
+        var lastUpdatedTemplate: Checklist? = null
+
         override val checklists: Flow<List<Checklist>> = flowOf(emptyList())
         override suspend fun addChecklist(checklist: Checklist): Long = 1L
         override suspend fun updateChecklist(checklist: Checklist) {}
-        override suspend fun updateChecklistTemplate(checklist: Checklist) {}
+        override suspend fun updateChecklistTemplate(checklist: Checklist) { lastUpdatedTemplate = checklist }
         override suspend fun deleteChecklist(checklist: Checklist) {}
         override suspend fun getChecklistById(id: Long): Checklist? = storedChecklist
         override fun observeChecklistById(id: Long): Flow<Checklist?> = flowOf(storedChecklist)

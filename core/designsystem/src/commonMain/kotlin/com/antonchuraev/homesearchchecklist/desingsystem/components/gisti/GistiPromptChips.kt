@@ -7,9 +7,16 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Repeat
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.StarBorder
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -17,6 +24,8 @@ import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.unit.dp
@@ -302,4 +311,212 @@ fun gistiChecklistPromptChips(
     GistiPromptChip(emoji = "➕", label = addItemsLabel, action = GistiChecklistAction.ADD_ITEMS),
     GistiPromptChip(emoji = "📊", label = summaryLabel, action = GistiChecklistAction.SUMMARY),
     GistiPromptChip(emoji = "🔔", label = remindLabel, action = GistiChecklistAction.REMIND),
+)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Item-create dock chips (selectable, blue-fill when active)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * The distinct quick-action a checklist **item-create** dock chip triggers.
+ *
+ * These chips render in the shared chat dock when it is switched into item-create mode
+ * (the checklist-detail "+" button). They are SELECTABLE (blue fill when active), unlike the
+ * one-shot [GistiQuickAction] / [GistiChecklistAction] chips:
+ *
+ * Group A — reminder presets (single-select among themselves; tapping the active one again
+ * clears the reminder):
+ *  - [REMIND_1H]               → remind in 1 hour.
+ *  - [REMIND_TOMORROW_MORNING] → remind tomorrow 09:00.
+ *  - [REMIND_TONIGHT]          → remind today 18:00 (or tomorrow 18:00 if already past).
+ *  - [REMIND_PICK]             → open the date&time picker; the chip then shows the resolved time.
+ *
+ * Group B — independent property toggles (each its own on/off state):
+ *  - [IMPORTANT] → mark the new item important (priority = 1).
+ *  - [REPEAT]    → open the repeat config; the chip then shows the repeat summary.
+ *
+ * The chip itself is pure UI; the host screen maps each action to its own intent/flow.
+ */
+enum class GistiItemCreateAction {
+    REMIND_1H,
+    REMIND_TOMORROW_MORNING,
+    REMIND_TONIGHT,
+    REMIND_PICK,
+    IMPORTANT,
+    REPEAT,
+}
+
+/**
+ * A single selectable dock chip. [selected] drives the blue-fill active styling.
+ *
+ * @param icon     Lead outline icon (hollow Material vector: bell for reminders, star-border /
+ *                 repeat for properties). Vector — not emoji — so it renders on wasmJs without
+ *                 emoji-font tofu.
+ * @param label    Short label; for [GistiItemCreateAction.REMIND_PICK] the host swaps this to the
+ *                 resolved absolute datetime once a custom time is chosen, and for
+ *                 [GistiItemCreateAction.REPEAT] to the repeat summary once configured.
+ * @param action   The action [T] this chip triggers (surfaced via [GistiSelectableChipRow.onChipClick]).
+ * @param selected Whether the chip is currently active (blue fill).
+ */
+data class GistiSelectableChip<T>(
+    val icon: ImageVector,
+    val label: String,
+    val action: T,
+    val selected: Boolean,
+)
+
+/**
+ * A single horizontally-scrolling row of SELECTABLE chips for the item-create dock — same
+ * [LazyRow] scroll pattern as [GistiPromptChips], but the chips carry a selected state. The reminder
+ * presets + property toggles stay on ONE line and scroll sideways (they no longer wrap) inside the
+ * always-visible expanded dock frame (the dock's peek chip slot fades out on expand, so item-create
+ * chips live in the answer frame instead). Selected chips fill solid `primary`/`onPrimary` (the blue
+ * active state); unselected chips are transparent with a hairline `outlineVariant` outline + hollow icon.
+ *
+ * Edge padding is the LazyRow [contentPadding] (the caller passes no outer horizontal padding),
+ * matching the [GistiPromptChips] convention.
+ */
+@Composable
+fun <T> GistiSelectableChipRow(
+    chips: List<GistiSelectableChip<T>>,
+    onChipClick: (T) -> Unit,
+    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(horizontal = AppDimens.ScreenPaddingHorizontal),
+) {
+    LazyRow(
+        modifier = modifier.fillMaxWidth(),
+        contentPadding = contentPadding,
+        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
+    ) {
+        items(chips) { chip ->
+            SelectablePromptChipItem(
+                icon = chip.icon,
+                label = chip.label,
+                selected = chip.selected,
+                onClick = { onChipClick(chip.action) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun SelectablePromptChipItem(
+    icon: ImageVector,
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val shape = RoundedCornerShape(19.dp) // full pill for height=38
+    // Outline aesthetic: an unselected chip is transparent with a hairline outline + a neutral
+    // hollow icon; a selected chip fills solid `primary` (the blue active state the user asked for).
+    val containerColor = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent
+    val contentColor = if (selected) {
+        MaterialTheme.colorScheme.onPrimary
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val border = if (selected) {
+        null
+    } else {
+        BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    }
+
+    Surface(
+        onClick = onClick,
+        shape = shape,
+        color = containerColor,
+        border = border,
+        modifier = Modifier
+            .height(38.dp)
+            .minimumInteractiveComponentSize(),
+    ) {
+        val centeredLineHeight = LineHeightStyle(
+            alignment = LineHeightStyle.Alignment.Center,
+            trim = LineHeightStyle.Trim.None,
+        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(horizontal = 14.dp),
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = contentColor,
+                modifier = Modifier.size(16.dp),
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge.copy(
+                    fontSize = 13.5.sp,
+                    lineHeight = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    lineHeightStyle = centeredLineHeight,
+                ),
+                color = contentColor,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+/**
+ * Factory for the **item-create** dock chips (reminder presets + property toggles) in display order:
+ * the four reminder presets first (single-select), then Important and Repeat (independent toggles).
+ *
+ * Labels are passed in (localized by the caller). [pickTimeLabel] / [repeatLabel] are the dynamic
+ * labels: pass the resolved datetime / repeat summary when the respective chip is active, otherwise
+ * the default "Pick time…" / "Repeat" text. The `selected*` params drive the blue-fill state.
+ *
+ * @param selectedReminder Which reminder preset is active (one of the `REMIND_*` actions), or null.
+ * @param importantSelected Whether the Important toggle is on.
+ * @param repeatSelected    Whether a repeat is configured.
+ */
+fun gistiItemCreatePromptChips(
+    in1HourLabel: String,
+    tomorrowMorningLabel: String,
+    tonightLabel: String,
+    pickTimeLabel: String,
+    importantLabel: String,
+    repeatLabel: String,
+    selectedReminder: GistiItemCreateAction?,
+    importantSelected: Boolean,
+    repeatSelected: Boolean,
+): List<GistiSelectableChip<GistiItemCreateAction>> = listOf(
+    GistiSelectableChip(
+        icon = Icons.Outlined.Notifications,
+        label = in1HourLabel,
+        action = GistiItemCreateAction.REMIND_1H,
+        selected = selectedReminder == GistiItemCreateAction.REMIND_1H,
+    ),
+    GistiSelectableChip(
+        icon = Icons.Outlined.Notifications,
+        label = tomorrowMorningLabel,
+        action = GistiItemCreateAction.REMIND_TOMORROW_MORNING,
+        selected = selectedReminder == GistiItemCreateAction.REMIND_TOMORROW_MORNING,
+    ),
+    GistiSelectableChip(
+        icon = Icons.Outlined.Notifications,
+        label = tonightLabel,
+        action = GistiItemCreateAction.REMIND_TONIGHT,
+        selected = selectedReminder == GistiItemCreateAction.REMIND_TONIGHT,
+    ),
+    GistiSelectableChip(
+        icon = Icons.Outlined.Schedule,
+        label = pickTimeLabel,
+        action = GistiItemCreateAction.REMIND_PICK,
+        selected = selectedReminder == GistiItemCreateAction.REMIND_PICK,
+    ),
+    GistiSelectableChip(
+        icon = Icons.Outlined.StarBorder,
+        label = importantLabel,
+        action = GistiItemCreateAction.IMPORTANT,
+        selected = importantSelected,
+    ),
+    GistiSelectableChip(
+        icon = Icons.Outlined.Repeat,
+        label = repeatLabel,
+        action = GistiItemCreateAction.REPEAT,
+        selected = repeatSelected,
+    ),
 )

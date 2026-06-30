@@ -73,6 +73,8 @@ internal fun WeeklyChecklistDetailContent(
     onItemTap: (itemId: String) -> Unit,
     modifier: Modifier = Modifier,
     contentBottomPadding: Dp = AppDimens.SpacingXxl,
+    // Bumped after a dock item-create add (which targets today) → scroll today's section into view.
+    addedItemSignal: Int = 0,
 ) {
     val items = state.defaultFill?.items.orEmpty()
     val overdueItems = remember(items, todayWeekday) { getOverdueItems(items, todayWeekday) }
@@ -103,6 +105,21 @@ internal fun WeeklyChecklistDetailContent(
             2 + cards // header + cards + add row
         }
         listState.scrollToItem(titleSlots + overdueSlots + daysBeforeSlots)
+    }
+
+    // After a dock item-create add (which targets today), scroll today's section into view so the
+    // new item is visible. Same slot math as the first-composition scroll above. Keyed on the
+    // one-shot signal; guarded so it never fires on the initial (0) value.
+    LaunchedEffect(addedItemSignal) {
+        if (addedItemSignal <= 0) return@LaunchedEffect
+        val titleSlots = 1
+        val overdueSlots = if (overdueItems.isEmpty()) 0 else (1 + overdueItems.size)
+        val daysBeforeToday = weekOrder.takeWhile { it != todayWeekday }
+        val daysBeforeSlots = daysBeforeToday.sumOf { day ->
+            val cards = items.count { it.weekday == day && !isOverdue(it, todayWeekday) }
+            2 + cards // header + cards + add row
+        }
+        listState.animateScrollToItem(titleSlots + overdueSlots + daysBeforeSlots)
     }
 
     LazyColumn(

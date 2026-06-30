@@ -509,6 +509,20 @@ class ChecklistDetailViewModel(
                 val triggerAt = combinePickerResults(dateMillis, intent.hour, intent.minute)
                 val now = Clock.System.now().toEpochMilliseconds()
                 if (triggerAt <= now) return
+                // Item-create scope: stage the resolved time on the chip state (CUSTOM preset) instead
+                // of persisting to any existing item/checklist — the item doesn't exist yet.
+                if (content.customPickerForItemCreate) {
+                    updateContentState {
+                        it.copy(
+                            itemCreateReminderAt = triggerAt,
+                            itemCreateReminderPreset = ItemCreateReminderPreset.CUSTOM,
+                            showCustomPicker = false,
+                            customPickerDateMillis = null,
+                            customPickerForItemCreate = false,
+                        )
+                    }
+                    return
+                }
                 // Route to the scope that opened the picker: a per-item reminder when an
                 // itemId was captured, otherwise the checklist-level reminder. Without this
                 // branch a custom date+time chosen from the item sheet was saved on the whole
@@ -534,6 +548,7 @@ class ChecklistDetailViewModel(
                         showCustomPicker = false,
                         customPickerDateMillis = null,
                         customPickerItemId = null,
+                        customPickerForItemCreate = false,
                         pendingRepeatConfig = null,
                         showEndConditionPicker = false,
                         reminderSheetLocked = false,
@@ -586,6 +601,87 @@ class ChecklistDetailViewModel(
                 analyticsTracker.event(AnalyticsEvents.DetailUi.QUICK_ADD_CANCELLED, mapOf(AnalyticsParams.HAD_TEXT to intent.hadText.toString()))
             }
 
+            // ── Item-create dock mode ──
+            is ChecklistDetailIntent.OnDockItemCreateOpened -> openItemCreateMode(intent.targetWeekday)
+            ChecklistDetailIntent.OnDockItemCreateClosed -> closeItemCreateMode()
+            is ChecklistDetailIntent.OnItemCreatePresetSelected -> selectItemCreatePreset(intent.preset)
+            ChecklistDetailIntent.OnItemCreateReminderPickRequested -> {
+                val tz = TimeZone.currentSystemDefault()
+                val todayDate = Clock.System.now().toLocalDateTime(tz).date
+                val todayUtcMidnight = LocalDateTime(todayDate, LocalTime(0, 0))
+                    .toInstant(TimeZone.UTC).toEpochMilliseconds()
+                updateContentState {
+                    it.copy(
+                        customPickerForItemCreate = true,
+                        customPickerItemId = null,
+                        itemReminderSheetFor = null,
+                        showReminderSheet = false,
+                        // Close the repeat sheet if the pick was launched from its ONCE tab.
+                        itemCreateRepeatSheetOpen = false,
+                        itemCreateRepeatSheetLocked = false,
+                        showCustomPicker = true,
+                        customPickerDateMillis = null,
+                        customPickerMinDateMillis = todayUtcMidnight,
+                        customPickerInitialHour = 9,
+                        isCustomTimeInPast = false,
+                    )
+                }
+            }
+            is ChecklistDetailIntent.OnItemCreateRepeatTabSelected -> updateContentState {
+                if (intent.tab == ReminderTab.REPEAT && it.pendingRepeatConfig == null) {
+                    it.copy(
+                        activeReminderTab = intent.tab,
+                        pendingRepeatConfig = it.itemCreateRepeat ?: PendingRepeatConfig(),
+                    )
+                } else {
+                    it.copy(activeReminderTab = intent.tab)
+                }
+            }
+            is ChecklistDetailIntent.OnItemCreateReminderSet -> updateContentState {
+                it.copy(
+                    itemCreateReminderAt = intent.at,
+                    itemCreateReminderPreset = if (intent.at != null) ItemCreateReminderPreset.CUSTOM else null,
+                    itemCreateRepeatSheetOpen = false,
+                    itemCreateRepeatSheetLocked = false,
+                    pendingRepeatConfig = null,
+                    repeatRuleSummary = null,
+                )
+            }
+            ChecklistDetailIntent.OnItemCreateImportantToggled ->
+                updateContentState { it.copy(itemCreateImportant = !it.itemCreateImportant) }
+            ChecklistDetailIntent.OnItemCreateRepeatRequested -> openItemCreateRepeatSheet()
+            ChecklistDetailIntent.OnItemCreateRepeatSaved -> {
+                val config = (_screenState.value as? ChecklistDetailState.Content)?.pendingRepeatConfig
+                updateContentState {
+                    it.copy(
+                        itemCreateRepeat = config,
+                        itemCreateRepeatSheetOpen = false,
+                        itemCreateRepeatSheetLocked = false,
+                        pendingRepeatConfig = null,
+                        repeatRuleSummary = null,
+                        showEndConditionPicker = false,
+                    )
+                }
+            }
+            ChecklistDetailIntent.OnItemCreateRepeatRemoved -> updateContentState {
+                it.copy(
+                    itemCreateRepeat = null,
+                    itemCreateRepeatSheetOpen = false,
+                    itemCreateRepeatSheetLocked = false,
+                    pendingRepeatConfig = null,
+                    repeatRuleSummary = null,
+                )
+            }
+            ChecklistDetailIntent.OnDismissItemCreateRepeatSheet -> updateContentState {
+                it.copy(
+                    itemCreateRepeatSheetOpen = false,
+                    itemCreateRepeatSheetLocked = false,
+                    pendingRepeatConfig = null,
+                    repeatRuleSummary = null,
+                    showEndConditionPicker = false,
+                )
+            }
+
             ChecklistDetailIntent.OnReturnedFromSettings -> handleReturnedFromSettings()
             ChecklistDetailIntent.OnSnackbarDismissed -> {
                 updateContentState { it.copy(snackbarMessage = null) }
@@ -620,7 +716,14 @@ class ChecklistDetailViewModel(
 
             // Reminder paywall upgrade from locked banner
             ChecklistDetailIntent.OnReminderUpgradeClick -> {
-                updateContentState { it.copy(showReminderSheet = false, reminderSheetLocked = false) }
+                updateContentState {
+                    it.copy(
+                        showReminderSheet = false,
+                        reminderSheetLocked = false,
+                        itemCreateRepeatSheetOpen = false,
+                        itemCreateRepeatSheetLocked = false,
+                    )
+                }
                 navigator.navigateToPaywall(source = "detail_reminder_limit")
             }
             ChecklistDetailIntent.OnItemReminderUpgradeClick -> {
@@ -1072,6 +1175,121 @@ class ChecklistDetailViewModel(
         updateContentState { it.copy(pendingItemInput = text) }
     }
 
+    // ─── Item-create dock mode ─────────────────────────────────────────────
+
+    /**
+     * Enter item-create mode (the "+" button). Clears the input + any stale chip selections.
+     * [targetWeekday] (ISO 1..7) pins items to a Weekly day column; null in Standard view.
+     */
+    private fun openItemCreateMode(targetWeekday: Int?) {
+        _pendingItemInput.value = ""
+        updateContentState {
+            it.copy(
+                itemCreateMode = true,
+                itemCreateTargetWeekday = targetWeekday,
+                pendingItemInput = "",
+                parsedToken = null,
+                itemCreateReminderAt = null,
+                itemCreateReminderPreset = null,
+                itemCreateImportant = false,
+                itemCreateRepeat = null,
+            )
+        }
+        analyticsTracker.event(AnalyticsEvents.DetailUi.QUICK_ADD_OPENED)
+    }
+
+    /** Exit item-create mode (dock collapsed/dismissed). Clears input + all chip/sheet state. */
+    private fun closeItemCreateMode() {
+        _pendingItemInput.value = ""
+        updateContentState {
+            it.copy(
+                itemCreateMode = false,
+                itemCreateTargetWeekday = null,
+                pendingItemInput = "",
+                parsedToken = null,
+                itemCreateReminderAt = null,
+                itemCreateReminderPreset = null,
+                itemCreateImportant = false,
+                itemCreateRepeat = null,
+                itemCreateRepeatSheetOpen = false,
+                itemCreateRepeatSheetLocked = false,
+                customPickerForItemCreate = false,
+            )
+        }
+    }
+
+    /**
+     * Toggle a reminder preset chip (single-select among the reminder chips). Tapping the active
+     * preset again clears the reminder. CUSTOM is set elsewhere (the date/time picker result).
+     */
+    private fun selectItemCreatePreset(preset: ItemCreateReminderPreset) {
+        val state = _screenState.value as? ChecklistDetailState.Content ?: return
+        if (state.itemCreateReminderPreset == preset) {
+            updateContentState { it.copy(itemCreateReminderAt = null, itemCreateReminderPreset = null) }
+        } else {
+            updateContentState {
+                it.copy(
+                    itemCreateReminderAt = computePresetReminderAt(preset),
+                    itemCreateReminderPreset = preset,
+                )
+            }
+        }
+    }
+
+    /**
+     * Resolves a quick-preset reminder time using the same math as the reminder sheet:
+     * +1h, tomorrow 09:00, and "tonight" 18:00 (rolling to tomorrow 18:00 once past 18:00 today).
+     */
+    private fun computePresetReminderAt(preset: ItemCreateReminderPreset): Long {
+        val tz = TimeZone.currentSystemDefault()
+        val now = Clock.System.now()
+        val nowMs = now.toEpochMilliseconds()
+        val today = now.toLocalDateTime(tz).date
+        return when (preset) {
+            ItemCreateReminderPreset.ONE_HOUR -> nowMs + 3_600_000L
+            ItemCreateReminderPreset.TOMORROW_MORNING -> {
+                val tomorrow = today.plus(1, DateTimeUnit.DAY)
+                LocalDateTime(tomorrow, LocalTime(9, 0)).toInstant(tz).toEpochMilliseconds()
+            }
+            ItemCreateReminderPreset.TONIGHT -> {
+                val todaySix = LocalDateTime(today, LocalTime(18, 0)).toInstant(tz).toEpochMilliseconds()
+                if (todaySix > nowMs) {
+                    todaySix
+                } else {
+                    val tomorrow = today.plus(1, DateTimeUnit.DAY)
+                    LocalDateTime(tomorrow, LocalTime(18, 0)).toInstant(tz).toEpochMilliseconds()
+                }
+            }
+            // CUSTOM never reaches here — the picker result sets the time directly.
+            ItemCreateReminderPreset.CUSTOM -> nowMs
+        }
+    }
+
+    /**
+     * Open the repeat-config sheet for the item-create Repeat chip. Reuses the existing repeat
+     * machinery (REPEAT tab + the `pendingRepeatConfig` intents). Free users are gated to a single
+     * recurring reminder: if the new item would be a second one (and none is staged yet), the sheet
+     * shows the locked-paywall banner instead of the config.
+     */
+    private fun openItemCreateRepeatSheet() {
+        viewModelScope.launch {
+            val isPremium = awaitUserLimits()?.isPremium ?: false
+            val state = _screenState.value as? ChecklistDetailState.Content ?: return@launch
+            val atLimit = !isPremium && state.itemCreateRepeat == null &&
+                repository.countActiveReminders() >= 1
+            val seed = state.itemCreateRepeat ?: PendingRepeatConfig()
+            updateContentState {
+                it.copy(
+                    itemCreateRepeatSheetOpen = true,
+                    itemCreateRepeatSheetLocked = atLimit,
+                    activeReminderTab = ReminderTab.REPEAT,
+                    pendingRepeatConfig = if (atLimit) null else seed,
+                    repeatRuleSummary = if (atLimit) null else buildRepeatSummary(seed),
+                )
+            }
+        }
+    }
+
     /**
      * Submits the current [ChecklistDetailState.Content.pendingItemInput].
      *
@@ -1133,50 +1351,78 @@ class ChecklistDetailViewModel(
             repeatTimeOfDayMinutes = null
         }
 
-        // Clear input state immediately (optimistic UX)
+        // Item-create chip overrides (no-ops outside item-create mode — the inline add path leaves
+        // these null/false). An explicitly selected reminder CHIP OVERRIDES the parsed-from-text
+        // reminder; a configured Repeat and the Important toggle apply on top of the parsed result.
+        val chipReminderAt = state.itemCreateReminderAt
+        val chipRepeatConfig = state.itemCreateRepeat
+        val chipImportant = state.itemCreateImportant
+
+        val finalReminderAt: Long? = chipReminderAt ?: reminderAt
+        val finalRepeatRule: ReminderRepeatRule?
+        val finalRepeatTimeOfDayMinutes: Int?
+        if (chipRepeatConfig != null) {
+            finalRepeatRule = chipRepeatConfig.toRule()
+            finalRepeatTimeOfDayMinutes = chipRepeatConfig.timeHour * 60 + chipRepeatConfig.timeMinute
+        } else {
+            finalRepeatRule = repeatRule
+            finalRepeatTimeOfDayMinutes = repeatTimeOfDayMinutes
+        }
+
+        // Clear input state immediately (optimistic UX). In item-create mode also reset the per-item
+        // chip selections but STAY in item-create mode (itemCreateMode left as-is) so the keyboard
+        // stays up for rapid multi-add.
         _pendingItemInput.value = ""
-        updateContentState { it.copy(pendingItemInput = "", parsedToken = null) }
+        updateContentState {
+            it.copy(
+                pendingItemInput = "",
+                parsedToken = null,
+                itemCreateReminderAt = null,
+                itemCreateReminderPreset = null,
+                itemCreateImportant = false,
+                itemCreateRepeat = null,
+            )
+        }
 
         // Create the template item first so the new fill item can be linked to it from birth.
         // parentId = currentFolderId so inline Smart-Add drops the item into the folder the user
-        // is currently viewing (root when currentFolderId == null).
-        val newChecklistItem = ChecklistItem(text = itemText, parentId = currentFolderId)
+        // is currently viewing (root when currentFolderId == null). weekday is set in Weekly view so
+        // the new item lands in a day column (null in Standard view → unchanged).
+        val targetWeekday = state.itemCreateTargetWeekday
+        val newChecklistItem = ChecklistItem(
+            text = itemText,
+            weekday = targetWeekday,
+            parentId = currentFolderId,
+        )
 
-        val newFillItem = if (token != null) {
-            val base = ChecklistFillItem(
-                text = itemText,
-                checked = false,
-                note = null,
-                templateItemId = newChecklistItem.id,
-            )
-            val withRepeat = if (repeatRule != null && repeatTimeOfDayMinutes != null) {
-                // Compute first trigger time (same logic as saveItemReminder)
-                val tz = TimeZone.currentSystemDefault()
-                val now = Clock.System.now()
-                val today = now.toLocalDateTime(tz).date
-                val timeHour = repeatTimeOfDayMinutes / 60
-                val timeMinute = repeatTimeOfDayMinutes % 60
-                val triggerTime = LocalTime(timeHour, timeMinute)
-                val todayTrigger = LocalDateTime(today, triggerTime).toInstant(tz).toEpochMilliseconds()
-                val firstTriggerAt = if (todayTrigger > now.toEpochMilliseconds()) {
-                    todayTrigger
-                } else {
-                    val tomorrow = today.plus(1, DateTimeUnit.DAY)
-                    LocalDateTime(tomorrow, triggerTime).toInstant(tz).toEpochMilliseconds()
-                }
-                base.withRepeatRule(repeatRule, repeatTimeOfDayMinutes, firstTriggerAt)
+        val baseFillItem = ChecklistFillItem(
+            text = itemText,
+            checked = false,
+            note = null,
+            weekday = targetWeekday,
+            templateItemId = newChecklistItem.id,
+        )
+        val withRepeat = if (finalRepeatRule != null && finalRepeatTimeOfDayMinutes != null) {
+            // Compute first trigger time (same logic as saveItemReminder)
+            val tz = TimeZone.currentSystemDefault()
+            val now = Clock.System.now()
+            val today = now.toLocalDateTime(tz).date
+            val timeHour = finalRepeatTimeOfDayMinutes / 60
+            val timeMinute = finalRepeatTimeOfDayMinutes % 60
+            val triggerTime = LocalTime(timeHour, timeMinute)
+            val todayTrigger = LocalDateTime(today, triggerTime).toInstant(tz).toEpochMilliseconds()
+            val firstTriggerAt = if (todayTrigger > now.toEpochMilliseconds()) {
+                todayTrigger
             } else {
-                base
+                val tomorrow = today.plus(1, DateTimeUnit.DAY)
+                LocalDateTime(tomorrow, triggerTime).toInstant(tz).toEpochMilliseconds()
             }
-            withRepeat.withReminderAt(reminderAt)
+            baseFillItem.withRepeatRule(finalRepeatRule, finalRepeatTimeOfDayMinutes, firstTriggerAt)
         } else {
-            ChecklistFillItem(
-                text = itemText,
-                checked = false,
-                note = null,
-                templateItemId = newChecklistItem.id,
-            )
+            baseFillItem
         }
+        val withReminder = withRepeat.withReminderAt(finalReminderAt)
+        val newFillItem = if (chipImportant) withReminder.withPriority(1) else withReminder
 
         val updatedFill = fill.copy(items = fill.items + newFillItem)
         val updatedChecklist = state.checklist.copy(items = state.checklist.items + newChecklistItem)
@@ -1189,6 +1435,8 @@ class ChecklistDetailViewModel(
                 checklist = updatedChecklist,
                 visibleFillItemIds = snapshot.visibleFillItemIds,
                 levelNodes = snapshot.levelNodes,
+                // Bump the one-shot scroll signal so the screen scrolls to the new item.
+                addedItemSignal = it.addedItemSignal + 1,
             )
         }
 
@@ -1196,16 +1444,16 @@ class ChecklistDetailViewModel(
             repository.updateFill(updatedFill)
             repository.updateChecklistTemplate(updatedChecklist)
 
-            // Schedule alarms for the new item if reminder was parsed
-            if (reminderAt != null) {
-                reminderScheduler.scheduleItemReminder(checklistId, fill.id, newFillItem.id, reminderAt)
+            // Schedule alarms for the new item if a reminder was parsed OR set via a chip.
+            if (finalReminderAt != null) {
+                reminderScheduler.scheduleItemReminder(checklistId, fill.id, newFillItem.id, finalReminderAt)
             }
             val nextAt = newFillItem.repeatNextAt
-            if (repeatRule != null && nextAt != null) {
+            if (finalRepeatRule != null && nextAt != null) {
                 reminderScheduler.scheduleItemRepeat(checklistId, fill.id, newFillItem.id, nextAt)
             }
 
-            val hasReminder = reminderAt != null || repeatRule != null
+            val hasReminder = finalReminderAt != null || finalRepeatRule != null
             analyticsTracker.event(AnalyticsEvents.Item.ADDED_QUICK, mapOf(
                 AnalyticsParams.CHECKLIST_ID to checklistId.toString(),
                 AnalyticsParams.ITEM_COUNT to updatedFill.items.size.toString(),

@@ -372,6 +372,36 @@ private fun GistiInlinePanelBanner(
 enum class DockAnchor { Peek, Expanded }
 
 /**
+ * Optional binding that switches the shared Gisti chat dock from its default AI-chat mode into
+ * **item-create mode** (the checklist-detail "+" button reuses the dock's bottom input to add an
+ * item instead of a separate inline field).
+ *
+ * When the host passes a non-null override into the `chatDockContent` slot:
+ *  - the dock's pinned input binds to [text] / [onTextChange] / [onSend] / [canSend] (the checklist
+ *    ViewModel's create path) instead of the ChatViewModel,
+ *  - the chat answer/greeting frame is hidden and [chips] (reminder presets + property toggles)
+ *    render in the always-visible expanded frame above the input,
+ *  - Send creates a checklist item (it never calls the AI chat).
+ *
+ * When the override is null the dock behaves exactly as the AI-chat dock — every other call-site
+ * (MainScreen) passes null and is unaffected.
+ *
+ * @param text         Current input text (mirrors the checklist VM's pending item input).
+ * @param onTextChange Fired on every keystroke (drives the live Smart-Add parser preview).
+ * @param onSend       Fired on Send — creates the item, clears the input, keeps item-create mode.
+ * @param canSend      True when the input is non-blank (Send disabled otherwise → no blank add).
+ * @param chips        The selectable item-create chips (reminder presets + Important/Repeat),
+ *                     rendered in the expanded frame above the input.
+ */
+class ChatDockItemCreateOverride(
+    val text: String,
+    val onTextChange: (String) -> Unit,
+    val onSend: () -> Unit,
+    val canSend: Boolean,
+    val chips: @Composable () -> Unit,
+)
+
+/**
  * Reveal progress of the dock: 0f at [DockAnchor.Peek] (frosted glass, collapsed) → 1f at
  * [DockAnchor.Expanded] (opaque panel). Safe before anchors are measured (offset == NaN → 0f).
  * Read this ONLY inside layout/draw/graphicsLayer lambdas — `offset`/`progress` are
@@ -431,6 +461,10 @@ fun GistiExpandableDockContent(
     // the keyboard is down). Used to cap the answer so the dock fits above the keyboard (FIX B).
     dockAvailableDp: Dp = Dp.Unspecified,
     answerMaxHeight: Dp = 210.dp,
+    // Minimum height of the answer/empty frame. 125dp gives the chat answer/greeting a comfortable
+    // body; item-create mode passes ~0 so the frame WRAPS the short chip row instead of leaving a big
+    // empty gap between the chips and the pinned input below.
+    answerMinHeight: Dp = 125.dp,
 ) {
     val density = LocalDensity.current
     val snapSpec = remember {
@@ -623,7 +657,7 @@ fun GistiExpandableDockContent(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(min = minOf(125.dp, effectiveAnswerMax), max = effectiveAnswerMax),
+                        .heightIn(min = minOf(answerMinHeight, effectiveAnswerMax), max = effectiveAnswerMax),
                 ) {
                     if (hasLastAnswer) lastAnswerContent() else emptyStateContent()
                 }

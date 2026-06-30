@@ -96,6 +96,13 @@ data class MoveTargetUiModel(
     val isCurrentParent: Boolean,
 )
 
+/**
+ * Which item-create reminder preset chip is currently active. The four reminder chips are
+ * single-select among themselves; [CUSTOM] is set when the user resolves a time via the
+ * "Pick time…" date/time picker (the chip then shows the absolute datetime).
+ */
+enum class ItemCreateReminderPreset { ONE_HOUR, TOMORROW_MORNING, TONIGHT, CUSTOM }
+
 sealed interface ChecklistDetailState : State {
     data object Loading : ChecklistDetailState
     data object NotFound : ChecklistDetailState
@@ -194,6 +201,30 @@ sealed interface ChecklistDetailState : State {
         // Smart Add parser state: text input is owned by ViewModel to allow debounced parsing
         val pendingItemInput: String = "",
         val parsedToken: ParsedDateToken? = null,
+        // ── Item-create dock mode (checklist detail "+") ──
+        // True while the shared chat dock is in item-create mode: its input creates a checklist item
+        // instead of calling the AI chat, and the dock shows the selectable item-create chips.
+        val itemCreateMode: Boolean = false,
+        // Selected reminder for the NEW item (chip override of any parsed-from-text reminder). null = none.
+        val itemCreateReminderAt: Long? = null,
+        // Which reminder preset chip is blue (drives single-select + the resolved "Pick time…" label).
+        val itemCreateReminderPreset: ItemCreateReminderPreset? = null,
+        // Independent property toggles for the new item.
+        val itemCreateImportant: Boolean = false,
+        val itemCreateRepeat: PendingRepeatConfig? = null,
+        // Repeat-config sheet (reuses ReminderSheet on the REPEAT tab) for the item-create Repeat chip.
+        val itemCreateRepeatSheetOpen: Boolean = false,
+        val itemCreateRepeatSheetLocked: Boolean = false,
+        // True while the shared custom date/time picker is scoped to the item-create reminder
+        // (as opposed to a per-item or checklist-level reminder).
+        val customPickerForItemCreate: Boolean = false,
+        // Target weekday (ISO 1=Mon..7=Sun) for the item created via the dock. Non-null in Weekly
+        // view (the toolbar "+" targets today) so the new item lands in a day column and stays
+        // visible; null in Standard view (unchanged). Applied to both the template + fill item.
+        val itemCreateTargetWeekday: Int? = null,
+        // One-shot signal (monotonic counter) bumped after each successful add so the screen can
+        // scroll the list to the freshly-added item (the removed inline path scrolled directly).
+        val addedItemSignal: Int = 0,
         // Attachments: viewer state — null = closed
         val attachmentViewerState: AttachmentViewerState? = null,
         // Pending picker item: which item triggered the file picker (so the callback knows where to attach)
@@ -367,6 +398,38 @@ sealed interface ChecklistDetailIntent : Intent {
     data class OnCompletedSectionToggle(val expanded: Boolean, val completedCount: Int) : ChecklistDetailIntent
     data object OnQuickAddOpened : ChecklistDetailIntent
     data class OnQuickAddCancelled(val hadText: Boolean) : ChecklistDetailIntent
+
+    // ── Item-create dock mode (checklist detail "+") ──
+    /**
+     * Enter item-create mode: the shared chat dock's input now adds checklist items. Resets chips.
+     * [targetWeekday] (ISO 1=Mon..7=Sun) pins the new item to a Weekly day column (today for the
+     * toolbar "+" in Weekly view); null in Standard view.
+     */
+    data class OnDockItemCreateOpened(val targetWeekday: Int? = null) : ChecklistDetailIntent
+    /** Exit item-create mode (dock collapsed/dismissed): clears the input + all chip selections. */
+    data object OnDockItemCreateClosed : ChecklistDetailIntent
+    /**
+     * Toggle a reminder preset chip for the new item (single-select among reminder chips). Tapping the
+     * already-active preset again clears the reminder. [ItemCreateReminderPreset.CUSTOM] is never sent
+     * here — it is set by the date/time picker; only ONE_HOUR / TOMORROW_MORNING / TONIGHT come through.
+     */
+    data class OnItemCreatePresetSelected(val preset: ItemCreateReminderPreset) : ChecklistDetailIntent
+    /** "Pick time…" chip: open the shared date/time picker scoped to the item-create reminder. */
+    data object OnItemCreateReminderPickRequested : ChecklistDetailIntent
+    /** Toggle the "⭐ Important" chip (priority = 1 on the new item). */
+    data object OnItemCreateImportantToggled : ChecklistDetailIntent
+    /** "🔁 Repeat" chip: open the repeat-config sheet (free-user limit gated). */
+    data object OnItemCreateRepeatRequested : ChecklistDetailIntent
+    /** Switch the item-create reminder/repeat sheet tab (kept item-create-scoped, no checklist seeding). */
+    data class OnItemCreateRepeatTabSelected(val tab: ReminderTab) : ChecklistDetailIntent
+    /** Set (or clear, when null) a one-shot reminder for the new item from the sheet's ONCE tab. */
+    data class OnItemCreateReminderSet(val at: Long?) : ChecklistDetailIntent
+    /** Commit the repeat config from the open sheet into the item-create chip state. */
+    data object OnItemCreateRepeatSaved : ChecklistDetailIntent
+    /** Clear the configured item-create repeat. */
+    data object OnItemCreateRepeatRemoved : ChecklistDetailIntent
+    /** Dismiss the item-create repeat-config sheet without changing the configured repeat. */
+    data object OnDismissItemCreateRepeatSheet : ChecklistDetailIntent
 
     // Repeat schedule (independent of reminder)
     data class OnRepeatTypeSelected(val type: RepeatType) : ChecklistDetailIntent
