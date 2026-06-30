@@ -13,6 +13,8 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.AnchoredDraggableDefaults
 import androidx.compose.foundation.gestures.AnchoredDraggableState
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.gestures.DraggableAnchors
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.anchoredDraggable
@@ -488,6 +490,14 @@ fun GistiExpandableDockContent(
     )
     val focusManager = LocalFocusManager.current
 
+    // Tracks an ACTIVE grabber drag (DragInteraction between Start and Stop/Cancel). The panel's
+    // settled-at-Peek `revealed = 0` shortcut (in the layout below) must NOT apply while the user is
+    // dragging the grabber up to open the dock: during the drag targetValue is still Peek and there is
+    // no animation running, so the shortcut would pin the panel to 0 and make it "pop" open only past
+    // the threshold instead of following the finger from the start (a drag-to-open regression).
+    val grabberInteraction = remember { MutableInteractionSource() }
+    val dragging by grabberInteraction.collectIsDraggedAsState()
+
     // ── FIX 2: the CHAT input's focus is the keyboard-up signal (NOT a global WindowInsets.ime — that
     // would let ChecklistDetail's inline add-item keyboard expand/lock the chat dock). While focused
     // the dock is LOCKED Expanded: grabber drag + nested-scroll collapse are disabled and chips are
@@ -600,6 +610,7 @@ fun GistiExpandableDockContent(
                 orientation = Orientation.Vertical,
                 enabled = true,
                 flingBehavior = fling,
+                interactionSource = grabberInteraction,
             ),
         )
 
@@ -650,7 +661,7 @@ fun GistiExpandableDockContent(
                     // later via updateAnchors → for 1–2 frames `full - off > 0` and the panel briefly
                     // reveals ("jumps up" before becoming the plain chat input). During the collapse
                     // animation isAnimationRunning is true → the offset-driven reveal runs (smooth close).
-                    val revealed = if (state.targetValue == DockAnchor.Peek && !state.isAnimationRunning) {
+                    val revealed = if (state.targetValue == DockAnchor.Peek && !state.isAnimationRunning && !dragging) {
                         0
                     } else {
                         val off = if (state.offset.isNaN()) full.toFloat() else state.offset
