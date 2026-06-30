@@ -837,13 +837,13 @@ private fun ChecklistDetailContent(
                 // ABOVE the keyboard — the measured dock height minus the ime inset the list already
                 // handled — otherwise freshly added items render hidden under the dock.
                 imeVisible && state.itemCreateMode ->
-                    (dockHeight - imeBottom).coerceAtLeast(0.dp) + AppDimens.SpacingLg
+                    (dockHeight - imeBottom).coerceAtLeast(0.dp) + AppDimens.SpacingXxl
                 // IME open (plain chat over the list): the list's Modifier.imePadding() already shrinks
                 // the viewport above the keyboard (restoring the pre-dock adjustResize "content lifts"
                 // behaviour), so the contentPadding only needs breathing room here — adding imeBottom
                 // too would double-count and push the last item too far up.
                 imeVisible -> AppDimens.SpacingSm
-                showDock -> dockHeight + AppDimens.SpacingLg
+                showDock -> dockHeight + AppDimens.SpacingXxl
                 else -> navBottom + AppDimens.SpacingLg
             }
             // FIX B: answer cap (status bar → keyboard top), computed HERE at the host where the ime
