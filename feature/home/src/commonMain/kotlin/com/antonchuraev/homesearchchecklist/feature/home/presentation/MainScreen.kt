@@ -319,7 +319,7 @@ fun MainScreen(
                 // navbar inset explicitly so the last row isn't swallowed by the navigation bar.
                 val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
                 val contentBottomPadding = if (showDock) {
-                    dockHeight + AppDimens.SpacingLg
+                    dockHeight + AppDimens.SpacingXxl
                 } else {
                     navBottom + AppDimens.SpacingXxl
                 }
