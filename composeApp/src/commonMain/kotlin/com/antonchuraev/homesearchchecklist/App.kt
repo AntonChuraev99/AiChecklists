@@ -934,10 +934,17 @@ fun App() {
                         onExpandFull = { navigator.navigateToAiChat() },
                         onHelpClick = { chatPanelHelpSheetOpen = true },
                         contextLabel = resolvedContextLabel,
-                        // Chips hosted INSIDE the morph (it fades + collapses them as the dock expands).
-                        // In item-create mode the peek chips are suppressed (the selectable item-create
-                        // chips render in the always-visible expanded frame via emptyStateContent).
-                        chipsContent = if (itemCreateOverride != null) null else chips,
+                        // Chips hosted INSIDE the morph. Chat: the contextual peek chips (fade as the dock
+                        // expands). Item-create: the reminder/property chips render in this SAME row (not in
+                        // the answer frame) and are PINNED (chipsPinned below) so they stay visible with the
+                        // keyboard up AND the create⇄chat peek is the same height → Back swaps the chip
+                        // content in place with no shrink/grow.
+                        chipsContent = if (itemCreateOverride != null) {
+                            { itemCreateOverride.chips() }
+                        } else {
+                            chips
+                        },
+                        chipsPinned = itemCreateOverride != null,
                         // Focused by the morph when the dock settles to Expanded (raise the keyboard).
                         inputFocusRequester = chatInputFocusRequester,
                         // On blur (keyboard dismissed) the dock collapses to Peek only when blank.
@@ -951,7 +958,11 @@ fun App() {
                         // answer; raise the frame cap so its escape/cancel chip isn't clipped.
                         answerMaxHeight = if (chatUiState.pendingChoice != null) 360.dp else 210.dp,
                         // Item-create shows only a short chip row — wrap it (min 0) so there's no empty
-                        // gap between the chips and the pinned input; chat keeps the 125dp comfortable body.
+                        // gap between the chips and the pinned input; chat keeps the 125dp comfortable
+                        // body. INSTANT (not animated): animating this min height sweeps panelFullPx every
+                        // frame during the open animation → updateAnchors churns → the AnchoredDraggable
+                        // resettles to Peek → the dock collapses → item-create exits (the "morph plays then
+                        // snaps back to chat" bug). The dock's own expand animation already masks the jump.
                         answerMinHeight = if (itemCreateOverride != null) 0.dp else 125.dp,
                         lastAnswerContent = {
                             // Fixed-height frame: scroll a long answer inside instead of growing the
@@ -1010,23 +1021,12 @@ fun App() {
                             }
                         },
                         emptyStateContent = {
-                            if (itemCreateOverride != null) {
-                                // Item-create chips render in the always-visible expanded frame (the peek
-                                // chip slot fades out on expand). Scrollable so the chips never clip when
-                                // the keyboard shrinks the frame on a small screen.
-                                val chipScroll = rememberScrollState()
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .verticalScroll(chipScroll)
-                                        // Match the main-screen chat-dock peek chips: just a small bottom
-                                        // gap above the pinned input (the peek chip slot uses SpacingXs),
-                                        // not the large SpacingMd vertical block that left a visible gap.
-                                        .padding(bottom = AppDimens.SpacingXs),
-                                ) {
-                                    itemCreateOverride.chips()
-                                }
-                            } else {
+                            // Chat: the greeting. Item-create: EMPTY — the reminder/property chips moved to
+                            // the pinned peek-chip row (chipsContent) so the create⇄chat peek is the SAME
+                            // height (a chip row is always present) and Back swaps the chips in place with no
+                            // shrink/grow. The answer frame just stays empty (height 0 via answerMinHeight=0)
+                            // in item-create.
+                            if (itemCreateOverride == null) {
                                 Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -1046,46 +1046,39 @@ fun App() {
                             }
                         },
                         inputContent = { onInputFocusChanged ->
-                            if (itemCreateOverride != null) {
-                                // Item-create mode: the dock input creates a checklist item (the AI chat
-                                // is never called). Stripped-down row — no help/attach/mic; Send is
-                                // disabled while blank.
-                                // Force focus on entering item-create: if the AI-chat dock was ALREADY
-                                // Expanded, tapping "+" doesn't change the dock's targetValue, so the
-                                // panel's targetValue-driven auto-focus never fires and the keyboard
-                                // would drop on the node swap. Keyed on Unit → runs once when this
-                                // branch enters composition (i.e. when item-create activates).
-                                LaunchedEffect(Unit) {
-                                    runCatching { chatInputFocusRequester.requestFocus() }
-                                }
+                            // ── Unified input node (chat ⇄ item-create) ──────────────────────────────
+                            // ONE ChatInputRow node spans BOTH modes (mode-derived props) so the field
+                            // is the SAME composable across the morph: when the dock switches into
+                            // item-create the row's help/attach buttons animate OUT in place (their
+                            // AnimatedVisibility runs only because the node persists) — a smooth morph of
+                            // the chat input INTO the create input, not a hard swap of two separate nodes.
+                            // A single shared focusRequester also stays on ONE field (no two-field focus
+                            // tug-of-war that would drop the keyboard mid-transition).
+                            // The input is rendered unless a CHAT choice block is pending (then chips are
+                            // the only interaction); item-create never has a pending choice.
+                            val ic = itemCreateOverride
+                            // Force-focus when ENTERING item-create from an ALREADY-Expanded chat dock:
+                            // the dock's targetValue doesn't change, so its targetValue-driven auto-focus
+                            // never fires and the keyboard would drop on the prop change. Keyed on the
+                            // mode transition so it runs once per entry (and never on exit).
+                            LaunchedEffect(ic != null) {
+                                if (ic != null) runCatching { chatInputFocusRequester.requestFocus() }
+                            }
+                            if (ic != null || chatUiState.pendingChoice == null) {
                                 ChatInputRow(
-                                    text = itemCreateOverride.text,
-                                    onTextChange = itemCreateOverride.onTextChange,
-                                    onSend = itemCreateOverride.onSend,
-                                    onAttachFileClick = {},
-                                    onVoiceRecordingStarted = {},
-                                    onVoiceRecordingStopped = {},
-                                    onVoiceRecordingCancelled = {},
-                                    isEnabled = true,
-                                    canSend = itemCreateOverride.canSend,
-                                    focusRequester = chatInputFocusRequester,
-                                    onFocusChanged = onInputFocusChanged,
-                                    // The "I want to…" placeholder is passed by the screen as peekPlaceholder.
-                                    placeholderOverride = peekPlaceholder,
-                                    simpleSendOnly = true,
-                                )
-                            } else if (chatUiState.pendingChoice == null) {
-                                // Hidden while a choice block is pending (chips are the only interaction).
-                                ChatInputRow(
-                                    text = chatUiState.inputText,
-                                    onTextChange = { chatViewModel.sendIntent(ChatScreenIntent.OnInputChange(it)) },
-                                    onSend = { chatViewModel.sendIntent(ChatScreenIntent.OnSendClick) },
+                                    text = ic?.text ?: chatUiState.inputText,
+                                    onTextChange = ic?.onTextChange
+                                        ?: { chatViewModel.sendIntent(ChatScreenIntent.OnInputChange(it)) },
+                                    onSend = ic?.onSend
+                                        ?: { chatViewModel.sendIntent(ChatScreenIntent.OnSendClick) },
                                     onAttachFileClick = { chatSheetAttachmentSheet = true },
                                     // BUG #1 FIX: send OnVoiceRecordingStarted (flips isRecording +
                                     // emits RequestRecordAudioPermission) like the full ChatScreen does.
                                     // The OLD inline panel only called sheetAudioRecorder.start() with NO
                                     // intent, so isRecording never flipped and the press-hold mic was a
                                     // no-op in the dock. Now the SAME press-hold works in the peek.
+                                    // (In item-create the mic/attach are hidden and Send replaces them, so
+                                    // these chat handlers are simply never reached there.)
                                     onVoiceRecordingStarted = {
                                         chatViewModel.sendIntent(ChatScreenIntent.OnVoiceRecordingStarted)
                                         sheetAudioRecorder.start()
@@ -1093,19 +1086,23 @@ fun App() {
                                     onVoiceRecordingStopped = { sheetAudioRecorder.stop() },
                                     onVoiceRecordingCancelled = { sheetAudioRecorder.cancel() },
                                     onHelpClick = { chatPanelHelpSheetOpen = true },
-                                    hasAttachments = chatUiState.pendingAttachments.isNotEmpty(),
-                                    isEnabled = !chatUiState.isProcessing,
-                                    canSend = chatUiState.canSend,
-                                    isRecording = chatUiState.isRecording,
-                                    isTranscribing = chatUiState.isTranscribing,
+                                    // Chat-only signals forced off in item-create (no attachments, never
+                                    // processing/recording/transcribing → placeholder + Send stay correct).
+                                    hasAttachments = ic == null && chatUiState.pendingAttachments.isNotEmpty(),
+                                    isEnabled = ic != null || !chatUiState.isProcessing,
+                                    canSend = ic?.canSend ?: chatUiState.canSend,
+                                    isRecording = ic == null && chatUiState.isRecording,
+                                    isTranscribing = ic == null && chatUiState.isTranscribing,
                                     onDragCancelChanged = { chatSheetDragCancel = it },
                                     focusRequester = chatInputFocusRequester,
                                     // Report focus to the morph: focus → expand + lock the dock open
                                     // while the keyboard is up; blur → release (collapse if blank).
                                     onFocusChanged = onInputFocusChanged,
-                                    // Contextual peek placeholder ("Ask Gisti…" / "Ask about <name>…")
-                                    // supplied per-screen so the collapsed dock reads meaningfully.
+                                    // Contextual peek placeholder — "I want to…" (item-create) /
+                                    // "Ask Gisti…" / "Ask about <name>…" (chat) — supplied per-screen.
                                     placeholderOverride = peekPlaceholder,
+                                    // Drives the in-row help/attach morph: true → stripped Send-only row.
+                                    simpleSendOnly = ic != null,
                                 )
                             }
                         },

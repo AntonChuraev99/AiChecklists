@@ -406,7 +406,18 @@ private fun ChecklistDetailContent(
             if (!state.itemCreateMode) onOpenChatSheet?.invoke()
         } else {
             onChatCollapse()
-            if (state.itemCreateMode) onIntent(ChecklistDetailIntent.OnDockItemCreateClosed)
+        }
+    }
+    // Exit item-create only once the dock has FULLY settled at Peek — NOT the instant targetValue flips
+    // to Peek (which is immediate on animateTo). settledValue updates only when the dock physically stops
+    // at an anchor, so item-create (and its chips) stay on screen through the WHOLE collapse animation.
+    // Otherwise itemCreateMode flips false mid-collapse → hasLastAnswer flips true → the chat-answer frame
+    // swaps into the still-open-but-closing dock and flashes for the animation's duration (the "second
+    // Back briefly opens the chat" artefact). Deferring the exit to the settle makes every collapse path
+    // (Back AND grabber-drag) seamless: the chat frame only appears once the dock is already hidden at Peek.
+    LaunchedEffect(dockState.settledValue) {
+        if (dockState.settledValue == DockAnchor.Peek && state.itemCreateMode) {
+            onIntent(ChecklistDetailIntent.OnDockItemCreateClosed)
         }
     }
     // Auto-collapse on any route change (App bumps the signal). animateTo needs anchors → NaN-guard.
@@ -422,9 +433,19 @@ private fun ChecklistDetailContent(
             // Item-create: Back closes the create dock and returns the screen to its OPENED (peek)
             // state. ALWAYS collapse to Peek (regardless of the unrelated chat-input draft) — settling
             // to Peek flips dockExpanded→false, which fires OnDockItemCreateClosed and exits the mode.
-            // Without this dedicated branch Back could leave the dock expanded as a CHAT dock.
+            // (The dock keeps this Peek target stable while the re-appearing chat-answer frame grows —
+            // see updateAnchors(newTarget) in GistiExpandableDockContent — so it no longer springs back
+            // open as a chat. That was the "second Back opens the chat" bug.)
             state.itemCreateMode ->
-                if (!dockState.offset.isNaN()) dockScope.launch { dockState.animateTo(DockAnchor.Peek) }
+                if (!dockState.offset.isNaN()) dockScope.launch {
+                    dockState.animateTo(DockAnchor.Peek)
+                    // Exit item-create AFTER the collapse settles. The settledValue effect below also does
+                    // this, but only fires on a settledValue CHANGE — a rapid "+"→Back before the open
+                    // animation reached Expanded leaves settledValue stale at Peek (never changed), so its
+                    // exit wouldn't fire and item-create would stick. Awaiting the collapse here closes that
+                    // gap. Idempotent with the settledValue exit (OnDockItemCreateClosed just clears state).
+                    onIntent(ChecklistDetailIntent.OnDockItemCreateClosed)
+                }
             // Chat: collapse only if the input is blank (a non-blank draft holds the dock open).
             chatInputBlank && !dockState.offset.isNaN() ->
                 dockScope.launch { dockState.animateTo(DockAnchor.Peek) }

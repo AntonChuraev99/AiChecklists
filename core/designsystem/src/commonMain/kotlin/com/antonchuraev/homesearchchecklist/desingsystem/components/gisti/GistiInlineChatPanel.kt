@@ -465,6 +465,13 @@ fun GistiExpandableDockContent(
     // body; item-create mode passes ~0 so the frame WRAPS the short chip row instead of leaving a big
     // empty gap between the chips and the pinned input below.
     answerMinHeight: Dp = 125.dp,
+    // PINNED chips: keep [chipsContent] fully visible (full alpha + full height) at ALL dock positions
+    // instead of fading it out with the dock-expand progress. Used by item-create, where the dock is
+    // Expanded (keyboard up) yet the reminder/property chips must stay on screen for selection — and
+    // pinning them makes the create⇄chat peek the SAME height (a chip row is always present), so Back
+    // swaps the chip CONTENT in place with no shrink/grow. Default false = the chat peek-chip behaviour
+    // (chips fade as the dock expands to reveal the answer).
+    chipsPinned: Boolean = false,
 ) {
     val density = LocalDensity.current
     val snapSpec = remember {
@@ -606,6 +613,14 @@ fun GistiExpandableDockContent(
                         DockAnchor.Expanded at 0f
                         DockAnchor.Peek at panelFullPx.toFloat()
                     },
+                    // Preserve the CURRENT target across an anchor re-measure. Default updateAnchors
+                    // re-picks newTarget = closestAnchor(offset); when the panel GROWS mid-collapse (the
+                    // chat-answer frame re-appears as item-create exits, or the keyboard toggles), the
+                    // small offset becomes closer to Expanded(0) than to the now-distant Peek anchor, so
+                    // the default flips the target back to Expanded — the dock springs open as a chat
+                    // (the "second Back re-opens the chat" bug). A content-driven re-measure must not
+                    // change the user/programmatic intent — only reposition the offset to the new anchors.
+                    newTarget = state.targetValue,
                 )
             }
         }
@@ -628,8 +643,19 @@ fun GistiExpandableDockContent(
                 .layout { measurable, constraints ->
                     val placeable = measurable.measure(constraints)
                     val full = placeable.height
-                    val off = if (state.offset.isNaN()) full.toFloat() else state.offset
-                    val revealed = (full - off).roundToInt().coerceIn(0, full)
+                    // When the dock is SETTLED at Peek (not mid-animation), force revealed = 0 — fully
+                    // collapsed — regardless of the measured panel height. Otherwise a content swap at Peek
+                    // (item-create chips → the taller chat-answer frame as item-create exits) grows `full`
+                    // in THIS layout pass while `state.offset` (the Peek anchor) only catches up one frame
+                    // later via updateAnchors → for 1–2 frames `full - off > 0` and the panel briefly
+                    // reveals ("jumps up" before becoming the plain chat input). During the collapse
+                    // animation isAnimationRunning is true → the offset-driven reveal runs (smooth close).
+                    val revealed = if (state.targetValue == DockAnchor.Peek && !state.isAnimationRunning) {
+                        0
+                    } else {
+                        val off = if (state.offset.isNaN()) full.toFloat() else state.offset
+                        (full - off).roundToInt().coerceIn(0, full)
+                    }
                     layout(placeable.width, revealed) {
                         placeable.placeRelative(0, 0)
                     }
@@ -675,11 +701,13 @@ fun GistiExpandableDockContent(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .graphicsLayer { alpha = 1f - state.dockProgress() }
+                    // Pinned (item-create) → always full alpha/height; otherwise fade+collapse with the
+                    // dock-expand progress (chat peek chips). One source of truth = dockProgress.
+                    .graphicsLayer { alpha = if (chipsPinned) 1f else 1f - state.dockProgress() }
                     .clipToBounds()
                     .layout { measurable, constraints ->
                         val placeable = measurable.measure(constraints)
-                        val factor = 1f - state.dockProgress()
+                        val factor = if (chipsPinned) 1f else 1f - state.dockProgress()
                         val h = (placeable.height * factor).roundToInt().coerceIn(0, placeable.height)
                         layout(placeable.width, h) { placeable.placeRelative(0, 0) }
                     },
