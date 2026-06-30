@@ -7,7 +7,10 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.BorderStroke
@@ -393,6 +396,12 @@ private fun ChecklistDetailContent(
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
 
+    // Measured chat-dock height (already includes the dock's own ime + navbar insets). Hoisted ABOVE
+    // AppScaffold so the snackbarHost slot can lift snackbars/toasts to sit just above the dock
+    // instead of under it. Written by the dock's onSizeChanged; read by the list's bottom
+    // contentPadding (dockHeight) AND the snackbar host.
+    var dockHeightPx by remember { mutableStateOf(0) }
+
     // ── Continuous-drag chat dock state (per-screen; never shared across two-pane panes) ──
     val dockState = remember { AnchoredDraggableState(initialValue = DockAnchor.Peek) }
     val dockScope = rememberCoroutineScope()
@@ -533,7 +542,8 @@ private fun ChecklistDetailContent(
     }
 
     // ── Attachment: FilePicker launchers ────────────────────────────────────────
-    // Two static pickers (IMAGE + PDF) — avoids re-keying a single picker on type change.
+    // Two static pickers — avoids re-keying a single picker on type change. IMAGE is the photo
+    // gallery; ANY is the "any file or photo" document picker (header row + "+File" tile both use it).
     val imagePicker = rememberFilePickerLauncher(type = FilePickerType.IMAGE) { result ->
         logger.debug(
             "Attachments",
@@ -558,7 +568,7 @@ private fun ChecklistDetailContent(
             )
         )
     }
-    val filePicker = rememberFilePickerLauncher(type = FilePickerType.PDF) { result ->
+    val filePicker = rememberFilePickerLauncher(type = FilePickerType.ANY) { result ->
         logger.debug(
             "Attachments",
             "picker callback: result=${result != null}, pendingItemId=${state.pendingAttachmentItemId}",
@@ -691,8 +701,33 @@ private fun ChecklistDetailContent(
     // own list and scrolls itself (see WeeklyChecklistDetailContent). Keyed on the one-shot signal.
     LaunchedEffect(state.addedItemSignal) {
         if (state.addedItemSignal > 0 && state.checklist.viewMode == ChecklistViewMode.Standard) {
-            val target = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
-            if (listState.layoutInfo.totalItemsCount > 0) listState.animateScrollToItem(target)
+            // The new item is appended as the last ACTIVE (unchecked) row. With separateCompleted on,
+            // the LazyColumn renders a "Completed" section (header + checked rows) BELOW the active
+            // list, so totalItemsCount-1 is a completed row — scrolling there overshoots PAST the new
+            // item and looks like it "landed in the middle". Target the last ACTIVE row instead
+            // (robust whether or not the completed section is expanded).
+            val checkedIds = if (state.separateCompleted) {
+                state.defaultFill?.items?.filter { it.checked }?.map { it.id }?.toSet().orEmpty()
+            } else {
+                emptySet()
+            }
+            val activeNodeCount = if (state.foldersEnabled) {
+                state.levelNodes.count { node ->
+                    node !is LevelNode.Leaf || node.fillItemId !in checkedIds
+                }
+            } else {
+                val visibleIds = state.visibleFillItemIds
+                val visible = state.defaultFill?.items?.let { items ->
+                    if (visibleIds == null) items else items.filter { it.id in visibleIds }
+                }.orEmpty()
+                visible.count { it.id !in checkedIds }
+            }
+            val headerCount = 1 + (if (state.additionalFillsCount > 0) 1 else 0)
+            val total = listState.layoutInfo.totalItemsCount
+            if (total > 0) {
+                val target = (headerCount + activeNodeCount - 1).coerceIn(0, total - 1)
+                listState.animateScrollToItem(target)
+            }
         }
     }
 
@@ -721,9 +756,19 @@ private fun ChecklistDetailContent(
         // zone (matches MainScreen); the dock carries its own navigationBarsPadding.
         contentExtendsBehindNavBar = true,
         snackbarHost = {
+            // Lift the snackbar to sit ABOVE the floating chat dock (the measured dockHeightPx already
+            // includes the dock's ime + navbar insets). When the dock is hidden (edit mode / no chat
+            // content) fall back to a plain imePadding so the snackbar still clears the keyboard.
+            val dockShown = chatDockContent != null && !isEditMode
             SnackbarHost(
                 hostState = snackbarHostState,
-                modifier = Modifier.imePadding(),
+                modifier = if (dockShown) {
+                    Modifier.padding(
+                        bottom = with(LocalDensity.current) { dockHeightPx.toDp() } + AppDimens.SpacingSm
+                    )
+                } else {
+                    Modifier.imePadding()
+                },
             )
         },
         actions = {
@@ -816,7 +861,6 @@ private fun ChecklistDetailContent(
             // gets exactly enough bottom contentPadding to scroll clear of the dock (single owner).
             val hazeState = rememberHazeState()
             val density = LocalDensity.current
-            var dockHeightPx by remember { mutableStateOf(0) }
             val dockHeight = with(density) { dockHeightPx.toDp() }
             val imeBottom = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
             val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -832,12 +876,12 @@ private fun ChecklistDetailContent(
             // the no-dock branch (edit mode) adds the navbar inset itself; when the dock is shown its
             // measured dockHeight already includes its own navigationBarsPadding.
             val listBottomPadding = when {
-                // Item-create mode: the keyboard is up AND the expanded dock floats above it (its own
-                // imePadding lifts it over the keyboard). The list's Modifier.imePadding() already
-                // reserves the keyboard, so here we must ADDITIONALLY reserve the dock body height
-                // ABOVE the keyboard — the measured dock height minus the ime inset the list already
-                // handled — otherwise freshly added items render hidden under the dock.
-                imeVisible && state.itemCreateMode ->
+                // Keyboard up AND the dock is expanded above it (item-create chips OR the AI chat
+                // panel — both float above the keyboard via their own imePadding). The list's
+                // Modifier.imePadding() reserves the keyboard, so here we ADDITIONALLY reserve the
+                // dock body height ABOVE the keyboard (measured dock height minus the ime inset the
+                // list already handled) — otherwise the last items stay hidden under the expanded dock.
+                imeVisible && (state.itemCreateMode || dockExpanded) ->
                     (dockHeight - imeBottom).coerceAtLeast(0.dp) + AppDimens.SpacingXxl
                 // IME open (plain chat over the list): the list's Modifier.imePadding() already shrinks
                 // the viewport above the keyboard (restoring the pre-dock adjustResize "content lifts"
@@ -1171,16 +1215,13 @@ private fun ChecklistDetailContent(
                           .fillMaxWidth()
                           .imePadding()
                           .navigationBarsPadding()
-                          // Freeze the measured height at PEEK so the list's bottom padding stays put
-                          // while the CHAT panel expands upward over the list (no list repad/jump).
-                          // EXCEPTION — item-create mode: there the user adds items that must stay
-                          // visible, so we DO track the expanded dock height (the listBottomPadding
-                          // item-create branch subtracts the ime inset back out).
-                          .onSizeChanged {
-                              if (dockState.targetValue == DockAnchor.Peek || state.itemCreateMode) {
-                                  dockHeightPx = it.height
-                              }
-                          },
+                          // Track the measured dock height in EVERY anchor (peek AND expanded). The
+                          // list's bottom contentPadding is derived from it, so when the chat panel
+                          // expands to half-screen the list gains enough bottom room to scroll its
+                          // last items clear of the dock. (Previously the height was frozen at Peek to
+                          // avoid a list reflow on open — but that trapped the last items under the
+                          // open chat, which is the bug this fixes.)
+                          .onSizeChanged { dockHeightPx = it.height },
                       // The morphing chat content. Peek placeholder = contextual "Ask about <name>…";
                       // chips hosted INSIDE the morph (it fades + collapses them as the dock expands).
                       pillContent = {
@@ -1833,12 +1874,30 @@ internal fun ChecklistItemCard(
         label = "item_highlight",
     )
 
+    // Light completion flourish: a subtle one-shot scale "pop" when the item transitions
+    // unchecked -> checked. Guarded by prevChecked so it fires ONLY on a real check (not on
+    // first composition, and not when an already-checked card is re-bound while scrolling —
+    // LaunchedEffect(item.checked) alone would re-pop on rebind). graphicsLayer scale is
+    // draw-only, so it never reflows the list (no placement jump).
+    var prevChecked by remember(item.id) { mutableStateOf(item.checked) }
+    val completionScale = remember(item.id) { Animatable(1f) }
+    LaunchedEffect(item.id, item.checked) {
+        if (item.checked && !prevChecked) {
+            completionScale.snapTo(1f)
+            completionScale.animateTo(1.06f, tween(durationMillis = 110))
+            completionScale.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy))
+        }
+        prevChecked = item.checked
+    }
+
     val cardModifier = modifier
         .fillMaxWidth()
         .graphicsLayer {
             if (isEditMode && !isDragging) {
                 rotationZ = wiggleAngle
             }
+            scaleX = completionScale.value
+            scaleY = completionScale.value
         }
         .then(if (isEditMode) cardDragModifier else Modifier)
 
@@ -2208,7 +2267,9 @@ internal fun ItemDetailsSheet(
                     title = stringResource(Res.string.detail_item_sheet_action_attachments),
                     subtitle = attachmentsSubtitle,
                     showChevron = false,
-                    onClick = {},
+                    // Tapping the row header opens the any-file/photo picker (same as the "+File" tile),
+                    // so the whole "Attachments — tap to add" row is an add affordance, not just the tiles.
+                    onClick = onAddFileClick,
                 )
 
                 // Inline thumbnails below — not wrapped in ItemDetailsSheetRow.

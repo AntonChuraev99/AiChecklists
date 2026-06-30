@@ -17,4 +17,7 @@ enum class FilePickerType {
     PDF,
     TEXT,
     AUDIO,
+
+    /** Any file (no MIME restriction) — the document picker accepts every type, images included. */
+    ANY,
 }

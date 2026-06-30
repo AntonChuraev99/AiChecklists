@@ -43,6 +43,7 @@ actual fun rememberFilePickerLauncher(
         FilePickerType.PDF -> arrayOf("application/pdf")
         FilePickerType.TEXT -> arrayOf("text/plain", "text/*")
         FilePickerType.AUDIO -> arrayOf("audio/*")
+        FilePickerType.ANY -> arrayOf("*/*")
     }
 
     val docLauncher = rememberLauncherForActivityResult(
@@ -63,7 +64,8 @@ actual fun rememberFilePickerLauncher(
                 )
                 FilePickerType.PDF,
                 FilePickerType.TEXT,
-                FilePickerType.AUDIO -> docLauncher.launch(mimeTypes)
+                FilePickerType.AUDIO,
+                FilePickerType.ANY -> docLauncher.launch(mimeTypes)
             }
         }
     }

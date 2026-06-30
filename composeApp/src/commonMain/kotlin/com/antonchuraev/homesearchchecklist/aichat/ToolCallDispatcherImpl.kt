@@ -100,13 +100,20 @@ class ToolCallDispatcherImpl(
         val (checklist, fill) = resolveChecklistAndFill(toolCall.checklistHint)
             ?: return resolveChecklistFailure(toolCall.checklistHint)
 
-        // Add item to fill
-        val newFillItem = ChecklistFillItem(text = toolCall.itemText, checked = false)
+        // Create the template item first so the fill row can carry the stable templateItemId link.
+        // Every other add path links them; without the link the row renders as an UNLINKED legacy row
+        // and folder-mode dumps it at the bottom regardless of its template position — that mismatch
+        // is what makes later-added items look like they "land in the middle".
+        val newTemplateItem = ChecklistItem(text = toolCall.itemText, checked = false)
+        val newFillItem = ChecklistFillItem(
+            text = toolCall.itemText,
+            checked = false,
+            templateItemId = newTemplateItem.id,
+        )
         val updatedFill = fill.copy(items = fill.items + newFillItem)
         checklistRepository.updateFill(updatedFill)
 
         // Add item to template (dual-update as per CLAUDE.md)
-        val newTemplateItem = ChecklistItem(text = toolCall.itemText, checked = false)
         val updatedChecklist = checklist.copy(items = checklist.items + newTemplateItem)
         checklistRepository.updateChecklistTemplate(updatedChecklist)
 
@@ -458,11 +465,15 @@ class ToolCallDispatcherImpl(
         val (checklist, fill) = resolveChecklistAndFill(toolCall.checklistHint)
             ?: return resolveChecklistFailure(toolCall.checklistHint)
 
-        val newFillItems = toolCall.itemTexts.map { ChecklistFillItem(text = it, checked = false) }
+        // Pair each template item with its fill row via templateItemId (see handleAddItem note) so the
+        // rows are never unlinked legacy rows that folder-mode would dump at the bottom.
+        val newTemplateItems = toolCall.itemTexts.map { ChecklistItem(text = it, checked = false) }
+        val newFillItems = newTemplateItems.map {
+            ChecklistFillItem(text = it.text, checked = false, templateItemId = it.id)
+        }
         val updatedFill = fill.copy(items = fill.items + newFillItems)
         checklistRepository.updateFill(updatedFill)
 
-        val newTemplateItems = toolCall.itemTexts.map { ChecklistItem(text = it, checked = false) }
         val updatedChecklist = checklist.copy(items = checklist.items + newTemplateItems)
         checklistRepository.updateChecklistTemplate(updatedChecklist)
 

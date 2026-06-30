@@ -265,6 +265,17 @@ class ChecklistDetailViewModel(
             }
         }
 
+        // Fallback for UNLINKED fill rows (templateItemId == null — legacy rows, or rows added by a
+        // path that didn't set the link, e.g. the AI-chat add). Keyed by text so a template leaf whose
+        // fill row lost its link can still be matched and rendered at its TEMPLATE position, instead of
+        // being dumped at the bottom by the legacy-rows pass below. First unlinked row per text wins.
+        val unlinkedFillIdByText: Map<String, String> = buildMap {
+            for (fillItem in fillItems) {
+                if (fillItem.templateItemId != null) continue
+                if (!containsKey(fillItem.text)) put(fillItem.text, fillItem.id)
+            }
+        }
+
         val folderModels = mutableListOf<FolderUiModel>()
         val levelNodes = mutableListOf<LevelNode>()
         val visibleIds = LinkedHashSet<String>()
@@ -288,9 +299,13 @@ class ChecklistDetailViewModel(
                 folderModels += model
                 levelNodes += LevelNode.Folder(model)
             } else {
-                // Leaf — surface only if it has a fill row at this level (its checked/note/attachment
-                // state lives there). A template leaf without a fill row is not rendered.
-                val fillId = fillIdByTemplateId[child.id] ?: continue
+                // Leaf — resolve its fill row by the stable templateItemId link first; fall back to a
+                // text match against UNLINKED legacy rows so a leaf whose row lost its link still
+                // renders at its TEMPLATE position (not dumped at the bottom by the legacy-rows pass).
+                // This was the "new item lands in the middle" bug: linked new items render here while
+                // unlinked old items got pushed PAST them by the fallback below.
+                val fillId = fillIdByTemplateId[child.id] ?: unlinkedFillIdByText[child.text] ?: continue
+                if (fillId in visibleIds) continue // guard: one unlinked row matched by two same-text leaves
                 visibleIds += fillId
                 levelNodes += LevelNode.Leaf(fillId)
             }
@@ -301,7 +316,10 @@ class ChecklistDetailViewModel(
         // template node to interleave with) so they stay visible and reorderable.
         if (currentFolderId == null) {
             for (fillItem in fillItems) {
-                if (fillItem.templateItemId == null) {
+                // Only TRULY orphaned rows — those NOT already matched to a template leaf by id or by
+                // the text fallback above. Without the `!in visibleIds` guard a text-matched row would
+                // be appended a second time (duplicate LazyColumn key).
+                if (fillItem.templateItemId == null && fillItem.id !in visibleIds) {
                     visibleIds += fillItem.id
                     levelNodes += LevelNode.Leaf(fillItem.id)
                 }
@@ -1426,15 +1444,20 @@ class ChecklistDetailViewModel(
 
         val updatedFill = fill.copy(items = fill.items + newFillItem)
         val updatedChecklist = state.checklist.copy(items = state.checklist.items + newChecklistItem)
-        // Refresh folder visibility too so a just-added item shows immediately in folder mode
-        // (otherwise it'd be absent from visibleFillItemIds / the reorderable list until the next
-        // Room emission).
+        // Mirror updateOrCreateContentState so the optimistic snapshot is exactly what the next Room
+        // emission will produce: sort the fill (priority float) and rebuild the folder tree from it.
+        // Crucially push the updated fill into state too — otherwise visibleFillItemIds/levelNodes
+        // reference the new leaf while defaultFill still lacks its backing row, so the screen's
+        // fillItemById lookup misses it for one frame (the new row can't render) and the post-add
+        // auto-scroll fires against a stale item count.
+        val optimisticFill = updatedFill.withSortedItems()
+        val optimisticSnapshot = buildFolderState(updatedChecklist, optimisticFill)
         updateContentState {
-            val snapshot = buildFolderState(updatedChecklist, updatedFill)
             it.copy(
                 checklist = updatedChecklist,
-                visibleFillItemIds = snapshot.visibleFillItemIds,
-                levelNodes = snapshot.levelNodes,
+                defaultFill = optimisticFill,
+                visibleFillItemIds = optimisticSnapshot.visibleFillItemIds,
+                levelNodes = optimisticSnapshot.levelNodes,
                 // Bump the one-shot scroll signal so the screen scrolls to the new item.
                 addedItemSignal = it.addedItemSignal + 1,
             )
@@ -2557,9 +2580,18 @@ class ChecklistDetailViewModel(
 
         pendingUndoJob?.cancel()
 
+        // Push the post-delete fill into state immediately (same invariant as addItemWithParse):
+        // otherwise defaultFill / levelNodes / visibleFillItemIds keep referencing the removed row
+        // until Room re-emits. A follow-up add in that window reads a stale defaultFill → wrong
+        // indices, order corruption and intermittent LazyColumn placement-animation jumps.
+        val optimisticFill = updatedFill.withSortedItems()
+        val snapshot = buildFolderState(updatedChecklist, optimisticFill)
         updateContentState {
             it.copy(
                 checklist = updatedChecklist,
+                defaultFill = optimisticFill,
+                visibleFillItemIds = snapshot.visibleFillItemIds,
+                levelNodes = snapshot.levelNodes,
                 pendingUndoItem = UndoableDeleteItem(
                     fillItem = item,
                     checklistItemText = item.text,
@@ -2624,9 +2656,17 @@ class ChecklistDetailViewModel(
         }
         val restoredChecklist = state.checklist.copy(items = restoredChecklistItems)
 
+        // Surface the restored item immediately (mirror of the delete/add fixes): the re-linked
+        // restoredFill is the optimistic base, so the restored row is present in
+        // defaultFill / levelNodes / visibleFillItemIds before Room re-emits.
+        val optimisticFill = restoredFill.withSortedItems()
+        val snapshot = buildFolderState(restoredChecklist, optimisticFill)
         updateContentState {
             it.copy(
                 checklist = restoredChecklist,
+                defaultFill = optimisticFill,
+                visibleFillItemIds = snapshot.visibleFillItemIds,
+                levelNodes = snapshot.levelNodes,
                 pendingUndoItem = null,
             )
         }
@@ -2661,9 +2701,17 @@ class ChecklistDetailViewModel(
         }
         val updatedChecklist = state.checklist.copy(items = updatedChecklistItems)
 
+        // Push the post-delete fill into state immediately (same invariant as addItemWithParse /
+        // swipeDeleteItem): keep defaultFill / levelNodes / visibleFillItemIds free of the removed
+        // row before Room re-emits, so a follow-up add does not read a stale fill.
+        val optimisticFill = updatedFill.withSortedItems()
+        val snapshot = buildFolderState(updatedChecklist, optimisticFill)
         updateContentState {
             it.copy(
                 checklist = updatedChecklist,
+                defaultFill = optimisticFill,
+                visibleFillItemIds = snapshot.visibleFillItemIds,
+                levelNodes = snapshot.levelNodes,
                 itemDetailsSheetFor = null,
             )
         }

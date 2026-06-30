@@ -168,6 +168,12 @@ fun MainScreen(
 
     val snackbarHostState = remember { SnackbarHostState() }
 
+    // Measured chat-dock height (already includes the dock's navbar inset). Hoisted ABOVE AppScaffold
+    // so the snackbarHost slot can lift snackbars/toasts to sit just above the dock instead of under
+    // it. Written by the dock's onSizeChanged; read by the list's bottom contentPadding (dockHeight)
+    // AND the snackbar host.
+    var dockHeightPx by remember { mutableStateOf(0) }
+
     val msgSignInSuccess = stringResource(Res.string.google_sign_in_success)
     val msgSignInFailed = stringResource(Res.string.google_sign_in_failed)
     val msgSignInRequired = stringResource(Res.string.google_sign_in_required)
@@ -221,9 +227,18 @@ fun MainScreen(
 
     AppScaffold(
         snackbarHost = {
+            // Lift the snackbar to sit ABOVE the floating chat dock (the measured dockHeightPx already
+            // includes the dock's navbar inset). When the dock is hidden fall back to navigationBarsPadding.
+            val dockShown = chatDockContent != null && !hideBottomBar && !isEditMode
             SnackbarHost(
                 hostState = snackbarHostState,
-                modifier = Modifier.navigationBarsPadding(),
+                modifier = if (dockShown) {
+                    Modifier.padding(
+                        bottom = with(LocalDensity.current) { dockHeightPx.toDp() } + AppDimens.SpacingSm
+                    )
+                } else {
+                    Modifier.navigationBarsPadding()
+                },
             )
         },
         title = "",
@@ -310,7 +325,6 @@ fun MainScreen(
                 // dock carries its own navigationBarsPadding, the list never does).
                 val hazeState = rememberHazeState()
                 val density = LocalDensity.current
-                var dockHeightPx by remember { mutableStateOf(0) }
                 val dockHeight = with(density) { dockHeightPx.toDp() }
                 // Same visibility as the old bottomBar (we are already inside the Success branch).
                 val showDock = chatDockContent != null && !hideBottomBar && !isEditMode

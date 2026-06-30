@@ -21,7 +21,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.automirrored.outlined.Article
 import androidx.compose.material.icons.outlined.AccountCircle
-import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Campaign
 import androidx.compose.material.icons.outlined.Feedback
@@ -68,11 +67,9 @@ import aichecklists.core.designsystem.generated.resources.drawer_item_home
 import aichecklists.core.designsystem.generated.resources.drawer_sign_in
 import aichecklists.core.designsystem.generated.resources.drawer_sign_out
 import aichecklists.core.designsystem.generated.resources.today_title
-import aichecklists.core.designsystem.generated.resources.drawer_logo_content_description
 import aichecklists.core.designsystem.generated.resources.drawer_section_about
 import aichecklists.core.designsystem.generated.resources.drawer_section_help
 import aichecklists.core.designsystem.generated.resources.drawer_section_navigate
-import aichecklists.core.designsystem.generated.resources.drawer_tagline
 import aichecklists.core.designsystem.generated.resources.drawer_version_label
 import aichecklists.core.designsystem.generated.resources.main_menu_leave_feedback
 import aichecklists.core.designsystem.generated.resources.main_menu_rate_app
@@ -140,8 +137,6 @@ fun AppNavigationDrawerContent(
             .fillMaxHeight()
             .verticalScroll(rememberScrollState())
     ) {
-        DrawerBrandHeader()
-
         // Cross-promo store badge: points the user to the OTHER platform.
         // Lives inside the scrollable Column (not a pinned footer) so it never
         // gets clipped on landscape / large font scales.
@@ -314,48 +309,6 @@ fun AppNavigationDrawerContent(
 
         Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
         DrawerFooter(versionName)
-    }
-}
-
-@Composable
-private fun DrawerBrandHeader() {
-    // Compact one-line brand row: 32dp logo tile + "Gisti" + "· AI Checklists"
-    // on a single baseline. Trimmed vertical padding (Md, not Lg) frees room for
-    // the cross-promo badge that sits directly below.
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(
-                horizontal = AppDimens.SpacingLg,
-                vertical = AppDimens.SpacingMd
-            ),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(32.dp)
-                .clip(MaterialTheme.shapes.small)
-                .background(MaterialTheme.colorScheme.primaryContainer),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.AutoAwesome,
-                contentDescription = stringResource(Res.string.drawer_logo_content_description),
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.size(20.dp)
-            )
-        }
-        Text(
-            text = "Gisti",
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Text(
-            text = stringResource(Res.string.drawer_tagline),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 

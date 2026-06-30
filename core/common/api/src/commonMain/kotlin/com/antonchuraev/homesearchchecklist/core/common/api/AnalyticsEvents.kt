@@ -121,6 +121,17 @@ object AnalyticsEvents {
         const val PREVIEW_SHOWN = "ai_chat_preview_shown"
         const val PREVIEW_CONFIRMED = "ai_chat_preview_confirmed"
         const val PREVIEW_REJECTED = "ai_chat_preview_rejected"
+
+        // ── Voice input (mic in the chat input row → Cloud Function transcription) ──
+        // One event per mic action so the funnel (tapped → cancelled / transcribed / failed) is
+        // measurable: until these shipped the voice feature was completely un-instrumented, so
+        // "is voice popular?" was unanswerable. VOICE_TRANSCRIBED carries CHAR_LEN; the FAILED
+        // event carries OUTCOME (file_missing / network_error / service_error / insufficient_credits).
+        const val VOICE_STARTED = "ai_chat_voice_started"
+        const val VOICE_CANCELLED = "ai_chat_voice_cancelled"
+        const val VOICE_TRANSCRIBED = "ai_chat_voice_transcribed"
+        const val VOICE_TRANSCRIBE_EMPTY = "ai_chat_voice_transcribe_empty"
+        const val VOICE_TRANSCRIBE_FAILED = "ai_chat_voice_transcribe_failed"
     }
 
     // ─── Paywall & purchase funnel ───────────────────────────────────────────

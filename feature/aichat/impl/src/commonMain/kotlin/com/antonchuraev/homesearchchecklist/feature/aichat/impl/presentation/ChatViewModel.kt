@@ -345,8 +345,10 @@ class ChatViewModel(
             }
 
             ChatScreenIntent.OnVoiceRecordingStarted -> {
-                // Phase 1: bookkeep state. Phase 3 will add AudioRecorder + permission check.
-                // Emit RequestRecordAudioPermission so the UI can ask at the right moment.
+                // Mic tapped — user initiated a voice recording. Track EVERY mic action (start →
+                // cancel / transcribe / fail) so we can measure how popular voice input is and where
+                // it drops off. Emit RequestRecordAudioPermission so the UI can ask at the right moment.
+                analytics.event(name = AnalyticsEvents.Chat.VOICE_STARTED)
                 viewModelScope.launch {
                     _sideEffect.emit(ChatScreenSideEffect.RequestRecordAudioPermission)
                 }
@@ -1260,6 +1262,7 @@ class ChatViewModel(
 
         if (recordingPath == null) {
             // User cancelled — silent skip FORBIDDEN, emit snackbar
+            analytics.event(name = AnalyticsEvents.Chat.VOICE_CANCELLED)
             viewModelScope.launch {
                 _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_recording_cancelled"))
             }
@@ -1273,6 +1276,10 @@ class ChatViewModel(
             val locale = localeProvider.current()
             when (val outcome = aiChatRepository.transcribeAudio(recordingPath, mimeType, locale)) {
                 is TranscriptionOutcome.Success -> {
+                    analytics.event(
+                        name = AnalyticsEvents.Chat.VOICE_TRANSCRIBED,
+                        params = mapOf(AnalyticsParams.CHAR_LEN to outcome.transcript.length),
+                    )
                     // Append transcript to existing input so the user can dictate multiple times
                     val currentInput = _screenState.value.inputText
                     val merged = if (currentInput.isBlank()) outcome.transcript
@@ -1283,16 +1290,31 @@ class ChatViewModel(
                     )
                 }
                 TranscriptionOutcome.EmptyTranscript -> {
+                    analytics.event(name = AnalyticsEvents.Chat.VOICE_TRANSCRIBE_EMPTY)
                     _screenState.value = _screenState.value.copy(isTranscribing = false)
                     _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_transcribe_empty"))
                 }
                 TranscriptionOutcome.FileMissing,
                 TranscriptionOutcome.NetworkError,
                 TranscriptionOutcome.ServiceError -> {
+                    val reason = when (outcome) {
+                        TranscriptionOutcome.FileMissing -> "file_missing"
+                        TranscriptionOutcome.NetworkError -> "network_error"
+                        TranscriptionOutcome.ServiceError -> "service_error"
+                        else -> "unknown"
+                    }
+                    analytics.event(
+                        name = AnalyticsEvents.Chat.VOICE_TRANSCRIBE_FAILED,
+                        params = mapOf(AnalyticsParams.OUTCOME to reason),
+                    )
                     _screenState.value = _screenState.value.copy(isTranscribing = false)
                     _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_transcribe_error"))
                 }
                 TranscriptionOutcome.InsufficientCredits -> {
+                    analytics.event(
+                        name = AnalyticsEvents.Chat.VOICE_TRANSCRIBE_FAILED,
+                        params = mapOf(AnalyticsParams.OUTCOME to "insufficient_credits"),
+                    )
                     _screenState.value = _screenState.value.copy(isTranscribing = false)
                     _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_insufficient_credits"))
                 }
