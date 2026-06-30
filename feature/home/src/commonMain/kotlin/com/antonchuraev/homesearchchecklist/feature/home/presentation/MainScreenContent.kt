@@ -212,7 +212,7 @@ private fun MainScreenContentLazyColumn(
             top = AppDimens.SpacingLg,
             bottom = contentBottomPadding
         ),
-        verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         if (screenState.showSyncBanner) {
             item(key = "sync_banner") {
@@ -250,9 +250,6 @@ private fun MainScreenContentLazyColumn(
                 }
             }
         } else {
-            item(key = "my_lists_header") {
-                MyListsHeader(count = localList.size)
-            }
             items(
                 items = localList,
                 key = { it.checklist.id }
@@ -390,15 +387,8 @@ private fun MainScreenContentLazyGrid(
             bottom = contentBottomPadding,
         ),
         horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd),
-        verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        item(
-            key = "my_lists_header",
-            span = { GridItemSpan(maxLineSpan) },
-        ) {
-            MyListsHeader(count = screenState.checklists.size)
-        }
-
         items(
             items = screenState.checklists,
             key = { it.checklist.id },
@@ -426,35 +416,6 @@ private fun MainScreenContentLazyGrid(
                 )
             }
         }
-    }
-}
-
-/**
- * Section header for the "My lists" group — uppercase caps label + count, per the
- * Gisti variant-D design (gisti-screens.jsx RxHome "My lists" header).
- */
-@Composable
-private fun MyListsHeader(count: Int) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = AppDimens.SpacingXs),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Text(
-            text = stringResource(Res.string.main_my_lists).uppercase(),
-            style = MaterialTheme.typography.labelMedium.copy(
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.5.sp,
-            ),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = count.toString(),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-        )
     }
 }
 
