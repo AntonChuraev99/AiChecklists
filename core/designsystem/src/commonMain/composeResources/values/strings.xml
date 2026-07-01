@@ -1352,6 +1352,10 @@
     <string name="google_sign_in_success">Signed in successfully</string>
     <string name="google_sign_in_failed">Sign-in failed. Please try again.</string>
     <string name="google_sign_in_required">Sign in with Google to use AI features</string>
+    <string name="sign_in_no_account">No Google account found on this device. Add one in your device settings, then try again.</string>
+    <string name="sign_in_cancelled">Sign-in cancelled.</string>
+    <string name="sign_in_unavailable">Google sign-in is temporarily unavailable. Please try again later.</string>
+    <string name="sign_in_network">No internet connection. Check your network and try again.</string>
 
     <!-- Agent plan-card (Phase 2d: agentic loop) -->
     <string name="chat_agent_plan_header">Apply these actions?</string>

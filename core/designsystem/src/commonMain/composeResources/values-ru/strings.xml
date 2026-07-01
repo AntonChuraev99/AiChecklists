@@ -1201,6 +1201,10 @@
     <string name="google_sign_in_success">Вход выполнен</string>
     <string name="google_sign_in_failed">Не удалось войти. Попробуйте снова.</string>
     <string name="google_sign_in_required">Войдите через Google для использования AI</string>
+    <string name="sign_in_no_account">На устройстве нет аккаунта Google. Добавьте его в настройках устройства и попробуйте снова.</string>
+    <string name="sign_in_cancelled">Вход отменён.</string>
+    <string name="sign_in_unavailable">Вход через Google временно недоступен. Попробуйте позже.</string>
+    <string name="sign_in_network">Нет подключения к интернету. Проверьте сеть и попробуйте снова.</string>
 
     <!-- Agent plan-card (Phase 2d: agentic loop) -->
     <string name="chat_agent_plan_header">Выполнить эти действия?</string>

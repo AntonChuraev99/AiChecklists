@@ -71,6 +71,10 @@ import aichecklists.core.designsystem.generated.resources.done
 import aichecklists.core.designsystem.generated.resources.google_sign_in_failed
 import aichecklists.core.designsystem.generated.resources.google_sign_in_required
 import aichecklists.core.designsystem.generated.resources.google_sign_in_success
+import aichecklists.core.designsystem.generated.resources.sign_in_no_account
+import aichecklists.core.designsystem.generated.resources.sign_in_cancelled
+import aichecklists.core.designsystem.generated.resources.sign_in_unavailable
+import aichecklists.core.designsystem.generated.resources.sign_in_network
 import aichecklists.core.designsystem.generated.resources.main_ask_gisti_placeholder
 import aichecklists.core.designsystem.generated.resources.main_create_checklist_action
 import aichecklists.core.designsystem.generated.resources.main_create_with_ai_action
@@ -177,6 +181,10 @@ fun MainScreen(
     val msgSignInSuccess = stringResource(Res.string.google_sign_in_success)
     val msgSignInFailed = stringResource(Res.string.google_sign_in_failed)
     val msgSignInRequired = stringResource(Res.string.google_sign_in_required)
+    val msgSignInNoAccount = stringResource(Res.string.sign_in_no_account)
+    val msgSignInCancelled = stringResource(Res.string.sign_in_cancelled)
+    val msgSignInUnavailable = stringResource(Res.string.sign_in_unavailable)
+    val msgSignInNetwork = stringResource(Res.string.sign_in_network)
 
     LaunchedEffect(viewModel) {
         viewModel.sideEffect.collect { effect ->
@@ -186,6 +194,10 @@ fun MainScreen(
                         "google_sign_in_success" -> msgSignInSuccess
                         "google_sign_in_failed" -> msgSignInFailed
                         "google_sign_in_required" -> msgSignInRequired
+                        "sign_in_no_account" -> msgSignInNoAccount
+                        "sign_in_cancelled" -> msgSignInCancelled
+                        "sign_in_unavailable" -> msgSignInUnavailable
+                        "sign_in_network" -> msgSignInNetwork
                         else -> effect.messageKey
                     }
                     snackbarHostState.showSnackbar(text)

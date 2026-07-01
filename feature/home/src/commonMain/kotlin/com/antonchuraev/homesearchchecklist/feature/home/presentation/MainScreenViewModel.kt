@@ -254,11 +254,27 @@ class MainScreenViewModel(
                         AnalyticsEvents.Auth.LOGIN_FAILED,
                         mapOf(AnalyticsParams.ERROR_CODE to "null_id_token"),
                     )
-                    _sideEffect.emit(MainScreenSideEffect.ShowSnackbar("google_sign_in_failed"))
+                    _sideEffect.emit(MainScreenSideEffect.ShowSnackbar("sign_in_unavailable"))
                     return@launch
                 }
                 val platform = getPlatformName()
-                userDataRepository.linkGoogleAccount(idToken, platform)
+                // Google sign-in already succeeded above; the account-linking write is a distinct
+                // failure surface. Without this guard a throw here emits neither login_success nor
+                // login_failed — the linking step would fail silently in analytics and show the
+                // user nothing.
+                try {
+                    userDataRepository.linkGoogleAccount(idToken, platform)
+                } catch (e: Exception) {
+                    analyticsTracker.event(
+                        AnalyticsEvents.Auth.LOGIN_FAILED,
+                        buildMap {
+                            put(AnalyticsParams.ERROR_CODE, "link_failed")
+                            e.message?.let { put(AnalyticsParams.ERROR_MESSAGE, it) }
+                        },
+                    )
+                    _sideEffect.emit(MainScreenSideEffect.ShowSnackbar("sign_in_unavailable"))
+                    return@launch
+                }
                 analyticsTracker.event(AnalyticsEvents.Auth.LOGIN_SUCCESS)
                 _sideEffect.emit(MainScreenSideEffect.ShowSnackbar("google_sign_in_success"))
             }.onFailure { e ->
@@ -269,8 +285,32 @@ class MainScreenViewModel(
                         e.message?.let { put(AnalyticsParams.ERROR_MESSAGE, it) }
                     },
                 )
-                _sideEffect.emit(MainScreenSideEffect.ShowSnackbar("google_sign_in_failed"))
+                _sideEffect.emit(MainScreenSideEffect.ShowSnackbar(signInErrorSnackbarKey(e)))
             }
+        }
+    }
+
+    /**
+     * Maps a Google sign-in failure to a user-facing snackbar key with a concrete explanation.
+     * Matches on the STABLE Credential Manager type id that the Android auth provider forwards as
+     * the message prefix (e.g. "android.credentials.GetCredentialException.TYPE_NO_CREDENTIAL: ..."
+     * — see AndroidGoogleAuthProvider.signIn), which is not R8-obfuscated. Unknown causes fall back
+     * to the generic key so the user always gets some explanation instead of a bare "try again".
+     */
+    private fun signInErrorSnackbarKey(error: Throwable): String {
+        val msg = error.message.orEmpty()
+        return when {
+            msg.contains("TYPE_NO_CREDENTIAL", ignoreCase = true) ||
+                msg.contains("No credentials", ignoreCase = true) -> "sign_in_no_account"
+            msg.contains("TYPE_USER_CANCELED", ignoreCase = true) ||
+                msg.contains("cancel", ignoreCase = true) -> "sign_in_cancelled"
+            msg.contains("SignInWithIdp", ignoreCase = true) ||
+                msg.contains("blocked", ignoreCase = true) ||
+                msg.contains("internal error", ignoreCase = true) -> "sign_in_unavailable"
+            msg.contains("network", ignoreCase = true) ||
+                msg.contains("TYPE_INTERRUPTED", ignoreCase = true) ||
+                msg.contains("timeout", ignoreCase = true) -> "sign_in_network"
+            else -> "google_sign_in_failed"
         }
     }
 
