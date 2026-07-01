@@ -4,9 +4,11 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AppResult
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentCloudStoragePort
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePort
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Attachment
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -95,6 +97,74 @@ class AttachmentMaterializeTest {
 
         assertFalse(result, "a failed cloud download leaves no local bytes → false")
         assertEquals(1, cloud.downloadCalls.size, "the download was attempted exactly once")
+    }
+
+    @Test
+    fun ensureAttachmentLocal_downloadFails_invokesOnFailure_withReasonAndThrowable() = runTest {
+        val local = FakeLocalStorage(sizeByPath = emptyMap()) // sizeOf == 0
+        val cloud = FakeCloudStorage(downloadResult = AppResult.Error(Exception("CORS blocked")))
+        var reportedReason: String? = null
+        var reportedThrowable: Throwable? = null
+
+        val result = ensureAttachmentLocal(
+            attachment = attachment(path = "/local/photo.jpg", storagePath = "users/u/att.jpg"),
+            local = local,
+            cloud = cloud,
+            onFailure = { reason, throwable ->
+                reportedReason = reason
+                reportedThrowable = throwable
+            },
+        )
+
+        assertFalse(result, "a failed cloud download leaves no local bytes → false")
+        assertEquals("CORS blocked", reportedReason, "onFailure carries the download reason for analytics")
+        assertEquals(
+            "CORS blocked",
+            reportedThrowable?.message,
+            "onFailure carries the underlying throwable for Crashlytics recordException",
+        )
+    }
+
+    @Test
+    fun ensureAttachmentLocal_success_doesNotInvokeOnFailure() = runTest {
+        val local = FakeLocalStorage(sizeByPath = emptyMap()) // sizeOf == 0
+        val cloud = FakeCloudStorage(downloadResult = AppResult.Success(Unit))
+        var failed = false
+
+        ensureAttachmentLocal(
+            attachment = attachment(path = "/local/photo.jpg", storagePath = "users/u/att.jpg"),
+            local = local,
+            cloud = cloud,
+            onFailure = { _, _ -> failed = true },
+        )
+
+        assertFalse(failed, "a successful materialize must not report a load failure")
+    }
+
+    @Test
+    fun ensureAttachmentLocal_downloadCancelled_propagates_andDoesNotReportFailure() = runTest {
+        // A cancelled download = the thumbnail/viewer left composition (scroll / swipe / close), NOT
+        // a load failure. It must propagate as cancellation and must NOT fire onFailure — otherwise
+        // every scroll-away pollutes the attachment_load_failed funnel + Crashlytics.
+        val local = FakeLocalStorage(sizeByPath = emptyMap()) // sizeOf == 0
+        val cloud = object : AttachmentCloudStoragePort {
+            override suspend fun download(storagePath: String, localPath: String): AppResult<Unit> =
+                throw CancellationException("scrolled away mid-download")
+            override suspend fun upload(localPath: String, storagePath: String) = AppResult.Success(Unit)
+            override suspend fun delete(storagePath: String) = AppResult.Success(Unit)
+        }
+        var reported = false
+
+        assertFailsWith<CancellationException> {
+            ensureAttachmentLocal(
+                attachment = attachment(path = "/local/photo.jpg", storagePath = "users/u/att.jpg"),
+                local = local,
+                cloud = cloud,
+                onFailure = { _, _ -> reported = true },
+            )
+        }
+
+        assertFalse(reported, "a cancelled download must not be reported as a load failure")
     }
 
     // ── Fakes ─────────────────────────────────────────────────────────────────

@@ -4,6 +4,7 @@ import android.net.Uri
 import android.util.Log
 import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.StorageException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
@@ -40,14 +41,35 @@ actual class AttachmentCloudStorage : AttachmentCloudStoragePort {
 
     actual override suspend fun download(storagePath: String, localPath: String): AppResult<Unit> =
         withContext(Dispatchers.IO) {
+            val target = File(localPath)
+            target.parentFile?.mkdirs()
+            var tmp: File? = null
             runCatching {
-                val target = File(localPath)
-                target.parentFile?.mkdirs()
+                // Download to a UNIQUE temp sibling, then atomically promote it to [localPath].
+                // getFile() streams bytes straight to disk, and this call lives in a Compose
+                // LaunchedEffect that is cancelled the moment the thumbnail leaves composition
+                // (scroll / swipe / sheet close). A cancelled or failed download must NOT leave a
+                // partial file at [localPath]: the materialize probe treats any sizeOf>0 as "Ready",
+                // so a truncated file renders as a permanent (and intermittent-looking) broken image.
+                // A unique temp name also stops concurrent downloads of the same image (thumbnail +
+                // fullscreen) from interleaving bytes into one shared .part.
+                val t = File.createTempFile("dl_", ".part", target.parentFile).also { tmp = it }
                 storage.reference.child(storagePath)
-                    .getFile(target)
+                    .getFile(t)
                     .await()
+                // renameTo is atomic within the same directory. If it loses the promote race (a
+                // concurrent download already produced target) or the FS refuses, an existing
+                // complete target is still success; otherwise it is a genuine failure.
+                if (!t.renameTo(target) && !target.exists()) {
+                    error("rename failed: no target at ${target.path}")
+                }
                 AppResult.Success(Unit)
             }.getOrElse { e ->
+                tmp?.delete() // never leave a partial temp behind
+                // Cancellation = the thumbnail/viewer left composition, NOT a load failure. Rethrow
+                // so structured concurrency unwinds cleanly and we do NOT fire a false
+                // attachment_load_failed event + Crashlytics recordException on every scroll-away.
+                if (e is CancellationException) throw e
                 Log.e(TAG, "download failed: $storagePath -> $localPath: ${e.message}", e)
                 AppResult.Error(Exception(e.message, e))
             }

@@ -19,6 +19,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -103,10 +107,17 @@ private fun ImageThumbnailContent(attachment: Attachment) {
 
         AttachmentMaterializeState.Ready -> {
             val context = LocalPlatformContext.current
-            val request = ImageRequest.Builder(context)
-                .data(attachment.path)
-                .crossfade(true)
-                .build()
+            val reportError = rememberAttachmentLoadErrorReporter()
+            // Stable request across recompositions (else Coil may restart and re-fire onError), and a
+            // once-per-path guard so a broken image reports the decode failure exactly once, never a
+            // per-recomposition storm of events + Crashlytics recordException.
+            val request = remember(attachment.path, context) {
+                ImageRequest.Builder(context)
+                    .data(attachment.path)
+                    .crossfade(true)
+                    .build()
+            }
+            var reported by remember(attachment.path) { mutableStateOf(false) }
 
             AsyncImage(
                 model = request,
@@ -115,6 +126,14 @@ private fun ImageThumbnailContent(attachment: Attachment) {
                 modifier = Modifier.fillMaxSize(),
                 placeholder = rememberVectorPainter(Icons.AutoMirrored.Filled.InsertDriveFile),
                 error = rememberVectorPainter(Icons.Filled.BrokenImage),
+                // Materialize said Ready, yet Coil could not decode the local bytes (partial/corrupt
+                // cache) — the previously-invisible half of the "broken image" bug. Report it once.
+                onError = { errorState ->
+                    if (!reported) {
+                        reported = true
+                        reportError(attachment, STAGE_DECODE, errorState.result.throwable)
+                    }
+                },
             )
         }
     }

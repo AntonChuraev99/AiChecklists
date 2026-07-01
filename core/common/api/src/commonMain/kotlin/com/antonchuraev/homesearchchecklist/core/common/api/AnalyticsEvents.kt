@@ -198,6 +198,23 @@ object AnalyticsEvents {
         const val ACTION_CLICK = "update_feed_action_click"
     }
 
+    // ─── Attachments (image/file thumbnail + cloud materialize) ──────────────
+    object Attachment {
+        /**
+         * An attachment thumbnail/viewer failed to display — the intermittent "broken image"
+         * placeholder the user sees. Fires for BOTH failure stages so the bug is finally
+         * attributable (until this shipped a decode failure on a materialized-Ready file was
+         * completely invisible — no log, no event):
+         *  - [AnalyticsParams.STAGE] = "materialize" — the cloud download (or local-existence probe)
+         *    produced no local bytes at all. Carries [AnalyticsParams.HAS_STORAGE_PATH] +
+         *    [AnalyticsParams.ERROR_MESSAGE] (Storage/App Check/CORS reason).
+         *  - [AnalyticsParams.STAGE] = "decode" — materialize said Ready (local file present) but
+         *    Coil could not decode the bytes → the classic partial/corrupt-cache case.
+         * Always carries [AnalyticsParams.MIME_TYPE] when known.
+         */
+        const val LOAD_FAILED = "attachment_load_failed"
+    }
+
     /**
      * New-user activation bundle (behind RC flag `activation_bundle_v1`).
      *
@@ -285,6 +302,11 @@ object AnalyticsParams {
     // Generic error diagnostics (login_failed etc.): code = stable type/class id, message = human text.
     const val ERROR_CODE = "error_code"
     const val ERROR_MESSAGE = "error_message"
+
+    // Attachment load diagnostics (attachment_load_failed).
+    const val STAGE = "stage"                     // "materialize" (cloud download) | "decode" (Coil)
+    const val HAS_STORAGE_PATH = "has_storage_path" // was a cloud copy even expected?
+    const val MIME_TYPE = "mime_type"
 }
 
 /**

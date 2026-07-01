@@ -292,10 +292,18 @@ private fun ZoomableImagePage(
 
             AttachmentMaterializeState.Ready -> {
                 val context = LocalPlatformContext.current
-                val request = ImageRequest.Builder(context)
-                    .data(attachment.path)
-                    .crossfade(true)
-                    .build()
+                val reportError = rememberAttachmentLoadErrorReporter()
+                // Stable request + once-per-path guard: the viewer recomposes on every pinch/pan
+                // frame (scale/offset read in composition), so an un-remembered request or an
+                // un-guarded onError would fire a decode-failure event + Crashlytics report per frame
+                // on a broken image.
+                val request = remember(attachment.path, context) {
+                    ImageRequest.Builder(context)
+                        .data(attachment.path)
+                        .crossfade(true)
+                        .build()
+                }
+                var reported by remember(attachment.path) { mutableStateOf(false) }
 
                 AsyncImage(
                     model = request,
@@ -310,6 +318,15 @@ private fun ZoomableImagePage(
                             translationY = offsetY,
                         ),
                     placeholder = rememberVectorPainter(Icons.AutoMirrored.Filled.InsertDriveFile),
+                    error = rememberVectorPainter(Icons.Filled.BrokenImage),
+                    // Decode-stage failure on a materialized-Ready file — report it once (previously
+                    // the viewer showed nothing and logged nothing when Coil could not read the bytes).
+                    onError = { errorState ->
+                        if (!reported) {
+                            reported = true
+                            reportError(attachment, STAGE_DECODE, errorState.result.throwable)
+                        }
+                    },
                 )
             }
         }
