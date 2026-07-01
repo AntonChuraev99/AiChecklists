@@ -15,15 +15,18 @@ All AI calls go through these functions for usage control and monitoring.
 Credits are deducted for all users (including premium). Premium users get daily refill to cap.
 """
 
+import asyncio
 import base64
 import json
 import os
+import threading
+import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import firebase_admin
-from firebase_admin import auth as firebase_auth, credentials, firestore
+from firebase_admin import auth as firebase_auth, credentials, firestore, remote_config
 from flask import Request, jsonify, make_response
 from google import genai
 from google.genai import types
@@ -66,6 +69,11 @@ MODEL_OVERRIDE_ALLOWLIST = {
     "gemini-2.5-pro",
     "gemini-2.0-flash",
     "gemini-2.0-flash-lite",
+    # 3.x tier — allowed as production A/B experiment arms (see assign_model_arm).
+    # Bounds cost: only these ids can be selected by the experiment config or the
+    # test-override gate; a fat-fingered config value can never hit an arbitrary model.
+    "gemini-3.1-flash-lite",
+    "gemini-3.5-flash",
 }
 
 
@@ -84,6 +92,101 @@ def resolve_model(default_model: str, requested_model, provided_secret) -> str:
     if requested_model not in MODEL_OVERRIDE_ALLOWLIST:
         return default_model  # not an allow-listed test model
     return requested_model
+
+
+# ----------------------------------------------------------------------------
+# Production A/B model experiment — Firebase Remote Config SERVER template.
+#
+# Each user gets a stable arm ("control" | "variant_b") from a Remote Config "User in
+# random percentage" condition evaluated server-side against `randomization_id` (= our
+# user_id). The RC server template (namespace firebase-server) holds:
+#   - condition `variant_50`   = percent(<= split) on seed "expmodel1"
+#   - param `ai_model_arm`      -> "variant_b" under the condition, else "control"
+#   - param `ai_model_<flow>`   -> variant model under the condition, else the control model
+# Managed entirely from the Firebase console (Remote Config → change template type to
+# "Server"): adjust the split (condition %), a model (param value), or stop (condition to
+# 0%) with native versioning + rollback — no redeploy, no Firestore doc, no hand-rolled hash.
+#
+# `get_server_template()` downloads the full template once per warm container (async → we
+# bridge it with asyncio.run) and refreshes at most every _RC_TTL_SECONDS; `evaluate()` is
+# a fast LOCAL call per request. The runtime service account needs roles/cloudconfig.viewer.
+#
+# Prod-safe by construction: RC load failure / missing param / unknown-or-disallowed model
+# -> (default_model, "control") — EXACTLY today's behaviour. In-app defaults mirror control
+# and every resolved model is re-checked against MODEL_OVERRIDE_ALLOWLIST (cost bound).
+# Does NOT change economics — only the Gemini model string per request varies by arm.
+_RC_MODEL_DEFAULTS = {
+    "ai_model_arm": "control",
+    "ai_model_chat_agent": "gemini-2.5-flash",
+    "ai_model_classify_chat_intent": "gemini-2.5-flash-lite",
+    "ai_model_analyze": "gemini-2.5-flash-lite",
+    "ai_model_generate": "gemini-2.5-flash-lite",
+    "ai_model_chat_completion": "gemini-2.5-flash",
+}
+_RC_TTL_SECONDS = 300  # refresh the server template at most every 5 min per warm container
+_rc_template = None
+_rc_loaded_at = 0.0
+_rc_lock = threading.Lock()
+
+
+def _get_rc_server_template():
+    """Return a cached, periodically-refreshed RC server template, or None if never loaded."""
+    global _rc_template, _rc_loaded_at
+    if _rc_template is not None and (time.time() - _rc_loaded_at) < _RC_TTL_SECONDS:
+        return _rc_template
+    with _rc_lock:
+        # Re-check under lock — another request thread may have just refreshed.
+        if _rc_template is not None and (time.time() - _rc_loaded_at) < _RC_TTL_SECONDS:
+            return _rc_template
+        try:
+            _rc_template = asyncio.run(
+                remote_config.get_server_template(default_config=_RC_MODEL_DEFAULTS)
+            )
+            _rc_loaded_at = time.time()
+        except Exception as e:  # noqa: BLE001 — never let RC break the AI path
+            print(f"[ai_model_experiment] RC server template load failed: {type(e).__name__}: {e}")
+    return _rc_template
+
+
+def assign_model_arm(user_id: str, flow: str, default_model: str) -> tuple[str, str]:
+    """Return (model_id, arm) for [user_id] on [flow] via the RC server template.
+
+    Prod-safe: any RC failure (load / evaluate / missing / disallowed model) falls back to
+    (default_model, "control"). Assignment is deterministic per user (RC hashes
+    randomization_id) and identical across flows, so the client can read the arm from any
+    single AI response and set it as a sticky analytics dimension.
+    """
+    template = _get_rc_server_template()
+    if template is None:
+        return default_model, "control"
+    try:
+        config = template.evaluate({"randomization_id": user_id})
+        arm = config.get_string("ai_model_arm") or "control"
+        model = config.get_string(f"ai_model_{flow}")
+    except Exception as e:  # noqa: BLE001 — RC must never break the AI path
+        print(f"[ai_model_experiment] RC evaluate failed flow={flow}: {type(e).__name__}: {e}")
+        return default_model, "control"
+    if not model or model not in MODEL_OVERRIDE_ALLOWLIST:
+        # RC missing/unknown/disallowed model — fail safe to control default. Forcing the
+        # arm to "control" too keeps arm↔model consistent (never attribute variant_b to a
+        # request that actually ran the control model).
+        return default_model, "control"
+    return model, arm
+
+
+def resolve_experiment_model(user_id: str, flow: str, default_model: str, data: dict) -> tuple[str, str]:
+    """Resolve (model_id, arm). Precedence: eval test-override > server A/B > default.
+
+    The offline eval harness (ai_model_eval.py) still wins when its secret-gated
+    `model_override` is present, so multi-model comparison keeps working; that arm is
+    labelled "override" so experiment analytics never counts eval traffic as a real arm.
+    """
+    base_model, arm = assign_model_arm(user_id, flow, default_model)
+    overridden = resolve_model(base_model, data.get("model_override"), data.get("test_secret"))
+    if overridden != base_model:
+        return overridden, "override"
+    return base_model, arm
+
 
 # RevenueCat verification (V1 Secret key, NOT public key)
 REVENUECAT_API_KEY = os.environ.get("REVENUECAT_API_KEY")
@@ -932,8 +1035,12 @@ def analyze_and_fill_checklist(request: Request):
         user_data=user_data_for_prompt
     )
 
+    # Model resolution: production A/B experiment (server-driven) + eval override precedence.
+    model_id, model_arm = resolve_experiment_model(user_id, "analyze", "gemini-2.5-flash-lite", data)
+    exp_meta = {"model_variant": model_arm, "model_id": model_id, "ai_flow": "analyze"}
+
     try:
-        response = call_gemini(prompt, input_type, input_data)
+        response = call_gemini(prompt, input_type, input_data, model_id=model_id)
         result = parse_gemini_json(response.text)
     except json.JSONDecodeError:
         return create_error_response("Failed to parse AI response", 500)
@@ -944,6 +1051,7 @@ def analyze_and_fill_checklist(request: Request):
     increment_usage(user_id, "analyze_and_fill_checklist", input_type)
 
     return create_success_response({
+        **exp_meta,
         "filled_items": result.get("filled_items", []),
         "summary": result.get("summary", ""),
         "confidence": result.get("confidence", 0.8),
@@ -1045,8 +1153,12 @@ def generate_checklist(request: Request):
         max_folder_depth=MAX_FOLDER_DEPTH
     )
 
+    # Model resolution: production A/B experiment (server-driven) + eval override precedence.
+    model_id, model_arm = resolve_experiment_model(user_id, "generate", "gemini-2.5-flash-lite", data)
+    exp_meta = {"model_variant": model_arm, "model_id": model_id, "ai_flow": "generate"}
+
     try:
-        response = call_gemini(prompt, input_type, input_data)
+        response = call_gemini(prompt, input_type, input_data, model_id=model_id)
         result = parse_gemini_json(response.text)
     except json.JSONDecodeError:
         return create_error_response("Failed to parse AI response", 500)
@@ -1057,6 +1169,7 @@ def generate_checklist(request: Request):
     increment_usage(user_id, "generate_checklist", input_type)
 
     return create_success_response({
+        **exp_meta,
         "checklist_name": result.get("checklist_name", "New Checklist"),
         "items": sanitize_generated_items(result.get("items", [])),
         "summary": result.get("summary", ""),
@@ -1678,8 +1791,9 @@ def classify_chat_intent(request: Request):
 
     user_id = data["user_id"]
 
-    # Test-only model override (gated; see resolve_model). Prod default = flash-lite.
-    model_id = resolve_model("gemini-2.5-flash-lite", data.get("model_override"), data.get("test_secret"))
+    # Model resolution: production A/B experiment (server-driven) + eval override precedence.
+    model_id, model_arm = resolve_experiment_model(user_id, "classify_chat_intent", "gemini-2.5-flash-lite", data)
+    exp_meta = {"model_variant": model_arm, "model_id": model_id, "ai_flow": "classify_chat_intent"}
 
     # Server is authoritative for credit accounting — client cannot bypass.
     # Deduct BEFORE the AI call so concurrent requests can't oversell.
@@ -1725,6 +1839,7 @@ def classify_chat_intent(request: Request):
             pass
 
         return create_success_response({
+            **exp_meta,
             "intent": intent,
             "entities": entities,
             "confidence": confidence,
@@ -2031,8 +2146,10 @@ def chat_completion(request: Request):
     if not user_id:
         return create_error_response("user_id is required", 400)
 
-    # Test-only model override (gated; see resolve_model). Prod default = flash.
-    model_id = resolve_model("gemini-2.5-flash", data.get("model_override"), data.get("test_secret"))
+    # Model resolution: production A/B experiment (server-driven) + eval override precedence.
+    # NOTE: chat_completion is legacy/dead (Layer 3 is chat_agent); wired for consistency.
+    model_id, model_arm = resolve_experiment_model(user_id, "chat_completion", "gemini-2.5-flash", data)
+    exp_meta = {"model_variant": model_arm, "model_id": model_id, "ai_flow": "chat_completion"}
 
     messages_raw = data.get("messages")
     if not isinstance(messages_raw, list) or not messages_raw:
@@ -2104,6 +2221,7 @@ def chat_completion(request: Request):
             pass
 
         return create_success_response({
+            **exp_meta,
             "content": content,
             "credits_remaining": new_credits,
         })
@@ -2473,8 +2591,9 @@ def chat_agent(request: Request):
     if not user_id:
         return create_error_response("user_id is required", 400)
 
-    # Test-only model override (gated; see resolve_model). Prod default = CHAT_AGENT_MODEL.
-    model_id = resolve_model(CHAT_AGENT_MODEL, data.get("model_override"), data.get("test_secret"))
+    # Model resolution: production A/B experiment (server-driven) + eval override precedence.
+    model_id, model_arm = resolve_experiment_model(user_id, "chat_agent", CHAT_AGENT_MODEL, data)
+    exp_meta = {"model_variant": model_arm, "model_id": model_id, "ai_flow": "chat_agent"}
 
     transcript = data.get("transcript")
     if not isinstance(transcript, list) or not transcript:
@@ -2542,6 +2661,7 @@ def chat_agent(request: Request):
             "Tell me what else you need."
         )
         return create_success_response({
+            **exp_meta,
             "type": "final",
             "content": cap_msg,
             "credits_remaining": get_user_credits(user_id),
@@ -2633,6 +2753,7 @@ def chat_agent(request: Request):
             except Exception:
                 pass
             return create_success_response({
+                **exp_meta,
                 "type": "options",
                 "prompt": present["prompt"],
                 "options": present["options"],
@@ -2648,6 +2769,7 @@ def chat_agent(request: Request):
 
         if tool_calls:
             return create_success_response({
+                **exp_meta,
                 "type": "tool_calls",
                 "tool_calls": tool_calls,
                 "credits_remaining": credits_remaining,
@@ -2658,6 +2780,7 @@ def chat_agent(request: Request):
             raise ValueError("Gemini returned neither tool calls nor text")
 
         return create_success_response({
+            **exp_meta,
             "type": "final",
             "content": content,
             "credits_remaining": credits_remaining,
