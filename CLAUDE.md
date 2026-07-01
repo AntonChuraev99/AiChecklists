@@ -105,6 +105,10 @@ One-liner map; deep rules load when you edit the feature. Full catalog: `docs/pr
 
 "AI не ответил" / "AI processing failed" — diagnose, don't blind-patch the client. Server runbook: `docs/cloud-functions-diagnostics.md` (gcloud logs → smoke test → symptom table). Client HTTP layer: `docs/client-diagnostics.md`. Skill `/test-firebase-function` automates the smoke test.
 
+## Analytics & A/B — keep the source-of-truth docs current
+
+`docs/marketing/ab-tests-overview-2026-06-18.md` is the single source of truth for A/B experiments, Remote Config params, and live product metrics (retention/funnel/CSAT/login). **Update it whenever you** change an RC key (`RemoteConfigKeys.kt` / `RemoteConfigDefaults.kt` or the Firebase RC template), start/stop a Firebase A/B experiment, or pull a fresh Amplitude snapshot — otherwise it silently drifts from prod. Keep the RC-limits table in `docs/unit-economics.md` in sync too. Both docs are gitignored (local-only). Prod truth = Firebase Console (RC + A/B Tests) + Amplitude project `786722`.
+
 ## Copy Guidelines
 
 Simple, clear, benefit-focused, action-oriented. Do: "Create Checklist", "Fill via AI", "Save". Don't: "Add New", "Submit", "Continue". Store listing: `docs/store-screenshots/store-listing-en.md`.
