@@ -72,7 +72,10 @@ class AnalyzeRepositoryImpl(
                                 suggestedItems = filledItems,
                                 confidence = response.data.confidence,
                                 summary = response.data.summary,
-                                fillItems = fillItems
+                                fillItems = fillItems,
+                                modelVariant = response.modelVariant,
+                                modelId = response.modelId,
+                                aiFlow = response.aiFlow,
                             )
                         )
                     } else {
@@ -104,7 +107,10 @@ class AnalyzeRepositoryImpl(
                                 confidence = response.data.confidence,
                                 summary = response.data.summary,
                                 suggestedName = response.data.checklistName,
-                                hasFolders = response.data.hasFolders
+                                hasFolders = response.data.hasFolders,
+                                modelVariant = response.modelVariant,
+                                modelId = response.modelId,
+                                aiFlow = response.aiFlow,
                             )
                         )
                     } else {

@@ -2,6 +2,8 @@ package com.antonchuraev.homesearchchecklist.feature.paywall.presentation
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
+import com.antonchuraev.homesearchchecklist.core.common.api.AiModelArm
+import com.antonchuraev.homesearchchecklist.core.common.api.AiModelExperimentTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
@@ -30,6 +32,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlin.concurrent.Volatile
 
 private const val TAG = "PaywallViewModel"
 
@@ -43,7 +46,11 @@ class PaywallViewModel(
     private val remoteConfigProvider: RemoteConfigProvider,
     private val logger: AppLogger? = null,
     sourceOverride: String? = null,
-    forceVariantOverride: String? = null
+    forceVariantOverride: String? = null,
+    // AI-model A/B attribution: read the persisted arm so the purchase events carry which model the
+    // user was on. Best-effort + nullable so pure-VM tests can omit it; the purchase never depends
+    // on it. See [AiModelExperimentTracker].
+    private val aiModelExperimentTracker: AiModelExperimentTracker? = null,
 ) : AppViewModel<PaywallState, PaywallIntent, Nothing>() {
 
     private val source: String = sourceOverride
@@ -57,6 +64,12 @@ class PaywallViewModel(
     // Attached to all purchase-related events for diagnostics.
     // Updated and read on the same viewModelScope coroutine — single-threaded access.
     private var analyticsContext: PurchaseAnalyticsContext? = null
+
+    // Persisted AI-model A/B arm, read once at init (deterministic per user + persisted, so a single
+    // read is enough). Attached to the purchase funnel events. Null until loaded / when unknown —
+    // best-effort, so if the read hasn't finished by tap time the params are simply omitted.
+    @Volatile
+    private var experimentArm: AiModelArm? = null
 
     // Maps raw string to PaywallVariant enum; forceVariant (from debug/nav arg) overrides RC.
     private fun parseVariant(raw: String?): PaywallVariant = when (raw) {
@@ -131,7 +144,29 @@ class PaywallViewModel(
                 getPlayStoreVersion()?.let { put("play_store_version", it) }
             },
         )
+
+        // Read the persisted A/B arm off the main path — best-effort attribution for the purchase
+        // funnel. Never blocks product load or the purchase itself.
+        aiModelExperimentTracker?.let { tracker ->
+            viewModelScope.launch {
+                experimentArm = runCatching { tracker.current() }.getOrNull()
+            }
+        }
+
         loadProducts()
+    }
+
+    /**
+     * AI-model A/B dimensions for the purchase funnel, or empty when the arm is unknown. Added to
+     * both [AnalyticsEvents.Paywall.PURCHASE_BUTTON_CLICKED] and
+     * [AnalyticsEvents.Paywall.PURCHASE_COMPLETED] so revenue can be split by which model the user
+     * was on — the north-star of the model experiment.
+     */
+    private fun modelArmParams(): Map<String, Any> = buildMap {
+        experimentArm?.let { arm ->
+            put(AnalyticsParams.AI_MODEL_VARIANT, arm.variant)
+            arm.modelId?.let { put(AnalyticsParams.AI_MODEL_ID, it) }
+        }
     }
 
     override fun onIntent(intent: PaywallIntent) {
@@ -307,6 +342,7 @@ class PaywallViewModel(
                 put("selected_plan", currentState.selectedPlan.name)
                 put("plan_type", currentState.selectedPlan.name.lowercase())
                 analyticsContext?.toEventParams()?.let { putAll(it) }
+                putAll(modelArmParams())
             },
         )
 
@@ -322,6 +358,7 @@ class PaywallViewModel(
                         put("plan_type", currentState.selectedPlan.name.lowercase())
                         put("price_str", selectedProduct.priceString.take(100))
                         analyticsContext?.toEventParams()?.let { putAll(it) }
+                        putAll(modelArmParams())
                     })
                     conversionEventHelper.logConversionEvent(result, selectedProduct)
                     _screenState.update {

@@ -89,7 +89,10 @@ class FirebaseAiServiceImpl(
                     confidence = responseBody.confidence ?: 0.8f,
                     aiCredits = responseBody.aiCredits ?: -1
                 ),
-                usage = responseBody.usage?.toUsageInfo()
+                usage = responseBody.usage?.toUsageInfo(),
+                modelVariant = responseBody.modelVariant,
+                modelId = responseBody.modelId,
+                aiFlow = responseBody.aiFlow,
             )
         } else {
             logger.error(TAG, "analyzeAndFillChecklist: FAILED - ${responseBody.error}")
@@ -146,7 +149,10 @@ class FirebaseAiServiceImpl(
                     aiCredits = responseBody.aiCredits ?: -1,
                     hasFolders = hasFolders
                 ),
-                usage = responseBody.usage?.toUsageInfo()
+                usage = responseBody.usage?.toUsageInfo(),
+                modelVariant = responseBody.modelVariant,
+                modelId = responseBody.modelId,
+                aiFlow = responseBody.aiFlow,
             )
         } else {
             logger.error(TAG, "generateChecklist: FAILED - ${responseBody.error}")
@@ -283,7 +289,12 @@ private data class FillChecklistResponseDto(
     val summary: String? = null,
     val confidence: Float? = null,
     @SerialName("ai_credits") val aiCredits: Int? = null,
-    val usage: UsageDto? = null
+    val usage: UsageDto? = null,
+    // Server-driven AI-model A/B assignment. Nullable + ignoreUnknownKeys → older servers stay
+    // compatible; null means "experiment off / unknown", never a real arm.
+    @SerialName("model_variant") val modelVariant: String? = null,
+    @SerialName("model_id") val modelId: String? = null,
+    @SerialName("ai_flow") val aiFlow: String? = null,
 )
 
 @Serializable
@@ -312,7 +323,12 @@ private data class GenerateChecklistResponseDto(
     val summary: String? = null,
     val confidence: Float? = null,
     @SerialName("ai_credits") val aiCredits: Int? = null,
-    val usage: UsageDto? = null
+    val usage: UsageDto? = null,
+    // Server-driven AI-model A/B assignment. Nullable + ignoreUnknownKeys → older servers stay
+    // compatible; null means "experiment off / unknown", never a real arm.
+    @SerialName("model_variant") val modelVariant: String? = null,
+    @SerialName("model_id") val modelId: String? = null,
+    @SerialName("ai_flow") val aiFlow: String? = null,
 )
 
 @Serializable

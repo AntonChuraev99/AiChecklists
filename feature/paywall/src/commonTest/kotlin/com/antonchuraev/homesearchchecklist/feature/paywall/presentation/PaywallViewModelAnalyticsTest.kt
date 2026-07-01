@@ -3,6 +3,8 @@ package com.antonchuraev.homesearchchecklist.feature.paywall.presentation
 import androidx.lifecycle.SavedStateHandle
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
+import com.antonchuraev.homesearchchecklist.core.common.api.AiModelArm
+import com.antonchuraev.homesearchchecklist.core.common.api.AiModelExperimentTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
@@ -97,13 +99,17 @@ class PaywallViewModelAnalyticsTest {
     private fun createViewModel(
         product: PaywallProduct,
         source: String = "test_source",
+        // Default Cancelled so the success/error branches (which call getString from Compose
+        // Resources, unresolvable in a plain JVM test) never run. Override to Success to exercise
+        // the purchase_completed branch (that branch itself does NOT call getString).
+        purchaseResult: PurchaseResult = PurchaseResult.Cancelled,
+        // null = "arm unknown" (experiment off / not seen yet); non-null = a persisted arm.
+        experimentArm: AiModelArm? = null,
     ): Pair<PaywallViewModel, RecordingAnalyticsTracker> {
         val tracker = RecordingAnalyticsTracker()
-        // purchase() returns Cancelled so the success/error branches (which call
-        // getString from Compose Resources, unresolvable in a plain JVM test) never run.
         val paywallRepo = FakePaywallRepository(
             offering = PaywallOffering(id = "default", products = listOf(product)),
-            purchaseResult = PurchaseResult.Cancelled,
+            purchaseResult = purchaseResult,
         )
         val userRepo = FakeUserDataRepository()
         val remoteConfig = FakeRemoteConfigProvider()
@@ -119,6 +125,7 @@ class PaywallViewModelAnalyticsTest {
             analyticsTracker = tracker,
             remoteConfigProvider = remoteConfig,
             sourceOverride = source,
+            aiModelExperimentTracker = FakeAiModelExperimentTracker(experimentArm),
         )
         return vm to tracker
     }
@@ -180,7 +187,67 @@ class PaywallViewModelAnalyticsTest {
             )
         }
 
+    // ── AI-model A/B attribution on the purchase event ────────────────────────
+
+    @Test
+    fun purchaseCompleted_whenArmKnown_carriesModelVariantAndId() =
+        testScope.runTest {
+            val (vm, tracker) = createViewModel(
+                product = monthlyTrialProduct,
+                purchaseResult = PurchaseResult.Success(
+                    subscriptionStatus = SubscriptionStatus.FREE,
+                    transactionId = "txn_test",
+                    hasFreeTrial = true,
+                ),
+                experimentArm = AiModelArm("variant_b", "gemini-3.1-flash-lite"),
+            )
+            advanceUntilIdle() // init reads the persisted arm; loadProducts populates state
+
+            vm.sendIntent(PaywallIntent.Purchase)
+            advanceUntilIdle()
+
+            val params = tracker.events
+                .first { it.first == AnalyticsEvents.Paywall.PURCHASE_COMPLETED }
+                .second
+            assertEquals("variant_b", params[AnalyticsParams.AI_MODEL_VARIANT])
+            assertEquals("gemini-3.1-flash-lite", params[AnalyticsParams.AI_MODEL_ID])
+        }
+
+    @Test
+    fun purchaseCompleted_whenArmUnknown_omitsModelParams() =
+        testScope.runTest {
+            val (vm, tracker) = createViewModel(
+                product = monthlyTrialProduct,
+                purchaseResult = PurchaseResult.Success(
+                    subscriptionStatus = SubscriptionStatus.FREE,
+                    transactionId = "txn_test",
+                    hasFreeTrial = true,
+                ),
+                experimentArm = null, // arm unknown → best-effort omit, never crash
+            )
+            advanceUntilIdle()
+
+            vm.sendIntent(PaywallIntent.Purchase)
+            advanceUntilIdle()
+
+            val params = tracker.events
+                .first { it.first == AnalyticsEvents.Paywall.PURCHASE_COMPLETED }
+                .second
+            assertTrue(
+                !params.containsKey(AnalyticsParams.AI_MODEL_VARIANT) &&
+                    !params.containsKey(AnalyticsParams.AI_MODEL_ID),
+                "unknown arm must not add ai_model_* params (and must not crash the purchase)",
+            )
+        }
+
     // ── Fakes ────────────────────────────────────────────────────────────────
+
+    private class FakeAiModelExperimentTracker(
+        private val arm: AiModelArm?,
+    ) : AiModelExperimentTracker {
+        override suspend fun report(variant: String?, modelId: String?, aiFlow: String?) {}
+        override suspend fun current(): AiModelArm? = arm
+    }
 
     private class RecordingAnalyticsTracker : AnalyticsTracker {
         val events = mutableListOf<Pair<String, Map<String, Any>>>()

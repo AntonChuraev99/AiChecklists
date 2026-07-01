@@ -11,6 +11,7 @@ kotlin {
         namespace = "com.antonchuraev.homesearchchecklist.core.common.impl"
         compileSdk = libs.versions.android.compileSdk.get().toInt()
         minSdk = libs.versions.android.minSdk.get().toInt()
+        withHostTest {}
 }
 
     listOf(iosArm64(), iosSimulatorArm64()).forEach {
@@ -28,11 +29,13 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(projects.core.common.api)
+            implementation(projects.core.datastore.api)
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.bundles.koin.library)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
+            implementation(libs.kotlinx.coroutines.test)
         }
     }
 }

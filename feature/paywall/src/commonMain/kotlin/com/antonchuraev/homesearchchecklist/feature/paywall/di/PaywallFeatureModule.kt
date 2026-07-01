@@ -49,6 +49,7 @@ val paywallFeatureModule = module {
             // explicitly from PaywallRoute (Nav3 savedStateHandle is unreliable).
             sourceOverride = params.values.getOrNull(0) as? String,
             forceVariantOverride = params.values.getOrNull(1) as? String,
+            aiModelExperimentTracker = getOrNull(),
         )
     }
     viewModelOf(::SubscriptionStatusViewModel)

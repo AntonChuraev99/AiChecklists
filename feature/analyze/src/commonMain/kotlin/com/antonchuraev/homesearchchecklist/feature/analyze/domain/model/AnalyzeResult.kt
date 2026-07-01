@@ -53,7 +53,21 @@ data class AnalyzeResult(
      * Only populated in fill mode. Not serialized.
      */
     @Transient
-    val fillItems: List<ChecklistFillItem> = emptyList()
+    val fillItems: List<ChecklistFillItem> = emptyList(),
+
+    /**
+     * Server-assigned AI-model A/B arm carried by the `analyze_and_fill_checklist` /
+     * `generate_checklist` response (`model_variant` / `model_id` / `ai_flow`). Null when the
+     * experiment is off or an older server didn't send them. Presentation mirrors these into the
+     * `ai_analyze_completed` event dimensions and the shared AiModelExperimentTracker. Not
+     * serialized — transient runtime attribution metadata, never persisted with the result.
+     */
+    @Transient
+    val modelVariant: String? = null,
+    @Transient
+    val modelId: String? = null,
+    @Transient
+    val aiFlow: String? = null,
 )
 
 /**

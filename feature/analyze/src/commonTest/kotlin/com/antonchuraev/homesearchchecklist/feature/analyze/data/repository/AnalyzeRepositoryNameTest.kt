@@ -86,10 +86,63 @@ class AnalyzeRepositoryNameTest {
         assertNull(result.getOrNull()?.suggestedName)
     }
 
+    @Test
+    fun analyzeData_generatePath_propagatesModelArmIntoResult() = runTest {
+        // The A/B arm (model_variant/model_id/ai_flow) parsed off the generate_checklist response
+        // must reach AnalyzeResult so presentation can attribute the generation + purchase funnel.
+        val service = FakeFirebaseAiService(
+            generateResult = GenerateChecklistResult(
+                checklistName = "Trip",
+                items = listOf(ChecklistItem(text = "Passport")),
+                summary = "",
+                confidence = 0.9f,
+                aiCredits = 5,
+                hasFolders = false,
+            ),
+            modelVariant = "variant_b",
+            modelId = "gemini-3.1-flash-lite",
+            aiFlow = "generate",
+        )
+
+        val result = repo(service).analyzeData(AnalyzeInputData.RawText("trip"), targetChecklist = null)
+
+        assertTrue(result.isSuccess)
+        assertEquals("variant_b", result.getOrNull()?.modelVariant)
+        assertEquals("gemini-3.1-flash-lite", result.getOrNull()?.modelId)
+        assertEquals("generate", result.getOrNull()?.aiFlow)
+    }
+
+    @Test
+    fun analyzeData_generatePath_noModelArm_keepsNull() = runTest {
+        // Backward compat: an older server that omits the fields (nullable + ignoreUnknownKeys)
+        // leaves the arm null — never a fabricated value.
+        val service = FakeFirebaseAiService(
+            generateResult = GenerateChecklistResult(
+                checklistName = "Trip",
+                items = listOf(ChecklistItem(text = "Item")),
+                summary = "",
+                confidence = 0.8f,
+                aiCredits = 3,
+                hasFolders = false,
+            ),
+        )
+
+        val result = repo(service).analyzeData(AnalyzeInputData.RawText("x"), targetChecklist = null)
+
+        assertTrue(result.isSuccess)
+        assertNull(result.getOrNull()?.modelVariant)
+        assertNull(result.getOrNull()?.modelId)
+        assertNull(result.getOrNull()?.aiFlow)
+    }
+
     // ── Fakes ───────────────────────────────────────────────────────────────
 
     private class FakeFirebaseAiService(
         private val generateResult: GenerateChecklistResult,
+        // Server-driven A/B arm echoed on the response wrapper (null = experiment off / older server).
+        private val modelVariant: String? = null,
+        private val modelId: String? = null,
+        private val aiFlow: String? = null,
     ) : FirebaseAiService {
         override suspend fun registerUser(
             deviceId: String,
@@ -112,7 +165,15 @@ class AnalyzeRepositoryNameTest {
             inputType: AiInputType,
             inputData: String?,
         ): Result<AiServiceResponse<GenerateChecklistResult>> =
-            Result.success(AiServiceResponse(success = true, data = generateResult))
+            Result.success(
+                AiServiceResponse(
+                    success = true,
+                    data = generateResult,
+                    modelVariant = modelVariant,
+                    modelId = modelId,
+                    aiFlow = aiFlow,
+                ),
+            )
 
         override suspend fun getUsageStats(
             userId: String,
