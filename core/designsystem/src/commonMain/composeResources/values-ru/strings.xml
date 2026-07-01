@@ -447,6 +447,19 @@
     <string name="paywall_preview_item4">300 кредитов ИИ ежедневно</string>
     <string name="paywall_preview_tagline">Суть любого\nконтента — в один клик</string>
 
+    <!-- Пейвол — опрос причины отмены покупки -->
+    <string name="cancel_reason_title">Передумали?</string>
+    <string name="cancel_reason_subtitle">Ваш ответ поможет нам стать лучше. Один тап — без ввода текста.</string>
+    <string name="cancel_reason_expensive">Дорого</string>
+    <string name="cancel_reason_just_looking">Пока просто смотрю</string>
+    <string name="cancel_reason_need_info">Нужно больше информации</string>
+    <string name="cancel_reason_subscriptions">Не уверен насчёт подписок</string>
+    <string name="cancel_reason_missing_feature">Нет нужной функции</string>
+    <string name="cancel_reason_payment_issue">Проблема с оплатой</string>
+    <string name="cancel_reason_other">Другое</string>
+    <string name="cancel_reason_dismiss">Не сейчас</string>
+    <string name="cancel_reason_thanks">Спасибо — это помогает.</string>
+
     <!-- Экран загрузки -->
     <string name="splash_loading">Подготовка...</string>
 
@@ -730,6 +743,10 @@
     <string name="debug_onboardings_interactive_desc">Шаги: категория → стиль → шаблон</string>
     <string name="debug_onboardings_slides_title">Слайдовый онбординг</string>
     <string name="debug_onboardings_slides_desc">3 слайда + paywall</string>
+
+    <!-- Debug — предпросмотр шторки причины отмены -->
+    <string name="debug_cancel_reason_title">Тест: шторка причины отмены</string>
+    <string name="debug_cancel_reason_description">Предпросмотр опроса причины отмены (в обход лимита сессии)</string>
 
     <!-- Каталог экранов -->
     <string name="debug_catalog_title">Каталог экранов</string>

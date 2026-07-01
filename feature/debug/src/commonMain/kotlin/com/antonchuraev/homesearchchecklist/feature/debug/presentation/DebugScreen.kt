@@ -23,6 +23,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Brush
+import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.GridView
@@ -44,8 +45,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -61,8 +64,12 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.AppSwitch
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.DockDesignDebug
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.CancelReason
+import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.CancelReasonStage
+import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.PostCancelReasonSheet
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
+import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -128,6 +135,13 @@ fun DebugScreen(
             stringResource(Res.string.debug_onboardings_description)
         ) {
             viewModel.sendIntent(DebugScreenIntent.OpenOnboardings)
+        },
+        DebugItem(
+            Icons.Default.Cancel,
+            stringResource(Res.string.debug_cancel_reason_title),
+            stringResource(Res.string.debug_cancel_reason_description)
+        ) {
+            viewModel.sendIntent(DebugScreenIntent.ShowCancelReasonSheet)
         }
     )
 
@@ -236,6 +250,30 @@ fun DebugScreen(
 
         if (showRepeatRulePreview) {
             RepeatPresetPreviewSheet(onDismiss = { showRepeatRulePreview = false })
+        }
+
+        // Debug preview of the paywall post-cancel reason sheet. Bypasses the session cap (always
+        // shows). Stage is driven locally here — `remember` re-initializes to Asking each time the
+        // sheet re-enters composition, so reopening always starts fresh.
+        if (screenState.showCancelReasonSheet) {
+            var debugStage by remember { mutableStateOf(CancelReasonStage.Asking) }
+            PostCancelReasonSheet(
+                stage = debugStage,
+                onSelectReason = { reason ->
+                    if (reason == CancelReason.PAYMENT_ISSUE) {
+                        viewModel.sendIntent(DebugScreenIntent.HideCancelReasonSheet)
+                    } else {
+                        debugStage = CancelReasonStage.Thanks
+                    }
+                },
+                onDismiss = { viewModel.sendIntent(DebugScreenIntent.HideCancelReasonSheet) },
+            )
+            LaunchedEffect(debugStage) {
+                if (debugStage == CancelReasonStage.Thanks) {
+                    delay(1000)
+                    viewModel.sendIntent(DebugScreenIntent.HideCancelReasonSheet)
+                }
+            }
         }
     }
 }

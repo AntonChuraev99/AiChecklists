@@ -42,6 +42,10 @@ class DebugViewModel(
             DebugScreenIntent.OpenInteractiveOnboarding -> appNavigator.navigateToInteractiveOnboarding()
             DebugScreenIntent.OpenScreenCatalog -> appNavigator.navigateToScreenCatalog()
             DebugScreenIntent.OpenOnboardings -> appNavigator.navigateToOnboardings()
+            DebugScreenIntent.ShowCancelReasonSheet -> _screenState.value =
+                _screenState.value.copy(showCancelReasonSheet = true)
+            DebugScreenIntent.HideCancelReasonSheet -> _screenState.value =
+                _screenState.value.copy(showCancelReasonSheet = false)
         }
     }
 

@@ -152,6 +152,16 @@ object AnalyticsEvents {
         const val RESTORE_COMPLETED = "restore_completed"
         const val RESTORE_NO_SUBSCRIPTION = "restore_no_subscription"
         const val RESTORE_FAILED = "restore_failed"
+
+        // Post-cancel reason picker — after the user dismisses the native purchase sheet
+        // ([PURCHASE_CANCELLED]) we show a neutral one-tap reason chooser to measure WHY.
+        // Fires at most once per app session (see CancelReasonSessionGate). CANCEL_REASON carries
+        // [AnalyticsParams.REASON] = the tapped reason key PLUS the SAME source/product_id/sku_id/
+        // plan_type params as PURCHASE_CANCELLED, so the two events join in analytics. DISMISSED
+        // fires when the user taps "Not now" (feedback on every action — no silent exit).
+        // Not GA4-reserved (no `purchase` / `firebase_*` prefix) → safe on both providers.
+        const val CANCEL_REASON = "paywall_cancel_reason"
+        const val CANCEL_REASON_DISMISSED = "paywall_cancel_reason_dismissed"
     }
 
     /**
@@ -291,6 +301,9 @@ object AnalyticsParams {
     const val VALUE = "value"
     const val CURRENCY = "currency"
     const val TRANSACTION_ID = "transaction_id"
+    // Post-cancel reason picker — the tapped reason key (CancelReason.key). Distinct from the
+    // literal "reason" already used ad-hoc by products_load_empty; this constant centralizes it.
+    const val REASON = "reason"
 
     // CSAT
     const val RATING = "rating"

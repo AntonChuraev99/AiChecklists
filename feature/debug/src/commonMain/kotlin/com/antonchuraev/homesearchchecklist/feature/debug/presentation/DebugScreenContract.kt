@@ -6,7 +6,8 @@ import com.antonchuraev.homesearchchecklist.core.common.api.State
 data class DebugScreenState(
     val showInfoDialog: Boolean = false,
     val isRestoreCreditsLoading: Boolean = false,
-    val restoreCreditsResult: RestoreCreditsResult? = null
+    val restoreCreditsResult: RestoreCreditsResult? = null,
+    val showCancelReasonSheet: Boolean = false
 ) : State
 
 sealed interface RestoreCreditsResult {
@@ -27,5 +28,7 @@ sealed interface DebugScreenIntent : Intent {
     data object OpenInteractiveOnboarding : DebugScreenIntent
     data object OpenScreenCatalog : DebugScreenIntent
     data object OpenOnboardings : DebugScreenIntent
+    data object ShowCancelReasonSheet : DebugScreenIntent
+    data object HideCancelReasonSheet : DebugScreenIntent
 }
 

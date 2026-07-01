@@ -22,11 +22,14 @@ import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.Purchas
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.PurchaseResult
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.RestoreResult
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetOfferingsUseCase
+import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetSubscriptionStatusUseCase
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.PurchaseProductUseCase
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.RestorePurchasesUseCase
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
 import org.jetbrains.compose.resources.getString
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,6 +38,9 @@ import kotlinx.coroutines.launch
 import kotlin.concurrent.Volatile
 
 private const val TAG = "PaywallViewModel"
+
+// How long the post-cancel reason picker lingers on the "Thanks" stage before auto-dismissing.
+private const val THANKS_DISMISS_DELAY_MS = 800L
 
 class PaywallViewModel(
     savedStateHandle: SavedStateHandle,
@@ -51,6 +57,13 @@ class PaywallViewModel(
     // user was on. Best-effort + nullable so pure-VM tests can omit it; the purchase never depends
     // on it. See [AiModelExperimentTracker].
     private val aiModelExperimentTracker: AiModelExperimentTracker? = null,
+    // Once-per-app-session cap for the post-cancel reason sheet. Koin `single` (shared across VM
+    // instances); default instance lets pure-VM tests omit it (fresh gate → shouldShow()=true).
+    private val cancelReasonGate: CancelReasonSessionGate = CancelReasonSessionGate(),
+    // Reads the real RevenueCat entitlement to guard the post-cancel sheet against the iOS 18.3–18.5
+    // StoreKit "userCancelled=true on a successful purchase" bug. Nullable default so pure-VM tests
+    // (which never exercise the iOS path) can omit it.
+    private val getSubscriptionStatusUseCase: GetSubscriptionStatusUseCase? = null,
 ) : AppViewModel<PaywallState, PaywallIntent, Nothing>() {
 
     private val source: String = sourceOverride
@@ -70,6 +83,11 @@ class PaywallViewModel(
     // best-effort, so if the read hasn't finished by tap time the params are simply omitted.
     @Volatile
     private var experimentArm: AiModelArm? = null
+
+    // Captured at PurchaseResult.Cancelled time so the later CANCEL_REASON / CANCEL_REASON_DISMISSED
+    // events carry the SAME source/product_id/sku_id/plan_type params as PURCHASE_CANCELLED (they
+    // join in analytics). Set on the viewModelScope coroutine, read on the same scope — single-thread.
+    private var cancelReasonBaseParams: Map<String, Any> = emptyMap()
 
     // Maps raw string to PaywallVariant enum; forceVariant (from debug/nav arg) overrides RC.
     private fun parseVariant(raw: String?): PaywallVariant = when (raw) {
@@ -193,7 +211,55 @@ class PaywallViewModel(
                     ),
                 )
             }
+            is PaywallIntent.SelectCancelReason -> selectCancelReason(intent.reason)
+            PaywallIntent.DismissCancelReason -> dismissCancelReason()
+            PaywallIntent.ConsumeSupportRequest ->
+                _screenState.update { it.copy(openSupportRequested = false) }
         }
+    }
+
+    private fun selectCancelReason(reason: CancelReason) {
+        // Debounce: once a reason is picked we leave the Asking stage. Ignore repeat/late taps so a
+        // fast double-tap cannot emit CANCEL_REASON twice or launch a second auto-dismiss coroutine.
+        if (_screenState.value.cancelReasonStage != CancelReasonStage.Asking) return
+
+        analyticsTracker.event(
+            AnalyticsEvents.Paywall.CANCEL_REASON,
+            cancelReasonBaseParams + (AnalyticsParams.REASON to reason.key),
+        )
+
+        // A payment issue is actionable — route the user to Support instead of a dead-end thank-you.
+        // PaywallRoute owns the mailto (VM stays UriHandler-free); we just flag + close the sheet.
+        if (reason == CancelReason.PAYMENT_ISSUE) {
+            _screenState.update {
+                it.copy(showCancelReasonSheet = false, openSupportRequested = true)
+            }
+            return
+        }
+
+        // Show a brief thank-you, then auto-dismiss — feedback on every action.
+        _screenState.update { it.copy(cancelReasonStage = CancelReasonStage.Thanks) }
+        viewModelScope.launch {
+            delay(THANKS_DISMISS_DELAY_MS)
+            _screenState.update { it.copy(showCancelReasonSheet = false) }
+        }
+    }
+
+    private fun dismissCancelReason() {
+        // A swipe/scrim-dismiss during the Thanks stage is NOT a separate "dismissed" outcome — the
+        // reason was already recorded. Close silently so one cancellation never counts as both a
+        // reason AND a dismissal (which would inflate the dismissed rate).
+        if (_screenState.value.cancelReasonStage == CancelReasonStage.Thanks) {
+            _screenState.update { it.copy(showCancelReasonSheet = false) }
+            return
+        }
+        // "Not now" / swipe-dismiss from the Asking stage is still a measurable outcome — never a
+        // silent exit.
+        analyticsTracker.event(
+            AnalyticsEvents.Paywall.CANCEL_REASON_DISMISSED,
+            cancelReasonBaseParams,
+        )
+        _screenState.update { it.copy(showCancelReasonSheet = false) }
     }
 
     private fun loadProducts() {
@@ -368,14 +434,35 @@ class PaywallViewModel(
                     navigator.navigateToSubscriptionStatus(showSuccessMessage = true)
                 }
                 is PurchaseResult.Cancelled -> {
-                    analyticsTracker.event(AnalyticsEvents.Paywall.PURCHASE_CANCELLED, buildMap {
+                    val cancelParams = buildMap<String, Any> {
                         put(AnalyticsParams.SOURCE, source)
                         put(AnalyticsParams.PRODUCT_ID, selectedProduct.id)
                         put("sku_id", selectedProduct.id)
                         put("plan_type", currentState.selectedPlan.name.lowercase())
                         analyticsContext?.toEventParams()?.let { putAll(it) }
-                    })
-                    _screenState.update { it.copy(isPurchasing = false) }
+                    }
+                    analyticsTracker.event(AnalyticsEvents.Paywall.PURCHASE_CANCELLED, cancelParams)
+                    // Reuse the exact same param set for the reason-picker events so they join.
+                    cancelReasonBaseParams = cancelParams
+
+                    // iOS 18.4 guard: StoreKit is known to report userCancelled=true on a
+                    // SUCCESSFUL purchase (observed 18.3–18.5). Guard on the REAL RevenueCat
+                    // entitlement — not a local flag the Cancelled branch never sets — so a spurious
+                    // "cancel" on a just-bought-premium user does not trigger the survey. Android's
+                    // live path is never premium-active here, so it is unaffected.
+                    val premiumActive = getSubscriptionStatusUseCase?.invoke()?.first()?.isActive == true
+                    if (!premiumActive && cancelReasonGate.shouldShow()) {
+                        cancelReasonGate.markShown()
+                        _screenState.update {
+                            it.copy(
+                                isPurchasing = false,
+                                showCancelReasonSheet = true,
+                                cancelReasonStage = CancelReasonStage.Asking,
+                            )
+                        }
+                    } else {
+                        _screenState.update { it.copy(isPurchasing = false) }
+                    }
                 }
                 is PurchaseResult.Error -> {
                     analyticsTracker.event(AnalyticsEvents.Paywall.PURCHASE_FAILED, buildMap {

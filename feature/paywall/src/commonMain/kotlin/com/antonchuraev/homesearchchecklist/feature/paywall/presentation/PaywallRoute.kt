@@ -217,5 +217,28 @@ fun PaywallRoute(
         errorMessage = state.error,
         onErrorDismiss = { viewModel.sendIntent(PaywallIntent.DismissError) },
     )
+
+    // Post-cancel reason picker — shown once per app session after a cancelled purchase, as a
+    // sibling overlay (ModalBottomSheet / AlertDialog) on top of the paywall.
+    if (state.showCancelReasonSheet) {
+        PostCancelReasonSheet(
+            stage = state.cancelReasonStage,
+            onSelectReason = { viewModel.sendIntent(PaywallIntent.SelectCancelReason(it)) },
+            onDismiss = { viewModel.sendIntent(PaywallIntent.DismissCancelReason) },
+        )
+    }
+
+    // "Payment issue" routes to Support: the VM flags the request (UriHandler-free), the Route
+    // opens mailto and clears the flag so it fires exactly once.
+    LaunchedEffect(state.openSupportRequested) {
+        if (state.openSupportRequested) {
+            analyticsTracker.event(
+                AnalyticsEvents.Paywall.SUPPORT_CLICKED,
+                mapOf(AnalyticsParams.SOURCE to state.source),
+            )
+            uriHandler.openUri("mailto:${PaywallConfig.SUPPORT_EMAIL}")
+            viewModel.sendIntent(PaywallIntent.ConsumeSupportRequest)
+        }
+    }
 }
 

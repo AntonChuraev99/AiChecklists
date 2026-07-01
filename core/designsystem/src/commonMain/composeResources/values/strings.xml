@@ -580,6 +580,19 @@
     <string name="paywall_preview_item4">300 AI credits daily</string>
     <string name="paywall_preview_tagline">Get the gist\nof anything</string>
 
+    <!-- Paywall — post-cancel reason picker (measures why the native purchase sheet was dismissed) -->
+    <string name="cancel_reason_title">Changed your mind?</string>
+    <string name="cancel_reason_subtitle">Your answer helps us improve. One tap — no typing.</string>
+    <string name="cancel_reason_expensive">Too expensive</string>
+    <string name="cancel_reason_just_looking">Just looking</string>
+    <string name="cancel_reason_need_info">Need more info</string>
+    <string name="cancel_reason_subscriptions">Not sure about subscriptions</string>
+    <string name="cancel_reason_missing_feature">Missing a feature</string>
+    <string name="cancel_reason_payment_issue">Payment issue</string>
+    <string name="cancel_reason_other">Other</string>
+    <string name="cancel_reason_dismiss">Not now</string>
+    <string name="cancel_reason_thanks">Thanks — this helps.</string>
+
     <!-- Splash Screen -->
     <string name="splash_loading">Getting things ready...</string>
 
@@ -896,6 +909,10 @@
     <string name="debug_onboardings_slides_desc">3 pager slides + paywall</string>
     <string name="debug_onboardings_ai_welcome_title">AI Welcome (Toki)</string>
     <string name="debug_onboardings_ai_welcome_desc">4 steps: AI-agent hook → create first list</string>
+
+    <!-- Debug — post-cancel reason sheet preview -->
+    <string name="debug_cancel_reason_title">Test: Cancel reason sheet</string>
+    <string name="debug_cancel_reason_description">Preview the post-cancel reason picker (bypasses the session cap)</string>
 
     <!-- Screen Catalog -->
     <string name="debug_catalog_title">Screen Catalog</string>

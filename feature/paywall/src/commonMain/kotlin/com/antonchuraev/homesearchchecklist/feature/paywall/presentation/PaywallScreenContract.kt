@@ -46,6 +46,11 @@ data class PaywallUiState(
     val variant: PaywallVariant    = PaywallVariant.Timeline,
 )
 
+// ─── Post-cancel reason picker ────────────────────────────────────────────────
+
+/** Stage of the post-cancel reason picker: pick a reason, then a brief thank-you. */
+enum class CancelReasonStage { Asking, Thanks }
+
 // ─── MVI State (ViewModel ↔ RevenueCat) ───────────────────────────────────────
 
 data class PaywallState(
@@ -60,6 +65,13 @@ data class PaywallState(
     // A/B test fields — populated from Remote Config
     val selectedPlan: PaywallPlan = PaywallPlan.Monthly,
     val variant: PaywallVariant   = PaywallVariant.Timeline,
+    // Post-cancel reason picker — shown once per app session after PurchaseResult.Cancelled.
+    val showCancelReasonSheet: Boolean = false,
+    val cancelReasonStage: CancelReasonStage = CancelReasonStage.Asking,
+    // One-shot request to open Support (mailto), consumed by PaywallRoute. Kept as a state flag
+    // instead of a SideEffect because PaywallViewModel's SideEffect type is Nothing, and it keeps
+    // the UriHandler out of the ViewModel (decoupled). Reset via ConsumeSupportRequest.
+    val openSupportRequested: Boolean = false,
 ) : State
 
 // ─── MVI Intent ───────────────────────────────────────────────────────────────
@@ -73,4 +85,10 @@ sealed interface PaywallIntent : Intent {
     data object Close : PaywallIntent
     // Phase 2: handled by ViewModel after RemoteConfig integration
     data class SelectPlan(val plan: PaywallPlan) : PaywallIntent
+
+    // Post-cancel reason picker
+    data class SelectCancelReason(val reason: CancelReason) : PaywallIntent
+    data object DismissCancelReason : PaywallIntent
+    /** PaywallRoute calls this after it has opened Support (mailto), to clear openSupportRequested. */
+    data object ConsumeSupportRequest : PaywallIntent
 }

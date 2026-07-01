@@ -35,6 +35,9 @@ kotlin {
 
             implementation(projects.feature.checklist)
             implementation(projects.feature.user)
+            // Debug-only: render the paywall post-cancel reason sheet standalone (visual test).
+            // No cycle — feature:paywall does not depend on feature:debug.
+            implementation(projects.feature.paywall)
 
             implementation(compose.runtime)
             implementation(compose.foundation)

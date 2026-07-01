@@ -8,6 +8,7 @@ import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetSu
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetUserLimitsUseCase
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.PurchaseProductUseCase
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.RestorePurchasesUseCase
+import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.CancelReasonSessionGate
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.PaywallViewModel
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.SubscriptionStatusViewModel
 import org.koin.core.Koin
@@ -25,6 +26,11 @@ expect fun createBillingPlatformPreCheck(): BillingPlatformPreCheck
 val paywallFeatureModule = module {
     single<BillingPlatformPreCheck> { createBillingPlatformPreCheck() }
     single<PaywallRepository> { createPaywallRepository() }
+
+    // Once-per-app-session cap for the post-cancel reason picker. `single` so the flag is shared
+    // across every PaywallViewModel instance (the paywall reopens from many sources) yet resets on
+    // cold start.
+    single { CancelReasonSessionGate() }
 
     // Use cases
     factory { GetSubscriptionStatusUseCase(get()) }
@@ -50,6 +56,8 @@ val paywallFeatureModule = module {
             sourceOverride = params.values.getOrNull(0) as? String,
             forceVariantOverride = params.values.getOrNull(1) as? String,
             aiModelExperimentTracker = getOrNull(),
+            cancelReasonGate = get(),
+            getSubscriptionStatusUseCase = get(),
         )
     }
     viewModelOf(::SubscriptionStatusViewModel)
