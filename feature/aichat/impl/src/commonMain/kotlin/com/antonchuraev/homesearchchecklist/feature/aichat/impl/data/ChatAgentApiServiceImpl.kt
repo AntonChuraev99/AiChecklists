@@ -139,6 +139,9 @@ internal class ChatAgentApiServiceImpl(
                         AgentStepResult.ToolCalls(
                             calls = calls.map { AgentToolCall(id = it.id, name = it.name, args = it.args) },
                             creditsRemaining = dto.creditsRemaining,
+                            modelVariant = dto.modelVariant,
+                            modelId = dto.modelId,
+                            aiFlow = dto.aiFlow,
                         )
                     }
                     "final" -> {
@@ -150,6 +153,9 @@ internal class ChatAgentApiServiceImpl(
                         AgentStepResult.Final(
                             content = content,
                             creditsRemaining = dto.creditsRemaining,
+                            modelVariant = dto.modelVariant,
+                            modelId = dto.modelId,
+                            aiFlow = dto.aiFlow,
                         )
                     }
                     "options" -> {
@@ -170,12 +176,21 @@ internal class ChatAgentApiServiceImpl(
                                 // Not enough valid options to render chips → degrade gracefully to a
                                 // plain final answer instead of failing the turn.
                                 logger.warning(TAG, "step: type=options but only ${cleaned.size} valid option(s) — falling back to Final")
-                                AgentStepResult.Final(content = prompt, creditsRemaining = dto.creditsRemaining)
+                                AgentStepResult.Final(
+                                    content = prompt,
+                                    creditsRemaining = dto.creditsRemaining,
+                                    modelVariant = dto.modelVariant,
+                                    modelId = dto.modelId,
+                                    aiFlow = dto.aiFlow,
+                                )
                             }
                             else -> AgentStepResult.Options(
                                 prompt = prompt,
                                 options = cleaned,
                                 creditsRemaining = dto.creditsRemaining,
+                                modelVariant = dto.modelVariant,
+                                modelId = dto.modelId,
+                                aiFlow = dto.aiFlow,
                             )
                         }
                     }
@@ -289,6 +304,12 @@ internal class ChatAgentApiServiceImpl(
         val options: List<String>? = null,
         @SerialName("credits_remaining") val creditsRemaining: Int = 0,
         val error: String? = null,
+        // Server-driven AI-model A/B assignment (dimensions only, never affect behaviour).
+        // Nullable + ignoreUnknownKeys=true → older servers that don't send these stay compatible;
+        // null means "experiment off / unknown", never a real arm.
+        @SerialName("model_variant") val modelVariant: String? = null,
+        @SerialName("model_id") val modelId: String? = null,
+        @SerialName("ai_flow") val aiFlow: String? = null,
     )
 
     // ─── Helpers ──────────────────────────────────────────────────────────────

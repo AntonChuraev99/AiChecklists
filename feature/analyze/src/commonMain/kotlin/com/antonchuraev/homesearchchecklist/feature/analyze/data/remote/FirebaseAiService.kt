@@ -10,7 +10,13 @@ data class AiServiceResponse<T>(
     val success: Boolean,
     val data: T? = null,
     val error: String? = null,
-    val usage: UsageInfo? = null
+    val usage: UsageInfo? = null,
+    // Server-driven AI-model A/B assignment (dimensions only, never affect behaviour). Null =
+    // experiment off / older server. Flow-agnostic, so it lives on the shared response wrapper
+    // (both analyze_and_fill and generate_checklist carry it), mirroring the chat_agent response.
+    val modelVariant: String? = null,
+    val modelId: String? = null,
+    val aiFlow: String? = null,
 )
 
 data class UsageInfo(

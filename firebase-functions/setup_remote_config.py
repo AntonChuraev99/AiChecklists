@@ -33,6 +33,13 @@ CONFIG = {
 
     # Input limits
     "ai_analysis_max_input_length": 10000,
+
+    # NOTE: the AI-model A/B experiment does NOT live here anymore. It moved to a
+    # Firebase Remote Config SERVER template (namespace firebase-server): params
+    # `ai_model_arm` + `ai_model_<flow>` gated by a "User in random percentage"
+    # condition on randomization_id. Managed in the Firebase console (Remote Config →
+    # template type "Server") with native versioning/rollback. See assign_model_arm
+    # in main.py. Stop/adjust = console (condition %), not this script.
 }
 
 # ============================================================================

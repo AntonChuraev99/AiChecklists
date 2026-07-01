@@ -24,6 +24,7 @@ import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -669,5 +670,77 @@ class ChatAgentApiServiceImplTest {
         )
 
         assertIs<AgentStepResult.ServiceError>(result)
+    }
+
+    // ── Phase 3: AI-model A/B dimensions (model_variant / model_id / ai_flow) ──────
+
+    @Test
+    fun step_200Final_carriesModelVariantIdAndFlow() = runTest {
+        val service = makeService {
+            respond(
+                content = """{"success":true,"type":"final","content":"ok","credits_remaining":4,"model_variant":"variant_b","model_id":"gemini-3.1-flash-lite","ai_flow":"chat_agent"}""",
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+            )
+        }
+
+        val result = service.step(
+            userId = "u1",
+            transcript = emptyList(),
+            locale = ChatLocale.En,
+            checklistsSummary = emptyList(),
+        )
+
+        assertIs<AgentStepResult.Final>(result)
+        assertEquals("variant_b", result.modelVariant)
+        assertEquals("gemini-3.1-flash-lite", result.modelId)
+        assertEquals("chat_agent", result.aiFlow)
+    }
+
+    @Test
+    fun step_200Final_withoutModelFields_variantIsNull_backwardCompat() = runTest {
+        // Older server (experiment off) omits the fields entirely — must not break parsing.
+        val service = makeService {
+            respond(
+                content = """{"success":true,"type":"final","content":"ok","credits_remaining":4}""",
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+            )
+        }
+
+        val result = service.step(
+            userId = "u1",
+            transcript = emptyList(),
+            locale = ChatLocale.En,
+            checklistsSummary = emptyList(),
+        )
+
+        assertIs<AgentStepResult.Final>(result)
+        assertNull(result.modelVariant)
+        assertNull(result.modelId)
+        assertNull(result.aiFlow)
+    }
+
+    @Test
+    fun step_200ToolCalls_carriesModelVariant() = runTest {
+        val service = makeService {
+            respond(
+                content = """{"success":true,"type":"tool_calls","tool_calls":[{"id":"c2","name":"find_items","args":{"query":"milk"}}],"credits_remaining":7,"model_variant":"control","model_id":"gemini-2.5-flash","ai_flow":"chat_agent"}""",
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+            )
+        }
+
+        val result = service.step(
+            userId = "u1",
+            transcript = sampleTranscript(),
+            locale = ChatLocale.En,
+            checklistsSummary = emptyList(),
+        )
+
+        assertIs<AgentStepResult.ToolCalls>(result)
+        assertEquals("control", result.modelVariant)
+        assertEquals("gemini-2.5-flash", result.modelId)
+        assertEquals("chat_agent", result.aiFlow)
     }
 }

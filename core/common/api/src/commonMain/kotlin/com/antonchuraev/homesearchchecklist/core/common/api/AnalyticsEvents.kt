@@ -275,6 +275,13 @@ object AnalyticsParams {
     const val OUTCOME = "outcome"
     const val ACTION_TYPE = "action_type"
 
+    // AI model A/B experiment — server-assigned arm, sticky user-property + event dimension.
+    // AI_MODEL_VARIANT doubles as the user-property KEY (same string) so every downstream
+    // event (incl. the paywall funnel) is segmentable by arm.
+    const val AI_MODEL_VARIANT = "ai_model_variant"
+    const val AI_MODEL_ID = "ai_model_id"
+    const val AI_FLOW = "ai_flow"
+
     // Paywall / purchase
     const val PRODUCT_ID = "product_id"
     const val HAS_FREE_TRIAL = "has_free_trial"

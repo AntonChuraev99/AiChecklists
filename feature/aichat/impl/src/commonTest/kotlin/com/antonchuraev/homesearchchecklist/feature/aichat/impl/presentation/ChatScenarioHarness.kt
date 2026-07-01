@@ -308,6 +308,13 @@ class HarnessAnalytics : AnalyticsTracker {
     override fun event(name: String, params: Map<String, Any>) = Unit
 }
 
+object HarnessNoOpModelExperimentTracker :
+    com.antonchuraev.homesearchchecklist.core.common.api.AiModelExperimentTracker {
+    override suspend fun report(variant: String?, modelId: String?, aiFlow: String?) = Unit
+    override suspend fun current():
+        com.antonchuraev.homesearchchecklist.core.common.api.AiModelArm? = null
+}
+
 // ─── Wiring helper: REAL parser + REAL routing + FAKE cloud + FAKE dispatcher ─
 
 /**
@@ -365,6 +372,7 @@ fun buildHarnessRig(scenario: ChatScenario): HarnessRig {
         userDataRepository = userRepo,
         aiChatPreferencesRepository = prefs,
         analytics = HarnessAnalytics(),
+        aiModelExperimentTracker = HarnessNoOpModelExperimentTracker,
         logger = HarnessNoOpLogger,
     )
 

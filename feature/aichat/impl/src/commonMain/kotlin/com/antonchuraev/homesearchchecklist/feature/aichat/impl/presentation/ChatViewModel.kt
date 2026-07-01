@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation
 
 import androidx.lifecycle.viewModelScope
+import com.antonchuraev.homesearchchecklist.core.common.api.AiModelExperimentTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsScreens
@@ -112,6 +113,7 @@ class ChatViewModel(
     private val userDataRepository: UserDataRepository,
     private val aiChatPreferencesRepository: AiChatPreferencesRepository,
     private val analytics: AnalyticsTracker,
+    private val aiModelExperimentTracker: AiModelExperimentTracker,
     private val logger: AppLogger,
 ) : AppViewModel<ChatScreenState, ChatScreenIntent, ChatScreenSideEffect>() {
 
@@ -505,7 +507,13 @@ class ChatViewModel(
      *
      * @param routedLayer The layer that produced the response; null → "unknown".
      */
-    private fun trackResponseReceived(routedLayer: RoutingLayer?, outcome: String) {
+    private fun trackResponseReceived(
+        routedLayer: RoutingLayer?,
+        outcome: String,
+        modelVariant: String? = null,
+        modelId: String? = null,
+        aiFlow: String? = null,
+    ) {
         val params = mutableMapOf<String, Any>(
             AnalyticsParams.ROUTED_LAYER to (routedLayer?.name ?: "unknown"),
             AnalyticsParams.OUTCOME to outcome,
@@ -513,7 +521,45 @@ class ChatViewModel(
         creditsForLayer(routedLayer)?.let { params[AnalyticsParams.CREDITS_USED] = it }
         _turnStartMs?.let { start -> params[AnalyticsParams.LATENCY_MS] = nowMillis() - start }
         _turnStartMs = null
+        // Guardrail dimensions for the AI-model A/B test — present only on Layer 3 agent responses
+        // that carry them; omitted for Layer 1/2 and error paths so the event schema stays clean.
+        modelVariant?.let { params[AnalyticsParams.AI_MODEL_VARIANT] = it }
+        modelId?.let { params[AnalyticsParams.AI_MODEL_ID] = it }
+        aiFlow?.let { params[AnalyticsParams.AI_FLOW] = it }
         analytics.event(name = AnalyticsEvents.Chat.RESPONSE_RECEIVED, params = params)
+    }
+
+    /** The AI-model A/B arm carried by a step result, if any (only success-carrying variants have it). */
+    private fun AgentStepResult.modelVariantOrNull(): String? = when (this) {
+        is AgentStepResult.ToolCalls -> modelVariant
+        is AgentStepResult.Final -> modelVariant
+        is AgentStepResult.Options -> modelVariant
+        AgentStepResult.InsufficientCredits,
+        AgentStepResult.NetworkError,
+        AgentStepResult.ServiceError,
+        -> null
+    }
+
+    /** The concrete AI model id carried by a step result, if any. */
+    private fun AgentStepResult.modelIdOrNull(): String? = when (this) {
+        is AgentStepResult.ToolCalls -> modelId
+        is AgentStepResult.Final -> modelId
+        is AgentStepResult.Options -> modelId
+        AgentStepResult.InsufficientCredits,
+        AgentStepResult.NetworkError,
+        AgentStepResult.ServiceError,
+        -> null
+    }
+
+    /** The server AI flow tag carried by a step result, if any. */
+    private fun AgentStepResult.aiFlowOrNull(): String? = when (this) {
+        is AgentStepResult.ToolCalls -> aiFlow
+        is AgentStepResult.Final -> aiFlow
+        is AgentStepResult.Options -> aiFlow
+        AgentStepResult.InsufficientCredits,
+        AgentStepResult.NetworkError,
+        AgentStepResult.ServiceError,
+        -> null
     }
 
     /** Maps a routing layer to its credit cost (Layer 1 = 0, Layer 2 = 1, Layer 3 = 3). */
@@ -1440,6 +1486,15 @@ class ChatViewModel(
                 contextChecklistName = contextChecklistName,
             )
 
+            // A/B: mirror the server-assigned model arm into the sticky user-property + persist it via
+            // the shared tracker. Deterministic per user, so it normally runs once per session (the
+            // tracker dedupes) — every later event (incl. the paywall funnel) then carries the arm.
+            aiModelExperimentTracker.report(
+                variant = stepResult.modelVariantOrNull(),
+                modelId = stepResult.modelIdOrNull(),
+                aiFlow = stepResult.aiFlowOrNull(),
+            )
+
             when (stepResult) {
                 is AgentStepResult.ToolCalls -> {
                     val calls = stepResult.calls
@@ -1487,7 +1542,13 @@ class ChatViewModel(
                                 params = mapOf(AnalyticsParams.ACTION_TYPE to call.name),
                             )
                         }
-                        trackResponseReceived(RoutingLayer.FullChat, outcome = "preview")
+                        trackResponseReceived(
+                            RoutingLayer.FullChat,
+                            outcome = "preview",
+                            modelVariant = stepResult.modelVariant,
+                            modelId = stepResult.modelId,
+                            aiFlow = stepResult.aiFlow,
+                        )
                         val decision = CompletableDeferred<Boolean>()
                         _pendingAgentDecision = decision
                         // Agent batch choice: one Primary "Do it all" (ExecuteAll) + Dismiss escape.
@@ -1573,7 +1634,13 @@ class ChatViewModel(
                     }.onFailure { e ->
                         logger.error(TAG, "runAgentTurn: failed to persist credit balance — ${e.message}", e)
                     }
-                    trackResponseReceived(RoutingLayer.FullChat, outcome = "answer")
+                    trackResponseReceived(
+                        RoutingLayer.FullChat,
+                        outcome = "answer",
+                        modelVariant = stepResult.modelVariant,
+                        modelId = stepResult.modelId,
+                        aiFlow = stepResult.aiFlow,
+                    )
                     addAndPersistAssistantMessage(
                         content = stepResult.content,
                         routedLayer = RoutingLayer.FullChat,
@@ -1595,7 +1662,13 @@ class ChatViewModel(
                     }.onFailure { e ->
                         logger.error(TAG, "runAgentTurn: failed to persist credit balance — ${e.message}", e)
                     }
-                    trackResponseReceived(RoutingLayer.FullChat, outcome = "options")
+                    trackResponseReceived(
+                        RoutingLayer.FullChat,
+                        outcome = "options",
+                        modelVariant = stepResult.modelVariant,
+                        modelId = stepResult.modelId,
+                        aiFlow = stepResult.aiFlow,
+                    )
                     // The question lives INSIDE the choice block (ChatChoice.prompt), NOT as a
                     // separate persisted message: the inline dock overlays only the pendingChoice
                     // over the last message, so a separately-persisted question would be hidden.

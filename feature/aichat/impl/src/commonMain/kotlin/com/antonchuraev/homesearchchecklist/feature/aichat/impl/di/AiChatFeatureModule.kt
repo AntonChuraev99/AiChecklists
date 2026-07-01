@@ -87,6 +87,7 @@ val aiChatFeatureModule = module {
             userDataRepository = get(),
             aiChatPreferencesRepository = get<AiChatPreferencesRepository>(),
             analytics = get(),
+            aiModelExperimentTracker = get(),
             logger = get(),
         )
     }

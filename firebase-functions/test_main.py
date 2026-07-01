@@ -764,3 +764,112 @@ class TestRefillPremiumCredits:
                     assert data["users_updated"] == 1   # active_user
                     assert data["users_expired"] == 1   # expired_user
                     assert data["users_skipped"] == 1   # full_user
+
+
+# ===========================================================================
+# AI model A/B experiment: assign_model_arm / resolve_experiment_model
+# ===========================================================================
+
+class TestModelExperiment:
+    """Server-driven A/B model assignment over a Firebase Remote Config server template.
+
+    We patch main._get_rc_server_template to return a fake ServerTemplate whose evaluate()
+    yields fixed param values — this exercises the mapping / fail-safe / allowlist logic in
+    assign_model_arm + resolve_experiment_model without touching Remote Config. The real
+    percent-condition bucketing (50/50 by randomization_id) is a property of the RC SDK's
+    evaluate() and was verified end-to-end out of band (~50.5% over 4000 ids).
+    """
+
+    class _FakeConfig:
+        def __init__(self, values):
+            self._values = values
+
+        def get_string(self, key):
+            return self._values.get(key, "")
+
+    class _FakeTemplate:
+        def __init__(self, values=None, raise_on_eval=False):
+            self._values = values or {}
+            self._raise = raise_on_eval
+
+        def evaluate(self, context=None):
+            if self._raise:
+                raise RuntimeError("evaluate boom")
+            return TestModelExperiment._FakeConfig(self._values)
+
+    def _patch_template(self, monkeypatch, main, template):
+        monkeypatch.setattr(main, "_get_rc_server_template", lambda: template)
+
+    def _arm_values(self, arm, model):
+        return {"ai_model_arm": arm, "ai_model_chat_agent": model, "ai_model_analyze": model}
+
+    def test_no_template_returns_control_default(self, _import_main, monkeypatch):
+        main = _import_main
+        self._patch_template(monkeypatch, main, None)
+        model, arm = main.assign_model_arm("user-1", "chat_agent", "gemini-2.5-flash")
+        assert arm == "control"
+        assert model == "gemini-2.5-flash"
+
+    def test_variant_arm_returns_variant_model(self, _import_main, monkeypatch):
+        main = _import_main
+        self._patch_template(monkeypatch, main,
+                             self._FakeTemplate(self._arm_values("variant_b", "gemini-3.1-flash-lite")))
+        model, arm = main.assign_model_arm("user-1", "chat_agent", "gemini-2.5-flash")
+        assert arm == "variant_b"
+        assert model == "gemini-3.1-flash-lite"
+
+    def test_control_arm_returns_control_model(self, _import_main, monkeypatch):
+        main = _import_main
+        self._patch_template(monkeypatch, main,
+                             self._FakeTemplate(self._arm_values("control", "gemini-2.5-flash")))
+        model, arm = main.assign_model_arm("user-1", "chat_agent", "gemini-2.5-flash")
+        assert arm == "control"
+        assert model == "gemini-2.5-flash"
+
+    def test_missing_model_param_falls_back(self, _import_main, monkeypatch):
+        main = _import_main
+        # arm present but the per-flow model param is empty ("") -> default + control.
+        self._patch_template(monkeypatch, main, self._FakeTemplate({"ai_model_arm": "variant_b"}))
+        model, arm = main.assign_model_arm("user-1", "chat_agent", "gemini-2.5-flash")
+        assert arm == "control"
+        assert model == "gemini-2.5-flash"
+
+    def test_failsafe_disallowed_model(self, _import_main, monkeypatch):
+        main = _import_main
+        # RC resolves a model NOT in the allowlist -> fail safe to control default.
+        self._patch_template(monkeypatch, main,
+                             self._FakeTemplate(self._arm_values("variant_b", "gpt-4o")))
+        model, arm = main.assign_model_arm("user-1", "chat_agent", "gemini-2.5-flash")
+        assert arm == "control"
+        assert model == "gemini-2.5-flash"
+
+    def test_failsafe_evaluate_raises(self, _import_main, monkeypatch):
+        main = _import_main
+        # A raising evaluate() must never break the AI path -> control default.
+        self._patch_template(monkeypatch, main, self._FakeTemplate(raise_on_eval=True))
+        model, arm = main.assign_model_arm("user-1", "analyze", "gemini-2.5-flash-lite")
+        assert arm == "control"
+        assert model == "gemini-2.5-flash-lite"
+
+    def test_eval_override_wins_and_labels_override(self, _import_main, monkeypatch):
+        main = _import_main
+        # RC would say control; the eval test-override must win and be labelled "override".
+        self._patch_template(monkeypatch, main,
+                             self._FakeTemplate(self._arm_values("control", "gemini-2.5-flash")))
+        monkeypatch.setattr(main, "MODEL_OVERRIDE_TEST_SECRET", "secret123")
+        model, arm = main.resolve_experiment_model(
+            "user-1", "chat_agent", "gemini-2.5-flash",
+            {"model_override": "gemini-2.5-pro", "test_secret": "secret123"},
+        )
+        assert arm == "override"
+        assert model == "gemini-2.5-pro"
+
+    def test_no_override_uses_rc_arm(self, _import_main, monkeypatch):
+        main = _import_main
+        self._patch_template(monkeypatch, main,
+                             self._FakeTemplate(self._arm_values("variant_b", "gemini-3.1-flash-lite")))
+        model, arm = main.resolve_experiment_model(
+            "user-1", "chat_agent", "gemini-2.5-flash", {},
+        )
+        assert arm == "variant_b"
+        assert model == "gemini-3.1-flash-lite"

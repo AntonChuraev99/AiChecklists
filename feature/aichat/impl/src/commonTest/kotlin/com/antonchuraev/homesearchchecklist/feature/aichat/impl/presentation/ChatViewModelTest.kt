@@ -272,8 +272,12 @@ private class FakeUserDataRepository(
 private class FakeAnalyticsTracker : com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker {
     val events = mutableListOf<Pair<String, Map<String, Any>>>()
     val screenViews = mutableListOf<String>()
+    /** Every setUserProperties(...) call, in order — used to assert the sticky A/B arm property. */
+    val userPropertyCalls = mutableListOf<Map<String, Any>>()
     override fun setUserId(userId: String) {}
-    override fun setUserProperties(properties: Map<String, Any>) {}
+    override fun setUserProperties(properties: Map<String, Any>) {
+        userPropertyCalls.add(properties)
+    }
     override fun screenView(name: String) {
         screenViews.add(name)
     }
@@ -286,6 +290,26 @@ private class FakeAnalyticsTracker : com.antonchuraev.homesearchchecklist.core.c
 
     /** Count of events emitted with [name]. */
     fun count(name: String): Int = events.count { it.first == name }
+
+    /** All setUserProperties calls that set [key], newest last. */
+    fun userPropertyCallsFor(key: String): List<Map<String, Any>> =
+        userPropertyCalls.filter { it.containsKey(key) }
+}
+
+/**
+ * Records every [report] ChatViewModel forwards. The dedupe / sticky-property / persistence
+ * behaviour now lives in AiModelExperimentTrackerImpl (covered by its own test) — here we only
+ * assert the ViewModel hands the server arm to the tracker on carrying rounds.
+ */
+private class FakeAiModelExperimentTracker :
+    com.antonchuraev.homesearchchecklist.core.common.api.AiModelExperimentTracker {
+    data class Report(val variant: String?, val modelId: String?, val aiFlow: String?)
+    val reports = mutableListOf<Report>()
+    override suspend fun report(variant: String?, modelId: String?, aiFlow: String?) {
+        reports.add(Report(variant, modelId, aiFlow))
+    }
+    override suspend fun current():
+        com.antonchuraev.homesearchchecklist.core.common.api.AiModelArm? = null
 }
 
 private fun makeVm(
@@ -297,6 +321,7 @@ private fun makeVm(
     userDataRepo: UserDataRepository = FakeUserDataRepository(),
     aiChatPreferencesRepo: AiChatPreferencesRepository = FakeAiChatPreferencesRepository(),
     analytics: com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker = FakeAnalyticsTracker(),
+    experimentTracker: FakeAiModelExperimentTracker = FakeAiModelExperimentTracker(),
 ): ChatViewModel = ChatViewModel(
     aiChatRepository = repo,
     toolCallDispatcher = dispatcher,
@@ -307,6 +332,7 @@ private fun makeVm(
     userDataRepository = userDataRepo,
     aiChatPreferencesRepository = aiChatPreferencesRepo,
     analytics = analytics,
+    aiModelExperimentTracker = experimentTracker,
     logger = NoOpLogger,
 )
 
@@ -2422,6 +2448,102 @@ class ChatViewModelTest {
         assertEquals("answer", params["outcome"])
         assertEquals("FullChat", params["routed_layer"])
         assertEquals(3, params["credits_used"], "Layer 3 (FullChat) costs 3 credits")
+    }
+
+    // ── A6b. model_variant → forwarded to the experiment tracker + response_received dimension ──
+    @Test
+    fun freeForm_modelVariant_forwardedToExperimentTracker() = runTest {
+        val findCall = AgentToolCall(
+            id = "call-find",
+            name = "find_items", // read-only → auto-dispatched, loop continues to the Final round
+            args = buildJsonObject { put("query", "milk") },
+        )
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.FreeForm,
+                confidence = 1.0f,
+                layer = RoutingLayer.FullChat,
+            ),
+            // Two rounds, BOTH carrying the same arm — the guard must collapse them to one set.
+            agentStepResults = listOf(
+                AgentStepResult.ToolCalls(
+                    calls = listOf(findCall),
+                    creditsRemaining = 99,
+                    modelVariant = "variant_b",
+                    modelId = "gemini-3.1-flash-lite",
+                    aiFlow = "chat_agent",
+                ),
+                AgentStepResult.Final(
+                    content = "Here is your week.",
+                    creditsRemaining = 98,
+                    modelVariant = "variant_b",
+                    modelId = "gemini-3.1-flash-lite",
+                    aiFlow = "chat_agent",
+                ),
+            ),
+        )
+        val fakeDispatcher = FakeToolCallDispatcher(
+            outcome = DispatchOutcome.Success("chat_dispatch_find_success", listOf("0", "")),
+        )
+        val analytics = FakeAnalyticsTracker()
+        val experimentTracker = FakeAiModelExperimentTracker()
+        val vm = makeVm(
+            repo = repo,
+            dispatcher = fakeDispatcher,
+            analytics = analytics,
+            experimentTracker = experimentTracker,
+        )
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("plan my week"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        // ChatViewModel forwards the server arm to the shared tracker on the carrying rounds; the
+        // sticky-property / dedupe lives in AiModelExperimentTrackerImpl (its own test).
+        assertTrue(
+            experimentTracker.reports.any {
+                it == FakeAiModelExperimentTracker.Report("variant_b", "gemini-3.1-flash-lite", "chat_agent")
+            },
+            "the server arm must be forwarded to the experiment tracker",
+        )
+
+        // Also attached as guardrail dimensions on the response_received event.
+        val params = analytics.paramsOf("ai_chat_response_received")
+        assertNotNull(params)
+        assertEquals("variant_b", params["ai_model_variant"])
+        assertEquals("gemini-3.1-flash-lite", params["ai_model_id"])
+        assertEquals("chat_agent", params["ai_flow"])
+    }
+
+    // ── A6c. No model_variant from server → no real arm forwarded, no event dimension (backward compat) ──
+    @Test
+    fun freeForm_noModelVariant_forwardsNoArmAndOmitsEventDimension() = runTest {
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.FreeForm,
+                confidence = 1.0f,
+                layer = RoutingLayer.FullChat,
+            ),
+            agentStepResults = listOf(
+                AgentStepResult.Final(content = "Here is your week.", creditsRemaining = 100),
+            ),
+        )
+        val analytics = FakeAnalyticsTracker()
+        val experimentTracker = FakeAiModelExperimentTracker()
+        val vm = makeVm(repo = repo, analytics = analytics, experimentTracker = experimentTracker)
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("plan my week"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        assertTrue(
+            experimentTracker.reports.none { it.variant != null },
+            "Missing model_variant (experiment off / older server) must not forward a real arm",
+        )
+        val params = analytics.paramsOf("ai_chat_response_received")
+        assertNotNull(params)
+        assertFalse(params.containsKey("ai_model_variant"),
+            "ai_model_variant must be omitted from the event when the server didn't send it")
     }
 
     // ── A7. thumb_down — OnFeedbackOpen emits ai_chat_thumb_down with message params ──

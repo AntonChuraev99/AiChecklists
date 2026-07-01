@@ -2,6 +2,7 @@ package com.antonchuraev.homesearchchecklist.feature.analyze.presentation
 
 import androidx.lifecycle.viewModelScope
 import com.antonchuraev.homesearchchecklist.core.common.api.ActivationCoordinator
+import com.antonchuraev.homesearchchecklist.core.common.api.AiModelExperimentTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
@@ -39,7 +40,10 @@ class AnalyzeViewModel(
     private val getSubscriptionStatusUseCase: GetSubscriptionStatusUseCase,
     private val analyticsTracker: AnalyticsTracker,
     private val activationCoordinator: ActivationCoordinator,
-    private val remoteConfigProvider: RemoteConfigProvider
+    private val remoteConfigProvider: RemoteConfigProvider,
+    // Best-effort AI-model A/B attribution — nullable so pure-VM tests can omit it. Shared with the
+    // chat + create flows so the sticky arm user-property and DataStore-persisted arm stay unified.
+    private val aiModelExperimentTracker: AiModelExperimentTracker? = null,
 ) : AppViewModel<AnalyzeScreenState, AnalyzeScreenIntent, Nothing>() {
 
     private val _screenState = MutableStateFlow(
@@ -256,10 +260,20 @@ class AnalyzeViewModel(
 
             analyzeRepository.analyzeData(inputData, targetChecklist)
                 .onSuccess { result ->
-                    analyticsTracker.event(AnalyticsEvents.Analyze.COMPLETED, mapOf(
-                        AnalyticsParams.INPUT_TYPE to inputType,
-                        "item_count" to result.suggestedItems.size
-                    ))
+                    // Mirror the server-assigned A/B arm into the sticky user-property + persist it
+                    // (best-effort) so the paywall can attribute revenue even for Analyze/Create-only
+                    // users. Guarded/deduped inside the tracker; never throws.
+                    aiModelExperimentTracker?.report(result.modelVariant, result.modelId, result.aiFlow)
+
+                    analyticsTracker.event(AnalyticsEvents.Analyze.COMPLETED, buildMap {
+                        put(AnalyticsParams.INPUT_TYPE, inputType)
+                        put("item_count", result.suggestedItems.size)
+                        // Guardrail dimensions — present only when the server sent an arm; omitted
+                        // otherwise so the event schema stays clean (matches ai_chat_response_received).
+                        result.modelVariant?.let { put(AnalyticsParams.AI_MODEL_VARIANT, it) }
+                        result.modelId?.let { put(AnalyticsParams.AI_MODEL_ID, it) }
+                        result.aiFlow?.let { put(AnalyticsParams.AI_FLOW, it) }
+                    })
 
                     // FILL flows (fill an existing checklist / apply to its default fill) keep going
                     // through the editable preview — there the user confirms which AI items land in
