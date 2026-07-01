@@ -1,0 +1,583 @@
+<!-- @dsCard group="Landing" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#1565C0" />
+
+  <!-- ============================================================
+       SEO — iteration 2 (real, keyword-tuned copy).
+       Primary keyword: "AI checklist app". Wedge: "turn anything into a checklist".
+       ============================================================ -->
+  <title>Gisti — AI Checklist App: Turn Anything Into a List</title>
+  <meta name="description" content="Gisti is the AI checklist app that turns any photo, PDF, link, text, or voice into a smart checklist in seconds. Free on Android &amp; web, synced. Try it free." />
+  <link rel="canonical" href="https://gisti-ai.com/" />
+  <meta name="robots" content="index, follow" />
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Gisti" />
+  <meta property="og:title" content="Gisti — Turn Anything Into a Smart Checklist with AI" />
+  <meta property="og:description" content="Snap a photo, paste a link, drop a PDF, or just talk — Gisti's AI builds your checklist in seconds. Same app, same lists on Android and the web. Start free." />
+  <meta property="og:url" content="https://gisti-ai.com/" />
+  <meta property="og:image" content="https://gisti-ai.com/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+
+  <!-- Twitter / X -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Gisti — The AI Checklist App That Turns Anything Into a List" />
+  <meta name="twitter:description" content="Photo, PDF, link, text, or voice in → smart checklist out. AI Chat builds and fills your lists. Free on Android &amp; web, cloud-synced. Try it free." />
+  <meta name="twitter:image" content="https://gisti-ai.com/og-image.png" />
+
+  <!-- Icons -->
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+
+  <!-- Fonts + brand tokens -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" rel="stylesheet" />
+  <!-- Compiled Tailwind utilities (static, minified, zero JS — regenerate with:
+       npx tailwindcss@3 -c tailwind.config.js -i src.css -o tailwind.css --minify) -->
+  <link rel="stylesheet" href="./tailwind.css" />
+  <link rel="stylesheet" href="./tokens.css" />
+
+  <!-- JSON-LD: SoftwareApplication (no aggregateRating — no honest rating data yet) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Gisti — AI Checklists",
+    "operatingSystem": "Android, Web",
+    "applicationCategory": "ProductivityApplication",
+    "description": "Gisti is an AI checklist app that turns any photo, PDF, link, text, or voice into a smart, trackable checklist. Chat with AI to create and fill lists, set reminders, export to Google Calendar, and sync across Android and web.",
+    "url": "https://gisti-ai.com/",
+    "downloadUrl": "https://play.google.com/store/apps/details?id=com.antonchuraev.aichecklists",
+    "offers": [
+      { "@type": "Offer", "price": "0", "priceCurrency": "USD", "name": "Free" },
+      { "@type": "Offer", "price": "1.99", "priceCurrency": "USD", "name": "Premium" }
+    ]
+  }
+  </script>
+
+  <!-- JSON-LD: FAQPage (mirrors the visible FAQ section — keep in sync) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      { "@type": "Question", "name": "Can AI make a checklist for me?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Gisti's AI turns your input — a photo, PDF, link, typed text, or voice — into a structured checklist in seconds, then lets you edit any item." } },
+      { "@type": "Question", "name": "How do I turn a photo into a checklist?", "acceptedAnswer": { "@type": "Answer", "text": "Open Gisti, tap to add a photo of any list, note, or document, and the AI reads it and builds a checklist you can check off right away." } },
+      { "@type": "Question", "name": "Can I turn a PDF or a link into a checklist?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Drop in a PDF or paste a web link and Gisti's AI extracts the steps and organizes them into a ready-to-use checklist." } },
+      { "@type": "Question", "name": "Is there a free AI to-do list app?", "acceptedAnswer": { "@type": "Answer", "text": "Gisti is free to start — 5 checklists, 5 AI fills each, 10 AI credits a day, and 10 recurring reminders. No sign-up needed to try it." } },
+      { "@type": "Question", "name": "Does Gisti work on both Android and the web?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Gisti has the same features on Android and the web, and your checklists sync through the cloud so they're the same on every device." } },
+      { "@type": "Question", "name": "How much does Gisti Premium cost?", "acceptedAnswer": { "@type": "Answer", "text": "Premium is $1.99/month and unlocks unlimited checklists and fills, 300 AI credits a day, Google Calendar export, and a weekly digest." } }
+    ]
+  }
+  </script>
+
+  <style>
+    html { scroll-behavior: smooth; }
+    :where(section[id], main#top) { scroll-margin-top: 84px; }
+    body { font-family: Roboto, system-ui, sans-serif; color: var(--on-surface); background: var(--surface); }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; line-height: 1; }
+    .wrap { width: 100%; max-width: 1120px; margin-inline: auto; padding-inline: 24px; }
+
+    /* Sticky frosted header */
+    .site-header { position: sticky; top: 0; z-index: 50; background: rgba(251,250,248,.82);
+      backdrop-filter: saturate(1.4) blur(12px); -webkit-backdrop-filter: saturate(1.4) blur(12px);
+      border-bottom: 1px solid var(--outline-variant); }
+
+    /* CSS-only mobile nav (checkbox hack, zero JS) */
+    #nav-toggle { display: none; }
+    .nav-panel { display: flex; align-items: center; gap: 28px; }
+    .nav-burger { display: none; }
+    @media (max-width: 860px) {
+      .nav-panel { position: absolute; left: 0; right: 0; top: 100%; flex-direction: column; align-items: stretch;
+        gap: 4px; padding: 12px 24px 20px; background: var(--surface); border-bottom: 1px solid var(--outline-variant);
+        transform: translateY(-8px); opacity: 0; pointer-events: none; transition: .18s ease; }
+      #nav-toggle:checked ~ .nav-panel { transform: translateY(0); opacity: 1; pointer-events: auto; }
+      .nav-panel a { padding: 12px 8px; }
+      .nav-burger { display: inline-flex; }
+      .nav-desktop-cta { display: none; }
+    }
+
+    /* Input-source chips (hero "anything in" card) */
+    .src-chip { display: inline-flex; align-items: center; gap: 6px;
+      background: var(--surface); border: 1px solid var(--outline-variant); border-radius: 999px;
+      padding: 8px 14px; font: 500 13px/1 Roboto; color: var(--on-surface); }
+    .src-chip .material-symbols-outlined { font-size: 18px; }
+
+    /* FAQ accordion (native <details>) */
+    details.faq { border-bottom: 1px solid var(--outline-variant); }
+    details.faq > summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between;
+      align-items: center; gap: 16px; padding: 20px 4px; font-weight: 600; }
+    details.faq > summary::-webkit-details-marker { display: none; }
+    details.faq > summary .chev { transition: transform .2s ease; color: var(--on-surface-variant); }
+    details.faq[open] > summary .chev { transform: rotate(180deg); }
+    details.faq .ans { padding: 0 4px 20px; color: var(--on-surface-variant); max-width: 68ch; }
+
+    /* Scroll-driven reveal — progressive enhancement, respects reduced motion */
+    @media (prefers-reduced-motion: no-preference) {
+      @supports (animation-timeline: view()) {
+        .reveal { animation: reveal-up linear both; animation-timeline: view(); animation-range: entry 0% cover 22%; }
+        @keyframes reveal-up { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: none; } }
+        .ai-fill, .ai-fill-hero { background-size: 160% 160%; animation: ai-drift 14s ease-in-out infinite; }
+        @keyframes ai-drift { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+      }
+    }
+    .lift { transition: transform .15s ease, box-shadow .15s ease; }
+    .lift:hover { transform: translateY(-3px); box-shadow: 0 12px 30px rgba(20,30,60,.10); }
+  </style>
+</head>
+
+<body class="bg-surface text-on-surface">
+
+  <!-- ======================= 1. HEADER / NAV ======================= -->
+  <header class="site-header">
+    <div class="wrap flex items-center justify-between h-16 relative">
+      <a href="#top" class="flex items-center gap-2" aria-label="Gisti home">
+        <img src="./favicon.svg" class="w-8 h-8" width="32" height="32" alt="Gisti app icon" />
+        <span class="text-[20px] font-bold tracking-tight">Gisti</span>
+      </a>
+
+      <input type="checkbox" id="nav-toggle" aria-hidden="true" />
+      <label for="nav-toggle" class="nav-burger btn-text btn h-10 px-2" aria-label="Toggle menu">
+        <span aria-hidden="true" class="material-symbols-outlined">menu</span>
+      </label>
+
+      <nav class="nav-panel t-label-l">
+        <a href="#features" class="text-on-surface-variant hover:text-primary">Features</a>
+        <a href="#how" class="text-on-surface-variant hover:text-primary">How it works</a>
+        <a href="#pricing" class="text-on-surface-variant hover:text-primary">Pricing</a>
+        <a href="#faq" class="text-on-surface-variant hover:text-primary">FAQ</a>
+        <a href="#cta" class="btn btn-primary btn-pill h-10 px-5">Get Gisti free</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="top">
+
+    <!-- ======================= 2. HERO ======================= -->
+    <section class="wrap grid lg:grid-cols-2 gap-12 lg:gap-8 items-center pt-16 pb-20 lg:pt-24 lg:pb-28">
+      <div class="reveal">
+        <span class="inline-flex items-center gap-2 ai-border rounded-pill px-3 py-1.5 t-label-l mb-6">
+          <span aria-hidden="true" class="material-symbols-outlined ai-text" style="font-size:18px">auto_awesome</span>
+          <span class="ai-text font-semibold">The AI checklist app</span>
+        </span>
+
+        <h1 class="t-display-l md:t-display-xl mb-5">
+          Turn <span class="ai-text">anything</span> into a checklist with AI
+        </h1>
+
+        <p class="t-body-l text-on-surface-variant max-w-[52ch] mb-8">
+          Snap a photo, paste a link, drop a PDF, type, or just speak — Gisti's AI turns it
+          into a smart, trackable checklist in seconds. Same lists on Android and the web,
+          always in sync.
+        </p>
+
+        <div class="flex flex-wrap items-center gap-3">
+          <!-- (a) Official Google Play badge — unmodified, per Google Play brand guidelines -->
+          <a href="https://play.google.com/store/apps/details?id=com.antonchuraev.aichecklists"
+             class="inline-flex items-center" aria-label="Get Gisti on Google Play">
+            <img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png"
+                 alt="Get it on Google Play" style="height:72px;display:block" />
+          </a>
+          <!-- (b) Open Web App (custom button; center-aligned with the badge) -->
+          <a href="https://app.gisti-ai.com" class="btn btn-primary btn-pill" style="height:52px;font-size:16px">
+            <span aria-hidden="true" class="material-symbols-outlined" style="font-size:18px">public</span>
+            Open the web app
+          </a>
+        </div>
+
+        <p class="t-body-m text-on-surface-variant mt-5 flex items-center gap-2">
+          <span aria-hidden="true" class="material-symbols-outlined text-success" style="font-size:18px">verified</span>
+          Free forever plan · Android &amp; web, always in sync
+        </p>
+      </div>
+
+      <!-- Signature: "anything in → checklist out", built from flat icon+text cards (no device mockups) -->
+      <div class="reveal relative">
+        <div class="ai-fill absolute -z-10 blur-3xl opacity-15 w-72 h-72 rounded-full" style="top:6%;right:8%"></div>
+
+        <!-- You add: input sources as icon+text chips -->
+        <div class="bg-surface-card rounded-xl border border-outline-variant p-5 shadow-card">
+          <div class="t-label-l text-on-surface-variant mb-3">You add anything</div>
+          <div class="flex flex-wrap gap-2.5">
+            <span class="src-chip"><span aria-hidden="true" class="material-symbols-outlined ai-text">photo_camera</span>Photo</span>
+            <span class="src-chip"><span aria-hidden="true" class="material-symbols-outlined ai-text">picture_as_pdf</span>PDF</span>
+            <span class="src-chip"><span aria-hidden="true" class="material-symbols-outlined ai-text">notes</span>Text</span>
+            <span class="src-chip"><span aria-hidden="true" class="material-symbols-outlined ai-text">link</span>Link</span>
+            <span class="src-chip"><span aria-hidden="true" class="material-symbols-outlined ai-text">mic</span>Voice</span>
+          </div>
+        </div>
+
+        <!-- AI transform indicator -->
+        <div class="flex items-center justify-center gap-2 my-4" aria-hidden="true">
+          <span class="ai-fill w-9 h-9 rounded-full grid place-items-center text-white">
+            <span aria-hidden="true" class="material-symbols-outlined" style="font-size:20px">auto_awesome</span>
+          </span>
+          <span aria-hidden="true" class="material-symbols-outlined ai-text">south</span>
+        </div>
+
+        <!-- Gisti creates: a flat checklist card (no phone frame) -->
+        <div class="bg-surface-card rounded-xl border border-outline-variant p-5 shadow-card">
+          <div class="flex items-center gap-3 mb-4">
+            <span class="w-9 h-9 rounded-xl grid place-items-center" style="background:#E3F2FD;color:#2196F3">
+              <span aria-hidden="true" class="material-symbols-outlined" style="font-size:20px">luggage</span>
+            </span>
+            <div>
+              <div class="t-title-m">Weekend Trip</div>
+              <div class="t-body-m text-on-surface-variant">4 of 6 done</div>
+            </div>
+          </div>
+          <div class="h-1.5 rounded-full mb-4" style="background:#EAE8E4">
+            <div class="h-1.5 rounded-full" style="width:66%;background:var(--success)"></div>
+          </div>
+          <ul class="space-y-2">
+            <li class="flex items-center gap-3 bg-surface rounded-md p-2.5 border border-outline-variant">
+              <span aria-hidden="true" class="material-symbols-outlined text-success" style="font-size:22px">check_circle</span>
+              <span class="t-body-m line-through text-on-surface-variant">Book train tickets</span>
+            </li>
+            <li class="flex items-center gap-3 bg-surface rounded-md p-2.5 border border-outline-variant">
+              <span aria-hidden="true" class="material-symbols-outlined text-success" style="font-size:22px">check_circle</span>
+              <span class="t-body-m line-through text-on-surface-variant">Pack charger</span>
+            </li>
+            <li class="flex items-center gap-3 bg-surface rounded-md p-2.5 border border-outline-variant">
+              <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">radio_button_unchecked</span>
+              <span class="t-body-m">Confirm hotel</span>
+            </li>
+            <li class="flex items-center gap-3 bg-surface rounded-md p-2.5 border border-outline-variant">
+              <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">radio_button_unchecked</span>
+              <span class="t-body-m">Download offline map</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================= 3. TRUST / VALUE STRIP (honest — no fabricated metrics) ======================= -->
+    <section class="bg-surface-low border-y border-outline-variant" aria-label="Why Gisti">
+      <div class="wrap py-8 grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+        <div class="flex flex-col items-center gap-1">
+          <span aria-hidden="true" class="material-symbols-outlined ai-text" style="font-size:26px">auto_awesome</span>
+          <div class="t-title-s">AI-powered</div>
+          <div class="t-body-m text-on-surface-variant">Understands your content</div>
+        </div>
+        <div class="flex flex-col items-center gap-1">
+          <span aria-hidden="true" class="material-symbols-outlined text-primary" style="font-size:26px">devices</span>
+          <div class="t-title-s">Android &amp; web</div>
+          <div class="t-body-m text-on-surface-variant">Same data, in sync</div>
+        </div>
+        <div class="flex flex-col items-center gap-1">
+          <span aria-hidden="true" class="material-symbols-outlined text-success" style="font-size:26px">payments</span>
+          <div class="t-title-s">Free to start</div>
+          <div class="t-body-m text-on-surface-variant">No payment to begin</div>
+        </div>
+        <div class="flex flex-col items-center gap-1">
+          <span aria-hidden="true" class="material-symbols-outlined text-primary" style="font-size:26px">cloud_done</span>
+          <div class="t-title-s">Cloud sync</div>
+          <div class="t-body-m text-on-surface-variant">Backed up to your account</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================= 4. CORE FEATURES ======================= -->
+    <section id="features" class="wrap py-20 lg:py-28">
+      <div class="max-w-[46ch] mb-12 reveal">
+        <h2 class="t-headline-l mb-3">Everything you want from an AI checklist app</h2>
+        <p class="t-body-l text-on-surface-variant">Capture, organize and finish — powered by AI, the same on every device.</p>
+      </div>
+
+      <!-- Flagship: AI Chat (wide, gradient border) -->
+      <div class="ai-border rounded-xl p-6 md:p-8 mb-6 reveal lift">
+        <div class="grid md:grid-cols-[1fr_auto] gap-6 items-center">
+          <div>
+            <span class="inline-flex items-center gap-2 ai-fill text-white rounded-pill px-3 py-1 t-label-l mb-4">
+              <span aria-hidden="true" class="material-symbols-outlined" style="font-size:16px">bolt</span>Flagship
+            </span>
+            <h3 class="t-headline-s mb-2">AI Chat Assistant</h3>
+            <p class="t-body-l text-on-surface-variant max-w-[56ch]">
+              Just chat with Gisti — ask, edit, and build checklists in plain language,
+              and it fills in the details for you.
+            </p>
+          </div>
+          <span class="ai-fill w-20 h-20 rounded-2xl grid place-items-center text-white shrink-0 mx-auto">
+            <span aria-hidden="true" class="material-symbols-outlined" style="font-size:40px">forum</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- Secondary features grid -->
+      <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 reveal lift">
+          <span class="w-12 h-12 rounded-xl grid place-items-center mb-4" style="background:#E3F2FD;color:#2196F3">
+            <span aria-hidden="true" class="material-symbols-outlined">auto_fix_high</span>
+          </span>
+          <h3 class="t-title-l mb-2">Create &amp; fill from anything</h3>
+          <p class="t-body-m text-on-surface-variant">Snap a photo, paste a link, drop a PDF, type, or speak — AI turns any source into a ready-to-use checklist.</p>
+        </article>
+
+        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 reveal lift">
+          <span class="w-12 h-12 rounded-xl grid place-items-center mb-4" style="background:#E7F4EC;color:#2E9E5B">
+            <span aria-hidden="true" class="material-symbols-outlined">sync</span>
+          </span>
+          <h3 class="t-title-l mb-2">Same app on Android &amp; web</h3>
+          <p class="t-body-m text-on-surface-variant">Your checklists live in the cloud and sync instantly, so you pick up on your phone right where you left off on the web.</p>
+        </article>
+
+        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 reveal lift">
+          <span class="w-12 h-12 rounded-xl grid place-items-center mb-4" style="background:#FFF8E1;color:#D9A21E">
+            <span aria-hidden="true" class="material-symbols-outlined">notifications_active</span>
+          </span>
+          <h3 class="t-title-l mb-2">Reminders &amp; Google Calendar</h3>
+          <p class="t-body-m text-on-surface-variant">Add reminders to any item and export to Google Calendar, so nothing slips — plus a weekly digest of what's ahead.</p>
+        </article>
+
+        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 reveal lift">
+          <span class="w-12 h-12 rounded-xl grid place-items-center mb-4" style="background:#F0EAFB;color:#7E5BD0">
+            <span aria-hidden="true" class="material-symbols-outlined">dashboard_customize</span>
+          </span>
+          <h3 class="t-title-l mb-2">Templates &amp; progress tracking</h3>
+          <p class="t-body-m text-on-surface-variant">Start fast from smart templates and watch your progress fill in as you check items off.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ======================= 5. HOW IT WORKS ======================= -->
+    <section id="how" class="bg-surface-low border-y border-outline-variant">
+      <div class="wrap py-20 lg:py-28">
+        <div class="max-w-[46ch] mb-12 reveal">
+          <h2 class="t-headline-l mb-3">Turn anything into a checklist in 3 steps</h2>
+          <p class="t-body-l text-on-surface-variant">Gisti does the organizing so you can do the doing.</p>
+        </div>
+
+        <ol class="grid md:grid-cols-3 gap-6">
+          <li class="reveal bg-surface-card rounded-xl border border-outline-variant p-6 lift">
+            <div class="flex items-center gap-3 mb-4">
+              <span class="ai-fill w-11 h-11 rounded-full grid place-items-center text-white font-bold" style="font-size:20px">1</span>
+              <span class="w-11 h-11 rounded-xl grid place-items-center" style="background:#E3F2FD;color:#2196F3">
+                <span aria-hidden="true" class="material-symbols-outlined">add_a_photo</span>
+              </span>
+            </div>
+            <h3 class="t-title-l mb-2">Add anything</h3>
+            <p class="t-body-m text-on-surface-variant">Snap a photo, paste a link, drop a PDF, type text, or speak.</p>
+          </li>
+          <li class="reveal bg-surface-card rounded-xl border border-outline-variant p-6 lift">
+            <div class="flex items-center gap-3 mb-4">
+              <span class="ai-fill w-11 h-11 rounded-full grid place-items-center text-white font-bold" style="font-size:20px">2</span>
+              <span class="w-11 h-11 rounded-xl grid place-items-center" style="background:#F0EAFB">
+                <span aria-hidden="true" class="material-symbols-outlined ai-text">auto_awesome</span>
+              </span>
+            </div>
+            <h3 class="t-title-l mb-2">AI builds your checklist</h3>
+            <p class="t-body-m text-on-surface-variant">Gisti reads it and creates a structured, ordered checklist in seconds.</p>
+          </li>
+          <li class="reveal bg-surface-card rounded-xl border border-outline-variant p-6 lift">
+            <div class="flex items-center gap-3 mb-4">
+              <span class="ai-fill w-11 h-11 rounded-full grid place-items-center text-white font-bold" style="font-size:20px">3</span>
+              <span class="w-11 h-11 rounded-xl grid place-items-center" style="background:#E7F4EC;color:#2E9E5B">
+                <span aria-hidden="true" class="material-symbols-outlined">task_alt</span>
+              </span>
+            </div>
+            <h3 class="t-title-l mb-2">Check off &amp; stay on track</h3>
+            <p class="t-body-m text-on-surface-variant">Set reminders, export to Calendar, and sync across all your devices.</p>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ======================= 6. USE CASES (icon + text cards; long-tail intent) ======================= -->
+    <section class="wrap py-20 lg:py-28">
+      <div class="max-w-[46ch] mb-12 reveal">
+        <h2 class="t-headline-l mb-3">What can you turn into a checklist?</h2>
+        <p class="t-body-l text-on-surface-variant">If you can snap it, paste it, type it or say it, Gisti can turn it into a checklist.</p>
+      </div>
+
+      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 reveal lift">
+          <span class="w-12 h-12 rounded-xl grid place-items-center mb-4" style="background:#E3F2FD;color:#2196F3">
+            <span aria-hidden="true" class="material-symbols-outlined">photo_camera</span>
+          </span>
+          <h3 class="t-title-l mb-2">Turn a photo into a checklist</h3>
+          <p class="t-body-m text-on-surface-variant">Snap a whiteboard, a handwritten note, or a document and get clean, checkable items.</p>
+        </article>
+
+        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 reveal lift">
+          <span class="w-12 h-12 rounded-xl grid place-items-center mb-4" style="background:#F0EAFB;color:#7E5BD0">
+            <span aria-hidden="true" class="material-symbols-outlined">picture_as_pdf</span>
+          </span>
+          <h3 class="t-title-l mb-2">Turn a PDF into a checklist</h3>
+          <p class="t-body-m text-on-surface-variant">Drop in a PDF and AI extracts the steps into a ready-to-use checklist.</p>
+        </article>
+
+        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 reveal lift">
+          <span class="w-12 h-12 rounded-xl grid place-items-center mb-4" style="background:#E7F4EC;color:#2E9E5B">
+            <span aria-hidden="true" class="material-symbols-outlined">link</span>
+          </span>
+          <h3 class="t-title-l mb-2">Paste a link into a checklist</h3>
+          <p class="t-body-m text-on-surface-variant">Share a recipe or article link and get a shopping or to-do list in seconds.</p>
+        </article>
+
+        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 reveal lift">
+          <span class="w-12 h-12 rounded-xl grid place-items-center mb-4" style="background:#FFF8E1;color:#D9A21E">
+            <span aria-hidden="true" class="material-symbols-outlined">mic</span>
+          </span>
+          <h3 class="t-title-l mb-2">Turn a voice note into a checklist</h3>
+          <p class="t-body-m text-on-surface-variant">Just speak — Gisti captures your to-dos hands-free and organizes them.</p>
+        </article>
+
+        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 reveal lift">
+          <span class="w-12 h-12 rounded-xl grid place-items-center mb-4" style="background:#E8EAFD;color:#6366F1">
+            <span aria-hidden="true" class="material-symbols-outlined">notes</span>
+          </span>
+          <h3 class="t-title-l mb-2">Turn text into a checklist</h3>
+          <p class="t-body-m text-on-surface-variant">Paste any notes or text and AI structures them into a checklist you can track.</p>
+        </article>
+
+        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 reveal lift">
+          <span class="w-12 h-12 rounded-xl grid place-items-center mb-4" style="background:#DDF3F5;color:#006874">
+            <span aria-hidden="true" class="material-symbols-outlined">luggage</span>
+          </span>
+          <h3 class="t-title-l mb-2">Turn a trip idea into a packing list</h3>
+          <p class="t-body-m text-on-surface-variant">Describe your trip and get a complete packing and prep checklist.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ======================= 7. PRICING ======================= -->
+    <section id="pricing" class="bg-surface-low border-y border-outline-variant">
+      <div class="wrap py-20 lg:py-28">
+        <div class="text-center max-w-[46ch] mx-auto mb-12 reveal">
+          <h2 class="t-headline-l mb-3">Simple pricing — start free</h2>
+          <p class="t-body-l text-on-surface-variant">Start free. Go unlimited for $1.99/mo.</p>
+        </div>
+
+        <div class="grid md:grid-cols-2 gap-6 max-w-[820px] mx-auto items-start">
+          <!-- Free -->
+          <div class="bg-surface-card rounded-xl border border-outline-variant p-7 reveal">
+            <h3 class="t-title-l">Free</h3>
+            <div class="my-3"><span class="t-headline-l">$0</span> <span class="t-body-m text-on-surface-variant">/ forever</span></div>
+            <p class="t-body-m text-on-surface-variant mb-5">Everything you need to get started.</p>
+            <ul class="space-y-3 t-body-m mb-7">
+              <li class="flex gap-2"><span aria-hidden="true" class="material-symbols-outlined text-success" style="font-size:20px">check</span>5 checklists</li>
+              <li class="flex gap-2"><span aria-hidden="true" class="material-symbols-outlined text-success" style="font-size:20px">check</span>5 AI fills per checklist</li>
+              <li class="flex gap-2"><span aria-hidden="true" class="material-symbols-outlined text-success" style="font-size:20px">check</span>10 AI credits / day</li>
+              <li class="flex gap-2"><span aria-hidden="true" class="material-symbols-outlined text-success" style="font-size:20px">check</span>10 recurring reminders</li>
+              <li class="flex gap-2"><span aria-hidden="true" class="material-symbols-outlined text-success" style="font-size:20px">check</span>Android &amp; web</li>
+            </ul>
+            <a href="https://app.gisti-ai.com" class="btn btn-secondary btn-pill w-full">Start free</a>
+          </div>
+
+          <!-- Premium (highlighted) -->
+          <div class="ai-border rounded-xl p-7 reveal">
+            <div class="flex items-center justify-between">
+              <h3 class="t-title-l">Premium</h3>
+              <span class="ai-fill text-white rounded-pill px-3 py-1 t-label-l">Most popular</span>
+            </div>
+            <div class="my-3"><span class="t-headline-l">$1.99</span> <span class="t-body-m text-on-surface-variant">/ month</span></div>
+            <p class="t-body-m text-on-surface-variant mb-5">Unlimited everything, plus power features.</p>
+            <ul class="space-y-3 t-body-m mb-7">
+              <li class="flex gap-2"><span aria-hidden="true" class="material-symbols-outlined text-success" style="font-size:20px">check</span>Unlimited checklists &amp; fills</li>
+              <li class="flex gap-2"><span aria-hidden="true" class="material-symbols-outlined text-success" style="font-size:20px">check</span>300 AI credits / day</li>
+              <li class="flex gap-2"><span aria-hidden="true" class="material-symbols-outlined text-success" style="font-size:20px">check</span>Google Calendar export</li>
+              <li class="flex gap-2"><span aria-hidden="true" class="material-symbols-outlined text-success" style="font-size:20px">check</span>Weekly digest</li>
+              <li class="flex gap-2"><span aria-hidden="true" class="material-symbols-outlined text-success" style="font-size:20px">check</span>Unlimited reminders</li>
+            </ul>
+            <a href="#cta" class="btn btn-primary btn-pill w-full">Get Premium</a>
+            <p class="t-body-m text-on-surface-variant text-center mt-3">Cancel anytime · Billed monthly</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================= 8. FAQ ======================= -->
+    <section id="faq" class="wrap py-20 lg:py-28 max-w-[760px]">
+      <h2 class="t-headline-l mb-8 reveal">AI checklist app: questions, answered</h2>
+
+      <details class="faq reveal" open>
+        <summary>Can AI make a checklist for me? <span aria-hidden="true" class="material-symbols-outlined chev">expand_more</span></summary>
+        <p class="ans">Yes. Gisti's AI turns your input — a photo, PDF, link, typed text, or voice — into a structured checklist in seconds, then lets you edit any item.</p>
+      </details>
+      <details class="faq reveal">
+        <summary>How do I turn a photo into a checklist? <span aria-hidden="true" class="material-symbols-outlined chev">expand_more</span></summary>
+        <p class="ans">Open Gisti, tap to add a photo of any list, note, or document, and the AI reads it and builds a checklist you can check off right away.</p>
+      </details>
+      <details class="faq reveal">
+        <summary>Can I turn a PDF or a link into a checklist? <span aria-hidden="true" class="material-symbols-outlined chev">expand_more</span></summary>
+        <p class="ans">Yes. Drop in a PDF or paste a web link and Gisti's AI extracts the steps and organizes them into a ready-to-use checklist.</p>
+      </details>
+      <details class="faq reveal">
+        <summary>Is there a free AI to-do list app? <span aria-hidden="true" class="material-symbols-outlined chev">expand_more</span></summary>
+        <p class="ans">Gisti is free to start — 5 checklists, 5 AI fills each, 10 AI credits a day, and 10 recurring reminders. No sign-up needed to try it.</p>
+      </details>
+      <details class="faq reveal">
+        <summary>Does Gisti work on both Android and the web? <span aria-hidden="true" class="material-symbols-outlined chev">expand_more</span></summary>
+        <p class="ans">Yes. Gisti has the same features on Android and the web, and your checklists sync through the cloud so they're the same on every device.</p>
+      </details>
+      <details class="faq reveal">
+        <summary>How much does Gisti Premium cost? <span aria-hidden="true" class="material-symbols-outlined chev">expand_more</span></summary>
+        <p class="ans">Premium is $1.99/month and unlocks unlimited checklists and fills, 300 AI credits a day, Google Calendar export, and a weekly digest.</p>
+      </details>
+    </section>
+
+    <!-- ======================= 9. FINAL CTA ======================= -->
+    <section id="cta" class="ai-fill-hero text-white">
+      <div class="wrap py-20 lg:py-24 text-center">
+        <h2 class="t-headline-l md:t-display-s mb-4">Turn your next idea into a checklist</h2>
+        <p class="t-body-l text-white/90 max-w-[48ch] mx-auto mb-8">Free on Android and the web — snap, paste, or speak, and let AI do the rest. No signup wall to try it.</p>
+        <div class="flex flex-wrap items-center justify-center gap-3">
+          <a href="https://play.google.com/store/apps/details?id=com.antonchuraev.aichecklists"
+             class="inline-flex items-center" aria-label="Get Gisti on Google Play">
+            <img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png"
+                 alt="Get it on Google Play" style="height:72px;display:block" />
+          </a>
+          <a href="https://app.gisti-ai.com" class="btn btn-on-gradient btn-pill" style="height:52px;font-size:16px">
+            <span aria-hidden="true" class="material-symbols-outlined" style="font-size:18px">public</span>Open the web app
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ======================= 10. FOOTER ======================= -->
+  <footer class="bg-surface border-t border-outline-variant">
+    <div class="wrap py-14 grid gap-10 md:grid-cols-[1.6fr_1fr_1fr]">
+      <div>
+        <a href="#top" class="flex items-center gap-2 mb-3" aria-label="Gisti home">
+          <img src="./favicon.svg" class="w-8 h-8" width="32" height="32" alt="Gisti app icon" />
+          <span class="text-[20px] font-bold tracking-tight">Gisti</span>
+        </a>
+        <p class="t-body-m text-on-surface-variant max-w-[34ch]">Turn anything into a checklist with AI. Free on Android and the web.</p>
+      </div>
+
+      <nav aria-label="Product">
+        <div class="t-label-l text-on-surface-variant mb-3">Product</div>
+        <ul class="space-y-2 t-body-m">
+          <li><a href="#features" class="hover:text-primary">Features</a></li>
+          <li><a href="#pricing" class="hover:text-primary">Pricing</a></li>
+          <li><a href="#faq" class="hover:text-primary">FAQ</a></li>
+          <li><a href="https://app.gisti-ai.com" class="hover:text-primary">Open the web app</a></li>
+          <li><a href="https://play.google.com/store/apps/details?id=com.antonchuraev.aichecklists" class="hover:text-primary">Download for Android</a></li>
+        </ul>
+      </nav>
+
+      <nav aria-label="Legal">
+        <div class="t-label-l text-on-surface-variant mb-3">Legal</div>
+        <ul class="space-y-2 t-body-m">
+          <li><a href="https://gisti-app.web.app/privacy-policy" target="_blank" rel="noopener" class="hover:text-primary">Privacy Policy</a></li>
+          <li><a href="https://gisti-app.web.app/terms" target="_blank" rel="noopener" class="hover:text-primary">Terms</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="wrap pb-10 t-body-m text-on-surface-variant border-t border-outline-variant pt-6">
+      © 2026 Gisti. All rights reserved.
+    </div>
+  </footer>
+
+</body>
+</html>

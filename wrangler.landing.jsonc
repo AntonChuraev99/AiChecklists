@@ -1,0 +1,35 @@
+// Cloudflare Worker configuration for the static SEO landing at the apex.
+//
+// Separate worker from the wasmJs app (see root wrangler.jsonc). The landing is
+// crawlable HTML served at https://gisti-ai.com/; the app lives on
+// https://app.gisti-ai.com/. Root-swap migration plan:
+// docs/plans/2026-07-01-landing-root-swap-migration-plan.md.
+//
+// ⚠ Route ownership is EXCLUSIVE. A hostname can belong to only one worker at a
+// time. The apex + www routes below are still claimed by the app worker
+// (wrangler.jsonc) until Phase 4 cutover: remove them from wrangler.jsonc and
+// deploy the app FIRST, then `wrangler deploy -c wrangler.landing.jsonc`.
+// Until cutover, deploy this worker only to a PREVIEW (`versions upload`).
+//
+// Deploy (from repo root):
+//   npx wrangler@4 versions upload -c wrangler.landing.jsonc   # preview, no route claim
+//   npx wrangler@4 deploy          -c wrangler.landing.jsonc   # prod (claims apex + www)
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "gisti-landing",
+	"compatibility_date": "2026-05-08",
+	"routes": [
+		{ "pattern": "gisti-ai.com", "custom_domain": true },
+		{ "pattern": "www.gisti-ai.com", "custom_domain": true }
+	],
+	"main": "landing-worker.js",
+	"assets": {
+		"directory": "./landing",
+		"not_found_handling": "none",
+		"binding": "ASSETS",
+		"run_worker_first": true
+	},
+	"observability": {
+		"enabled": true
+	}
+}

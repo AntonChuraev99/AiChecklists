@@ -7,10 +7,12 @@
 // Wired up in wrangler.jsonc as "main" together with
 // assets.run_worker_first: true (without it, requests matching an asset
 // bypass this script entirely).
-const CANONICAL_HOST = "gisti-ai.com";
+// Root-swap 2026-07-01: the app moved to app.gisti-ai.com; apex + www now serve the
+// static SEO landing (separate worker). This worker serves ONLY app.gisti-ai.com.
+const CANONICAL_HOST = "app.gisti-ai.com";
 const REDIRECT_HOSTS = new Set([
-  "checklists.gisti.workers.dev", // legacy production URL
-  "www.gisti-ai.com", // www alias → apex
+  "checklists.gisti.workers.dev", // legacy production URL → app.gisti-ai.com
+  // www.gisti-ai.com is no longer ours — it belongs to the landing worker now.
 ]);
 
 // Firebase Auth helper origin. We reverse-proxy /__/auth/* to it so the OAuth
@@ -20,7 +22,7 @@ const REDIRECT_HOSTS = new Set([
 // cookies, silently breaking signInWithPopup/signInWithRedirect. Serving the helper
 // same-origin via this proxy removes the blocker — the officially supported fix
 // (firebase.google.com/docs/auth/web/redirect-best-practices, "reverse proxy").
-// Pairs with firebaseConfig.authDomain === "gisti-ai.com" (build.gradle.kts).
+// Pairs with firebaseConfig.authDomain === "app.gisti-ai.com" (build.gradle.kts).
 const FIREBASE_AUTH_HOST = "aichecklists-40230.firebaseapp.com";
 
 export default {

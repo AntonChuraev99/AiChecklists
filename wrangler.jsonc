@@ -32,9 +32,10 @@
 	// the workers_dev default to false — it must stay explicit here until the
 	// 301 redirect (src/redirect.js) ships AND we deliberately sunset the host.
 	"workers_dev": true,
+	// Root-swap 2026-07-01: app moved to app.gisti-ai.com; apex + www now belong to the
+	// landing worker (wrangler.landing.jsonc). This worker serves ONLY the app subdomain.
 	"routes": [
-		{ "pattern": "gisti-ai.com", "custom_domain": true },
-		{ "pattern": "www.gisti-ai.com", "custom_domain": true }
+		{ "pattern": "app.gisti-ai.com", "custom_domain": true }
 	],
 	"main": "src/redirect.js",
 	"assets": {

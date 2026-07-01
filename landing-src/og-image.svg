@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" font-family="Arial, Helvetica, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="432" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3B82F6"/><stop offset="1" stop-color="#1D4ED8"/>
+    </linearGradient>
+    <linearGradient id="ai" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2196F3"/><stop offset=".6" stop-color="#6366F1"/><stop offset="1" stop-color="#A855F7"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="76" y1="76" x2="76" y2="356" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff" stop-opacity=".4"/><stop offset="1" stop-color="#fff" stop-opacity=".1"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="#FBFAF8"/>
+  <circle cx="1150" cy="60" r="280" fill="url(#ai)" opacity="0.12"/>
+  <rect width="1200" height="10" fill="url(#ai)"/>
+
+  <g transform="translate(80,66) scale(0.2222)">
+    <rect width="432" height="432" rx="96" fill="url(#bg)"/>
+    <circle cx="216" cy="216" r="140" fill="none" stroke="url(#ring)" stroke-width="14"/>
+    <circle cx="216" cy="216" r="110" fill="#fff"/>
+    <path d="M158 222L202 264L282 174" fill="none" stroke="#1D4ED8" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M338 86L342 100L356 104L342 108L338 122L334 108L320 104L334 100Z" fill="#FDE68A"/>
+  </g>
+  <text x="190" y="126" font-size="48" font-weight="700" fill="#1D1B20">Gisti</text>
+
+  <text x="80" y="298" font-size="74" font-weight="700" fill="#1D1B20">Turn anything into</text>
+  <text x="80" y="384" font-size="74" font-weight="700" fill="#1D1B20">a checklist with <tspan fill="#6366F1">AI</tspan></text>
+
+  <text x="82" y="454" font-size="30" fill="#49454F">Photo · PDF · Link · Voice · Text  →  a smart, trackable checklist</text>
+
+  <text x="82" y="552" font-size="28" font-weight="700" fill="#1565C0">Free on Android &amp; Web · gisti-ai.com</text>
+</svg>

@@ -1,0 +1,115 @@
+/* Gisti brand tokens — mirror of the claude.ai/design project tokens.css.
+   Source of truth for the landing's brand consistency (colors, radii, spacing,
+   type scale, core component classes). Keep in sync with core/designsystem. */
+
+:root {
+  /* ── Material 3 role colors (UI chrome, accessible on white) ── */
+  --primary: #1565C0;            /* CTA, links, focus — WCAG AA/AAA on white */
+  --on-primary: #FFFFFF;
+  --primary-container: #E3F2FD;
+  --on-primary-container: #001C37;
+  --secondary: #4A6572;
+  --tertiary: #006874;
+
+  /* ── Surfaces ── */
+  --surface: #FBFAF8;            /* page background (warm off-white) */
+  --surface-card: #FFFFFF;       /* cards */
+  --surface-low: #F6F5F2;        /* alternating band */
+  --surface-cont: #F1F0ED;       /* subtle fill */
+
+  /* ── Text / lines ── */
+  --on-surface: #1D1B20;         /* headings */
+  --on-surface-variant: #49454F; /* body */
+  --outline: #79747E;
+  --outline-variant: #E2E0DB;    /* hairlines */
+  --error: #BA1A1A;
+
+  /* ── Brand accents (vivid — the AI signature, intentionally off the M3 role set) ── */
+  --brand-blue: #2196F3;
+  --brand-indigo: #6366F1;
+  --brand-purple: #A855F7;
+  --brand-text: #212121;
+  --brand-bezel: #1A1A1A;
+  --success: #2E9E5B;            /* completion green (checkmarks) */
+  --star: #F4A923;               /* rating gold */
+
+  /* ── AI gradients (the brand's remembered element) ── */
+  --ai-gradient: linear-gradient(135deg, #2196F3 0%, #6366F1 60%, #A855F7 100%);
+  --ai-gradient-hero: linear-gradient(135deg, #2196F3 0%, #6366F1 100%); /* darker → safe for white text */
+
+  /* ── Radii ── */
+  --r-xs: 4px;  --r-sm: 8px;  --r-md: 12px;  --r-lg: 16px;  --r-xl: 24px;  --r-full: 999px;
+
+  /* ── Spacing scale ── */
+  --sp-xxs: 2px; --sp-xs: 4px; --sp-sm: 8px; --sp-md: 12px; --sp-lg: 16px;
+  --sp-xl: 24px; --sp-xxl: 32px; --sp-xxxl: 48px;
+
+  /* ── Component metrics ── */
+  --screen-h: 16px;
+  --btn-h: 48px;
+}
+
+/* ── Type scale (Roboto) ─────────────────────────────────────────────
+   Landing extends the app scale UP for hero display sizes only; every
+   other role matches the app 1:1. size / line-height / weight. */
+.t-display-xl { font-size: 56px; line-height: 60px; font-weight: 700; letter-spacing: -0.02em; }
+.t-display-l  { font-size: 44px; line-height: 50px; font-weight: 700; letter-spacing: -0.015em; }
+.t-display-s  { font-size: 36px; line-height: 44px; font-weight: 400; }
+.t-headline-l { font-size: 32px; line-height: 40px; font-weight: 600; }
+.t-headline-m { font-size: 28px; line-height: 36px; font-weight: 600; }
+.t-headline-s { font-size: 24px; line-height: 32px; font-weight: 600; }
+.t-title-l    { font-size: 22px; line-height: 28px; font-weight: 500; }
+.t-title-m    { font-size: 16px; line-height: 24px; font-weight: 500; }
+.t-body-l     { font-size: 16px; line-height: 24px; font-weight: 400; }
+.t-body-m     { font-size: 14px; line-height: 20px; font-weight: 400; }
+.t-label-l    { font-size: 14px; line-height: 20px; font-weight: 500; }
+
+/* ── Buttons (match project .btn API) ── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-sm);
+  height: var(--btn-h); padding: 0 var(--sp-xl); border-radius: var(--r-md);
+  font: 500 15px/1 Roboto, system-ui, sans-serif; text-decoration: none;
+  border: 1px solid transparent; cursor: pointer; white-space: nowrap;
+  transition: transform .12s ease, box-shadow .12s ease, background-color .12s ease;
+}
+.btn:active { transform: translateY(1px); }
+.btn-primary { background: var(--primary); color: var(--on-primary); box-shadow: 0 1px 2px rgba(21,101,192,.25); }
+.btn-primary:hover { box-shadow: 0 4px 14px rgba(21,101,192,.30); }
+.btn-secondary { background: var(--surface-card); color: var(--primary); border-color: var(--outline-variant); }
+.btn-secondary:hover { border-color: var(--primary); background: var(--primary-container); }
+.btn-text { background: transparent; color: var(--primary); padding: 0 var(--sp-md); }
+.btn-text:hover { background: var(--primary-container); }
+.btn-pill { border-radius: var(--r-full); }
+.btn-on-gradient { background: #fff; color: var(--primary); }
+.btn-on-gradient:hover { box-shadow: 0 6px 20px rgba(0,0,0,.18); }
+
+/* ── AI gradient helpers ── */
+.ai-fill { background: var(--ai-gradient); }
+.ai-fill-hero { background: var(--ai-gradient-hero); }
+.ai-text {
+  background: var(--ai-gradient); -webkit-background-clip: text; background-clip: text;
+  color: transparent; -webkit-text-fill-color: transparent;
+}
+.ai-border { position: relative; background: var(--surface-card); }
+.ai-border::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.5px;
+  background: var(--ai-gradient);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none;
+}
+
+/* ── Phone frame (bezel #1A1A1A, 44px radius) — for hero + showcase mockups ── */
+.phone {
+  position: relative; width: 280px; aspect-ratio: 9 / 19.2;
+  background: var(--brand-bezel); border-radius: 44px; padding: 10px;
+  box-shadow: 0 24px 60px rgba(20, 30, 60, .22), 0 4px 12px rgba(20,30,60,.10);
+}
+.phone-screen {
+  width: 100%; height: 100%; background: var(--surface); border-radius: 34px;
+  overflow: hidden; display: flex; flex-direction: column;
+}
+
+/* ── Focus ring (accessibility floor) ── */
+a:focus-visible, button:focus-visible, summary:focus-visible, .btn:focus-visible {
+  outline: 3px solid var(--primary); outline-offset: 2px; border-radius: var(--r-xs);
+}
