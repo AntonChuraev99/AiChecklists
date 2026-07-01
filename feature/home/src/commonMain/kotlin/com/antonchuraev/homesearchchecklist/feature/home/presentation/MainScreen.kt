@@ -209,9 +209,23 @@ fun MainScreen(
         }
     }
 
-    // BACK while the dock is expanded: hide the keyboard, then collapse to peek ONLY if the input is
-    // blank (a non-blank draft holds the dock open — the user keeps their text). Once collapsed the
-    // handler disables, so a further BACK navigates normally.
+    // BACK on the home root must NEVER fall through to the Activity — at the root the NavDisplay
+    // back handler is disabled (nothing to pop), so an unhandled BACK reaches ComponentActivity and
+    // finish()es the app, dropping the user to the launcher. The three handlers below are mutually
+    // exclusive by state (only one is ever enabled), so their registration order is irrelevant.
+    //
+    // 1) Drawer open → close the drawer (Compact only; drawerState is null on Medium/Expanded).
+    PlatformBackHandler(enabled = drawerState?.isOpen == true) {
+        scope.launch { drawerState?.close() }
+    }
+    // 2) True root (drawer closed, dock collapsed) → swallow. Product decision: BACK on the home
+    //    screen does nothing so the user is never kicked out of the app (they leave via Home).
+    PlatformBackHandler(enabled = drawerState?.isOpen != true && !dockExpanded) {
+        // Intentionally no-op.
+    }
+    // 3) Dock expanded: hide the keyboard, then collapse to peek ONLY if the input is blank (a
+    //    non-blank draft holds the dock open — the user keeps their text). Once collapsed handler
+    //    (2) takes over and swallows further BACKs.
     PlatformBackHandler(enabled = dockExpanded) {
         focusManager.clearFocus()
         if (chatInputBlank && !dockState.offset.isNaN()) {
