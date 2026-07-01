@@ -398,7 +398,9 @@ private fun DrawerStorePromoBadge(
 // GISTI_GOOGLE_PLAY_URL (same value) — that const is module-internal and not
 // reachable from composeApp. Candidate for future consolidation into a shared
 // core constant.
-private const val WEB_APP_URL = "https://gisti-ai.com/"
+// Root-swap 2026-07-01: the app lives on app.gisti-ai.com now; apex serves the
+// static SEO landing. This in-app "open web version" link must point at the app.
+private const val WEB_APP_URL = "https://app.gisti-ai.com/"
 private const val GOOGLE_PLAY_URL =
     "https://play.google.com/store/apps/details?id=com.antonchuraev.aichecklists"
 
