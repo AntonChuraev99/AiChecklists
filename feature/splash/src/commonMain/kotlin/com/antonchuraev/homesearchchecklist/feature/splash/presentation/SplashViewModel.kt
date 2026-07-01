@@ -97,11 +97,9 @@ class SplashViewModel(
                 // onboarding variant silently fell back to the empty client default (slides) —
                 // collapsing the live split to 0% "none" in production while emulators (instant
                 // fetch) looked fine.
-                val (activated, fetchDuration) = measureTimedValue {
-                    runCatching { remoteConfigProvider.fetchAndActivate() }.getOrDefault(false)
-                }
+                val (activated, fetchMs) = fetchAndActivateWithFastRetry()
                 rcActivated = activated
-                rcFetchMs = fetchDuration.inWholeMilliseconds
+                rcFetchMs = fetchMs
                 val fetchError = remoteConfigProvider.lastFetchError()
                 rcError = fetchError?.let { "${it::class.simpleName}: ${it.message}" }
                 if (!activated) {
@@ -115,7 +113,7 @@ class SplashViewModel(
                         fetchError,
                     )
                 }
-                log("fetchAndActivate (onboarding pending) activated=$activated took ${fetchDuration.inWholeMilliseconds}ms, hasUserId=${userData.userId.isNotBlank()}")
+                log("fetchAndActivate (onboarding pending) activated=$activated took ${fetchMs}ms, hasUserId=${userData.userId.isNotBlank()}")
             }
 
             // First-checklist A/B experiment: cohort attribution (all users) + auto-create
@@ -141,6 +139,36 @@ class SplashViewModel(
             // Refresh Remote Config so A/B variants & feature flags apply on next launch.
             launch { runCatching { remoteConfigProvider.fetchAndActivate() } }
         }
+    }
+
+    /**
+     * Fetches + activates Remote Config for the onboarding gate, with ONE fast-only retry.
+     *
+     * ~28% of first launches fail fetchAndActivate() (prod analytics); the single biggest
+     * *transient* cause is "Firebase Installations failed to get installation auth token" — FIS
+     * registration races the very first fetch on a cold start and clears on a second call. We retry
+     * exactly once, but ONLY when the first attempt failed FAST: a slow failure means the SDK fetch
+     * timeout elapsed (offline / dead network), where a retry would just double the splash wait, so
+     * we skip it. This is NOT a UI timer — each attempt is bounded by the SDK's own
+     * setFetchTimeoutInSeconds; we merely re-issue a cheap, fast-failing call. Auth / API-key
+     * rejections also fail fast, so they get one more try at ~no cost and then proceed on defaults.
+     * (The remaining bulk of failures are API-key / App Check authorization — a Cloud config fix,
+     * not something any client retry can resolve.)
+     *
+     * @return (activated, totalFetchMillis)
+     */
+    private suspend fun fetchAndActivateWithFastRetry(): Pair<Boolean, Long> {
+        val (ok1, d1) = measureTimedValue {
+            runCatching { remoteConfigProvider.fetchAndActivate() }.getOrDefault(false)
+        }
+        val ms1 = d1.inWholeMilliseconds
+        if (ok1 || ms1 > RC_FAST_FAIL_CEILING_MS) return ok1 to ms1
+
+        log("fetchAndActivate failed fast (${ms1}ms) — one transient retry (likely FIS token race)")
+        val (ok2, d2) = measureTimedValue {
+            runCatching { remoteConfigProvider.fetchAndActivate() }.getOrDefault(false)
+        }
+        return ok2 to (ms1 + d2.inWholeMilliseconds)
     }
 
     private fun navigateTo(
@@ -309,5 +337,10 @@ class SplashViewModel(
 
     companion object {
         private const val TAG = "SplashViewModel"
+
+        // A fetchAndActivate() failure faster than this is treated as transient (Firebase
+        // Installations token race / fast backend error), NOT the SDK fetch-timeout (offline) —
+        // only fast failures are retried once, so an offline first launch is never double-waited.
+        private const val RC_FAST_FAIL_CEILING_MS = 3000L
     }
 }
