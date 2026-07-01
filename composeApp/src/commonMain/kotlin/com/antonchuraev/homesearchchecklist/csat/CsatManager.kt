@@ -27,19 +27,33 @@ class CsatManager(private val datastore: AppDatastore) {
         private const val KEY_ACTION_COUNT = "csat_action_count"
         private const val KEY_LAST_SHOWN_DATE = "csat_last_shown_date"
         private const val KEY_LAST_OUTCOME = "csat_last_outcome"
+        private const val KEY_DISTINCT_DAYS = "csat_distinct_days"
+        private const val KEY_LAST_ACTION_DATE = "csat_last_action_date"
+        private const val KEY_SHOW_COUNT = "csat_show_count"
 
         private const val COOLDOWN_SUBMITTED_DAYS = 45
-        private const val COOLDOWN_DISMISSED_DAYS = 3
-        private const val MIN_ACTIONS = 2
+        private const val COOLDOWN_DISMISSED_DAYS = 7
+
+        // Ask only an engaged, returning user at a success moment (peak-end rule + Play In-App
+        // Review guidance): N completed "value" actions AND activity across ≥2 distinct days, so
+        // one-and-done first-session users (who skew neutral/noise) are never surveyed. Capped at
+        // MAX_LIFETIME_SHOWS prompts ever so we never nag.
+        private const val MIN_ACTIONS = 3
+        private const val MIN_DISTINCT_DAYS = 2
+        private const val MAX_LIFETIME_SHOWS = 3
 
         const val OUTCOME_SUBMITTED = "submitted"
         const val OUTCOME_DISMISSED = "dismissed"
     }
 
+    // Trigger on SUCCESS/VALUE moments, not on creation. Firing on "*_created" asked the user
+    // mid-task (while building a checklist) and skewed responses toward neutral/dismissed; a
+    // completed fill ("job done") or a share is a genuine positive peak — and, unlike the old
+    // creation triggers, it is a natural post-task boundary rather than an interruption. Using
+    // fill_completed also closes the auto-create blind spot: users who only ever get the
+    // auto-created starter checklist now still reach a trigger when they finish it.
     private val csatTriggerEvents = setOf(
-        "checklist_created",
-        "fill_created",
-        "default_fill_updated",
+        "fill_completed",
         "share_checklist",
     )
 
@@ -49,11 +63,26 @@ class CsatManager(private val datastore: AppDatastore) {
     suspend fun onUserAction() {
         val count = datastore.observeInt(KEY_ACTION_COUNT, 0).first()
         datastore.saveInt(KEY_ACTION_COUNT, count + 1)
+
+        // Count distinct calendar days on which a value action happened — the returning-user gate.
+        val today = todayEpochDays()
+        val lastActionDay = datastore.observeInt(KEY_LAST_ACTION_DATE, 0).first()
+        if (lastActionDay != today) {
+            val distinctDays = datastore.observeInt(KEY_DISTINCT_DAYS, 0).first()
+            datastore.saveInt(KEY_DISTINCT_DAYS, distinctDays + 1)
+            datastore.saveInt(KEY_LAST_ACTION_DATE, today)
+        }
     }
 
     suspend fun shouldShowCsat(): Boolean {
         val count = datastore.observeInt(KEY_ACTION_COUNT, 0).first()
         if (count < MIN_ACTIONS) return false
+
+        val distinctDays = datastore.observeInt(KEY_DISTINCT_DAYS, 0).first()
+        if (distinctDays < MIN_DISTINCT_DAYS) return false
+
+        val shownCount = datastore.observeInt(KEY_SHOW_COUNT, 0).first()
+        if (shownCount >= MAX_LIFETIME_SHOWS) return false
 
         val lastShownDay = datastore.observeInt(KEY_LAST_SHOWN_DATE, 0).first()
         if (lastShownDay == 0) return true
@@ -71,6 +100,8 @@ class CsatManager(private val datastore: AppDatastore) {
 
     suspend fun recordShown() {
         datastore.saveInt(KEY_LAST_SHOWN_DATE, todayEpochDays())
+        val shownCount = datastore.observeInt(KEY_SHOW_COUNT, 0).first()
+        datastore.saveInt(KEY_SHOW_COUNT, shownCount + 1)
     }
 
     suspend fun recordOutcome(outcome: String) {
