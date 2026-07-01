@@ -1,14 +1,19 @@
 package com.antonchuraev.homesearchchecklist.core.auth.impl
 
 import android.app.Activity
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.provider.Settings
 import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.GetCredentialException
+import androidx.credentials.exceptions.NoCredentialException
 import com.antonchuraev.homesearchchecklist.core.auth.api.GoogleAuthState
 import com.antonchuraev.homesearchchecklist.core.auth.api.GoogleUser
-import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider as FirebaseGoogleAuthProvider
@@ -17,6 +22,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.tasks.await
 import java.lang.ref.WeakReference
+import java.security.MessageDigest
+import java.security.SecureRandom
 
 internal class AndroidGoogleAuthProvider(
     private val webClientId: String,
@@ -53,14 +60,15 @@ internal class AndroidGoogleAuthProvider(
         return try {
             val credentialManager = CredentialManager.create(activity)
 
-            val googleIdOption = GetGoogleIdOption.Builder()
-                .setServerClientId(webClientId)
-                .setFilterByAuthorizedAccounts(false)
-                .setAutoSelectEnabled(true)
+            // Explicit sign-in BUTTON flow: GetSignInWithGoogleOption always enumerates ALL device
+            // Google accounts (no filterByAuthorizedAccounts / autoSelect), so users with no prior
+            // authorization still get the account picker instead of TYPE_NO_CREDENTIAL.
+            val signInOption = GetSignInWithGoogleOption.Builder(webClientId)
+                .setNonce(generateNonce())
                 .build()
 
             val request = GetCredentialRequest.Builder()
-                .addCredentialOption(googleIdOption)
+                .addCredentialOption(signInOption)
                 .build()
 
             val credResult = credentialManager.getCredential(
@@ -91,6 +99,24 @@ internal class AndroidGoogleAuthProvider(
                 _authState.value = GoogleAuthState.Error(err)
                 Result.failure(IllegalStateException(err))
             }
+        } catch (e: NoCredentialException) {
+            // No Google account on the device at all: send the user to Add-Account so they can add
+            // one, then surface a distinct failure. Keep the "TYPE_NO_CREDENTIAL" token so the
+            // ViewModel maps it to the right snackbar.
+            _authState.value = GoogleAuthState.NotAuthenticated
+            try {
+                activity.startActivity(
+                    Intent(Settings.ACTION_ADD_ACCOUNT)
+                        .putExtra(Settings.EXTRA_ACCOUNT_TYPES, arrayOf("com.google")),
+                )
+            } catch (_: ActivityNotFoundException) {
+                // No add-account UI available; still return the distinct failure below.
+            }
+            Result.failure(Exception("TYPE_NO_CREDENTIAL: no google account on device", e))
+        } catch (e: GetCredentialCancellationException) {
+            // User dismissed the picker.
+            _authState.value = GoogleAuthState.NotAuthenticated
+            Result.failure(Exception("TYPE_USER_CANCELED: cancelled", e))
         } catch (e: GetCredentialException) {
             // Carry the STABLE Credential Manager type (e.type is a constant string id, NOT
             // obfuscated by R8) + the human message up to the ViewModel, so login_failed analytics
@@ -102,6 +128,13 @@ internal class AndroidGoogleAuthProvider(
             _authState.value = GoogleAuthState.Error(e.message ?: "Sign-in failed")
             Result.failure(e)
         }
+    }
+
+    /** Cryptographically secure per-request nonce (SHA-256 hex of 32 random bytes). */
+    private fun generateNonce(): String {
+        val raw = ByteArray(NONCE_BYTES).also { SecureRandom().nextBytes(it) }
+        val digest = MessageDigest.getInstance("SHA-256").digest(raw)
+        return digest.joinToString("") { "%02x".format(it) }
     }
 
     override suspend fun signOut() {
@@ -121,5 +154,9 @@ internal class AndroidGoogleAuthProvider(
         } catch (_: Exception) {
             null
         }
+    }
+
+    private companion object {
+        private const val NONCE_BYTES = 32
     }
 }
