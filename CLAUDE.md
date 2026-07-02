@@ -113,7 +113,9 @@ One-liner map; deep rules load when you edit the feature. Full catalog: `docs/pr
 
 ## Copy Guidelines
 
-Simple, clear, benefit-focused, action-oriented. Do: "Create Checklist", "Fill via AI", "Save". Don't: "Add New", "Submit", "Continue". Store listing: `docs/store-screenshots/store-listing-en.md`.
+Simple, clear, benefit-focused, action-oriented. Do: "Create Checklist", "Fill via AI", "Save". Don't: "Add New", "Submit", "Continue".
+
+**Play Store listing — source of truth: `docs/store-screenshots/store-listing-en.md`** (tracked in git via force-add; the rest of `docs/` stays ignored). Any listing change starts in this doc (title/short/full with char limits 30/80/4000, keyword-coverage table), then is pasted into Play Console → Main store listing — and any console edit must be mirrored back, otherwise the doc silently drifts from prod (this happened before the 2026-07-02 ASO audit).
 
 ## Dependencies & Economics
 

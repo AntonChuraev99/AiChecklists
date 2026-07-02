@@ -1,0 +1,143 @@
+# Google Play Store Listing — EN
+
+_Updated: 2026-07-02 · App version: 1.17.7 · ASO audit revision_
+
+**This file is the source of truth for the Play Store listing.** Whenever the listing changes in Play Console, update this doc in the same task — and vice versa: any listing edit starts here, then gets pasted into the console.
+
+**Changes vs live listing (ASO audit 2026-07-02):**
+- Short description: added `checklist` + `to-do list` keywords (the live version had neither — the second-highest-weight indexed field carried no primary keyword).
+- Full description: live was 1395/4000 chars — expanded to ~3300 (Play indexes all 4000; unused chars are wasted keyword slots). Kept the live version's tone, added long-tail keywords (grocery list, packing list, photo to checklist, weekly planner, to-do list) + a keyword paragraph before the CTA.
+- Title unchanged (29/30, already optimal).
+
+Apply manually: Play Console → Store presence → Main store listing.
+
+---
+
+## App Title (30 char max)
+
+```
+Gisti: AI Checklist Assistant
+```
+
+29/30 chars — unchanged.
+
+---
+
+## Short Description (80 char max)
+
+```
+AI checklist & to-do list — chat to add tasks, set reminders, plan your week
+```
+
+76/80 chars. Keywords: `ai checklist`, `to-do list`, `tasks`, `reminders`, `plan`.
+
+---
+
+## Full Description (4000 char max)
+
+```
+Gisti is an AI checklist and to-do list app with a built-in chat assistant. Type "add eggs to grocery list" or "remind me tomorrow at 6pm" — done. No menus, no forms. Your lists, tasks, and reminders organize themselves.
+
+💬 AI CHAT ASSISTANT
+
+Talk to Gisti like a friend:
+• "Add milk to my shopping list" — item added instantly
+• "Remind me to call mom tomorrow at 6pm" — reminder set
+• "Create a packing list for Paris" — full checklist built in seconds
+• "What's on my list?" — search across all your lists
+• "Push everything to next week" — bulk reschedule
+
+Text or voice input. Works in English and Russian. Zero learning curve — just say what you need.
+
+📸 TURN ANYTHING INTO A CHECKLIST
+
+Point, snap, done:
+• 📷 Photo — receipt, whiteboard, label, handwritten note
+• 📄 PDF — contract, syllabus, report
+• 🎙 Voice — speak your ideas, get a structured to-do list
+• 🔗 Link — extract action items from any article
+• ✍️ Text — paste messy notes, AI organizes them into a clean list
+
+AI detects the language and builds a clear checklist in seconds. No manual typing.
+
+🔔 REMINDERS & DAILY PLANNER
+
+• Per-item reminders — every task gets its own alert
+• Recurring schedules — daily, weekly, monthly, or custom
+• Smart dates in chat — say "tomorrow 9pm", it just works
+• Today view — a daily planner with everything due now
+• Calendar view — all your checklists and reminders on one grid
+
+Never forget a task again. Gisti remembers, so you don't have to.
+
+📅 WEEKLY PLANNER
+
+Turn any checklist into a Mon–Sun weekly planner. Perfect for routines, meal prep, workout plans, or work sprints. See your week, check off tasks day by day.
+
+⚡ ORGANIZE YOUR WAY
+
+▸ Ready-made templates — grocery list, travel, study, fitness, cleaning, work
+▸ Folders — group related items inside any checklist
+▸ Fill via AI — drop a photo into an existing list, AI checks off matching items
+▸ Photo attachments on any task
+▸ Drag-to-reorder, priority stars, swipe-to-delete
+▸ Auto-delete completed items
+▸ Share as PDF or plain text
+▸ Home screen widget — check off items without opening the app
+▸ Dark theme & Material You dynamic colors
+
+🌐 PHONE + BROWSER
+
+Gisti runs on Android and in any browser at gisti-ai.com — same checklists, same AI, same data. Sign in with Google to sync across devices.
+
+💡 HOW PEOPLE USE GISTI
+
+🛒 "Add eggs, milk, bread" — grocery shopping list ready in 2 seconds
+🏠 Snap a photo of an apartment — inspection checklist built by AI
+📚 Import a syllabus PDF — track every assignment
+👔 Record a meeting — AI extracts action items automatically
+📅 "Laundry every Monday 8am" — recurring reminder set once, forever
+
+📦 FREE & PREMIUM
+
+FREE TO START:
+• 100 AI credits
+• Ready-made templates
+• Reminders and lists
+
+PREMIUM — 3-day free trial:
+• $1.99/month or $20/year
+• Unlimited checklists, fills & reminders
+• 300 AI credits refilled daily
+• Calendar view & weekly planner
+
+🔒 PRIVACY FIRST
+
+Your checklists stay on your device. Cloud sync is optional via Google Sign-In. We don't sell your data.
+
+Whether you need a simple to-do list, a task planner with reminders, a grocery list maker, a weekly planner for routines, or an AI checklist maker that turns photos and PDFs into actionable lists — Gisti does it all in one chat.
+
+Stop managing lists manually. Just tell Gisti what you need.
+
+Questions? churaevanton@gmail.com
+```
+
+---
+
+## Keyword coverage (post-edit check)
+
+| Keyword | Where | Count |
+|---|---|---|
+| checklist / checklists | title, short, full | ~11 in full (natural contexts) |
+| to-do list | short, full | 3 |
+| ai checklist | title, full (1st sentence, within first 167 chars) | ✓ |
+| grocery list / shopping list | full | 4 |
+| reminders | short, full | 6+ |
+| weekly planner / daily planner | full | 4 |
+| packing list, task planner, checklist maker | full (long-tail) | 1 each |
+
+## Follow-ups
+
+- Rating is blocker #1 (stars hidden on the listing): copy improvements drive clicks, not installs. Review prompt after a success moment + reply to every review (replies are indexed).
+- RU locale listing = a separate indexed surface; the app is already bilingual (do only on explicit request — project rule).
+- A/B via Play Store Experiments is premature: not enough impressions at 500+ installs. Ship copy edits directly.
