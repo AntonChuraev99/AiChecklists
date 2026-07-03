@@ -47,9 +47,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.feature.paywall.data.PaywallConfig
 import com.antonchuraev.homesearchchecklist.feature.user.data.device.getPlatformName
@@ -80,6 +82,7 @@ import aichecklists.core.designsystem.generated.resources.settings_title
 import aichecklists.core.designsystem.generated.resources.update_feed_menu_item
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 
 /**
  * Shared Navigation Drawer content for all drawer-accessible destinations.
@@ -98,6 +101,20 @@ object DrawerDestination {
     const val Today = "today"
     const val Calendar = "calendar"
     const val AiChat = "ai_chat"
+}
+
+/**
+ * Open an external link through the platform [UriHandler], degrading to a logged warning
+ * instead of crashing when no handler can open it. On Android [UriHandler.openUri] maps to
+ * `startActivity(ACTION_VIEW)` / `ACTION_SENDTO`; a device with no browser or mail client
+ * throws `ActivityNotFoundException`, which previously crashed the app (Crashlytics
+ * c1aeb170 / 123ba20e). Every drawer link (web promo, support mailto, privacy, terms) routes
+ * through here. Extracted as a pure top-level function so the crash-guard is unit-testable
+ * without a Compose host.
+ */
+internal fun safeOpenUri(uriHandler: UriHandler, logger: AppLogger, url: String) {
+    runCatching { uriHandler.openUri(url) }
+        .onFailure { logger.warning("DrawerLink", "openUri failed for $url: ${it.message}") }
 }
 
 @Composable
@@ -120,6 +137,8 @@ fun AppNavigationDrawerContent(
     onSignOutClick: () -> Unit = {},
 ) {
     val uriHandler = LocalUriHandler.current
+    val logger: AppLogger = koinInject()
+    val openLink: (String) -> Unit = { url -> safeOpenUri(uriHandler, logger, url) }
     val drawerItemColors = NavigationDrawerItemDefaults.colors(
         unselectedTextColor = MaterialTheme.colorScheme.onSurface,
         unselectedIconColor = MaterialTheme.colorScheme.onSurface,
@@ -144,7 +163,7 @@ fun AppNavigationDrawerContent(
             platformName = platformName,
             onClick = { url ->
                 onCloseDrawer()
-                uriHandler.openUri(url)
+                openLink(url)
             },
         )
 
@@ -276,7 +295,7 @@ fun AppNavigationDrawerContent(
             selected = false,
             onClick = {
                 onCloseDrawer()
-                uriHandler.openUri("mailto:${PaywallConfig.SUPPORT_EMAIL}")
+                openLink("mailto:${PaywallConfig.SUPPORT_EMAIL}")
             },
             colors = drawerItemColors,
             modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
@@ -290,7 +309,7 @@ fun AppNavigationDrawerContent(
             selected = false,
             onClick = {
                 onCloseDrawer()
-                uriHandler.openUri(PaywallConfig.PRIVACY_POLICY_URL)
+                openLink(PaywallConfig.PRIVACY_POLICY_URL)
             },
             colors = drawerItemColors,
             modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
@@ -301,7 +320,7 @@ fun AppNavigationDrawerContent(
             selected = false,
             onClick = {
                 onCloseDrawer()
-                uriHandler.openUri(PaywallConfig.TERMS_OF_USE_URL)
+                openLink(PaywallConfig.TERMS_OF_USE_URL)
             },
             colors = drawerItemColors,
             modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)

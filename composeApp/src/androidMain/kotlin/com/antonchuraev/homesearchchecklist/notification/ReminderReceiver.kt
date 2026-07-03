@@ -6,6 +6,7 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.TaskStackBuilder
@@ -343,6 +344,10 @@ class ReminderReceiver : BroadcastReceiver() {
         internal const val CHANNEL_ID = "checklist_reminders"
 
         fun createNotificationChannel(context: Context) {
+            // NotificationChannel exists only on API 26+ (minSdk is 24). Referencing it on
+            // API 24/25 throws NoClassDefFoundError — pre-O devices post notifications with no
+            // channel, so there is simply nothing to create.
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 context.getString(R.string.reminder_notification_channel),

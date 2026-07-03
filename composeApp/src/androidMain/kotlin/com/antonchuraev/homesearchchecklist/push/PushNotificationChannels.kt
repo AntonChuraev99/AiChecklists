@@ -3,6 +3,7 @@ package com.antonchuraev.homesearchchecklist.push
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.os.Build
 import com.antonchuraev.aichecklists.R
 import com.antonchuraev.homesearchchecklist.notification.ReminderReceiver
 
@@ -49,6 +50,10 @@ internal object PushNotificationChannels {
      * user-changed importance. Safe to call on every app start.
      */
     fun createAll(context: Context) {
+        // NotificationChannel exists only on API 26+ (minSdk is 24). Referencing it on
+        // API 24/25 throws NoClassDefFoundError at startup — pre-O devices post pushes with
+        // no channel, so there is nothing to create.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val promotions = NotificationChannel(
             PROMOTIONS_CHANNEL_ID,
             context.getString(R.string.promotions_notification_channel),
