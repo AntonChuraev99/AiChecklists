@@ -67,6 +67,33 @@ interface UserApiService {
         idToken: String,
         platform: String,
     ): Result<LinkGoogleAccountApiResult>
+
+    /**
+     * Register / refresh the FCM push token on the user's server-side credit doc
+     * (`users/{userId}`) via the Admin-SDK Cloud Function.
+     *
+     * The client CANNOT write this doc directly: Firestore rules make `users/{userId}`
+     * server-write-only, and anonymous users have no Firebase Auth at all. Routing token
+     * registration through the CF works uniformly for BOTH anonymous and signed-in users
+     * and co-locates the token with `is_premium` / `pushHoldout` so the promo sender can
+     * suppress premium/holdout on the same document.
+     *
+     * @param userId canonical device-registration user_id (the credit-doc id)
+     * @param token FCM registration token (never blank — a blank token would clobber the stored one)
+     * @param platform "android"
+     * @param pushHoldout deterministic retention control-group flag (client-owned)
+     * @param fcmOptIn explicit promo opt-in
+     * @return Result.success(Unit) on a successful server write.
+     *
+     * Default no-op success keeps commonTest fakes compiling (only the real impl hits the network).
+     */
+    suspend fun registerPushToken(
+        userId: String,
+        token: String,
+        platform: String,
+        pushHoldout: Boolean,
+        fcmOptIn: Boolean,
+    ): Result<Unit> = Result.success(Unit)
 }
 
 data class LinkGoogleAccountApiResult(
@@ -203,6 +230,37 @@ class UserApiServiceImpl(
             throw Exception(responseBody.error ?: "Failed to restore credits")
         }
     }
+
+    override suspend fun registerPushToken(
+        userId: String,
+        token: String,
+        platform: String,
+        pushHoldout: Boolean,
+        fcmOptIn: Boolean,
+    ): Result<Unit> = runCatching {
+        logger.debug(TAG, "registerPushToken: userId=${userId.take(8)}..., platform=$platform, holdout=$pushHoldout")
+
+        val response: HttpResponse = httpClient.post("$baseUrl/register_push_token") {
+            contentType(ContentType.Application.Json)
+            setBody(
+                RegisterPushTokenRequest(
+                    userId = userId,
+                    fcmToken = token,
+                    platform = platform,
+                    pushHoldout = pushHoldout,
+                    fcmOptIn = fcmOptIn,
+                )
+            )
+        }
+
+        val responseBody = response.body<RegisterPushTokenResponseDto>()
+        if (responseBody.success) {
+            logger.debug(TAG, "registerPushToken: SUCCESS")
+        } else {
+            logger.error(TAG, "registerPushToken: FAILED - ${responseBody.error}")
+            throw Exception(responseBody.error ?: "Failed to register push token")
+        }
+    }
 }
 
 @Serializable
@@ -253,4 +311,19 @@ private data class LinkGoogleAccountResponseDto(
     @SerialName("ai_credits") val aiCredits: Int? = null,
     @SerialName("is_premium") val isPremium: Boolean? = null,
     @SerialName("bonus_credits_granted") val bonusCreditsGranted: Int? = null,
+)
+
+@Serializable
+private data class RegisterPushTokenRequest(
+    @SerialName("user_id") val userId: String,
+    @SerialName("fcm_token") val fcmToken: String,
+    val platform: String,
+    @SerialName("push_holdout") val pushHoldout: Boolean,
+    @SerialName("fcm_opt_in") val fcmOptIn: Boolean,
+)
+
+@Serializable
+private data class RegisterPushTokenResponseDto(
+    val success: Boolean,
+    val error: String? = null,
 )

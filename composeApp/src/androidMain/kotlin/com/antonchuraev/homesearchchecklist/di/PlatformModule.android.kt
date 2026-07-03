@@ -21,6 +21,9 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.Firestor
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.calendar.CalendarEventLauncher
 import com.antonchuraev.homesearchchecklist.feature.user.data.device.DeviceIdProvider
 import com.antonchuraev.homesearchchecklist.push.PushTokenRepositoryAndroid
+import com.antonchuraev.homesearchchecklist.retention.PushTimingResolver
+import com.antonchuraev.homesearchchecklist.retention.RetentionPrefs
+import com.antonchuraev.homesearchchecklist.retention.RetentionPushScheduler
 import com.antonchuraev.homesearchchecklist.sync.AndroidFirestoreSyncDataSource
 import org.koin.core.module.Module
 import org.koin.core.qualifier.named
@@ -68,10 +71,12 @@ actual fun platformModule(): Module = module {
     // Firestore sync data source — Android implementation using the Firebase Android SDK.
     single<FirestoreSyncDataSource> { AndroidFirestoreSyncDataSource() }
 
-    // FCM token + activity tracking — writes users/{uid}.fcmToken / lastActiveAt for
-    // the re-engagement campaign. Resolved by GistiFirebaseMessagingService (onNewToken)
-    // and GistiApplication (app-start registration) via GlobalContext.
-    single<PushTokenRepository> { PushTokenRepositoryAndroid(get(), get()) }
+    // FCM token + activity tracking — registers users/{user_id}.fcmToken / lastActiveAt for the
+    // re-engagement campaign via the register_push_token Cloud Function (Admin SDK; the credit doc
+    // is server-write-only and anonymous users have no Firebase Auth). get() resolves AppLogger,
+    // UserApiService, UserDataRepository, AnalyticsTracker. Resolved by GistiFirebaseMessagingService
+    // (onNewToken) and GistiApplication (app-start registration) via GlobalContext.
+    single<PushTokenRepository> { PushTokenRepositoryAndroid(get(), get(), get(), get()) }
 
     // Google Play in-app update controller (Android-only). Observed by AppUpdateLauncher;
     // get() resolves Context (AppContextHolder.context), AppLogger and AnalyticsTracker above.
@@ -82,4 +87,12 @@ actual fun platformModule(): Module = module {
     // BroadcastReceiver/repository, so there is no circular dependency. get() resolves the
     // AppLogger override above.
     single<CalendarEventLauncher> { AndroidCalendarEventLauncher(AppContextHolder.context, get()) }
+
+    // ─── Local retention pushes (streak-save / overdue / weekly digest) ───
+    // Android-only, on-device (no server): scheduled on AlarmManager, resolved from Koin here (no
+    // circular dep — they only need Context/DataStore/RemoteConfig/ChecklistRepository/Analytics, all
+    // available in composeApp). RetentionPushReceiver pulls these via GlobalContext at fire time.
+    single { RetentionPrefs(get()) }
+    single { PushTimingResolver(remoteConfig = get(), prefs = get(), analytics = get(), logger = get()) }
+    single { RetentionPushScheduler(context = AppContextHolder.context, timingResolver = get()) }
 }

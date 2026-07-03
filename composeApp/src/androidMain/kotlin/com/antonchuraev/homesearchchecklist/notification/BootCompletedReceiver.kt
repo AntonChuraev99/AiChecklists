@@ -7,6 +7,7 @@ import android.util.Log
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.usecase.RecoverRecurringRemindersUseCase
+import com.antonchuraev.homesearchchecklist.retention.RetentionPushScheduler
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -60,6 +61,11 @@ class BootCompletedReceiver : BroadcastReceiver() {
                         )
                     }
                 }
+
+                // 5. Re-register the LOCAL retention auto-push alarms (daily + weekly digest) — like
+                // all AlarmManager alarms they are cleared on power-off and must be restored on boot.
+                val retentionScheduler: RetentionPushScheduler = koin.get()
+                retentionScheduler.scheduleAll()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

@@ -116,6 +116,12 @@
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="promotions" />
 
+        <!-- Emits push_dismissed when a re-engagement notification is swiped away. Wired as the
+             notification's delete intent (class lives in :composeApp androidMain push package). -->
+        <receiver
+            android:name="com.antonchuraev.homesearchchecklist.push.PushDismissReceiver"
+            android:exported="false" />
+
         <!-- Reminder Notification Receiver (handles checklist-level and per-item reminders) -->
         <receiver
             android:name="com.antonchuraev.homesearchchecklist.notification.ReminderReceiver"
@@ -145,6 +151,13 @@
                 <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
             </intent-filter>
         </receiver>
+
+        <!-- Local retention auto-pushes (streak-save / overdue / weekly digest). Triggered only by
+             explicit-component AlarmManager PendingIntents from RetentionPushScheduler, so no
+             intent-filter is needed (the action is read from the explicit intent). exported=false. -->
+        <receiver
+            android:name="com.antonchuraev.homesearchchecklist.retention.RetentionPushReceiver"
+            android:exported="false" />
 
         <!-- Checklist Widget -->
         <receiver

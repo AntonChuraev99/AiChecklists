@@ -21,13 +21,35 @@
     <string name="reminder_notification_channel_desc">Notifications for checklist reminders and deadlines</string>
     <string name="reminder_notification_tap">Tap to open</string>
     <plurals name="reminder_items_remaining">
-        <item quantity="one">%d item remaining</item>
-        <item quantity="other">%d items remaining</item>
+        <item quantity="one">%1$d item remaining</item>
+        <item quantity="other">%1$d items remaining</item>
     </plurals>
 
-    <!-- Push / Promotions Notifications (FCM re-engagement) -->
-    <string name="promotions_notification_channel">Updates &amp; Tips</string>
-    <string name="promotions_notification_channel_desc">Product updates, tips, and reminders to come back</string>
+    <!-- Push / Promotions Notifications (FCM re-engagement). Separate user toggle from the
+         checklist_reminders channel, so muting this never silences reminders the user set. -->
+    <string name="promotions_notification_channel">Tips &amp; Offers</string>
+    <string name="promotions_notification_channel_desc">Product tips, weekly summaries and offers. Reminders you set are a separate channel and stay on.</string>
+
+    <!-- Local retention pushes (AlarmManager, on-device data). Honest copy, no fake urgency. -->
+    <!-- Streak-save: a daily-habit recurring checklist still has open items in the delivery window. -->
+    <string name="retention_streak_title">Keep it going</string>
+    <plurals name="retention_streak_body">
+        <item quantity="one">%1$d item left in %2$s today</item>
+        <item quantity="other">%1$d items left in %2$s today</item>
+    </plurals>
+    <!-- Overdue: a partially-done checklist left untouched for a day or more. -->
+    <string name="retention_overdue_title">Still on your list</string>
+    <plurals name="retention_overdue_body">
+        <item quantity="one">%1$d item still open in %2$s</item>
+        <item quantity="other">%1$d items still open in %2$s</item>
+    </plurals>
+    <!-- Weekly digest (promotions channel): honest cross-checklist summary of what is still open. -->
+    <string name="retention_digest_title">Your weekly check-in</string>
+    <plurals name="retention_digest_body_open">
+        <item quantity="one">%1$d item is waiting across your %2$d checklists.</item>
+        <item quantity="other">%1$d items are waiting across your %2$d checklists.</item>
+    </plurals>
+    <string name="retention_digest_body_caught_up">All caught up across %1$d checklists. Nice work!</string>
 
     <!-- ACTION_PROCESS_TEXT selection-toolbar menu labels (must stay short) -->
     <string name="process_text_create_ai">Checklist from text</string>

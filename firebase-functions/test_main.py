@@ -639,6 +639,119 @@ class TestParseGeminiJson:
             main.parse_gemini_json("not json at all")
 
 
+class TestParsePushTokenRegistration:
+    """Tests for parse_push_token_registration — the pure body validator behind
+    register_push_token (the merge-write of an FCM token into the credit-doc)."""
+
+    def _valid(self):
+        return {
+            "user_id": "abcdefghij-uuid",
+            "fcm_token": "fcm-tok-xyz",
+            "platform": "android",
+            "push_holdout": False,
+            "fcm_opt_in": True,
+        }
+
+    def test_valid_body_parsed(self, _import_main):
+        main = _import_main
+        fields, error = main.parse_push_token_registration(self._valid())
+        assert error is None
+        assert fields == {
+            "user_id": "abcdefghij-uuid",
+            "fcm_token": "fcm-tok-xyz",
+            "platform": "android",
+            "push_holdout": False,
+            "fcm_opt_in": True,
+        }
+
+    def test_booleans_default_false_when_absent(self, _import_main):
+        main = _import_main
+        fields, error = main.parse_push_token_registration({
+            "user_id": "user-1234567890", "fcm_token": "t", "platform": "web",
+        })
+        assert error is None
+        assert fields["push_holdout"] is False
+        assert fields["fcm_opt_in"] is False
+
+    def test_web_platform_accepted(self, _import_main):
+        main = _import_main
+        body = self._valid()
+        body["platform"] = "web"
+        fields, error = main.parse_push_token_registration(body)
+        assert error is None and fields["platform"] == "web"
+
+    def test_user_id_and_token_trimmed(self, _import_main):
+        main = _import_main
+        body = self._valid()
+        body["user_id"] = "  padded-user-id  "
+        body["fcm_token"] = "  tok  "
+        fields, error = main.parse_push_token_registration(body)
+        assert error is None
+        assert fields["user_id"] == "padded-user-id"
+        assert fields["fcm_token"] == "tok"
+
+    def test_missing_body_rejected(self, _import_main):
+        main = _import_main
+        fields, error = main.parse_push_token_registration(None)
+        assert fields is None and error
+
+    def test_short_user_id_rejected(self, _import_main):
+        main = _import_main
+        body = self._valid()
+        body["user_id"] = "short"  # < 10 chars
+        fields, error = main.parse_push_token_registration(body)
+        assert fields is None and "user_id" in error
+
+    def test_missing_user_id_rejected(self, _import_main):
+        main = _import_main
+        body = self._valid()
+        del body["user_id"]
+        fields, error = main.parse_push_token_registration(body)
+        assert fields is None and "user_id" in error
+
+    def test_blank_token_rejected(self, _import_main):
+        main = _import_main
+        body = self._valid()
+        body["fcm_token"] = "   "
+        fields, error = main.parse_push_token_registration(body)
+        assert fields is None and "fcm_token" in error
+
+    def test_missing_token_rejected(self, _import_main):
+        main = _import_main
+        body = self._valid()
+        del body["fcm_token"]
+        fields, error = main.parse_push_token_registration(body)
+        assert fields is None and "fcm_token" in error
+
+    def test_bad_platform_rejected(self, _import_main):
+        main = _import_main
+        body = self._valid()
+        body["platform"] = "ios"  # not in {android, web}
+        fields, error = main.parse_push_token_registration(body)
+        assert fields is None and "platform" in error
+
+    def test_missing_platform_rejected(self, _import_main):
+        main = _import_main
+        body = self._valid()
+        del body["platform"]
+        fields, error = main.parse_push_token_registration(body)
+        assert fields is None and "platform" in error
+
+    def test_non_bool_holdout_rejected(self, _import_main):
+        main = _import_main
+        body = self._valid()
+        body["push_holdout"] = "true"  # string, not bool
+        fields, error = main.parse_push_token_registration(body)
+        assert fields is None and "push_holdout" in error
+
+    def test_non_bool_opt_in_rejected(self, _import_main):
+        main = _import_main
+        body = self._valid()
+        body["fcm_opt_in"] = 1  # int, not bool
+        fields, error = main.parse_push_token_registration(body)
+        assert fields is None and "fcm_opt_in" in error
+
+
 # ===========================================================================
 # P0: Refill verifies subscription via RevenueCat
 # ===========================================================================

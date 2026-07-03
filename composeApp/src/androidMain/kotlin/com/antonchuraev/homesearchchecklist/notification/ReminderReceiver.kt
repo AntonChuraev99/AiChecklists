@@ -333,7 +333,14 @@ class ReminderReceiver : BroadcastReceiver() {
         const val EXTRA_ITEM_ID = "item_id"
         const val ACTION_OPEN_CHECKLIST = "com.antonchuraev.aichecklists.action.OPEN_CHECKLIST"
         const val EXTRA_NAVIGATE_CHECKLIST_ID = "navigate_to_checklist"
-        private const val CHANNEL_ID = "checklist_reminders"
+
+        /**
+         * Reminders (functional) channel id. Widened to `internal` so the FCM layer
+         * ([com.antonchuraev.homesearchchecklist.push.PushNotificationChannels.channelIdFor]) can
+         * route data pushes with `channel="reminders"` into this same high-importance channel —
+         * a single source of truth instead of duplicating the literal. Channel creation stays here.
+         */
+        internal const val CHANNEL_ID = "checklist_reminders"
 
         fun createNotificationChannel(context: Context) {
             val channel = NotificationChannel(

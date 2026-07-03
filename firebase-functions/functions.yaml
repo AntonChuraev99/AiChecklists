@@ -42,8 +42,32 @@ endpoints:
       - key: REVENUECAT_API_KEY
         secret: revenuecat-api-key
 
+  # Promotional re-engagement / win-back push sender. Cloud Scheduler → HTTP.
+  # AMPLITUDE_SERVER_API_KEY = push_sent CTR denominator; PUSH_ADMIN_KEY = optional
+  # caller gate. The RC server template (roles/cloudconfig.viewer, already granted for the
+  # AI-model experiment) supplies the copy A/B arm + variants — no secret needed for it.
+  send_promotions_batch:
+    entryPoint: send_promotions_batch
+    httpsTrigger: {}
+    region: us-central1
+    platform: gcfv2
+    secretEnvironmentVariables:
+      - key: AMPLITUDE_SERVER_API_KEY
+        secret: amplitude-server-key
+      - key: PUSH_ADMIN_KEY
+        secret: push-admin-key
+
   get_credits_info:
     entryPoint: get_credits_info
+    httpsTrigger: {}
+    region: us-central1
+    platform: gcfv2
+
+  # Merge-writes an FCM push token into the credit-doc users/{user_id}.
+  # No secrets — Admin SDK / Firestore only. --allow-unauthenticated + App Check
+  # (platform-level), same trust model as register_user.
+  register_push_token:
+    entryPoint: register_push_token
     httpsTrigger: {}
     region: us-central1
     platform: gcfv2

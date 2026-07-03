@@ -43,6 +43,16 @@ object RemoteConfigKeys {
     // for new users; "current" keeps the existing empty-state flow.
     const val FIRST_CHECKLIST_VARIANT = "first_checklist_variant"
 
+    // Retention push timing A/B arm: "behavioral" | "fixed".
+    //   behavioral — the local retention auto-pushes (streak-save / overdue / weekly digest) are
+    //                delivered at the user's most-active hour (a 24-slot on-device activity histogram).
+    //   fixed      — delivered at a fixed default window (~19:00 local).
+    // Sticky per user (client reads it once, mirrors it into the sticky user-property push_ab_arm and
+    // tags every retention push event with push_ab_experiment="timing"). Live from release -> assigned
+    // in the Firebase RC console via a percent split; NEVER hardcoded. Only affects OUR auto-pushes —
+    // user-set reminders always fire at the time the user chose.
+    const val PUSH_TIMING_ARM = "push_timing_arm"
+
     // New-user activation bundle master switch (boolean). When ON (the default):
     //   - SKIP the static first-checklist auto-seed so the user lands on the AI first-run hero,
     //   - render the activation hero (prompt + chips) on the empty MainScreen,
@@ -91,7 +101,7 @@ object RemoteConfigDefaults {
     // Paywall default plan — "monthly" so low-tier markets see affordable price first.
     const val PAYWALL_DEFAULT_PLAN = "monthly"
 
-    // Empty client default by design: empty → resolver falls back to
+    // Empty client default by design: empty -> resolver falls back to
     // PaywallRemoteConfig.DEFAULT_OFFER. Distinguishes "RC returned config" from "fetch failed".
     const val PAYWALL_CONFIG = ""
 
@@ -104,6 +114,11 @@ object RemoteConfigDefaults {
     // can still override per-cohort — set the parameter to "current" to opt a control group
     // out of auto-create. Keep this in sync with the Firebase Console parameter default.
     const val FIRST_CHECKLIST_VARIANT = "auto_create"
+
+    // Retention push timing default arm. "behavioral" is the product hypothesis (deliver at the
+    // user's most-active hour). A failed/empty RC fetch keeps the behavioral treatment; the Firebase
+    // RC console assigns the 50/50 split per user. The client value is sticky per install regardless.
+    const val PUSH_TIMING_ARM = "behavioral"
 
     // Activation bundle ON by default — this is the desired baseline product behavior (AI
     // first-run instead of a static seed). Default-ON is fail-open BY DESIGN: a failed/slow

@@ -17,6 +17,16 @@ service cloud.firestore {
       allow read: if request.auth != null
                   && (request.auth.uid == userId
                       || (resource != null && resource.data.google_uid == request.auth.uid));
+      // The push fields — fcmToken, platform, lastActiveAt, fcmOptIn, pushHoldout — are NOT
+      // written by the client directly. Token registration goes through the register_push_token
+      // Cloud Function (Admin SDK, bypasses these rules), keyed by the canonical device-
+      // registration user_id (the credit-doc id, which is a server UUID, NOT the Firebase Auth
+      // uid). This is required because the credit doc is server-write-only AND anonymous users
+      // have no Firebase Auth (`request.auth == null`) — an owner-write rule could never let an
+      // anonymous device attach its token. Other server-owned push fields (lastPromoSentAt,
+      // lastPromoCampaignId, fcmTokenInvalidatedAt) are likewise Admin-SDK only.
+      // The owner-only write below stays for any future client-owned field on this doc; note it
+      // does NOT (and cannot) cover the credit doc itself, whose id != request.auth.uid.
       allow write: if request.auth != null && request.auth.uid == userId;
 
       match /checklists/{checklistId} {

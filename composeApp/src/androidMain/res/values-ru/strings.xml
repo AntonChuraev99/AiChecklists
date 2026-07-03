@@ -21,15 +21,15 @@
     <string name="reminder_notification_channel_desc">Уведомления о напоминаниях и дедлайнах чек-листов</string>
     <string name="reminder_notification_tap">Нажмите, чтобы открыть</string>
     <plurals name="reminder_items_remaining">
-        <item quantity="one">%d элемент остался</item>
-        <item quantity="few">%d элемента осталось</item>
-        <item quantity="many">%d элементов осталось</item>
-        <item quantity="other">%d элементов осталось</item>
+        <item quantity="one">%1$d элемент остался</item>
+        <item quantity="few">%1$d элемента осталось</item>
+        <item quantity="many">%1$d элементов осталось</item>
+        <item quantity="other">%1$d элементов осталось</item>
     </plurals>
 
     <!-- Push-уведомления / промо (FCM re-engagement) -->
-    <string name="promotions_notification_channel">Обновления и советы</string>
-    <string name="promotions_notification_channel_desc">Обновления приложения, советы и напоминания вернуться</string>
+    <string name="promotions_notification_channel">Советы и предложения</string>
+    <string name="promotions_notification_channel_desc">Советы по продукту, еженедельные сводки и предложения. Напоминания, которые вы ставите, — отдельный канал и остаются включёнными.</string>
 
     <!-- Пункты меню выделения текста ACTION_PROCESS_TEXT (должны быть короткими) -->
     <string name="process_text_create_ai">Чек-лист из текста</string>

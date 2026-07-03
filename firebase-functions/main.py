@@ -26,7 +26,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import firebase_admin
-from firebase_admin import auth as firebase_auth, credentials, firestore, remote_config
+from firebase_admin import auth as firebase_auth, credentials, firestore, messaging, remote_config
 from flask import Request, jsonify, make_response
 from google import genai
 from google.genai import types
@@ -37,6 +37,7 @@ from flask import request as flask_request  # global request context for CORS or
 
 import cors  # local module: CORS origin whitelist (unit-testable without firebase_admin)
 from generated_items import MAX_FOLDER_DEPTH, sanitize_generated_items  # nested AI-item sanitizer (unit-testable)
+import push_promotions  # local module: promo-push audience filter / copy A/B / payload (unit-testable)
 
 # Initialize Firebase Admin
 if not firebase_admin._apps:
@@ -190,6 +191,24 @@ def resolve_experiment_model(user_id: str, flow: str, default_model: str, data: 
 
 # RevenueCat verification (V1 Secret key, NOT public key)
 REVENUECAT_API_KEY = os.environ.get("REVENUECAT_API_KEY")
+
+# ---------------------------------------------------------------------------
+# Promotional push (send_promotions_batch) configuration.
+# ---------------------------------------------------------------------------
+# Amplitude server-side ingestion for the `push_sent` event — the ONLY reliable CTR
+# denominator (a client can't count a push that never arrived). SECRET: read from env
+# (Secret Manager `amplitude-server-key`), never hard-coded. Empty → push_sent emit is
+# skipped (send still works, just uncounted). Region defaults to US to match the browser
+# SDK (init.js `serverZone: 'US'`, project 786722); EU projects override the endpoint env.
+AMPLITUDE_SERVER_API_KEY = os.environ.get("AMPLITUDE_SERVER_API_KEY", "")
+AMPLITUDE_HTTP_ENDPOINT = os.environ.get(
+    "AMPLITUDE_HTTP_ENDPOINT", "https://api2.amplitude.com/2/httpapi"
+)
+
+# Optional admin gate for the promo sender. When set (recommended for prod), a caller
+# (Cloud Scheduler body / manual trigger) MUST present a matching `admin_key`. Unset →
+# open, like refill_premium_credits (relies on the function being scheduler-invoked).
+PUSH_ADMIN_KEY = os.environ.get("PUSH_ADMIN_KEY", "")
 
 # ---------------------------------------------------------------------------
 # Proprietary AI prompts live OUTSIDE the public repo.
@@ -940,6 +959,131 @@ def link_google_account(request: Request):
 
 
 # ============================================================================
+# FUNCTION 1c: Register an FCM push token onto an existing credit-doc
+# ============================================================================
+
+def parse_push_token_registration(data) -> tuple[dict | None, str | None]:
+    """Validate & normalize a register_push_token body. Pure — no Firestore, unit-testable.
+
+    Returns (fields, None) on success or (None, error_message) on invalid input.
+    `fields` = {user_id, fcm_token, platform, push_holdout, fcm_opt_in}. The two
+    boolean flags default to False when the client omits them.
+    """
+    if not isinstance(data, dict):
+        return None, "Request body is required"
+
+    user_id = data.get("user_id")
+    if not user_id or not isinstance(user_id, str) or len(user_id) < 10:
+        return None, "Valid user_id is required (min 10 characters)"
+
+    fcm_token = data.get("fcm_token")
+    if not fcm_token or not isinstance(fcm_token, str) or not fcm_token.strip():
+        return None, "fcm_token is required (non-empty string)"
+
+    platform = data.get("platform")
+    if platform not in ("android", "web"):
+        return None, "platform must be one of: android, web"
+
+    push_holdout = data.get("push_holdout", False)
+    fcm_opt_in = data.get("fcm_opt_in", False)
+    if not isinstance(push_holdout, bool):
+        return None, "push_holdout must be a boolean"
+    if not isinstance(fcm_opt_in, bool):
+        return None, "fcm_opt_in must be a boolean"
+
+    return {
+        # user_id is a document id — strip whitespace but do NOT lowercase (it must
+        # match the exact server-issued UUID that register_user created the doc under).
+        "user_id": user_id.strip(),
+        "fcm_token": fcm_token.strip(),
+        "platform": platform,
+        "push_holdout": push_holdout,
+        "fcm_opt_in": fcm_opt_in,
+    }, None
+
+
+@functions_framework.http
+def register_push_token(request: Request):
+    """
+    Merge-write a device's FCM push token into its existing credit-doc
+    users/{user_id}.
+
+    This is how ANONYMOUS (not-signed-in) users get a push token onto the
+    server: they only ever touch their user doc through this Cloud Functions
+    layer (the client has no direct Firestore write path into the users/
+    collection), so the token has to be delivered here to widen push reach.
+    The field names written here (fcmToken, pushHoldout) are exactly what
+    send_promotions_batch / push_promotions.is_eligible_for_promo read back.
+
+    Request body:
+    {
+        "user_id": "string (server-issued UUID, >=10 chars)",
+        "fcm_token": "string (non-empty FCM registration token)",
+        "platform": "android" | "web",
+        "push_holdout": boolean (optional, default false),
+        "fcm_opt_in": boolean (optional, default false)
+    }
+
+    Response 200: { "success": true }
+    Response 400: invalid body (missing/short user_id, blank token, bad platform)
+
+    Idempotent: this is a merge-write, so repeated calls just refresh the token
+    and lastActiveAt — never a duplicate doc, and never clobbering the credit
+    fields (is_premium / ai_credits / google_uid / device_id are untouched).
+
+    Doc-not-exists behaviour: set(merge=True) CREATES the doc if it is absent,
+    holding only these 5 push fields. In the normal flow register_user has
+    already created the credit-doc before the client ever obtains a user_id, so
+    the doc exists and this is a pure field-merge. A merge-create only happens
+    for a stale/unknown user_id (harmless — such a partial doc carries no credits
+    and never affects billing); see the security note below for the abuse angle.
+
+    SECURITY: deployed --allow-unauthenticated with the SAME trust model as
+    register_user — the caller supplies its own user_id (just like device_id
+    there), with no Firebase ID token by design (anonymous users have no Auth
+    identity, which is the very reason this endpoint exists). Risk: a hostile
+    client could name someone else's user_id and attach its own token, so the
+    victim's promo pushes would go to the attacker's device (or overwrite the
+    victim's real token, silently dropping their pushes); a spray of fake
+    user_ids could also mint junk partial docs. Firebase App Check — enforced at
+    the platform level for this project, exactly as for register_user (there is
+    no in-code App Check anywhere in this module; it is a console/gateway
+    concern) — is what makes that expensive: only genuine app builds obtain a
+    valid App Check token, blocking scripted user_id spoofing.
+    """
+    # CORS preflight — browsers send OPTIONS before cross-origin POST
+    if request.method == "OPTIONS":
+        return cors_preflight_ok()
+
+    if request.method != "POST":
+        return create_error_response("Only POST method is allowed", 405)
+
+    try:
+        data = request.get_json()
+    except Exception:
+        return create_error_response("Invalid JSON body", 400)
+
+    fields, error = parse_push_token_registration(data)
+    if error:
+        return create_error_response(error, 400)
+
+    try:
+        db.collection("users").document(fields["user_id"]).set(
+            {
+                "fcmToken": fields["fcm_token"],
+                "platform": fields["platform"],
+                "lastActiveAt": firestore.SERVER_TIMESTAMP,
+                "pushHoldout": fields["push_holdout"],
+                "fcmOptIn": fields["fcm_opt_in"],
+            },
+            merge=True,  # never clobber is_premium / ai_credits / google_uid / device_id
+        )
+        return create_success_response({})
+    except Exception as e:
+        return create_error_response(f"Failed to register push token: {str(e)}", 500)
+
+
+# ============================================================================
 # FUNCTION 2: Auto-fill existing checklist
 # ============================================================================
 
@@ -1326,6 +1470,310 @@ def refill_premium_credits(request: Request):
 
     except Exception as e:
         return create_error_response(f"Failed to refill credits: {str(e)}", 500)
+
+
+# ============================================================================
+# PROMOTIONAL PUSH — re-engagement / win-back broadcast (send_promotions_batch)
+# ============================================================================
+# Server-side push for dormant users (report §5 audience segmentation, §6 measurement).
+# Cloud Scheduler → HTTP, same pattern as refill_premium_credits. PROMOTIONAL layer only:
+# premium + holdout users are unconditionally excluded. Consent = opt-OUT via the "Tips &
+# Offers" notification channel (the OS drops the push if the user disabled it), so the server
+# targets all token-holders — no server-side opt-in flag.
+
+
+def assign_push_arm(user_id: str) -> str:
+    """Copy A/B arm ("control" | "a" | "b") for [user_id] via the RC SERVER template.
+
+    Mirrors assign_model_arm EXACTLY (same cached server template, same percent-condition
+    mechanism, same fail-safe): the RC param `push_ab_arm` is evaluated against
+    randomization_id = user_id. Deterministic per user, identical across campaigns, and any
+    RC failure (load / evaluate / unknown arm) falls back to "control". The experiment
+    (percent split + arm mapping) is managed entirely from the Firebase RC console.
+    """
+    template = _get_rc_server_template()
+    if template is None:
+        return "control"
+    try:
+        config = template.evaluate({"randomization_id": user_id})
+        arm = config.get_string("push_ab_arm") or "control"
+    except Exception as e:  # noqa: BLE001 — RC must never break a send
+        print(f"[push_ab] RC evaluate failed: {type(e).__name__}: {e}")
+        return "control"
+    return arm if arm in push_promotions.PUSH_ARM_ALLOWLIST else "control"
+
+
+def _get_push_copy_variants_json() -> str:
+    """RC `push_copy_variants_json` (console-editable copy table). '' → in-code fallback.
+
+    Not personalised — the same JSON for everyone — so the randomization_id is a constant.
+    """
+    template = _get_rc_server_template()
+    if template is None:
+        return ""
+    try:
+        config = template.evaluate({"randomization_id": "push_copy"})
+        return config.get_string("push_copy_variants_json") or ""
+    except Exception as e:  # noqa: BLE001 — RC must never break a send
+        print(f"[push_ab] RC copy variants load failed: {type(e).__name__}: {e}")
+        return ""
+
+
+def _emit_amplitude_events(events: list) -> int:
+    """POST `push_sent` events to Amplitude HTTP V2 (server-side CTR denominator).
+
+    Non-fatal by design: a missing key or an HTTP error logs a warning and returns 0 — it
+    must NEVER abort a real push send. Chunks to 100 events/request (well under the API's
+    1000 events/sec cap). Returns the count accepted for upload.
+    """
+    if not events:
+        return 0
+    if not AMPLITUDE_SERVER_API_KEY:
+        print(f"[push_ab] AMPLITUDE_SERVER_API_KEY unset — {len(events)} push_sent events "
+              "NOT counted (CTR denominator missing). Configure the secret to measure opens.")
+        return 0
+    uploaded = 0
+    for batch in push_promotions.chunked(events, 100):
+        try:
+            resp = http_requests.post(
+                AMPLITUDE_HTTP_ENDPOINT,
+                json={"api_key": AMPLITUDE_SERVER_API_KEY, "events": batch},
+                headers={"Content-Type": "application/json"},
+                timeout=10,
+            )
+            if resp.status_code == 200:
+                uploaded += len(batch)
+            else:
+                print(f"[push_ab] Amplitude upload non-200: {resp.status_code} {resp.text[:200]}")
+        except Exception as e:  # noqa: BLE001 — analytics must never break the send
+            print(f"[push_ab] Amplitude upload failed: {type(e).__name__}: {e}")
+    return uploaded
+
+
+@functions_framework.http
+def send_promotions_batch(request: Request):
+    """Send a batch of PROMOTIONAL re-engagement / win-back pushes to dormant users.
+
+    Cloud Scheduler → HTTP (same pattern as refill_premium_credits). Parameterised by
+    push_type + the inactivity window (days). PROMOTIONAL layer ONLY:
+      * Premium users are UNCONDITIONALLY suppressed (they're converted — nothing to sell;
+        compliance + measurement). This CF never sends the "everyone incl. premium" digest/
+        release variant — that would be a separate FUNCTIONAL broadcast.
+      * Holdout users (`pushHoldout == true`) are UNCONDITIONALLY skipped (retention control
+        group — report §6.1).
+      * Consent = opt-OUT via the "Tips & Offers" notification channel — the OS drops the push
+        if the user disabled that channel, so all token-holders are targeted (no server-side
+        opt-in flag). Chosen 2026-07-03 over an explicit promoOptIn soft-ask.
+    Emits `push_sent` to Amplitude per delivered push (CTR denominator), cleans up dead FCM
+    tokens, and stamps a per-user frequency cap. The A/B copy arm ("copy" experiment) comes
+    from the RC server template (assign_push_arm).
+
+    Request body (all optional):
+      { "push_type": "reengagement"|"winback"|"digest"|"tip"|"release"|"upsell"  (default "reengagement"),
+        "min_inactive_days": int   (default 3   — dormant AT LEAST this long),
+        "max_inactive_days": int|null (default null — no lower bound; set for a window, e.g. win-back 14..30),
+        "campaign_id": str         (default "{push_type}_{YYYYMMDD}"),
+        "dry_run": bool            (default false — simulate: NO FCM / NO Amplitude / NO writes),
+        "fcm_validate_only": bool  (default false — FCM dry_run: validates tokens, no delivery),
+        "max_users": int           (default 5000 — cap Firestore reads per run),
+        "promo_cooldown_hours": int (default 20 — per-user frequency cap ~1/day),
+        "admin_key": str           (REQUIRED — must equal the PUSH_ADMIN_KEY secret, which
+                                     MUST be set or the CF refuses to run; fail-closed) }
+    """
+    try:
+        data = request.get_json(silent=True) or {}
+    except Exception:  # noqa: BLE001 — tolerate a bodyless scheduler ping
+        data = {}
+
+    # Auth gate — FAIL-CLOSED. This CF sends REAL pushes to real users and deploys with
+    # --allow-unauthenticated, so a missing/empty key must LOCK the endpoint, never open it.
+    # (The old `if PUSH_ADMIN_KEY and ...` form was fail-open: an unset secret skipped the
+    # guard entirely, leaving a public push-blast endpoint — notification-bomb / quota abuse.)
+    if not PUSH_ADMIN_KEY:
+        return create_error_response(
+            "Server misconfigured: PUSH_ADMIN_KEY is not set — refusing to send", 503
+        )
+    if data.get("admin_key") != PUSH_ADMIN_KEY:
+        return create_error_response("Unauthorized", 403)
+
+    push_type = str(data.get("push_type") or "reengagement")
+    if push_type not in push_promotions.PROMO_PUSH_TYPES:
+        return create_error_response(
+            f"Invalid push_type '{push_type}'. Allowed: {sorted(push_promotions.PROMO_PUSH_TYPES)}",
+            400,
+        )
+
+    try:
+        min_days = int(data.get("min_inactive_days", 3))
+        max_days = data.get("max_inactive_days")
+        max_users = int(data.get("max_users", 5000))
+        cooldown_hours = int(data.get("promo_cooldown_hours", 20))
+    except (TypeError, ValueError):
+        return create_error_response("min_inactive_days / max_inactive_days / max_users / "
+                                     "promo_cooldown_hours must be integers", 400)
+
+    dry_run = bool(data.get("dry_run", False))
+    fcm_validate_only = bool(data.get("fcm_validate_only", False))
+    campaign_id = str(data.get("campaign_id")
+                      or f"{push_type}_{datetime.now(timezone.utc):%Y%m%d}")
+
+    now = datetime.now(timezone.utc)
+    upper = now - timedelta(days=min_days)
+
+    try:
+        # --- Audience query: single-field range on lastActiveAt (Firestore-friendly). ---
+        # We deliberately keep premium / holdout OUT of the query: Firestore cannot mix
+        # `fcmToken != null` with a range on lastActiveAt, and an equality beside the range
+        # would require a composite index. With a small, low-retention base the range read +
+        # client-side filter (is_eligible_for_promo) is cheaper than the index; revisit (add a
+        # composite index) if the dormant base grows large. Two bounds on the SAME field
+        # (lastActiveAt) are allowed.
+        base_query = db.collection("users").where("lastActiveAt", "<", upper)
+        if max_days is not None:
+            lower = now - timedelta(days=int(max_days))
+            base_query = base_query.where("lastActiveAt", ">", lower)
+        page_size = 500
+        base_query = base_query.order_by("lastActiveAt").limit(page_size)
+
+        variants_json = _get_push_copy_variants_json()
+
+        # --- Collect eligible users, page by page. `max_users` bounds docs SCANNED
+        # (the real Firestore read cost), not the eligible count — a large sparse dormant
+        # base can't blow past the cap. Deepest-dormant first (order_by lastActiveAt asc).
+        eligible = []  # list of (uid, token, arm, title, body)
+        skip_counts: dict[str, int] = {}
+        scanned = 0
+        last_doc = None
+        while scanned < max_users:
+            page_q = base_query.start_after(last_doc) if last_doc is not None else base_query
+            docs = list(page_q.get())
+            if not docs:
+                break
+            for doc in docs:
+                scanned += 1
+                ud = doc.to_dict() or {}
+                ok, reason = push_promotions.is_eligible_for_promo(ud, now, cooldown_hours)
+                if not ok:
+                    skip_counts[reason] = skip_counts.get(reason, 0) + 1
+                    continue
+                arm = assign_push_arm(doc.id)
+                title, body = push_promotions.select_copy(push_type, arm, variants_json)
+                eligible.append((doc.id, ud["fcmToken"], arm, title, body))
+                if scanned >= max_users:
+                    break
+            last_doc = docs[-1]
+            if len(docs) < page_size:
+                break
+
+        # --- Group by arm: payload is identical within an arm → one multicast per chunk. ---
+        by_arm: dict[str, list] = {}
+        for item in eligible:
+            by_arm.setdefault(item[2], []).append(item)
+
+        sent_count = 0
+        failed_count = 0
+        tokens_cleaned = 0
+        amplitude_events: list = []
+        arm_breakdown: dict[str, int] = {}
+
+        for arm, group in by_arm.items():
+            _, _, _, title, body = group[0]
+            data_payload = push_promotions.build_data_payload(
+                push_type, campaign_id, arm, title, body
+            )
+            for chunk in push_promotions.chunked(group, 500):  # FCM cap = 500 tokens/multicast
+                tokens = [g[1] for g in chunk]
+                arm_breakdown[arm] = arm_breakdown.get(arm, 0) + len(tokens)
+                if dry_run:
+                    continue  # simulate only — no FCM, no Amplitude, no Firestore writes
+
+                message = messaging.MulticastMessage(
+                    data=data_payload,
+                    tokens=tokens,
+                    android=messaging.AndroidConfig(
+                        priority="normal",       # promo is low-intrusion, not time-critical
+                        ttl=timedelta(hours=24),  # a stale promo shouldn't arrive days later
+                        collapse_key=campaign_id,  # don't stack multiple of the same campaign
+                    ),
+                )
+                # HTTP v1 + Admin SDK (legacy FCM API retired 2024-06). dry_run here =
+                # FCM's own validate-only pass (server round-trip, no device delivery).
+                response = messaging.send_each_for_multicast(
+                    message, dry_run=fcm_validate_only
+                )
+
+                batch_writer = db.batch()
+                has_writes = False
+                now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+                for i, send_resp in enumerate(response.responses):
+                    uid, token = chunk[i][0], chunk[i][1]
+                    if send_resp.success:
+                        sent_count += 1
+                        amplitude_events.append(push_promotions.build_amplitude_event(
+                            uid, push_type, campaign_id, arm, now_ms, f"{campaign_id}:{uid}"))
+                        if not fcm_validate_only:
+                            # Stamp the frequency cap so the next run skips this user.
+                            batch_writer.update(
+                                db.collection("users").document(uid),
+                                {"lastPromoSentAt": firestore.SERVER_TIMESTAMP,
+                                 "lastPromoCampaignId": campaign_id},
+                            )
+                            has_writes = True
+                    else:
+                        failed_count += 1
+                        kind = push_promotions.classify_send_error(send_resp.exception)
+                        if kind == "unrecoverable":
+                            # Dead token — remove it so we stop wasting FCM quota on it.
+                            batch_writer.update(
+                                db.collection("users").document(uid),
+                                {"fcmToken": firestore.DELETE_FIELD,
+                                 "fcmTokenInvalidatedAt": firestore.SERVER_TIMESTAMP},
+                            )
+                            has_writes = True
+                            tokens_cleaned += 1
+                        else:
+                            print(f"[push] transient send error uid={uid}: "
+                                  f"{type(send_resp.exception).__name__}: {send_resp.exception}")
+
+                if has_writes:
+                    try:
+                        batch_writer.commit()
+                    except Exception as e:  # noqa: BLE001 — a write race must not abort the run
+                        print(f"[push] Firestore batch commit failed: {type(e).__name__}: {e}")
+
+        amplitude_uploaded = 0 if dry_run else _emit_amplitude_events(amplitude_events)
+
+        result = {
+            "campaign_id": campaign_id,
+            "push_type": push_type,
+            "dry_run": dry_run,
+            "fcm_validate_only": fcm_validate_only,
+            "scanned": scanned,
+            "eligible": len(eligible),
+            "sent": sent_count,
+            "failed": failed_count,
+            "tokens_cleaned": tokens_cleaned,
+            "amplitude_uploaded": amplitude_uploaded,
+            "arm_breakdown": arm_breakdown,
+            "skip_reasons": skip_counts,
+        }
+        if dry_run and eligible:
+            s_uid, s_token, s_arm, s_title, s_body = eligible[0]
+            result["sample_payload"] = push_promotions.build_data_payload(
+                push_type, campaign_id, s_arm, s_title, s_body)
+
+        # Audit log (mirrors credits_refill_log). Skipped on dry_run (nothing happened).
+        if not dry_run:
+            try:
+                db.collection("promo_push_log").add(
+                    {**result, "timestamp": datetime.now(timezone.utc).isoformat()})
+            except Exception as e:  # noqa: BLE001
+                print(f"[push] promo_push_log write failed: {type(e).__name__}: {e}")
+
+        return create_success_response(result)
+
+    except Exception as e:  # noqa: BLE001
+        return create_error_response(f"Failed to send promotions: {str(e)}", 500)
 
 
 # ============================================================================

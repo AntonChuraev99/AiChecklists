@@ -103,7 +103,72 @@ object AnalyticsEvents {
         const val RECURRING_CANCELLED = "recurring_reminder_cancelled"
     }
 
-    // ─── AI: Analyze (Photo/PDF/Text/Link/Voice → checklist) ─────────────────
+    // ─── Push / re-engagement (FCM campaigns + notification lifecycle) ────────
+    /**
+     * FCM push measurement contour. Distinct from [Reminder] (which tracks LOCAL
+     * AlarmManager notifications the device schedules for itself): these track the
+     * server-driven push pipeline + the raw notification lifecycle, so re-engagement
+     * campaigns are measurable end-to-end and provable against retention.
+     *
+     * Every push event carries the shared push params ([AnalyticsParams.PUSH_TYPE],
+     * [AnalyticsParams.CHANNEL], [AnalyticsParams.AUDIENCE_CLASS],
+     * [AnalyticsParams.CAMPAIGN_ID], [AnalyticsParams.PUSH_HOLDOUT]) so any metric can
+     * be sliced by campaign / type / control-bucket without a new chart per dimension.
+     *
+     * Attribution model: [SENT] (server) -> [RECEIVED] (client) -> [OPENED] (client) is
+     * the delivery/open funnel; open->downstream-action within a window proves real use;
+     * retention split on [AnalyticsParams.PUSH_HOLDOUT] proves *incremental* lift
+     * (open-vs-not measures selection, not effect — see docs/reports/push-retention-*).
+     */
+    object Push {
+        /**
+         * Emitted SERVER-SIDE (firebase-functions `send_promotions_batch` -> Amplitude
+         * HTTP API) at the moment a push is dispatched. The ONLY reliable CTR/delivery
+         * denominator — a client cannot count a push that never arrived. Declared here
+         * so the wire name has ONE source of truth across client, server, and dashboards.
+         */
+        const val SENT = "push_sent"
+
+        /** Client `onMessageReceived` (our payload is data-only -> always invoked). delivery = received / sent. */
+        const val RECEIVED = "push_received"
+
+        /** Client, on notification tap -> deep-link. open rate = opened / received. Sibling of [Reminder.NOTIFICATION_TAPPED]. */
+        const val OPENED = "push_opened"
+
+        /** Client, swipe-away via `setDeleteIntent`. Notification-fatigue proxy. */
+        const val DISMISSED = "push_dismissed"
+
+        /**
+         * Client, sampled on app start: system notifications enabled + per-channel
+         * importance. Android has NO channel-disable callback, so we poll on start to
+         * measure opt-out drift (e.g. user muted the "Tips & Offers" channel alone).
+         * Carries [AnalyticsParams.NOTIFICATIONS_ENABLED] + [AnalyticsParams.CHANNEL] +
+         * [AnalyticsParams.CHANNEL_IMPORTANCE].
+         */
+        const val PERMISSION_STATE = "push_permission_state"
+    }
+
+    /**
+     * [AnalyticsParams.PUSH_TYPE] values for LOCAL (on-device AlarmManager) retention pushes.
+     *
+     * These are deliberately DISJOINT from any server FCM push_type (`reengagement`/`winback`/…),
+     * so the shared push funnel ([Push.RECEIVED] -> [Push.OPENED]) stays a single, sliceable series:
+     * filtering `push_type IN (streak_save, overdue, digest)` isolates the local retention pushes,
+     * everything else is server-driven. Wire strings — keep identical to the values enumerated in the
+     * [AnalyticsParams.PUSH_TYPE] contract comment.
+     */
+    object LocalPushType {
+        /** Recurring (daily-habit) checklist still has open items in the delivery window. Functional. */
+        const val STREAK_SAVE = "streak_save"
+
+        /** A partially-done checklist left untouched for >= 1 day. Functional. */
+        const val OVERDUE = "overdue"
+
+        /** Weekly summary of open items across all checklists. Promotional. */
+        const val DIGEST = "digest"
+    }
+
+    // ─── AI: Analyze (Photo/PDF/Text/Link/Voice -> checklist) ─────────────────
     object Analyze {
         const val STARTED = "ai_analyze_started"
         const val COMPLETED = "ai_analyze_completed"
@@ -122,8 +187,8 @@ object AnalyticsEvents {
         const val PREVIEW_CONFIRMED = "ai_chat_preview_confirmed"
         const val PREVIEW_REJECTED = "ai_chat_preview_rejected"
 
-        // ── Voice input (mic in the chat input row → Cloud Function transcription) ──
-        // One event per mic action so the funnel (tapped → cancelled / transcribed / failed) is
+        // ── Voice input (mic in the chat input row -> Cloud Function transcription) ──
+        // One event per mic action so the funnel (tapped -> cancelled / transcribed / failed) is
         // measurable: until these shipped the voice feature was completely un-instrumented, so
         // "is voice popular?" was unanswerable. VOICE_TRANSCRIBED carries CHAR_LEN; the FAILED
         // event carries OUTCOME (file_missing / network_error / service_error / insufficient_credits).
@@ -159,7 +224,7 @@ object AnalyticsEvents {
         // [AnalyticsParams.REASON] = the tapped reason key PLUS the SAME source/product_id/sku_id/
         // plan_type params as PURCHASE_CANCELLED, so the two events join in analytics. DISMISSED
         // fires when the user taps "Not now" (feedback on every action — no silent exit).
-        // Not GA4-reserved (no `purchase` / `firebase_*` prefix) → safe on both providers.
+        // Not GA4-reserved (no `purchase` / `firebase_*` prefix) -> safe on both providers.
         const val CANCEL_REASON = "paywall_cancel_reason"
         const val CANCEL_REASON_DISMISSED = "paywall_cancel_reason_dismissed"
     }
@@ -219,7 +284,7 @@ object AnalyticsEvents {
          *    produced no local bytes at all. Carries [AnalyticsParams.HAS_STORAGE_PATH] +
          *    [AnalyticsParams.ERROR_MESSAGE] (Storage/App Check/CORS reason).
          *  - [AnalyticsParams.STAGE] = "decode" — materialize said Ready (local file present) but
-         *    Coil could not decode the bytes → the classic partial/corrupt-cache case.
+         *    Coil could not decode the bytes -> the classic partial/corrupt-cache case.
          * Always carries [AnalyticsParams.MIME_TYPE] when known.
          */
         const val LOAD_FAILED = "attachment_load_failed"
@@ -327,6 +392,38 @@ object AnalyticsParams {
     const val STAGE = "stage"                     // "materialize" (cloud download) | "decode" (Coil)
     const val HAS_STORAGE_PATH = "has_storage_path" // was a cloud copy even expected?
     const val MIME_TYPE = "mime_type"
+
+    // ─── Push / re-engagement (object Push) ──────────────────────────────────
+    // Shared across every push event so a single metric can slice by type / channel /
+    // campaign / control-bucket. Values are wire format — keep server (Python) + client
+    // (Kotlin) + dashboards spelling these identically.
+    const val PUSH_TYPE = "push_type"        // reminder|streak_save|overdue|digest|reengagement|winback|upsell|tip|release
+    const val CHANNEL = "channel"            // reminders|promo — which NotificationChannel carried it
+    const val AUDIENCE_CLASS = "audience_class" // functional|promotional (functional is never Premium-suppressed)
+    const val CAMPAIGN_ID = "campaign_id"    // per-send id -> each campaign independently measurable & comparable
+    /**
+     * Promo holdout bucket. Doubles as the user-property KEY (same string) exactly like
+     * [AI_MODEL_VARIANT]: `true` = user is in the control group that receives NO
+     * promotional pushes. Segment N-Day retention exposed vs holdout to prove the
+     * campaign's *incremental* retention lift (the causal number, not a correlation).
+     */
+    const val PUSH_HOLDOUT = "push_holdout"
+    const val IS_PREMIUM = "is_premium"      // entitlement at event time — promo suppressed when true
+    // push_permission_state diagnostics
+    const val NOTIFICATIONS_ENABLED = "notifications_enabled" // app-level toggle (areNotificationsEnabled)
+    const val CHANNEL_IMPORTANCE = "channel_importance"       // per-channel importance (0 = user muted this channel)
+    /**
+     * Push A/B experiment dimension. Two params so several experiments can run at once
+     * without colliding: [PUSH_AB_EXPERIMENT] = which experiment ("copy" | "timing" |
+     * "cadence"), [PUSH_AB_ARM] = the assigned variant ("control" | "a" | "b" | …).
+     * [PUSH_AB_ARM] doubles as a sticky user-property (same pattern as [AI_MODEL_VARIANT]).
+     * Server assigns the arm for promo pushes via the Remote Config SERVER template
+     * (the `assign_model_arm` mechanism); client reads it from the push payload and also
+     * carries a client-side arm for timing experiments. Live from release -> managed in the
+     * Firebase RC console (percent split), never hardcoded.
+     */
+    const val PUSH_AB_EXPERIMENT = "push_ab_experiment"
+    const val PUSH_AB_ARM = "push_ab_arm"
 }
 
 /**

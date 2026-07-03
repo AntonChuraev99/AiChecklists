@@ -19,6 +19,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
 import com.antonchuraev.homesearchchecklist.consent.ConsentDialog
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.isAppLocaleOverrideStale
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.reapplyAppLocaleNow
@@ -32,6 +33,11 @@ import com.antonchuraev.homesearchchecklist.core.datastore.api.ThemeRepository
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AddToChecklistPurpose
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.notification.ReminderReceiver
+import com.antonchuraev.homesearchchecklist.push.PushAnalytics
+import com.antonchuraev.homesearchchecklist.retention.RetentionPrefs
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import java.util.Calendar
 import org.koin.android.ext.android.inject
 import org.koin.compose.koinInject
 
@@ -39,6 +45,7 @@ class MainActivity : ComponentActivity() {
 
     private val appNavigator: AppNavigator by inject()
     private val analyticsTracker: AnalyticsTracker by inject()
+    private val retentionPrefs: RetentionPrefs by inject()
     private val debugMenuDetector = if (AppBuildConfig.isDebug) {
         DebugMenuDetector { appNavigator.navigateToDebugMenu() }
     } else {
@@ -103,6 +110,11 @@ class MainActivity : ComponentActivity() {
         // Check for deep link in launch intent (cold start from notification)
         extractDeepLinkChecklistId(intent)?.let { id ->
             pendingChecklistId = id
+        }
+        // Cold-start push tap: emit push_opened once. Guarded on savedInstanceState == null so a
+        // config-change recreate (which re-delivers the same launch intent) never double-counts.
+        if (savedInstanceState == null) {
+            emitPushOpenedIfPresent(intent)
         }
 
         // Check for an ACTION_PROCESS_TEXT request (cold start from the selection toolbar).
@@ -200,21 +212,56 @@ class MainActivity : ComponentActivity() {
             reapplyAppLocaleNow()
             reassertAppLocale()
         }
+
+        // Behavioral-timing signal: record a foreground as an activity sample (debounced inside
+        // RetentionPrefs to at most once per 15 min). Best-effort — never blocks resume.
+        recordActiveForRetentionTiming()
+    }
+
+    /**
+     * Feed a warm-foreground activity sample into the behavioral-timing histogram. Only affects the
+     * delivery hour of OUR local auto-pushes; user-set reminders are unaffected. Debounced in prefs.
+     */
+    private fun recordActiveForRetentionTiming() {
+        val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+        val now = System.currentTimeMillis()
+        lifecycleScope.launch(Dispatchers.IO) {
+            runCatching { retentionPrefs.recordActiveHour(hour, now) }
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        // A push deep-link reuses ACTION_OPEN_CHECKLIST for navigation, so distinguish it from a
+        // LOCAL reminder tap — otherwise one push tap would inflate reminder_notification_tapped too.
+        val isPush = PushAnalytics.isPushIntent(intent)
         // Warm start — NavController is already ready
         extractDeepLinkChecklistId(intent)?.let { id ->
             appNavigator.navigateToChecklistDetail(id)
-            analyticsTracker.event(AnalyticsEvents.Reminder.NOTIFICATION_TAPPED, mapOf(
-                "checklist_id" to id.toString()
-            ))
+            if (!isPush) {
+                analyticsTracker.event(AnalyticsEvents.Reminder.NOTIFICATION_TAPPED, mapOf(
+                    "checklist_id" to id.toString()
+                ))
+            }
         }
         // Warm start from the ACTION_PROCESS_TEXT selection toolbar — navigate immediately.
         extractProcessTextRequest(intent)?.let { request ->
             routeProcessText(request)
         }
+        // Warm-start push tap: emit push_opened. Cold vs warm are mutually exclusive per tap
+        // (onCreate handles cold, onNewIntent handles warm), so this fires exactly once.
+        emitPushOpenedIfPresent(intent)
+    }
+
+    /**
+     * Emit [AnalyticsEvents.Push.OPENED] when this intent came from an FCM push notification tap.
+     * Sibling of the reminder [AnalyticsEvents.Reminder.NOTIFICATION_TAPPED] flow, but keyed off
+     * the push metadata extras ([PushAnalytics]) rather than the deep-link action — so it fires for
+     * BOTH deep-link (checklist_id) and plain re-engagement pushes.
+     */
+    private fun emitPushOpenedIfPresent(intent: Intent?) {
+        if (intent == null || !PushAnalytics.isPushIntent(intent)) return
+        analyticsTracker.event(AnalyticsEvents.Push.OPENED, PushAnalytics.paramsFromIntent(intent))
     }
 
     private fun extractDeepLinkChecklistId(intent: Intent?): Long? {

@@ -1,7 +1,13 @@
 package com.antonchuraev.homesearchchecklist
 
 import android.app.Application
+import android.app.NotificationManager
+import android.os.Build
+import androidx.core.app.NotificationManagerCompat
 import com.antonchuraev.homesearchchecklist.consent.ConsentManager
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppContextHolder
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.PushTokenRepository
@@ -11,6 +17,9 @@ import com.antonchuraev.homesearchchecklist.feature.paywall.data.PaywallConfig
 import com.antonchuraev.homesearchchecklist.feature.paywall.data.RevenueCatInitializer
 import com.antonchuraev.homesearchchecklist.notification.ReminderReceiver
 import com.antonchuraev.homesearchchecklist.push.PushNotificationChannels
+import com.antonchuraev.homesearchchecklist.retention.RetentionPrefs
+import com.antonchuraev.homesearchchecklist.retention.RetentionPushScheduler
+import java.util.Calendar
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -54,6 +63,67 @@ open class GistiApplication : Application() {
 
         // Register the FCM token + bump lastActiveAt for the re-engagement campaign.
         registerPushToken()
+
+        // Sample the notification opt-out state once per start (Android has no channel-disable
+        // callback) so we can measure opt-out drift on the promotions channel over time.
+        emitPushPermissionState()
+
+        // Record this cold start as an activity sample (behavioral timing) and (re)schedule the
+        // LOCAL retention auto-pushes (streak-save / overdue / weekly digest). Idempotent — user-set
+        // reminders are handled entirely separately in rescheduleReminders() above and are untouched.
+        scheduleRetentionPushes()
+    }
+
+    /**
+     * Feed a cold-start activity sample into the behavioral-timing histogram, then (re)schedule the
+     * two retention alarms at the resolved delivery hour. All best-effort: a failure here never
+     * affects app start (or user reminders).
+     */
+    private fun scheduleRetentionPushes() {
+        applicationScope.launch {
+            val koin = GlobalContext.getOrNull() ?: return@launch
+            try {
+                val prefs: RetentionPrefs = koin.get()
+                val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+                prefs.recordActiveHour(hour, System.currentTimeMillis())
+
+                val scheduler: RetentionPushScheduler = koin.get()
+                scheduler.scheduleAll()
+            } catch (e: Exception) {
+                koin.getOrNull<AppLogger>()?.warning("Retention", "schedule on start failed: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Emit [AnalyticsEvents.Push.PERMISSION_STATE] once per start with the app-level notification
+     * toggle and the promotions-channel importance (0 = the user muted "Tips & Offers" alone). Runs
+     * after channel creation so [NotificationManager.getNotificationChannel] resolves. Null-safe
+     * against the widget process where the tracker may not be bound.
+     */
+    private fun emitPushPermissionState() {
+        val tracker: AnalyticsTracker = GlobalContext.getOrNull()?.getOrNull() ?: return
+        val notificationsEnabled = NotificationManagerCompat.from(this).areNotificationsEnabled()
+        val promoImportance = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            getSystemService(NotificationManager::class.java)
+                ?.getNotificationChannel(PushNotificationChannels.PROMOTIONS_CHANNEL_ID)
+                ?.importance ?: 0
+        } else {
+            0
+        }
+        runCatching {
+            tracker.event(
+                AnalyticsEvents.Push.PERMISSION_STATE,
+                mapOf(
+                    AnalyticsParams.NOTIFICATIONS_ENABLED to notificationsEnabled,
+                    AnalyticsParams.CHANNEL to PushNotificationChannels.DATA_CHANNEL_PROMO,
+                    AnalyticsParams.CHANNEL_IMPORTANCE to promoImportance,
+                ),
+            )
+        }.onFailure { e ->
+            GlobalContext.getOrNull()?.getOrNull<AppLogger>()
+                ?.warning("PushFcm", "permission_state emit failed: ${e.message}")
+        }
     }
 
     /**
@@ -71,7 +141,7 @@ open class GistiApplication : Application() {
         if (!koinAlreadyStarted) {
             startKoin {
                 // Allow definition overrides so instrumented tests (TestApplication)
-                // can swap PaywallRepository → FakePaywallRepository for screenshot harness.
+                // can swap PaywallRepository -> FakePaywallRepository for screenshot harness.
                 // Production code never overrides bindings.
                 allowOverride(true)
                 androidLogger()
