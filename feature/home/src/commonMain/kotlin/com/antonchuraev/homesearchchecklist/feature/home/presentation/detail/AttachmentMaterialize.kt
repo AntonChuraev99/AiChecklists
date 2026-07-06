@@ -65,16 +65,23 @@ internal suspend fun ensureAttachmentLocal(
     logger: AppLogger? = null,
     onFailure: (reason: String, throwable: Throwable?) -> Unit = { _, _ -> },
 ): Boolean {
-    logger?.debug(TAG, "materialize: path=${attachment.path} storagePath=${attachment.storagePath}")
-    val localSize = local.sizeOf(attachment.path)
+    // The synced attachment.path is platform-specific; on the web an Android-created path is
+    // unreadable. Resolve to a path THIS platform can read (opfs://… on web, unchanged elsewhere)
+    // and use it for BOTH the local-existence probe and the download target so they never diverge.
+    val localPath = resolveAttachmentLocalPath(attachment.path, attachment.storagePath)
+    logger?.debug(
+        TAG,
+        "materialize: path=${attachment.path} localPath=$localPath storagePath=${attachment.storagePath}",
+    )
+    val localSize = local.sizeOf(localPath)
     logger?.debug(TAG, "materialize: localSize=$localSize")
     if (localSize > 0) return true
     val storagePath = attachment.storagePath ?: run {
         logger?.debug(TAG, "materialize: no storagePath — let loader try path as-is")
         return true // no cloud copy; the loader tries path as-is (its onError reports a decode miss)
     }
-    logger?.debug(TAG, "materialize: downloading $storagePath")
-    return when (val result = cloud.download(storagePath, attachment.path)) {
+    logger?.debug(TAG, "materialize: downloading $storagePath -> $localPath")
+    return when (val result = cloud.download(storagePath, localPath)) {
         is AppResult.Success -> true
         is AppResult.Error -> {
             onFailure(result.exception.message ?: "download failed", result.exception)
