@@ -3168,7 +3168,9 @@ class ChecklistDetailViewModel(
             ?: return
         updateContentState {
             it.copy(
-                pendingOpenExternallyPath = attachment.path,
+                // Resolve to the path THIS platform can read (opfs://… on web for Android-synced
+                // attachments; unchanged on Android/iOS) — the raw synced path is unreadable on web.
+                pendingOpenExternallyPath = resolveAttachmentLocalPath(attachment.path, attachment.storagePath),
                 pendingOpenExternallyMimeType = attachment.mimeType,
             )
         }

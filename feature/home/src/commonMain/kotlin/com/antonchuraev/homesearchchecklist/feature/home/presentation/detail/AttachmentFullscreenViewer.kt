@@ -297,13 +297,18 @@ private fun ZoomableImagePage(
                 // frame (scale/offset read in composition), so an un-remembered request or an
                 // un-guarded onError would fire a decode-failure event + Crashlytics report per frame
                 // on a broken image.
-                val request = remember(attachment.path, context) {
+                // Render the path THIS platform can read (opfs://… on web for Android-synced
+                // attachments; unchanged on Android/iOS) — NOT the raw synced attachment.path.
+                val localPath = remember(attachment.path, attachment.storagePath) {
+                    resolveAttachmentLocalPath(attachment.path, attachment.storagePath)
+                }
+                val request = remember(localPath, context) {
                     ImageRequest.Builder(context)
-                        .data(attachment.path)
+                        .data(localPath)
                         .crossfade(true)
                         .build()
                 }
-                var reported by remember(attachment.path) { mutableStateOf(false) }
+                var reported by remember(localPath) { mutableStateOf(false) }
 
                 AsyncImage(
                     model = request,

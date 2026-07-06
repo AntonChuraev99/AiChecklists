@@ -5,6 +5,10 @@ firebase_admin (main.py creates a Firestore client at import time).
 """
 
 ALLOWED_ORIGINS = {
+    # The app moved to the app. subdomain in the 2026-07-01 root-swap (apex +
+    # www now serve the SEO landing). This is the live app origin.
+    "https://app.gisti-ai.com",
+    # Legacy apex — kept in case an old tab / cached bundle is still on it.
     "https://gisti-ai.com",
     # The www alias 301-redirects to the apex before the app loads;
     # kept in the whitelist as belt-and-braces.

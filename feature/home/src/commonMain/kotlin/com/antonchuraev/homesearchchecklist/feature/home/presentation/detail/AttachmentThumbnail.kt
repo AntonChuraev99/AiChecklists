@@ -111,13 +111,18 @@ private fun ImageThumbnailContent(attachment: Attachment) {
             // Stable request across recompositions (else Coil may restart and re-fire onError), and a
             // once-per-path guard so a broken image reports the decode failure exactly once, never a
             // per-recomposition storm of events + Crashlytics recordException.
-            val request = remember(attachment.path, context) {
+            // Render the path THIS platform can read (opfs://… on web for Android-synced
+            // attachments; unchanged on Android/iOS) — NOT the raw synced attachment.path.
+            val localPath = remember(attachment.path, attachment.storagePath) {
+                resolveAttachmentLocalPath(attachment.path, attachment.storagePath)
+            }
+            val request = remember(localPath, context) {
                 ImageRequest.Builder(context)
-                    .data(attachment.path)
+                    .data(localPath)
                     .crossfade(true)
                     .build()
             }
-            var reported by remember(attachment.path) { mutableStateOf(false) }
+            var reported by remember(localPath) { mutableStateOf(false) }
 
             AsyncImage(
                 model = request,
