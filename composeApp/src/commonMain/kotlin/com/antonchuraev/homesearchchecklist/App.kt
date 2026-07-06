@@ -1065,13 +1065,20 @@ fun App() {
                                 if (ic != null) runCatching { chatInputFocusRequester.requestFocus() }
                             }
                             if (ic != null || chatUiState.pendingChoice == null) {
+                              Column {
+                                // Item-create only: pending-attachment preview strip ABOVE the input.
+                                // In chat mode (ic == null) the strip lambda is absent → nothing renders,
+                                // and the Column wraps a single fillMaxWidth child (layout-neutral).
+                                if (ic != null) ic.attachmentStrip()
                                 ChatInputRow(
                                     text = ic?.text ?: chatUiState.inputText,
                                     onTextChange = ic?.onTextChange
                                         ?: { chatViewModel.sendIntent(ChatScreenIntent.OnInputChange(it)) },
                                     onSend = ic?.onSend
                                         ?: { chatViewModel.sendIntent(ChatScreenIntent.OnSendClick) },
-                                    onAttachFileClick = { chatSheetAttachmentSheet = true },
+                                    // Item-create opens ITS picker (files staged on the new item); chat
+                                    // opens the chat attachment sheet.
+                                    onAttachFileClick = ic?.onAttachClick ?: { chatSheetAttachmentSheet = true },
                                     // BUG #1 FIX: send OnVoiceRecordingStarted (flips isRecording +
                                     // emits RequestRecordAudioPermission) like the full ChatScreen does.
                                     // The OLD inline panel only called sheetAudioRecorder.start() with NO
@@ -1086,9 +1093,9 @@ fun App() {
                                     onVoiceRecordingStopped = { sheetAudioRecorder.stop() },
                                     onVoiceRecordingCancelled = { sheetAudioRecorder.cancel() },
                                     onHelpClick = { chatPanelHelpSheetOpen = true },
-                                    // Chat-only signals forced off in item-create (no attachments, never
-                                    // processing/recording/transcribing → placeholder + Send stay correct).
-                                    hasAttachments = ic == null && chatUiState.pendingAttachments.isNotEmpty(),
+                                    // Item-create now supports attachments: drive the placeholder hint
+                                    // from the staged-files flag; chat keeps its own pending-attachment flag.
+                                    hasAttachments = if (ic != null) ic.hasAttachments else chatUiState.pendingAttachments.isNotEmpty(),
                                     isEnabled = ic != null || !chatUiState.isProcessing,
                                     canSend = ic?.canSend ?: chatUiState.canSend,
                                     isRecording = ic == null && chatUiState.isRecording,
@@ -1103,7 +1110,11 @@ fun App() {
                                     placeholderOverride = peekPlaceholder,
                                     // Drives the in-row help/attach morph: true → stripped Send-only row.
                                     simpleSendOnly = ic != null,
+                                    // Item-create keeps the attach button visible (help + mic stay hidden)
+                                    // so files can be staged on the new item.
+                                    attachVisibleInSimpleMode = ic != null,
                                 )
+                              }
                             }
                         },
                         recordingOverlay = {

@@ -154,6 +154,13 @@ fun ChatInputRow(
      * full ChatScreen + AI-chat dock are unchanged.
      */
     simpleSendOnly: Boolean = false,
+    /**
+     * In [simpleSendOnly] (item-create) mode the trailing attach button is hidden by default. Set
+     * true to KEEP it visible so the item-create dock can attach files to the new item. The leading
+     * help button and the press-and-hold mic stay hidden regardless. No-op when [simpleSendOnly] is
+     * false (the full AI-chat row already shows attach). Defaults to false.
+     */
+    attachVisibleInSimpleMode: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     // Pre-resolve strings in Composable scope (spec §10 rule 6)
@@ -329,10 +336,10 @@ fun ChatInputRow(
         )
 
         // [3] Attach file button (moved to trailing side, next to Mic/Send — Telegram pattern).
-        // Animates out in item-create mode (attachments are a chat-only feature) — same morph as the
-        // leading help button so the trailing cluster collapses smoothly to a lone Send.
+        // Normally animates out in item-create mode, but the item-create dock re-enables it via
+        // [attachVisibleInSimpleMode] so files can be attached to the new item (help + mic still hide).
         AnimatedVisibility(
-            visible = !simpleSendOnly,
+            visible = !simpleSendOnly || attachVisibleInSimpleMode,
             enter = fadeIn() + expandHorizontally(),
             exit = fadeOut() + shrinkHorizontally(),
         ) {

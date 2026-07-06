@@ -235,6 +235,13 @@ sealed interface ChecklistDetailState : State {
         // Image picker / file picker launch triggers (cleared immediately after picker launches)
         val triggerImagePicker: Boolean = false,
         val triggerFilePicker: Boolean = false,
+        // ── Item-create attachments (staged before the item exists) ──
+        // Files picked while in item-create mode. Rendered as a preview strip above the create input
+        // and written to the new item on Send. Cleared on exit-without-create (see closeItemCreateMode).
+        val itemCreatePendingAttachments: List<PendingItemAttachment> = emptyList(),
+        // One-shot trigger to launch the item-create file picker (cleared right after it launches,
+        // mirroring triggerImagePicker/triggerFilePicker).
+        val triggerItemCreatePicker: Boolean = false,
     ) : ChecklistDetailState
 }
 
@@ -245,6 +252,19 @@ sealed interface ChecklistDetailState : State {
 data class AttachmentViewerState(
     val itemId: String,
     val initialAttachmentId: String,
+)
+
+/**
+ * A file picked in item-create mode BEFORE the item exists. Held in
+ * [ChecklistDetailState.Content.itemCreatePendingAttachments] and written to the freshly created
+ * item on Send (see [ChecklistDetailIntent.OnAddItemWithParse]); dropped on exit-without-create.
+ * [sourcePath] is the raw picker result path (rendered directly by Coil in the preview strip — it is
+ * NOT yet a stored/synced attachment path).
+ */
+data class PendingItemAttachment(
+    val sourcePath: String,
+    val fileName: String,
+    val mimeType: String?,
 )
 
 sealed interface ChecklistDetailIntent : Intent {
@@ -496,6 +516,20 @@ sealed interface ChecklistDetailIntent : Intent {
     ) : ChecklistDetailIntent
     /** Dispatched when the open-externally ACTION_VIEW intent has been sent by the Composable. */
     data object OnOpenExternallyDispatched : ChecklistDetailIntent
+
+    // ── Item-create attachments (staged before the item exists) ──
+    /** Attach button tapped in item-create mode → quota check, then set the picker trigger. */
+    data object OnItemCreateAttachClick : ChecklistDetailIntent
+    /** A file was picked in item-create mode → stage it in [ChecklistDetailState.Content.itemCreatePendingAttachments]. */
+    data class OnItemCreateAttachmentPicked(
+        val sourcePath: String,
+        val fileName: String,
+        val mimeType: String?,
+    ) : ChecklistDetailIntent
+    /** Dispatched from the Composable right after the item-create picker launches (clears the trigger). */
+    data object OnItemCreatePickerLaunched : ChecklistDetailIntent
+    /** Remove one staged item-create attachment (× on its preview tile), keyed by source path. */
+    data class OnRemoveItemCreatePendingAttachment(val sourcePath: String) : ChecklistDetailIntent
 
     // Priority
     data class OnToggleItemPriority(val itemId: String) : ChecklistDetailIntent

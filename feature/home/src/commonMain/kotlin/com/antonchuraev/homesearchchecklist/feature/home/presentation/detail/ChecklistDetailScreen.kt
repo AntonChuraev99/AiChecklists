@@ -13,6 +13,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -47,6 +48,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.BasicTextField
@@ -56,7 +58,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.DriveFileMove
+import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.MoreVert
@@ -124,6 +128,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -147,11 +152,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import androidx.lifecycle.Lifecycle
@@ -602,6 +611,25 @@ private fun ChecklistDetailContent(
         if (state.triggerFilePicker) filePicker.launch()
     }
 
+    // Item-create picker (ANY type). The callback dispatches only intents built from `result`, but on
+    // wasmJs a picker callback captures Compose state at composition time — wrap `onIntent` in
+    // rememberUpdatedState so a re-composed lambda is always seen (filepicker stale-closure trap).
+    val latestOnIntent by rememberUpdatedState(onIntent)
+    val itemCreatePicker = rememberFilePickerLauncher(type = FilePickerType.ANY) { result ->
+        latestOnIntent(ChecklistDetailIntent.OnItemCreatePickerLaunched)
+        if (result == null) return@rememberFilePickerLauncher
+        latestOnIntent(
+            ChecklistDetailIntent.OnItemCreateAttachmentPicked(
+                sourcePath = result.filePath,
+                fileName = result.fileName,
+                mimeType = result.mimeType,
+            )
+        )
+    }
+    LaunchedEffect(state.triggerItemCreatePicker) {
+        if (state.triggerItemCreatePicker) itemCreatePicker.launch()
+    }
+
     // ── Attachment: open-externally via AttachmentOpener ────────────────────────
     val attachmentOpener: com.antonchuraev.homesearchchecklist.core.common.api.AttachmentOpener = org.koin.compose.koinInject()
     val coroutineScope = rememberCoroutineScope()    // shared with reorder below
@@ -743,6 +771,24 @@ private fun ChecklistDetailContent(
         label = "wiggleAngle"
     )
 
+    // ── Item-create scrim state (shared by BOTH scrims) ──────────────────────────────────────────
+    // A single alpha drives two tiled scrims so the WHOLE screen dims in lockstep while item-create
+    // is active — the content scrim (inside the AppScaffold content, below the bright dock) and the
+    // top-bar scrim (a root sibling ABOVE the AppScaffold, so it can dim the app bar the scaffold owns).
+    // [contentTopPx] is the measured height of the top-bar zone (status bar + pinned app bar), captured
+    // from the content anchor's position in the root; the top scrim uses exactly it, so the two scrims
+    // tile edge-to-edge with no double-dark seam and no bright gap. Pinned app bar (pinnedScrollBehavior)
+    // → the height is stable, and onGloballyPositioned re-measures on any layout change regardless.
+    val scrimAlpha by animateFloatAsState(
+        targetValue = if (state.itemCreateMode) 0.5f else 0f,
+        animationSpec = tween(durationMillis = 220),
+        label = "item_create_scrim",
+    )
+    var contentTopPx by remember { mutableStateOf(0f) }
+
+    // Root Box wraps the AppScaffold so the top-bar scrim can be a sibling ABOVE the scaffold chrome.
+    // Bottom sheets / dialogs stay OUTSIDE this Box (below) so they are never dimmed and float on top.
+    Box(modifier = Modifier.fillMaxSize()) {
     AppScaffold(
         onBackButtonClick = {
             if (isEditMode) {
@@ -901,7 +947,14 @@ private fun ChecklistDetailContent(
                 Dp.Unspecified
             }
 
-            Box(modifier = Modifier.fillMaxSize()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    // Report where the scaffold content starts in the root (= status bar + top app bar
+                    // height). The top-bar scrim in the root Box uses this as its exact height so the two
+                    // scrims tile without a seam. Recomputes on any layout change (size-class flip etc.).
+                    .onGloballyPositioned { contentTopPx = it.positionInRoot().y },
+            ) {
               Box(
                   modifier = Modifier
                       .fillMaxSize()
@@ -1186,11 +1239,44 @@ private fun ChecklistDetailContent(
                 } // end when (state.checklist.viewMode)
               } // end hazeSource Box (live backdrop captured by the dock)
 
+              // Item-create CONTENT scrim — dims the list while item-create mode is active. A sibling
+              // drawn AFTER the list content but BEFORE the navbar strip + dock below: it covers the
+              // scrolling content, then the navbar strip and the dock draw ON TOP and stay bright (the
+              // nav strip is visually part of the dock — same gistiDockColor() — so it must NOT be dimmed;
+              // see the bottom-nav-must-match-dock fix). Being later in the Box, the dock also keeps its
+              // touch priority so the scrim never steals its taps. The TOP-BAR scrim (root Box, below)
+              // dims the app bar in lockstep via the shared [scrimAlpha]. Tapping the scrim collapses the
+              // dock to Peek → exits item-create via the settledValue==Peek gate above.
+              if (scrimAlpha > 0.001f) {
+                  Box(
+                      modifier = Modifier
+                          .matchParentSize()
+                          .background(Color.Black.copy(alpha = scrimAlpha))
+                          .then(
+                              if (state.itemCreateMode) {
+                                  Modifier.clickable(
+                                      interactionSource = remember { MutableInteractionSource() },
+                                      indication = null,
+                                  ) {
+                                      if (!dockState.offset.isNaN()) {
+                                          dockScope.launch { dockState.animateTo(DockAnchor.Peek) }
+                                      }
+                                  }
+                              } else {
+                                  // Fading out (mode already exited): non-interactive so it can't block taps.
+                                  Modifier
+                              },
+                          ),
+                  )
+              }
+
               // Nav-bar strip — same as MainScreen: paint the system navigation-bar zone with the dock's
               // own gistiDockColor() so the gesture/nav strip matches the dock instead of letting the
               // white page show through beneath it (the dock sits navbar-padded ABOVE this strip, owning
               // ime ∪ navigationBars, so the strip can't live inside the dock — it is a sibling filling
-              // exactly the navbar inset at the screen bottom). Only while the dock is shown.
+              // exactly the navbar inset at the screen bottom). Drawn AFTER the content scrim so it stays
+              // dock-white during item-create (the system-nav zone belongs to the dock, not the dimmed
+              // content). Only while the dock is shown.
               if (showDock) {
                   Box(
                       modifier = Modifier
@@ -1270,6 +1356,16 @@ private fun ChecklistDetailContent(
                                       onSend = { onIntent(ChecklistDetailIntent.OnAddItemWithParse) },
                                       canSend = state.pendingItemInput.isNotBlank(),
                                       chips = { ItemCreateChipsRow(state = state, onIntent = onIntent) },
+                                      onAttachClick = { onIntent(ChecklistDetailIntent.OnItemCreateAttachClick) },
+                                      attachmentStrip = {
+                                          ItemCreateAttachmentStrip(
+                                              pending = state.itemCreatePendingAttachments,
+                                              onRemove = { sp ->
+                                                  onIntent(ChecklistDetailIntent.OnRemoveItemCreatePendingAttachment(sp))
+                                              },
+                                          )
+                                      },
+                                      hasAttachments = state.itemCreatePendingAttachments.isNotEmpty(),
                                   )
                               } else {
                                   null
@@ -1281,6 +1377,36 @@ private fun ChecklistDetailContent(
             } // end anchor Box
         }
     }
+
+        // Top-bar scrim — the second tile, dimming the app-bar zone (status bar + pinned app bar) that
+        // the AppScaffold owns, in lockstep with the content scrim via the shared [scrimAlpha]. Its
+        // height is the measured [contentTopPx], so its bottom edge meets the content scrim's top edge
+        // exactly — no double-dark seam, no bright gap. Interactive only while item-create is active;
+        // a tap collapses the dock to Peek → exits item-create (same as tapping the content scrim).
+        if (scrimAlpha > 0.001f && contentTopPx > 0.5f) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .height(with(LocalDensity.current) { contentTopPx.toDp() })
+                    .background(Color.Black.copy(alpha = scrimAlpha))
+                    .then(
+                        if (state.itemCreateMode) {
+                            Modifier.clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                            ) {
+                                if (!dockState.offset.isNaN()) {
+                                    dockScope.launch { dockState.animateTo(DockAnchor.Peek) }
+                                }
+                            }
+                        } else {
+                            Modifier
+                        },
+                    ),
+            )
+        }
+    } // end root Box (item-create top-bar scrim lives here, above the AppScaffold chrome)
 
     // Item details sheet — opens when user taps the right 70% of a ChecklistItemCard
     val detailsItem = state.itemDetailsSheetFor?.let { id ->
@@ -3565,6 +3691,80 @@ private fun ItemCreateChipsRow(
                 }
             },
         )
+    }
+}
+
+/**
+ * Horizontal preview strip of files staged in item-create mode (BEFORE the item exists), rendered
+ * above the create input. Each 64dp tile shows the picked source directly (Coil loads raw picker
+ * URIs and opfs:// alike — the proven chat pattern) with a × button to unstage it. Images crop-fill;
+ * other types show a file icon. Renders nothing when [pending] is empty.
+ */
+@Composable
+private fun ItemCreateAttachmentStrip(
+    pending: List<PendingItemAttachment>,
+    onRemove: (sourcePath: String) -> Unit,
+) {
+    if (pending.isEmpty()) return
+    val tileShape = RoundedCornerShape(8.dp)
+    val removeLabel = stringResource(Res.string.item_create_remove_attachment)
+    LazyRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = AppDimens.ScreenPaddingHorizontal),
+        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
+        contentPadding = PaddingValues(vertical = AppDimens.SpacingXs),
+    ) {
+        items(pending, key = { it.sourcePath }) { att ->
+            Box(modifier = Modifier.size(64.dp)) {
+                Surface(
+                    shape = tileShape,
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    if (att.mimeType?.startsWith("image/") == true) {
+                        AsyncImage(
+                            model = att.sourcePath,
+                            contentDescription = att.fileName,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(tileShape),
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.InsertDriveFile,
+                                contentDescription = att.fileName,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(AppDimens.IconSizeMd),
+                            )
+                        }
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(2.dp)
+                        .size(20.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surface)
+                        .clickable { onRemove(att.sourcePath) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Close,
+                        contentDescription = removeLabel,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
+            }
+        }
     }
 }
 
