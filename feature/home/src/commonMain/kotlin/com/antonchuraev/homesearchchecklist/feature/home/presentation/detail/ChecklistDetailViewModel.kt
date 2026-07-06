@@ -759,6 +759,18 @@ class ChecklistDetailViewModel(
             is ChecklistDetailIntent.OnOpenAttachmentExternally -> handleOpenExternally(intent.attachmentId)
             ChecklistDetailIntent.OnImagePickerLaunched -> updateContentState { it.copy(triggerImagePicker = false) }
             ChecklistDetailIntent.OnFilePickerLaunched -> updateContentState { it.copy(triggerFilePicker = false) }
+
+            // Item-create attachments (staged before the item exists)
+            ChecklistDetailIntent.OnItemCreateAttachClick -> handleItemCreateAttachClick()
+            is ChecklistDetailIntent.OnItemCreateAttachmentPicked -> handleItemCreatePicked(intent)
+            ChecklistDetailIntent.OnItemCreatePickerLaunched ->
+                updateContentState { it.copy(triggerItemCreatePicker = false) }
+            is ChecklistDetailIntent.OnRemoveItemCreatePendingAttachment -> updateContentState { s ->
+                s.copy(
+                    itemCreatePendingAttachments =
+                        s.itemCreatePendingAttachments.filterNot { it.sourcePath == intent.sourcePath },
+                )
+            }
             ChecklistDetailIntent.OnOpenExternallyDispatched -> updateContentState {
                 it.copy(pendingOpenExternallyPath = null, pendingOpenExternallyMimeType = null)
             }
@@ -1232,6 +1244,9 @@ class ChecklistDetailViewModel(
                 itemCreateRepeatSheetOpen = false,
                 itemCreateRepeatSheetLocked = false,
                 customPickerForItemCreate = false,
+                // Drop any files staged but never sent, so they don't leak into the next create session.
+                itemCreatePendingAttachments = emptyList(),
+                triggerItemCreatePicker = false,
             )
         }
     }
@@ -1482,6 +1497,46 @@ class ChecklistDetailViewModel(
                 AnalyticsParams.ITEM_COUNT to updatedFill.items.size.toString(),
                 "has_smart_reminder" to hasReminder.toString()
             ))
+
+            // Write any item-create attachments onto the freshly created item. `state` is the snapshot
+            // captured at the top of addItemWithParse; each file goes through the proven
+            // store→size→probe→addAttachment path and the repository Flow refreshes state so the
+            // thumbnails appear on the new row. A file that fails to store or exceeds the size cap is
+            // dropped — but we surface the SAME snackbar the single-attachment path (handleAttachmentPicked)
+            // gives, so the drop is never silent (project rule: feedback on every user action).
+            val pending = state.itemCreatePendingAttachments
+            if (pending.isNotEmpty()) {
+                var anyTooLarge = false
+                var anyLoadError = false
+                pending.forEach { p ->
+                    when (materializeAttachment(
+                        fillId = fill.id,
+                        itemId = newFillItem.id,
+                        sourcePath = p.sourcePath,
+                        fileName = p.fileName,
+                        mimeType = p.mimeType,
+                    )) {
+                        AttachResult.OK -> Unit
+                        AttachResult.TOO_LARGE -> anyTooLarge = true
+                        AttachResult.LOAD_ERROR -> anyLoadError = true
+                    }
+                }
+                // Clear ONLY the files we just processed — item-create stays open for rapid multi-add
+                // (the attach button is still live), so a file staged DURING this async materialize must
+                // survive for the next item instead of being wiped by a blanket emptyList().
+                val processedPaths = pending.map { it.sourcePath }.toSet()
+                updateContentState {
+                    it.copy(
+                        itemCreatePendingAttachments =
+                            it.itemCreatePendingAttachments.filterNot { a -> a.sourcePath in processedPaths },
+                        snackbarMessage = when {
+                            anyTooLarge -> SNACKBAR_ATTACHMENT_TOO_LARGE
+                            anyLoadError -> SNACKBAR_ATTACHMENT_LOAD_ERROR
+                            else -> it.snackbarMessage
+                        },
+                    )
+                }
+            }
 
             isAddingItem = false
         }
@@ -3128,6 +3183,100 @@ class ChecklistDetailViewModel(
             updateContentState { it.copy(pendingAttachmentItemId = null) }
             // Repository emits a Flow update; combine() in loadData() picks up the new fill state.
         }
+
+    // ── Item-create attachments (staged before the item exists) ──────────────────
+
+    /**
+     * Attach button in the item-create dock. The quota is checked against the number of files ALREADY
+     * staged for the new item (mirrors [handleAddAttachment], which checks an existing item's count).
+     * Under the limit → set [ChecklistDetailState.Content.triggerItemCreatePicker] so the Composable
+     * launches the picker; at the limit → the premium-upgrade snackbar (never a silent no-op).
+     */
+    private fun handleItemCreateAttachClick() {
+        val content = _screenState.value as? ChecklistDetailState.Content ?: return
+        val limits = content.userLimits
+        val current = content.itemCreatePendingAttachments.size
+        val blocked = if (limits != null) {
+            !limits.canAddAttachment(current)
+        } else {
+            current >= FREE_ATTACHMENT_LIMIT_PER_ITEM
+        }
+        if (blocked) {
+            logger.warning(TAG, "itemCreate attach: blocked by limit (staged=$current)")
+            updateContentState { it.copy(snackbarMessage = SNACKBAR_ATTACHMENT_PREMIUM_LIMIT) }
+            return
+        }
+        updateContentState { it.copy(triggerItemCreatePicker = true) }
+    }
+
+    /**
+     * Stage a picked file for the not-yet-created item. The bytes are NOT stored here (there is no
+     * item/fill target yet) — the source path is held and materialized onto the new item in
+     * [addItemWithParse] after it is persisted.
+     */
+    private fun handleItemCreatePicked(intent: ChecklistDetailIntent.OnItemCreateAttachmentPicked) {
+        updateContentState {
+            it.copy(
+                itemCreatePendingAttachments = it.itemCreatePendingAttachments + PendingItemAttachment(
+                    sourcePath = intent.sourcePath,
+                    fileName = intent.fileName,
+                    mimeType = intent.mimeType,
+                ),
+            )
+        }
+    }
+
+    /**
+     * Stores a picked source file onto an existing item: copy into local storage → size guard →
+     * probe image dims → write via [ChecklistRepository.addAttachment] (its Flow refresh surfaces the
+     * thumbnail). Best-effort: returns false on any failure (logged), so a bad file never blocks the
+     * others. Shared by the item-create Send path.
+     */
+    /** Outcome of [materializeAttachment] so the item-create caller can surface the right snackbar
+     *  (matching the feedback the existing [handleAttachmentPicked] single-attachment path gives). */
+    private enum class AttachResult { OK, LOAD_ERROR, TOO_LARGE }
+
+    private suspend fun materializeAttachment(
+        fillId: Long,
+        itemId: String,
+        sourcePath: String,
+        fileName: String,
+        mimeType: String?,
+    ): AttachResult {
+        val attachmentId = Attachment.generateId()
+        val storedPath = attachmentStorage.storeAttachment(
+            sourcePath = sourcePath,
+            fillId = fillId,
+            itemId = itemId,
+            attachmentId = attachmentId,
+            originalFileName = fileName,
+        )
+        if (storedPath == null) {
+            logger.warning(TAG, "itemCreate: storeAttachment null for $fileName")
+            return AttachResult.LOAD_ERROR
+        }
+        val sizeBytes = attachmentStorage.sizeOf(storedPath)
+        if (sizeBytes > MAX_ATTACHMENT_SIZE_BYTES) {
+            logger.warning(TAG, "itemCreate: too large $sizeBytes for $fileName — deleting")
+            attachmentStorage.deleteAttachment(storedPath)
+            return AttachResult.TOO_LARGE
+        }
+        val (w, h) = attachmentStorage.probeImage(storedPath, mimeType)
+        repository.addAttachment(
+            fillId, itemId,
+            Attachment(
+                id = attachmentId,
+                path = storedPath,
+                fileName = fileName,
+                mimeType = mimeType,
+                sizeBytes = sizeBytes,
+                createdAt = currentTimeMillis(),
+                width = w,
+                height = h,
+            ),
+        )
+        return AttachResult.OK
+    }
 
     private fun handleOpenViewer(attachmentId: String) {
         val content = _screenState.value as? ChecklistDetailState.Content ?: return

@@ -399,6 +399,12 @@ enum class DockAnchor { Peek, Expanded }
  * @param canSend      True when the input is non-blank (Send disabled otherwise → no blank add).
  * @param chips        The selectable item-create chips (reminder presets + Important/Repeat),
  *                     rendered in the expanded frame above the input.
+ * @param onAttachClick     Fired when the attach button is tapped — opens the item-create file picker
+ *                          (the new item's attachments are staged until Send, then written to it).
+ * @param attachmentStrip   Pending-attachment thumbnail strip rendered ABOVE the input row (empty →
+ *                          renders nothing). Lets the user preview/remove files before the item exists.
+ * @param hasAttachments    True when at least one file is staged — drives the "…with attachment"
+ *                          placeholder hint on the input (item text is still required to Send).
  */
 class ChatDockItemCreateOverride(
     val text: String,
@@ -406,6 +412,9 @@ class ChatDockItemCreateOverride(
     val onSend: () -> Unit,
     val canSend: Boolean,
     val chips: @Composable () -> Unit,
+    val onAttachClick: () -> Unit,
+    val attachmentStrip: @Composable () -> Unit,
+    val hasAttachments: Boolean,
 )
 
 /**

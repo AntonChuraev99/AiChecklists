@@ -232,6 +232,7 @@
     <string name="item_create_chip_pick_time">Pick time…</string>
     <string name="item_create_chip_important">Important</string>
     <string name="item_create_chip_repeat">Repeat</string>
+    <string name="item_create_remove_attachment">Remove attachment</string>
     <string name="main_free_lists_used">%1$d of %2$d free lists used</string>
     <string name="main_menu">Menu</string>
     <string name="main_menu_support">Support</string>

@@ -354,6 +354,116 @@ class ChecklistDetailAttachmentsTest {
         assertEquals(existingAttachment.mimeType, state.pendingOpenExternallyMimeType)
     }
 
+    // ── Item-create attachments (staged before the item exists) ────────────────
+
+    @Test
+    fun addItem_withPendingAttachments_attachesToCreatedItem() = runTest {
+        attachmentStorage.storeResult = "/data/attachments/10/new/att.bin"
+        attachmentStorage.sizeResult = 400_000L
+        attachmentStorage.probeResult = 640 to 480
+        val vm = createViewModel()
+
+        // Type the new item's name and stage two files before it exists.
+        vm.onIntent(ChecklistDetailIntent.OnItemInputChanged("New task"))
+        vm.onIntent(
+            ChecklistDetailIntent.OnItemCreateAttachmentPicked(
+                sourcePath = "/tmp/a.jpg", fileName = "a.jpg", mimeType = "image/jpeg",
+            ),
+        )
+        vm.onIntent(
+            ChecklistDetailIntent.OnItemCreateAttachmentPicked(
+                sourcePath = "/tmp/b.pdf", fileName = "b.pdf", mimeType = "application/pdf",
+            ),
+        )
+        // Both files staged before Send.
+        assertEquals(2, contentState(vm).itemCreatePendingAttachments.size)
+
+        // Send creates the item and materializes the staged files onto it.
+        vm.onIntent(ChecklistDetailIntent.OnAddItemWithParse)
+
+        assertEquals(2, repository.addAttachmentCalls.size)
+        val newItemId = contentState(vm).defaultFill!!.items.last().id
+        repository.addAttachmentCalls.forEach { call ->
+            assertEquals(testFill.id, call.fillId)
+            assertEquals(newItemId, call.itemId)
+        }
+        assertEquals(
+            setOf("a.jpg", "b.pdf"),
+            repository.addAttachmentCalls.map { it.attachment.fileName }.toSet(),
+        )
+        // Staged list cleared after the successful create.
+        assertTrue(contentState(vm).itemCreatePendingAttachments.isEmpty())
+    }
+
+    @Test
+    fun addItem_withOversizePendingAttachment_dropsFileAndEmitsSnackbar() = runTest {
+        // Staged file stores fine but exceeds the 10 MB cap → materialize drops it (deletes the stored
+        // copy, no addAttachment) and the create path surfaces the too-large snackbar (never silent).
+        attachmentStorage.storeResult = "/data/attachments/10/new/big.bin"
+        attachmentStorage.sizeResult = ChecklistDetailViewModel.MAX_ATTACHMENT_SIZE_BYTES + 1L
+        val vm = createViewModel()
+
+        vm.onIntent(ChecklistDetailIntent.OnItemInputChanged("Big task"))
+        vm.onIntent(
+            ChecklistDetailIntent.OnItemCreateAttachmentPicked(
+                sourcePath = "/tmp/big.bin", fileName = "big.bin", mimeType = "application/octet-stream",
+            ),
+        )
+        vm.onIntent(ChecklistDetailIntent.OnAddItemWithParse)
+
+        val state = contentState(vm)
+        // The oversized attachment is dropped, not attached.
+        assertEquals(0, repository.addAttachmentCalls.size)
+        assertTrue(attachmentStorage.deletedPaths.contains("/data/attachments/10/new/big.bin"))
+        // The drop is surfaced (feedback on every user action), not silent.
+        assertEquals(ChecklistDetailViewModel.SNACKBAR_ATTACHMENT_TOO_LARGE, state.snackbarMessage)
+        // Processed file cleared from the staged list.
+        assertTrue(state.itemCreatePendingAttachments.isEmpty())
+    }
+
+    @Test
+    fun itemCreateAttach_overQuota_freeUser_blockedWithSnackbar() = runTest {
+        val vm = createViewModel(paywallRepository = FakePaywallRepository(SubscriptionStatus.FREE))
+
+        // Stage the free-tier limit (3) worth of files, then attempt one more.
+        repeat(ChecklistDetailViewModel.FREE_ATTACHMENT_LIMIT_PER_ITEM) { i ->
+            vm.onIntent(
+                ChecklistDetailIntent.OnItemCreateAttachmentPicked(
+                    sourcePath = "/tmp/f$i.jpg", fileName = "f$i.jpg", mimeType = "image/jpeg",
+                ),
+            )
+        }
+        vm.onIntent(ChecklistDetailIntent.OnItemCreateAttachClick)
+
+        val state = contentState(vm)
+        assertEquals(ChecklistDetailViewModel.SNACKBAR_ATTACHMENT_PREMIUM_LIMIT, state.snackbarMessage)
+        // Picker must NOT be triggered — the user should upgrade first.
+        assertTrue(!state.triggerItemCreatePicker)
+    }
+
+    @Test
+    fun removePendingAttachment_removesFromState() = runTest {
+        val vm = createViewModel()
+
+        vm.onIntent(
+            ChecklistDetailIntent.OnItemCreateAttachmentPicked(
+                sourcePath = "/tmp/a.jpg", fileName = "a.jpg", mimeType = "image/jpeg",
+            ),
+        )
+        vm.onIntent(
+            ChecklistDetailIntent.OnItemCreateAttachmentPicked(
+                sourcePath = "/tmp/b.pdf", fileName = "b.pdf", mimeType = "application/pdf",
+            ),
+        )
+        assertEquals(2, contentState(vm).itemCreatePendingAttachments.size)
+
+        vm.onIntent(ChecklistDetailIntent.OnRemoveItemCreatePendingAttachment("/tmp/a.jpg"))
+
+        val remaining = contentState(vm).itemCreatePendingAttachments
+        assertEquals(1, remaining.size)
+        assertEquals("/tmp/b.pdf", remaining.first().sourcePath)
+    }
+
     // ── Fakes ─────────────────────────────────────────────────────────────────
 
     /**
