@@ -134,6 +134,7 @@ All dependency versions live in `gradle/libs.versions.toml` — the single sourc
 |---|---|
 | `designsystem` | `core/designsystem/**`, `*Screen.kt` — colors, spacing, components, edge-to-edge insets |
 | `compose-resources-kmp` | `composeResources/**`, `build.gradle.kts`, `strings.xml` — androidResources opt-in, localization |
+| `gradle-compose-tooling-deps` | `**/build.gradle.kts` — ui-tooling/test deps must stay debug/test-only, not in release |
 | `ui-card-patterns` | `*Card*.kt`, `*ItemDetailsSheet*.kt`, `*Pager*.kt`, `feature/home/**` — hit-zone, pager, double-padding |
 | `adaptive-navigation` | `navigation/**`, `App.kt`, `*Navigator*.kt` — WindowSizeClass, Nav 3, adding destinations |
 | `credit-restore` | `*Purchase*.kt`, `*Credits*.kt`, `*Restore*.kt`, `*Paywall*.kt` — restore flow, Firestore |

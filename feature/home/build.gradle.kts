@@ -52,6 +52,10 @@ kotlin {
             implementation(compose.materialIconsExtended)
             implementation(compose.ui)
             implementation(compose.components.resources)
+            // @Preview / @PreviewLightDark annotations for MainScreenContentPreviews.kt.
+            // CMP-aligned annotation lib (maps to androidx.compose.ui:ui-tooling-preview on Android,
+            // which carries @PreviewLightDark). Lightweight, release-safe. Mirrors composeApp.
+            implementation(compose.components.uiToolingPreview)
 
             implementation(libs.androidx.lifecycle.runtimeCompose)
             implementation(libs.androidx.lifecycle.viewmodelCompose)
@@ -71,8 +75,6 @@ kotlin {
         }
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)
-            // ui-tooling provides @PreviewLightDark and other preview annotations for androidMain
-            implementation(libs.androidx.compose.ui.tooling)
         }
 
         // androidHostTest source set: JVM/Robolectric screenshot tests (Roborazzi) for the folder UI.
@@ -95,4 +97,12 @@ roborazzi {
     // Store golden PNGs under src/ so they are versioned alongside the test code.
     // Verify task compares against these files; record task writes them.
     outputDir.set(file("src/androidHostTest/roborazzi"))
+}
+
+// Compose UI tooling for Android debug builds only — restores interactive @Preview rendering in
+// Android Studio without shipping the tooling runtime to release. androidRuntimeClasspath is the
+// AGP9 replacement for debugImplementation(compose.uiTooling) in KMP library modules (mirrors
+// composeApp). Uses the CMP-version-aligned compose.uiTooling, NOT Google's androidx ui-tooling.
+dependencies {
+    add("androidRuntimeClasspath", compose.uiTooling)
 }

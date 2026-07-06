@@ -63,6 +63,7 @@ import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.TextFieldValue
@@ -279,10 +280,16 @@ fun ChatInputRow(
                 if (newValue.text != text) onTextChange(newValue.text)
             },
             placeholder = {
+                // Force the hint to a single line regardless of the field being multiline
+                // (singleLine=false / maxLines=4 below). Without this the wider RU string
+                // "Сообщение Gisti" wraps to 2 lines in the narrow weight(1f) slot. Ellipsis is a
+                // safety net only — the hint is short enough to fit; typed text still grows to 4 lines.
                 androidx.compose.material3.Text(
                     text = placeholder,
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             },
             singleLine = false,
