@@ -167,7 +167,9 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiC
 import androidx.compose.foundation.gestures.AnchoredDraggableState
 import androidx.compose.foundation.gestures.animateTo
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.DockAnchor
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.DockFullExpandState
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiGlassChatDock
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.rememberDockFullExpandState
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiDockColor
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiPromptChips
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiChecklistPromptChips
@@ -256,7 +258,9 @@ fun ChecklistDetailScreen(
      * The last arg is non-null only while the dock is in item-create mode (the "+" flow); null = the
      * default AI-chat dock, byte-for-byte unchanged. When [chatDockContent] is null the dock is hidden.
      */
-    chatDockContent: (@Composable (AnchoredDraggableState<DockAnchor>, String, Dp, @Composable () -> Unit, ChatDockItemCreateOverride?) -> Unit)? = null,
+    chatDockContent: (@Composable (AnchoredDraggableState<DockAnchor>, String, Dp, @Composable () -> Unit, ChatDockItemCreateOverride?, () -> Unit) -> Unit)? = null,
+    /** App-level FULL chat overlay content (the dock's third "floor"). Per-screen; see [ChecklistDetailContent]. */
+    chatFullContent: (@Composable (DockFullExpandState, Int) -> Unit)? = null,
     /**
      * Fires a contextual prompt-chip [GistiChecklistAction] for THIS checklist (chips above the
      * chat input). Called with (checklistId, checklistName, action) so App.kt can set the chat
@@ -294,6 +298,7 @@ fun ChecklistDetailScreen(
             chatInputBlank = chatInputBlank,
             routeCollapseSignal = routeCollapseSignal,
             chatDockContent = chatDockContent,
+            chatFullContent = chatFullContent,
             onChecklistQuickAction = onChecklistQuickAction?.let { cb ->
                 { action -> cb(currentState.checklist.id, currentState.checklist.name, action) }
             },
@@ -391,7 +396,8 @@ private fun ChecklistDetailContent(
     onChatCollapse: () -> Unit = {},
     chatInputBlank: Boolean = true,
     routeCollapseSignal: Int = 0,
-    chatDockContent: (@Composable (AnchoredDraggableState<DockAnchor>, String, Dp, @Composable () -> Unit, ChatDockItemCreateOverride?) -> Unit)? = null,
+    chatDockContent: (@Composable (AnchoredDraggableState<DockAnchor>, String, Dp, @Composable () -> Unit, ChatDockItemCreateOverride?, () -> Unit) -> Unit)? = null,
+    chatFullContent: (@Composable (DockFullExpandState, Int) -> Unit)? = null,
     onChecklistQuickAction: ((GistiChecklistAction) -> Unit)? = null,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
@@ -404,6 +410,10 @@ private fun ChecklistDetailContent(
 
     // ── Continuous-drag chat dock state (per-screen; never shared across two-pane panes) ──
     val dockState = remember { AnchoredDraggableState(initialValue = DockAnchor.Peek) }
+    // Per-screen FULL overlay state (the dock's third "floor") + the dock's live Expanded height (the
+    // overlay's collapsed start height). Full is a SEPARATE state — never a third dock anchor.
+    val fullState = rememberDockFullExpandState()
+    var dockExpandedHeightPx by remember { mutableStateOf(0) }
     val dockScope = rememberCoroutineScope()
     val dockExpanded by remember { derivedStateOf { dockState.targetValue == DockAnchor.Expanded } }
     val chatFocusManager = LocalFocusManager.current
@@ -456,10 +466,16 @@ private fun ChecklistDetailContent(
                     // gap. Idempotent with the settledValue exit (OnDockItemCreateClosed just clears state).
                     onIntent(ChecklistDetailIntent.OnDockItemCreateClosed)
                 }
-            // Chat: collapse only if the input is blank (a non-blank draft holds the dock open).
-            chatInputBlank && !dockState.offset.isNaN() ->
+            // Chat: BACK always collapses to Peek. A draft is preserved — the text lives in the chat
+            // input, which stays visible at Peek.
+            !dockState.offset.isNaN() ->
                 dockScope.launch { dockState.animateTo(DockAnchor.Peek) }
         }
+    }
+    // FULL overlay open → BACK collapses it back onto the expanded dock. Registered AFTER the dock
+    // handler above so it wins while both are enabled (full-open implies dock-expanded).
+    PlatformBackHandler(enabled = fullState.isOpen) {
+        dockScope.launch { fullState.close() }
     }
 
     // Diagnostic logger for the attachment add path (picker callbacks below). On web these go to
@@ -1221,7 +1237,11 @@ private fun ChecklistDetailContent(
                           // last items clear of the dock. (Previously the height was frozen at Peek to
                           // avoid a list reflow on open — but that trapped the last items under the
                           // open chat, which is the bug this fixes.)
-                          .onSizeChanged { dockHeightPx = it.height },
+                          .onSizeChanged {
+                              dockHeightPx = it.height
+                              // Live dock height → the full overlay's start height (grows out of the dock).
+                              dockExpandedHeightPx = it.height
+                          },
                       // The morphing chat content. Peek placeholder = contextual "Ask about <name>…";
                       // chips hosted INSIDE the morph (it fades + collapses them as the dock expands).
                       pillContent = {
@@ -1274,6 +1294,8 @@ private fun ChecklistDetailContent(
                               } else {
                                   null
                               },
+                              // ↗ / drag-up over Expanded → open the FULL overlay.
+                              { dockScope.launch { fullState.open() } },
                           )
                       },
                   )
@@ -1281,6 +1303,10 @@ private fun ChecklistDetailContent(
             } // end anchor Box
         }
     }
+
+    // FULL chat overlay — sibling of AppScaffold (covers the top bar; statusBarsPadding inside). Opaque,
+    // above the dock. Renders nothing until opened (its own reveal gate).
+    chatFullContent?.invoke(fullState, dockExpandedHeightPx)
 
     // Item details sheet — opens when user taps the right 70% of a ChecklistItemCard
     val detailsItem = state.itemDetailsSheetFor?.let { id ->

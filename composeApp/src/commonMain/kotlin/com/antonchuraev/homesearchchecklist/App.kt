@@ -41,6 +41,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -147,6 +148,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.com
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.AiChoiceResponse
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatFeedbackSheet
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatInputRow
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.ChatMessageList
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatMessageBubble
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatTypingIndicator
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatRecordingOverlay
@@ -154,7 +156,9 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Chat
 import androidx.compose.foundation.gestures.AnchoredDraggableState
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.ChatDockItemCreateOverride
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.DockAnchor
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.DockFullExpandState
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiExpandableDockContent
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiFullChatOverlay
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatAttachmentSourceSheet
 import com.antonchuraev.homesearchchecklist.core.filepicker.api.picker.FilePickerType
 import com.antonchuraev.homesearchchecklist.core.filepicker.api.picker.rememberFilePickerLauncher
@@ -165,6 +169,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
@@ -790,6 +795,10 @@ fun App() {
             // requester when the dock settles to Expanded — it has the exact drag state). App only
             // creates the shared requester and hands it to the input row.
             val chatInputFocusRequester = remember { FocusRequester() }
+            // Separate requester for the FULL overlay's own input node (the dock input still exists
+            // beneath the opaque overlay — a shared requester would let the two ChatInputRows fight
+            // over focus). The overlay clears focus on open/close instead of auto-raising the keyboard.
+            val chatFullInputFocusRequester = remember { FocusRequester() }
 
             // Sheet local state: recording timer, drag-cancel, attachment sheet flag
             var chatSheetDragCancel by remember { mutableStateOf(false) }
@@ -920,8 +929,8 @@ fun App() {
                 chatUiState.isProcessing ||
                 lastAssistantMessage != null
 
-            val chatDockContent: @Composable (AnchoredDraggableState<DockAnchor>, String, Dp, @Composable () -> Unit, ChatDockItemCreateOverride?) -> Unit =
-                { dockState, peekPlaceholder, dockAvailableDp, chips, itemCreateOverride ->
+            val chatDockContent: @Composable (AnchoredDraggableState<DockAnchor>, String, Dp, @Composable () -> Unit, ChatDockItemCreateOverride?, () -> Unit) -> Unit =
+                { dockState, peekPlaceholder, dockAvailableDp, chips, itemCreateOverride, onOpenFull ->
                     GistiExpandableDockContent(
                         state = dockState,
                         // Item-create mode hides the chat answer/greeting frame (it shows the item-create
@@ -930,8 +939,9 @@ fun App() {
                         hasLastAnswer = if (itemCreateOverride != null) false else hasLastAnswer,
                         // Answer cap height from the host (status bar → keyboard top); Unspecified = no kb.
                         dockAvailableDp = dockAvailableDp,
-                        // Banner ↗ → full chat route; the route change collapses the dock (signal).
-                        onExpandFull = { navigator.navigateToAiChat() },
+                        // ↗ (and drag-up over-scroll at Expanded) → open the in-place FULL overlay
+                        // (the per-screen third "floor"), NOT a navigation to the full chat route.
+                        onExpandFull = onOpenFull,
                         onHelpClick = { chatPanelHelpSheetOpen = true },
                         contextLabel = resolvedContextLabel,
                         // Chips hosted INSIDE the morph. Chat: the contextual peek chips (fade as the dock
@@ -1116,6 +1126,70 @@ fun App() {
                     )
                 }
 
+            // ── FULL chat overlay content (the expanded dock's third "floor") ──────────────────────
+            // Rendered by each screen ABOVE its dock (so it covers the top bar) with a per-screen
+            // DockFullExpandState. Same singleton ChatViewModel wiring as the dock, but chat-only (no
+            // item-create) and with its OWN input focus requester. The full scrollable history reuses
+            // ChatMessageList (extracted from ChatScreen) so it matches the full-screen chat exactly.
+            val chatFullContent: @Composable (DockFullExpandState, Int) -> Unit = { fullState, dockHeightPx ->
+                val fullListState = rememberLazyListState()
+                val fullFocusManager = LocalFocusManager.current
+                val fullTotalItemCount = chatUiState.messages.size +
+                    (if (chatUiState.pendingChoice != null) 1 else 0) +
+                    (if (chatUiState.isProcessing && chatUiState.pendingChoice == null) 1 else 0)
+                // Clear focus on open AND close so the keyboard never lingers over a hidden input node
+                // (the dock input beneath, or the full input after collapse). User taps to type.
+                LaunchedEffect(fullState.isOpen) { fullFocusManager.clearFocus() }
+                GistiFullChatOverlay(
+                    state = fullState,
+                    dockStartHeightPx = dockHeightPx,
+                    onCollapse = { scope.launch { fullState.close() } },
+                    historyContent = {
+                        ChatMessageList(
+                            state = chatUiState,
+                            onIntent = { chatViewModel.sendIntent(it) },
+                            listState = fullListState,
+                            showTodayDivider = false,
+                            totalItemCount = fullTotalItemCount,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    },
+                    inputContent = {
+                        // Hidden while a pending choice block is shown (chips are the only interaction),
+                        // mirroring the full ChatScreen.
+                        if (chatUiState.pendingChoice == null) {
+                            ChatInputRow(
+                                text = chatUiState.inputText,
+                                onTextChange = { chatViewModel.sendIntent(ChatScreenIntent.OnInputChange(it)) },
+                                onSend = { chatViewModel.sendIntent(ChatScreenIntent.OnSendClick) },
+                                onAttachFileClick = { chatSheetAttachmentSheet = true },
+                                onVoiceRecordingStarted = {
+                                    chatViewModel.sendIntent(ChatScreenIntent.OnVoiceRecordingStarted)
+                                    sheetAudioRecorder.start()
+                                },
+                                onVoiceRecordingStopped = { sheetAudioRecorder.stop() },
+                                onVoiceRecordingCancelled = { sheetAudioRecorder.cancel() },
+                                onHelpClick = { chatPanelHelpSheetOpen = true },
+                                hasAttachments = chatUiState.pendingAttachments.isNotEmpty(),
+                                isEnabled = !chatUiState.isProcessing,
+                                canSend = chatUiState.canSend,
+                                isRecording = chatUiState.isRecording,
+                                isTranscribing = chatUiState.isTranscribing,
+                                onDragCancelChanged = { chatSheetDragCancel = it },
+                                focusRequester = chatFullInputFocusRequester,
+                            )
+                        }
+                    },
+                    recordingOverlay = {
+                        ChatRecordingOverlay(
+                            isRecording = chatUiState.isRecording,
+                            durationMs = chatSheetRecordingMs,
+                            isDragCancel = chatSheetDragCancel,
+                        )
+                    },
+                )
+            }
+
             val renderNav: @Composable (DrawerState?) -> Unit = { drawerState ->
             NavDisplay(
                 backStack = navigator.backStack,
@@ -1155,6 +1229,8 @@ fun App() {
                                 onEditModeChange = { isEditMode = it },
                                 // Continuous-drag dock content (MainScreen owns its own drag state).
                                 chatDockContent = chatDockContent,
+                                // FULL overlay content (MainScreen owns its own per-screen full state).
+                                chatFullContent = chatFullContent,
                                 // When MainScreen's dock opens/closes → seed the home (null) chat context
                                 // + fire the open analytics (chatSheetOpen mirror drives those effects).
                                 onChatExpandedChanged = { expandedNow ->
@@ -1259,6 +1335,7 @@ fun App() {
                             },
                             onChatCollapse = { chatSheetOpen = false },
                             chatDockContent = chatDockContent,
+                            chatFullContent = chatFullContent,
                             chatInputBlank = chatUiState.inputText.isBlank(),
                             routeCollapseSignal = routeCollapseSignal,
                             onChecklistQuickAction = { checklistId, checklistName, action ->

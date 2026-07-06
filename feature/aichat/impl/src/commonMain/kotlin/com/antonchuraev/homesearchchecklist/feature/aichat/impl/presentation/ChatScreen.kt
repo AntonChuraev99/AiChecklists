@@ -283,34 +283,6 @@ fun ChatContent(
     onNavigateToPaywall: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
-    // Welcome bubble is a UI affordance, not data
-    val welcomeText = stringResource(Res.string.chat_assistant_welcome)
-    val welcomeBubble = remember(welcomeText) {
-        ChatMessage(
-            id = "__welcome",
-            role = ChatRole.Assistant,
-            content = welcomeText,
-            timestamp = 0L,
-        )
-    }
-
-    // IME scroll-anchor fix: re-run scrollToItem(0) when keyboard opens/closes so the
-    // reverseLayout list stays pinned to the bottom after viewport resize.
-    // MUST use imeBottom as a LaunchedEffect key — totalItemCount alone is insufficient.
-    val density = LocalDensity.current
-    val imeBottom = WindowInsets.ime.getBottom(density)
-    val hasInitializedScroll = remember { mutableStateOf(false) }
-    LaunchedEffect(totalItemCount, imeBottom) {
-        if (totalItemCount > 0) {
-            if (!hasInitializedScroll.value) {
-                listState.scrollToItem(0)
-                hasInitializedScroll.value = true
-            } else {
-                listState.animateScrollToItem(0)
-            }
-        }
-    }
-
     Column(
         modifier = modifier
             .imePadding(),
@@ -321,69 +293,17 @@ fun ChatContent(
             onWhyClick = { onIntent(ChatScreenIntent.OnHelpClick) },
         )
 
-        // Message list — occupies all remaining vertical space
-        LazyColumn(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .adaptiveContentWidth(),
-            state = listState,
-            reverseLayout = true,
-            contentPadding = PaddingValues(
-                horizontal = AppDimens.ScreenPaddingHorizontal,
-                vertical = AppDimens.SpacingMd,
-            ),
-            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd),
-        ) {
-            if (state.isProcessing && state.pendingChoice == null) {
-                item(key = "__typing") {
-                    ChatTypingIndicator()
-                }
-            }
-
-            state.pendingChoice?.let { pending ->
-                item(key = "choice_block") {
-                    AiChoiceResponse(
-                        pending = pending,
-                        onSelect = { id -> onIntent(ChatScreenIntent.OnChoiceSelected(id)) },
-                        onEditChange = { onIntent(ChatScreenIntent.OnChoiceEditChange(it)) },
-                        onEditConfirm = { onIntent(ChatScreenIntent.OnChoiceEditConfirmed) },
-                        modifier = Modifier.padding(bottom = AppDimens.SpacingSm),
-                    )
-                }
-            }
-
-            items(
-                items = state.messages.asReversed(),
-                key = { it.id },
-            ) { message ->
-                ChatMessageBubble(
-                    message = message,
-                    onFeedbackClick = { onIntent(ChatScreenIntent.OnFeedbackOpen(it)) },
-                    onThumbUpClick = { onIntent(ChatScreenIntent.OnThumbUpClick(it)) },
-                    onOpenChecklist = message.linkedChecklistId?.let { id ->
-                        { onIntent(ChatScreenIntent.OnOpenChecklist(id)) }
-                    },
-                    onAskAiFallback = message.askAiForText?.let { text ->
-                        { onIntent(ChatScreenIntent.OnAskAiFallback(text)) }
-                    },
-                    showSenderLabel = message.role == ChatRole.Assistant,
-                )
-            }
-
-            if (showTodayDivider) {
-                item(key = "__day_divider") {
-                    com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatDayDivider()
-                }
-            }
-
-            item(key = "__welcome") {
-                ChatMessageBubble(
-                    message = welcomeBubble,
-                    showSenderLabel = false,
-                )
-            }
-        }
+        // Message list — occupies all remaining vertical space. Extracted to [ChatMessageList] so the
+        // App-level FULL chat overlay renders the SAME scrollable history (reverseLayout + IME
+        // scroll-anchor fix + welcome bubble) without duplicating it.
+        ChatMessageList(
+            state = state,
+            onIntent = onIntent,
+            listState = listState,
+            showTodayDivider = showTodayDivider,
+            totalItemCount = totalItemCount,
+            modifier = Modifier.weight(1f),
+        )
 
         // Recording overlay — slides in from bottom when mic is active
         ChatRecordingOverlay(
@@ -424,6 +344,121 @@ fun ChatContent(
                 isRecording = state.isRecording,
                 isTranscribing = state.isTranscribing,
                 onDragCancelChanged = onDragCancelChanged,
+            )
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ChatMessageList — the reverseLayout scrollable message history.
+// Extracted from ChatContent so BOTH the full-screen ChatScreen and the App-level
+// FULL chat overlay (the expanded dock's third "floor") render the exact same list
+// (welcome bubble + typing indicator + pending-choice block + IME scroll-anchor fix).
+// The caller applies the fill/weight modifier; this owns the list's own scroll effect.
+// ---------------------------------------------------------------------------
+
+/**
+ * Reverse-layout scrollable chat history: typing indicator (top), optional pending-choice block,
+ * the messages (newest at the bottom), an optional "Today" divider and the welcome bubble.
+ *
+ * @param showTodayDivider Whether the most recent message is from today (caller computes it).
+ * @param totalItemCount   Message + choice + typing count — the IME scroll-anchor key.
+ */
+@Composable
+fun ChatMessageList(
+    state: ChatScreenState,
+    onIntent: (ChatScreenIntent) -> Unit,
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    showTodayDivider: Boolean,
+    totalItemCount: Int,
+    modifier: Modifier = Modifier,
+) {
+    // Welcome bubble is a UI affordance, not data
+    val welcomeText = stringResource(Res.string.chat_assistant_welcome)
+    val welcomeBubble = remember(welcomeText) {
+        ChatMessage(
+            id = "__welcome",
+            role = ChatRole.Assistant,
+            content = welcomeText,
+            timestamp = 0L,
+        )
+    }
+
+    // IME scroll-anchor fix: re-run scrollToItem(0) when keyboard opens/closes so the
+    // reverseLayout list stays pinned to the bottom after viewport resize.
+    // MUST use imeBottom as a LaunchedEffect key — totalItemCount alone is insufficient.
+    val density = LocalDensity.current
+    val imeBottom = WindowInsets.ime.getBottom(density)
+    val hasInitializedScroll = remember { mutableStateOf(false) }
+    LaunchedEffect(totalItemCount, imeBottom) {
+        if (totalItemCount > 0) {
+            if (!hasInitializedScroll.value) {
+                listState.scrollToItem(0)
+                hasInitializedScroll.value = true
+            } else {
+                listState.animateScrollToItem(0)
+            }
+        }
+    }
+
+    LazyColumn(
+        modifier = modifier
+            .fillMaxWidth()
+            .adaptiveContentWidth(),
+        state = listState,
+        reverseLayout = true,
+        contentPadding = PaddingValues(
+            horizontal = AppDimens.ScreenPaddingHorizontal,
+            vertical = AppDimens.SpacingMd,
+        ),
+        verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd),
+    ) {
+        if (state.isProcessing && state.pendingChoice == null) {
+            item(key = "__typing") {
+                ChatTypingIndicator()
+            }
+        }
+
+        state.pendingChoice?.let { pending ->
+            item(key = "choice_block") {
+                AiChoiceResponse(
+                    pending = pending,
+                    onSelect = { id -> onIntent(ChatScreenIntent.OnChoiceSelected(id)) },
+                    onEditChange = { onIntent(ChatScreenIntent.OnChoiceEditChange(it)) },
+                    onEditConfirm = { onIntent(ChatScreenIntent.OnChoiceEditConfirmed) },
+                    modifier = Modifier.padding(bottom = AppDimens.SpacingSm),
+                )
+            }
+        }
+
+        items(
+            items = state.messages.asReversed(),
+            key = { it.id },
+        ) { message ->
+            ChatMessageBubble(
+                message = message,
+                onFeedbackClick = { onIntent(ChatScreenIntent.OnFeedbackOpen(it)) },
+                onThumbUpClick = { onIntent(ChatScreenIntent.OnThumbUpClick(it)) },
+                onOpenChecklist = message.linkedChecklistId?.let { id ->
+                    { onIntent(ChatScreenIntent.OnOpenChecklist(id)) }
+                },
+                onAskAiFallback = message.askAiForText?.let { text ->
+                    { onIntent(ChatScreenIntent.OnAskAiFallback(text)) }
+                },
+                showSenderLabel = message.role == ChatRole.Assistant,
+            )
+        }
+
+        if (showTodayDivider) {
+            item(key = "__day_divider") {
+                com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatDayDivider()
+            }
+        }
+
+        item(key = "__welcome") {
+            ChatMessageBubble(
+                message = welcomeBubble,
+                showSenderLabel = false,
             )
         }
     }

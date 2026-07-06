@@ -13,6 +13,8 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.AnchoredDraggableDefaults
 import androidx.compose.foundation.gestures.AnchoredDraggableState
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.gestures.DraggableAnchors
@@ -65,6 +67,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalFocusManager
@@ -604,14 +609,44 @@ fun GistiExpandableDockContent(
         // proven-working configuration. ISSUE B: always enabled (no !chatFieldFocused gate) so the dock
         // can ALWAYS be collapsed — dragging down targets Peek, and the targetValue→Peek effect clears
         // focus to dismiss the keyboard. The handle is a thin full-width bar (easy to hit). ──
+        // ── FULL trigger wiring (additive; the Peek↔Expanded anchoredDraggable below is unchanged) ──
+        // The observe-only pointerInput adds the "3rd floor" drag-up gesture (drag the grabber UP while the
+        // dock is Expanded → open Full) without touching the dock's own drag. No separate button.
+        val openFullLatest by rememberUpdatedState(onExpandFull)
+        val fullOpenDragThresholdPx = with(density) { 48.dp.toPx() }
         DockGrabberHandle(
-            modifier = Modifier.anchoredDraggable(
-                state = state,
-                orientation = Orientation.Vertical,
-                enabled = true,
-                flingBehavior = fling,
-                interactionSource = grabberInteraction,
-            ),
+            modifier = Modifier
+                .anchoredDraggable(
+                    state = state,
+                    orientation = Orientation.Vertical,
+                    enabled = true,
+                    flingBehavior = fling,
+                    interactionSource = grabberInteraction,
+                )
+                // FULL open-on-over-drag. On the Initial pass and NEVER consuming, so the
+                // anchoredDraggable above is byte-for-byte unaffected: accumulate the vertical drag,
+                // and when the dock is SETTLED at Expanded and the finger drags UP past the threshold,
+                // open the Full overlay. (Up-drag at Expanded is a no-op for the dock — offset clamps at 0.)
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                        var accumY = 0f
+                        var fired = false
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                            if (!change.pressed) break
+                            accumY += change.positionChange().y
+                            if (!fired &&
+                                state.settledValue == DockAnchor.Expanded &&
+                                accumY <= -fullOpenDragThresholdPx
+                            ) {
+                                fired = true
+                                openFullLatest()
+                            }
+                        }
+                    }
+                },
         )
 
         // ── Reveal panel: banner + answer. Visible height = (full − offset), read INSIDE the layout
@@ -744,30 +779,62 @@ fun GistiExpandableDockContent(
 }
 
 /**
- * Height of the dock's grab handle — a thin, full-width 24dp bar with a small centered pill. The whole
- * bar is the drag/touch target (the caller puts [Modifier.anchoredDraggable] on it), so it stays a
- * compact visual the user liked while still being an easy full-width grab. A taller transparent overlay
- * was tried to enlarge the hit zone without added height, but Compose did not route drags to it — so the
- * gesture lives on this concrete handle instead. Also feeds [chromeFixed] so the answer cap stays right.
+ * Reported layout footprint of the dock's grab handle — a thin 24dp row. This value feeds the dock's
+ * anchor measurement + [chromeFixed], so it MUST stay 24dp even though the TOUCH target below is taller.
  */
 private val DockGrabberHeight = 24.dp
 
-/** The grabber handle. The drag gesture comes from the caller's [Modifier.anchoredDraggable] applied
- *  across this whole full-width [DockGrabberHeight] bar; the visible pill is the small centered bar. */
+/**
+ * Actual touch/drag height of the grabber — [DockGrabberHandle] measures its child at this height (so
+ * drags land across ~48dp) while reporting only [DockGrabberHeight] to the parent. This decouples the
+ * finger-friendly hit zone from the compact 24dp visual footprint the layout depends on.
+ */
+private val DockGrabberTouchHeight = 48.dp
+
+/**
+ * The grabber handle. Uses the **report-small / touch-big** technique: the outer box measures its child
+ * at [DockGrabberTouchHeight] (48dp) but reports only [DockGrabberHeight] (24dp) to the parent Column —
+ * so the dock's anchor/[chromeFixed] measurement is byte-for-byte unchanged while the drag/touch zone is
+ * a comfortable 48dp. The taller touch box is centered and NOT clipped, so touches in the transparent
+ * dock padding above/below the visible pill still reach the handle. A transparent SIBLING overlay was
+ * tried earlier to grow the hit zone and failed (Compose didn't route drags to it); measuring a bigger
+ * child of the SAME node does route them. The caller's [Modifier.anchoredDraggable] is applied to the
+ * inner 48dp box so the whole touch box drags the dock. Full-screen is opened by the up-drag detector on
+ * the caller's modifier (no separate button).
+ */
 @Composable
-private fun DockGrabberHandle(modifier: Modifier = Modifier) {
+private fun DockGrabberHandle(
+    modifier: Modifier = Modifier,
+) {
     Box(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxWidth()
-            .height(DockGrabberHeight),
-        contentAlignment = Alignment.Center,
+            .layout { measurable, constraints ->
+                val touchPx = DockGrabberTouchHeight.roundToPx()
+                val placeable = measurable.measure(
+                    constraints.copy(minHeight = touchPx, maxHeight = touchPx),
+                )
+                val reportPx = DockGrabberHeight.roundToPx()
+                layout(placeable.width, reportPx) {
+                    // Center the taller touch box within the 24dp report (overflows equally up/down).
+                    placeable.place(0, (reportPx - touchPx) / 2)
+                }
+            },
     ) {
+        // Inner 48dp box = the real drag/touch target (caller's anchoredDraggable + Full up-drag detector).
         Box(
-            modifier = Modifier
-                .width(36.dp)
-                .height(4.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)),
-        )
+            modifier = modifier
+                .fillMaxWidth()
+                .height(DockGrabberTouchHeight),
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(36.dp)
+                    .height(4.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)),
+            )
+        }
     }
 }

@@ -57,7 +57,9 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCreditsCh
 import com.antonchuraev.homesearchchecklist.desingsystem.components.PlatformBackHandler
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.ChatDockItemCreateOverride
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.DockAnchor
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.DockFullExpandState
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiGlassChatDock
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.rememberDockFullExpandState
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiPromptChips
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiQuickAction
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiDefaultPromptChips
@@ -115,7 +117,13 @@ fun MainScreen(
      * `chatDockContent(dockState, peekPlaceholder, chips)` — the screen owns the per-screen
      * [AnchoredDraggableState] (no shared draggable across two-pane panes). When null, dock hidden.
      */
-    chatDockContent: (@Composable (AnchoredDraggableState<DockAnchor>, String, Dp, @Composable () -> Unit, ChatDockItemCreateOverride?) -> Unit)? = null,
+    chatDockContent: (@Composable (AnchoredDraggableState<DockAnchor>, String, Dp, @Composable () -> Unit, ChatDockItemCreateOverride?, () -> Unit) -> Unit)? = null,
+    /**
+     * App-level FULL chat overlay content (the expanded dock's third "floor"). Rendered ABOVE the whole
+     * screen (covers the top bar) with this screen's own [DockFullExpandState] + the measured live dock
+     * height. When null the full overlay is unavailable. Per-screen — never shared across two-pane panes.
+     */
+    chatFullContent: (@Composable (DockFullExpandState, Int) -> Unit)? = null,
     /** True when the chat input is blank — drives BACK (collapse only when blank; else text holds open). */
     chatInputBlank: Boolean = true,
     /** Called when this screen's dock settles to / away from Expanded (App seeds context + analytics). */
@@ -153,6 +161,13 @@ fun MainScreen(
 
     // Per-screen drag state for the continuous chat dock (NOT shared across two-pane panes).
     val dockState = remember { AnchoredDraggableState(initialValue = DockAnchor.Peek) }
+    // Per-screen FULL overlay state (the dock's third "floor"). Separate from dockState — Full is NOT a
+    // third dock anchor (that would re-measure the dock's reveal panel and break keyboard-up Expanded).
+    val fullState = rememberDockFullExpandState()
+    // Live Expanded height of the dock (the full overlay's collapsed start height, so it grows out of
+    // the dock seamlessly). Measured continuously — does NOT drive the list's bottom padding (that stays
+    // frozen at the Peek height via dockHeightPx below).
+    var dockExpandedHeightPx by remember { mutableStateOf(0) }
     // Discrete "is the dock open" — targetValue flips at the drag midpoint, so reading it here
     // recomposes only on that flip (NOT per pixel; the pixel-level reveal is offset-driven in layout).
     val dockExpanded by remember { derivedStateOf { dockState.targetValue == DockAnchor.Expanded } }
@@ -235,14 +250,20 @@ fun MainScreen(
     PlatformBackHandler(enabled = drawerState?.isOpen != true && !dockExpanded) {
         // Intentionally no-op.
     }
-    // 3) Dock expanded: hide the keyboard, then collapse to peek ONLY if the input is blank (a
-    //    non-blank draft holds the dock open — the user keeps their text). Once collapsed handler
-    //    (2) takes over and swallows further BACKs.
+    // 3) Dock expanded: hide the keyboard and ALWAYS collapse to peek on BACK. A draft is NOT lost — the
+    //    text lives in the chat input, which stays visible at Peek. Once collapsed handler (2) takes over
+    //    and swallows further BACKs.
     PlatformBackHandler(enabled = dockExpanded) {
         focusManager.clearFocus()
-        if (chatInputBlank && !dockState.offset.isNaN()) {
+        if (!dockState.offset.isNaN()) {
             scope.launch { dockState.animateTo(DockAnchor.Peek) }
         }
+    }
+    // 4) FULL overlay open → BACK collapses it back onto the expanded dock. Registered AFTER (3) so it
+    //    wins while both are enabled (full-open implies dock-expanded). The dock stays Expanded beneath
+    //    (keepExpanded when there is content), so collapsing Full reveals the expanded chat again.
+    PlatformBackHandler(enabled = fullState.isOpen) {
+        scope.launch { fullState.close() }
     }
 
     LaunchedEffect(drawerState?.isOpen) {
@@ -456,6 +477,10 @@ fun MainScreen(
                                 // drag-up begins, so growth is not measured.
                                 .onSizeChanged {
                                     if (dockState.targetValue == DockAnchor.Peek) dockHeightPx = it.height
+                                    // Track the LIVE dock height too (used only as the full overlay's
+                                    // start height — it must NOT freeze at Peek, or Full would grow from
+                                    // the wrong origin). Does not affect the list's bottom padding.
+                                    dockExpandedHeightPx = it.height
                                 },
                             // The morphing chat content. Home peek placeholder = "Ask Gisti…"; chips are
                             // hosted INSIDE the morph (it fades + collapses them as the dock expands).
@@ -492,6 +517,8 @@ fun MainScreen(
                                     },
                                     // MainScreen never enters item-create mode → no override.
                                     null,
+                                    // ↗ / drag-up over Expanded → open the FULL overlay.
+                                    { scope.launch { fullState.open() } },
                                 )
                             },
                         )
@@ -500,4 +527,8 @@ fun MainScreen(
             }
         }
     }
+
+    // FULL chat overlay — sibling of AppScaffold so it covers the top bar (statusBarsPadding inside).
+    // Opaque; drawn above the dock. Renders nothing until opened (its own reveal gate).
+    chatFullContent?.invoke(fullState, dockExpandedHeightPx)
 }
