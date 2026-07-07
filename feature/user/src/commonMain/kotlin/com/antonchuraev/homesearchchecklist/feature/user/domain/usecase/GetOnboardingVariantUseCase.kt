@@ -20,7 +20,11 @@ class GetOnboardingVariantUseCase(
             RemoteConfigKeys.ONBOARDING,
             RemoteConfigDefaults.ONBOARDING
         )
-        val variant = when (raw) {
+        // Firebase A/B arm values are author-entered by hand in the Console. Normalize case and
+        // stray whitespace so a "Interactive" / " none " typo can't silently collapse the user
+        // into the DEFAULT (slides) control arm and starve the treatment to 0 assignments.
+        val normalized = raw.trim().lowercase()
+        val variant = when (normalized) {
             TYPE_INTERACTIVE -> OnboardingVariant.INTERACTIVE
             TYPE_NONE -> OnboardingVariant.NONE
             TYPE_AI_WELCOME -> {

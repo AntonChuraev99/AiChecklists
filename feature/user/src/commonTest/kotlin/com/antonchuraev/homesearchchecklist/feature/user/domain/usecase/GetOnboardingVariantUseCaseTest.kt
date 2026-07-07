@@ -67,6 +67,30 @@ class GetOnboardingVariantUseCaseTest {
         assertEquals(GetOnboardingVariantUseCase.OnboardingVariant.NONE, result)
     }
 
+    /**
+     * Firebase A/B arm values are author-entered by hand in the Console. A capitalized
+     * "Interactive" (or a value with stray whitespace) must NOT fall through to the DEFAULT
+     * (slides) control arm — that silently starves the interactive treatment to 0 users while
+     * the experiment reports as running. The parser must be case- and whitespace-insensitive.
+     */
+    @Test
+    fun invoke_mixedCaseInteractive_returnsInteractive() {
+        val useCase = createUseCase("Interactive")
+
+        val result = useCase()
+
+        assertEquals(GetOnboardingVariantUseCase.OnboardingVariant.INTERACTIVE, result)
+    }
+
+    @Test
+    fun invoke_paddedUppercaseNone_returnsNone() {
+        val useCase = createUseCase("  NONE  ")
+
+        val result = useCase()
+
+        assertEquals(GetOnboardingVariantUseCase.OnboardingVariant.NONE, result)
+    }
+
     @Test
     fun invoke_aiWelcomeValue_onAndroid_returnsAiWelcome() {
         val useCase = createUseCase("ai_welcome", isAndroid = true)
