@@ -99,6 +99,8 @@
     #nav-toggle { display: none; }
     .nav-panel { display: flex; align-items: center; gap: 28px; }
     .nav-burger { display: none; }
+    .nav-open-cta { white-space: nowrap; }
+    .nav-open-short { display: none; }
     @media (max-width: 860px) {
       .nav-panel { position: absolute; left: 0; right: 0; top: 100%; flex-direction: column; align-items: stretch;
         gap: 4px; padding: 12px 24px 20px; background: var(--surface); border-bottom: 1px solid var(--outline-variant);
@@ -107,6 +109,10 @@
       .nav-panel a { padding: 12px 8px; }
       .nav-burger { display: inline-flex; }
       .nav-desktop-cta { display: none; }
+      /* Compact primary CTA (short "Open" label) so it fits the bar beside the burger on small phones. */
+      .nav-open-cta { padding-inline: 14px; }
+      .nav-open-full { display: none; }
+      .nav-open-short { display: inline; }
     }
 
     /* Input-source chips (hero "anything in" card) */
@@ -148,18 +154,30 @@
         <span class="text-[20px] font-bold tracking-tight">Gisti</span>
       </a>
 
-      <input type="checkbox" id="nav-toggle" aria-hidden="true" />
-      <label for="nav-toggle" class="nav-burger btn-text btn h-10 px-2" aria-label="Toggle menu">
-        <span aria-hidden="true" class="material-symbols-outlined">menu</span>
-      </label>
+      <!-- Right cluster: collapsing nav + Log in (in burger on mobile) · always-visible primary · burger toggle.
+           #nav-toggle must precede .nav-panel as a sibling for the CSS-only (#nav-toggle:checked ~ .nav-panel) hack. -->
+      <div class="flex items-center gap-3">
+        <input type="checkbox" id="nav-toggle" aria-hidden="true" />
 
-      <nav class="nav-panel t-label-l">
-        <a href="#features" class="text-on-surface-variant hover:text-primary">Features</a>
-        <a href="#how" class="text-on-surface-variant hover:text-primary">How it works</a>
-        <a href="#pricing" class="text-on-surface-variant hover:text-primary">Pricing</a>
-        <a href="#faq" class="text-on-surface-variant hover:text-primary">FAQ</a>
-        <a href="#cta" class="btn btn-primary btn-pill h-10 px-5">Get Gisti free</a>
-      </nav>
+        <nav class="nav-panel t-label-l">
+          <a href="#features" class="text-on-surface-variant hover:text-primary">Features</a>
+          <a href="#how" class="text-on-surface-variant hover:text-primary">How it works</a>
+          <a href="#pricing" class="text-on-surface-variant hover:text-primary">Pricing</a>
+          <a href="#faq" class="text-on-surface-variant hover:text-primary">FAQ</a>
+          <a href="https://app.gisti-ai.com" class="btn btn-text h-10 px-4" aria-label="Log in to the Gisti web app">Log in</a>
+        </nav>
+
+        <!-- Primary conversion: open the web app. Stays visible in the bar on mobile too (outside .nav-panel). -->
+        <a href="https://app.gisti-ai.com" class="btn btn-primary btn-pill h-10 px-5 nav-open-cta" aria-label="Open the Gisti web app">
+          <span aria-hidden="true" class="material-symbols-outlined nav-open-icon" style="font-size:18px">public</span>
+          <span class="nav-open-full">Open web app</span>
+          <span class="nav-open-short">Open</span>
+        </a>
+
+        <label for="nav-toggle" class="nav-burger btn-text btn h-10 px-2" aria-label="Toggle menu">
+          <span aria-hidden="true" class="material-symbols-outlined">menu</span>
+        </label>
+      </div>
     </div>
   </header>
 
