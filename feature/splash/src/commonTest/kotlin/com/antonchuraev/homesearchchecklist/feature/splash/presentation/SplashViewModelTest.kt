@@ -374,6 +374,48 @@ class SplashViewModelTest {
         )
     }
 
+    /**
+     * Regression guard for the residual RC-delivery failure (~25% of first launches, 2026-07-07):
+     * the Firebase Installations token race can fail MORE than one cold-start fetch before it
+     * settles. A single retry (2 attempts total) gives up and forces the user onto the empty
+     * client default (slides) control arm, contaminating every RC-driven A/B. Up to 3 fast-only
+     * attempts recover the server variant. Here the fetch fails FAST twice then succeeds with
+     * server value "none" → the user must reach main, and all three attempts must be issued.
+     */
+    @Test
+    fun navigateTo_newUser_transientFetchFailsTwiceThenSucceeds_routesByServerVariant() = testScope.runTest {
+        val rc = FlakyFastFailRemoteConfig(
+            failuresBeforeSuccess = 2,
+            onboardingValueAfterSuccess = "none",
+        )
+        val nav = RecordingNavigator()
+
+        fakeUserData.nextRegistration = RegistrationData(
+            userData = UserData(userId = "new-uuid", isOnboardingPassed = false),
+            isNewUser = true,
+        )
+
+        createViewModel(
+            userId = "",
+            isOnboardingPassed = false,
+            remoteConfig = rc,
+            navigator = nav,
+        )
+
+        advanceUntilIdle()
+
+        assertEquals(
+            3,
+            rc.attempts,
+            "a fast-failing transient fetch must be retried up to 3 attempts before giving up",
+        )
+        assertEquals(
+            listOf("main"),
+            nav.routes,
+            "3rd attempt succeeds with server 'none' — must route to main, not fall back to slides",
+        )
+    }
+
     // ============================================================
     // First-checklist A/B experiment
     // ============================================================
@@ -858,6 +900,39 @@ class SplashViewModelTest {
         override fun getString(key: String, defaultValue: String): String {
             if (key != RemoteConfigKeys.ONBOARDING) return defaultValue
             return if (fetched) onboardingValueAfterFetch else defaultValue
+        }
+
+        override fun getBoolean(key: String, defaultValue: Boolean): Boolean = defaultValue
+        override fun getLong(key: String, defaultValue: Long): Long = defaultValue
+    }
+
+    /**
+     * Fails [failuresBeforeSuccess] fetch attempts FAST (no delay — mimics a Firebase
+     * Installations token race that rejects instantly), then activates on the next attempt.
+     * Exposes [attempts] so a test can assert how many retries the ViewModel issued.
+     */
+    private class FlakyFastFailRemoteConfig(
+        private val failuresBeforeSuccess: Int,
+        private val onboardingValueAfterSuccess: String,
+    ) : RemoteConfigProvider {
+
+        var attempts: Int = 0
+            private set
+        private var activated: Boolean = false
+
+        override suspend fun fetchAndActivate(): Boolean {
+            attempts++
+            return if (attempts > failuresBeforeSuccess) {
+                activated = true
+                true
+            } else {
+                false
+            }
+        }
+
+        override fun getString(key: String, defaultValue: String): String {
+            if (key != RemoteConfigKeys.ONBOARDING) return defaultValue
+            return if (activated) onboardingValueAfterSuccess else defaultValue
         }
 
         override fun getBoolean(key: String, defaultValue: Boolean): Boolean = defaultValue

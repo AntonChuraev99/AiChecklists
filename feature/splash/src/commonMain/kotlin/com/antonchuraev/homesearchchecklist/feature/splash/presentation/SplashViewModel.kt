@@ -32,6 +32,7 @@ import aichecklists.core.designsystem.generated.resources.first_checklist_item_4
 import aichecklists.core.designsystem.generated.resources.first_checklist_title
 import org.jetbrains.compose.resources.getString
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.time.measureTimedValue
@@ -142,33 +143,43 @@ class SplashViewModel(
     }
 
     /**
-     * Fetches + activates Remote Config for the onboarding gate, with ONE fast-only retry.
+     * Fetches + activates Remote Config for the onboarding gate, with up to
+     * [RC_MAX_FAST_ATTEMPTS] fast-only attempts.
      *
-     * ~28% of first launches fail fetchAndActivate() (prod analytics); the single biggest
-     * *transient* cause is "Firebase Installations failed to get installation auth token" — FIS
-     * registration races the very first fetch on a cold start and clears on a second call. We retry
-     * exactly once, but ONLY when the first attempt failed FAST: a slow failure means the SDK fetch
-     * timeout elapsed (offline / dead network), where a retry would just double the splash wait, so
-     * we skip it. This is NOT a UI timer — each attempt is bounded by the SDK's own
-     * setFetchTimeoutInSeconds; we merely re-issue a cheap, fast-failing call. Auth / API-key
-     * rejections also fail fast, so they get one more try at ~no cost and then proceed on defaults.
+     * ~25% of first launches still fail fetchAndActivate() (prod analytics, 2026-07-07); the single
+     * biggest *transient* cause is "Firebase Installations failed to get installation auth token" —
+     * FIS registration races the very first fetch on a cold start. It can need MORE than one retry
+     * to settle, so a single retry (the previous behavior) still gave up too early and forced the
+     * user onto the empty client default (slides), contaminating every RC-driven A/B. We now retry
+     * up to [RC_MAX_FAST_ATTEMPTS] times, with a small [RC_RETRY_BACKOFF_MS] backoff to let the FIS
+     * token propagate — but ONLY while each attempt fails FAST. A slow failure means the SDK fetch
+     * timeout elapsed (offline / dead network), where more attempts would just multiply the splash
+     * wait, so we stop at the first slow failure. This is NOT a UI timer — each attempt is bounded
+     * by the SDK's own setFetchTimeoutInSeconds; we merely re-issue cheap, fast-failing calls.
      * (The remaining bulk of failures are API-key / App Check authorization — a Cloud config fix,
      * not something any client retry can resolve.)
      *
      * @return (activated, totalFetchMillis)
      */
     private suspend fun fetchAndActivateWithFastRetry(): Pair<Boolean, Long> {
-        val (ok1, d1) = measureTimedValue {
-            runCatching { remoteConfigProvider.fetchAndActivate() }.getOrDefault(false)
+        var totalMs = 0L
+        repeat(RC_MAX_FAST_ATTEMPTS) { attempt ->
+            val (ok, d) = measureTimedValue {
+                runCatching { remoteConfigProvider.fetchAndActivate() }.getOrDefault(false)
+            }
+            val ms = d.inWholeMilliseconds
+            totalMs += ms
+            if (ok) return true to totalMs
+            // Slow failure → SDK fetch-timeout elapsed (offline / dead network). Retrying would
+            // only multiply the splash wait, so stop; only fast failures are worth re-issuing.
+            if (ms > RC_FAST_FAIL_CEILING_MS) return false to totalMs
+            if (attempt < RC_MAX_FAST_ATTEMPTS - 1) {
+                log("fetchAndActivate failed fast (${ms}ms) — transient retry ${attempt + 1}/${RC_MAX_FAST_ATTEMPTS - 1} (likely FIS token race)")
+                delay(RC_RETRY_BACKOFF_MS)
+                totalMs += RC_RETRY_BACKOFF_MS
+            }
         }
-        val ms1 = d1.inWholeMilliseconds
-        if (ok1 || ms1 > RC_FAST_FAIL_CEILING_MS) return ok1 to ms1
-
-        log("fetchAndActivate failed fast (${ms1}ms) — one transient retry (likely FIS token race)")
-        val (ok2, d2) = measureTimedValue {
-            runCatching { remoteConfigProvider.fetchAndActivate() }.getOrDefault(false)
-        }
-        return ok2 to (ms1 + d2.inWholeMilliseconds)
+        return false to totalMs
     }
 
     private fun navigateTo(
@@ -340,7 +351,15 @@ class SplashViewModel(
 
         // A fetchAndActivate() failure faster than this is treated as transient (Firebase
         // Installations token race / fast backend error), NOT the SDK fetch-timeout (offline) —
-        // only fast failures are retried once, so an offline first launch is never double-waited.
+        // only fast failures are retried, so an offline first launch is never multi-waited.
         private const val RC_FAST_FAIL_CEILING_MS = 3000L
+
+        // Total fast-only fetch attempts before proceeding on client defaults. The FIS token race
+        // can need more than one retry to settle on a cold start; 3 attempts recover it without a
+        // meaningful splash cost (each fast fail is sub-second and gated by RC_FAST_FAIL_CEILING_MS).
+        private const val RC_MAX_FAST_ATTEMPTS = 3
+
+        // Small backoff between fast retries to let the Firebase Installations token propagate.
+        private const val RC_RETRY_BACKOFF_MS = 200L
     }
 }
