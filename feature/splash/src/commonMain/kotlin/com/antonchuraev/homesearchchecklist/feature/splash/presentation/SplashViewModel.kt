@@ -35,6 +35,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.measureTimedValue
 
 class SplashViewModel(
@@ -165,14 +166,28 @@ class SplashViewModel(
         var totalMs = 0L
         repeat(RC_MAX_FAST_ATTEMPTS) { attempt ->
             val (ok, d) = measureTimedValue {
-                runCatching { remoteConfigProvider.fetchAndActivate() }.getOrDefault(false)
+                try {
+                    remoteConfigProvider.fetchAndActivate()
+                } catch (e: CancellationException) {
+                    // Never swallow cancellation — re-throwing keeps structured concurrency intact.
+                    // Prod logs showed JobCancellationException among RC failures: a runCatching that
+                    // ate it would keep retrying inside an already-cancelled scope.
+                    throw e
+                } catch (e: Throwable) {
+                    false
+                }
             }
             val ms = d.inWholeMilliseconds
             totalMs += ms
             if (ok) return true to totalMs
-            // Slow failure → SDK fetch-timeout elapsed (offline / dead network). Retrying would
-            // only multiply the splash wait, so stop; only fast failures are worth re-issuing.
-            if (ms > RC_FAST_FAIL_CEILING_MS) return false to totalMs
+            // Only re-issue FAST, genuinely-transient failures (the FIS installation-token race).
+            // Stop otherwise: a slow failure = SDK fetch-timeout (offline); a throttled fetch would
+            // just re-throttle; an authorization failure ("not authorized" / API-key / App Check) is
+            // a Cloud-config problem, never client-recoverable — prod data shows it is the single
+            // largest failure bucket, so retrying it only wastes splash time.
+            if (ms > RC_FAST_FAIL_CEILING_MS || !isTransientFetchError(remoteConfigProvider.lastFetchError())) {
+                return false to totalMs
+            }
             if (attempt < RC_MAX_FAST_ATTEMPTS - 1) {
                 log("fetchAndActivate failed fast (${ms}ms) — transient retry ${attempt + 1}/${RC_MAX_FAST_ATTEMPTS - 1} (likely FIS token race)")
                 delay(RC_RETRY_BACKOFF_MS)
@@ -180,6 +195,19 @@ class SplashViewModel(
             }
         }
         return false to totalMs
+    }
+
+    /**
+     * A fast RC fetch failure is worth retrying ONLY if it is a genuine transient (FIS token race).
+     * Authorization rejections (API-key restriction / App Check) and throttling are not
+     * client-recoverable and must not be re-issued. A null error with a false result (e.g. an empty
+     * activation) is treated as transient since a retry is cheap.
+     */
+    private fun isTransientFetchError(error: Throwable?): Boolean {
+        val message = error?.message?.lowercase() ?: return true
+        if ("not authorized" in message || "api key" in message) return false
+        if ("throttl" in message) return false
+        return true
     }
 
     private fun navigateTo(

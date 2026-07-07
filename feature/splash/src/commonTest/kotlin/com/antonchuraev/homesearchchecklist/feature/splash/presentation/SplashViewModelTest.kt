@@ -416,6 +416,44 @@ class SplashViewModelTest {
         )
     }
 
+    /**
+     * "not authorized" (API-key restriction / App Check) is the largest prod RC-failure bucket and
+     * is NOT client-recoverable — a Cloud config fix, not something a retry can resolve. It must be
+     * issued exactly once (no wasted splash time), then fall back to the client default.
+     */
+    @Test
+    fun navigateTo_newUser_authFailure_notRetried_fallsBackToClientDefault() = testScope.runTest {
+        val rc = FastFailWithErrorRemoteConfig(
+            errorMessage = "Fetch failed: The user is not authorized to access the project.",
+        )
+        val nav = RecordingNavigator()
+
+        fakeUserData.nextRegistration = RegistrationData(
+            userData = UserData(userId = "new-uuid", isOnboardingPassed = false),
+            isNewUser = true,
+        )
+
+        createViewModel(
+            userId = "",
+            isOnboardingPassed = false,
+            remoteConfig = rc,
+            navigator = nav,
+        )
+
+        advanceUntilIdle()
+
+        assertEquals(
+            1,
+            rc.attempts,
+            "a non-transient authorization failure must NOT be retried",
+        )
+        assertEquals(
+            listOf("onboarding"),
+            nav.routes,
+            "after the single failed fetch, fall back to the client default (slides)",
+        )
+    }
+
     // ============================================================
     // First-checklist A/B experiment
     // ============================================================
@@ -935,6 +973,28 @@ class SplashViewModelTest {
             return if (activated) onboardingValueAfterSuccess else defaultValue
         }
 
+        override fun getBoolean(key: String, defaultValue: Boolean): Boolean = defaultValue
+        override fun getLong(key: String, defaultValue: Long): Long = defaultValue
+    }
+
+    /**
+     * Always fails fast, reporting [errorMessage] via lastFetchError(). Used to verify that
+     * non-transient failures (authorization / throttle) are NOT retried.
+     */
+    private class FastFailWithErrorRemoteConfig(
+        private val errorMessage: String,
+    ) : RemoteConfigProvider {
+
+        var attempts: Int = 0
+            private set
+
+        override suspend fun fetchAndActivate(): Boolean {
+            attempts++
+            return false
+        }
+
+        override fun lastFetchError(): Throwable = RuntimeException(errorMessage)
+        override fun getString(key: String, defaultValue: String): String = defaultValue
         override fun getBoolean(key: String, defaultValue: Boolean): Boolean = defaultValue
         override fun getLong(key: String, defaultValue: Long): Long = defaultValue
     }
