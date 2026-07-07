@@ -5,5 +5,5 @@ import com.antonchuraev.homesearchchecklist.core.remoteconfig.impl.createRemoteC
 import org.koin.dsl.module
 
 val remoteConfigModule = module {
-    single<RemoteConfigProvider> { createRemoteConfigProvider() }
+    single<RemoteConfigProvider> { createRemoteConfigProvider(get()) }
 }

@@ -28,6 +28,9 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(projects.core.remoteconfig.api)
+            // AppLogger — injected into the platform provider factory so the Android FIS warm-up
+            // can report timeouts/failures through the shared logging pipeline.
+            implementation(projects.core.common.api)
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.bundles.koin.library)
         }
@@ -39,4 +42,7 @@ dependencies {
     // platform() BOM resolution is not available inside kotlin { sourceSets { } }.
     add("androidMainImplementation", platform(libs.firebase.bom))
     add("androidMainImplementation", libs.firebase.config)
+    // Firebase Installations — needed on the compile classpath to warm up the FIS auth token before
+    // the RC fetch (firebase-config exposes it only transitively via implementation). Version = BOM.
+    add("androidMainImplementation", libs.firebase.installations)
 }

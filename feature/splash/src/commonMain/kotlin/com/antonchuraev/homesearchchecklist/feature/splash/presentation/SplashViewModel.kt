@@ -89,6 +89,8 @@ class SplashViewModel(
             var rcActivated: Boolean? = null
             var rcFetchMs: Long? = null
             var rcError: String? = null
+            var rcAttempts: Int? = null
+            var rcRecoveredOnAttempt: Int? = null
             if (!userData.isOnboardingPassed) {
                 // Reactively await the real fetch — NO fixed timeout cap. fetchAndActivate()
                 // suspends exactly until the fetch completes: fast network ~1s, slow cold-start
@@ -99,12 +101,14 @@ class SplashViewModel(
                 // onboarding variant silently fell back to the empty client default (slides) —
                 // collapsing the live split to 0% "none" in production while emulators (instant
                 // fetch) looked fine.
-                val (activated, fetchMs) = fetchAndActivateWithFastRetry()
-                rcActivated = activated
-                rcFetchMs = fetchMs
+                val rc = fetchAndActivateWithFastRetry()
+                rcActivated = rc.activated
+                rcFetchMs = rc.totalMs
+                rcAttempts = rc.attempts
+                rcRecoveredOnAttempt = rc.recoveredOnAttempt
                 val fetchError = remoteConfigProvider.lastFetchError()
                 rcError = fetchError?.let { "${it::class.simpleName}: ${it.message}" }
-                if (!activated) {
+                if (!rc.activated) {
                     // Not swallowed anymore: record the real exception so a prod-only signing /
                     // App Check fetch rejection lands in Crashlytics AND in the
                     // onboarding_rc_resolved.rc_error analytics param. Reproducible on the Play
@@ -115,7 +119,7 @@ class SplashViewModel(
                         fetchError,
                     )
                 }
-                log("fetchAndActivate (onboarding pending) activated=$activated took ${fetchMs}ms, hasUserId=${userData.userId.isNotBlank()}")
+                log("fetchAndActivate (onboarding pending) activated=${rc.activated} took ${rc.totalMs}ms, attempts=${rc.attempts}, recoveredOnAttempt=${rc.recoveredOnAttempt}, hasUserId=${userData.userId.isNotBlank()}")
             }
 
             // First-checklist A/B experiment: cohort attribution (all users) + auto-create
@@ -124,7 +128,7 @@ class SplashViewModel(
             // already carries the `first_checklist_variant` user property.
             applyFirstChecklistExperiment(userData, isNewUser)
 
-            navigateTo(userData.isOnboardingPassed, rcActivated, rcFetchMs, rcError)
+            navigateTo(userData.isOnboardingPassed, rcActivated, rcFetchMs, rcError, rcAttempts, rcRecoveredOnAttempt)
         }
     }
 
@@ -160,9 +164,11 @@ class SplashViewModel(
      * (The remaining bulk of failures are API-key / App Check authorization — a Cloud config fix,
      * not something any client retry can resolve.)
      *
-     * @return (activated, totalFetchMillis)
+     * @return an [RcFetchResult] carrying activation success, total fetch millis, how many attempts
+     *   were issued, and which attempt recovered (1-based; 0 = never) — the last two feed the
+     *   onboarding_rc_resolved telemetry so the next release can measure warm-up + retry recovery.
      */
-    private suspend fun fetchAndActivateWithFastRetry(): Pair<Boolean, Long> {
+    private suspend fun fetchAndActivateWithFastRetry(): RcFetchResult {
         var totalMs = 0L
         repeat(RC_MAX_FAST_ATTEMPTS) { attempt ->
             val (ok, d) = measureTimedValue {
@@ -179,14 +185,27 @@ class SplashViewModel(
             }
             val ms = d.inWholeMilliseconds
             totalMs += ms
-            if (ok) return true to totalMs
+            val attemptsSoFar = attempt + 1
+            if (ok) {
+                return RcFetchResult(
+                    activated = true,
+                    totalMs = totalMs,
+                    attempts = attemptsSoFar,
+                    recoveredOnAttempt = attemptsSoFar,
+                )
+            }
             // Only re-issue FAST, genuinely-transient failures (the FIS installation-token race).
             // Stop otherwise: a slow failure = SDK fetch-timeout (offline); a throttled fetch would
             // just re-throttle; an authorization failure ("not authorized" / API-key / App Check) is
             // a Cloud-config problem, never client-recoverable — prod data shows it is the single
             // largest failure bucket, so retrying it only wastes splash time.
             if (ms > RC_FAST_FAIL_CEILING_MS || !isTransientFetchError(remoteConfigProvider.lastFetchError())) {
-                return false to totalMs
+                return RcFetchResult(
+                    activated = false,
+                    totalMs = totalMs,
+                    attempts = attemptsSoFar,
+                    recoveredOnAttempt = 0,
+                )
             }
             if (attempt < RC_MAX_FAST_ATTEMPTS - 1) {
                 log("fetchAndActivate failed fast (${ms}ms) — transient retry ${attempt + 1}/${RC_MAX_FAST_ATTEMPTS - 1} (likely FIS token race)")
@@ -194,8 +213,28 @@ class SplashViewModel(
                 totalMs += RC_RETRY_BACKOFF_MS
             }
         }
-        return false to totalMs
+        return RcFetchResult(
+            activated = false,
+            totalMs = totalMs,
+            attempts = RC_MAX_FAST_ATTEMPTS,
+            recoveredOnAttempt = 0,
+        )
     }
+
+    /**
+     * Outcome of [fetchAndActivateWithFastRetry].
+     *
+     * @property activated did fetchAndActivate() ultimately succeed
+     * @property totalMs total time spent across all attempts + backoffs
+     * @property attempts how many fetch attempts were issued (1-based)
+     * @property recoveredOnAttempt 1-based index of the attempt that succeeded, or 0 if it never did
+     */
+    private data class RcFetchResult(
+        val activated: Boolean,
+        val totalMs: Long,
+        val attempts: Int,
+        val recoveredOnAttempt: Int,
+    )
 
     /**
      * A fast RC fetch failure is worth retrying ONLY if it is a genuine transient (FIS token race).
@@ -215,6 +254,8 @@ class SplashViewModel(
         rcActivated: Boolean? = null,
         rcFetchMs: Long? = null,
         rcError: String? = null,
+        rcAttempts: Int? = null,
+        rcRecoveredOnAttempt: Int? = null,
     ) {
         try {
             with(appNavigator) {
@@ -243,6 +284,8 @@ class SplashViewModel(
                             rcActivated?.let { put(AnalyticsParams.RC_ACTIVATED, it) }
                             rcFetchMs?.let { put(AnalyticsParams.FETCH_MS, it) }
                             rcError?.let { put(AnalyticsParams.RC_ERROR, it) }
+                            rcAttempts?.let { put(AnalyticsParams.RC_ATTEMPTS, it) }
+                            rcRecoveredOnAttempt?.let { put(AnalyticsParams.RC_RECOVERED_ON_ATTEMPT, it) }
                         },
                     )
                     when (variant) {

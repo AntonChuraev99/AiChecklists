@@ -380,6 +380,12 @@ object AnalyticsParams {
     const val FETCH_MS = "fetch_ms"
     // Exception class + message when fetchAndActivate() fails (prod-only signing/App Check fetch failure)
     const val RC_ERROR = "rc_error"
+    // How many fetchAndActivate() attempts the fast-retry loop issued (1-based total), and which
+    // attempt finally succeeded (1-based index; 0 = never recovered). Together they MEASURE whether
+    // the FIS warm-up + fast retry actually recovers the cold-start installation-token race — the
+    // ~26% FIS slice of empty-onboarding first launches (2026-07-07).
+    const val RC_ATTEMPTS = "rc_attempts"
+    const val RC_RECOVERED_ON_ATTEMPT = "recovered_on_attempt"
 
     // Activation bundle — which hero template chip was tapped (e.g. "trip", "groceries").
     const val CHIP_KEY = "chip_key"

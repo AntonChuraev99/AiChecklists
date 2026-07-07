@@ -2,6 +2,7 @@
 
 package com.antonchuraev.homesearchchecklist.core.remoteconfig.impl
 
+import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
 import kotlin.js.Promise
 import kotlinx.coroutines.await
@@ -67,5 +68,8 @@ private class WasmFirebaseRemoteConfigProvider : RemoteConfigProvider {
         }
 }
 
-/** Creates the wasmJs Firebase Remote Config provider backed by init.js globalThis bridges. */
-actual fun createRemoteConfigProvider(): RemoteConfigProvider = WasmFirebaseRemoteConfigProvider()
+/**
+ * Creates the wasmJs Firebase Remote Config provider backed by init.js globalThis bridges.
+ * logger is unused here (JS bridge logs to console); accepted to satisfy the common expect signature.
+ */
+actual fun createRemoteConfigProvider(logger: AppLogger): RemoteConfigProvider = WasmFirebaseRemoteConfigProvider()

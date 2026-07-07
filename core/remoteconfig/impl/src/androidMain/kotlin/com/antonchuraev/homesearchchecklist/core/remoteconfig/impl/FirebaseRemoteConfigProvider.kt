@@ -1,16 +1,22 @@
 package com.antonchuraev.homesearchchecklist.core.remoteconfig.impl
 
+import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDefaults
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigKeys
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
+import com.google.firebase.installations.FirebaseInstallations
 import com.google.firebase.remoteconfig.FirebaseRemoteConfig
 import com.google.firebase.remoteconfig.FirebaseRemoteConfigSettings
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * Android implementation using Firebase Remote Config.
  */
-class FirebaseRemoteConfigProvider : RemoteConfigProvider {
+class FirebaseRemoteConfigProvider(
+    private val logger: AppLogger,
+) : RemoteConfigProvider {
 
     private val remoteConfig: FirebaseRemoteConfig = FirebaseRemoteConfig.getInstance()
 
@@ -63,6 +69,13 @@ class FirebaseRemoteConfigProvider : RemoteConfigProvider {
     override fun lastFetchError(): Throwable? = lastError
 
     override suspend fun fetchAndActivate(): Boolean {
+        // Warm up Firebase Installations FIRST so the RC fetch has a valid installation auth token.
+        // ~26% of empty-onboarding first launches (prod, 2026-07-07) failed with "Firebase
+        // Installations failed to get installation auth token for fetch" — FIS registration races
+        // the very first cold-start fetch. Awaiting the id here forces registration to settle before
+        // the fetch below. Non-fatal by design (see warmUpInstallations): on any timeout/error we
+        // still proceed to the fetch, so this can never make first launch worse than today.
+        warmUpInstallations()
         return try {
             remoteConfig.fetchAndActivate().await().also { lastError = null }
         } catch (e: Exception) {
@@ -72,6 +85,41 @@ class FirebaseRemoteConfigProvider : RemoteConfigProvider {
             // A/B silently collapses to the empty client default (always "slides").
             lastError = e
             false
+        }
+    }
+
+    /**
+     * Awaits the Firebase Installations id to force installation registration BEFORE the RC fetch,
+     * eliminating the FIS-token race that empties the onboarding RC value on cold start.
+     *
+     * Strictly best-effort:
+     *  - Bounded by [FIS_WARMUP_TIMEOUT_MS] via [withTimeoutOrNull] so a broken / absent-GMS device
+     *    (custom ROM, degraded Play Services) can never hang splash — on timeout the id is null and
+     *    we proceed to the fetch anyway.
+     *  - Any non-cancellation exception is logged as a warning and swallowed (proceed to fetch).
+     *  - [CancellationException] is re-thrown to keep structured concurrency intact.
+     *
+     * FIS caches the id after the first success, so this only costs latency on the genuine cold
+     * start — exactly where the race lives.
+     */
+    private suspend fun warmUpInstallations() {
+        try {
+            val id = withTimeoutOrNull(FIS_WARMUP_TIMEOUT_MS) {
+                FirebaseInstallations.getInstance().id.await()
+            }
+            if (id == null) {
+                logger.warning(
+                    TAG,
+                    "FIS warm-up timed out after ${FIS_WARMUP_TIMEOUT_MS}ms — proceeding to RC fetch without a confirmed installation token",
+                )
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            logger.warning(
+                TAG,
+                "FIS warm-up failed (${e::class.simpleName}: ${e.message}) — proceeding to RC fetch anyway",
+            )
         }
     }
 
@@ -101,5 +149,14 @@ class FirebaseRemoteConfigProvider : RemoteConfigProvider {
         } catch (e: Exception) {
             defaultValue
         }
+    }
+
+    companion object {
+        private const val TAG = "RemoteConfig"
+
+        // Upper bound on the FIS warm-up. On a healthy device the cached/registered id returns in
+        // well under a second; this ceiling only guards a broken/absent-GMS device from stalling
+        // splash. On timeout we proceed to the fetch anyway (best-effort, never fatal).
+        private const val FIS_WARMUP_TIMEOUT_MS = 5_000L
     }
 }
