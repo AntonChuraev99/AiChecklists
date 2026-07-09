@@ -38,6 +38,7 @@ from flask import request as flask_request  # global request context for CORS or
 
 import cors  # local module: CORS origin whitelist (unit-testable without firebase_admin)
 from generated_items import MAX_FOLDER_DEPTH, sanitize_generated_items  # nested AI-item sanitizer (unit-testable)
+from credits_logic import reservation_decision  # local module: reserve-credits branch (unit-testable)
 import push_promotions  # local module: promo-push audience filter / copy A/B / payload (unit-testable)
 
 # Module logger — replaces bare print(); logger.exception() in except blocks emits the
@@ -632,40 +633,69 @@ def get_user_premium_status(user_id: str) -> bool:
     return user_data.get("is_premium", False)
 
 
-def reserve_credits(user_id: str) -> int | None:
+def reserve_credits(user_id: str, request_id: str | None = None) -> int | None:
     """
     Atomically check and deduct credits in a single Firestore transaction.
     Returns new remaining count, or None if insufficient credits.
+
+    When [request_id] is provided (client-generated UUID, stable across HTTP retries of
+    the same logical action), the reservation is idempotent: a repeat of the same
+    request_id does NOT deduct again — it returns the balance recorded at first reserve.
+    This closes the double-charge window where the client retries a transport exception
+    AFTER the server already reserved + returned 200 but the client never received it.
+    Old clients omit request_id → falls back to the original non-deduped behaviour.
     """
     config = get_credits_config()
     cost = config["action_cost"]
     user_ref = db.collection("users").document(user_id)
+    # Namespace the dedup doc by user so two users' request_ids can never collide. request_id
+    # is a UUID from the client (no "/"), safe as a Firestore doc id.
+    res_ref = (
+        db.collection("credit_reservations").document(f"{user_id}__{request_id}")
+        if request_id else None
+    )
 
     @firestore.transactional
     def txn(transaction):
+        # All reads MUST precede all writes inside a Firestore transaction.
         snapshot = user_ref.get(transaction=transaction)
-        if not snapshot.exists:
-            return None
-        current = snapshot.get("ai_credits") or 0
-        if current < cost:
-            return None
-        new_count = current - cost
-        transaction.update(user_ref, {
-            "ai_credits": new_count,
-            "updated_at": datetime.now(timezone.utc).isoformat()
-        })
-        return new_count
+        res_snap = res_ref.get(transaction=transaction) if res_ref is not None else None
+        current = (snapshot.get("ai_credits") or 0) if snapshot.exists else 0
+        prior_remaining = res_snap.get("remaining_after") if (res_snap is not None and res_snap.exists) else None
+
+        action, value = reservation_decision(snapshot.exists, current, cost, prior_remaining)
+        if action != "reserve":
+            return value  # no_user/insufficient -> None; replay -> recorded remaining
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+        transaction.update(user_ref, {"ai_credits": value, "updated_at": now_iso})
+        if res_ref is not None:
+            transaction.set(res_ref, {
+                "user_id": user_id,
+                "request_id": request_id,
+                "cost": cost,
+                "remaining_after": value,
+                "reserved_at": now_iso,
+            })
+        return value
 
     return txn(db.transaction())
 
 
-def refund_credits(user_id: str, amount: int, reason: str) -> bool:
+def refund_credits(user_id: str, amount: int, reason: str, request_id: str | None = None) -> bool:
     """Refund `amount` credits previously reserved (inverse of reserve_credits).
 
     Called when a downstream step fails AFTER credits were already reserved
     (rejected input caught before reserve does NOT reach here). Increments the
     balance in a single Firestore transaction and logs to credits_refund_log
     for audit.
+
+    When [request_id] is given, the matching credit_reservations doc is DELETED on a
+    successful refund so reserve/refund stay symmetric on the idempotency key: a
+    subsequent retry (e.g. retryOnServerErrors after a Gemini 5xx that we just refunded)
+    re-reserves cleanly instead of replaying the now-rolled-back reservation. If the
+    refund did NOT apply, the reservation is kept so a retry replays (user stays charged
+    exactly once and still gets a result) rather than being charged a second time.
 
     Best-effort: any failure here is swallowed so the ORIGINAL error (the reason
     we are refunding in the first place) is what surfaces to the client.
@@ -688,6 +718,16 @@ def refund_credits(user_id: str, amount: int, reason: str) -> bool:
     try:
         ok = txn(db.transaction())
         if ok:
+            # Roll back the idempotency marker so a retry re-reserves (single charge) rather
+            # than replaying a reservation whose credits we just returned (would be a free action).
+            if request_id:
+                try:
+                    db.collection("credit_reservations").document(f"{user_id}__{request_id}").delete()
+                except Exception:
+                    logger.exception(
+                        "refund_credits: reservation-doc delete failed user=%s request_id=%s",
+                        user_id[:8], request_id,
+                    )
             try:
                 db.collection("credits_refund_log").add({
                     "user_id": user_id,
@@ -696,9 +736,26 @@ def refund_credits(user_id: str, amount: int, reason: str) -> bool:
                     "refunded_at": datetime.now(timezone.utc).isoformat(),
                 })
             except Exception:
-                pass
+                # Refund itself applied; only the audit-log write failed. Non-fatal, but log it
+                # so the audit trail's gaps are visible instead of silent.
+                logger.exception(
+                    "refund_credits: audit-log write failed user=%s reason=%s amount=%s",
+                    user_id[:8], reason, amount,
+                )
+        else:
+            # User doc missing -> refund could NOT be applied: the user stays wrongly charged.
+            logger.error(
+                "refund_credits: user doc missing, refund NOT applied user=%s reason=%s amount=%s",
+                user_id[:8], reason, amount,
+            )
         return ok
     except Exception:
+        # Firestore txn failed -> the one path where a user is wrongly charged with zero
+        # telemetry. Surface it (was a silent `return False`).
+        logger.exception(
+            "refund_credits: txn failed, refund NOT applied user=%s reason=%s amount=%s",
+            user_id[:8], reason, amount,
+        )
         return False
 
 
@@ -1179,6 +1236,9 @@ def analyze_and_fill_checklist(request: Request):
     checklist = data.get("checklist")
     input_type = data.get("input_type")
     input_data = data.get("input_data")
+    # Idempotency key: client sends a stable UUID per logical AI action (reused across HTTP
+    # retries). Absent on old clients -> None -> non-deduped fallback. See reserve_credits.
+    request_id = (data.get("request_id") or "").strip() or None
 
     # Validate required fields
     if not checklist or not isinstance(checklist.get("items"), list):
@@ -1204,7 +1264,7 @@ def analyze_and_fill_checklist(request: Request):
 
     # Reserve credits atomically (deduct before Gemini call)
     cost = get_credits_config()["action_cost"]
-    remaining = reserve_credits(user_id)
+    remaining = reserve_credits(user_id, request_id)
     if remaining is None:
         suffix = "Refill at 12:00 CET." if is_premium else "Get premium for daily refill."
         return create_error_response(f"Not enough credits. Need {cost}. {suffix}", 402)
@@ -1237,11 +1297,11 @@ def analyze_and_fill_checklist(request: Request):
         result = parse_gemini_json(response.text)
     except json.JSONDecodeError as e:
         logger.exception("analyze_and_fill_checklist: parse failed for user=%s", user_id[:8])
-        refund_credits(user_id, cost, "gemini_parse_error")
+        refund_credits(user_id, cost, "gemini_parse_error", request_id)
         return create_error_response("Failed to parse AI response", 500)
     except Exception as e:
         logger.exception("analyze_and_fill_checklist: gemini call failed for user=%s", user_id[:8])
-        refund_credits(user_id, cost, "gemini_error")
+        refund_credits(user_id, cost, "gemini_error", request_id)
         return create_error_response("AI processing failed. Please try again.", 500)
 
     # Increment usage stats
@@ -1303,6 +1363,9 @@ def generate_checklist(request: Request):
     input_data = data.get("input_data", "")
     locale = (data.get("locale") or "en").strip().lower()
     output_language = "Russian" if locale == "ru" else "English"
+    # Idempotency key: client sends a stable UUID per logical AI action (reused across HTTP
+    # retries). Absent on old clients -> None -> non-deduped fallback. See reserve_credits.
+    request_id = (data.get("request_id") or "").strip() or None
 
     # Validate required fields
     if not user_prompt:
@@ -1329,7 +1392,7 @@ def generate_checklist(request: Request):
 
     # Reserve credits atomically (deduct before Gemini call)
     cost = get_credits_config()["action_cost"]
-    remaining = reserve_credits(user_id)
+    remaining = reserve_credits(user_id, request_id)
     if remaining is None:
         suffix = "Refill at 12:00 CET." if is_premium else "Get premium for daily refill."
         return create_error_response(f"Not enough credits. Need {cost}. {suffix}", 402)
@@ -1360,11 +1423,11 @@ def generate_checklist(request: Request):
         result = parse_gemini_json(response.text)
     except json.JSONDecodeError as e:
         logger.exception("generate_checklist: parse failed for user=%s", user_id[:8])
-        refund_credits(user_id, cost, "gemini_parse_error")
+        refund_credits(user_id, cost, "gemini_parse_error", request_id)
         return create_error_response("Failed to parse AI response", 500)
     except Exception as e:
         logger.exception("generate_checklist: gemini call failed for user=%s", user_id[:8])
-        refund_credits(user_id, cost, "gemini_error")
+        refund_credits(user_id, cost, "gemini_error", request_id)
         return create_error_response("AI processing failed. Please try again.", 500)
 
     # Increment usage stats

@@ -17,6 +17,8 @@ import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 /**
  * Implementation of FirebaseAiService using Ktor HTTP client.
@@ -98,6 +100,10 @@ class FirebaseAiServiceImpl(
         val request = FillChecklistRequest(
             userId = userId,
             isPremium = isPremium,
+            // Idempotency key generated ONCE here. HttpRequestRetry re-sends the SAME request
+            // body on a transport-drop retry, so the server sees an identical request_id and
+            // dedups the credit reservation (no double-charge). See reserve_credits (server).
+            requestId = newRequestId(),
             checklist = ChecklistDto(
                 id = checklist.id,
                 name = checklist.name,
@@ -159,6 +165,8 @@ class FirebaseAiServiceImpl(
         val request = GenerateChecklistRequest(
             userId = userId,
             isPremium = isPremium,
+            // See analyzeAndFillChecklist: stable idempotency key, reused across retries.
+            requestId = newRequestId(),
             prompt = prompt,
             inputType = inputType.toApiString(),
             inputData = inputData
@@ -287,6 +295,11 @@ class FirebaseAiServiceImpl(
         }
     }
 
+    /** Fresh idempotency key per logical AI action. Uuid.random() matches the id idiom already
+     *  used in this module (GeneratedChecklistParser). Reused verbatim across HttpRequestRetry. */
+    @OptIn(ExperimentalUuidApi::class)
+    private fun newRequestId(): String = Uuid.random().toString()
+
     private fun AiInputType.toApiString(): String = when (this) {
         AiInputType.TEXT -> "text"
         AiInputType.URL -> "url"
@@ -357,6 +370,7 @@ private data class ErrorEnvelopeDto(val error: String? = null)
 private data class FillChecklistRequest(
     @SerialName("user_id") val userId: String,
     @SerialName("is_premium") val isPremium: Boolean,
+    @SerialName("request_id") val requestId: String,
     val checklist: ChecklistDto,
     @SerialName("input_type") val inputType: String,
     @SerialName("input_data") val inputData: String
@@ -403,6 +417,7 @@ private data class FilledItemDto(
 private data class GenerateChecklistRequest(
     @SerialName("user_id") val userId: String,
     @SerialName("is_premium") val isPremium: Boolean,
+    @SerialName("request_id") val requestId: String,
     val prompt: String,
     @SerialName("input_type") val inputType: String,
     @SerialName("input_data") val inputData: String? = null
