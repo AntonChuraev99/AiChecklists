@@ -7,6 +7,7 @@ import com.antonchuraev.homesearchchecklist.feature.analyze.data.remote.Firebase
 import com.antonchuraev.homesearchchecklist.feature.analyze.data.remote.GenerateChecklistResult
 import com.antonchuraev.homesearchchecklist.feature.analyze.data.remote.RegisterUserResult
 import com.antonchuraev.homesearchchecklist.feature.analyze.data.remote.UsageInfo
+import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AiAnalyzeError
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeInputData
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Attachment
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
@@ -39,10 +40,10 @@ import kotlin.test.assertTrue
  */
 class AnalyzeRepositoryNameTest {
 
-    private fun repo(service: FirebaseAiService) = AnalyzeRepositoryImpl(
+    private fun repo(service: FirebaseAiService, userId: String = "test") = AnalyzeRepositoryImpl(
         firebaseAiService = service,
         checklistRepository = NoopChecklistRepository(),
-        userDataRepository = FakeUserDataRepository(),
+        userDataRepository = FakeUserDataRepository(userId),
     )
 
     @Test
@@ -135,7 +136,35 @@ class AnalyzeRepositoryNameTest {
         assertNull(result.getOrNull()?.aiFlow)
     }
 
+    @Test
+    fun analyzeData_blankUserId_returnsUserNotReadyWithoutCallingService() = runTest {
+        // Guard: a blank userId (new user / web-before-sign-in) must NOT reach the AI function — it
+        // would be a guaranteed server 400. The service fake throws on any call, proving we bail first.
+        val service = ThrowingFirebaseAiService()
+
+        val result = repo(service, userId = "").analyzeData(AnalyzeInputData.RawText("trip"), targetChecklist = null)
+
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull() is AiAnalyzeError.UserNotReady)
+    }
+
     // ── Fakes ───────────────────────────────────────────────────────────────
+
+    /** Every AI call fails the test — used to prove the blank-userId guard short-circuits first. */
+    private class ThrowingFirebaseAiService : FirebaseAiService {
+        override suspend fun registerUser(deviceId: String, appVersion: String?, platform: String?) =
+            error("service must not be called")
+
+        override suspend fun analyzeAndFillChecklist(
+            userId: String, isPremium: Boolean, checklist: Checklist, inputType: AiInputType, inputData: String,
+        ): Result<AiServiceResponse<FillChecklistResult>> = error("service must not be called")
+
+        override suspend fun generateChecklist(
+            userId: String, isPremium: Boolean, prompt: String, inputType: AiInputType, inputData: String?,
+        ): Result<AiServiceResponse<GenerateChecklistResult>> = error("service must not be called")
+
+        override suspend fun getUsageStats(userId: String, isPremium: Boolean) = error("service must not be called")
+    }
 
     private class FakeFirebaseAiService(
         private val generateResult: GenerateChecklistResult,
@@ -181,8 +210,8 @@ class AnalyzeRepositoryNameTest {
         ): Result<AiServiceResponse<UsageInfo>> = error("not used")
     }
 
-    private class FakeUserDataRepository : UserDataRepository {
-        private val userData = UserData(userId = "test", isPremium = false)
+    private class FakeUserDataRepository(userId: String = "test") : UserDataRepository {
+        private val userData = UserData(userId = userId, isPremium = false)
         private val flow = MutableStateFlow(userData)
         override fun getUserDataFlow(): StateFlow<UserData> = flow
         override suspend fun getUserData(): UserData = userData

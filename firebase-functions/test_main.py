@@ -524,8 +524,8 @@ class TestReserveCredits:
                 remaining = main.reserve_credits("nonexistent-user")
                 assert remaining is None
 
-    def test_gemini_failure_does_not_refund_credits(self, _import_main):
-        """When Gemini fails, credits are consumed (not refunded)."""
+    def test_gemini_failure_refunds_reserved_credits(self, _import_main):
+        """When Gemini fails after reserve, the reserved credits are refunded."""
         main = _import_main
 
         def rc_side_effect(key, default):
@@ -537,20 +537,29 @@ class TestReserveCredits:
 
         with patch.object(main, "get_user_premium_status", return_value=True):
             with patch.object(main, "check_usage_limit", return_value=(True, "")):
-                with patch.object(main, "reserve_credits", return_value=20):
-                    with patch.object(main, "get_remote_config_value", side_effect=rc_side_effect):
-                        with patch.object(main, "call_gemini", side_effect=Exception("Gemini error")):
-                            with app.test_request_context():
-                                req = make_request({
-                                    "user_id": "user-123",
-                                    "checklist": {"items": [{"text": "item1"}]},
-                                    "input_type": "text",
-                                    "input_data": "test"
-                                })
-                                response, status = main.analyze_and_fill_checklist(req)
-                                assert status == 500
-                                # Credits were already deducted (20 remaining),
-                                # no refund happened
+                with patch.object(main, "get_credits_config", return_value={
+                    "action_cost": 30, "premium_daily_credits_cap": 300, "initial_credits": 100
+                }):
+                    with patch.object(main, "reserve_credits", return_value=20):
+                        with patch.object(main, "refund_credits", return_value=True) as mock_refund:
+                            with patch.object(main, "get_remote_config_value", side_effect=rc_side_effect):
+                                with patch.object(main, "call_gemini", side_effect=Exception("Gemini error")):
+                                    with app.test_request_context():
+                                        req = make_request({
+                                            "user_id": "user-123",
+                                            "checklist": {"items": [{"text": "item1"}]},
+                                            "input_type": "text",
+                                            "input_data": "test"
+                                        })
+                                        response = main.analyze_and_fill_checklist(req)
+                                        # create_error_response returns a single CORS-wrapped
+                                        # Response (status baked in), not a (body, code) tuple.
+                                        status = response[1] if isinstance(response, tuple) else response.status_code
+                                        assert status == 500
+                                        # Reserved credits are refunded on Gemini failure.
+                                        mock_refund.assert_called_once_with(
+                                            "user-123", 30, "gemini_error"
+                                        )
 
 
 # ===========================================================================

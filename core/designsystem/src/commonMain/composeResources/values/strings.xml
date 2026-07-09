@@ -612,6 +612,8 @@
     <string name="fill_error_name_required">Enter a name</string>
     <string name="analyze_error_select_checklist">Select a checklist</string>
     <string name="analyze_error_analysis_failed">Failed to analyze</string>
+    <string name="analyze_error_user_not_ready">Signing you in… please try again in a moment</string>
+    <string name="analyze_error_network">Connection problem. Check your internet and try again</string>
     <!-- Default names (used in ViewModels via getString) -->
     <string name="default_checklist_name">New Checklist</string>
     <string name="default_fill_name">AI Fill</string>

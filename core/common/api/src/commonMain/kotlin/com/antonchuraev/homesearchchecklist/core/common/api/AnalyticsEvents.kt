@@ -330,6 +330,12 @@ object AnalyticsParams {
     const val FORMAT = "format"
     const val INPUT_TYPE = "input_type"
 
+    // AI analyze failure taxonomy on ai_analyze_failed — coarse machine reason so failures group in
+    // Amplitude WITHOUT regex over the free-text [ERROR]. Values (wire): credit_gate | daily_limit |
+    // input_too_long | network | timeout | server_5xx | auth_403 | user_not_ready | unknown.
+    // Kept alongside [ERROR] (raw string) for the long tail. See AiFailureReason.
+    const val FAILURE_REASON = "failure_reason"
+
     // Checklist / item
     const val CHECKLIST_ID = "checklist_id"
     const val FILL_ID = "fill_id"

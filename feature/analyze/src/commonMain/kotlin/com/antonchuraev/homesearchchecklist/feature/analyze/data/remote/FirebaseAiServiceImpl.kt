@@ -1,10 +1,13 @@
 package com.antonchuraev.homesearchchecklist.feature.analyze.data.remote
 
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
+import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AiAnalyzeError
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
 import io.ktor.client.*
 import io.ktor.client.call.*
+import io.ktor.client.network.sockets.ConnectTimeoutException
+import io.ktor.client.network.sockets.SocketTimeoutException
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
@@ -28,6 +31,31 @@ class FirebaseAiServiceImpl(
         private const val TAG = "FirebaseAiService"
         // Default Cloud Functions URL - update after deployment
         private const val DEFAULT_BASE_URL = "https://us-central1-aichecklists-40230.cloudfunctions.net"
+
+        // Bounded retry for TRANSIENT failures only (~15-20% of failures were 5xx, ~18% client
+        // network/DNS/timeout). 2 retries with exponential backoff (500ms -> 1000ms, capped at 2s)
+        // stays well inside the 120s request timeout. 4xx (400/402/403/429) are terminal and never
+        // retried — surfaced immediately so the user sees the real cause (credits / limit / auth).
+        private const val MAX_RETRIES = 2
+        private const val INITIAL_BACKOFF_MS = 500L
+        private const val MAX_BACKOFF_MS = 2_000L
+        private const val MAX_ERROR_BODY_CHARS = 300
+
+        // Substrings that mark a retryable/transport transient error across platforms (Android
+        // OkHttp + wasmJs JS fetch messages). Lowercased match. NOT a stable API — best-effort only.
+        private val TRANSIENT_NETWORK_MARKERS = listOf(
+            "unable to resolve host",
+            "failed to connect",
+            "connection reset",
+            "connection closed",
+            "connection refused",
+            "connection abort",
+            "unexpected end of stream",
+            "network is unreachable",
+            "software caused connection abort",
+            "stream closed",
+            "broken pipe",
+        )
     }
 
     private val json = Json {
@@ -45,6 +73,17 @@ class FirebaseAiServiceImpl(
             connectTimeoutMillis = 30_000  // 30 seconds to connect
             socketTimeoutMillis = 120_000  // 2 minutes socket timeout
         }
+        install(HttpRequestRetry) {
+            maxRetries = MAX_RETRIES
+            // Retry 5xx (transient server) — evaluated on the response status; works even though
+            // expectSuccess is off (the plugin inspects status directly, verified vs Ktor 3.4.x docs).
+            retryOnServerErrors(maxRetries = MAX_RETRIES)
+            // Retry connect/socket timeouts + transport IO (DNS, dropped connections). The overall
+            // 120s request timeout is deliberately NOT retried here — re-issuing it would double the
+            // wall-clock wait; it is still CLASSIFIED as `timeout` for analytics downstream.
+            retryOnExceptionIf(maxRetries = MAX_RETRIES) { _, cause -> cause.isRetryableTransient() }
+            delayMillis { retry -> (INITIAL_BACKOFF_MS shl (retry - 1)).coerceAtMost(MAX_BACKOFF_MS) }
+        }
     }
 
     override suspend fun analyzeAndFillChecklist(
@@ -53,7 +92,7 @@ class FirebaseAiServiceImpl(
         checklist: Checklist,
         inputType: AiInputType,
         inputData: String
-    ): Result<AiServiceResponse<FillChecklistResult>> = runCatching {
+    ): Result<AiServiceResponse<FillChecklistResult>> = aiRunCatching {
         logger.debug(TAG, "analyzeAndFillChecklist: userId=${userId.take(8)}..., checklistId=${checklist.id}, inputType=$inputType")
 
         val request = FillChecklistRequest(
@@ -74,6 +113,11 @@ class FirebaseAiServiceImpl(
             setBody(request)
         }
         logger.debug(TAG, "analyzeAndFillChecklist: response status=${response.status}")
+
+        // Non-2xx (App Check 403, exhausted-retry 5xx, validation 4xx) -> typed AiAnalyzeError.Http
+        // carrying the status code so the ViewModel can split auth_403 / server_5xx cleanly. 2xx with
+        // a {"success":false,...} JSON body still flows through below unchanged.
+        response.throwIfHttpError()
 
         val responseBody = response.body<FillChecklistResponseDto>()
 
@@ -109,7 +153,7 @@ class FirebaseAiServiceImpl(
         prompt: String,
         inputType: AiInputType,
         inputData: String?
-    ): Result<AiServiceResponse<GenerateChecklistResult>> = runCatching {
+    ): Result<AiServiceResponse<GenerateChecklistResult>> = aiRunCatching {
         logger.debug(TAG, "generateChecklist: userId=${userId.take(8)}..., inputType=$inputType, promptLength=${prompt.length}")
 
         val request = GenerateChecklistRequest(
@@ -126,6 +170,9 @@ class FirebaseAiServiceImpl(
             setBody(request)
         }
         logger.debug(TAG, "generateChecklist: response status=${response.status}")
+
+        // See analyzeAndFillChecklist: surface non-2xx as typed AiAnalyzeError.Http before decoding.
+        response.throwIfHttpError()
 
         val responseBody = response.body<GenerateChecklistResponseDto>()
 
@@ -253,7 +300,54 @@ class FirebaseAiServiceImpl(
         limit = limit ?: 10,
         remaining = remaining ?: (limit ?: 10) - (today ?: count ?: 0)
     )
+
+    // ── Transient-failure resilience helpers ────────────────────────────────────────────────────
+
+    /**
+     * Like [runCatching] but maps transport exceptions surfaced AFTER retries into the typed
+     * [AiAnalyzeError] boundary variants, so presentation classifies by type instead of stringly
+     * matching Ktor internals. [AiAnalyzeError.Http] (thrown by [throwIfHttpError]) passes through.
+     * Unknown causes (e.g. serialization on a 2xx body) are kept as-is — the classifier's message
+     * fallback handles them.
+     */
+    private suspend inline fun <T> aiRunCatching(crossinline block: suspend () -> T): Result<T> =
+        runCatching { block() }.recoverCatching { cause -> throw cause.toAiServiceError() }
+
+    private fun Throwable.toAiServiceError(): Throwable = when {
+        this is AiAnalyzeError -> this
+        this is HttpRequestTimeoutException ||
+            this is ConnectTimeoutException ||
+            this is SocketTimeoutException -> AiAnalyzeError.Timeout
+        isRetryableTransient() -> AiAnalyzeError.Network
+        else -> this
+    }
+
+    /** Retry predicate: connect/socket timeouts + transport IO. Excludes the 120s request timeout. */
+    private fun Throwable.isRetryableTransient(): Boolean {
+        if (this is ConnectTimeoutException || this is SocketTimeoutException) return true
+        val msg = (message ?: "").lowercase()
+        return TRANSIENT_NETWORK_MARKERS.any { it in msg }
+    }
+
+    /**
+     * On a non-2xx response, throw [AiAnalyzeError.Http] carrying the status code + best-effort
+     * server error string. Reads the body ONCE via [bodyAsText] (so callers must NOT also call
+     * [HttpResponse.body] on the same non-2xx response). No-op on 2xx.
+     */
+    private suspend fun HttpResponse.throwIfHttpError() {
+        if (status.isSuccess()) return
+        val bodyText = runCatching { bodyAsText() }.getOrNull()
+        val serverError = bodyText
+            ?.let { runCatching { json.decodeFromString(ErrorEnvelopeDto.serializer(), it).error }.getOrNull() }
+            ?: bodyText?.take(MAX_ERROR_BODY_CHARS)
+        logger.error(TAG, "HTTP ${status.value} from AI function: ${serverError ?: "<no body>"}")
+        throw AiAnalyzeError.Http(status.value, serverError)
+    }
 }
+
+/** Minimal envelope to extract the server `error` field from any non-2xx JSON body (both flows). */
+@Serializable
+private data class ErrorEnvelopeDto(val error: String? = null)
 
 // ============================================================================
 // DTOs for API communication

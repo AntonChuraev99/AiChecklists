@@ -18,6 +18,7 @@ Credits are deducted for all users (including premium). Premium users get daily 
 import asyncio
 import base64
 import json
+import logging
 import os
 import threading
 import time
@@ -38,6 +39,10 @@ from flask import request as flask_request  # global request context for CORS or
 import cors  # local module: CORS origin whitelist (unit-testable without firebase_admin)
 from generated_items import MAX_FOLDER_DEPTH, sanitize_generated_items  # nested AI-item sanitizer (unit-testable)
 import push_promotions  # local module: promo-push audience filter / copy A/B / payload (unit-testable)
+
+# Module logger — replaces bare print(); logger.exception() in except blocks emits the
+# traceback to Cloud Logging stderr so real 5xx causes are no longer invisible.
+logger = logging.getLogger("gisti")
 
 # Initialize Firebase Admin
 if not firebase_admin._apps:
@@ -654,6 +659,49 @@ def reserve_credits(user_id: str) -> int | None:
     return txn(db.transaction())
 
 
+def refund_credits(user_id: str, amount: int, reason: str) -> bool:
+    """Refund `amount` credits previously reserved (inverse of reserve_credits).
+
+    Called when a downstream step fails AFTER credits were already reserved
+    (rejected input caught before reserve does NOT reach here). Increments the
+    balance in a single Firestore transaction and logs to credits_refund_log
+    for audit.
+
+    Best-effort: any failure here is swallowed so the ORIGINAL error (the reason
+    we are refunding in the first place) is what surfaces to the client.
+    Returns True on success, False if the user doc is missing or the txn fails.
+    """
+    user_ref = db.collection("users").document(user_id)
+
+    @firestore.transactional
+    def txn(transaction):
+        snapshot = user_ref.get(transaction=transaction)
+        if not snapshot.exists:
+            return False
+        current = snapshot.get("ai_credits") or 0
+        transaction.update(user_ref, {
+            "ai_credits": current + amount,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        })
+        return True
+
+    try:
+        ok = txn(db.transaction())
+        if ok:
+            try:
+                db.collection("credits_refund_log").add({
+                    "user_id": user_id,
+                    "reason": reason,
+                    "amount": amount,
+                    "refunded_at": datetime.now(timezone.utc).isoformat(),
+                })
+            except Exception:
+                pass
+        return ok
+    except Exception:
+        return False
+
+
 # ============================================================================
 # Shared AI helpers
 # ============================================================================
@@ -1147,18 +1195,19 @@ def analyze_and_fill_checklist(request: Request):
     if not usage_allowed:
         return create_error_response(usage_error, 429)
 
-    # Reserve credits atomically (deduct before Gemini call)
-    remaining = reserve_credits(user_id)
-    if remaining is None:
-        cost = get_credits_config()["action_cost"]
-        suffix = "Refill at 12:00 CET." if is_premium else "Get premium for daily refill."
-        return create_error_response(f"Not enough credits. Need {cost}. {suffix}", 402)
-
-    # Check input length (skip for binary data types)
+    # Check input length (skip for binary data types) — BEFORE reserving credits,
+    # so a rejected (too-long) input never deducts credits.
     if input_type not in ("image_base64", "audio_base64"):
         max_length = get_remote_config_value("ai_analysis_max_input_length", DEFAULT_MAX_INPUT_LENGTH)
         if len(input_data) > max_length:
             return create_error_response(f"Input data exceeds maximum length of {max_length} characters")
+
+    # Reserve credits atomically (deduct before Gemini call)
+    cost = get_credits_config()["action_cost"]
+    remaining = reserve_credits(user_id)
+    if remaining is None:
+        suffix = "Refill at 12:00 CET." if is_premium else "Get premium for daily refill."
+        return create_error_response(f"Not enough credits. Need {cost}. {suffix}", 402)
 
     # Build prompt
     checklist_items = "\n".join([
@@ -1186,9 +1235,13 @@ def analyze_and_fill_checklist(request: Request):
     try:
         response = call_gemini(prompt, input_type, input_data, model_id=model_id)
         result = parse_gemini_json(response.text)
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
+        logger.exception("analyze_and_fill_checklist: parse failed for user=%s", user_id[:8])
+        refund_credits(user_id, cost, "gemini_parse_error")
         return create_error_response("Failed to parse AI response", 500)
-    except Exception:
+    except Exception as e:
+        logger.exception("analyze_and_fill_checklist: gemini call failed for user=%s", user_id[:8])
+        refund_credits(user_id, cost, "gemini_error")
         return create_error_response("AI processing failed. Please try again.", 500)
 
     # Increment usage stats
@@ -1264,14 +1317,8 @@ def generate_checklist(request: Request):
     if not usage_allowed:
         return create_error_response(usage_error, 429)
 
-    # Reserve credits atomically (deduct before Gemini call)
-    remaining = reserve_credits(user_id)
-    if remaining is None:
-        cost = get_credits_config()["action_cost"]
-        suffix = "Refill at 12:00 CET." if is_premium else "Get premium for daily refill."
-        return create_error_response(f"Not enough credits. Need {cost}. {suffix}", 402)
-
-    # Check input length (skip binary data in length calculation)
+    # Check input length (skip binary data in length calculation) — BEFORE reserving
+    # credits, so a rejected (too-long) input never deducts credits.
     max_length = get_remote_config_value("ai_analysis_max_input_length", DEFAULT_MAX_INPUT_LENGTH)
     if input_type in ("image_base64", "audio_base64"):
         total_input = user_prompt  # Only check prompt length for binary inputs
@@ -1279,6 +1326,13 @@ def generate_checklist(request: Request):
         total_input = user_prompt + (input_data or "")
     if len(total_input) > max_length:
         return create_error_response(f"Input exceeds maximum length of {max_length} characters")
+
+    # Reserve credits atomically (deduct before Gemini call)
+    cost = get_credits_config()["action_cost"]
+    remaining = reserve_credits(user_id)
+    if remaining is None:
+        suffix = "Refill at 12:00 CET." if is_premium else "Get premium for daily refill."
+        return create_error_response(f"Not enough credits. Need {cost}. {suffix}", 402)
 
     # Build prompt
     if input_type == "image_base64":
@@ -1304,9 +1358,13 @@ def generate_checklist(request: Request):
     try:
         response = call_gemini(prompt, input_type, input_data, model_id=model_id)
         result = parse_gemini_json(response.text)
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
+        logger.exception("generate_checklist: parse failed for user=%s", user_id[:8])
+        refund_credits(user_id, cost, "gemini_parse_error")
         return create_error_response("Failed to parse AI response", 500)
-    except Exception:
+    except Exception as e:
+        logger.exception("generate_checklist: gemini call failed for user=%s", user_id[:8])
+        refund_credits(user_id, cost, "gemini_error")
         return create_error_response("AI processing failed. Please try again.", 500)
 
     # Increment usage stats
@@ -2295,6 +2353,7 @@ def classify_chat_intent(request: Request):
         })
 
     except Exception as e:
+        logger.exception("classify_chat_intent: gemini call or JSON parse failed for user=%s", user_id[:8])
         # Gemini call or JSON parse failed AFTER reserve_chat_credit deducted 1.
         # Refund the credit so the user is not charged for our failure.
         # Best-effort — refund failure is swallowed; original error is surfaced.
@@ -2408,6 +2467,7 @@ def transcribe_audio(request: Request):
         })
 
     except Exception as e:
+        logger.exception("transcribe_audio: gemini call failed for user=%s", user_id[:8])
         # Gemini call failed AFTER reserve_chat_credit deducted 1.
         # Refund so the user is not charged for our failure.
         refund_chat_credit(user_id, reason=f"transcribe_audio_gemini_failure: {type(e).__name__}")
@@ -3235,6 +3295,7 @@ def chat_agent(request: Request):
         })
 
     except Exception as e:
+        logger.exception("chat_agent: gemini agent step failed for user=%s", user_id[:8])
         # Refund only if WE reserved on this round (first round). Later rounds
         # never charged, so there is nothing to refund.
         if reserved_this_round:

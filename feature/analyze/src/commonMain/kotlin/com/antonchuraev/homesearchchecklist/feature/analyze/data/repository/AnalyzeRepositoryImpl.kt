@@ -2,6 +2,7 @@ package com.antonchuraev.homesearchchecklist.feature.analyze.data.repository
 
 import com.antonchuraev.homesearchchecklist.feature.analyze.data.remote.AiInputType
 import com.antonchuraev.homesearchchecklist.feature.analyze.data.remote.FirebaseAiService
+import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AiAnalyzeError
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeInputData
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeResult
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.repository.AnalyzeRepository
@@ -30,6 +31,15 @@ class AnalyzeRepositoryImpl(
         val userData = userDataRepository.getUserData()
         val userId = userData.userId
         val isPremium = userData.isPremium
+
+        // Guard: a blank userId means the user isn't registered yet (new user / web-before-sign-in
+        // timing). Calling the AI function with an empty user_id is a guaranteed server 400
+        // ("user_id is required") that historically accounted for ~12% of ai_analyze_failed. Bail
+        // early with a typed, terminal reason so presentation can prompt "signing you in… try again"
+        // instead of a silent generic error — and we skip the wasted file read / base64 encode below.
+        if (userId.isBlank()) {
+            return Result.failure(AiAnalyzeError.UserNotReady)
+        }
 
         // Convert input data to API format
         val (inputType, inputDataString) = convertInputData(inputData)

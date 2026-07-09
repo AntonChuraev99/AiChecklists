@@ -11,6 +11,7 @@ import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDefaults
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigKeys
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
+import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AiFailureReason
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeInputData
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeResult
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeResultHolder
@@ -300,18 +301,41 @@ class AnalyzeViewModel(
                     }
                 }
                 .onFailure { error ->
+                    // Coarse machine reason so Amplitude can group ai_analyze_failed without regex
+                    // over free text; keep the raw error string alongside for the long tail.
+                    val reason = AiFailureReason.classify(error)
                     analyticsTracker.event(AnalyticsEvents.Analyze.FAILED, mapOf(
                         AnalyticsParams.INPUT_TYPE to inputType,
-                        "error" to (error.message ?: "unknown")
+                        AnalyticsParams.FAILURE_REASON to reason.wireValue,
+                        AnalyticsParams.ERROR to (error.message ?: "unknown")
                     ))
                     _screenState.update {
                         it.copy(
                             isAnalyzing = false,
-                            error = error.message ?: getString(Res.string.analyze_error_analysis_failed)
+                            error = userFacingError(reason, error.message)
                         )
                     }
                 }
         }
+    }
+
+    /**
+     * Maps a classified [AiFailureReason] to a user-facing message. Synthetic transport markers
+     * (network / timeout / `http_*`) are NEVER shown raw: transport + auth + 5xx failures get a
+     * friendly localized string, [AiFailureReason.USER_NOT_READY] gets the "signing you in…" prompt,
+     * and the server's own actionable message (credits / daily limit / too-long) is shown as-is when
+     * present. Suspend because [getString] resolves a Compose Resource off the composition.
+     */
+    private suspend fun userFacingError(reason: AiFailureReason, rawMessage: String?): String = when (reason) {
+        AiFailureReason.USER_NOT_READY -> getString(Res.string.analyze_error_user_not_ready)
+        AiFailureReason.NETWORK, AiFailureReason.TIMEOUT -> getString(Res.string.analyze_error_network)
+        AiFailureReason.AUTH_403, AiFailureReason.SERVER_5XX -> getString(Res.string.analyze_error_analysis_failed)
+        AiFailureReason.CREDIT_GATE,
+        AiFailureReason.DAILY_LIMIT,
+        AiFailureReason.INPUT_TOO_LONG,
+        AiFailureReason.UNKNOWN ->
+            rawMessage?.takeIf { it.isNotBlank() && !it.startsWith("http_") }
+                ?: getString(Res.string.analyze_error_analysis_failed)
     }
 
     /**
