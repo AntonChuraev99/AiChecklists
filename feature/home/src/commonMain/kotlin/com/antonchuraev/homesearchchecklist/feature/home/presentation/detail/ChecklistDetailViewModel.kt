@@ -106,6 +106,13 @@ class ChecklistDetailViewModel(
      */
     private var poppedMissingLevel = false
 
+    /**
+     * Guards the recurring-list nudge evaluation. Set true the first time the checklist reaches the
+     * candidate state (root level, >=2 items, no repeat). Once started, the persisted show-once flag
+     * decides whether to actually surface it — a repeated Room emission never re-evaluates.
+     */
+    private var recurringNudgeCheckStarted = false
+
     init {
         loadData()
         observeInputForParsing()
@@ -222,6 +229,8 @@ class ChecklistDetailViewModel(
                 levelNodes = folderState.levelNodes,
             )
         }
+
+        maybeShowRecurringNudge(checklist, sortedFill)
     }
 
     /**
@@ -583,6 +592,8 @@ class ChecklistDetailViewModel(
             is ChecklistDetailIntent.OnRepeatIntervalChanged -> updatePendingRepeatConfig { it.copy(interval = intent.interval.coerceIn(1, 99), isCustom = true) }
             is ChecklistDetailIntent.OnWeekDayToggled -> toggleWeekDay(intent.dayNumber)
             is ChecklistDetailIntent.OnResetChecksToggled -> updatePendingRepeatConfig { it.copy(resetChecks = intent.enabled) }
+            ChecklistDetailIntent.OnRecurringNudgeAccepted -> acceptRecurringNudge()
+            ChecklistDetailIntent.OnRecurringNudgeDismissed -> dismissRecurringNudge()
             is ChecklistDetailIntent.OnRepeatTimeChanged -> updatePendingRepeatConfig { it.copy(timeHour = intent.hour, timeMinute = intent.minute) }
             ChecklistDetailIntent.OnSaveRepeatSchedule -> saveRepeatSchedule()
             ChecklistDetailIntent.OnRemoveRepeatSchedule -> removeRepeatSchedule()
@@ -2451,6 +2462,79 @@ class ChecklistDetailViewModel(
         }
     }
 
+    // ── Retention: recurring-list nudge ─────────────────────────────────────────
+    /**
+     * Surfaces the one-time recurring-list nudge when this checklist is a plausible candidate for a
+     * repeating routine: at the checklist root (not a folder level), with >= [RECURRING_NUDGE_MIN_ITEMS]
+     * items, and no repeat schedule yet. Shown at most ONCE ever (persisted device flag) so we never
+     * nag. Fires [AnalyticsEvents.Retention.RECURRING_NUDGE_SHOWN] (source=detail) on first display.
+     */
+    private fun maybeShowRecurringNudge(checklist: Checklist, fill: ChecklistFill?) {
+        if (recurringNudgeCheckStarted) return
+        if (currentFolderId != null) return                       // checklist-level nudge only at root
+        if (checklist.repeatRule != null) return                  // already repeats — nothing to offer
+        if ((fill?.items?.size ?: 0) < RECURRING_NUDGE_MIN_ITEMS) return  // skip trivial 0/1-item lists
+        recurringNudgeCheckStarted = true
+        viewModelScope.launch {
+            // Show-once, ever — don't re-ask across sessions / process death.
+            if (datastore.observeBoolean(PREF_RECURRING_NUDGE_SHOWN, false).first()) return@launch
+            datastore.saveBoolean(PREF_RECURRING_NUDGE_SHOWN, true)
+            analyticsTracker.event(
+                AnalyticsEvents.Retention.RECURRING_NUDGE_SHOWN,
+                mapOf(AnalyticsParams.SOURCE to RECURRING_NUDGE_SOURCE),
+            )
+            updateContentState { it.copy(showRecurringNudge = true) }
+        }
+    }
+
+    /**
+     * Accept the nudge: set a default weekly repeat via the existing [saveRepeatSchedule] path
+     * (which fires [AnalyticsEvents.Reminder.REPEAT_SCHEDULE_SET]). Respects the free-user recurring
+     * limit exactly like [initRepeatTabIfNeeded] — routes to the paywall when the user is capped
+     * (feedback, never a silent no-op). Emits [AnalyticsEvents.Retention.RECURRING_NUDGE_ACCEPTED].
+     */
+    private fun acceptRecurringNudge() {
+        updateContentState { it.copy(showRecurringNudge = false) }   // immediate feedback: hide banner
+        viewModelScope.launch {
+            analyticsTracker.event(
+                AnalyticsEvents.Retention.RECURRING_NUDGE_ACCEPTED,
+                mapOf(AnalyticsParams.SOURCE to RECURRING_NUDGE_SOURCE),
+            )
+            val limits = awaitUserLimits()
+            val activeCount = repository.countActiveRepeatSchedules()
+            val canCreate = limits?.canCreateRecurringReminder(activeCount) ?: true
+            if (!canCreate) {
+                analyticsTracker.event(AnalyticsEvents.Reminder.RECURRING_LIMIT_HIT)
+                navigator.navigateToPaywall(source = "recurring_nudge_limit")
+                return@launch
+            }
+            // Default weekly schedule at 09:00, applied via the shared save path.
+            updateContentState {
+                it.copy(
+                    pendingRepeatConfig = PendingRepeatConfig(
+                        type = RepeatType.WEEKLY,
+                        interval = 1,
+                        timeHour = 9,
+                        timeMinute = 0,
+                    ),
+                )
+            }
+            saveRepeatSchedule()
+            updateContentState { it.copy(snackbarMessage = SNACKBAR_RECURRING_NUDGE_SET) }
+        }
+    }
+
+    /** Dismiss the nudge: hide the banner (visible feedback) and record the outcome. */
+    private fun dismissRecurringNudge() {
+        updateContentState { it.copy(showRecurringNudge = false) }
+        viewModelScope.launch {
+            analyticsTracker.event(
+                AnalyticsEvents.Retention.RECURRING_NUDGE_DISMISSED,
+                mapOf(AnalyticsParams.SOURCE to RECURRING_NUDGE_SOURCE),
+            )
+        }
+    }
+
     private suspend fun maybeShowExactAlarmInstruction() {
         if (reminderScheduler.canScheduleExactAlarms()) return
 
@@ -3392,5 +3476,15 @@ class ChecklistDetailViewModel(
          * [aichecklists.core.designsystem.generated.resources.Res.string.calendar_app_not_found].
          */
         const val SNACKBAR_CALENDAR_APP_NOT_FOUND = "calendar_app_not_found"
+
+        // ── Retention: recurring-list nudge ──────────────────────────────────
+        /** Device-global show-once flag for the recurring-list nudge (never nag). */
+        const val PREF_RECURRING_NUDGE_SHOWN = "recurring_nudge_shown"
+        /** Confirmation snackbar after the recurring nudge sets a weekly repeat. */
+        const val SNACKBAR_RECURRING_NUDGE_SET = "recurring_nudge_set"
+        /** [AnalyticsParams.SOURCE] value for the detail-screen recurring nudge. */
+        private const val RECURRING_NUDGE_SOURCE = "detail"
+        /** Skip the nudge on trivial lists — a 0/1-item list is not worth repeating. */
+        private const val RECURRING_NUDGE_MIN_ITEMS = 2
     }
 }

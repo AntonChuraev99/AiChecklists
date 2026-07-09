@@ -169,6 +169,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonDestructive
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonSecondary
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonText
 import com.antonchuraev.homesearchchecklist.desingsystem.components.PlatformBackHandler
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.FillOptionsSheet
@@ -511,6 +512,7 @@ private fun ChecklistDetailContent(
     val attachmentDeletedMsg = stringResource(Res.string.attachment_deleted_snackbar)
     val folderReminderUnavailableMsg = stringResource(Res.string.folder_reminder_unavailable)
     val calendarAppNotFoundMsg = stringResource(Res.string.calendar_app_not_found)
+    val recurringNudgeSetMsg = stringResource(Res.string.recurring_nudge_set_confirmation)
     LaunchedEffect(state.snackbarMessage) {
         val message = state.snackbarMessage ?: return@LaunchedEffect
         val isSmartAddHint = message == ChecklistDetailViewModel.SNACKBAR_SMART_ADD_HINT_ADD_TEXT ||
@@ -526,6 +528,7 @@ private fun ChecklistDetailContent(
             ChecklistDetailViewModel.SNACKBAR_ATTACHMENT_DELETED -> attachmentDeletedMsg
             ChecklistDetailViewModel.SNACKBAR_FOLDER_REMINDER_UNAVAILABLE -> folderReminderUnavailableMsg
             ChecklistDetailViewModel.SNACKBAR_CALENDAR_APP_NOT_FOUND -> calendarAppNotFoundMsg
+            ChecklistDetailViewModel.SNACKBAR_RECURRING_NUDGE_SET -> recurringNudgeSetMsg
             else -> message
         }
         smartAddHintActive.value = isSmartAddHint
@@ -1092,10 +1095,21 @@ private fun ChecklistDetailContent(
                 // checklist name still lives in the top app bar); the progress bar reflects only
                 // the items visible at this level.
                 item {
-                    ProgressHeader(
-                        items = visibleFillItems,
-                        name = state.currentFolderTitle ?: state.checklist.name,
-                    )
+                    // ProgressHeader + the retention recurring nudge share ONE LazyColumn slot so the
+                    // deeplink auto-scroll index math (slot 0 = ProgressHeader) stays valid whether or
+                    // not the nudge is showing.
+                    Column(verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)) {
+                        ProgressHeader(
+                            items = visibleFillItems,
+                            name = state.currentFolderTitle ?: state.checklist.name,
+                        )
+                        if (state.showRecurringNudge) {
+                            RecurringNudgeCard(
+                                onAccept = { onIntent(ChecklistDetailIntent.OnRecurringNudgeAccepted) },
+                                onDismiss = { onIntent(ChecklistDetailIntent.OnRecurringNudgeDismissed) },
+                            )
+                        }
+                    }
                 }
 
                 // View all fills button (if there are additional fills)
@@ -1823,6 +1837,73 @@ private fun ChecklistDetailContent(
             fillViaAiLabel = stringResource(Res.string.fill_via_ai_title),
             fillViaAiDescription = stringResource(Res.string.fill_via_ai_desc),
         )
+    }
+}
+
+/**
+ * Retention: quiet, one-time inline suggestion offering to make this checklist repeat weekly. Kept
+ * deliberately low-key (a suggestion, not an alarm): a hairline [AppCard] with a small repeat tile,
+ * a title/subtitle, a dismiss "x", and an outlined (secondary) accept button. Visibility + show-once
+ * persistence are owned by [ChecklistDetailViewModel]; this is a pure renderer.
+ */
+@Composable
+private fun RecurringNudgeCard(
+    onAccept: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    AppCard(
+        modifier = modifier,
+        contentPadding = PaddingValues(AppDimens.SpacingMd),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Repeat,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(Res.string.recurring_nudge_title),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = stringResource(Res.string.recurring_nudge_subtitle),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        imageVector = Icons.Filled.Close,
+                        contentDescription = stringResource(Res.string.recurring_nudge_dismiss),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            AppButtonSecondary(
+                text = stringResource(Res.string.recurring_nudge_accept),
+                onClick = onAccept,
+                icon = Icons.Outlined.Repeat,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
     }
 }
 

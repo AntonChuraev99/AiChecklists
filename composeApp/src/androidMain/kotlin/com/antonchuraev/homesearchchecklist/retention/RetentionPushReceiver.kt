@@ -6,10 +6,13 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.TaskStackBuilder
 import com.antonchuraev.aichecklists.R
+import com.antonchuraev.homesearchchecklist.AppBuildConfig
 import com.antonchuraev.homesearchchecklist.MainActivity
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
@@ -51,6 +54,7 @@ class RetentionPushReceiver : BroadcastReceiver() {
         when (intent.action) {
             ACTION_RETENTION_DAILY -> handleDaily(context)
             ACTION_RETENTION_DIGEST -> handleDigest(context)
+            ACTION_RETENTION_COMEBACK -> handleComeback(context, intent)
         }
     }
 
@@ -115,6 +119,115 @@ class RetentionPushReceiver : BroadcastReceiver() {
                 pendingResult.finish()
             }
         }
+    }
+
+    /**
+     * The D0->D1 come-back nudge (one-shot). Unlike daily/digest it has NO recurring/overdue
+     * precondition — it only requires that the FIRST checklist still exists, still has open items,
+     * and the user has not returned on their own since the alarm was armed. This is the whole point:
+     * it covers the day-1 leak the other three structurally cannot reach.
+     *
+     * The alarm marks itself FIRED first (so a later boot never re-arms it), then runs the honest
+     * gates, emitting [AnalyticsEvents.Retention.COMEBACK_SKIPPED] with a precise reason on any skip.
+     *
+     * Debug force path: a manual `am broadcast ... --ez $EXTRA_COMEBACK_FORCE true` (honored ONLY on
+     * debuggable builds) bypasses every gate and shows for the newest checklist, so the nudge can be
+     * exercised on demand without a fresh install or a 22h wait.
+     */
+    private fun handleComeback(context: Context, intent: Intent) {
+        val pendingResult = goAsync()
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val deps = resolveDeps() ?: return@launch
+                val force = AppBuildConfig.isDebug && intent.getBooleanExtra(EXTRA_COMEBACK_FORCE, false)
+
+                // One-shot: consume it now so a reboot can never re-arm a fired come-back.
+                if (!force) deps.prefs.markComebackFired()
+
+                if (!force && !notificationsEnabled(context)) {
+                    emitSkipped(deps, REASON_PERMISSION_OFF)
+                    return@launch
+                }
+
+                // Honest signal: the user already came back on their own after we armed — no nudge.
+                if (!force) {
+                    val armedAt = deps.prefs.comebackArmedAt()
+                    val lastActive = deps.prefs.lastActiveMs()
+                    if (armedAt > 0L && lastActive > armedAt) {
+                        emitSkipped(deps, REASON_ALREADY_ACTIVE)
+                        return@launch
+                    }
+                }
+
+                val dateKey = todayKey()
+                if (!force && !deps.prefs.canShowOn(dateKey)) {
+                    emitSkipped(deps, REASON_FREQUENCY_CAP)
+                    return@launch
+                }
+
+                // findComeback emits its own skip reason (no_checklist / no_unchecked) and returns null.
+                val spec = findComeback(deps, intent, force) ?: return@launch
+                showRetentionPush(context, deps, spec)
+                if (!force) deps.prefs.markShown(dateKey)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                logSafe("comeback handler crashed: ${e.message}", e)
+            } finally {
+                pendingResult.finish()
+            }
+        }
+    }
+
+    /**
+     * Resolve the come-back target: the checklist id captured at arm time (intent extra), or — on a
+     * debug force run with no id — the newest checklist. Shows only if it still exists and still has
+     * unchecked items; otherwise emits the precise skip reason and returns null.
+     */
+    private suspend fun findComeback(deps: Deps, intent: Intent, force: Boolean): RetentionPushSpec? {
+        val extraId = intent.getLongExtra(EXTRA_COMEBACK_CHECKLIST_ID, -1L).takeIf { it > 0L }
+        val checklists = deps.repository.checklists.first()
+        val target = when {
+            extraId != null -> checklists.firstOrNull { it.id == extraId }
+            force -> checklists.maxByOrNull { it.id }
+            else -> null
+        }
+        if (target == null) {
+            emitSkipped(deps, REASON_NO_CHECKLIST)
+            return null
+        }
+        val fill = deps.repository.getDefaultFillOneShot(target.id)
+        val unchecked = fill?.let { uncheckedCount(it) } ?: 0
+        if (unchecked <= 0) {
+            emitSkipped(deps, REASON_NO_UNCHECKED)
+            return null
+        }
+        val context = deps.appContext
+        val name = target.name.ifBlank { intent.getStringExtra(EXTRA_COMEBACK_CHECKLIST_NAME).orEmpty() }
+        return RetentionPushSpec(
+            pushType = AnalyticsEvents.LocalPushType.COMEBACK,
+            channelToken = PushNotificationChannels.DATA_CHANNEL_REMINDERS,
+            audienceClass = AUDIENCE_FUNCTIONAL,
+            campaignId = CAMPAIGN_COMEBACK,
+            title = context.getString(R.string.retention_comeback_title),
+            body = context.resources.getQuantityString(
+                R.plurals.retention_comeback_body, unchecked, unchecked, name,
+            ),
+            checklistId = target.id,
+        )
+    }
+
+    private fun notificationsEnabled(context: Context): Boolean =
+        NotificationManagerCompat.from(context).areNotificationsEnabled()
+
+    private fun emitSkipped(deps: Deps, reason: String) {
+        deps.logger.debug(TAG, "comeback: skipped — reason=$reason")
+        runCatching {
+            deps.analytics.event(
+                AnalyticsEvents.Retention.COMEBACK_SKIPPED,
+                mapOf(AnalyticsParams.REASON to reason),
+            )
+        }.onFailure { deps.logger.warning(TAG, "comeback skipped-event emit failed: ${it.message}") }
     }
 
     // ─── Candidate selection (honest signals computed from Room only) ───
@@ -356,6 +469,14 @@ class RetentionPushReceiver : BroadcastReceiver() {
 
         const val ACTION_RETENTION_DAILY = "com.antonchuraev.aichecklists.ACTION_RETENTION_DAILY"
         const val ACTION_RETENTION_DIGEST = "com.antonchuraev.aichecklists.ACTION_RETENTION_DIGEST"
+        const val ACTION_RETENTION_COMEBACK = "com.antonchuraev.aichecklists.ACTION_RETENTION_COMEBACK"
+
+        // Come-back alarm extras (namespaced; the id/name are captured at arm time, name re-resolved
+        // live at fire time). EXTRA_COMEBACK_FORCE is honored ONLY on debuggable builds — the debug
+        // on-demand test hook that bypasses the honest gates.
+        const val EXTRA_COMEBACK_CHECKLIST_ID = "gisti.comeback.checklist_id"
+        const val EXTRA_COMEBACK_CHECKLIST_NAME = "gisti.comeback.checklist_name"
+        const val EXTRA_COMEBACK_FORCE = "gisti.comeback.force"
 
         /** Single notification id so a new retention push replaces the previous one (never stacks). */
         private const val RETENTION_NOTIFICATION_ID = 990_001
@@ -368,6 +489,14 @@ class RetentionPushReceiver : BroadcastReceiver() {
         private const val CAMPAIGN_STREAK = "local_streak_save"
         private const val CAMPAIGN_OVERDUE = "local_overdue"
         private const val CAMPAIGN_DIGEST = "local_weekly_digest"
+        private const val CAMPAIGN_COMEBACK = "local_comeback"
+
+        // COMEBACK_SKIPPED reasons (wire values — keep in sync with AnalyticsEvents.Retention doc).
+        private const val REASON_PERMISSION_OFF = "permission_off"
+        private const val REASON_NO_CHECKLIST = "no_checklist"
+        private const val REASON_ALREADY_ACTIVE = "already_active"
+        private const val REASON_FREQUENCY_CAP = "frequency_cap"
+        private const val REASON_NO_UNCHECKED = "no_unchecked"
 
         private const val ONE_DAY_MS = 24 * 60 * 60 * 1000L
 

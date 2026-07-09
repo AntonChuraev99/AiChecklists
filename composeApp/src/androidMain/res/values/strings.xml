@@ -50,6 +50,12 @@
         <item quantity="other">%1$d items are waiting across your %2$d checklists.</item>
     </plurals>
     <string name="retention_digest_body_caught_up">All caught up across %1$d checklists. Nice work!</string>
+    <!-- Come-back: one-shot D0->D1 nudge ~22h after the user's first checklist (name + open count). -->
+    <string name="retention_comeback_title">Pick up where you left off</string>
+    <plurals name="retention_comeback_body">
+        <item quantity="one">%1$d item still waiting in %2$s</item>
+        <item quantity="other">%1$d items still waiting in %2$s</item>
+    </plurals>
 
     <!-- ACTION_PROCESS_TEXT selection-toolbar menu labels (must stay short) -->
     <string name="process_text_create_ai">Checklist from text</string>

@@ -12,6 +12,7 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AppContextHolder
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.PushTokenRepository
 import com.antonchuraev.homesearchchecklist.di.appModule
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
 import com.antonchuraev.homesearchchecklist.feature.paywall.data.PaywallConfig
 import com.antonchuraev.homesearchchecklist.feature.paywall.data.RevenueCatInitializer
@@ -21,9 +22,11 @@ import com.antonchuraev.homesearchchecklist.retention.RetentionPrefs
 import com.antonchuraev.homesearchchecklist.retention.RetentionPushScheduler
 import java.util.Calendar
 import com.google.firebase.messaging.FirebaseMessaging
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import org.koin.android.ext.koin.androidContext
@@ -72,6 +75,63 @@ open class GistiApplication : Application() {
         // LOCAL retention auto-pushes (streak-save / overdue / weekly digest). Idempotent — user-set
         // reminders are handled entirely separately in rescheduleReminders() above and are untouched.
         scheduleRetentionPushes()
+
+        // Arm the one-shot D0->D1 come-back nudge the first time the user creates a checklist.
+        scheduleComebackOnFirstChecklist()
+    }
+
+    /**
+     * Observe [ChecklistRepository.checklists] and arm the one-shot come-back nudge on the FIRST
+     * genuine empty -> non-empty transition (the user's very first checklist). This is the day-1
+     * lever the recurring/overdue/digest pushes structurally cannot reach.
+     *
+     * Guards:
+     *  - Arms at most once per user lifetime ([RetentionPrefs.isComebackArmed]) — surviving process
+     *    death: an armed-or-fired come-back is never re-armed, even if the user deletes everything
+     *    and creates a new "first" checklist.
+     *  - Requires observing the empty state FIRST, so an existing user whose first emission is
+     *    already non-empty (had checklists before this shipped) is never nudged.
+     *
+     * All best-effort — a failure here never affects app start or user reminders.
+     */
+    private fun scheduleComebackOnFirstChecklist() {
+        applicationScope.launch {
+            val koin = GlobalContext.getOrNull() ?: return@launch
+            val prefs: RetentionPrefs = koin.getOrNull() ?: return@launch
+            val repository: ChecklistRepository = koin.getOrNull() ?: return@launch
+            val scheduler: RetentionPushScheduler = koin.getOrNull() ?: return@launch
+            val analytics: AnalyticsTracker? = koin.getOrNull()
+            val logger: AppLogger? = koin.getOrNull()
+
+            // Already armed once (in this or a previous process) — nothing to observe.
+            if (prefs.isComebackArmed()) return@launch
+
+            var sawEmpty = false
+            repository.checklists.collect { list ->
+                when {
+                    list.isEmpty() -> sawEmpty = true
+                    // First checklist after we saw the empty day-0 state -> arm, then stop observing.
+                    sawEmpty -> {
+                        val first = list.minByOrNull { it.id } ?: list.first()
+                        val armedAt = System.currentTimeMillis()
+                        runCatching {
+                            scheduler.scheduleComeback(first.id, first.name)
+                            prefs.markComebackScheduled(first.id, armedAt)
+                            analytics?.event(
+                                AnalyticsEvents.Retention.COMEBACK_SCHEDULED,
+                                mapOf(
+                                    AnalyticsParams.CHECKLIST_ID to first.id.toString(),
+                                    AnalyticsParams.DELAY_HOURS to RetentionPushScheduler.COMEBACK_DELAY_HOURS,
+                                ),
+                            )
+                        }.onFailure { logger?.warning("Retention", "comeback arm failed: ${it.message}") }
+                        throw CancellationException("comeback armed")
+                    }
+                    // Non-empty first emission = existing user -> never nudge; stop observing.
+                    else -> throw CancellationException("existing user — no come-back nudge")
+                }
+            }
+        }
     }
 
     /**

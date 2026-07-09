@@ -187,6 +187,12 @@ sealed interface ChecklistDetailState : State {
         val pendingRepeatConfig: PendingRepeatConfig? = null,
         val showEndConditionPicker: Boolean = false,
         val repeatRuleSummary: String? = null,
+        // ── Retention: recurring-list nudge ──
+        // Quiet, one-time inline suggestion offering to make this list repeat weekly. Shown once
+        // ever (persisted device flag), only at the checklist root on a non-trivial list (>=2 items)
+        // that has no repeat schedule yet. Accept → sets a default weekly repeat via the existing
+        // repeat-schedule path; dismiss → hides it. See ChecklistDetailViewModel.maybeShowRecurringNudge.
+        val showRecurringNudge: Boolean = false,
         // Per-item reminder sheet: null = closed; non-null = open for that itemId
         val itemReminderSheetFor: String? = null,
         val activeItemReminderTab: ReminderTab = ReminderTab.ONCE,
@@ -460,6 +466,12 @@ sealed interface ChecklistDetailIntent : Intent {
     data class OnRepeatTimeChanged(val hour: Int, val minute: Int) : ChecklistDetailIntent
     data object OnSaveRepeatSchedule : ChecklistDetailIntent
     data object OnRemoveRepeatSchedule : ChecklistDetailIntent
+
+    // ── Retention: recurring-list nudge ──
+    /** Accept the recurring nudge → set a default weekly repeat schedule (fires RECURRING_NUDGE_ACCEPTED). */
+    data object OnRecurringNudgeAccepted : ChecklistDetailIntent
+    /** Dismiss the recurring nudge (feedback: banner hides; fires RECURRING_NUDGE_DISMISSED). */
+    data object OnRecurringNudgeDismissed : ChecklistDetailIntent
 
     // End condition
     data object OnEndConditionClick : ChecklistDetailIntent

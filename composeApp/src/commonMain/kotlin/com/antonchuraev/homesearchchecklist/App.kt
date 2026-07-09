@@ -17,10 +17,12 @@ import com.antonchuraev.homesearchchecklist.csat.CsatViewModel
 import com.antonchuraev.homesearchchecklist.csat.InAppReviewLauncher
 import com.antonchuraev.homesearchchecklist.appupdate.AppUpdateLauncher
 import com.antonchuraev.homesearchchecklist.sync.UserCreditsSync
+import com.antonchuraev.homesearchchecklist.core.datastore.api.AppDatastore
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppThemeMode
 import com.antonchuraev.homesearchchecklist.core.datastore.api.LanguageRepository
 import com.antonchuraev.homesearchchecklist.core.datastore.api.ThemeRepository
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import com.antonchuraev.homesearchchecklist.desingsystem.emoji.LocalEmojiFont
 import com.antonchuraev.homesearchchecklist.desingsystem.emoji.rememberEmojiFont
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppLocaleEnvironment
@@ -200,6 +202,8 @@ import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigPr
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
 import com.antonchuraev.homesearchchecklist.activation.ActivationReminderSheet
+import com.antonchuraev.homesearchchecklist.activation.WidgetPromoSheet
+import com.antonchuraev.homesearchchecklist.feature.onboarding.isWidgetSupported
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDateTime
@@ -1578,6 +1582,49 @@ fun App() {
                 )
             }
 
+            // ── Widget promo (retention) ─────────────────────────────────────────
+            // Promotes the home-screen widget a DISTINCT beat after the user's SECOND checklist so it
+            // never stacks with the post-first-checklist reminder opt-in (ActivationReminderSheet) or
+            // its notification-permission ask. Evaluated once per app-open: if widgets are supported,
+            // the user already has >= 2 checklists (so they are past the first-checklist moment — the
+            // reminder opt-in already had its turn in a prior session), and the device show-once flag
+            // is unset, we mark it shown and surface the promo. The render guard ALSO requires the
+            // reminder sheet to be absent — a hard guarantee the two never co-render in one frame.
+            // The flag is device-global (the widget is a per-device surface, not per-account), stored
+            // via AppDatastore — same boolean-key pattern as ActivationPrefsRepository.
+            val appDatastore: AppDatastore = koinInject()
+            val widgetPromoAnalytics: AnalyticsTracker = koinInject()
+            var showWidgetPromo by rememberSaveable { mutableStateOf(false) }
+            LaunchedEffect(Unit) {
+                if (!isWidgetSupported()) return@LaunchedEffect
+                if (appDatastore.observeBoolean(WIDGET_PROMO_SHOWN_KEY, false).first()) return@LaunchedEffect
+                val checklistCount = checklistRepository.checklists.first().size
+                if (checklistCount < WIDGET_PROMO_MIN_CHECKLISTS) return@LaunchedEffect
+                // Never overlap the activation reminder soft-ask (which also drives the notif ask).
+                if (activationReminderChecklistId != null) return@LaunchedEffect
+                appDatastore.saveBoolean(WIDGET_PROMO_SHOWN_KEY, true)
+                widgetPromoAnalytics.event(AnalyticsEvents.Widget.PROMO_SHOWN)
+                showWidgetPromo = true
+            }
+            if (showWidgetPromo && activationReminderChecklistId == null) {
+                WidgetPromoSheet(
+                    onAddWidget = {
+                        scope.launch { widgetPromoAnalytics.event(AnalyticsEvents.Widget.PROMO_ACCEPTED) }
+                        showWidgetPromo = false
+                        // Hand off to the established widget-instruction flow (no programmatic pin API).
+                        showWidgetInstruction = true
+                    },
+                    onSkip = {
+                        scope.launch { widgetPromoAnalytics.event(AnalyticsEvents.Widget.PROMO_DISMISSED) }
+                        showWidgetPromo = false
+                    },
+                    onDismiss = {
+                        scope.launch { widgetPromoAnalytics.event(AnalyticsEvents.Widget.PROMO_DISMISSED) }
+                        showWidgetPromo = false
+                    },
+                )
+            }
+
             // In-App Review launcher — side-effect composable, no UI
             InAppReviewLauncher(
                 shouldLaunch = csatState.shouldLaunchReview,
@@ -1593,3 +1640,12 @@ fun App() {
         } // CompositionLocalProvider(LocalEmojiFont)
     }
 }
+
+/** Device-global show-once flag for the retention widget promo sheet (see [App]). */
+private const val WIDGET_PROMO_SHOWN_KEY = "widget_promo_shown"
+
+/**
+ * Minimum checklist count before the widget promo may appear. `>= 2` places it a distinct beat after
+ * the post-first-checklist activation reminder, so the two retention prompts never stack.
+ */
+private const val WIDGET_PROMO_MIN_CHECKLISTS = 2

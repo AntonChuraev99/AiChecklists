@@ -7,6 +7,7 @@ import android.util.Log
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.usecase.RecoverRecurringRemindersUseCase
+import com.antonchuraev.homesearchchecklist.retention.RetentionPrefs
 import com.antonchuraev.homesearchchecklist.retention.RetentionPushScheduler
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -66,6 +67,20 @@ class BootCompletedReceiver : BroadcastReceiver() {
                 // all AlarmManager alarms they are cleared on power-off and must be restored on boot.
                 val retentionScheduler: RetentionPushScheduler = koin.get()
                 retentionScheduler.scheduleAll()
+
+                // 6. Re-arm the one-shot D0->D1 come-back nudge ONLY if it is still pending (armed but
+                // not yet fired) — at its original fire instant, or shortly if that already passed.
+                val retentionPrefs: RetentionPrefs = koin.get()
+                if (retentionPrefs.isComebackPending()) {
+                    val checklistId = retentionPrefs.comebackChecklistId()
+                    if (checklistId != null) {
+                        retentionScheduler.rescheduleComebackAt(
+                            armedAtMs = retentionPrefs.comebackArmedAt(),
+                            checklistId = checklistId,
+                            checklistName = "",
+                        )
+                    }
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

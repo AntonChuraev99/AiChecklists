@@ -84,11 +84,65 @@ class RetentionPrefs(
         dataStore.saveString(KEY_LAST_SHOWN_DATE, dateKey)
     }
 
+    // ─── D0->D1 come-back nudge (one-shot arm state) ───
+
+    /**
+     * True once a come-back alarm has EVER been armed (pending or already fired). This is the
+     * arm-at-most-once-per-user guard: the first checklist arms it, and it never re-arms — even if
+     * the user later deletes every checklist and creates a new "first" one.
+     */
+    suspend fun isComebackArmed(): Boolean = comebackState() != COMEBACK_STATE_NONE
+
+    /**
+     * True while a come-back alarm is armed and still PENDING (not yet fired). Gates the boot-time
+     * re-arm: an already-fired come-back must never be re-scheduled on reboot.
+     */
+    suspend fun isComebackPending(): Boolean = comebackState() == COMEBACK_STATE_SCHEDULED
+
+    /** Record the come-back alarm as armed/pending for [checklistId] at [armedAtMs]. */
+    suspend fun markComebackScheduled(checklistId: Long, armedAtMs: Long) {
+        dataStore.saveString(KEY_COMEBACK_CHECKLIST_ID, checklistId.toString())
+        dataStore.saveString(KEY_COMEBACK_ARMED_AT, armedAtMs.toString())
+        dataStore.saveString(KEY_COMEBACK_STATE, COMEBACK_STATE_SCHEDULED)
+    }
+
+    /** Mark the come-back alarm as fired/consumed so a later boot never re-arms it. */
+    suspend fun markComebackFired() {
+        dataStore.saveString(KEY_COMEBACK_STATE, COMEBACK_STATE_FIRED)
+    }
+
+    /** The target checklist id captured when the come-back was armed, or null if never armed. */
+    suspend fun comebackChecklistId(): Long? =
+        dataStore.observeString(KEY_COMEBACK_CHECKLIST_ID, "").first().toLongOrNull()
+
+    /** When the come-back alarm was armed (epoch ms), or 0 if never armed. */
+    suspend fun comebackArmedAt(): Long =
+        dataStore.observeString(KEY_COMEBACK_ARMED_AT, "").first().toLongOrNull() ?: 0L
+
+    /**
+     * Last recorded foreground/activity sample (epoch ms), or 0 if none yet. Fed by
+     * [recordActiveHour]; the come-back honest signal compares it against [comebackArmedAt] to skip
+     * nudging a user who already returned on their own after the alarm was armed.
+     */
+    suspend fun lastActiveMs(): Long =
+        dataStore.observeString(KEY_LAST_ACTIVE_MS, "").first().toLongOrNull() ?: 0L
+
+    private suspend fun comebackState(): String =
+        dataStore.observeString(KEY_COMEBACK_STATE, COMEBACK_STATE_NONE).first()
+
     private companion object {
         const val KEY_HISTOGRAM = "retention_hour_histogram"
         const val KEY_LAST_ACTIVE_MS = "retention_last_active_ms"
         const val KEY_LAST_SHOWN_DATE = "retention_last_shown_date"
         const val SEPARATOR = ","
+
+        // Come-back one-shot arm state machine (persisted): none -> scheduled -> fired.
+        const val KEY_COMEBACK_STATE = "retention_comeback_state"
+        const val KEY_COMEBACK_CHECKLIST_ID = "retention_comeback_checklist_id"
+        const val KEY_COMEBACK_ARMED_AT = "retention_comeback_armed_at"
+        const val COMEBACK_STATE_NONE = ""
+        const val COMEBACK_STATE_SCHEDULED = "scheduled"
+        const val COMEBACK_STATE_FIRED = "fired"
 
         /** Ignore activity samples closer together than this (15 min) so a resume storm counts once. */
         const val RECORD_DEBOUNCE_MS = 15 * 60 * 1000L

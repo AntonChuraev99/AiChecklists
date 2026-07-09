@@ -166,6 +166,62 @@ object AnalyticsEvents {
 
         /** Weekly summary of open items across all checklists. Promotional. */
         const val DIGEST = "digest"
+
+        /**
+         * D0->D1 come-back: a ONE-SHOT nudge ~20-24h after the user's FIRST checklist, keyed to
+         * that checklist, with NO recurring/overdue precondition. Covers the day-1 leak point the
+         * other three local pushes structurally cannot reach (see docs push-retention "D0->D1 gap").
+         * Functional. Flows through the shared push funnel: [Push.RECEIVED]/[Push.OPENED] with
+         * push_type = comeback + campaign_id = "local_comeback".
+         */
+        const val COMEBACK = "comeback"
+    }
+
+    /**
+     * On-device retention MECHANICS beyond the raw push funnel: whether a local nudge was armed /
+     * skipped, and the recurring-list nudge outcome. These make each new retention lever provable
+     * in Amplitude on its own (scheduled vs shown vs skipped; nudge shown vs accepted vs dismissed),
+     * not just visible through the shared push delivery events.
+     */
+    object Retention {
+        /** Come-back alarm ARMED after the first checklist. Params: [AnalyticsParams.CHECKLIST_ID], [AnalyticsParams.DELAY_HOURS]. */
+        const val COMEBACK_SCHEDULED = "retention_comeback_scheduled"
+
+        /** Come-back alarm fired but nothing shown. Param: [AnalyticsParams.REASON] = permission_off | no_checklist | already_active | frequency_cap. */
+        const val COMEBACK_SKIPPED = "retention_comeback_skipped"
+
+        /** Recurring-list nudge surfaced (offer to make a list repeat). Param: [AnalyticsParams.SOURCE] = create | detail | first_run. */
+        const val RECURRING_NUDGE_SHOWN = "recurring_nudge_shown"
+
+        /** User accepted the recurring nudge -> a repeat schedule was set. */
+        const val RECURRING_NUDGE_ACCEPTED = "recurring_nudge_accepted"
+
+        /** User dismissed the recurring nudge (feedback on every action — no silent exit). */
+        const val RECURRING_NUDGE_DISMISSED = "recurring_nudge_dismissed"
+    }
+
+    /**
+     * Home-screen widget lifecycle + promo funnel. Until now the ONLY widget event was
+     * [Item.WIDGET_TOGGLED] (an item checked from the widget) — so widget ADOPTION and the
+     * widget's RETURN contribution were both invisible. [ADDED] measures adoption; [OPENED]
+     * (deep-link tap) is the widget's actual retention signal; the PROMO_* trio measures the
+     * post-first-checklist promo sheet that drives installs.
+     */
+    object Widget {
+        /** Widget bound to a checklist (first onUpdate for a new appWidgetId / config confirmed). */
+        const val ADDED = "widget_added"
+
+        /** Widget tapped -> deep-link into the checklist (the widget-driven return signal). */
+        const val OPENED = "widget_opened"
+
+        /** The "add the widget" promo sheet was shown (after the first checklist). */
+        const val PROMO_SHOWN = "widget_promo_shown"
+
+        /** User tapped "Add widget" -> system pin-widget request launched. */
+        const val PROMO_ACCEPTED = "widget_promo_accepted"
+
+        /** User dismissed the widget promo sheet (feedback on every action — no silent exit). */
+        const val PROMO_DISMISSED = "widget_promo_dismissed"
     }
 
     // ─── AI: Analyze (Photo/PDF/Text/Link/Voice -> checklist) ─────────────────
@@ -395,6 +451,10 @@ object AnalyticsParams {
 
     // Activation bundle — which hero template chip was tapped (e.g. "trip", "groceries").
     const val CHIP_KEY = "chip_key"
+
+    // Retention come-back nudge — how far ahead the one-shot alarm was armed (diagnostics on
+    // retention_comeback_scheduled; pairs with [AnalyticsEvents.Retention.COMEBACK_SKIPPED] reason).
+    const val DELAY_HOURS = "delay_hours"
 
     // Generic error diagnostics (login_failed etc.): code = stable type/class id, message = human text.
     const val ERROR_CODE = "error_code"

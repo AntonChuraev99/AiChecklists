@@ -3,6 +3,7 @@ package com.antonchuraev.homesearchchecklist.widget.data
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -47,16 +48,36 @@ class WidgetStateManager(private val context: Context) {
     }
 
     /**
-     * Clear the configuration for a specific widget (e.g., when widget is removed).
+     * Clear the configuration for a specific widget (e.g., when widget is removed). Also clears the
+     * adoption marker so a future widget that happens to reuse this appWidgetId is counted again.
      */
     suspend fun clearWidget(appWidgetId: Int) {
         val key = longPreferencesKey(keyForWidget(appWidgetId))
+        val adoptedKey = booleanPreferencesKey(adoptedKeyForWidget(appWidgetId))
         context.widgetDataStore.edit { prefs ->
             prefs.remove(key)
+            prefs.remove(adoptedKey)
         }
+    }
+
+    /**
+     * Record [appWidgetId] as an adopted (analytics-counted) widget, returning true only the FIRST
+     * time it is seen. Lets the config flow emit `widget_added` exactly once per widget instance so
+     * re-configuring the same widget never double-counts adoption.
+     */
+    suspend fun markAdoptedIfNew(appWidgetId: Int): Boolean {
+        val adoptedKey = booleanPreferencesKey(adoptedKeyForWidget(appWidgetId))
+        val already = context.widgetDataStore.data.first()[adoptedKey] ?: false
+        if (already) return false
+        context.widgetDataStore.edit { prefs -> prefs[adoptedKey] = true }
+        return true
     }
 
     private fun keyForWidget(appWidgetId: Int): String {
         return "widget_${appWidgetId}_checklist_id"
+    }
+
+    private fun adoptedKeyForWidget(appWidgetId: Int): String {
+        return "widget_${appWidgetId}_adopted"
     }
 }

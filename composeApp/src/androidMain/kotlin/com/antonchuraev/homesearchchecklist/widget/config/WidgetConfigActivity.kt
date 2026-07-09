@@ -40,6 +40,9 @@ import androidx.lifecycle.lifecycleScope
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppTheme
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.widget.ChecklistWidget
@@ -199,6 +202,16 @@ class WidgetConfigActivity : ComponentActivity() {
         lifecycleScope.launch {
             // Save selection
             stateManager.setSelectedChecklistId(appWidgetId, checklist.id)
+
+            // Adoption analytics: emit widget_added once per widget instance (first bind only).
+            runCatching {
+                if (stateManager.markAdoptedIfNew(appWidgetId)) {
+                    GlobalContext.getOrNull()?.getOrNull<AnalyticsTracker>()?.event(
+                        AnalyticsEvents.Widget.ADDED,
+                        mapOf(AnalyticsParams.CHECKLIST_ID to checklist.id.toString()),
+                    )
+                }
+            }
 
             // Update widget
             val glanceId = GlanceAppWidgetManager(this@WidgetConfigActivity)

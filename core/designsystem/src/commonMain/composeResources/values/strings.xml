@@ -95,6 +95,22 @@
     <string name="onboarding_discover_widget_done">Got it</string>
 
     <string name="onboarding_discover_maybe_later">Maybe Later</string>
+
+    <!-- Retention: recurring-list nudge (checklist detail) -->
+    <string name="recurring_nudge_title">Repeat this list weekly?</string>
+    <string name="recurring_nudge_subtitle">Make it a routine and we'll bring it back each week.</string>
+    <string name="recurring_nudge_accept">Repeat weekly</string>
+    <string name="recurring_nudge_dismiss">Dismiss</string>
+    <string name="recurring_nudge_set_confirmation">Weekly repeat set</string>
+
+    <!-- Retention: home-screen widget promo sheet (after the user's 2nd checklist) -->
+    <string name="widget_promo_title">Add the Gisti widget</string>
+    <string name="widget_promo_description">Keep a checklist one tap away, right on your home screen.</string>
+    <string name="widget_promo_feature1">See your list without opening the app</string>
+    <string name="widget_promo_feature2">Check items off from the home screen</string>
+    <string name="widget_promo_feature3">A daily nudge to keep the streak going</string>
+    <string name="widget_promo_add">Add widget</string>
+    <string name="widget_promo_skip">Not now</string>
     <string name="onboarding_discover_completed">%1$d of %2$d completed</string>
 
     <!-- AI Welcome onboarding (Toki style) — Android-only variant -->

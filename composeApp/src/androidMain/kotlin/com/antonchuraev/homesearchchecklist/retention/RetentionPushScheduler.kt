@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import com.antonchuraev.homesearchchecklist.AppBuildConfig
 import java.util.Calendar
 
 /**
@@ -49,6 +50,52 @@ class RetentionPushScheduler(
         scheduleAlarm(
             nextWeeklyTriggerMillis(hour, DIGEST_DAY_OF_WEEK, System.currentTimeMillis()),
             digestPendingIntent(),
+        )
+    }
+
+    // ─── D0->D1 come-back nudge (ONE-SHOT; no recurring/overdue precondition) ───
+
+    /**
+     * Arm the one-shot come-back alarm ~[COMEBACK_DELAY_HOURS]h from now, keyed to [checklistId]
+     * (the user's first checklist). NOT rescheduled — it fires exactly once. On debug builds the
+     * delay collapses to [COMEBACK_DEBUG_DELAY_MS] so the nudge can be exercised without waiting a
+     * day. [checklistName] is carried as a fallback label; the receiver re-resolves the live name.
+     */
+    fun scheduleComeback(checklistId: Long, checklistName: String) {
+        val delay = comebackDelayMs()
+        scheduleAlarm(System.currentTimeMillis() + delay, comebackPendingIntent(checklistId, checklistName))
+    }
+
+    /**
+     * Re-arm the come-back alarm after a reboot at its ORIGINAL fire instant ([armedAtMs] + delay).
+     * If that instant has already passed while the device was off, fire shortly instead
+     * ([COMEBACK_REARM_MIN_BUFFER_MS]). Only called by boot recovery for a still-pending come-back.
+     */
+    fun rescheduleComebackAt(armedAtMs: Long, checklistId: Long, checklistName: String) {
+        val originalTrigger = armedAtMs + comebackDelayMs()
+        val safeTrigger = maxOf(originalTrigger, System.currentTimeMillis() + COMEBACK_REARM_MIN_BUFFER_MS)
+        scheduleAlarm(safeTrigger, comebackPendingIntent(checklistId, checklistName))
+    }
+
+    /** Cancel a pending come-back alarm (PendingIntent equality ignores extras — id/name irrelevant). */
+    fun cancelComeback() {
+        alarmManager.cancel(comebackPendingIntent(0L, ""))
+    }
+
+    private fun comebackDelayMs(): Long =
+        if (AppBuildConfig.isDebug) COMEBACK_DEBUG_DELAY_MS else COMEBACK_DELAY_MS
+
+    private fun comebackPendingIntent(checklistId: Long, checklistName: String): PendingIntent {
+        val intent = Intent(context, RetentionPushReceiver::class.java).apply {
+            action = RetentionPushReceiver.ACTION_RETENTION_COMEBACK
+            putExtra(RetentionPushReceiver.EXTRA_COMEBACK_CHECKLIST_ID, checklistId)
+            putExtra(RetentionPushReceiver.EXTRA_COMEBACK_CHECKLIST_NAME, checklistName)
+        }
+        return PendingIntent.getBroadcast(
+            context,
+            COMEBACK_REQUEST_CODE,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
     }
 
@@ -120,7 +167,20 @@ class RetentionPushScheduler(
         const val DAILY_REQUEST_CODE = -1_000_001
         const val DIGEST_REQUEST_CODE = -1_000_002
 
+        /** One-shot come-back alarm — disjoint negative request code (never collides with the above). */
+        const val COMEBACK_REQUEST_CODE = -1_000_003
+
         /** Weekly digest fires on Sundays (Calendar.SUNDAY). */
         const val DIGEST_DAY_OF_WEEK = Calendar.SUNDAY
+
+        /** Come-back nudge fires ~22h after the first checklist — squarely in the D0->D1 gap. */
+        const val COMEBACK_DELAY_HOURS = 22
+        const val COMEBACK_DELAY_MS = COMEBACK_DELAY_HOURS * 60L * 60L * 1000L
+
+        /** Debug-only collapsed delay so the nudge is testable without waiting a day (20s). */
+        const val COMEBACK_DEBUG_DELAY_MS = 20_000L
+
+        /** If the original come-back instant already passed during a reboot, fire this soon after. */
+        const val COMEBACK_REARM_MIN_BUFFER_MS = 60_000L
     }
 }
