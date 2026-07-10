@@ -11,11 +11,10 @@
  *   - READS fan out across the union of the caller's user docs (device-doc + google_uid-doc).
  *   - AI credit calls charge `creditUserId` (the device/credit doc — what the app sends to CFs).
  *   - CREATES write to `writeUserId` (the google_uid data doc — cross-device source of truth).
- *   - MUTATIONS read-modify-write the SAME doc the checklist was found in (`ownerId`), never
- *     migrating data between docs.
+ *   - MUTATIONS read-modify-write the SAME doc the checklist was found in (`ownerId`).
  *
- * All writes mirror the Kotlin sync contract byte-for-byte (encode.ts + mutate.ts, gated by the
- * contract test) and honor dirty-parent + templateItemId + monotonic updatedAt invariants.
+ * Public-launch hardening (security.ts): opaque OAuth state, per-user rate limiting, deterministic
+ * request_id (retry dedup), and a safe() wrapper so a tool never leaks an unhandled error.
  */
 import { McpAgent } from "agents/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -49,14 +48,40 @@ import {
   leafItemCount,
   parseFillItems,
   parseTemplateItems,
+  type ChecklistItem,
   type ChecklistSyncData,
 } from "./model";
+import {
+  RATE_TIERS,
+  REQUEST_ID_BUCKET_MS,
+  rateLimit,
+  stableRequestId,
+  type RateTier,
+} from "./security";
 
 const SIGN_IN_HINT =
   "No linked Gisti account for this Google email. Open the Gisti app and sign in with Google first, then reconnect.";
 
-function textResult(text: string) {
+type ToolResult = { content: Array<{ type: "text"; text: string }> };
+
+function textResult(text: string): ToolResult {
   return { content: [{ type: "text" as const, text }] };
+}
+
+/**
+ * Wrap a tool handler so it never throws out to the transport: CfError → user-facing hint, anything
+ * else → logged + a generic message. Keeps a bad request from surfacing as a raw 500 to the client.
+ */
+function safe<A>(handler: (args: A) => Promise<ToolResult>): (args: A) => Promise<ToolResult> {
+  return async (args: A) => {
+    try {
+      return await handler(args);
+    } catch (e) {
+      if (e instanceof CfError) return textResult(cfErrorHint(e));
+      console.error("[gisti-mcp] tool error:", e instanceof Error ? (e.stack ?? e.message) : e);
+      return textResult("Something went wrong handling that request. Please try again.");
+    }
+  };
 }
 
 /** One-line summary for the list view. */
@@ -66,23 +91,53 @@ function summarizeChecklist(c: ChecklistSyncData): string {
   return `• ${c.name} — ${count} item${count === 1 ? "" : "s"} [id: ${c.cloudId}]${reminder}`;
 }
 
-/** Detailed view: the default fill's items with checked state + note, exposing each item's id. */
+/**
+ * Detailed view: the folder tree (from the template), each leaf showing its checked state + note
+ * from the default fill (matched by templateItemId) and its id (the id CRUD tools speak). Orphans
+ * (parentId pointing at a missing/non-folder node) render at the root so nothing is hidden.
+ */
 function renderChecklist(c: ChecklistSyncData): string {
   const lines: string[] = [`Checklist: ${c.name} (id: ${c.cloudId})`];
+  const template = parseTemplateItems(c.itemsJson);
   const fill = defaultFill(c);
-  if (fill) {
-    const items = parseFillItems(fill.itemsJson);
+
+  // Fallback: no template tree (legacy) → render the flat fill.
+  if (template.length === 0) {
+    const items = fill ? parseFillItems(fill.itemsJson) : [];
     lines.push(`Items (${items.length}):`);
     for (const it of items) {
-      const id = it.templateItemId ?? it.id;
       const note = it.note ? `  — ${it.note}` : "";
-      lines.push(`  ${it.checked ? "[x]" : "[ ]"} ${it.text}  (id: ${id})${note}`);
+      lines.push(`  ${it.checked ? "[x]" : "[ ]"} ${it.text}  (id: ${it.templateItemId ?? it.id})${note}`);
     }
-  } else {
-    const items = parseTemplateItems(c.itemsJson).filter((i) => i.type === "ITEM");
-    lines.push(`Items (${items.length}):`);
-    for (const it of items) lines.push(`  [ ] ${it.text}  (id: ${it.id})`);
+    return lines.join("\n");
   }
+
+  const state = new Map<string, { checked: boolean; note: string | null }>();
+  if (fill) {
+    for (const fi of parseFillItems(fill.itemsJson)) {
+      if (fi.templateItemId) state.set(fi.templateItemId, { checked: fi.checked, note: fi.note });
+    }
+  }
+
+  const folderIds = new Set(template.filter((i) => i.type === "FOLDER").map((i) => i.id));
+  const isRoot = (i: ChecklistItem): boolean => !i.parentId || !folderIds.has(i.parentId);
+  const childrenOf = (id: string): ChecklistItem[] => template.filter((i) => !isRoot(i) && i.parentId === id);
+
+  lines.push(`Items (${template.filter((i) => i.type === "ITEM").length}):`);
+  const walk = (items: ChecklistItem[], depth: number): void => {
+    const indent = "  ".repeat(depth + 1);
+    for (const it of items) {
+      if (it.type === "FOLDER") {
+        lines.push(`${indent}📁 ${it.text}  (id: ${it.id})`);
+        walk(childrenOf(it.id), depth + 1);
+      } else {
+        const st = state.get(it.id);
+        const note = st?.note ? `  — ${st.note}` : "";
+        lines.push(`${indent}${st?.checked ? "[x]" : "[ ]"} ${it.text}  (id: ${it.id})${note}`);
+      }
+    }
+  };
+  walk(template.filter(isRoot), 0);
   return lines.join("\n");
 }
 
@@ -99,7 +154,7 @@ async function collectChecklists(env: Env, ids: string[]): Promise<ChecklistSync
 }
 
 export class GistiMCP extends McpAgent<Env, unknown, Props> {
-  server = new McpServer({ name: "Gisti Checklists", version: "0.2.0" });
+  server = new McpServer({ name: "Gisti Checklists", version: "0.3.0" });
 
   /** All candidate user_ids for the caller (read fan-out), or [] if not linked. */
   private async userIds(): Promise<string[]> {
@@ -115,6 +170,15 @@ export class GistiMCP extends McpAgent<Env, unknown, Props> {
     return resolveUserContext(this.env, email);
   }
 
+  /** Best-effort per-user rate limit. Returns a deny message, or null when allowed / unauthenticated. */
+  private async rateLimited(tier: RateTier): Promise<string | null> {
+    const email = this.props?.claims.email;
+    if (!email) return null;
+    const { limit, windowSeconds } = RATE_TIERS[tier];
+    const r = await rateLimit(this.env.OAUTH_KV, `${tier}:${email}`, limit, windowSeconds, Date.now());
+    return r.allowed ? null : `You're doing that too fast — try again in about ${r.resetSeconds}s.`;
+  }
+
   async init() {
     this.registerReadTools();
     this.registerAiTools();
@@ -127,33 +191,39 @@ export class GistiMCP extends McpAgent<Env, unknown, Props> {
       "list_checklists",
       "List all of the signed-in user's checklists (name, item count, id).",
       {},
-      async () => {
+      safe(async () => {
+        const denied = await this.rateLimited("read");
+        if (denied) return textResult(denied);
         const ids = await this.userIds();
         if (ids.length === 0) return textResult(SIGN_IN_HINT);
         const checklists = await collectChecklists(this.env, ids);
         if (checklists.length === 0) return textResult("You have no checklists yet.");
         return textResult(checklists.map(summarizeChecklist).join("\n"));
-      },
+      }),
     );
 
     this.server.tool(
       "get_checklist",
-      "Get one checklist by its id, with its items, their checked state, notes, and item ids.",
+      "Get one checklist by its id: its folder tree, each item's checked state, note, and id.",
       { checklistId: z.string().describe("The checklist id (cloudId) from list_checklists.") },
-      async ({ checklistId }) => {
+      safe(async ({ checklistId }) => {
+        const denied = await this.rateLimited("read");
+        if (denied) return textResult(denied);
         const ids = await this.userIds();
         if (ids.length === 0) return textResult(SIGN_IN_HINT);
         const owned = await findChecklistWithOwner(this.env, ids, checklistId);
         if (!owned) return textResult(`No checklist found with id ${checklistId}.`);
         return textResult(renderChecklist(owned.checklist));
-      },
+      }),
     );
 
     this.server.tool(
       "search_checklists",
       "Search the user's checklists by a text query over names and item text.",
       { query: z.string().describe("Text to match against checklist names and item text.") },
-      async ({ query }) => {
+      safe(async ({ query }) => {
+        const denied = await this.rateLimited("read");
+        if (denied) return textResult(denied);
         const ids = await this.userIds();
         if (ids.length === 0) return textResult(SIGN_IN_HINT);
         const q = query.trim().toLowerCase();
@@ -167,7 +237,7 @@ export class GistiMCP extends McpAgent<Env, unknown, Props> {
         });
         if (hits.length === 0) return textResult(`No checklists match "${query}".`);
         return textResult(hits.map(summarizeChecklist).join("\n"));
-      },
+      }),
     );
   }
 
@@ -180,29 +250,26 @@ export class GistiMCP extends McpAgent<Env, unknown, Props> {
         prompt: z.string().describe("What the checklist should be about, e.g. 'packing list for a ski trip'."),
         locale: z.string().optional().describe("Output language fallback: 'ru' for Russian, else English."),
       },
-      async ({ prompt, locale }) => {
+      safe(async ({ prompt, locale }) => {
+        const denied = await this.rateLimited("ai");
+        if (denied) return textResult(denied);
         const ctx = await this.context();
         if (!ctx) return textResult(SIGN_IN_HINT);
-        try {
-          const res = await generateChecklist({
-            userId: ctx.creditUserId,
-            prompt,
-            requestId: crypto.randomUUID(),
-            locale,
-          });
-          const checklist = buildAiChecklist(res.checklistName, res.items, Date.now());
-          await writeChecklist(this.env, ctx.writeUserId, checklist);
-          const n = leafItemCount(checklist);
-          return textResult(
-            `✓ Created "${checklist.name}" with ${n} item${n === 1 ? "" : "s"}. (id: ${checklist.cloudId})\n` +
-              (res.summary ? `${res.summary}\n` : "") +
-              `AI credits left: ${res.aiCredits}`,
-          );
-        } catch (e) {
-          if (e instanceof CfError) return textResult(cfErrorHint(e));
-          throw e;
-        }
-      },
+        const requestId = await stableRequestId(
+          [ctx.creditUserId, "create", prompt, locale ?? ""],
+          REQUEST_ID_BUCKET_MS,
+          Date.now(),
+        );
+        const res = await generateChecklist({ userId: ctx.creditUserId, prompt, requestId, locale });
+        const checklist = buildAiChecklist(res.checklistName, res.items, Date.now());
+        await writeChecklist(this.env, ctx.writeUserId, checklist);
+        const n = leafItemCount(checklist);
+        return textResult(
+          `✓ Created "${checklist.name}" with ${n} item${n === 1 ? "" : "s"}. (id: ${checklist.cloudId})\n` +
+            (res.summary ? `${res.summary}\n` : "") +
+            `AI credits left: ${res.aiCredits}`,
+        );
+      }),
     );
 
     this.server.tool(
@@ -216,36 +283,38 @@ export class GistiMCP extends McpAgent<Env, unknown, Props> {
           .optional()
           .describe("How to interpret `input`. Default 'text'."),
       },
-      async ({ checklistId, input, inputType }) => {
+      safe(async ({ checklistId, input, inputType }) => {
+        const denied = await this.rateLimited("ai");
+        if (denied) return textResult(denied);
         const ctx = await this.context();
         if (!ctx) return textResult(SIGN_IN_HINT);
         const owned = await findChecklistWithOwner(this.env, ctx.allIds, checklistId);
         if (!owned) return textResult(`No checklist found with id ${checklistId}.`);
         const items = flattenFillForAi(owned.checklist, Date.now());
         if (items.length === 0) return textResult("That checklist has no items to fill.");
-        try {
-          const res = await analyzeAndFillChecklist({
-            userId: ctx.creditUserId,
-            checklistId: owned.checklist.cloudId,
-            checklistName: owned.checklist.name,
-            items,
-            inputType: inputType ?? "text",
-            inputData: input,
-            requestId: crypto.randomUUID(),
-          });
-          const next = applyFilledItems(owned.checklist, res.filledItems, Date.now());
-          await writeChecklist(this.env, owned.ownerId, next);
-          const done = res.filledItems.filter((f) => f.checked).length;
-          return textResult(
-            `✓ Filled "${owned.checklist.name}": ${done}/${items.length} checked.\n` +
-              (res.summary ? `${res.summary}\n` : "") +
-              `AI credits left: ${res.aiCredits}`,
-          );
-        } catch (e) {
-          if (e instanceof CfError) return textResult(cfErrorHint(e));
-          throw e;
-        }
-      },
+        const requestId = await stableRequestId(
+          [ctx.creditUserId, "fill", checklistId, inputType ?? "text", input],
+          REQUEST_ID_BUCKET_MS,
+          Date.now(),
+        );
+        const res = await analyzeAndFillChecklist({
+          userId: ctx.creditUserId,
+          checklistId: owned.checklist.cloudId,
+          checklistName: owned.checklist.name,
+          items,
+          inputType: inputType ?? "text",
+          inputData: input,
+          requestId,
+        });
+        const next = applyFilledItems(owned.checklist, res.filledItems, Date.now());
+        await writeChecklist(this.env, owned.ownerId, next);
+        const done = res.filledItems.filter((f) => f.checked).length;
+        return textResult(
+          `✓ Filled "${owned.checklist.name}": ${done}/${items.length} checked.\n` +
+            (res.summary ? `${res.summary}\n` : "") +
+            `AI credits left: ${res.aiCredits}`,
+        );
+      }),
     );
   }
 
@@ -257,7 +326,9 @@ export class GistiMCP extends McpAgent<Env, unknown, Props> {
       fn: (c: ChecklistSyncData, now: number) => ChecklistSyncData | null,
       ok: (c: ChecklistSyncData) => string,
       missing = "That item was not found in the checklist.",
-    ) => {
+    ): Promise<ToolResult> => {
+      const denied = await this.rateLimited("write");
+      if (denied) return textResult(denied);
       const ctx = await this.context();
       if (!ctx) return textResult(SIGN_IN_HINT);
       const owned = await findChecklistWithOwner(this.env, ctx.allIds, checklistId);
@@ -276,12 +347,13 @@ export class GistiMCP extends McpAgent<Env, unknown, Props> {
         itemId: z.string().describe("The item id from get_checklist."),
         checked: z.boolean().describe("true = done/checked, false = not done."),
       },
-      ({ checklistId, itemId, checked }) =>
+      safe(({ checklistId, itemId, checked }) =>
         mutate(
           checklistId,
           (c, now) => toggleItem(c, itemId, checked, now),
           () => `✓ Marked item as ${checked ? "done" : "not done"}.`,
         ),
+      ),
     );
 
     this.server.tool(
@@ -292,7 +364,9 @@ export class GistiMCP extends McpAgent<Env, unknown, Props> {
         text: z.string().describe("The new item's text."),
         parentId: z.string().optional().describe("A folder item id to nest under; omit for top level."),
       },
-      async ({ checklistId, text, parentId }) => {
+      safe(async ({ checklistId, text, parentId }) => {
+        const denied = await this.rateLimited("write");
+        if (denied) return textResult(denied);
         const ctx = await this.context();
         if (!ctx) return textResult(SIGN_IN_HINT);
         const owned = await findChecklistWithOwner(this.env, ctx.allIds, checklistId);
@@ -300,7 +374,7 @@ export class GistiMCP extends McpAgent<Env, unknown, Props> {
         const { checklist, itemId } = addItem(owned.checklist, text, parentId ?? null, Date.now());
         await writeChecklist(this.env, owned.ownerId, checklist);
         return textResult(`✓ Added "${text}". (id: ${itemId})`);
-      },
+      }),
     );
 
     this.server.tool(
@@ -311,8 +385,9 @@ export class GistiMCP extends McpAgent<Env, unknown, Props> {
         itemId: z.string().describe("The item id from get_checklist."),
         text: z.string().describe("The new text."),
       },
-      ({ checklistId, itemId, text }) =>
+      safe(({ checklistId, itemId, text }) =>
         mutate(checklistId, (c, now) => renameItem(c, itemId, text, now), () => `✓ Renamed item to "${text}".`),
+      ),
     );
 
     this.server.tool(
@@ -323,12 +398,13 @@ export class GistiMCP extends McpAgent<Env, unknown, Props> {
         itemId: z.string().describe("The item id from get_checklist."),
         note: z.string().describe("The note text; pass an empty string to clear it."),
       },
-      ({ checklistId, itemId, note }) =>
+      safe(({ checklistId, itemId, note }) =>
         mutate(
           checklistId,
           (c, now) => editNote(c, itemId, note, now),
           () => (note ? "✓ Note updated." : "✓ Note cleared."),
         ),
+      ),
     );
 
     this.server.tool(
@@ -338,8 +414,9 @@ export class GistiMCP extends McpAgent<Env, unknown, Props> {
         checklistId: z.string().describe("The checklist id."),
         itemId: z.string().describe("The item id from get_checklist."),
       },
-      ({ checklistId, itemId }) =>
+      safe(({ checklistId, itemId }) =>
         mutate(checklistId, (c, now) => deleteItem(c, itemId, now), () => "✓ Item deleted."),
+      ),
     );
 
     this.server.tool(
@@ -349,13 +426,14 @@ export class GistiMCP extends McpAgent<Env, unknown, Props> {
         checklistId: z.string().describe("The checklist id."),
         orderedItemIds: z.array(z.string()).describe("Item ids in the desired new order."),
       },
-      ({ checklistId, orderedItemIds }) =>
+      safe(({ checklistId, orderedItemIds }) =>
         mutate(
           checklistId,
           (c, now) => reorderItems(c, orderedItemIds, now),
           () => "✓ Items reordered.",
           "None of those item ids are in the checklist.",
         ),
+      ),
     );
 
     this.server.tool(
@@ -365,16 +443,18 @@ export class GistiMCP extends McpAgent<Env, unknown, Props> {
         checklistId: z.string().describe("The checklist id."),
         name: z.string().describe("The new checklist name."),
       },
-      ({ checklistId, name }) =>
+      safe(({ checklistId, name }) =>
         mutate(checklistId, (c, now) => renameChecklist(c, name, now), () => `✓ Renamed checklist to "${name}".`),
+      ),
     );
 
     this.server.tool(
       "delete_checklist",
       "Delete a whole checklist (soft delete — it is removed from the app on all devices).",
       { checklistId: z.string().describe("The checklist id.") },
-      ({ checklistId }) =>
+      safe(({ checklistId }) =>
         mutate(checklistId, (c, now) => softDeleteChecklist(c, now), (c) => `✓ Deleted "${c.name}".`),
+      ),
     );
 
     this.server.tool(
@@ -384,14 +464,16 @@ export class GistiMCP extends McpAgent<Env, unknown, Props> {
         name: z.string().describe("The checklist name."),
         items: z.array(z.string()).optional().describe("Initial item texts (may be empty)."),
       },
-      async ({ name, items }) => {
+      safe(async ({ name, items }) => {
+        const denied = await this.rateLimited("write");
+        if (denied) return textResult(denied);
         const ctx = await this.context();
         if (!ctx) return textResult(SIGN_IN_HINT);
         const checklist = createEmptyChecklist(name, items ?? [], Date.now());
         await writeChecklist(this.env, ctx.writeUserId, checklist);
         const n = leafItemCount(checklist);
         return textResult(`✓ Created "${name}" with ${n} item${n === 1 ? "" : "s"}. (id: ${checklist.cloudId})`);
-      },
+      }),
     );
   }
 }

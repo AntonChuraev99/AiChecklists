@@ -7,14 +7,14 @@
  *   GET /authorize  → parse the MCP client's request → redirect to Google consent
  *   GET /callback   → exchange code → read id_token claims → completeAuthorization()
  *
- * ⚠ Hardening (Phase 0 → prod): `state` here carries the base64 oauthReqInfo unsigned.
- * The provider still validates the client (clientId/redirectUri) on completeAuthorization,
- * but a signed/opaque state (KV-stored, like the official demo) should replace this before
- * the public launch. Tracked in the design doc hardening section.
+ * `state` is an OPAQUE one-time nonce backed by KV (storeAuthState/consumeAuthState): the
+ * oauthReqInfo never leaves the server, and a forged/replayed nonce can't be consumed — CSRF
+ * and tamper safe for the public launch.
  */
 import { Hono } from "hono";
 import type { AuthRequest } from "@cloudflare/workers-oauth-provider";
 import type { Env, Props } from "./types";
+import { consumeAuthState, storeAuthState } from "./security";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -43,12 +43,14 @@ app.get("/authorize", async (c) => {
   }
   if (!oauthReqInfo.clientId) return c.text("Invalid authorization request", 400);
 
+  const nonce = await storeAuthState(c.env.OAUTH_KV, oauthReqInfo);
+
   const url = new URL(GOOGLE_AUTH_URL);
   url.searchParams.set("client_id", c.env.GOOGLE_OAUTH_CLIENT_ID);
   url.searchParams.set("redirect_uri", callbackUrl(c.req.url));
   url.searchParams.set("response_type", "code");
   url.searchParams.set("scope", "openid email profile");
-  url.searchParams.set("state", btoa(JSON.stringify(oauthReqInfo)));
+  url.searchParams.set("state", nonce);
   url.searchParams.set("access_type", "online");
   url.searchParams.set("prompt", "select_account");
   return c.redirect(url.href);
@@ -59,12 +61,9 @@ app.get("/callback", async (c) => {
   const stateRaw = c.req.query("state");
   if (!code || !stateRaw) return c.text("Missing code or state", 400);
 
-  let oauthReqInfo: AuthRequest;
-  try {
-    oauthReqInfo = JSON.parse(atob(stateRaw)) as AuthRequest;
-  } catch {
-    return c.text("Invalid state", 400);
-  }
+  const consumed = await consumeAuthState(c.env.OAUTH_KV, stateRaw);
+  if (!consumed) return c.text("Invalid or expired state", 400);
+  const oauthReqInfo = consumed as AuthRequest;
   if (!oauthReqInfo.clientId) return c.text("Invalid state", 400);
 
   const tokenResp = await fetch(GOOGLE_TOKEN_URL, {
