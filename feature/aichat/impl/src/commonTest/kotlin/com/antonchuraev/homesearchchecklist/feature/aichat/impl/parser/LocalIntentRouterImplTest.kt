@@ -463,10 +463,10 @@ class LocalIntentRouterImplTest {
     }
 
     @Test
-    fun findItems_ru_where() = runTest {
+    fun findItems_ru_where_escalates() = runTest {
+        // B-demote: broad find escalates to Layer 2 (decision 2026-07-10)
         val result = router.route("где молоко", ChatLocale.Ru)
-        assertIs<ChatIntent.FindItems>(result.intent)
-        assertTrue(result.confidence >= 0.6f)
+        assertIs<ChatIntent.Unknown>(result.intent)
     }
 
     @Test
@@ -477,10 +477,10 @@ class LocalIntentRouterImplTest {
     }
 
     @Test
-    fun findItems_ru_show() = runTest {
+    fun findItems_ru_show_escalates() = runTest {
+        // B-demote: broad find escalates to Layer 2 (decision 2026-07-10)
         val result = router.route("покажи список покупок", ChatLocale.Ru)
-        assertIs<ChatIntent.FindItems>(result.intent)
-        assertTrue(result.confidence >= 0.6f)
+        assertIs<ChatIntent.Unknown>(result.intent)
     }
 
     @Test
@@ -498,10 +498,10 @@ class LocalIntentRouterImplTest {
     }
 
     @Test
-    fun findItems_ru_showAll() = runTest {
+    fun findItems_ru_showAll_escalates() = runTest {
+        // B-demote: broad find escalates to Layer 2 (decision 2026-07-10)
         val result = router.route("показать все задачи", ChatLocale.Ru)
-        assertIs<ChatIntent.FindItems>(result.intent)
-        assertTrue(result.confidence >= 0.6f)
+        assertIs<ChatIntent.Unknown>(result.intent)
     }
 
     // ─── FindItems — EN ──────────────────────────────────────────────────────
@@ -514,10 +514,10 @@ class LocalIntentRouterImplTest {
     }
 
     @Test
-    fun findItems_en_where() = runTest {
+    fun findItems_en_where_escalates() = runTest {
+        // B-demote: broad find escalates to Layer 2 (decision 2026-07-10)
         val result = router.route("where is my grocery list", ChatLocale.En)
-        assertIs<ChatIntent.FindItems>(result.intent)
-        assertTrue(result.confidence >= 0.6f)
+        assertIs<ChatIntent.Unknown>(result.intent)
     }
 
     @Test
@@ -528,10 +528,10 @@ class LocalIntentRouterImplTest {
     }
 
     @Test
-    fun findItems_en_show() = runTest {
+    fun findItems_en_show_escalates() = runTest {
+        // B-demote: broad find escalates to Layer 2 (decision 2026-07-10)
         val result = router.route("show me all tasks", ChatLocale.En)
-        assertIs<ChatIntent.FindItems>(result.intent)
-        assertTrue(result.confidence >= 0.6f)
+        assertIs<ChatIntent.Unknown>(result.intent)
     }
 
     @Test
@@ -542,10 +542,10 @@ class LocalIntentRouterImplTest {
     }
 
     @Test
-    fun findItems_en_whereAre() = runTest {
+    fun findItems_en_whereAre_escalates() = runTest {
+        // B-demote: broad find escalates to Layer 2 (decision 2026-07-10)
         val result = router.route("where are my reminders", ChatLocale.En)
-        assertIs<ChatIntent.FindItems>(result.intent)
-        assertTrue(result.confidence >= 0.6f)
+        assertIs<ChatIntent.Unknown>(result.intent)
     }
 
     @kotlin.test.Ignore
@@ -568,24 +568,24 @@ class LocalIntentRouterImplTest {
     }
 
     @Test
-    fun createChecklist_ru_createList() = runTest {
+    fun createChecklist_ru_createList_topicForm_escalates() = runTest {
+        // B-demote: create-with-«для»/«for» escalates to AI-fill (decision 2026-07-10)
         val result = router.route("создай список для поездки", ChatLocale.Ru)
-        assertIs<ChatIntent.CreateChecklist>(result.intent)
-        assertTrue(result.confidence >= 0.6f)
+        assertIs<ChatIntent.FreeForm>(result.intent)
     }
 
     @Test
-    fun createChecklist_ru_listFor() = runTest {
+    fun createChecklist_ru_listFor_topicForm_escalates() = runTest {
+        // B-demote: create-with-«для»/«for» escalates to AI-fill (decision 2026-07-10)
         val result = router.route("список для дня рождения", ChatLocale.Ru)
-        assertIs<ChatIntent.CreateChecklist>(result.intent)
-        assertTrue(result.confidence >= 0.6f)
+        assertIs<ChatIntent.FreeForm>(result.intent)
     }
 
     @Test
-    fun createChecklist_ru_createChecklist() = runTest {
+    fun createChecklist_ru_createChecklist_topicForm_escalates() = runTest {
+        // B-demote: create-with-«для»/«for» escalates to AI-fill (decision 2026-07-10)
         val result = router.route("создай чеклист для работы", ChatLocale.Ru)
-        assertIs<ChatIntent.CreateChecklist>(result.intent)
-        assertTrue(result.confidence >= 0.6f)
+        assertIs<ChatIntent.FreeForm>(result.intent)
     }
 
     @Test
@@ -603,10 +603,10 @@ class LocalIntentRouterImplTest {
     }
 
     @Test
-    fun createChecklist_ru_listForEvent() = runTest {
+    fun createChecklist_ru_listForEvent_topicForm_escalates() = runTest {
+        // B-demote: create-with-«для»/«for» escalates to AI-fill (decision 2026-07-10)
         val result = router.route("список для вечеринки", ChatLocale.Ru)
-        assertIs<ChatIntent.CreateChecklist>(result.intent)
-        assertTrue(result.confidence >= 0.6f)
+        assertIs<ChatIntent.FreeForm>(result.intent)
     }
 
     // ─── CreateChecklist — EN ─────────────────────────────────────────────────
@@ -622,45 +622,45 @@ class LocalIntentRouterImplTest {
     }
 
     @Test
-    fun createChecklist_en_createList() = runTest {
+    fun createChecklist_en_createList_topicForm_escalates() = runTest {
+        // B-demote: create-with-«для»/«for» escalates to AI-fill (decision 2026-07-10)
         val result = router.route("create list for the trip", ChatLocale.En)
-        assertIs<ChatIntent.CreateChecklist>(result.intent)
-        assertTrue(result.confidence >= 0.6f)
+        assertIs<ChatIntent.FreeForm>(result.intent)
     }
 
     @Test
-    fun createChecklist_en_listFor() = runTest {
+    fun createChecklist_en_listFor_topicForm_escalates() = runTest {
+        // B-demote: create-with-«для»/«for» escalates to AI-fill (decision 2026-07-10)
         val result = router.route("list for birthday party", ChatLocale.En)
-        assertIs<ChatIntent.CreateChecklist>(result.intent)
-        assertTrue(result.confidence >= 0.6f)
+        assertIs<ChatIntent.FreeForm>(result.intent)
     }
 
     @Test
-    fun createChecklist_en_newChecklist() = runTest {
+    fun createChecklist_en_newChecklist_topicForm_escalates() = runTest {
+        // B-demote: create-with-«для»/«for» escalates to AI-fill (decision 2026-07-10)
         val result = router.route("new checklist for work", ChatLocale.En)
-        assertIs<ChatIntent.CreateChecklist>(result.intent)
-        assertTrue(result.confidence >= 0.6f)
+        assertIs<ChatIntent.FreeForm>(result.intent)
     }
 
     @Test
-    fun createChecklist_en_makeList() = runTest {
+    fun createChecklist_en_makeList_topicForm_escalates() = runTest {
+        // B-demote: create-with-«для»/«for» escalates to AI-fill (decision 2026-07-10)
         val result = router.route("make a list for groceries", ChatLocale.En)
-        assertIs<ChatIntent.CreateChecklist>(result.intent)
-        assertTrue(result.confidence >= 0.6f)
+        assertIs<ChatIntent.FreeForm>(result.intent)
     }
 
     @Test
-    fun createChecklist_en_createChecklist() = runTest {
+    fun createChecklist_en_createChecklist_topicForm_escalates() = runTest {
+        // B-demote: create-with-«для»/«for» escalates to AI-fill (decision 2026-07-10)
         val result = router.route("create checklist for the project", ChatLocale.En)
-        assertIs<ChatIntent.CreateChecklist>(result.intent)
-        assertTrue(result.confidence >= 0.6f)
+        assertIs<ChatIntent.FreeForm>(result.intent)
     }
 
     @Test
-    fun createChecklist_en_createAList() = runTest {
+    fun createChecklist_en_createAList_topicForm_escalates() = runTest {
+        // B-demote: create-with-«для»/«for» escalates to AI-fill (decision 2026-07-10)
         val result = router.route("create a list for dinner", ChatLocale.En)
-        assertIs<ChatIntent.CreateChecklist>(result.intent)
-        assertTrue(result.confidence >= 0.6f)
+        assertIs<ChatIntent.FreeForm>(result.intent)
     }
 
     // ─── CreateChecklist — single-word broad triggers ─────────────────────────
@@ -1294,6 +1294,77 @@ class LocalIntentRouterImplTest {
     fun completeItem_ru_markConcrete_keepsWorking() = runTest {
         val result = router.route("отметь молоко", ChatLocale.Ru)
         assertIs<ChatIntent.CompleteItem>(result.intent)
+        assertTrue(result.confidence >= 0.6f)
+    }
+
+    // ─── B precision-first: escalation guards ─────────────────────────────────
+    //
+    // Contract migration (decision 2026-07-10): Layer 1 fires only on unambiguous
+    // local imperatives. Structured payloads (meta-marker + hint-prep), WH-questions,
+    // and topic-form creates («для»/«for») escalate to the LLM (FreeForm → Layer 3).
+
+    @Test
+    fun createItem_ru_structuredPayload_escalates() = runTest {
+        val result = router.route("добавь в ai чек-лист пункт тест", ChatLocale.Ru)
+        assertIs<ChatIntent.FreeForm>(result.intent)
+    }
+
+    @Test
+    fun createItem_ru_folderAdd_escalates() = runTest {
+        val result = router.route("добавь в апки в папку баги такой пункт что есть баг", ChatLocale.Ru)
+        assertIs<ChatIntent.FreeForm>(result.intent)
+    }
+
+    @Test
+    fun question_ru_howToFindJob_escalates() = runTest {
+        val result = router.route("как мне найти работу в Китае", ChatLocale.Ru)
+        assertIs<ChatIntent.FreeForm>(result.intent)
+    }
+
+    @Test
+    fun question_ru_whatCanAdd_escalates() = runTest {
+        val result = router.route("что можно добавить в этот список", ChatLocale.Ru)
+        assertIs<ChatIntent.FreeForm>(result.intent)
+    }
+
+    @Test
+    fun createChecklist_ru_topicForm_escalates() = runTest {
+        val result = router.route("создай чек-лист для скалолазания", ChatLocale.Ru)
+        assertIs<ChatIntent.FreeForm>(result.intent)
+    }
+
+    // ─── B precision-first: keep-working anchors (fast-path must survive) ──────
+
+    @Test
+    fun createItem_ru_plainAddWithHint_keepsLocal() = runTest {
+        // marker «список» is NOT in the structural-marker set — must stay local
+        val result = router.route("добавь молоко в список покупок", ChatLocale.Ru)
+        assertIs<ChatIntent.CreateItem>(result.intent)
+    }
+
+    @Test
+    fun createItem_ru_verbStartingItem_keepsLocal() = runTest {
+        val result = router.route("добавь заказать два мусорных ведра в дела", ChatLocale.Ru)
+        assertIs<ChatIntent.CreateItem>(result.intent)
+    }
+
+    @Test
+    fun createItem_ru_bareItemMarkerNoPrep_keepsLocal() = runTest {
+        // marker «пункт» but no hint-preposition → normal add, stays local
+        val result = router.route("добавь пункт молоко", ChatLocale.Ru)
+        assertIs<ChatIntent.CreateItem>(result.intent)
+    }
+
+    @Test
+    fun findItems_ru_explicitFind_keepsLocal() = runTest {
+        val result = router.route("найди молоко", ChatLocale.Ru)
+        assertIs<ChatIntent.FindItems>(result.intent)
+    }
+
+    @Test
+    fun createChecklist_ru_plainName_keepsLocal() = runTest {
+        val result = router.route("создай список покупок", ChatLocale.Ru)
+        assertIs<ChatIntent.CreateChecklist>(result.intent)
         assertTrue(result.confidence >= 0.6f)
     }
 }

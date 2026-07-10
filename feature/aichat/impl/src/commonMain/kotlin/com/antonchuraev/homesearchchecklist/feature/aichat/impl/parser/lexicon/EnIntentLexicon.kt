@@ -81,18 +81,20 @@ internal object EnIntentLexicon {
     )
 
     // ─── FindItems ────────────────────────────────────────────────────────────
-    // "find milk", "where is my shopping list", "search for butter"
+    // Explicit search imperatives only. Broad interrogatives («where is», «show»,
+    // «list») were demoted (decision 2026-07-10) — they dead-ended at find-item
+    // instead of escalating to the Layer 3 agent, which can actually answer.
     val findItems: Set<String> = setOf(
         "search for",
         "look for",
-        "where is",
-        "where are",
         "find",
         "search",
-        "show me",
-        "show",
-        "list",
-        "where",
+    )
+
+    // ─── WH-question starts (escalate to Layer 3) ─────────────────────────────
+    // WH-interrogative sentence starts → escalate (conversational question, not a command).
+    val whQuestionStarts: Set<String> = setOf(
+        "what", "how", "why", "which",
     )
 
     // ─── CreateChecklist ──────────────────────────────────────────────────────

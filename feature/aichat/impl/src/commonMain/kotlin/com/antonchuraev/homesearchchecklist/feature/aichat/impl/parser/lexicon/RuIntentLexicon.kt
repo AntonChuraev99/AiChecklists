@@ -44,10 +44,8 @@ internal object RuIntentLexicon {
     val completeItem: Set<String> = setOf(
         "отметить",
         "отметь",
-        "выполнить",
         "выполнил",
         "выполнено",
-        "сделать",
         "сделано",
         "сделал",
         "закрыть",
@@ -70,17 +68,23 @@ internal object RuIntentLexicon {
     )
 
     // ─── FindItems ────────────────────────────────────────────────────────────
-    // "найди молоко", "где молоко", "покажи список покупок"
+    // Explicit search imperatives only. Broad interrogatives («где», «покажи»,
+    // «показать») were demoted (decision 2026-07-10) — they dead-ended at find-item
+    // instead of escalating to the Layer 3 agent, which can actually answer.
     val findItems: Set<String> = setOf(
         "найти",
         "найди",
         "поиск",
         "ищи",
         "искать",
-        "показать",
-        "покажи",
-        "где",
         "найдите",
+    )
+
+    // ─── WH-question starts (escalate to Layer 3) ─────────────────────────────
+    // WH-interrogative sentence starts → escalate (conversational question, not a command).
+    val whQuestionStarts: Set<String> = setOf(
+        "что", "чо", "чё", "как", "почему", "зачем", "сколько",
+        "какой", "какая", "какие", "какое", "чем",
     )
 
     // ─── CreateChecklist ──────────────────────────────────────────────────────

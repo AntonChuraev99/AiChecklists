@@ -166,14 +166,12 @@ internal class LocalIntentRouterImpl(
         lower: String,
         locale: ChatLocale,
     ): IntentClassification? {
-        val phrases = when (locale) {
-            ChatLocale.Ru -> RuIntentLexicon.planningQuestions
-            ChatLocale.En -> EnIntentLexicon.planningQuestions
-        }
-        val matched = phrases.sortedByDescending { it.length }
-            .firstOrNull { containsAtBoundary(lower, it) } ?: return null
-
-        logger.debug(TAG, "PlanningQuestion matched='$matched' → escalating to Layer 3 (full chat)")
+        val phrases = when (locale) { ChatLocale.Ru -> RuIntentLexicon.planningQuestions; ChatLocale.En -> EnIntentLexicon.planningQuestions }
+        val whStarts = when (locale) { ChatLocale.Ru -> RuIntentLexicon.whQuestionStarts; ChatLocale.En -> EnIntentLexicon.whQuestionStarts }
+        val matchedPhrase = phrases.sortedByDescending { it.length }.firstOrNull { containsAtBoundary(lower, it) }
+        val startsWithWh = whStarts.any { startsWithKeyword(lower, it) }
+        if (matchedPhrase == null && !startsWithWh) return null
+        logger.debug(TAG, "QuestionEscalation phrase='$matchedPhrase' wh=$startsWithWh -> Layer 3")
         return freeFormEscalation()
     }
 
@@ -288,6 +286,15 @@ internal class LocalIntentRouterImpl(
         val matched = keywords.sortedByDescending { it.length }
             .firstOrNull { containsAtBoundary(lower, it) } ?: return null
 
+        // Topic-form escalation: «создай список ДЛЯ поездки» / «create list FOR the trip»
+        // implies an AI-filled list → escalate to Layer 3 (agent routes to generate_checklist).
+        // Plain names («создай список покупок») have no «для»/«for» → stay local.
+        val isTopicForm = when (locale) {
+            ChatLocale.Ru -> containsAtBoundary(lower, "для")
+            ChatLocale.En -> containsAtBoundary(lower, "for")
+        }
+        if (isTopicForm) return freeFormEscalation()
+
         val endIdx = firstMatchEnd(lower, keywords)
         // Take EVERYTHING after the trigger keyword as the raw name.
         // Layer 1 is broad-recall; if the user wanted a clean name they would type it cleanly.
@@ -380,6 +387,7 @@ internal class LocalIntentRouterImpl(
         }
         val payload = lower.substring(endIdx).trim()
         if (isReferentialPayload(payload, locale)) return freeFormEscalation()
+        if (hasStructuralMetaMarker(payload, locale)) return freeFormEscalation()
         val hasItemText = payload.isNotBlank() && payload != hint
 
         val confidence = when {
@@ -541,6 +549,26 @@ internal class LocalIntentRouterImpl(
         }
         if (core.isEmpty()) return false
         return core.joinToString(" ") in referents || core.all { it in referents }
+    }
+
+    /**
+     * True when a CreateItem payload describes checklist STRUCTURE rather than a plain item —
+     * a meta-marker («пункт»/«папка»/«чек-лист» · item/folder/checklist) co-occurring with a
+     * hint-preposition, e.g. «в ai чек-лист пункт тест». Layer 1 mis-extracts these; escalate.
+     * A bare marker with no hint-prep («добавь пункт молоко») is a normal add and stays local.
+     */
+    private fun hasStructuralMetaMarker(payload: String, locale: ChatLocale): Boolean {
+        val markers = when (locale) {
+            ChatLocale.Ru -> listOf("пункт", "папк", "чек-лист", "чеклист")
+            ChatLocale.En -> listOf("item", "folder", "checklist")
+        }
+        if (markers.none { payload.contains(it) }) return false
+        val hintPreps = when (locale) {
+            ChatLocale.Ru -> RuIntentLexicon.hintPrepositions
+            ChatLocale.En -> EnIntentLexicon.hintPrepositions
+        }
+        val tokens = payload.split(' ').filter { it.isNotBlank() }
+        return tokens.any { it in hintPreps }
     }
 
     /**
