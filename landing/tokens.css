@@ -90,12 +90,12 @@
   background: var(--ai-gradient); -webkit-background-clip: text; background-clip: text;
   color: transparent; -webkit-text-fill-color: transparent;
 }
-.ai-border { position: relative; background: var(--surface-card); }
-.ai-border::before {
-  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.5px;
-  background: var(--ai-gradient);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none;
+.ai-border {
+  position: relative;
+  border: 1.5px solid transparent;
+  background:
+    linear-gradient(var(--surface-card), var(--surface-card)) padding-box,
+    var(--ai-gradient) border-box;
 }
 
 /* ── Phone frame (bezel #1A1A1A, 44px radius) — for hero + showcase mockups ── */
