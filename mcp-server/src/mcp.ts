@@ -34,9 +34,12 @@ import {
   applyFilledItems,
   buildAiChecklist,
   createEmptyChecklist,
+  createNamedFill,
   deleteItem,
   editNote,
+  findFill,
   flattenFillForAi,
+  listFills,
   renameChecklist,
   renameItem,
   reorderItems,
@@ -50,6 +53,7 @@ import {
   parseTemplateItems,
   type ChecklistItem,
   type ChecklistSyncData,
+  type FillSyncData,
 } from "./model";
 import {
   RATE_TIERS,
@@ -96,10 +100,11 @@ function summarizeChecklist(c: ChecklistSyncData): string {
  * from the default fill (matched by templateItemId) and its id (the id CRUD tools speak). Orphans
  * (parentId pointing at a missing/non-folder node) render at the root so nothing is hidden.
  */
-function renderChecklist(c: ChecklistSyncData): string {
-  const lines: string[] = [`Checklist: ${c.name} (id: ${c.cloudId})`];
+function renderChecklist(c: ChecklistSyncData, targetFill: FillSyncData | null = null): string {
   const template = parseTemplateItems(c.itemsJson);
-  const fill = defaultFill(c);
+  const fill = targetFill ?? defaultFill(c);
+  const fillLabel = fill && !fill.isDefault ? ` — fill: ${fill.name || fill.cloudId}` : "";
+  const lines: string[] = [`Checklist: ${c.name} (id: ${c.cloudId})${fillLabel}`];
 
   // Fallback: no template tree (legacy) → render the flat fill.
   if (template.length === 0) {
@@ -154,7 +159,7 @@ async function collectChecklists(env: Env, ids: string[]): Promise<ChecklistSync
 }
 
 export class GistiMCP extends McpAgent<Env, unknown, Props> {
-  server = new McpServer({ name: "Gisti Checklists", version: "0.3.0" });
+  server = new McpServer({ name: "Gisti Checklists", version: "0.4.0" });
 
   /** All candidate user_ids for the caller (read fan-out), or [] if not linked. */
   private async userIds(): Promise<string[]> {
@@ -204,16 +209,21 @@ export class GistiMCP extends McpAgent<Env, unknown, Props> {
 
     this.server.tool(
       "get_checklist",
-      "Get one checklist by its id: its folder tree, each item's checked state, note, and id.",
-      { checklistId: z.string().describe("The checklist id (cloudId) from list_checklists.") },
-      safe(async ({ checklistId }) => {
+      "Get one checklist by its id: its folder tree, each item's checked state, note, and id. Pass fillId to view a specific fill (session) instead of the default one.",
+      {
+        checklistId: z.string().describe("The checklist id (cloudId) from list_checklists."),
+        fillId: z.string().optional().describe("A fill id from list_fills to view that session's state; omit for the default fill."),
+      },
+      safe(async ({ checklistId, fillId }) => {
         const denied = await this.rateLimited("read");
         if (denied) return textResult(denied);
         const ids = await this.userIds();
         if (ids.length === 0) return textResult(SIGN_IN_HINT);
         const owned = await findChecklistWithOwner(this.env, ids, checklistId);
         if (!owned) return textResult(`No checklist found with id ${checklistId}.`);
-        return textResult(renderChecklist(owned.checklist));
+        const fill = fillId ? findFill(owned.checklist, fillId) : null;
+        if (fillId && !fill) return textResult(`No fill found with id ${fillId} in "${owned.checklist.name}".`);
+        return textResult(renderChecklist(owned.checklist, fill));
       }),
     );
 
@@ -282,18 +292,22 @@ export class GistiMCP extends McpAgent<Env, unknown, Props> {
           .enum(["text", "url", "image_base64", "audio_base64"])
           .optional()
           .describe("How to interpret `input`. Default 'text'."),
+        fillId: z.string().optional().describe("A fill id from list_fills to fill that session; omit for the default fill."),
       },
-      safe(async ({ checklistId, input, inputType }) => {
+      safe(async ({ checklistId, input, inputType, fillId }) => {
         const denied = await this.rateLimited("ai");
         if (denied) return textResult(denied);
         const ctx = await this.context();
         if (!ctx) return textResult(SIGN_IN_HINT);
         const owned = await findChecklistWithOwner(this.env, ctx.allIds, checklistId);
         if (!owned) return textResult(`No checklist found with id ${checklistId}.`);
-        const items = flattenFillForAi(owned.checklist, Date.now());
+        if (fillId && !findFill(owned.checklist, fillId)) {
+          return textResult(`No fill found with id ${fillId} in "${owned.checklist.name}".`);
+        }
+        const items = flattenFillForAi(owned.checklist, Date.now(), fillId ?? null);
         if (items.length === 0) return textResult("That checklist has no items to fill.");
         const requestId = await stableRequestId(
-          [ctx.creditUserId, "fill", checklistId, inputType ?? "text", input],
+          [ctx.creditUserId, "fill", checklistId, fillId ?? "", inputType ?? "text", input],
           REQUEST_ID_BUCKET_MS,
           Date.now(),
         );
@@ -306,7 +320,7 @@ export class GistiMCP extends McpAgent<Env, unknown, Props> {
           inputData: input,
           requestId,
         });
-        const next = applyFilledItems(owned.checklist, res.filledItems, Date.now());
+        const next = applyFilledItems(owned.checklist, res.filledItems, Date.now(), fillId ?? null);
         await writeChecklist(this.env, owned.ownerId, next);
         const done = res.filledItems.filter((f) => f.checked).length;
         return textResult(
@@ -341,17 +355,19 @@ export class GistiMCP extends McpAgent<Env, unknown, Props> {
 
     this.server.tool(
       "toggle_item",
-      "Check or uncheck an item in a checklist.",
+      "Check or uncheck an item in a checklist. Pass fillId to target a specific fill (session).",
       {
         checklistId: z.string().describe("The checklist id."),
         itemId: z.string().describe("The item id from get_checklist."),
         checked: z.boolean().describe("true = done/checked, false = not done."),
+        fillId: z.string().optional().describe("A fill id from list_fills; omit for the default fill."),
       },
-      safe(({ checklistId, itemId, checked }) =>
+      safe(({ checklistId, itemId, checked, fillId }) =>
         mutate(
           checklistId,
-          (c, now) => toggleItem(c, itemId, checked, now),
+          (c, now) => toggleItem(c, itemId, checked, now, fillId ?? null),
           () => `✓ Marked item as ${checked ? "done" : "not done"}.`,
+          "That item or fill was not found in the checklist.",
         ),
       ),
     );
@@ -392,17 +408,19 @@ export class GistiMCP extends McpAgent<Env, unknown, Props> {
 
     this.server.tool(
       "edit_note",
-      "Set or clear the note attached to an item.",
+      "Set or clear the note attached to an item. Pass fillId to target a specific fill (session).",
       {
         checklistId: z.string().describe("The checklist id."),
         itemId: z.string().describe("The item id from get_checklist."),
         note: z.string().describe("The note text; pass an empty string to clear it."),
+        fillId: z.string().optional().describe("A fill id from list_fills; omit for the default fill."),
       },
-      safe(({ checklistId, itemId, note }) =>
+      safe(({ checklistId, itemId, note, fillId }) =>
         mutate(
           checklistId,
-          (c, now) => editNote(c, itemId, note, now),
+          (c, now) => editNote(c, itemId, note, now, fillId ?? null),
           () => (note ? "✓ Note updated." : "✓ Note cleared."),
+          "That item or fill was not found in the checklist.",
         ),
       ),
     );
@@ -473,6 +491,53 @@ export class GistiMCP extends McpAgent<Env, unknown, Props> {
         await writeChecklist(this.env, ctx.writeUserId, checklist);
         const n = leafItemCount(checklist);
         return textResult(`✓ Created "${name}" with ${n} item${n === 1 ? "" : "s"}. (id: ${checklist.cloudId})`);
+      }),
+    );
+
+    // ── Named fills (extra "sessions" of the same checklist) ──────────────────────
+    this.server.tool(
+      "list_fills",
+      "List a checklist's fills (sessions): the default fill plus any extra named fills, each with its checked/total count and id. Use a fill id with get_checklist / toggle_item / edit_note / fill_checklist_ai to work on that session.",
+      { checklistId: z.string().describe("The checklist id.") },
+      safe(async ({ checklistId }) => {
+        const denied = await this.rateLimited("read");
+        if (denied) return textResult(denied);
+        const ids = await this.userIds();
+        if (ids.length === 0) return textResult(SIGN_IN_HINT);
+        const owned = await findChecklistWithOwner(this.env, ids, checklistId);
+        if (!owned) return textResult(`No checklist found with id ${checklistId}.`);
+        const fills = listFills(owned.checklist);
+        if (fills.length === 0) return textResult("That checklist has no fills.");
+        return textResult(
+          fills
+            .map((f) => {
+              const label = f.isDefault ? "Default fill" : f.name || "(unnamed fill)";
+              return `• ${label} — ${f.checked}/${f.total} checked [fill id: ${f.fillId}]`;
+            })
+            .join("\n"),
+        );
+      }),
+    );
+
+    this.server.tool(
+      "create_fill",
+      "Create a new named fill — a fresh session of the checklist to check off independently (mirrors the current items, all unchecked). Use it for a repeatable checklist you run more than once.",
+      {
+        checklistId: z.string().describe("The checklist id."),
+        name: z.string().describe("A name for the new fill/session, e.g. 'March trip'."),
+      },
+      safe(async ({ checklistId, name }) => {
+        const denied = await this.rateLimited("write");
+        if (denied) return textResult(denied);
+        const trimmed = name.trim();
+        if (!trimmed) return textResult("Please give the new fill a name.");
+        const ctx = await this.context();
+        if (!ctx) return textResult(SIGN_IN_HINT);
+        const owned = await findChecklistWithOwner(this.env, ctx.allIds, checklistId);
+        if (!owned) return textResult(`No checklist found with id ${checklistId}.`);
+        const { checklist, fillId } = createNamedFill(owned.checklist, trimmed, Date.now());
+        await writeChecklist(this.env, owned.ownerId, checklist);
+        return textResult(`✓ Created fill "${trimmed}". (fill id: ${fillId})`);
       }),
     );
   }

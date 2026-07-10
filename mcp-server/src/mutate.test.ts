@@ -10,8 +10,11 @@ import {
   applyFilledItems,
   buildAiChecklist,
   createEmptyChecklist,
+  createNamedFill,
   deleteItem,
   editNote,
+  findFill,
+  listFills,
   renameChecklist,
   renameItem,
   reorderItems,
@@ -216,5 +219,72 @@ describe("renameChecklist / softDeleteChecklist", () => {
     const c = createEmptyChecklist("X", [], T0);
     const out = softDeleteChecklist(c, T0 + 1);
     expect(out.isDeleted).toBe(true);
+  });
+});
+
+describe("named fills (Phase 3)", () => {
+  it("createNamedFill adds a non-default fill mirroring the template, unchecked, with templateItemId", () => {
+    const c = createEmptyChecklist("Trip", ["Passport", "Charger"], T0);
+    const before = c.updatedAt;
+    const { checklist: out, fillId } = createNamedFill(c, "  March trip  ", T0 + 5);
+    const fill = out.fills.find((f) => f.cloudId === fillId)!;
+    expect(fill.isDefault).toBe(false);
+    expect(fill.name).toBe("March trip"); // trimmed
+    const items = parseFillItems(fill.itemsJson);
+    expect(items.map((i) => i.text)).toEqual(["Passport", "Charger"]);
+    expect(items.every((i) => i.templateItemId !== null && !i.checked)).toBe(true);
+    expect(items.map((i) => i.templateItemId)).toEqual(template(out).map((t) => t.id)); // links match template
+    expect(out.updatedAt).toBeGreaterThan(before); // dirty-parent
+    expect(out.fills).toHaveLength(2); // default + named
+  });
+
+  it("listFills reports default + named with checked/total counts", () => {
+    const c = createEmptyChecklist("Trip", ["a", "b", "c"], T0);
+    const id = template(c)[0]!.id;
+    const toggled = toggleItem(c, id, true, T0 + 1)!; // default fill: 1/3 checked
+    const { checklist: withFill, fillId } = createNamedFill(toggled, "Second", T0 + 2);
+    const fills = listFills(withFill);
+    expect(fills).toHaveLength(2);
+    expect(fills.find((f) => f.isDefault)!).toMatchObject({ total: 3, checked: 1, name: "" });
+    expect(fills.find((f) => f.fillId === fillId)!).toMatchObject({
+      total: 3,
+      checked: 0,
+      name: "Second",
+      isDefault: false,
+    });
+  });
+
+  it("toggle_item with fillId targets ONLY that fill, leaving the default untouched", () => {
+    const c = createEmptyChecklist("Trip", ["a", "b"], T0);
+    const { checklist: withFill, fillId } = createNamedFill(c, "S", T0 + 1);
+    const itemId = template(withFill)[0]!.id;
+    const out = toggleItem(withFill, itemId, true, T0 + 2, fillId)!;
+    // named fill checked, default fill NOT touched
+    expect(parseFillItems(findFill(out, fillId)!.itemsJson).find((i) => i.templateItemId === itemId)!.checked).toBe(true);
+    expect(fillItems(out).find((i) => i.templateItemId === itemId)!.checked).toBe(false);
+  });
+
+  it("edit_note with fillId targets that fill, default untouched", () => {
+    const c = createEmptyChecklist("Trip", ["a"], T0);
+    const { checklist: withFill, fillId } = createNamedFill(c, "S", T0 + 1);
+    const itemId = template(withFill)[0]!.id;
+    const out = editNote(withFill, itemId, "hi", T0 + 2, fillId)!;
+    expect(parseFillItems(findFill(out, fillId)!.itemsJson)[0]!.note).toBe("hi");
+    expect(fillItems(out)[0]!.note).toBeNull();
+  });
+
+  it("state ops return null for an unknown fillId", () => {
+    const c = createEmptyChecklist("Trip", ["a"], T0);
+    const itemId = template(c)[0]!.id;
+    expect(toggleItem(c, itemId, true, T0 + 1, "no-such-fill")).toBeNull();
+    expect(editNote(c, itemId, "x", T0 + 1, "no-such-fill")).toBeNull();
+  });
+
+  it("findFill ignores deleted fills", () => {
+    const c = createEmptyChecklist("Trip", ["a"], T0);
+    const { checklist: withFill, fillId } = createNamedFill(c, "S", T0 + 1);
+    expect(findFill(withFill, fillId)).not.toBeNull();
+    withFill.fills.find((f) => f.cloudId === fillId)!.isDeleted = true;
+    expect(findFill(withFill, fillId)).toBeNull();
   });
 });

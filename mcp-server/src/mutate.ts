@@ -53,19 +53,24 @@ function newFillItem(text: string, templateItemId: string | null, checked = fals
   };
 }
 
-/** The default fill mirroring a template item list 1:1 (folders included, all unchecked). */
-function buildDefaultFill(templateItems: ChecklistItem[], now: number): FillSyncData {
+/** A fill mirroring a template item list 1:1 (folders included, all unchecked). */
+function buildFill(templateItems: ChecklistItem[], name: string, isDefault: boolean, now: number): FillSyncData {
   const items = templateItems.map((t) => newFillItem(t.text, t.id, false));
   return {
     cloudId: newCloudId(),
-    name: "",
+    name,
     itemsJson: encodeFillItems(items),
     coverImagePath: null,
     createdAt: now,
-    isDefault: true,
+    isDefault,
     updatedAt: now,
     isDeleted: false,
   };
+}
+
+/** The default fill (isDefault=true, name=""), mirroring the template. */
+function buildDefaultFill(templateItems: ChecklistItem[], now: number): FillSyncData {
+  return buildFill(templateItems, "", true, now);
 }
 
 /** A fresh checklist envelope with Kotlin defaults. */
@@ -125,6 +130,26 @@ function touchFill(f: FillSyncData, now: number): void {
   f.updatedAt = nextUpdatedAt(f.updatedAt, now);
 }
 
+/**
+ * The fill a STATE mutation targets: an explicit `fillId` (matched by cloudId, non-deleted) when
+ * given, else the default fill (created if the checklist has none). Returns null ONLY when an
+ * explicit fillId was given but no such live fill exists — the caller surfaces "not found".
+ *
+ * ⚠ Only STATE ops (toggle / edit_note / AI-fill) accept a fillId. STRUCTURAL ops (add / rename /
+ * delete / reorder item) stay template + default-fill, because the app itself reconciles ONLY the
+ * default fill on a template edit (`ChecklistRepositoryImpl.updateChecklist`) — named fills are
+ * independent sessions that do NOT auto-mirror template changes.
+ */
+function selectFill(c: ChecklistSyncData, fillId: string | null, now: number): FillSyncData | null {
+  if (fillId) return c.fills.find((f) => f.cloudId === fillId && !f.isDeleted) ?? null;
+  return ensureDefaultFill(c, now);
+}
+
+/** Public: find a non-deleted fill by its cloudId (null if absent). */
+export function findFill(c: ChecklistSyncData, fillId: string): FillSyncData | null {
+  return c.fills.find((f) => f.cloudId === fillId && !f.isDeleted) ?? null;
+}
+
 // ── Phase 1: AI-write mappers ────────────────────────────────────────────────────
 
 /** Walk the generate_checklist nested tree → a flat List<ChecklistItem> with UUID ids + parentId. */
@@ -156,8 +181,13 @@ export function buildAiChecklist(name: string, tree: GeneratedNode[], now: numbe
 }
 
 /** One flat {text,checked} per default-fill item, in order — the payload sent to analyze CF. */
-export function flattenFillForAi(c: ChecklistSyncData, now: number): Array<{ text: string; checked: boolean }> {
-  const fill = ensureDefaultFill(clone(c), now); // clone: read-only view, don't mutate the input
+export function flattenFillForAi(
+  c: ChecklistSyncData,
+  now: number,
+  fillId: string | null = null,
+): Array<{ text: string; checked: boolean }> {
+  const fill = selectFill(clone(c), fillId, now); // clone: read-only view, don't mutate the input
+  if (!fill) return [];
   return parseFillItems(fill.itemsJson).map((i) => ({ text: i.text, checked: i.checked }));
 }
 
@@ -175,9 +205,11 @@ export function applyFilledItems(
   c: ChecklistSyncData,
   filled: Array<{ index: number; text: string; checked: boolean; note: string | null }>,
   now: number,
+  fillId: string | null = null,
 ): ChecklistSyncData {
   const next = clone(c);
-  const fill = ensureDefaultFill(next, now);
+  const fill = selectFill(next, fillId, now);
+  if (!fill) return next; // bad fillId → no-op (mcp.ts validates fillId before calling)
   const items = parseFillItems(fill.itemsJson);
   const used = new Set<number>();
   const norm = (s: string): string => s.trim().toLowerCase();
@@ -216,9 +248,16 @@ function findFillIndex(items: ChecklistFillItem[], itemId: string): number {
 }
 
 /** Toggle a checklist item's checked state (on the default fill). Null if the item is absent. */
-export function toggleItem(c: ChecklistSyncData, itemId: string, checked: boolean, now: number): ChecklistSyncData | null {
+export function toggleItem(
+  c: ChecklistSyncData,
+  itemId: string,
+  checked: boolean,
+  now: number,
+  fillId: string | null = null,
+): ChecklistSyncData | null {
   const next = clone(c);
-  const fill = ensureDefaultFill(next, now);
+  const fill = selectFill(next, fillId, now);
+  if (!fill) return null;
   const items = parseFillItems(fill.itemsJson);
   const idx = findFillIndex(items, itemId);
   if (idx === -1) return null;
@@ -230,9 +269,16 @@ export function toggleItem(c: ChecklistSyncData, itemId: string, checked: boolea
 }
 
 /** Set/clear the note on a checklist item (default fill). Null if the item is absent. */
-export function editNote(c: ChecklistSyncData, itemId: string, note: string | null, now: number): ChecklistSyncData | null {
+export function editNote(
+  c: ChecklistSyncData,
+  itemId: string,
+  note: string | null,
+  now: number,
+  fillId: string | null = null,
+): ChecklistSyncData | null {
   const next = clone(c);
-  const fill = ensureDefaultFill(next, now);
+  const fill = selectFill(next, fillId, now);
+  if (!fill) return null;
   const items = parseFillItems(fill.itemsJson);
   const idx = findFillIndex(items, itemId);
   if (idx === -1) return null;
@@ -361,4 +407,48 @@ export function createEmptyChecklist(name: string, itemTexts: string[], now: num
     .filter((t) => t.length > 0)
     .map((t) => newTemplateItem(t, null, "ITEM"));
   return fromTemplateItems(name, template, now);
+}
+
+// ── Phase 3: named fills (extra "sessions") ──────────────────────────────────────
+
+/** A one-line summary of a fill for list_fills. */
+export interface FillSummary {
+  fillId: string;
+  name: string;
+  isDefault: boolean;
+  total: number;
+  checked: number;
+}
+
+/** Every non-deleted fill of a checklist, with its checked/total counts. */
+export function listFills(c: ChecklistSyncData): FillSummary[] {
+  return c.fills
+    .filter((f) => !f.isDeleted)
+    .map((f) => {
+      const items = parseFillItems(f.itemsJson);
+      return {
+        fillId: f.cloudId,
+        name: f.name,
+        isDefault: f.isDefault,
+        total: items.length,
+        checked: items.filter((i) => i.checked).length,
+      };
+    });
+}
+
+/**
+ * Create a new NON-default fill (an extra "session") that mirrors the CURRENT template 1:1, all
+ * unchecked — the same shape the app's default fill is built with (templateItemId on every item),
+ * but isDefault=false with a caller-given name. Dirty-parent bump. Returns the new fill's cloudId.
+ */
+export function createNamedFill(
+  c: ChecklistSyncData,
+  name: string,
+  now: number,
+): { checklist: ChecklistSyncData; fillId: string } {
+  const next = clone(c);
+  const fill = buildFill(parseTemplateItems(next.itemsJson), name.trim(), false, now);
+  next.fills.push(fill);
+  touchChecklist(next, now);
+  return { checklist: next, fillId: fill.cloudId };
 }

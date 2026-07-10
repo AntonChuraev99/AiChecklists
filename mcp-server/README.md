@@ -37,6 +37,7 @@ REST + a service-account JWT signed RS256 with Web Crypto (`firestore.ts`) — n
 | 1 AI | `fill_checklist_ai(id, input)` | → `analyze_and_fill_checklist` CF → results merged into the fill |
 | 2 CRUD | `toggle_item` / `add_item` / `rename_item` / `edit_note` / `delete_item` / `reorder_items` | operate on the item id from `get_checklist` |
 | 2 CRUD | `rename_checklist` / `delete_checklist` (soft) / `create_checklist_empty` | |
+| 3 fills | `list_fills` / `create_fill` | extra named "sessions" of a checklist. The state tools (`get_checklist` / `toggle_item` / `edit_note` / `fill_checklist_ai`) take an optional `fillId` to target one; structural edits (add/rename/delete/reorder item) stay on the template + default fill, mirroring the app |
 
 AI tools spend the user's AI credits (enforced server-side by the Cloud Functions).
 
@@ -128,7 +129,9 @@ tools, an already-connected client must **reconnect** to pick up the new tool li
 
 ## Deferred (Phase 3)
 
-Not launch-blockers, postponed to a focused pass: **named fills** (`fillId` param — CRUD currently
-targets only the default fill) and **reminders/repeat via tools** (the nested `ReminderRepeatRule`
-serialization warrants its own contract-test first). The full design log lives in
+**Named fills shipped** — `list_fills` / `create_fill` plus an optional `fillId` on the state tools
+(code-complete, unit-tested; a field rename/reorder can't drift because a named fill is the same
+`FillSyncData` the encoder already pins). Still postponed to a focused pass: **reminders/repeat via
+tools** — the nested `ReminderRepeatRule` + polymorphic `RepeatEndCondition` serialization warrants
+its own contract-test first. The full design log lives in
 `docs/active/gisti-mcp-server-design-2026-07-10.md` (local, gitignored).
