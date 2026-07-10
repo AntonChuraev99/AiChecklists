@@ -102,3 +102,9 @@ SECURITY_DELIVERY_SUMMARY.txt
 !core/**/*.png
 !feature/**/*.png
 *.stackdump
+
+# Gisti MCP secrets — never commit (public repo)
+client_secret_*.json
+**/client_secret_*.json
+**/*-sa.json
+**/service-account*.json
