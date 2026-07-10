@@ -111,6 +111,8 @@ One-liner map; deep rules load when you edit the feature. Full catalog: `docs/pr
 
 `docs/marketing/ab-tests-overview-2026-06-18.md` is the single source of truth for A/B experiments, Remote Config params, and live product metrics (retention/funnel/CSAT/login). **Update it whenever you** change an RC key (`RemoteConfigKeys.kt` / `RemoteConfigDefaults.kt` or the Firebase RC template), start/stop a Firebase A/B experiment, or pull a fresh Amplitude snapshot — otherwise it silently drifts from prod. Keep the RC-limits table in `docs/unit-economics.md` in sync too. Both docs are gitignored (local-only). Prod truth = Firebase Console (RC + A/B Tests) + Amplitude project `786722`.
 
+**Starting/stopping a Firebase A/B experiment ALSO requires syncing the daily Telegram analytics routine.** The Claude cloud routine "Gisti — Daily Analytics → Telegram" emails a morning report whose A/B block carries a **hardcoded experiment registry inside the routine prompt** — Firebase A/B results have no public API, so it cannot auto-refresh. When you start or stop an experiment, tell Claude **"обнови A/B в рутине"** and it will sync the registry (via the `RemoteTrigger` tool / `/schedule`) so the report stops showing a stale experiment set. Bot token/chat_id live ONLY in the routine prompt (never commit them). Details: project memory `telegram-daily-analytics-routine`.
+
 ## Copy Guidelines
 
 Simple, clear, benefit-focused, action-oriented. Do: "Create Checklist", "Fill via AI", "Save". Don't: "Add New", "Submit", "Continue".
