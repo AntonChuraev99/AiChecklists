@@ -5,6 +5,7 @@ module.exports = {
   // Recompile is optional — landing/tailwind.css is committed.
   content: [
     'landing/index.html',
+    'landing/mcp/index.html',
   ],
   theme: {
     extend: {
