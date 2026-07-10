@@ -14,6 +14,8 @@ Guidance for Claude Code in this repo. Keep this file **≤200 lines** (Anthropi
 
 **Web** is a full parallel platform (not a lite companion): Compose wasmJs renderer (Skiko canvas), Room 3.0 over SQLite OPFS Web Worker, Firebase JS SDK (ESM). AI flow goes through CORS-enabled Cloud Functions — direct Gemini calls from the browser are forbidden.
 
+**MCP server** (`mcp-server/`): a remote Cloudflare Worker exposing each signed-in user's checklists (read + AI-generate + CRUD) to any MCP client over Google OAuth — live at `https://gisti-mcp.gisti.workers.dev/mcp`. Full reference: `mcp-server/README.md`.
+
 **Product:** the AI Chat Assistant is the flagship interaction layer; secondary AI flows (Create/Fill) turn content into checklists. Full feature catalog, tiers, platform-parity matrix: `docs/product-features.md`.
 
 **Business model:** Free (5 checklists, 5 fills each, 10 AI credits/day, 10 recurring reminders) · Premium $1.99/mo (unlimited + 300 credits/day + Calendar + Weekly) · 3-day trial.
