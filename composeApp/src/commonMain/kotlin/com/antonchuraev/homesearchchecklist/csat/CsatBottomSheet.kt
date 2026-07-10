@@ -315,8 +315,10 @@ private fun FeedbackOnlyContent(
         FeedbackInputSection(
             value = feedbackText,
             onValueChange = onTextChange,
+            // Feedback-only sheet has no rating to carry signal — require non-blank text so an
+            // empty submit can't fire a content-free feedback_submitted (was always-enabled).
             onSubmitClick = onSubmit,
-            submitEnabled = true,
+            submitEnabled = feedbackText.isNotBlank(),
         )
     }
 }

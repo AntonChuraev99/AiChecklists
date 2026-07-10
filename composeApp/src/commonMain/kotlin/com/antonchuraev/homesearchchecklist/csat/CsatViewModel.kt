@@ -75,17 +75,25 @@ class CsatViewModel(
         csatManager.startObserving(
             scope = viewModelScope,
             analyticsTracker = analyticsTracker,
-            onShouldShow = { showWithDelay() },
+            onShouldShow = { trigger, score -> showWithDelay(trigger, score) },
         )
     }
 
-    private suspend fun showWithDelay() {
+    private suspend fun showWithDelay(triggerEvent: String, score: Int) {
         if (csatShownThisSession) return
         delay(SHOW_DELAY_MS)
         if (csatShownThisSession) return
         csatShownThisSession = true
         csatManager.recordShown()
-        analyticsTracker.event(AnalyticsEvents.Csat.SHOWN)
+        // Log WHICH scored moment (and the score) triggered the show — without this the scored
+        // model is a black box in analytics (can't see which trigger converts to a survey).
+        analyticsTracker.event(
+            AnalyticsEvents.Csat.SHOWN,
+            mapOf(
+                AnalyticsParams.TRIGGER_EVENT to triggerEvent,
+                AnalyticsParams.SCORE to score,
+            ),
+        )
         _screenState.update { it.copy(showBottomSheet = true) }
     }
 
@@ -153,7 +161,7 @@ class CsatViewModel(
     private fun handleToggleChip(chip: FeedbackChip) {
         val wasSelected = chip in _screenState.value.selectedChips
         analyticsTracker.event(
-            "csat_chip_toggled",
+            AnalyticsEvents.Csat.CHIP_TOGGLED,
             mapOf("chip" to chip.name, "selected" to !wasSelected),
         )
         _screenState.update {
@@ -177,8 +185,11 @@ class CsatViewModel(
 
         if (state.isFeedbackOnly) {
             analyticsTracker.event(
-                "feedback_submitted",
-                mapOf("text" to state.feedbackText),
+                AnalyticsEvents.Csat.FEEDBACK_SUBMITTED,
+                mapOf(
+                    AnalyticsParams.HAD_TEXT to state.feedbackText.isNotBlank(),
+                    "text" to state.feedbackText,
+                ),
             )
             _screenState.update {
                 it.copy(
@@ -194,9 +205,10 @@ class CsatViewModel(
         val rating = state.selectedRating ?: return
 
         analyticsTracker.event(
-            "csat_submitted",
+            AnalyticsEvents.Csat.SUBMITTED,
             mapOf(
-                "rating" to rating.name,
+                AnalyticsParams.RATING to rating.name,
+                AnalyticsParams.HAD_TEXT to state.feedbackText.isNotBlank(),
                 "text" to state.feedbackText,
                 "chips" to state.selectedChips.joinToString(",") { it.name },
             ),
@@ -213,6 +225,10 @@ class CsatViewModel(
 
     private fun handleReviewComplete() {
         // Review flow finished (shown, dismissed, or quota-exceeded) → thank the user.
+        // Log flow completion so the review funnel isn't blind after csat_review_tapped — the
+        // Play/StoreKit API never reports whether the user actually rated, so this is the only
+        // signal that the launched review returned.
+        analyticsTracker.event(AnalyticsEvents.Csat.REVIEW_COMPLETED)
         _screenState.update {
             it.copy(shouldLaunchReview = false, showBottomSheet = false, showFeedbackThanks = true)
         }

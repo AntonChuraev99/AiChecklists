@@ -320,8 +320,12 @@ object AnalyticsEvents {
         const val DISMISSED = "csat_dismissed"
         const val RATING_SELECTED = "csat_rating_selected"
         const val REVIEW_TAPPED = "csat_review_tapped"
-        const val REVIEW_SKIPPED = "csat_review_skipped"
+        // Review flow returned (rated / dismissed / quota-exceeded — the store API never says which).
+        const val REVIEW_COMPLETED = "csat_review_completed"
         const val FEEDBACK_OPENED = "feedback_opened"
+        const val SUBMITTED = "csat_submitted"
+        const val CHIP_TOGGLED = "csat_chip_toggled"
+        const val FEEDBACK_SUBMITTED = "feedback_submitted"
     }
 
     // ─── Updates feed ────────────────────────────────────────────────────────
@@ -380,6 +384,8 @@ object AnalyticsEvents {
  */
 object AnalyticsParams {
     const val SOURCE = "source"
+    const val TRIGGER_EVENT = "trigger_event"
+    const val SCORE = "score"
     const val VARIANT = "variant"
     const val PAGE = "page"
     const val ERROR = "error"
