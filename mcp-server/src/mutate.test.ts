@@ -72,22 +72,40 @@ describe("treeToTemplateItems / buildAiChecklist", () => {
 });
 
 describe("applyFilledItems", () => {
-  it("maps filled_items by index onto the fill (checked + note), dirty-parents", () => {
-    const c = createEmptyChecklist("Viewing", ["Water pressure", "Windows"], T0);
+  it("maps by text regardless of 1-based index or return order (the live-found bug)", () => {
+    const c = createEmptyChecklist("Viewing", ["Water pressure", "Windows", "Doors"], T0);
     const before = c.updatedAt;
+    // Model returns 1-BASED index, shuffled order — index as-a-0-based-array-index would shift/drop.
     const out = applyFilledItems(
       c,
       [
-        { index: 0, checked: true, note: "strong" },
-        { index: 1, checked: true, note: null },
+        { index: 2, text: "Windows", checked: true, note: "new" },
+        { index: 1, text: "Water pressure", checked: true, note: "strong" },
+        { index: 3, text: "Doors", checked: false, note: null },
       ],
       T0 + 5,
     );
     const fi = fillItems(out);
-    expect(fi[0]).toMatchObject({ checked: true, note: "strong" });
-    expect(fi[1]).toMatchObject({ checked: true, note: null });
+    expect(fi[0]).toMatchObject({ text: "Water pressure", checked: true, note: "strong" });
+    expect(fi[1]).toMatchObject({ text: "Windows", checked: true, note: "new" });
+    expect(fi[2]).toMatchObject({ text: "Doors", checked: false, note: null });
     expect(out.updatedAt).toBeGreaterThan(before); // dirty-parent
     expect(defaultFill(out)!.updatedAt).toBeGreaterThan(before);
+  });
+
+  it("matches case-insensitively then falls back to numeric index when text is absent", () => {
+    const c = createEmptyChecklist("T", ["Milk", "Eggs"], T0);
+    const out = applyFilledItems(
+      c,
+      [
+        { index: 1, text: "milk", checked: true, note: null }, // case-insensitive → Milk
+        { index: 2, text: "totally different", checked: true, note: "x" }, // no text → index 2→(2-1)=Eggs
+      ],
+      T0 + 1,
+    );
+    const fi = fillItems(out);
+    expect(fi.find((f) => f.text === "Milk")!.checked).toBe(true);
+    expect(fi.find((f) => f.text === "Eggs")!).toMatchObject({ checked: true, note: "x" });
   });
 });
 

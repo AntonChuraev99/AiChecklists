@@ -162,24 +162,44 @@ export function flattenFillForAi(c: ChecklistSyncData, now: number): Array<{ tex
 }
 
 /**
- * Apply analyze_and_fill_checklist results onto the default fill: `filled_items[i].index` maps to
- * the i-th fill item we sent, setting checked + note while preserving ids + templateItemId.
- * Dirty-parent bump. Returns the read-modify-written checklist.
+ * Apply analyze_and_fill_checklist results onto the default fill, setting checked + note while
+ * preserving ids + templateItemId. Dirty-parent bump. Returns the read-modify-written checklist.
+ *
+ * ⚠ Match by `text`, NOT by `index`: the model returns `filled_items[].index` 1-BASED (verified
+ * live 2026-07-10 — using it as a 0-based array index shifted every result by one and dropped the
+ * last item). Each filled item echoes the original `text`, so we resolve it to the first not-yet-
+ * used fill item with that text (exact, then trimmed/case-insensitive), and only fall back to the
+ * numeric index (tolerating 0- or 1-based) when the text can't be matched.
  */
 export function applyFilledItems(
   c: ChecklistSyncData,
-  filled: Array<{ index: number; checked: boolean; note: string | null }>,
+  filled: Array<{ index: number; text: string; checked: boolean; note: string | null }>,
   now: number,
 ): ChecklistSyncData {
   const next = clone(c);
   const fill = ensureDefaultFill(next, now);
   const items = parseFillItems(fill.itemsJson);
+  const used = new Set<number>();
+  const norm = (s: string): string => s.trim().toLowerCase();
+
   for (const f of filled) {
-    const item = items[f.index];
-    if (!item) continue;
-    item.checked = f.checked;
-    item.note = f.note ?? null;
+    let idx = items.findIndex((it, i) => !used.has(i) && it.text === f.text);
+    if (idx === -1) idx = items.findIndex((it, i) => !used.has(i) && norm(it.text) === norm(f.text));
+    if (idx === -1) {
+      // Fallback: numeric index, tolerating either base; prefer as-is, then index-1.
+      for (const cand of [f.index, f.index - 1]) {
+        if (cand >= 0 && cand < items.length && !used.has(cand)) {
+          idx = cand;
+          break;
+        }
+      }
+    }
+    if (idx === -1) continue;
+    items[idx]!.checked = f.checked;
+    items[idx]!.note = f.note ?? null;
+    used.add(idx);
   }
+
   fill.itemsJson = encodeFillItems(items);
   touchFill(fill, now);
   touchChecklist(next, now);
