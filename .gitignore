@@ -102,3 +102,20 @@ SECURITY_DELIVERY_SUMMARY.txt
 !core/**/*.png
 !feature/**/*.png
 *.stackdump
+
+# Gisti MCP secrets — never commit (public repo)
+client_secret_*.json
+**/client_secret_*.json
+**/*-sa.json
+**/service-account*.json
+
+# mcp-server dev/build (never commit)
+.dev.vars
+**/.dev.vars
+node_modules/
+**/node_modules/
+.wrangler/
+**/.wrangler/
+
+# local wrangler dev log
+*.wrangler-dev.log
