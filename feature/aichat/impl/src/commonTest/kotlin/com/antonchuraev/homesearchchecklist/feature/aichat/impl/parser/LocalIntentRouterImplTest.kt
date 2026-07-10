@@ -1245,4 +1245,55 @@ class LocalIntentRouterImplTest {
         assertIs<ChatIntent.CreateChecklist>(result.intent)
         assertTrue(result.confidence >= 0.6f)
     }
+
+    // ─── Planning/progress question escalation ────────────────────────────────
+    //
+    // Real Amplitude ai_chat_feedback thumbs-down (prod 786722): user typed
+    // «Что мне сделать сегодня?» ("What should I do today?"). Layer 1 mis-classified
+    // it as a COMMAND (a broad command keyword matched) and dead-ended with
+    // «В апки не нашёл пункт "что мне сделать сегодня?"» instead of escalating to the
+    // Layer 3 agent, which reads the checklist and suggests what to do. A
+    // planning/progress QUESTION carries no concrete item — it must escalate to
+    // ChatIntent.FreeForm (the same escalation intent used for referential payloads).
+
+    @Test
+    fun freeForm_ru_planningQuestion_escalates() = runTest {
+        // Exact bad transcript from the Amplitude thumbs-down.
+        val result = router.route("Что мне сделать сегодня?", ChatLocale.Ru)
+        assertIs<ChatIntent.FreeForm>(result.intent)
+    }
+
+    @Test
+    fun freeForm_ru_whatToDo_escalates() = runTest {
+        val result = router.route("что мне делать сегодня", ChatLocale.Ru)
+        assertIs<ChatIntent.FreeForm>(result.intent)
+    }
+
+    @Test
+    fun freeForm_en_whatShouldIDo_escalates() = runTest {
+        val result = router.route("what should I do today?", ChatLocale.En)
+        assertIs<ChatIntent.FreeForm>(result.intent)
+    }
+
+    // Guard-rails: real completion commands must keep working after the fix — a
+    // lexicon tweak that escalates planning questions must NOT nuke real completion.
+
+    @Test
+    fun completeItem_ru_done_keepsWorking() = runTest {
+        val result = router.route("сделано", ChatLocale.Ru)
+        assertIs<ChatIntent.CompleteItem>(result.intent)
+    }
+
+    @Test
+    fun completeItem_ru_doneWithItem_keepsWorking() = runTest {
+        val result = router.route("сделал покупки", ChatLocale.Ru)
+        assertIs<ChatIntent.CompleteItem>(result.intent)
+    }
+
+    @Test
+    fun completeItem_ru_markConcrete_keepsWorking() = runTest {
+        val result = router.route("отметь молоко", ChatLocale.Ru)
+        assertIs<ChatIntent.CompleteItem>(result.intent)
+        assertTrue(result.confidence >= 0.6f)
+    }
 }

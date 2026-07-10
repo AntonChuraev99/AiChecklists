@@ -146,4 +146,20 @@ internal object RuIntentLexicon {
     // Completion markers stripped from the tail of a payload before the referential
     // check, so «отметь все выполнено» still reduces to a bare referent.
     val completionMarkers: Set<String> = setOf("выполнено", "сделано", "готово")
+
+    // ─── Planning/progress questions (escalate to Layer 3) ────────────────────
+    // Open-ended "what should I do / what's next" questions. They name no concrete
+    // item — the user wants the assistant to read their checklists and suggest next
+    // steps, which only Layer 3 (full chat, with context) can do. Listed here so the
+    // router escalates BEFORE a broad command verb (e.g. the CompleteItem infinitive
+    // «сделать») greedily swallows «что мне сделать сегодня?». Real Amplitude case
+    // 2026-07-10: «Что мне сделать сегодня?» mis-fired CompleteItem and dead-ended.
+    val planningQuestions: Set<String> = setOf(
+        "что мне сделать",
+        "что мне делать",
+        "что делать",
+        "что мне сегодня делать",
+        "что дальше",
+        "чем заняться",
+    )
 }

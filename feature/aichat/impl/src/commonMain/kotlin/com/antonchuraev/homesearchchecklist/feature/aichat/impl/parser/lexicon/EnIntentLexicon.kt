@@ -159,4 +159,18 @@ internal object EnIntentLexicon {
     // Completion markers stripped from the tail of a payload before the referential
     // check, so "mark all done" still reduces to a bare referent.
     val completionMarkers: Set<String> = setOf("done", "complete", "completed", "finished")
+
+    // ─── Planning/progress questions (escalate to Layer 3) ────────────────────
+    // Open-ended "what should I do / what's next" questions — no concrete item; the
+    // user wants the assistant to look at their checklists and suggest next steps
+    // (Layer 3 only). Escalated before command verbs so a typed planning question is
+    // not mis-fired as a local action. Mirrors RuIntentLexicon.planningQuestions.
+    val planningQuestions: Set<String> = setOf(
+        "what should i do",
+        "what do i do",
+        "what to do",
+        "what shall i do",
+        "what's next",
+        "what next",
+    )
 }

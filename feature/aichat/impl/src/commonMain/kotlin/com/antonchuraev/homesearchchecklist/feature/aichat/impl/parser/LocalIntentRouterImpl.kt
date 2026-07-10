@@ -119,6 +119,11 @@ internal class LocalIntentRouterImpl(
     // ─── Classification dispatch ──────────────────────────────────────────────
 
     private fun classify(normalized: String, lower: String, locale: ChatLocale): IntentClassification {
+        // PlanningQuestion runs first: an open-ended "what should I do / what's next"
+        // question must escalate to Layer 3 BEFORE a broad command verb swallows it.
+        // Real incident (2026-07-10): «что мне СДЕЛАТЬ сегодня?» matched the CompleteItem
+        // infinitive «сделать» and fired a confident wrong action instead of answering.
+        tryPlanningQuestion(normalized, lower, locale)?.let { return it }
         // AttachToItem runs first: "прикрепи к" / "attach to" keywords are very specific
         // and must not be shadowed by the broad CreateItem triggers ("добавь к", "add to").
         tryAttachToItem(normalized, lower, locale)?.let { return it }
@@ -137,6 +142,39 @@ internal class LocalIntentRouterImpl(
         tryCompleteItem(normalized, lower, locale)?.let { return it }
         tryFindItems(normalized, lower, locale)?.let { return it }
         return unknown(normalized)
+    }
+
+    // ─── PlanningQuestion ─────────────────────────────────────────────────────
+
+    /**
+     * Escalates open-ended planning/progress QUESTIONS («что мне сделать сегодня?»,
+     * "what should I do today?") to Layer 3 (full chat) instead of letting a broad
+     * command keyword fire a confident local action.
+     *
+     * These name no concrete item — the user is asking the assistant to look at their
+     * checklists and suggest next steps, which only the Layer 3 agent (with checklist
+     * context) can answer. Runs FIRST in [classify] so an interrogative like «что мне
+     * СДЕЛАТЬ сегодня» is not swallowed by the CompleteItem infinitive «сделать».
+     *
+     * Real Amplitude bad-feedback case (2026-07-10, prod 786722): «Что мне сделать
+     * сегодня?» mis-fired CompleteItem and dead-ended at "не нашёл пункт" instead of
+     * answering. Escalating (not lexicon-trimming «сделать») keeps real completion
+     * commands («сделано», «сделал покупки», «отметь молоко») working.
+     */
+    private fun tryPlanningQuestion(
+        normalized: String,
+        lower: String,
+        locale: ChatLocale,
+    ): IntentClassification? {
+        val phrases = when (locale) {
+            ChatLocale.Ru -> RuIntentLexicon.planningQuestions
+            ChatLocale.En -> EnIntentLexicon.planningQuestions
+        }
+        val matched = phrases.sortedByDescending { it.length }
+            .firstOrNull { containsAtBoundary(lower, it) } ?: return null
+
+        logger.debug(TAG, "PlanningQuestion matched='$matched' → escalating to Layer 3 (full chat)")
+        return freeFormEscalation()
     }
 
     // ─── AttachToItem ─────────────────────────────────────────────────────────
