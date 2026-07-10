@@ -25,6 +25,7 @@ import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Campaign
 import androidx.compose.material.icons.outlined.Feedback
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Login
 import androidx.compose.material.icons.outlined.MailOutline
@@ -66,6 +67,7 @@ import aichecklists.core.designsystem.generated.resources.drawer_promo_web_top
 import aichecklists.core.designsystem.generated.resources.nav_ai_chat
 import aichecklists.core.designsystem.generated.resources.drawer_account
 import aichecklists.core.designsystem.generated.resources.drawer_item_home
+import aichecklists.core.designsystem.generated.resources.drawer_item_mcp
 import aichecklists.core.designsystem.generated.resources.drawer_sign_in
 import aichecklists.core.designsystem.generated.resources.drawer_sign_out
 import aichecklists.core.designsystem.generated.resources.today_title
@@ -101,6 +103,7 @@ object DrawerDestination {
     const val Today = "today"
     const val Calendar = "calendar"
     const val AiChat = "ai_chat"
+    const val Mcp = "mcp"
 }
 
 /**
@@ -125,6 +128,7 @@ fun AppNavigationDrawerContent(
     onTodayClick: () -> Unit = {},
     onCalendarClick: () -> Unit = {},
     onAiChatClick: () -> Unit = {},
+    onMcpClick: () -> Unit = {},
     onUpdateFeedClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onRateAppClick: () -> Unit,
@@ -213,6 +217,17 @@ fun AppNavigationDrawerContent(
             onClick = {
                 onCloseDrawer()
                 onAiChatClick()
+            },
+            colors = drawerItemColors,
+            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+        )
+        NavigationDrawerItem(
+            label = { Text(stringResource(Res.string.drawer_item_mcp)) },
+            icon = { Icon(Icons.Outlined.Hub, contentDescription = null) },
+            selected = selectedItemId == DrawerDestination.Mcp,
+            onClick = {
+                onCloseDrawer()
+                onMcpClick()
             },
             colors = drawerItemColors,
             modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)

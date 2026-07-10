@@ -1,0 +1,18 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "gisti-mcp",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-01",
+  "compatibility_flags": ["nodejs_compat"],
+  // gisti-ai.com zone + workers live in the churaevanton@gmail.com CF account.
+  // Pin it so a swapify-logged-in wrangler can't deploy into the wrong account.
+  "account_id": "2c9dfaadbca94b44f59f13dbf70519d7",
+  "durable_objects": {
+    "bindings": [{ "name": "MCP_OBJECT", "class_name": "GistiMCP" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["GistiMCP"] }],
+  "kv_namespaces": [
+    { "binding": "OAUTH_KV", "id": "384442e368b54d7f909ac6f967182eb0" }
+  ],
+  "observability": { "enabled": true }
+}

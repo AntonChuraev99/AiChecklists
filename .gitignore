@@ -108,3 +108,11 @@ client_secret_*.json
 **/client_secret_*.json
 **/*-sa.json
 **/service-account*.json
+
+# mcp-server dev/build (never commit)
+.dev.vars
+**/.dev.vars
+**/node_modules/
+
+# local wrangler dev log
+*.wrangler-dev.log
