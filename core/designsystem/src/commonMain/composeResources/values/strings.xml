@@ -186,6 +186,7 @@
     <string name="drawer_version_label">Version %1$s</string>
     <string name="drawer_logo_content_description">Gisti logo</string>
     <string name="drawer_item_home">Home</string>
+    <string name="drawer_item_mcp">Gisti MCP</string>
     <!-- Drawer cross-promo store badge -->
     <string name="drawer_promo_web_top">ALSO ON THE WEB</string>
     <string name="drawer_promo_web_bottom">Open gisti-ai.com</string>
@@ -1433,4 +1434,18 @@
     <!-- In-app update (Google Play flexible update — restart snackbar) -->
     <string name="app_update_downloaded_message">Update downloaded</string>
     <string name="app_update_downloaded_restart">Restart</string>
+
+    <!-- MCP Screen (Gisti MCP — connect checklists to Claude via the remote MCP server) -->
+    <string name="mcp_title">Gisti MCP</string>
+    <string name="mcp_hero_title">Manage your checklists right from Claude.</string>
+    <string name="mcp_hero_body">Read, create, and edit them by chatting — even while Gisti is closed.</string>
+    <string name="mcp_value_read">Read your checklists in Claude</string>
+    <string name="mcp_value_create">Create new ones with AI</string>
+    <string name="mcp_value_edit">Check off &amp; edit hands-free</string>
+    <string name="mcp_value_sync">Cloud-synced across all your devices</string>
+    <string name="mcp_cta_guide">Connection guide</string>
+    <string name="mcp_endpoint_label">MCP server URL</string>
+    <string name="mcp_endpoint_copied">Copied</string>
+    <string name="mcp_endpoint_copy_cd">Copy MCP server URL</string>
+    <string name="mcp_requires_google">Requires signing in with Google</string>
 </resources>

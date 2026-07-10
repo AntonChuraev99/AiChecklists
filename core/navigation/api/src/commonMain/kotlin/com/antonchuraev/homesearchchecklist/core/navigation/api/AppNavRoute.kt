@@ -120,6 +120,14 @@ sealed interface AppNavRoute : NavKey {
     @Serializable
     data object AiChat : AppNavRoute
 
+    /**
+     * "Gisti MCP" info screen (remote MCP server). Pushed from the navigation drawer as a
+     * read-and-return detail page (back-arrow, keeps the shell underneath) — not a top-level
+     * drawer tab, so it is intentionally absent from the shell's selected-destination set.
+     */
+    @Serializable
+    data object Mcp : AppNavRoute
+
     @Serializable
     data object Onboardings : AppNavRoute
 

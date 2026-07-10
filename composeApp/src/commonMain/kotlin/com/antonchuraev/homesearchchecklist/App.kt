@@ -191,6 +191,7 @@ import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.Paywall
 import com.antonchuraev.homesearchchecklist.feature.paywall.presentation.SubscriptionStatusScreen
 import com.antonchuraev.homesearchchecklist.feature.sharing.presentation.ShareScreen
 import com.antonchuraev.homesearchchecklist.feature.updatefeed.presentation.UpdateFeedScreen
+import com.antonchuraev.homesearchchecklist.mcp.McpScreen
 import com.antonchuraev.homesearchchecklist.core.common.api.ActivationCoordinator
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
@@ -910,6 +911,14 @@ fun App() {
                     DrawerDestination.Today -> navigator.navigateToToday()
                     DrawerDestination.Calendar -> navigator.navigateToCalendar()
                     DrawerDestination.AiChat -> navigator.navigateToAiChat()
+                    DrawerDestination.Mcp -> {
+                        // Push as a detail screen (back-arrow return). No dedicated AppNavigator
+                        // method — mutate the exposed backStack directly with a launchSingleTop
+                        // guard, avoiding an interface change + its test-fakes ripple.
+                        if (navigator.backStack.lastOrNull() != AppNavRoute.Mcp) {
+                            navigator.backStack.add(AppNavRoute.Mcp)
+                        }
+                    }
                     DrawerDestination.UpdateFeed -> navigator.navigateToUpdateFeed()
                     DrawerDestination.Settings -> navigator.navigateToSettings()
                 }
@@ -1395,6 +1404,10 @@ fun App() {
                             onBackClick = { navigator.onBack() },
                             drawerState = drawerState,
                         )
+                    }
+
+                    entry<AppNavRoute.Mcp> {
+                        McpScreen(onBack = { navigator.onBack() })
                     }
 
                     entry<AppNavRoute.Today>(
