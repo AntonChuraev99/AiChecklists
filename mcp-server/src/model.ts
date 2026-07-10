@@ -47,7 +47,12 @@ export interface ChecklistFillItem {
   weekday: number | null;
   priority: number;
   reminderAt: number | null;
-  repeatRule: string | null; // ReminderRepeatRule (serial shape not yet needed for read)
+  /**
+   * Item-level ReminderRepeatRule — a NESTED JSON object in the fill's itemsJson (unlike the
+   * checklist-level repeatRule which is a stringified JSON string). Preserved VERBATIM (raw
+   * parsed value) so a read-modify-write re-emits its exact bytes; the MCP never edits it.
+   */
+  repeatRule: unknown;
   repeatTimeOfDayMinutes: number | null;
   repeatNextAt: number | null;
   repeatOccurrenceCount: number;
@@ -117,7 +122,7 @@ function decodeFillItem(raw: Record<string, unknown>): ChecklistFillItem {
     weekday: numOrNull(raw["weekday"]),
     priority: typeof raw["priority"] === "number" ? (raw["priority"] as number) : 0,
     reminderAt: numOrNull(raw["reminderAt"]),
-    repeatRule: typeof raw["repeatRule"] === "string" ? (raw["repeatRule"] as string) : null,
+    repeatRule: raw["repeatRule"] ?? null, // nested object — preserved verbatim
     repeatTimeOfDayMinutes: numOrNull(raw["repeatTimeOfDayMinutes"]),
     repeatNextAt: numOrNull(raw["repeatNextAt"]),
     repeatOccurrenceCount:

@@ -14,6 +14,7 @@
  */
 
 import type { ChecklistSyncData, FillSyncData } from "./model";
+import { CHECKLIST_DOC_FIELD_PATHS, toChecklistDoc, wrapFields } from "./encode";
 
 const PROJECT_ID = "aichecklists-40230";
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
@@ -171,20 +172,16 @@ async function firestoreFetch(
 
 // ── Public read API ─────────────────────────────────────────────────────────────
 
-/**
- * Resolve ALL candidate user_ids for the Google email proven by OAuth.
- *
- * Gisti keeps TWO docs per person (identity divergence, cf. project memory
- * `credits-shared-self-healing`): a device-registration doc whose ID is a UUID and which
- * carries the `google_email`/`google_uid` FIELDS, and a google-keyed doc whose ID IS the
- * Firebase `google_uid` and which actually holds the checklists (its identity fields are
- * empty). Resolving by the `google_email` field alone lands on the (often empty) device doc.
- *
- * So we return the UNION: every doc matching `google_email == email`, PLUS each of their
- * `google_uid` field values (the id of the checklist-bearing doc). Callers union checklists
- * across all candidates. Empty array → no linked user (caller → "sign in first").
- */
-export async function resolveUserIds(env: FirestoreEnv, email: string): Promise<string[]> {
+/** One `users` doc matching the caller's email: its own id + the google_uid FIELD it carries. */
+interface UserMatch {
+  /** The matched doc's id — the device-registration doc (holds credits + identity fields). */
+  docId: string;
+  /** Its `google_uid` field value — the id of the checklist-bearing doc, or null if unset. */
+  googleUid: string | null;
+}
+
+/** Run the `users where google_email == email` query and extract (docId, google_uid) per hit. */
+async function queryUsersByEmail(env: FirestoreEnv, email: string): Promise<UserMatch[]> {
   const body = {
     structuredQuery: {
       from: [{ collectionId: "users" }],
@@ -199,15 +196,72 @@ export async function resolveUserIds(env: FirestoreEnv, email: string): Promise<
     body: JSON.stringify(body),
   })) as Array<{ document?: { name: string; fields?: { google_uid?: { stringValue?: string } } } }>;
 
-  const ids = new Set<string>();
+  const matches: UserMatch[] = [];
   for (const row of result) {
     if (!row.document?.name) continue;
-    const docId = row.document.name.split("/").pop(); // device-registration doc
-    if (docId) ids.add(docId);
-    const guid = row.document.fields?.google_uid?.stringValue; // google-keyed data doc id
-    if (guid) ids.add(guid);
+    const docId = row.document.name.split("/").pop();
+    if (!docId) continue;
+    matches.push({ docId, googleUid: row.document.fields?.google_uid?.stringValue ?? null });
+  }
+  return matches;
+}
+
+/**
+ * Resolve ALL candidate user_ids for the Google email proven by OAuth.
+ *
+ * Gisti keeps TWO docs per person (identity divergence, cf. project memory
+ * `credits-shared-self-healing`): a device-registration doc whose ID is a UUID and which
+ * carries the `google_email`/`google_uid` FIELDS, and a google-keyed doc whose ID IS the
+ * Firebase `google_uid` and which actually holds the checklists (its identity fields are
+ * empty). Resolving by the `google_email` field alone lands on the (often empty) device doc.
+ *
+ * So we return the UNION: every doc matching `google_email == email`, PLUS each of their
+ * `google_uid` field values (the id of the checklist-bearing doc). Callers union checklists
+ * across all candidates. Empty array → no linked user (caller → "sign in first").
+ */
+export async function resolveUserIds(env: FirestoreEnv, email: string): Promise<string[]> {
+  const matches = await queryUsersByEmail(env, email);
+  const ids = new Set<string>();
+  for (const m of matches) {
+    ids.add(m.docId);
+    if (m.googleUid) ids.add(m.googleUid);
   }
   return [...ids];
+}
+
+/**
+ * Identity split needed by the WRITE phases (CF credit calls vs Firestore writes land on
+ * DIFFERENT docs — the #1 trap of this data model):
+ *  - `creditUserId` = the device-registration doc (holds credits + is what the APP sends to
+ *    the Cloud Functions as `user_id`). AI credit reservation must charge THIS doc.
+ *  - `writeUserId`  = the google_uid data doc (holds `checklists`, cross-device source of
+ *    truth). ALL checklist mutations/creates target THIS doc. Falls back to the device doc
+ *    only if the person has no linked google_uid (degenerate; keeps writes self-consistent).
+ *  - `allIds` = union for read fan-out.
+ * Returns null when the email is not linked to any Gisti user (caller → "sign in first").
+ */
+export interface UserContext {
+  creditUserId: string;
+  writeUserId: string;
+  allIds: string[];
+}
+
+export async function resolveUserContext(env: FirestoreEnv, email: string): Promise<UserContext | null> {
+  const matches = await queryUsersByEmail(env, email);
+  if (matches.length === 0) return null;
+  // The doc matched by google_email IS the device/credit doc; prefer the first with a
+  // google_uid so writes land on the checklist-bearing doc even if a stray device doc sorts first.
+  const primary = matches.find((m) => m.googleUid) ?? matches[0]!;
+  const ids = new Set<string>();
+  for (const m of matches) {
+    ids.add(m.docId);
+    if (m.googleUid) ids.add(m.googleUid);
+  }
+  return {
+    creditUserId: primary.docId,
+    writeUserId: primary.googleUid ?? primary.docId,
+    allIds: [...ids],
+  };
 }
 
 /** Back-compat single-id resolve (diagnostic scripts). Prefer resolveUserIds. */
@@ -292,4 +346,65 @@ export async function getChecklist(
   } catch {
     return null; // 404 → not found
   }
+}
+
+// ── Write API (Phase 1/2) ─────────────────────────────────────────────────────────
+
+/** A located checklist plus the user_id doc it actually lives under (mutations write back here). */
+export interface OwnedChecklist {
+  checklist: ChecklistSyncData;
+  /** The `users/{ownerId}` doc holding this checklist — write the mutation back to THIS id. */
+  ownerId: string;
+}
+
+/**
+ * Find a checklist by cloudId across candidate user_ids AND report which doc owns it. Mutations
+ * must read-modify-write the SAME doc they were found in (never migrate data between the
+ * device-doc and the google_uid-doc), so callers pass ownerId back to `writeChecklist`.
+ * Returns the first non-deleted hit, or null.
+ */
+export async function findChecklistWithOwner(
+  env: FirestoreEnv,
+  ids: string[],
+  cloudId: string,
+): Promise<OwnedChecklist | null> {
+  for (const ownerId of ids) {
+    const checklist = await getChecklist(env, ownerId, cloudId);
+    if (checklist && !checklist.isDeleted) return { checklist, ownerId };
+  }
+  return null;
+}
+
+/**
+ * Create or overwrite a checklist doc at `users/{userId}/checklists/{cloudId}`.
+ *
+ * PATCH with an `updateMask` of exactly the fields we manage: every managed field is written
+ * (create-or-replace them), while any field the app adds in the future that we don't model is
+ * left untouched — matching the client's `set(merge = true)`. The caller supplies the fully
+ * read-modify-written `ChecklistSyncData` (all managed fields populated) and the owning userId
+ * (the google_uid data doc for creates; the located ownerId for mutations).
+ */
+export async function writeChecklist(
+  env: FirestoreEnv,
+  userId: string,
+  checklist: ChecklistSyncData,
+): Promise<void> {
+  const doc = toChecklistDoc(checklist);
+  const mask = CHECKLIST_DOC_FIELD_PATHS.map((p) => `updateMask.fieldPaths=${encodeURIComponent(p)}`).join(
+    "&",
+  );
+  await firestoreFetch(env, `/users/${userId}/checklists/${checklist.cloudId}?${mask}`, {
+    method: "PATCH",
+    body: JSON.stringify({ fields: wrapFields(doc) }),
+  });
+}
+
+/**
+ * HARD-delete a checklist document (physically removes it). ⚠ NOT an MCP tool — the app uses a
+ * soft `isDeleted` tombstone for cross-device delete propagation, so exposing a hard delete would
+ * break sync. Provided only for the verification script's cleanup (leave prod pristine after a
+ * test write).
+ */
+export async function deleteChecklistDoc(env: FirestoreEnv, userId: string, cloudId: string): Promise<void> {
+  await firestoreFetch(env, `/users/${userId}/checklists/${cloudId}`, { method: "DELETE" });
 }
