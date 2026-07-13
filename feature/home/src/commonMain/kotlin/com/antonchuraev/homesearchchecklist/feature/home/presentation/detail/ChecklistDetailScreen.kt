@@ -1671,13 +1671,15 @@ private fun ChecklistDetailContent(
                 pendingRepeatConfig = state.pendingRepeatConfig,
                 showEndConditionPicker = state.showEndConditionPicker,
                 isLocked = state.itemReminderSheetLocked,
+                showFullScreenOption = true,
+                fullScreenEnabled = state.itemReminderFullScreen,
             ),
             callbacks = ReminderSheetCallbacks(
                 onTabSelected = { onIntent(ChecklistDetailIntent.OnItemReminderTabSelected(it)) },
                 onPresetSelected = { triggerAt ->
                     if (itemReminderItem != null) {
                         onIntent(ChecklistDetailIntent.OnSaveItemReminder(
-                            itemReminderItem.id, triggerAt, null, null
+                            itemReminderItem.id, triggerAt, null, null, state.itemReminderFullScreen
                         ))
                     }
                 },
@@ -1702,7 +1704,7 @@ private fun ChecklistDetailContent(
                         val rule = config.toRule()
                         val timeMinutes = config.timeHour * 60 + config.timeMinute
                         onIntent(ChecklistDetailIntent.OnSaveItemReminder(
-                            itemReminderItem.id, null, rule, timeMinutes
+                            itemReminderItem.id, null, rule, timeMinutes, state.itemReminderFullScreen
                         ))
                     }
                 },
@@ -1716,6 +1718,7 @@ private fun ChecklistDetailContent(
                         onIntent(ChecklistDetailIntent.OnAddItemToCalendar(itemReminderItem.id))
                     }
                 },
+                onFullScreenToggled = { onIntent(ChecklistDetailIntent.OnItemReminderFullScreenToggled(it)) },
                 onDismiss = { onIntent(ChecklistDetailIntent.OnDismissItemReminderSheet) },
                 onUpgradeClick = { onIntent(ChecklistDetailIntent.OnItemReminderUpgradeClick) },
             )
@@ -1781,6 +1784,17 @@ private fun ChecklistDetailContent(
             onOpenSettings = { onIntent(ChecklistDetailIntent.OnExactAlarmOpenSettings) },
             onSkip = { onIntent(ChecklistDetailIntent.OnExactAlarmSkip) },
             onDismiss = { onIntent(ChecklistDetailIntent.OnDismissExactAlarmSheet) }
+        )
+    }
+
+    // Full-screen-intent (alarm-style) permission instruction sheet
+    if (state.showFullScreenIntentSheet) {
+        FullScreenIntentInstructionSheet(
+            dontShowAgain = state.fsiDontShowAgain,
+            onDontShowAgainChanged = { onIntent(ChecklistDetailIntent.OnFsiDontShowChanged(it)) },
+            onOpenSettings = { onIntent(ChecklistDetailIntent.OnFsiOpenSettings) },
+            onSkip = { onIntent(ChecklistDetailIntent.OnFsiSkip) },
+            onDismiss = { onIntent(ChecklistDetailIntent.OnDismissFsiSheet) }
         )
     }
 
@@ -3331,6 +3345,74 @@ private fun NotificationFeatureRow(
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f)
         )
+    }
+}
+
+@Composable
+private fun FullScreenIntentInstructionSheet(
+    dontShowAgain: Boolean,
+    onDontShowAgainChanged: (Boolean) -> Unit,
+    onOpenSettings: () -> Unit,
+    onSkip: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AdaptiveSheetOrDialog(
+        onDismiss = onDismiss,
+        title = { Text(stringResource(Res.string.reminder_fsi_title)) },
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .navigationBarsPadding()
+                .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
+                .padding(bottom = AppDimens.SpacingXxl),
+            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd)
+        ) {
+
+            Spacer(modifier = Modifier.height(AppDimens.SpacingXs))
+
+            // Steps
+            StepRow(number = 1, text = stringResource(Res.string.reminder_fsi_step1))
+            StepRow(number = 2, text = stringResource(Res.string.reminder_fsi_step2))
+            StepRow(number = 3, text = stringResource(Res.string.reminder_fsi_step3))
+
+            // Description
+            Text(
+                text = stringResource(Res.string.reminder_fsi_description),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = AppDimens.SpacingXs)
+            )
+
+            // Don't show again checkbox
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Checkbox(
+                    checked = dontShowAgain,
+                    onCheckedChange = onDontShowAgainChanged
+                )
+                Text(
+                    text = stringResource(Res.string.reminder_fsi_dont_show),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+
+            // Buttons
+            AppButton(
+                text = stringResource(Res.string.reminder_fsi_open_settings),
+                onClick = onOpenSettings,
+                modifier = Modifier.fillMaxWidth()
+            )
+            AppButtonText(
+                text = stringResource(Res.string.reminder_fsi_skip),
+                onClick = onSkip,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
     }
 }
 

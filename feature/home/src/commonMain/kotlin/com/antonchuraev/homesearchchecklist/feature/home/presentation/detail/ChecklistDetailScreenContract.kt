@@ -169,6 +169,11 @@ sealed interface ChecklistDetailState : State {
         val customPickerItemId: String? = null,
         val showExactAlarmSheet: Boolean = false,
         val exactAlarmDontShowAgain: Boolean = false,
+        // Full-screen-intent (alarm-style) permission instruction sheet — a clone of the exact-alarm
+        // flow, shown when the user enables the per-item full-screen toggle but the OS FSI permission
+        // is not granted (API 34+).
+        val showFullScreenIntentSheet: Boolean = false,
+        val fsiDontShowAgain: Boolean = false,
         val showNotificationPermissionSheet: Boolean = false,
         val snackbarMessage: String? = null,
         val showOverflowSheet: Boolean = false,
@@ -196,6 +201,9 @@ sealed interface ChecklistDetailState : State {
         // Per-item reminder sheet: null = closed; non-null = open for that itemId
         val itemReminderSheetFor: String? = null,
         val activeItemReminderTab: ReminderTab = ReminderTab.ONCE,
+        // Full-screen-reminder toggle value for the open per-item reminder sheet. Seeded from the
+        // item's current reminderFullScreen when the sheet opens; applied to the item on save.
+        val itemReminderFullScreen: Boolean = false,
         // Item details sheet: null = closed; non-null = open for that itemId
         val itemDetailsSheetFor: String? = null,
         // Inline text edit inside ItemDetailsSheet: null = view mode (Text title); non-null = edit mode (TextField with focus)
@@ -552,11 +560,24 @@ sealed interface ChecklistDetailIntent : Intent {
         val itemId: String,
         val reminderAt: Long?,
         val repeatRule: ReminderRepeatRule?,
-        val repeatTimeOfDayMinutes: Int?
+        val repeatTimeOfDayMinutes: Int?,
+        val fullScreen: Boolean
     ) : ChecklistDetailIntent
     data class OnRemoveItemReminder(val itemId: String) : ChecklistDetailIntent
     data object OnDismissItemReminderSheet : ChecklistDetailIntent
     data class OnItemReminderTabSelected(val tab: ReminderTab) : ChecklistDetailIntent
+
+    // ── Per-item full-screen (alarm-style) reminder ──
+    /** Toggle the "full-screen reminder" switch inside the per-item reminder sheet. */
+    data class OnItemReminderFullScreenToggled(val enabled: Boolean) : ChecklistDetailIntent
+    /** FSI-instruction sheet: open the system full-screen-intent permission settings. */
+    data object OnFsiOpenSettings : ChecklistDetailIntent
+    /** FSI-instruction sheet: dismiss without opening settings ("Skip"). */
+    data object OnFsiSkip : ChecklistDetailIntent
+    /** FSI-instruction sheet: toggle the "don't show again" checkbox. */
+    data class OnFsiDontShowChanged(val checked: Boolean) : ChecklistDetailIntent
+    /** FSI-instruction sheet: dismissed via scrim/back (same effect as Skip). */
+    data object OnDismissFsiSheet : ChecklistDetailIntent
 
     // Calendar export (one-way) — fired from the "Add to Google Calendar" row in the reminder sheet.
     // Synchronous handler (Web popup-safety): the calendar launch must happen inside the click

@@ -710,6 +710,22 @@
     <string name="reminder_exact_alarm_granted">Precise reminders enabled!</string>
     <string name="reminder_exact_alarm_denied">Reminders may be delayed by a few minutes</string>
 
+    <!-- Full-screen (alarm-style) reminder -->
+    <string name="reminder_fullscreen_toggle">Full-screen reminder</string>
+    <string name="reminder_fullscreen_toggle_desc">Shows over the lock screen like an alarm</string>
+    <string name="reminder_fsi_title">Show reminders full-screen</string>
+    <string name="reminder_fsi_step1">Tap "Open Settings" below</string>
+    <string name="reminder_fsi_step2">Find "Full-screen notifications" (or Gisti in the app list)</string>
+    <string name="reminder_fsi_step3">Turn it on for Gisti</string>
+    <string name="reminder_fsi_description">Full-screen reminders show over the lock screen like an alarm, so you never miss the important ones.</string>
+    <string name="reminder_fsi_dont_show">Don't show again</string>
+    <string name="reminder_fsi_open_settings">Open Settings</string>
+    <string name="reminder_fsi_skip">Skip</string>
+    <!-- Full-screen reminder alarm activity (over the lock screen) -->
+    <string name="reminder_full_screen_label">Reminder</string>
+    <string name="reminder_full_screen_open">Open</string>
+    <string name="reminder_full_screen_dismiss">Dismiss</string>
+
     <!-- Notification Permission -->
     <string name="reminder_notification_permission_title">Enable Notifications</string>
     <string name="reminder_notification_permission_description">Allow Gisti to notify you when your reminder is due so you never miss an important checklist.</string>

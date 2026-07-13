@@ -95,6 +95,9 @@ class ChecklistDetailViewModel(
     /** True when user navigated to exact alarm settings; used to detect return. */
     private var wentToExactAlarmSettings = false
 
+    /** True when user navigated to full-screen-intent settings; used to detect return. */
+    private var wentToFsiSettings = false
+
     private var pendingUndoJob: Job? = null
 
     /**
@@ -556,7 +559,10 @@ class ChecklistDetailViewModel(
                 // checklist (the shared picker carries no scope of its own).
                 val itemId = content.customPickerItemId
                 if (itemId != null) {
-                    saveItemReminder(itemId, triggerAt, repeatRule = null, repeatTimeOfDayMinutes = null)
+                    saveItemReminder(
+                        itemId, triggerAt, repeatRule = null, repeatTimeOfDayMinutes = null,
+                        fullScreen = content.itemReminderFullScreen
+                    )
                 } else {
                     saveReminder(triggerAt)
                 }
@@ -613,6 +619,16 @@ class ChecklistDetailViewModel(
                 updateContentState { it.copy(exactAlarmDontShowAgain = intent.checked) }
             }
             ChecklistDetailIntent.OnDismissExactAlarmSheet -> handleExactAlarmSkip()
+
+            // Full-screen-intent (alarm-style) permission
+            is ChecklistDetailIntent.OnItemReminderFullScreenToggled ->
+                handleItemReminderFullScreenToggled(intent.enabled)
+            ChecklistDetailIntent.OnFsiOpenSettings -> handleFsiOpenSettings()
+            ChecklistDetailIntent.OnFsiSkip -> handleFsiSkip()
+            is ChecklistDetailIntent.OnFsiDontShowChanged -> {
+                updateContentState { it.copy(fsiDontShowAgain = intent.checked) }
+            }
+            ChecklistDetailIntent.OnDismissFsiSheet -> handleFsiSkip()
 
             // Analytics-only intents
             is ChecklistDetailIntent.OnCompletedSectionToggle -> {
@@ -792,7 +808,8 @@ class ChecklistDetailViewModel(
             // Per-item reminders
             is ChecklistDetailIntent.OnItemReminderClick -> handleItemReminderClick(intent.itemId)
             is ChecklistDetailIntent.OnSaveItemReminder -> saveItemReminder(
-                intent.itemId, intent.reminderAt, intent.repeatRule, intent.repeatTimeOfDayMinutes
+                intent.itemId, intent.reminderAt, intent.repeatRule, intent.repeatTimeOfDayMinutes,
+                intent.fullScreen
             )
             is ChecklistDetailIntent.OnRemoveItemReminder -> removeItemReminder(intent.itemId)
             ChecklistDetailIntent.OnDismissItemReminderSheet -> {
@@ -2566,7 +2583,58 @@ class ChecklistDetailViewModel(
         }
     }
 
+    // ─── Full-screen-intent (alarm-style) permission — clone of the exact-alarm flow ───
+
+    /**
+     * Called when the user toggles the per-item "full-screen reminder" switch. Records the choice on
+     * the sheet state (applied to the item on save). When turning it ON without the OS FSI permission
+     * (API 34+), surfaces the instruction sheet — mirrors [maybeShowExactAlarmInstruction].
+     */
+    private fun handleItemReminderFullScreenToggled(enabled: Boolean) {
+        viewModelScope.launch {
+            updateContentState { it.copy(itemReminderFullScreen = enabled) }
+            if (enabled) maybeShowFullScreenIntentInstruction()
+        }
+    }
+
+    private suspend fun maybeShowFullScreenIntentInstruction() {
+        if (reminderScheduler.canUseFullScreenIntent()) return
+
+        val suppressed = datastore.observeBoolean(PREF_FSI_DONT_SHOW, false).first()
+        if (suppressed) return
+
+        updateContentState { it.copy(showFullScreenIntentSheet = true, fsiDontShowAgain = false) }
+    }
+
+    private fun handleFsiOpenSettings() {
+        viewModelScope.launch {
+            val state = _screenState.value as? ChecklistDetailState.Content ?: return@launch
+            if (state.fsiDontShowAgain) {
+                datastore.saveBoolean(PREF_FSI_DONT_SHOW, true)
+            }
+            wentToFsiSettings = true
+            updateContentState { it.copy(showFullScreenIntentSheet = false) }
+            reminderScheduler.openFullScreenIntentSettings()
+        }
+    }
+
+    private fun handleFsiSkip() {
+        viewModelScope.launch {
+            val state = _screenState.value as? ChecklistDetailState.Content ?: return@launch
+            if (state.fsiDontShowAgain) {
+                datastore.saveBoolean(PREF_FSI_DONT_SHOW, true)
+            }
+            updateContentState { it.copy(showFullScreenIntentSheet = false) }
+        }
+    }
+
     fun handleReturnedFromSettings() {
+        // FSI settings return: no alarm reschedule needed (FSI is a notification-posting flag, not an
+        // alarm schedule) — just clear the navigation flag so it doesn't linger.
+        if (wentToFsiSettings) {
+            wentToFsiSettings = false
+        }
+
         if (!wentToExactAlarmSettings) return
         wentToExactAlarmSettings = false
 
@@ -2893,6 +2961,7 @@ class ChecklistDetailViewModel(
                         itemReminderSheetFor = itemId,
                         activeItemReminderTab = ReminderTab.ONCE,
                         itemReminderSheetLocked = true,
+                        itemReminderFullScreen = item.reminderFullScreen,
                     )
                 }
                 return@launch
@@ -2906,7 +2975,8 @@ class ChecklistDetailViewModel(
                         itemReminderSheetFor = itemId,
                         activeItemReminderTab = ReminderTab.ONCE,
                         itemReminderSheetLocked = false,
-                        showNotificationPermissionSheet = true
+                        showNotificationPermissionSheet = true,
+                        itemReminderFullScreen = item.reminderFullScreen,
                     )
                 }
             } else {
@@ -2920,6 +2990,7 @@ class ChecklistDetailViewModel(
                         itemReminderSheetFor = itemId,
                         activeItemReminderTab = defaultTab,
                         itemReminderSheetLocked = false,
+                        itemReminderFullScreen = item.reminderFullScreen,
                     )
                 }
                 if (defaultTab == ReminderTab.REPEAT) {
@@ -2957,7 +3028,8 @@ class ChecklistDetailViewModel(
         itemId: String,
         reminderAt: Long?,
         repeatRule: ReminderRepeatRule?,
-        repeatTimeOfDayMinutes: Int?
+        repeatTimeOfDayMinutes: Int?,
+        fullScreen: Boolean
     ) {
         viewModelScope.launch {
             val state = _screenState.value as? ChecklistDetailState.Content ?: return@launch
@@ -2970,7 +3042,7 @@ class ChecklistDetailViewModel(
                 reminderScheduler.cancelItemRepeat(checklistId, fill.id, itemId)
             }
 
-            val updatedItem: ChecklistFillItem = if (repeatRule != null && repeatTimeOfDayMinutes != null) {
+            val updatedItem: ChecklistFillItem = (if (repeatRule != null && repeatTimeOfDayMinutes != null) {
                 // Compute first trigger time the same way saveRepeatSchedule does
                 val tz = TimeZone.currentSystemDefault()
                 val now = Clock.System.now()
@@ -2991,7 +3063,7 @@ class ChecklistDetailViewModel(
             } else {
                 // One-shot only: clear any prior repeat, set reminderAt
                 item.withReminderCleared().withReminderAt(reminderAt)
-            }
+            }).withReminderFullScreen(fullScreen)
 
             val updatedItems = fill.items.map { if (it.id == itemId) updatedItem else it }
             val updatedFill = fill.copy(items = updatedItems)
@@ -3424,6 +3496,8 @@ class ChecklistDetailViewModel(
         const val PREF_EXACT_ALARM_DONT_SHOW = "exact_alarm_dont_show"
         const val SNACKBAR_EXACT_GRANTED = "exact_alarm_granted"
         const val SNACKBAR_EXACT_DENIED = "exact_alarm_denied"
+        /** Device-global suppress flag for the full-screen-intent instruction sheet ("don't show again"). */
+        const val PREF_FSI_DONT_SHOW = "fsi_dont_show"
         /**
          * Smart Add hint: user typed only the trigger phrase (no item text), or all non-trigger
          * text was stripped to blank. Tell them to add actual task text.

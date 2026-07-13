@@ -166,6 +166,10 @@ data class ChecklistFillItem private constructor(
     val attachments: List<Attachment> = emptyList(),
     // ── Stable link to the template item (end of constructor — safest for JSON schema) ──
     val templateItemId: String? = null,
+    // ── Per-item full-screen-intent reminder (Android alarm-style over lock screen) ──
+    // Lives in the JSON blob (no SQL column / Firestore field — fills sync via itemsJson).
+    // Only meaningful while a reminder is set; cleared by withReminderCleared().
+    val reminderFullScreen: Boolean = false,
 ) {
     constructor(
         text: String,
@@ -189,42 +193,42 @@ data class ChecklistFillItem private constructor(
     fun withChecked(checked: Boolean) = ChecklistFillItem(
         text, checked, note, id, weekday, priority,
         reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount,
-        attachments, templateItemId,
+        attachments, templateItemId, reminderFullScreen,
     )
 
     /** Update note while preserving id, weekday, priority, reminder fields, attachments, and template link */
     fun withNote(note: String?) = ChecklistFillItem(
         text, checked, note, id, weekday, priority,
         reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount,
-        attachments, templateItemId,
+        attachments, templateItemId, reminderFullScreen,
     )
 
     /** Update weekday while preserving id, text, checked state, note, priority, reminder fields, attachments, and template link */
     fun withWeekday(weekday: Int?) = ChecklistFillItem(
         text, checked, note, id, weekday, priority,
         reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount,
-        attachments, templateItemId,
+        attachments, templateItemId, reminderFullScreen,
     )
 
     /** Update text while preserving id, checked state, note, weekday, priority, reminder fields, attachments, and template link */
     fun withText(text: String) = ChecklistFillItem(
         text, checked, note, id, weekday, priority,
         reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount,
-        attachments, templateItemId,
+        attachments, templateItemId, reminderFullScreen,
     )
 
     /** Toggle priority between 0 (normal) and 1 (starred); preserves all other fields */
     fun withPriority(priority: Int) = ChecklistFillItem(
         text, checked, note, id, weekday, priority,
         reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount,
-        attachments, templateItemId,
+        attachments, templateItemId, reminderFullScreen,
     )
 
     /** Set or clear the one-shot reminder timestamp; preserves all other fields */
     fun withReminderAt(reminderAt: Long?) = ChecklistFillItem(
         text, checked, note, id, weekday, priority,
         reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount,
-        attachments, templateItemId,
+        attachments, templateItemId, reminderFullScreen,
     )
 
     /** Set the recurring repeat schedule; preserves all other fields */
@@ -235,14 +239,14 @@ data class ChecklistFillItem private constructor(
     ) = ChecklistFillItem(
         text, checked, note, id, weekday, priority,
         reminderAt, rule, timeOfDayMinutes, nextAt, repeatOccurrenceCount,
-        attachments, templateItemId,
+        attachments, templateItemId, reminderFullScreen,
     )
 
     /** Advance the repeat schedule to the next trigger; preserves all other fields */
     fun withRepeatAdvanced(nextAt: Long?, newCount: Int) = ChecklistFillItem(
         text, checked, note, id, weekday, priority,
         reminderAt, repeatRule, repeatTimeOfDayMinutes, nextAt, newCount,
-        attachments, templateItemId,
+        attachments, templateItemId, reminderFullScreen,
     )
 
     /** Clear all reminder data (both one-shot and repeat) while preserving all other fields */
@@ -255,6 +259,7 @@ data class ChecklistFillItem private constructor(
         repeatOccurrenceCount = 0,
         attachments = attachments,
         templateItemId = templateItemId,
+        reminderFullScreen = false,
     )
 
     /** Append [att] to the end of [attachments]; preserves all other fields */
@@ -263,6 +268,7 @@ data class ChecklistFillItem private constructor(
         reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount,
         attachments = attachments + att,
         templateItemId = templateItemId,
+        reminderFullScreen = reminderFullScreen,
     )
 
     /** Remove the attachment with [attachmentId]; preserves order and all other fields. No-op if id not found. */
@@ -271,6 +277,7 @@ data class ChecklistFillItem private constructor(
         reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount,
         attachments = attachments.filter { it.id != attachmentId },
         templateItemId = templateItemId,
+        reminderFullScreen = reminderFullScreen,
     )
 
     /** Replace [attachments] entirely; used by the repository after a platform store/delete op. */
@@ -279,13 +286,21 @@ data class ChecklistFillItem private constructor(
         reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount,
         attachments = attachments,
         templateItemId = templateItemId,
+        reminderFullScreen = reminderFullScreen,
     )
 
     /** Set or update the stable link to the template [ChecklistItem.id]; preserves all other fields */
     fun withTemplateItemId(templateItemId: String?) = ChecklistFillItem(
         text, checked, note, id, weekday, priority,
         reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount,
-        attachments, templateItemId,
+        attachments, templateItemId, reminderFullScreen,
+    )
+
+    /** Set the per-item full-screen-intent flag (alarm-style delivery); preserves all other fields */
+    fun withReminderFullScreen(fullScreen: Boolean) = ChecklistFillItem(
+        text, checked, note, id, weekday, priority,
+        reminderAt, repeatRule, repeatTimeOfDayMinutes, repeatNextAt, repeatOccurrenceCount,
+        attachments, templateItemId, fullScreen,
     )
 
     /** Returns true if this item has any active reminder (one-shot OR recurring) */

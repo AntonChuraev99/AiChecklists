@@ -1,15 +1,19 @@
 package com.antonchuraev.homesearchchecklist.notification
 
 import android.app.AlarmManager
+import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.core.content.ContextCompat
+import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.scheduler.ChecklistReminderScheduler
+import org.koin.core.context.GlobalContext
 import kotlin.math.absoluteValue
 
 class ReminderScheduler(
@@ -140,6 +144,34 @@ class ReminderScheduler(
         }
     }
 
+    // ─── Full-screen-intent permission (USE_FULL_SCREEN_INTENT is RESTRICTED since API 34) ───
+
+    override fun canUseFullScreenIntent(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            // API 34+: the permission is auto-granted only to alarm/calling apps; everyone else
+            // must query this and degrade silently to a heads-up notification when false.
+            context.getSystemService(NotificationManager::class.java).canUseFullScreenIntent()
+        } else {
+            // API 24-33: USE_FULL_SCREEN_INTENT is a normal (auto-granted) permission.
+            true
+        }
+    }
+
+    override fun openFullScreenIntentSettings() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return
+        val intent = Intent(
+            Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
+            Uri.parse("package:${context.packageName}")
+        ).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
+        // Guaranteed system settings action on API 34+, but guard the launch anyway: an OEM
+        // that stripped the settings activity would throw ActivityNotFoundException.
+        runCatching { context.startActivity(intent) }
+            .onFailure { e ->
+                GlobalContext.getOrNull()?.get<AppLogger>()
+                    ?.warning(TAG, "Cannot open full-screen-intent settings: ${e.message}")
+            }
+    }
+
     override fun hasNotificationPermission(): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             ContextCompat.checkSelfPermission(
@@ -226,6 +258,7 @@ class ReminderScheduler(
     }
 
     companion object {
+        private const val TAG = "ReminderScheduler"
         private const val REPEAT_OFFSET = 100_000
 
         // Item request-code ranges:

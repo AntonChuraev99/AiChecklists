@@ -644,6 +644,7 @@ class ChecklistDetailFolderActionsTest {
                 reminderAt = triggerAt,
                 repeatRule = null,
                 repeatTimeOfDayMinutes = null,
+                fullScreen = false,
             )
         )
 

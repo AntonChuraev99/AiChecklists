@@ -154,6 +154,13 @@ kotlin {
             // re-exports okio so we pull it transitively without adding a new version pin.
             implementation(libs.datastore.core.okio)
         }
+
+        // JVM/host unit tests over androidMain symbols (e.g. FullScreenIntentGateTest exercising
+        // the internal shouldUseFullScreenIntent gate). kotlin.test is not inherited from
+        // commonTest for this source set, so declare it explicitly.
+        getByName("androidHostTest").dependencies {
+            implementation(libs.kotlin.test)
+        }
     }
 }
 

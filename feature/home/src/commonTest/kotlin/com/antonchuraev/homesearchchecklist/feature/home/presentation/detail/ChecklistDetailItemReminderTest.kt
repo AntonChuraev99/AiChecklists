@@ -288,7 +288,8 @@ class ChecklistDetailItemReminderTest {
             itemId = itemNoReminder.id,
             reminderAt = triggerAt,
             repeatRule = null,
-            repeatTimeOfDayMinutes = null
+            repeatTimeOfDayMinutes = null,
+            fullScreen = false
         ))
 
         // Fill should be persisted with the reminder
@@ -323,7 +324,8 @@ class ChecklistDetailItemReminderTest {
             itemId = itemNoReminder.id,
             reminderAt = null,
             repeatRule = rule,
-            repeatTimeOfDayMinutes = 9 * 60
+            repeatTimeOfDayMinutes = 9 * 60,
+            fullScreen = false
         ))
 
         val savedFill = repository.lastUpdatedFill
@@ -357,7 +359,8 @@ class ChecklistDetailItemReminderTest {
             itemId = itemWithOneShotReminder.id,
             reminderAt = null,
             repeatRule = newRule,
-            repeatTimeOfDayMinutes = 9 * 60
+            repeatTimeOfDayMinutes = 9 * 60,
+            fullScreen = false
         ))
 
         // Both cancel methods called for the old alarm before scheduling new

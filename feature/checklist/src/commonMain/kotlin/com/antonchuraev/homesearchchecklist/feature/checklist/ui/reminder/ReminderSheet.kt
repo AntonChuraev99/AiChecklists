@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -58,6 +59,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
@@ -137,7 +139,10 @@ fun ReminderSheet(
                         onPresetSelected = callbacks.onPresetSelected,
                         onCustomDateRequested = callbacks.onCustomDateRequested,
                         onRemoveReminder = callbacks.onRemoveReminder,
-                        onAddToCalendar = callbacks.onAddToCalendar
+                        onAddToCalendar = callbacks.onAddToCalendar,
+                        showFullScreenOption = state.showFullScreenOption,
+                        fullScreenEnabled = state.fullScreenEnabled,
+                        onFullScreenToggled = callbacks.onFullScreenToggled
                     )
                     ReminderTab.REPEAT -> RepeatTabContent(
                         config = state.pendingRepeatConfig ?: PendingRepeatConfig(),
@@ -155,7 +160,10 @@ fun ReminderSheet(
                         onDismissEndCondition = callbacks.onDismissEndCondition,
                         onSave = callbacks.onSaveRepeat,
                         onRemove = callbacks.onRemoveRepeat,
-                        onAddToCalendar = callbacks.onAddToCalendar
+                        onAddToCalendar = callbacks.onAddToCalendar,
+                        showFullScreenOption = state.showFullScreenOption,
+                        fullScreenEnabled = state.fullScreenEnabled,
+                        onFullScreenToggled = callbacks.onFullScreenToggled
                     )
                 }
             }
@@ -212,7 +220,10 @@ private fun OnceTabContent(
     onPresetSelected: (Long) -> Unit,
     onCustomDateRequested: () -> Unit,
     onRemoveReminder: () -> Unit,
-    onAddToCalendar: () -> Unit
+    onAddToCalendar: () -> Unit,
+    showFullScreenOption: Boolean,
+    fullScreenEnabled: Boolean,
+    onFullScreenToggled: (Boolean) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -250,6 +261,14 @@ private fun OnceTabContent(
             onClick = onCustomDateRequested
         )
 
+        if (showFullScreenOption) {
+            HorizontalDivider(modifier = Modifier.padding(vertical = AppDimens.SpacingSm))
+            FullScreenReminderRow(
+                enabled = fullScreenEnabled,
+                onToggle = onFullScreenToggled
+            )
+        }
+
         // Always available — exports the checklist to Google Calendar. With a reminder set, its
         // time/repeat is pre-filled; without one, the calendar opens for the user to pick a time.
         HorizontalDivider(modifier = Modifier.padding(vertical = AppDimens.SpacingSm))
@@ -281,7 +300,10 @@ private fun RepeatTabContent(
     onDismissEndCondition: () -> Unit,
     onSave: () -> Unit,
     onRemove: () -> Unit,
-    onAddToCalendar: () -> Unit
+    onAddToCalendar: () -> Unit,
+    showFullScreenOption: Boolean,
+    fullScreenEnabled: Boolean,
+    onFullScreenToggled: (Boolean) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -416,6 +438,14 @@ private fun RepeatTabContent(
             )
         }
 
+        if (showFullScreenOption) {
+            HorizontalDivider(modifier = Modifier.padding(vertical = AppDimens.SpacingSm))
+            FullScreenReminderRow(
+                enabled = fullScreenEnabled,
+                onToggle = onFullScreenToggled
+            )
+        }
+
         HorizontalDivider(modifier = Modifier.padding(vertical = AppDimens.SpacingSm))
 
         // End condition row
@@ -542,6 +572,48 @@ private fun CalendarActionRow(onClick: () -> Unit) {
                 modifier = Modifier.weight(1f)
             )
         }
+    }
+}
+
+/**
+ * Toggle row for the per-item "full-screen reminder" (alarm/incoming-call style delivery over the
+ * lock screen). Uses [toggleable] with [Role.Switch] on the whole row + an [AppSwitch] with a null
+ * change handler, so the row is a single accessible switch target (never a bare Switch — that would
+ * double-toggle). Rendered only when the caller opts in via `showFullScreenOption`.
+ */
+@Composable
+private fun FullScreenReminderRow(
+    enabled: Boolean,
+    onToggle: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .toggleable(
+                value = enabled,
+                role = Role.Switch,
+                onValueChange = onToggle
+            )
+            .padding(vertical = AppDimens.SpacingSm),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = stringResource(Res.string.reminder_fullscreen_toggle),
+                style = MaterialTheme.typography.bodyLarge
+            )
+            Text(
+                text = stringResource(Res.string.reminder_fullscreen_toggle_desc),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Spacer(modifier = Modifier.width(AppDimens.SpacingMd))
+        AppSwitch(
+            checked = enabled,
+            onCheckedChange = null
+        )
     }
 }
 

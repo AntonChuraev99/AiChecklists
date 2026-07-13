@@ -65,4 +65,10 @@ interface ChecklistReminderScheduler {
 
     /** Returns true if the app can post notifications (always true below API 33). */
     fun hasNotificationPermission(): Boolean = true
+
+    /** Returns true if the app can post full-screen-intent notifications (always true below API 34). */
+    fun canUseFullScreenIntent(): Boolean = true
+
+    /** Opens system settings to grant full-screen-intent permission. No-op below API 34. */
+    fun openFullScreenIntentSettings() {}
 }

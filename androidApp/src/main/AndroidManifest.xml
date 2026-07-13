@@ -6,6 +6,10 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Alarm-style per-item reminders (over the lock screen). RESTRICTED since API 34: auto-granted
+         only for CATEGORY_ALARM (this app's declared core function); gated at runtime by
+         NotificationManager.canUseFullScreenIntent() and degrades to a heads-up otherwise. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <!-- Required for Google Ads attribution on Android 13+ (API 33) -->
     <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
 
@@ -133,6 +137,17 @@
                 <action android:name="com.antonchuraev.aichecklists.ACTION_ITEM_REPEAT_FIRE" />
             </intent-filter>
         </receiver>
+
+        <!-- Alarm-style full-screen reminder shown over the lock screen for per-item reminders
+             that opted into reminderFullScreen. Launched only via setFullScreenIntent from
+             ReminderReceiver; not exported, excluded from recents. -->
+        <activity
+            android:name="com.antonchuraev.homesearchchecklist.notification.FullScreenReminderActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:theme="@android:style/Theme.Material.Light.NoActionBar" />
 
         <!-- Boot Completed Receiver: reschedule reminders after device reboot -->
         <receiver

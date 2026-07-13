@@ -23,6 +23,17 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.koin.core.context.GlobalContext
 
+/**
+ * Pure decision for whether a per-item reminder should escalate to a full-screen (alarm-style)
+ * notification. Extracted as a top-level function so it can be unit-tested off-device: it is
+ * true only when the item opted in AND the OS currently permits full-screen intents.
+ *
+ * @param fullScreenFlag the item's `reminderFullScreen` opt-in.
+ * @param permitted `NotificationManager.canUseFullScreenIntent()` on API 34+, always true below.
+ */
+internal fun shouldUseFullScreenIntent(fullScreenFlag: Boolean, permitted: Boolean): Boolean =
+    fullScreenFlag && permitted
+
 class ReminderReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -156,7 +167,10 @@ class ReminderReceiver : BroadcastReceiver() {
 
                 val checklist = repository.getChecklistById(checklistId)
                 val checklistName = checklist?.name ?: context.getString(R.string.app_name)
-                showItemNotification(context, checklistId, fillId, itemId, checklistName, item.text)
+                showItemNotification(
+                    context, checklistId, fillId, itemId, checklistName, item.text,
+                    item.reminderFullScreen
+                )
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -211,7 +225,10 @@ class ReminderReceiver : BroadcastReceiver() {
 
                 val checklist = repository.getChecklistById(checklistId)
                 val checklistName = checklist?.name ?: context.getString(R.string.app_name)
-                showItemNotification(context, checklistId, fillId, itemId, checklistName, item.text)
+                showItemNotification(
+                    context, checklistId, fillId, itemId, checklistName, item.text,
+                    item.reminderFullScreen
+                )
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -228,29 +245,32 @@ class ReminderReceiver : BroadcastReceiver() {
         fillId: Long,
         itemId: String,
         checklistName: String,
-        itemText: String
+        itemText: String,
+        fullScreen: Boolean
     ) {
+        val notificationId = ReminderScheduler.itemReminderRequestCode(fillId, itemId)
+        val useFsi = shouldUseFullScreenIntent(fullScreen, canPostFullScreen(context))
+
         val deepLinkIntent = Intent(context, MainActivity::class.java).apply {
             action = ACTION_OPEN_CHECKLIST
             putExtra(EXTRA_NAVIGATE_CHECKLIST_ID, checklistId)
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
-        val pendingIntent = TaskStackBuilder.create(context).run {
+        val contentPendingIntent = TaskStackBuilder.create(context).run {
             addNextIntentWithParentStack(deepLinkIntent)
             getPendingIntent(
-                ReminderScheduler.itemReminderRequestCode(fillId, itemId),
+                notificationId,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )!!
         }
 
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_checkbox_checked)
             .setContentTitle(checklistName.take(200))
             .setContentText(itemText.take(200))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setAutoCancel(true)
-            .setContentIntent(pendingIntent)
+            .setContentIntent(contentPendingIntent)
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
             .setPublicVersion(
                 NotificationCompat.Builder(context, CHANNEL_ID)
@@ -259,14 +279,46 @@ class ReminderReceiver : BroadcastReceiver() {
                     .setContentText(context.getString(R.string.reminder_notification_tap))
                     .build()
             )
-            .build()
+
+        if (useFsi) {
+            // Alarm-style: fires the FullScreenReminderActivity over the lock screen. CATEGORY_ALARM
+            // is the defensible Play declaration for this app's reminders (NOT CATEGORY_CALL).
+            val fullScreenPendingIntent = PendingIntent.getActivity(
+                context,
+                notificationId,
+                FullScreenReminderActivity.createIntent(
+                    context = context,
+                    checklistId = checklistId,
+                    checklistName = checklistName.take(200),
+                    itemText = itemText.take(200),
+                    notificationId = notificationId
+                ),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            builder
+                .setCategory(NotificationCompat.CATEGORY_ALARM)
+                .setFullScreenIntent(fullScreenPendingIntent, true)
+        } else {
+            // Standard heads-up reminder (also the silent degrade path when FSI is not permitted).
+            builder.setCategory(NotificationCompat.CATEGORY_REMINDER)
+        }
 
         val notificationManager = context.getSystemService(NotificationManager::class.java)
         // Use a unique notification ID so item notifications don't overwrite checklist notifications
-        notificationManager.notify(
-            ReminderScheduler.itemReminderRequestCode(fillId, itemId),
-            notification
-        )
+        notificationManager.notify(notificationId, builder.build())
+    }
+
+    /**
+     * Whether the OS currently permits posting a full-screen-intent notification. On API 34+ this
+     * is gated by [NotificationManager.canUseFullScreenIntent]; below 34 the (auto-granted) normal
+     * permission covers it, so it is always allowed.
+     */
+    private fun canPostFullScreen(context: Context): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            context.getSystemService(NotificationManager::class.java).canUseFullScreenIntent()
+        } else {
+            true
+        }
     }
 
     private fun showNotification(

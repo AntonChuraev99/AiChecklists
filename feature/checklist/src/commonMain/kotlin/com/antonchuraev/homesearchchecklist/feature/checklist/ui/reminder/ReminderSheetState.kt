@@ -46,6 +46,14 @@ data class ReminderSheetState(
     val showEndConditionPicker: Boolean = false,
     /** When true, hides tab content and shows the premium-upgrade locked banner. */
     val isLocked: Boolean = false,
+    /**
+     * When true, renders the "full-screen reminder" toggle row inside the tab content (alarm-style
+     * delivery over the lock screen). Only enabled by the per-item reminder call-site; default false
+     * keeps it hidden for the checklist-level, item-create, and onboarding sheets.
+     */
+    val showFullScreenOption: Boolean = false,
+    /** Current value of the full-screen-reminder toggle (only meaningful when [showFullScreenOption]). */
+    val fullScreenEnabled: Boolean = false,
 )
 
 /**
@@ -77,6 +85,9 @@ data class ReminderSheetCallbacks(
     // existing call-sites (e.g. onboarding) don't need to change. The row is only shown when a
     // reminder/repeat is already configured (there is something to export).
     val onAddToCalendar: () -> Unit = {},
+    // Full-screen reminder toggle (per-item only). Defaults to no-op so other call-sites
+    // (checklist-level, item-create, onboarding) don't need to change.
+    val onFullScreenToggled: (Boolean) -> Unit = {},
     // Sheet
     val onDismiss: () -> Unit,
     // Locked paywall banner

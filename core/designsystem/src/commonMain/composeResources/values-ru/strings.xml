@@ -559,6 +559,22 @@
     <string name="reminder_exact_alarm_granted">Точные напоминания включены!</string>
     <string name="reminder_exact_alarm_denied">Напоминания могут приходить с небольшой задержкой</string>
 
+    <!-- Full-screen (alarm-style) reminder -->
+    <string name="reminder_fullscreen_toggle">Напоминание на весь экран</string>
+    <string name="reminder_fullscreen_toggle_desc">Показывается поверх экрана блокировки, как будильник</string>
+    <string name="reminder_fsi_title">Показывать напоминания на весь экран</string>
+    <string name="reminder_fsi_step1">Нажмите «Открыть настройки» ниже</string>
+    <string name="reminder_fsi_step2">Найдите «Уведомления на весь экран» (или Gisti в списке приложений)</string>
+    <string name="reminder_fsi_step3">Включите для Gisti</string>
+    <string name="reminder_fsi_description">Напоминания на весь экран показываются поверх экрана блокировки, как будильник, чтобы вы не пропустили важное.</string>
+    <string name="reminder_fsi_dont_show">Больше не показывать</string>
+    <string name="reminder_fsi_open_settings">Открыть настройки</string>
+    <string name="reminder_fsi_skip">Пропустить</string>
+    <!-- Full-screen reminder alarm activity (over the lock screen) -->
+    <string name="reminder_full_screen_label">Напоминание</string>
+    <string name="reminder_full_screen_open">Открыть</string>
+    <string name="reminder_full_screen_dismiss">Закрыть</string>
+
     <!-- Разрешение на уведомления -->
     <string name="reminder_notification_permission_title">Включить уведомления</string>
     <string name="reminder_notification_permission_description">Разрешите Gisti уведомлять вас, когда наступит время напоминания, чтобы не пропустить важный чек-лист.</string>
