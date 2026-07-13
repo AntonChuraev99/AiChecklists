@@ -187,6 +187,12 @@ object AnalyticsEvents {
         /** Come-back alarm ARMED after the first checklist. Params: [AnalyticsParams.CHECKLIST_ID], [AnalyticsParams.DELAY_HOURS]. */
         const val COMEBACK_SCHEDULED = "retention_comeback_scheduled"
 
+        /** Come-back alarm actually FIRED and deps resolved (broadcast received on a WARM process),
+         *  emitted before any gate. Splits scheduled -> fired -> (shown | skipped). A large
+         *  scheduled-minus-fired gap ⇒ the alarm fired cold (see Crashlytics "comeback dropped") or
+         *  never fired (OEM/Doze). */
+        const val COMEBACK_FIRED = "retention_comeback_fired"
+
         /** Come-back alarm fired but nothing shown. Param: [AnalyticsParams.REASON] = permission_off | no_checklist | already_active | frequency_cap. */
         const val COMEBACK_SKIPPED = "retention_comeback_skipped"
 

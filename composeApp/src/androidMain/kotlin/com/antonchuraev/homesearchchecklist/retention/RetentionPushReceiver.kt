@@ -20,6 +20,7 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.
 import com.antonchuraev.homesearchchecklist.notification.ReminderReceiver
 import com.antonchuraev.homesearchchecklist.push.PushAnalytics
 import com.antonchuraev.homesearchchecklist.push.PushNotificationChannels
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -138,7 +139,20 @@ class RetentionPushReceiver : BroadcastReceiver() {
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val deps = resolveDeps() ?: return@launch
+                val deps = resolveDeps()
+                if (deps == null) {
+                    // Cold-process silent-drop made VISIBLE. The alarm fired but Koin wasn't bound,
+                    // so the nudge can't run. This used to return with ZERO signal — the prime suspect
+                    // for scheduled(20) -> ~0 deliveries. Crashlytics is Koin-free, so record it there;
+                    // scheduled - COMEBACK_FIRED - <this> = alarm-miss becomes computable.
+                    runCatching { FirebaseCrashlytics.getInstance().log("comeback dropped: deps_not_ready (cold process)") }
+                    android.util.Log.w(TAG, "comeback: dropped — deps not ready (cold process)")
+                    return@launch
+                }
+                // Fire-side signal (warm path) — emitted before any gate so the funnel is complete.
+                runCatching { deps.analytics.event(AnalyticsEvents.Retention.COMEBACK_FIRED) }
+                    .onFailure { deps.logger.warning(TAG, "comeback fired-event emit failed: ${it.message}") }
+
                 val force = AppBuildConfig.isDebug && intent.getBooleanExtra(EXTRA_COMEBACK_FORCE, false)
 
                 // One-shot: consume it now so a reboot can never re-arm a fired come-back.
