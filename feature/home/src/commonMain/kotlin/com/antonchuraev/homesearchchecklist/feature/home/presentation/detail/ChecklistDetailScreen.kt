@@ -1630,6 +1630,8 @@ private fun ChecklistDetailContent(
                 pendingRepeatConfig = state.pendingRepeatConfig,
                 showEndConditionPicker = state.showEndConditionPicker,
                 isLocked = state.reminderSheetLocked,
+                showFullScreenOption = true,
+                fullScreenEnabled = state.checklist.reminderFullScreen,
             ),
             callbacks = ReminderSheetCallbacks(
                 onTabSelected = { onIntent(ChecklistDetailIntent.OnReminderTabSelected(it)) },
@@ -1650,6 +1652,7 @@ private fun ChecklistDetailContent(
                 onAddToCalendar = { onIntent(ChecklistDetailIntent.OnAddToCalendar) },
                 onDismiss = { onIntent(ChecklistDetailIntent.OnDismissReminderUI) },
                 onUpgradeClick = { onIntent(ChecklistDetailIntent.OnReminderUpgradeClick) },
+                onFullScreenToggled = { onIntent(ChecklistDetailIntent.OnChecklistReminderFullScreenToggled(it)) },
             )
         )
     }

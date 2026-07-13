@@ -44,6 +44,13 @@ interface ChecklistRepository {
 
     // One-shot reminders (independent of repeat)
     suspend fun setReminder(checklistId: Long, reminderAt: Long?)
+
+    /**
+     * Persist the checklist-level "full-screen (alarm-style) reminder" opt-in flag.
+     * Default no-op so the many inline test fakes need not override it; the real
+     * [com.antonchuraev.homesearchchecklist.feature.checklist.data.repository.ChecklistRepositoryImpl] overrides it.
+     */
+    suspend fun setReminderFullScreen(checklistId: Long, fullScreen: Boolean) {}
     /**
      * Counts active one-shot reminders across both checklist-level and per-item scopes.
      *

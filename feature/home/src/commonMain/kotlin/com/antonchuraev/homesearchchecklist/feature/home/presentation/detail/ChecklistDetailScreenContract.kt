@@ -570,6 +570,7 @@ sealed interface ChecklistDetailIntent : Intent {
     // ── Per-item full-screen (alarm-style) reminder ──
     /** Toggle the "full-screen reminder" switch inside the per-item reminder sheet. */
     data class OnItemReminderFullScreenToggled(val enabled: Boolean) : ChecklistDetailIntent
+    data class OnChecklistReminderFullScreenToggled(val enabled: Boolean) : ChecklistDetailIntent
     /** FSI-instruction sheet: open the system full-screen-intent permission settings. */
     data object OnFsiOpenSettings : ChecklistDetailIntent
     /** FSI-instruction sheet: dismiss without opening settings ("Skip"). */

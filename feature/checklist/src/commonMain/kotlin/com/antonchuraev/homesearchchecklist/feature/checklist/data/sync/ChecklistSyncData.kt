@@ -12,6 +12,7 @@ data class ChecklistSyncData(
     val repeatTimeOfDayMinutes: Int? = null,
     val repeatNextAt: Long? = null,
     val repeatOccurrenceCount: Int = 0,
+    val reminderFullScreen: Boolean = false,
     val separateCompleted: Boolean = false,
     val position: Int = 0,
     val autoDeleteCompleted: Boolean = false,

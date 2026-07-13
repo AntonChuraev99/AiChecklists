@@ -170,6 +170,10 @@ class ChecklistRepositoryImpl(
         checklistDao.updateReminder(checklistId, reminderAt)
     }
 
+    override suspend fun setReminderFullScreen(checklistId: Long, fullScreen: Boolean) {
+        checklistDao.updateReminderFullScreen(checklistId, fullScreen)
+    }
+
     override suspend fun countActiveReminders(): Int {
         val now = currentTimeMillis()
         // Checklist-level one-shot reminders still in the future (original behavior preserved)

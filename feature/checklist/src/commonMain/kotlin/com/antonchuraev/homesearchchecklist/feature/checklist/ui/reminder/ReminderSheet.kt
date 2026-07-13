@@ -64,6 +64,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonText
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
@@ -601,8 +602,10 @@ private fun FullScreenReminderRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = stringResource(Res.string.reminder_fullscreen_toggle),
-                style = MaterialTheme.typography.bodyLarge
+                style = MaterialTheme.typography.bodyLarge,
+                lineHeight = 20.sp
             )
+            Spacer(modifier = Modifier.height(AppDimens.SpacingXs))
             Text(
                 text = stringResource(Res.string.reminder_fullscreen_toggle_desc),
                 style = MaterialTheme.typography.bodySmall,

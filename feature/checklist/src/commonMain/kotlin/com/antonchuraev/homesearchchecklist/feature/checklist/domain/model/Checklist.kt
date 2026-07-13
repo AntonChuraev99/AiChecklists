@@ -17,6 +17,9 @@ data class Checklist(
     val repeatTimeOfDayMinutes: Int? = null,
     val repeatNextAt: Long? = null,
     val repeatOccurrenceCount: Int = 0,
+    // Per-checklist opt-in: fire the checklist-level reminder as an alarm-style full-screen
+    // notification (over the lock screen). Mirrors ChecklistFillItem.reminderFullScreen (per-item).
+    val reminderFullScreen: Boolean = false,
     val separateCompleted: Boolean = false,
     val position: Int = 0,
     val autoDeleteCompleted: Boolean = false,

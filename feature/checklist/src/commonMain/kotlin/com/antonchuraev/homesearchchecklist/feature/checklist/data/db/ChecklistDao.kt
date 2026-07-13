@@ -105,6 +105,9 @@ interface ChecklistDao {
     @Query("UPDATE checklists SET reminderAt = :reminderAt WHERE id = :id")
     suspend fun updateReminder(id: Long, reminderAt: Long?)
 
+    @Query("UPDATE checklists SET reminderFullScreen = :fullScreen WHERE id = :id")
+    suspend fun updateReminderFullScreen(id: Long, fullScreen: Boolean)
+
     @Query("SELECT COUNT(*) FROM checklists WHERE reminderAt IS NOT NULL AND reminderAt > :nowMillis")
     suspend fun countActiveReminders(nowMillis: Long): Int
 

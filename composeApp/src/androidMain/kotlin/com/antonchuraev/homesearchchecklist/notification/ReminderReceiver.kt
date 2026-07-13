@@ -72,7 +72,10 @@ class ReminderReceiver : BroadcastReceiver() {
                 // One-shot: clear reminderAt after firing
                 repository.setReminder(checklistId, null)
 
-                showNotification(context, checklistId, checklist.name, uncheckedCount)
+                showNotification(
+                    context, checklistId, checklist.name, uncheckedCount,
+                    checklist.reminderFullScreen
+                )
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -137,7 +140,10 @@ class ReminderReceiver : BroadcastReceiver() {
                     ))
                 }
 
-                showNotification(context, checklistId, checklist.name, uncheckedCount)
+                showNotification(
+                    context, checklistId, checklist.name, uncheckedCount,
+                    checklist.reminderFullScreen
+                )
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -325,7 +331,8 @@ class ReminderReceiver : BroadcastReceiver() {
         context: Context,
         checklistId: Long,
         checklistName: String,
-        uncheckedCount: Int
+        uncheckedCount: Int,
+        fullScreen: Boolean
     ) {
         val body = if (uncheckedCount == 0) {
             context.getString(R.string.reminder_all_completed)
@@ -337,6 +344,9 @@ class ReminderReceiver : BroadcastReceiver() {
             )
         }
 
+        val notificationId = ReminderScheduler.reminderRequestCode(checklistId)
+        val useFsi = shouldUseFullScreenIntent(fullScreen, canPostFullScreen(context))
+
         val deepLinkIntent = Intent(context, MainActivity::class.java).apply {
             action = ACTION_OPEN_CHECKLIST
             putExtra(EXTRA_NAVIGATE_CHECKLIST_ID, checklistId)
@@ -345,17 +355,16 @@ class ReminderReceiver : BroadcastReceiver() {
         val pendingIntent = TaskStackBuilder.create(context).run {
             addNextIntentWithParentStack(deepLinkIntent)
             getPendingIntent(
-                ReminderScheduler.reminderRequestCode(checklistId),
+                notificationId,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )!!
         }
 
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_checkbox_checked)
             .setContentTitle(checklistName.take(200))
             .setContentText(body)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
@@ -366,13 +375,34 @@ class ReminderReceiver : BroadcastReceiver() {
                     .setContentText(context.getString(R.string.reminder_notification_tap))
                     .build()
             )
-            .build()
+
+        if (useFsi) {
+            // Alarm-style: fires the FullScreenReminderActivity over the lock screen. CATEGORY_ALARM
+            // is the defensible Play declaration for this app's reminders (NOT CATEGORY_CALL). The
+            // checklist has no single item text, so the "N items remaining" / "all completed" body
+            // is passed as the itemText the activity renders.
+            val fullScreenPendingIntent = PendingIntent.getActivity(
+                context,
+                notificationId,
+                FullScreenReminderActivity.createIntent(
+                    context = context,
+                    checklistId = checklistId,
+                    checklistName = checklistName.take(200),
+                    itemText = body.take(200),
+                    notificationId = notificationId
+                ),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            builder
+                .setCategory(NotificationCompat.CATEGORY_ALARM)
+                .setFullScreenIntent(fullScreenPendingIntent, true)
+        } else {
+            // Standard heads-up reminder (also the silent degrade path when FSI is not permitted).
+            builder.setCategory(NotificationCompat.CATEGORY_REMINDER)
+        }
 
         val notificationManager = context.getSystemService(NotificationManager::class.java)
-        notificationManager.notify(
-            ReminderScheduler.reminderRequestCode(checklistId),
-            notification
-        )
+        notificationManager.notify(notificationId, builder.build())
     }
 
     companion object {

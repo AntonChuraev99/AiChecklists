@@ -623,6 +623,8 @@ class ChecklistDetailViewModel(
             // Full-screen-intent (alarm-style) permission
             is ChecklistDetailIntent.OnItemReminderFullScreenToggled ->
                 handleItemReminderFullScreenToggled(intent.enabled)
+            is ChecklistDetailIntent.OnChecklistReminderFullScreenToggled ->
+                handleChecklistReminderFullScreenToggled(intent.enabled)
             ChecklistDetailIntent.OnFsiOpenSettings -> handleFsiOpenSettings()
             ChecklistDetailIntent.OnFsiSkip -> handleFsiSkip()
             is ChecklistDetailIntent.OnFsiDontShowChanged -> {
@@ -2593,6 +2595,21 @@ class ChecklistDetailViewModel(
     private fun handleItemReminderFullScreenToggled(enabled: Boolean) {
         viewModelScope.launch {
             updateContentState { it.copy(itemReminderFullScreen = enabled) }
+            if (enabled) maybeShowFullScreenIntentInstruction()
+        }
+    }
+
+    /**
+     * Checklist-level FSI toggle. Unlike the per-item flag (applied to the item on save), the
+     * checklist reminder has no separate "save" step for this flag, so it is persisted immediately
+     * onto the checklist row (and reflected in state so the sheet's [state.checklist.reminderFullScreen]
+     * binding updates). Surfaces the instruction sheet when turning ON without OS FSI permission.
+     */
+    private fun handleChecklistReminderFullScreenToggled(enabled: Boolean) {
+        viewModelScope.launch {
+            val state = _screenState.value as? ChecklistDetailState.Content ?: return@launch
+            repository.setReminderFullScreen(state.checklist.id, enabled)
+            updateContentState { it.copy(checklist = it.checklist.copy(reminderFullScreen = enabled)) }
             if (enabled) maybeShowFullScreenIntentInstruction()
         }
     }
