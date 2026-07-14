@@ -1,0 +1,37 @@
+{
+  "category": "business",
+  "slug": "small-business-setup-checklist",
+  "order": 5,
+  "title": "Small Business Setup Checklist",
+  "metaTitle": "Small Business Setup Checklist (Step by Step) | Gisti",
+  "metaDescription": "A step-by-step small business setup checklist: plan, register, finances, tax, licenses, insurance, and getting ready to trade. Free, or tailor it in Gisti.",
+  "cardDesc": "Everything to set up a small business — plan, register, finances, tax, and licenses.",
+  "ordered": true,
+  "intro": "Setting up a small business means getting the foundations right so you can trade legally and get paid without nasty surprises later. This checklist walks through the setup in order — from a simple plan and the right legal structure to bank accounts, tax registration, licenses, and insurance. It's aimed at the practical admin of getting open, not the strategy of what to sell. See more <a href=\"/checklists/business/\" class=\"text-primary hover:underline\">business and launch checklists</a>.",
+  "items": [
+    { "text": "Write a simple business plan: what you sell, to whom, and how you'll make money" },
+    { "text": "Choose a business structure (sole trader, LLC, partnership, or company)", "note": "It affects your tax, paperwork, and personal liability — ask an accountant if you're unsure." },
+    { "text": "Pick and check your business name for availability and trademark conflicts" },
+    { "text": "Register the business with the relevant government authority" },
+    { "text": "Register for tax and get any required tax ID or number" },
+    { "text": "Check which licenses or permits your trade and location require", "note": "Requirements vary a lot by industry and region — don't assume you need none." },
+    { "text": "Open a dedicated business bank account" },
+    { "text": "Set up bookkeeping or accounting software from day one" },
+    { "text": "Get the business insurance your trade needs (liability, professional, contents)" },
+    { "text": "Set up a system to track income, expenses, and receipts for tax time" },
+    { "text": "Choose how you'll take payment: card reader, online checkout, or invoicing" },
+    { "text": "Set your prices and payment terms, and prepare an invoice template" },
+    { "text": "Register a domain and set up a professional email address" },
+    { "text": "Build a simple website or listing so customers can find and contact you" },
+    { "text": "Set up the tools you'll run the business on (calendar, storage, comms)" },
+    { "text": "Sort out suppliers, stock, or the equipment you need to deliver" },
+    { "text": "Understand your record-keeping and tax-filing deadlines" },
+    { "text": "Do a soft launch to test your systems before you open fully" }
+  ],
+  "faq": [
+    { "q": "What do I need to set up a small business?", "a": "At minimum: a simple plan, the right legal structure, a registered business name, tax registration, any licenses your trade requires, a business bank account, bookkeeping, and appropriate insurance. Once those foundations are in place you can take payment, invoice, and trade properly." },
+    { "q": "Do I need a business bank account for a small business?", "a": "It's strongly recommended, and for a registered company it's usually required. Even as a sole trader, a separate account keeps business and personal money apart, which makes bookkeeping and tax far simpler and looks more professional to customers and suppliers." },
+    { "q": "How much does it cost to set up a small business?", "a": "It varies widely — a sole trader offering a service can start for very little beyond registration and insurance, while a business needing premises, stock, or equipment costs far more. Budget for registration fees, insurance, accounting software, a website, and any licenses, and keep a buffer for the first slow months." }
+  ],
+  "related": ["startup-checklist", "website-launch-checklist", "social-media-content-checklist", "product-launch-checklist"]
+}

@@ -1,0 +1,37 @@
+{
+  "category": "moving",
+  "slug": "new-home-setup-checklist",
+  "order": 4,
+  "title": "New Home Setup Checklist",
+  "metaTitle": "New Home Setup Checklist (First Days) | Gisti",
+  "metaDescription": "A new home setup checklist for your first days: shut-offs, alarms, meter readings, changing the locks, deep clean, and settling in. Free, or tailor it with AI in Gisti.",
+  "cardDesc": "First-days-in tasks — shut-offs, alarms, meter readings, locks, and a deep clean before you unpack.",
+  "ordered": false,
+  "intro": "The first days in a new home are the time to get the fundamentals right — where the shut-offs are, whether the alarms work, and getting the place clean before furniture fills it. This checklist covers the safety, admin, and settling-in tasks so your new place feels like home fast. More in our <a href=\"/checklists/moving/\" class=\"text-primary hover:underline\">moving and home checklists</a>.",
+  "items": [
+    { "text": "Locate and label the fuse box, water stopcock, and gas shut-off", "note": "You'll want these in an emergency, not during one." },
+    { "text": "Test smoke and carbon-monoxide alarms and replace any dead batteries" },
+    { "text": "Take meter readings (gas, electric, water) and send them to your providers" },
+    { "text": "Confirm utilities, heating, and hot water all work" },
+    { "text": "Change the locks, or at least have the keys re-keyed", "note": "You don't know who else still has a copy." },
+    { "text": "Set up and test your internet and Wi-Fi" },
+    { "text": "Do a deep clean before furniture arrives", "note": "Kitchen, bathroom, and floors are easiest empty." },
+    { "text": "Check for leaks, damp, or pest signs and photograph any issues for your records" },
+    { "text": "Find the nearest hospital, pharmacy, and grocery store" },
+    { "text": "Learn your bin and recycling collection days and where the bins go" },
+    { "text": "Unpack your essentials box first: bedding, toiletries, chargers, and a kettle" },
+    { "text": "Register with a local doctor and dentist" },
+    { "text": "Introduce yourself to the neighbours and ask about parking and building quirks" },
+    { "text": "Update your address on IDs, accounts, and deliveries", "note": "See the change-of-address checklist." },
+    { "text": "Set up a basic first-aid kit and a fire extinguisher" },
+    { "text": "Note your landlord's or property manager's emergency contact" },
+    { "text": "Program the thermostat and check every window and door lock" },
+    { "text": "Plan your furniture layout before hauling heavy items around" }
+  ],
+  "faq": [
+    { "q": "What should I do first in a new home?", "a": "Before unpacking, find the fuse box, water stopcock, and gas shut-off, test the smoke and carbon-monoxide alarms, take meter readings, and confirm the utilities and heating work. Then change the locks and do a deep clean while the rooms are still empty." },
+    { "q": "Should I change the locks when I move in?", "a": "Yes — you have no way of knowing who still holds a copy of the old keys (previous tenants, agents, cleaners). Re-keying or replacing the locks is a cheap, one-time job that's well worth the peace of mind. Check your lease first if you're renting." },
+    { "q": "How do I set up utilities in a new home?", "a": "Contact each provider (electricity, gas, water, internet) a couple of weeks before moving to transfer or open accounts for your move date, then take meter readings on day one and send them in so you're only billed for what you use." }
+  ],
+  "related": ["moving-house-checklist", "first-apartment-essentials", "change-of-address-checklist", "packing-to-move-checklist"]
+}

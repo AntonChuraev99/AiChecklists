@@ -1,0 +1,35 @@
+{
+  "category": "wedding",
+  "slug": "wedding-planning-checklist",
+  "order": 1,
+  "title": "Wedding Planning Checklist",
+  "metaTitle": "Wedding Planning Checklist (12-Month Timeline) | Gisti",
+  "metaDescription": "A step-by-step wedding planning checklist with a 12-month timeline: budget, venue, vendors, invitations, and the final week. Free, or tailor it to your date with AI in Gisti.",
+  "cardDesc": "A month-by-month 12-month timeline — budget, venue, vendors, invites, and the final week, in order.",
+  "ordered": true,
+  "intro": "Planning a wedding is dozens of decisions spread across a year, and the order matters — the best venues and photographers book out 9 to 12 months ahead. This checklist lays it all out as a month-by-month timeline so you lock in the big things early and coast into the final week. Work through it in order, and see the rest of our <a href=\"/checklists/wedding/\" class=\"text-primary hover:underline\">wedding and event checklists</a> for the details.",
+  "items": [
+    { "text": "12+ months out: set your total budget, rough guest count, and your top 3 priorities as a couple", "note": "Agree on what you'll splurge on and what you'll skip before you spend a cent." },
+    { "text": "11 months out: tour and book your venue and lock in the date", "note": "Popular venues book a year ahead — the date follows the venue, not the other way around." },
+    { "text": "10 months out: book the photographer and videographer, and hire a planner if you want one" },
+    { "text": "9 months out: book the caterer and start dress and suit shopping", "note": "Wedding dresses can take 6+ months to order and alter." },
+    { "text": "8 months out: book the band or DJ, the officiant, and the florist" },
+    { "text": "7 months out: order your dress, book hotel room blocks for guests, and plan the honeymoon", "note": "Reserve room blocks early so guests get a group rate." },
+    { "text": "6 months out: send save-the-dates and start building your gift registry", "note": "Save-the-dates matter most for destination weddings and holiday-season dates." },
+    { "text": "5 months out: order invitations, plan the ceremony, and choose your wedding party's attire" },
+    { "text": "4 months out: do a cake tasting and order the cake, and buy the wedding rings" },
+    { "text": "3 months out: finalize the menu, book hair and makeup, and apply for the marriage license", "note": "Check your license's validity window — many expire 30 to 90 days after issue." },
+    { "text": "2 months out: mail the invitations with a clear RSVP date, and do a hair and makeup trial", "note": "RSVP deadline about 3 weeks before the wedding gives you time to chase stragglers." },
+    { "text": "6 weeks out: final dress fitting, and start the seating chart" },
+    { "text": "1 month out: confirm the final headcount with all vendors, make final payments, and write your vows" },
+    { "text": "2 weeks out: finalize the seating chart, break in your shoes, and confirm the day-of timeline with every vendor" },
+    { "text": "1 week out: pack for the honeymoon, assemble welcome bags, and delegate day-of tasks to trusted people", "note": "Give someone the vendor contact list so you're not fielding calls in your dress." },
+    { "text": "Day before: attend the rehearsal and rehearsal dinner, drop off items at the venue, and get an early night" }
+  ],
+  "faq": [
+    { "q": "How far in advance should I start planning a wedding?", "a": "Start about 12 months out. Booking the venue, photographer, and caterer first is what drives the timeline, since the best ones are reserved 9 to 12 months ahead. If you have a shorter runway, prioritize the venue and date, then fill in vendors as fast as you can." },
+    { "q": "What should I book first when planning a wedding?", "a": "Book the venue first, because it locks in your date and shapes your guest count, budget, and catering options. Right after that, secure the photographer, caterer, and any must-have vendors, since they get reserved a year out. Everything else keys off those bookings." },
+    { "q": "What is the hardest part of wedding planning?", "a": "For most couples it's the budget and the guest list, because they affect every other decision. Set both early, agree on your top priorities as a couple, and let the numbers guide your choices. Using a checklist to sequence tasks removes a lot of the last-minute stress." }
+  ],
+  "related": ["wedding-day-timeline", "event-planning-checklist", "party-planning-checklist", "birthday-party-checklist"]
+}

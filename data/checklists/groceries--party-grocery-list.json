@@ -1,0 +1,40 @@
+{
+  "category": "groceries",
+  "slug": "party-grocery-list",
+  "order": 4,
+  "title": "Party Grocery List",
+  "metaTitle": "Party Grocery List (Food & Drinks Checklist) | Gisti",
+  "metaDescription": "A party grocery list covering food, drinks, snacks, and supplies for a get-together — with rough amounts to plan per guest. Free, or tailor it with AI in Gisti.",
+  "cardDesc": "Everything for a get-together — food, drinks, snacks, ice, and the supplies people forget.",
+  "ordered": false,
+  "intro": "Hosting is mostly about not running out. This party grocery list covers the food, drinks, and supplies a get-together needs, with rough per-guest amounts so you can scale it to your headcount. Confirm your guest count and any allergies first, then adjust the quantities up or down. See more <a href=\"/checklists/groceries/\" class=\"text-primary hover:underline\">grocery and shopping lists</a>.",
+  "items": [
+    { "text": "A mix of soft drinks, juice, and sparkling water", "note": "Plan about 2-3 drinks per guest for the first few hours." },
+    { "text": "Beer, wine, or a batch cocktail, if you're serving alcohol" },
+    { "text": "Plenty of ice — more than you think you'll need", "note": "Roughly 1-2 lbs (0.5-1 kg) per guest for drinks and coolers." },
+    { "text": "Coffee, tea, and milk for later in the night" },
+    { "text": "A main or two — a platter, tray bake, pizzas, or something on the grill" },
+    { "text": "Buns, bread, or wraps if you're serving anything handheld" },
+    { "text": "A couple of dips — hummus, salsa, guacamole, or a cheese dip" },
+    { "text": "Chips, crackers, pretzels, and nuts for grazing", "note": "Set snacks out before guests arrive to cover the early lull." },
+    { "text": "A cheese and charcuterie board — cheeses, cured meats, and crackers" },
+    { "text": "A veggie platter and fruit for lighter and dietary options", "note": "Always include a vegetarian and a non-alcoholic option." },
+    { "text": "Dessert — a cake, cookies, or something easy to serve" },
+    { "text": "Condiments: ketchup, mustard, mayo, and any sauces your mains need" },
+    { "text": "Paper plates, napkins, cups, and cutlery", "note": "Buy about 1.5x your guest count — plates and cups get swapped." },
+    { "text": "Serving bowls, platters, and a couple of serving spoons" },
+    { "text": "Trash bags and a recycling bag, set out where guests can see them" },
+    { "text": "Paper towels and cleaning wipes for spills" },
+    { "text": "A cooler or two, plus bags of ice to fill them" },
+    { "text": "Bottle opener, corkscrew, and a can opener" },
+    { "text": "Aluminum foil, cling film, and containers for leftovers" },
+    { "text": "Candles, a lighter, and music or a speaker for atmosphere" },
+    { "text": "A few extras for allergies or kids — a gluten-free snack and a juice option", "note": "Ask guests about allergies when they RSVP." }
+  ],
+  "faq": [
+    { "q": "How much food and drink do I need per person for a party?", "a": "As a rough guide, plan 2-3 drinks per guest for the first couple of hours and around 6-8 appetizer-sized bites each if food is the main event. For ice, allow 1-2 lbs (0.5-1 kg) per person. Always round up a little, and include non-alcoholic drinks and a vegetarian option." },
+    { "q": "What food is easiest to serve at a party?", "a": "Grazing food is the easiest to host with — dips, chips, a cheese and charcuterie board, veggie platters, and anything guests can serve themselves. Trays that bake in one go, or handheld items like sliders and pizza, save you from plating individual meals and let you enjoy the party too." },
+    { "q": "What supplies do people forget to buy for a party?", "a": "The commonly forgotten items are ice, extra trash and recycling bags, enough napkins and cups, and serving spoons for shared dishes. A bottle opener and corkscrew, foil and containers for leftovers, and a non-alcoholic plus allergy-friendly option round out what tends to get missed." }
+  ],
+  "related": ["weekly-grocery-list", "meal-plan-shopping-list", "pantry-staples-checklist"]
+}

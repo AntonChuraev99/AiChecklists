@@ -1,0 +1,37 @@
+{
+  "category": "fitness",
+  "slug": "gym-bag-checklist",
+  "order": 3,
+  "title": "Gym Bag Checklist",
+  "metaTitle": "Gym Bag Checklist (What to Pack) | Gisti",
+  "metaDescription": "A gym bag checklist covering workout gear, shower kit, and the easy-to-forget extras so you never skip a session over a missing item. Free, or tailor it with AI in Gisti.",
+  "cardDesc": "Everything for a gym session — workout gear, shower kit, and the easy-to-forget extras.",
+  "ordered": false,
+  "intro": "Half the battle of a consistent gym habit is just having a packed bag by the door. This checklist covers the workout gear, the shower kit, and the little extras people forget until they're standing at the locker without a padlock. Use it as-is, or open it in Gisti to save your own version, and see the rest of our <a href=\"/checklists/fitness/\" class=\"text-primary hover:underline\">health and fitness checklists</a>.",
+  "items": [
+    { "text": "Workout clothes: a moisture-wicking top and shorts or leggings", "note": "Sweat-wicking fabric beats cotton, which stays wet and chafes." },
+    { "text": "Proper training shoes for your workout" },
+    { "text": "A spare pair of socks" },
+    { "text": "Water bottle", "note": "Fill it before you leave so you're not queuing at the fountain." },
+    { "text": "Small sweat towel for wiping down equipment and yourself" },
+    { "text": "Padlock for the locker" },
+    { "text": "Headphones, charged" },
+    { "text": "Lifting gloves or wrist straps, if you lift heavy" },
+    { "text": "A resistance band for warm-ups and activation" },
+    { "text": "A pre- or post-workout snack or protein shake", "note": "Protein plus carbs within an hour or two of training supports recovery." },
+    { "text": "Deodorant" },
+    { "text": "Shower kit: travel soap or body wash, shampoo, and flip-flops", "note": "Flip-flops keep you off shared shower floors." },
+    { "text": "A quick-dry towel for showering" },
+    { "text": "A full change of clean clothes and underwear" },
+    { "text": "A dry bag or plastic bag for sweaty clothes", "note": "Keeps the wet kit from soaking everything else in the bag." },
+    { "text": "Membership card or the gym app on your phone" },
+    { "text": "Hair ties or a headband" },
+    { "text": "Phone plus a charger or power bank" }
+  ],
+  "faq": [
+    { "q": "What should I keep in my gym bag?", "a": "The core kit is workout clothes and shoes, a water bottle, a sweat towel, a padlock, and headphones. If you shower at the gym, add flip-flops, a shower towel, toiletries, deodorant, and a full change of clothes. A resistance band and a post-workout snack round it out." },
+    { "q": "How do I stop my gym bag from smelling?", "a": "Keep sweaty clothes in a separate dry bag or plastic bag, and empty and air out the whole bag after every session instead of leaving damp kit inside. Tossing in a small pouch of baking soda or a dryer sheet absorbs odor, and washing the bag itself every so often helps." },
+    { "q": "Should I pack my gym bag the night before?", "a": "Yes — a packed bag by the door removes the biggest excuse to skip a workout. Restock it right after each session: swap in clean clothes, refill snacks, and put your headphones back so it's always ready. Keeping duplicates of small items like a padlock and deodorant in the bag means less to remember." }
+  ],
+  "related": ["marathon-training-checklist", "morning-routine-checklist", "meal-prep-checklist"]
+}

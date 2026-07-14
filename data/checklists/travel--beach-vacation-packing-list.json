@@ -1,0 +1,39 @@
+{
+  "category": "travel",
+  "slug": "beach-vacation-packing-list",
+  "order": 4,
+  "title": "Beach Vacation Packing List",
+  "metaTitle": "Beach Vacation Packing List (Sun, Sea & Essentials) | Gisti",
+  "metaDescription": "A complete beach vacation packing list: swimwear, reef-safe sunscreen, sun protection, and the things people forget. Free to use, or tailor it to your trip with AI in Gisti.",
+  "cardDesc": "Swimwear, reef-safe sunscreen, sun protection, and the beach-day extras people always forget.",
+  "ordered": false,
+  "intro": "A beach vacation is easy to under-pack for — until the sunburn, the missing bug spray, and the one swimsuit that never dries. This list covers sun protection, water-day gear, and the small extras that make a hot-weather trip comfortable. Find more <a href=\"/checklists/travel/\" class=\"text-primary hover:underline\">travel and packing checklists</a>.",
+  "items": [
+    { "text": "Passport or ID and travel documents" },
+    { "text": "Two or three swimsuits", "note": "One's always drying." },
+    { "text": "Reef-safe sunscreen SPF 30+ and after-sun", "note": "Reef-safe is legally required in some destinations." },
+    { "text": "Wide-brim hat and UV-protection sunglasses" },
+    { "text": "Lightweight cover-up or kaftan" },
+    { "text": "Flip-flops plus one pair of walking sandals" },
+    { "text": "Quick-dry beach towel", "note": "Sand-resistant ones pack smaller." },
+    { "text": "Breathable, light clothing for hot days" },
+    { "text": "One warm layer for air-conditioned restaurants and evenings" },
+    { "text": "Aloe vera or after-sun for sunburn" },
+    { "text": "Insect repellent", "note": "Essential for tropical evenings." },
+    { "text": "Waterproof phone pouch and a dry bag for valuables" },
+    { "text": "Refillable water bottle", "note": "Hydration matters in the heat." },
+    { "text": "Beach bag or tote" },
+    { "text": "Daily medications plus motion-sickness tablets for boat trips" },
+    { "text": "Basic first-aid: plasters, antiseptic, painkillers" },
+    { "text": "Portable fan or cooling towel for extreme heat" },
+    { "text": "Snorkel gear if you have it", "note": "Rentals add up fast." },
+    { "text": "E-reader or book with a waterproof case" },
+    { "text": "Power bank and travel adapter" }
+  ],
+  "faq": [
+    { "q": "What should I pack for a beach vacation?", "a": "Swimwear (bring two or three), reef-safe sunscreen, a hat and UV sunglasses, a cover-up, sandals, a quick-dry towel, insect repellent, and a dry bag for valuables. Add one warm layer for air-conditioned indoors and cool evenings." },
+    { "q": "How much sunscreen do I need for a week at the beach?", "a": "For a week of daily sun, plan on one to two full-size bottles per person — a proper application uses about a shot-glass amount every two hours. Choose SPF 30 or higher, and reef-safe if your destination requires it." },
+    { "q": "What is reef-safe sunscreen and do I need it?", "a": "Reef-safe sunscreens leave out oxybenzone and octinoxate, chemicals that damage coral. Destinations like Hawaii, parts of Mexico, and Palau legally require them, so pack a mineral (zinc or titanium) sunscreen to be safe." }
+  ],
+  "related": ["5-day-paris-packing-list", "weekend-trip-packing-list", "international-flight-checklist", "business-trip-checklist"]
+}

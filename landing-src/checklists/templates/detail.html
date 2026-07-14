@@ -1,0 +1,48 @@
+  <main class="wrap">
+    {{breadcrumb}}
+
+    <article class="max-w-[760px]">
+      <h1 class="t-display-s md:t-display-l mb-4">{{h1}}</h1>
+      <p class="t-body-l text-on-surface-variant max-w-[60ch] mb-8">{{intro}}</p>
+
+      <!-- D. The checklist (crawlable list — the core asset) -->
+      <h2 class="t-headline-s mt-10 mb-1">{{title}} <span class="t-body-m text-on-surface-variant font-normal">· {{count}} items</span></h2>
+      {{listOpen}}
+{{items}}
+      {{listClose}}
+
+      <!-- E. Make it yours -->
+      <div class="ai-border rounded-xl p-5 md:p-6 mt-10">
+        <div class="flex items-start gap-3">
+          <span aria-hidden="true" class="material-symbols-outlined ai-text shrink-0" style="font-size:24px">auto_awesome</span>
+          <div>
+            <h3 class="t-title-m mb-1">Make it yours in Gisti</h3>
+            <p class="t-body-m text-on-surface-variant mb-3">Open this checklist in Gisti to tick items off, add your own, set reminders, and keep it in sync across Android and the web. AI can tailor every item to your exact situation.</p>
+            <a href="https://app.gisti-ai.com" class="btn btn-secondary btn-pill h-10 px-4 t-label-l">
+              <span aria-hidden="true" class="material-symbols-outlined" style="font-size:18px">open_in_new</span>
+              Open Gisti
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- F. Primary CTA -->
+      <div class="mt-10">
+      {{cta}}
+      </div>
+    </article>
+
+    <!-- G. Related checklists (full wrap) -->
+    <section class="mt-16" aria-label="Related checklists">
+      <h2 class="t-headline-s mb-6">Related checklists</h2>
+      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+{{related}}
+      </div>
+    </section>
+
+    <!-- H. FAQ -->
+    <section class="mt-16 mb-20 max-w-[760px]" aria-label="Frequently asked questions">
+      <h2 class="t-headline-s mb-6">Frequently asked questions</h2>
+{{faq}}
+    </section>
+  </main>

@@ -1,0 +1,39 @@
+{
+  "category": "baby",
+  "slug": "newborn-first-month-checklist",
+  "order": 1,
+  "title": "Newborn First Month Checklist",
+  "metaTitle": "Newborn First Month Checklist (What You Really Need) | Gisti",
+  "metaDescription": "What a newborn really needs in the first month: safe sleep, feeding, diapering, and health essentials — no over-buying. Free to use, or tailor it with AI in Gisti.",
+  "cardDesc": "The genuine first-month must-haves — safe sleep, feeding, diapering, and health, no over-buying.",
+  "ordered": false,
+  "intro": "The first month with a newborn needs far less gear than the stores suggest — but the right basics make it far calmer. This checklist covers safe sleep, feeding (breast or bottle), diapering, and health essentials, plus a few reminders to look after yourself too. See more <a href=\"/checklists/baby/\" class=\"text-primary hover:underline\">baby and parenting checklists</a>.",
+  "items": [
+    { "text": "6-8 newborn and 0-3 month bodysuits and sleepers", "note": "Babies grow fast — don't overbuy newborn size." },
+    { "text": "A safe sleep space (crib, bassinet, or Moses basket) with a firm, flat mattress", "note": "No pillows, bumpers, or loose blankets." },
+    { "text": "4-6 fitted sheets for the mattress" },
+    { "text": "Swaddles or sleep sacks", "note": "Safer than loose blankets." },
+    { "text": "Newborn diapers and plenty of wipes", "note": "Newborns go through 10-12 a day." },
+    { "text": "Diaper cream and a changing pad" },
+    { "text": "If breastfeeding: nursing bras, breast pads, nipple cream, and a pump if you'll express" },
+    { "text": "If formula feeding: bottles, newborn-flow teats, formula, and a bottle brush" },
+    { "text": "Burp cloths and bibs", "note": "Buy more than you think you'll need." },
+    { "text": "A car seat, correctly installed and rear-facing", "note": "Most hospitals won't discharge you without one." },
+    { "text": "A soft carrier or sling, and a stroller or pram" },
+    { "text": "Baby bath support, hooded towels, and fragrance-free baby wash" },
+    { "text": "Soft washcloths and a soft-bristle baby brush" },
+    { "text": "A digital thermometer and infant paracetamol", "note": "Only on your doctor's advice." },
+    { "text": "Baby nail clippers or a file" },
+    { "text": "A stack of muslin cloths for everything" },
+    { "text": "Blackout blinds or a dim night light for night feeds" },
+    { "text": "Contact details for your pediatrician and the out-of-hours line" },
+    { "text": "Warm layers, a hat, and mittens if the weather's cold" },
+    { "text": "Postpartum supplies for you: pads, comfortable clothing, and easy snacks", "note": "Caring for yourself is part of the first month." }
+  ],
+  "faq": [
+    { "q": "What does a newborn really need in the first month?", "a": "The genuine must-haves are a safe flat sleep space, bodysuits and sleepers, diapers and wipes, feeding supplies (breast or bottle), burp cloths, a correctly installed car seat, and a thermometer. Most other gear can wait until you know your baby." },
+    { "q": "How many diapers does a newborn use a day?", "a": "Newborns typically go through 10-12 diapers a day in the first weeks, so plan for roughly 300 in the first month. Buy only a small pack of newborn size — many babies move into size 1 within a few weeks." },
+    { "q": "What do I not need to buy for a newborn?", "a": "You can skip most gadgets early on — wipe warmers, lots of newborn-size clothes, shoes, and elaborate toys. Babies grow fast and need very little beyond safe sleep, feeding, diapering, and warmth in the first month." }
+  ],
+  "related": ["hospital-bag-checklist", "baby-registry-checklist", "diaper-bag-checklist", "baby-proofing-checklist"]
+}

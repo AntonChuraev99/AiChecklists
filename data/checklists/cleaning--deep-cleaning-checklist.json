@@ -1,0 +1,39 @@
+{
+  "category": "cleaning",
+  "slug": "deep-cleaning-checklist",
+  "order": 1,
+  "title": "Deep Cleaning Checklist",
+  "metaTitle": "Deep Cleaning Checklist (Whole House, Room by Room) | Gisti",
+  "metaDescription": "A room-by-room deep cleaning checklist for the grime a weekly clean misses: skirting boards, extractor filters, limescale, and mattresses. Free in Gisti.",
+  "cardDesc": "The twice-a-year deep clean — skirting boards, appliance filters, limescale, and the spots a weekly tidy skips.",
+  "ordered": false,
+  "intro": "A deep clean goes after the build-up a weekly tidy never touches — the greasy extractor filter, the limescale in the kettle, the dust on top of the doorframes. This checklist works through the whole home so nothing gets skipped in the once- or twice-a-year reset. Tackle it over a weekend, or split it across a few evenings. See more <a href=\"/checklists/cleaning/\" class=\"text-primary hover:underline\">cleaning and chore checklists</a>.",
+  "items": [
+    { "text": "Dust from the top down: light fixtures, ceiling corners, and the tops of doorframes and wardrobes", "note": "Dust falls, so always start high and finish at the floor." },
+    { "text": "Wash walls, switch plates, and skirting boards with a damp microfiber cloth" },
+    { "text": "Clean windows inside and out, including the tracks and sills", "note": "A cotton bud lifts the grime packed into the corners of the tracks." },
+    { "text": "Launder the curtains and wipe down blinds slat by slat" },
+    { "text": "Descale the kettle and coffee machine with a vinegar or citric-acid solution" },
+    { "text": "Degrease the extractor hood and soak or replace its filter", "note": "Metal filters can go through a hot dishwasher cycle." },
+    { "text": "Deep-clean the oven: remove the racks to soak, and scrub the interior glass" },
+    { "text": "Pull out the fridge, defrost the freezer, and wipe the coils and door seals" },
+    { "text": "Empty and wipe every kitchen cupboard, checking food dates while you're in there" },
+    { "text": "Run an empty hot cycle with cleaner in the washing machine and dishwasher", "note": "Wipe the rubber door seal and clear the dishwasher filter." },
+    { "text": "Scrub the grout and re-caulk any mouldy sealant around the bath and sink" },
+    { "text": "Descale the showerhead by soaking it in vinegar overnight" },
+    { "text": "Disinfect and descale the toilet, including the base and behind the bowl" },
+    { "text": "Vacuum and flip the mattresses, and wash mattress protectors and pillows" },
+    { "text": "Wash or dry-clean duvets, and vacuum the divan or bed base" },
+    { "text": "Move furniture to vacuum underneath, then shampoo carpets or mop hard floors" },
+    { "text": "Wipe down radiators and vacuum the dust from between the fins" },
+    { "text": "Disinfect high-touch spots: light switches, door handles, and remote controls" },
+    { "text": "Vacuum upholstered sofas and chairs, including under the cushions" },
+    { "text": "Empty, wash, and disinfect every bin, including the kitchen caddy" }
+  ],
+  "faq": [
+    { "q": "How often should I deep clean my house?", "a": "Most homes need a full deep clean once or twice a year — often in spring and before winter — on top of your weekly routine. High-traffic spots like the kitchen and bathroom benefit from a deeper monthly go at the oven, extractor filter, and grout." },
+    { "q": "What's the difference between deep cleaning and regular cleaning?", "a": "Regular cleaning keeps surfaces tidy week to week — wiping counters, vacuuming, and cleaning the toilet. Deep cleaning goes after the built-up grime those routines skip: inside the oven, behind the fridge, limescale in the kettle, grout, mattresses, and the tops of doorframes." },
+    { "q": "What order should I deep clean a room in?", "a": "Work top to bottom and dry to wet. Dust high surfaces first so falling debris lands on floors you haven't done yet, tackle greasy and wet jobs like the oven and bathroom in the middle, and finish by vacuuming and mopping the floor last so you don't tread dirt back over clean areas." }
+  ],
+  "related": ["move-out-cleaning-checklist", "spring-cleaning-checklist", "house-chores-checklist", "daily-cleaning-checklist"]
+}

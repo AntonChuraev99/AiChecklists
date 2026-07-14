@@ -1,0 +1,37 @@
+{
+  "category": "cleaning",
+  "slug": "move-out-cleaning-checklist",
+  "order": 2,
+  "title": "Move Out Cleaning Checklist",
+  "metaTitle": "Move Out Cleaning Checklist (Get Your Deposit Back) | Gisti",
+  "metaDescription": "A room-by-room move-out cleaning checklist to help get your deposit back — kitchen, bathroom, floors, and the spots landlords check. Free in Gisti.",
+  "cardDesc": "The end-of-tenancy clean that gets your deposit back — in the order landlords inspect.",
+  "ordered": true,
+  "intro": "An end-of-tenancy clean is judged against the move-in inventory, so it pays to be thorough — a missed oven or a mouldy seal is the most common reason deposits get docked. This checklist runs in order, room by room, and saves the floors for last so you clean your way out of the empty place. Do it once the furniture is gone and the rooms are clear. See more <a href=\"/checklists/cleaning/\" class=\"text-primary hover:underline\">cleaning and chore checklists</a>.",
+  "items": [
+    { "text": "Start once the place is empty: open the windows, and gather bin bags, cloths, and cleaners before you begin" },
+    { "text": "Kitchen first: empty every cupboard and drawer, then wipe them inside and out" },
+    { "text": "Deep-clean the oven, hob, grill, and extractor filter", "note": "Grease inside the oven is the single most-docked item on an inventory." },
+    { "text": "Defrost, empty, and wipe the fridge and freezer, and leave the doors ajar if you're switching them off" },
+    { "text": "Descale the kettle, and clean the sink, taps, and any tiled splashback" },
+    { "text": "Bathroom next: descale the toilet, taps, and showerhead, and scrub limescale off the screen" },
+    { "text": "Clean and re-whiten the grout, and wipe mould off the silicone sealant", "note": "A dab of mould remover left for an hour lifts black spotting." },
+    { "text": "Polish the mirrors, chrome, and glass until they're streak-free" },
+    { "text": "Wipe down all interior doors, handles, and light switches" },
+    { "text": "Clean the inside and outside of every window, plus the sills and tracks" },
+    { "text": "Dust and wipe skirting boards, radiators, and picture rails throughout" },
+    { "text": "Remove cobwebs from ceiling corners and light fittings in every room" },
+    { "text": "Fill nail holes and wipe scuffs off the walls", "note": "Check your tenancy agreement on whether small holes need filling." },
+    { "text": "Wipe inside all built-in wardrobes and storage cupboards" },
+    { "text": "Clean any supplied appliances — the washing machine drawer, dishwasher filter, and microwave" },
+    { "text": "Take a full set of dated photos once each room is done, as proof of its condition" },
+    { "text": "Vacuum every room, including inside the cupboards and along the edges" },
+    { "text": "Mop the hard floors and shampoo or spot-clean the carpets, working toward the front door last" }
+  ],
+  "faq": [
+    { "q": "Do I need to professionally clean when moving out?", "a": "Not usually — most tenancy agreements only require the property to be returned as clean as it was at move-in, matching the inventory. Since the 2019 Tenant Fees Act in England, a landlord can't force you to pay for professional cleaning. A thorough DIY clean is fine as long as it meets the check-in standard." },
+    { "q": "What do landlords check when you move out?", "a": "They compare the property against the move-in inventory and check-in photos. The usual deposit-docking culprits are a greasy oven, limescale and mould in the bathroom, dirty windows and sills, marked walls, and carpets that weren't vacuumed or cleaned. Dated photos of each finished room are your best protection." },
+    { "q": "How long does move-out cleaning take?", "a": "A one-bedroom flat is roughly 4-6 hours of solid work; a family house can take a full day, or two people sharing it. The oven and bathroom eat the most time, so start them early and let the cleaners soak while you work on other rooms." }
+  ],
+  "related": ["deep-cleaning-checklist", "spring-cleaning-checklist", "daily-cleaning-checklist"]
+}

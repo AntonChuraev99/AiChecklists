@@ -6,6 +6,7 @@ module.exports = {
   content: [
     'landing/index.html',
     'landing/mcp/index.html',
+    'landing/checklists/**/*.html',
   ],
   theme: {
     extend: {

@@ -1,0 +1,37 @@
+{
+  "category": "travel",
+  "slug": "business-trip-checklist",
+  "order": 5,
+  "title": "Business Trip Checklist",
+  "metaTitle": "Business Trip Packing Checklist (Work Travel) | Gisti",
+  "metaDescription": "A business trip packing checklist: laptop and adapters, wrinkle-free outfits, presentation tech, and travel-size toiletries. Free to use, or tailor it with AI in Gisti.",
+  "cardDesc": "Laptop and adapters, wrinkle-free outfits, presentation tech, and the work-travel essentials.",
+  "ordered": false,
+  "intro": "A business trip lives or dies by the tech and the outfits. Forget the presentation adapter or turn up in a creased shirt and the whole trip feels off. This checklist keeps your work travel sharp: everything for the meeting, the flight, and the hotel. See more <a href=\"/checklists/travel/\" class=\"text-primary hover:underline\">travel checklists</a>.",
+  "items": [
+    { "text": "Photo ID or passport and any visa needed" },
+    { "text": "Boarding passes, hotel, and rental-car confirmations" },
+    { "text": "Laptop, charger, and a spare charging cable" },
+    { "text": "Phone, power bank, and adapter for your destination" },
+    { "text": "Business cards" },
+    { "text": "Notebook and pens, or a tablet and stylus" },
+    { "text": "Two or three wrinkle-resistant business outfits", "note": "Hang them the moment you arrive." },
+    { "text": "One smart-casual outfit for dinners or downtime" },
+    { "text": "Comfortable dress shoes you've already worn in" },
+    { "text": "Toiletries and a grooming kit in travel sizes" },
+    { "text": "Presentation dongles and an HDMI or USB-C adapter", "note": "Hotels and clients rarely have the right cable." },
+    { "text": "Printed copies of key documents as a backup" },
+    { "text": "Daily medications and basic painkillers" },
+    { "text": "Reusable water bottle and a few snacks" },
+    { "text": "Noise-cancelling headphones for the flight and the hotel" },
+    { "text": "Expense receipts folder or app set up before you go" },
+    { "text": "A small multi-port charger", "note": "Hotel outlets are always in short supply." },
+    { "text": "A light layer for cold conference rooms and planes" }
+  ],
+  "faq": [
+    { "q": "What should I pack for a business trip?", "a": "Your laptop and all its adapters, phone and power bank, two-to-three wrinkle-resistant business outfits, comfortable dress shoes, business cards, presentation dongles, and travel-size toiletries. A multi-port charger solves the always-too-few hotel outlets." },
+    { "q": "How do I pack business clothes without wrinkles?", "a": "Roll knits and fold structured items along their seams, use the hotel's hangers as soon as you arrive, and hang garments in the bathroom during a hot shower to steam out creases. Wrinkle-resistant fabrics and a garment folder help most." },
+    { "q": "What tech should I not forget for a work trip?", "a": "The easily-forgotten items are the presentation adapter (HDMI or USB-C), a spare charging cable, a power bank, and a small multi-port charger. Clients and hotels rarely have the exact cable you need, so bring your own." }
+  ],
+  "related": ["5-day-paris-packing-list", "weekend-trip-packing-list", "international-flight-checklist", "beach-vacation-packing-list"]
+}

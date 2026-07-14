@@ -1,0 +1,37 @@
+{
+  "category": "baby",
+  "slug": "diaper-bag-checklist",
+  "order": 4,
+  "title": "Diaper Bag Checklist",
+  "metaTitle": "Diaper Bag Checklist (What to Pack) | Gisti",
+  "metaDescription": "A diaper bag checklist: diapers and wipes, a changing mat, spare outfits, feeding, and a small first-aid kit — plus what to pack for yourself. Free, or tailor it in Gisti.",
+  "cardDesc": "Diapers and wipes, spare outfits, feeding, and a first-aid kit — plus what to pack for yourself.",
+  "ordered": false,
+  "intro": "A well-stocked diaper bag turns an outing from stressful to easy — as long as it's restocked before the next trip. This checklist covers the essentials for baby (diapers, spare clothes, feeding) and the small extras for you, so you're ready for the blowout that always comes at the worst moment. More <a href=\"/checklists/baby/\" class=\"text-primary hover:underline\">baby checklists</a> here.",
+  "items": [
+    { "text": "4-6 diapers, more for a long day out", "note": "Roughly one per hour out, plus a couple of spares." },
+    { "text": "A travel pack of wipes" },
+    { "text": "A portable, foldable changing mat" },
+    { "text": "Diaper cream in a small tube" },
+    { "text": "Scented bags for dirty diapers" },
+    { "text": "1-2 full changes of clothes for baby", "note": "Blowouts happen at the worst time." },
+    { "text": "Muslins or burp cloths" },
+    { "text": "Feeding supplies: a bottle and formula, or a nursing cover if you prefer one" },
+    { "text": "A bib and a few napkins" },
+    { "text": "A pacifier or two, in a clean case" },
+    { "text": "Hand sanitizer and a few tissues" },
+    { "text": "A small first-aid kit: a thermometer, plasters, and infant paracetamol", "note": "Only give medication on your doctor's advice." },
+    { "text": "Sun hat and baby-safe sunscreen in summer, or an extra layer and hat in winter" },
+    { "text": "A light blanket or swaddle" },
+    { "text": "A small toy or two to distract a fussy baby" },
+    { "text": "A snack and water for you", "note": "Parents forget themselves." },
+    { "text": "A spare shirt for you", "note": "For the same blowout reasons." },
+    { "text": "Restock it after every outing so it's always ready to grab" }
+  ],
+  "faq": [
+    { "q": "What should I keep in a diaper bag?", "a": "Stock diapers and wipes, a changing mat, diaper cream, scented bags, one or two spare outfits for baby, feeding supplies, a pacifier, muslins, hand sanitizer, and a small first-aid kit. Add a snack and a spare shirt for yourself, and restock after every trip." },
+    { "q": "How many diapers should I pack in a diaper bag?", "a": "A good rule is one diaper for every hour you'll be out, plus two or three extra. For a typical outing, 4-6 diapers is plenty; pack more for a full day or a trip." },
+    { "q": "How do I keep my diaper bag organized?", "a": "Use the bag's pockets by category — diapers and wipes together, feeding in another pocket, a wet bag for messes, and your own things in an outer pocket. Restock it as soon as you get home so it's always ready to grab and go." }
+  ],
+  "related": ["newborn-first-month-checklist", "hospital-bag-checklist", "baby-registry-checklist", "baby-proofing-checklist"]
+}

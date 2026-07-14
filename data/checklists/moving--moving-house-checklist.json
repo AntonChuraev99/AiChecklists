@@ -1,0 +1,31 @@
+{
+  "category": "moving",
+  "slug": "moving-house-checklist",
+  "order": 1,
+  "title": "Moving House Checklist",
+  "metaTitle": "Moving House Checklist (8-Week Timeline) | Gisti",
+  "metaDescription": "A step-by-step moving house checklist with an 8-week timeline: quotes, decluttering, utilities, change of address, and moving day. Free, or tailor it with AI in Gisti.",
+  "cardDesc": "A step-by-step 8-week timeline — quotes, decluttering, utilities, and moving day, in order.",
+  "ordered": true,
+  "intro": "Moving house is a hundred small tasks riding on one big date. This checklist lays them out as an 8-week timeline, so you handle quotes and decluttering early and aren't scrambling the night before. Work through it in order, and see the rest of our <a href=\"/checklists/moving/\" class=\"text-primary hover:underline\">moving and home checklists</a> for the details.",
+  "items": [
+    { "text": "Eight weeks out: set your moving date and budget, and decide between movers and a DIY van", "note": "Get three quotes before you book." },
+    { "text": "Seven weeks out: declutter room by room and sell, donate, or bin what you won't take", "note": "You pay to move everything, so lighten the load first." },
+    { "text": "Six weeks out: book your movers or hire van, and reserve any elevator or parking permits", "note": "Good movers book out early in summer." },
+    { "text": "Five weeks out: gather boxes, tape, bubble wrap, and markers, and start packing rarely-used rooms" },
+    { "text": "Four weeks out: notify your landlord or list your home, and confirm your new address details" },
+    { "text": "Three weeks out: transfer or set up utilities, internet, and insurance at the new place", "note": "Book the internet install early — slots fill up." },
+    { "text": "Two weeks out: file your change of address and redirect your mail", "note": "See our change-of-address checklist for who to tell." },
+    { "text": "One week out: pack everything but essentials, label boxes by room, and defrost the freezer" },
+    { "text": "Two days out: pack an essentials box (chargers, toiletries, meds, a change of clothes) and keep it with you" },
+    { "text": "Moving day: photograph meter readings, do a final walkthrough, and check every room and cupboard before you leave" },
+    { "text": "First day in: find the fuse box, stopcock, and thermostat, and test that the utilities work" },
+    { "text": "First week in: unpack essentials, update your address on IDs and accounts, and register with a local doctor" }
+  ],
+  "faq": [
+    { "q": "When should I start planning a house move?", "a": "Start about eight weeks out. That gives you time to compare mover quotes, declutter, book any elevator or parking permits, transfer utilities, and file a change of address without a last-minute scramble." },
+    { "q": "What should I do first when moving house?", "a": "First, lock in your moving date and budget and decide between hiring movers or a DIY van — everything else keys off that date. Then declutter before you pack, so you're not paying to move things you'll throw out." },
+    { "q": "What should be in my moving essentials box?", "a": "Pack a box you keep with you containing phone chargers, toiletries, medications, a change of clothes, snacks and water, basic tools, toilet paper, and important documents. It saves you digging through boxes on your first night." }
+  ],
+  "related": ["packing-to-move-checklist", "change-of-address-checklist", "new-home-setup-checklist", "first-apartment-essentials"]
+}

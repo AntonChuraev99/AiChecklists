@@ -1,0 +1,38 @@
+{
+  "category": "travel",
+  "slug": "international-flight-checklist",
+  "order": 3,
+  "title": "International Flight Checklist",
+  "metaTitle": "International Flight Checklist (Documents & Carry-On) | Gisti",
+  "metaDescription": "Everything to check before an international flight: passport validity, visas, carry-on rules for liquids and power banks, and airport timing. Free, or tailor it in Gisti.",
+  "cardDesc": "Pre-flight documents, carry-on rules, and airport timing so nothing derails an international departure.",
+  "ordered": false,
+  "intro": "An international flight has more that can go wrong than a domestic hop — passport validity rules, visas, and stricter carry-on limits. This checklist gathers the documents to confirm, the items to pack in the cabin, and the timing to hit, so nothing sends you back from the gate. See more <a href=\"/checklists/travel/\" class=\"text-primary hover:underline\">travel checklists</a>.",
+  "items": [
+    { "text": "Passport valid for at least 6 months beyond your travel dates", "note": "Many countries refuse entry otherwise." },
+    { "text": "Visa, ETA, or ETIAS for your destination", "note": "Apply well ahead — some take days to approve." },
+    { "text": "Printed or offline boarding pass and hotel confirmation" },
+    { "text": "Travel insurance details and an emergency contact card" },
+    { "text": "Copies of your passport, stored separately and in the cloud" },
+    { "text": "Local currency plus a card that works abroad", "note": "Tell your bank you're travelling so it isn't frozen." },
+    { "text": "Universal power adapter for your destination's plug type" },
+    { "text": "Power bank in your carry-on", "note": "Lithium batteries are banned from checked bags." },
+    { "text": "Medications in your carry-on, in original packaging", "note": "With a doctor's note for anything unusual." },
+    { "text": "Liquids under 100ml in a clear resealable bag for cabin security" },
+    { "text": "Noise-cancelling headphones or earbuds, with content downloaded" },
+    { "text": "Neck pillow, eye mask, and earplugs for long-haul" },
+    { "text": "Refillable water bottle — empty through security, fill after" },
+    { "text": "Snacks that clear customs", "note": "Avoid fresh fruit, meat, or seeds." },
+    { "text": "A change of clothes and essentials in your carry-on", "note": "In case checked luggage is delayed." },
+    { "text": "Check your baggage allowance and weigh your bag at home", "note": "Overweight fees are steep at the airport." },
+    { "text": "Offline maps and a translation app downloaded before you fly" },
+    { "text": "A roaming plan or local eSIM set up before departure" },
+    { "text": "Arrive at the airport about 3 hours before an international departure" }
+  ],
+  "faq": [
+    { "q": "What do I need for an international flight?", "a": "A passport valid 6+ months, any required visa or ETIAS, boarding passes, travel insurance, a card that works abroad, and your medications, power bank, and liquids packed correctly for the cabin. Arrive about 3 hours early for international departures." },
+    { "q": "How early should I get to the airport for an international flight?", "a": "Aim for 3 hours before departure. International check-in, security, and passport control take longer than domestic, and many airlines close international check-in 60-90 minutes before the flight." },
+    { "q": "Can I bring a power bank on a plane?", "a": "Yes, but only in your carry-on — lithium batteries are banned from checked luggage. Most airlines allow power banks up to 100Wh without approval; larger ones need airline permission." }
+  ],
+  "related": ["5-day-paris-packing-list", "weekend-trip-packing-list", "beach-vacation-packing-list", "business-trip-checklist"]
+}

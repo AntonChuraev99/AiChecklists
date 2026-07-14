@@ -1,0 +1,34 @@
+{
+  "category": "work",
+  "slug": "meeting-prep-checklist",
+  "order": 3,
+  "title": "Meeting Prep Checklist",
+  "metaTitle": "Meeting Prep Checklist (Run Better Meetings) | Gisti",
+  "metaDescription": "A meeting prep checklist for shorter, sharper meetings: a real purpose, an agenda, the right people, and clear next steps. Free, or tailor it with AI in Gisti.",
+  "cardDesc": "Run tighter meetings — a real purpose, an agenda, the right people, and clear next steps.",
+  "ordered": false,
+  "intro": "Most bad meetings were lost before they started: no clear purpose, no agenda, and the wrong people in the room. This checklist covers the prep that turns a meeting from a time-sink into a decision. Run through it before you send the invite, and see the rest of our <a href=\"/checklists/work/\" class=\"text-primary hover:underline\">work and onboarding checklists</a>.",
+  "items": [
+    { "text": "Define the meeting's purpose and the outcome you want", "note": "If you can't name a clear outcome, you may not need the meeting." },
+    { "text": "Decide whether a meeting is actually needed, or if an email or doc would do" },
+    { "text": "Invite only the people who genuinely need to be there", "note": "Every extra attendee lowers the odds of a decision and raises the cost." },
+    { "text": "Write an agenda and share it ahead of time" },
+    { "text": "Set a clear start and end time, and keep it as short as it can be" },
+    { "text": "Assign a facilitator to run it and a note-taker to capture decisions" },
+    { "text": "Send any pre-reads or materials in advance", "note": "Reading time inside the meeting is wasted group time." },
+    { "text": "Book the room or set up and share the video link" },
+    { "text": "Test the AV, screen sharing, and any demo beforehand" },
+    { "text": "Prepare your slides, data, or demo" },
+    { "text": "List the specific decisions that must be made in the meeting" },
+    { "text": "Come with a proposed recommendation, not just open questions", "note": "It's faster to react to a proposal than to build one from scratch live." },
+    { "text": "Plan time for discussion and for agreeing next steps" },
+    { "text": "Keep a parking lot for off-topic items so they don't derail the agenda" },
+    { "text": "Know who owns following up on the action items afterward" }
+  ],
+  "faq": [
+    { "q": "How do I prepare for a meeting?", "a": "Start by defining the purpose and the outcome you want, then build a short agenda around the decisions that must be made. Invite only the people who need to be there, send any pre-reads in advance, and prepare a recommendation rather than just questions. Test your AV and demo before you start." },
+    { "q": "What makes a meeting effective?", "a": "Effective meetings have a clear purpose, a shared agenda, the right people, and a defined outcome. They start and end on time, capture decisions and action items with owners, and keep off-topic tangents in a parking lot. The best test is whether everyone leaves knowing what was decided and what they own next." },
+    { "q": "Do I really need this meeting?", "a": "Ask what decision or discussion genuinely requires people to be together in real time. If the goal is just to share information, an email, doc, or recorded update is usually faster and respects everyone's focus time. Reserve meetings for the things that need live discussion, alignment, or a decision." }
+  ],
+  "related": ["daily-standup-checklist", "project-kickoff-checklist", "remote-work-setup-checklist"]
+}

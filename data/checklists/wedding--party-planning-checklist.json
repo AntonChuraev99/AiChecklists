@@ -1,0 +1,35 @@
+{
+  "category": "wedding",
+  "slug": "party-planning-checklist",
+  "order": 5,
+  "title": "Party Planning Checklist",
+  "metaTitle": "Party Planning Checklist (Free Guide) | Gisti",
+  "metaDescription": "A party planning checklist for any get-together: guest list, food and drinks, decor, playlist, and the day-of setup. Free, or tailor it to your party with AI in Gisti.",
+  "cardDesc": "A simple plan for any get-together — guest list, food and drinks, decor, playlist, and setup.",
+  "ordered": false,
+  "intro": "A good party looks effortless because the host did the boring parts early — the invites, the shopping, and the prep. This checklist covers the essentials for a dinner, a house party, or any celebration so you can spend the evening with your guests instead of in the kitchen. Use it as-is, or open it in Gisti to check things off, and browse the rest of our <a href=\"/checklists/wedding/\" class=\"text-primary hover:underline\">party and event checklists</a>.",
+  "items": [
+    { "text": "Pick the occasion, date, and start and end time" },
+    { "text": "Set a headcount and a budget" },
+    { "text": "Choose a venue or prep your own space" },
+    { "text": "Send invites 2 to 3 weeks ahead with an RSVP request", "note": "A group chat or a quick form is enough for a casual party." },
+    { "text": "Plan the menu and quantities, allowing for dietary needs", "note": "Ask about allergies and vegetarians when people RSVP." },
+    { "text": "Plan drinks: alcoholic and non-alcoholic, plus plenty of ice", "note": "Ice is the most-forgotten item — buy more than you think." },
+    { "text": "Write a shopping list and shop 1 to 2 days ahead" },
+    { "text": "Plan decor and lighting for the mood you want", "note": "Dimmer, warmer light instantly makes a room feel like a party." },
+    { "text": "Build a playlist long enough to cover the whole night, and test the speaker" },
+    { "text": "Plan one activity or icebreaker if guests won't all know each other" },
+    { "text": "Arrange seating and flow so people naturally mingle" },
+    { "text": "Stock essentials: cups, plates, napkins, serving utensils, and trash bags" },
+    { "text": "Clear space and set up a spot for coats and bags" },
+    { "text": "Day-of: cook and prep early, chill the drinks, and give the bathroom a quick tidy" },
+    { "text": "Ask a friend to co-host: manage the door and keep drinks and food topped up" },
+    { "text": "Set out food about 15 minutes before guests are due", "note": "First guests always arrive right on time — be ready." }
+  ],
+  "faq": [
+    { "q": "How much food and drink should I buy for a party?", "a": "Plan about 6 to 8 appetizer-size bites per person for the first two hours, plus a bit more if the party runs long. For drinks, allow roughly 2 to 3 per guest for the first two hours and always include a non-alcoholic option. Buy more ice and napkins than you think you need." },
+    { "q": "How far in advance should I plan a party?", "a": "For a casual party, 2 to 3 weeks is plenty: send invites early enough to get RSVPs, then shop and prep in the final couple of days. For a bigger or themed party, start 4 to 6 weeks out to book a space and line up any rentals or catering." },
+    { "q": "How do I host a party without stressing?", "a": "Do everything you can the day before — shopping, decor, and any dishes that keep. Choose make-ahead food over anything you have to plate to order, prep a playlist so you're not fiddling with music, and enlist a co-host to handle the door and refills so you can actually enjoy your own party." }
+  ],
+  "related": ["birthday-party-checklist", "event-planning-checklist", "wedding-planning-checklist"]
+}

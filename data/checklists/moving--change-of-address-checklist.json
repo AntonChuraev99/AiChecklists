@@ -1,0 +1,31 @@
+{
+  "category": "moving",
+  "slug": "change-of-address-checklist",
+  "order": 3,
+  "title": "Change of Address Checklist",
+  "metaTitle": "Change of Address Checklist (Who to Notify) | Gisti",
+  "metaDescription": "A step-by-step change of address checklist: mail redirect, government, banks, utilities, insurance, and subscriptions — in the right order. Free, or tailor it in Gisti.",
+  "cardDesc": "Who to tell when you move, in the right order — mail, government, banks, utilities, and more.",
+  "ordered": true,
+  "intro": "When you move, dozens of organizations need your new address — and missing one can mean a lost bill, a lapsed policy, or mail going to a stranger. This checklist walks through who to notify in a sensible order, starting with the safety net of mail redirection. See more <a href=\"/checklists/moving/\" class=\"text-primary hover:underline\">moving and home checklists</a>.",
+  "items": [
+    { "text": "Redirect your mail with your postal service", "note": "Set it to start on your move date — it buys time to update everyone else." },
+    { "text": "File your official change of address with the government: voter roll, tax authority, and driver's license agency" },
+    { "text": "Update your bank, credit cards, and any loan or mortgage providers" },
+    { "text": "Tell your employer's payroll and HR, and update pension or retirement accounts" },
+    { "text": "Update your insurance: home or renter's, car, health, and life policies" },
+    { "text": "Switch or transfer utilities: electricity, gas, water, internet, and phone" },
+    { "text": "Update your doctor, dentist, and pharmacy, and transfer prescriptions" },
+    { "text": "Change your address on subscriptions and deliveries", "note": "Streaming billing, meal kits, Amazon, and any recurring boxes." },
+    { "text": "Update your driving license and vehicle registration", "note": "Many places require this within a set number of days." },
+    { "text": "Tell schools or childcare and transfer any records" },
+    { "text": "Update online shopping accounts and digital wallets" },
+    { "text": "Let friends and family know, and update your address on any wills or legal documents" }
+  ],
+  "faq": [
+    { "q": "Who do I need to notify when I change my address?", "a": "Start with mail redirection and the government (tax, voter, and license). Then your bank and cards, employer, insurers, utilities, doctor and pharmacy, and finally subscriptions and online shopping accounts. Working in that order keeps money and official mail flowing first." },
+    { "q": "How far in advance should I change my address?", "a": "File mail redirection and update banks, utilities, and insurance about two weeks before you move, setting the change to take effect on your move date. Update your driver's license and vehicle registration soon after moving — many places have a legal deadline of 10-30 days." },
+    { "q": "What happens if I forget to change my address somewhere?", "a": "Missed mail can mean late fees, a lapsed insurance policy, or a bill going to your old home. Mail redirection is your safety net — it forwards anything you forgot for several months, giving you time to catch the accounts you missed." }
+  ],
+  "related": ["moving-house-checklist", "new-home-setup-checklist", "packing-to-move-checklist", "first-apartment-essentials"]
+}

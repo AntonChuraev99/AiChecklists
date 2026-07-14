@@ -1,0 +1,41 @@
+{
+  "category": "groceries",
+  "slug": "pantry-staples-checklist",
+  "order": 5,
+  "title": "Pantry Staples Checklist",
+  "metaTitle": "Pantry Staples Checklist (Stock a Kitchen) | Gisti",
+  "metaDescription": "A pantry staples checklist to stock a kitchen: grains, canned goods, oils, spices, baking basics, and long-life essentials. Free, or tailor it with AI in Gisti.",
+  "cardDesc": "Stock a working kitchen — grains, canned goods, oils, spices, baking basics, and long-life essentials.",
+  "ordered": false,
+  "intro": "A well-stocked pantry is what lets you cook a meal without a special trip to the store. This pantry staples checklist covers the long-life basics a working kitchen keeps on hand — grains, canned goods, oils and vinegars, spices, and baking essentials — so you only ever have to buy the fresh ingredients on top. Restock from it whenever something runs low. See more <a href=\"/checklists/groceries/\" class=\"text-primary hover:underline\">grocery and shopping lists</a>.",
+  "items": [
+    { "text": "Rice — white, brown, or both" },
+    { "text": "Pasta in a couple of shapes, and noodles" },
+    { "text": "Oats and a breakfast cereal" },
+    { "text": "Flour — all-purpose, plus any you bake with" },
+    { "text": "Breadcrumbs or a stuffing mix" },
+    { "text": "Canned tomatoes — whole and chopped", "note": "The base of countless quick dinners." },
+    { "text": "Canned beans, chickpeas, and lentils" },
+    { "text": "Canned tuna, and coconut milk for curries" },
+    { "text": "Stock cubes or bouillon", "note": "Turns water into the base of soups, rice, and sauces." },
+    { "text": "Pasta sauce, and a jar of pesto or curry paste" },
+    { "text": "Peanut butter, and a jam or honey" },
+    { "text": "Cooking oil and olive oil" },
+    { "text": "Vinegar — white, plus a balsamic or wine vinegar" },
+    { "text": "Soy sauce, hot sauce, and Worcestershire or fish sauce" },
+    { "text": "Ketchup, mustard, and mayonnaise" },
+    { "text": "Salt, black pepper, and a pepper mill" },
+    { "text": "Everyday spices — cumin, paprika, chili, cinnamon, and mixed herbs", "note": "Buy the ones you actually cook with, not a giant rack that goes stale." },
+    { "text": "Garlic and onion powder, plus a stock of fresh garlic and onions" },
+    { "text": "Sugar — white and brown — plus baking soda and baking powder" },
+    { "text": "Vanilla extract, and a bar of chocolate or cocoa" },
+    { "text": "Coffee, tea, and long-life or powdered milk as a backup" },
+    { "text": "Nuts, dried fruit, and a couple of snack bars", "note": "Store opened nuts sealed — they go rancid over time." }
+  ],
+  "faq": [
+    { "q": "What are essential pantry staples?", "a": "The essentials are long-life basics you cook from constantly: rice and pasta, canned tomatoes and beans, stock cubes, cooking and olive oil, vinegar, and core condiments like soy sauce and mustard. Add flour, sugar, and baking soda for baking, plus salt, pepper, and the handful of spices you actually use. With these on hand, most meals need only fresh ingredients on top." },
+    { "q": "How do I stock a pantry from scratch?", "a": "Build it in layers rather than all at once. Start with the grains, canned goods, and oils you use weekly, then add spices and baking basics as recipes call for them. Buy a little extra of anything shelf-stable when it's on offer, and label or date items so the oldest get used first." },
+    { "q": "How long do pantry staples last?", "a": "Dry goods like rice, pasta, and canned foods keep for many months to years if sealed and stored cool and dry. Flour, nuts, and oils have shorter lives — a few months to a year — because their fats can go rancid, so buy those in amounts you'll get through. Check dates, keep the pantry cool and dark, and rotate stock so nothing is forgotten at the back." }
+  ],
+  "related": ["weekly-grocery-list", "meal-plan-shopping-list", "healthy-grocery-list"]
+}

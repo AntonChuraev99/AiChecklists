@@ -1,0 +1,41 @@
+{
+  "category": "groceries",
+  "slug": "weekly-grocery-list",
+  "order": 1,
+  "title": "Weekly Grocery List",
+  "metaTitle": "Weekly Grocery List (Free Printable Checklist) | Gisti",
+  "metaDescription": "A complete weekly grocery list organized by aisle: produce, protein, dairy, pantry, frozen, and household basics. Free, or tailor it with AI in Gisti.",
+  "cardDesc": "A full week's shop organized by aisle — produce, protein, dairy, pantry, frozen, and household.",
+  "ordered": false,
+  "intro": "This weekly grocery list covers a balanced week of real meals for a household, grouped the way a supermarket is laid out so you shop in one smooth loop instead of doubling back. Treat it as a starting template — cross off what you already have, and adjust the quantities to how many people you're feeding. See more <a href=\"/checklists/groceries/\" class=\"text-primary hover:underline\">grocery and shopping lists</a>.",
+  "items": [
+    { "text": "Bananas, plus a couple of apples or oranges" },
+    { "text": "Leafy greens — spinach, lettuce, or a salad mix", "note": "Buy loose if you'll use it fast; bagged wilts quicker." },
+    { "text": "Tomatoes, cucumber, and bell peppers" },
+    { "text": "Onions, garlic, and potatoes", "note": "Store these cool and dark, and keep onions away from potatoes." },
+    { "text": "Carrots and a broccoli or seasonal vegetable" },
+    { "text": "A bunch of fresh herbs and a lemon" },
+    { "text": "Chicken breasts or thighs" },
+    { "text": "Ground beef, turkey, or a plant-based mince" },
+    { "text": "A dozen eggs" },
+    { "text": "Fish, or canned tuna or salmon" },
+    { "text": "Beans, chickpeas, or lentils, canned or dried", "note": "A cheap protein that stretches any meal." },
+    { "text": "Milk or a plant-based alternative" },
+    { "text": "Butter and a block or wedge of cheese" },
+    { "text": "Yogurt — plain or Greek" },
+    { "text": "Bread, wraps, or bagels" },
+    { "text": "Pasta, rice, or noodles" },
+    { "text": "Cooking oil, plus salt, pepper, and a spice you're low on" },
+    { "text": "Pasta sauce or canned tomatoes" },
+    { "text": "Breakfast cereal or oats" },
+    { "text": "Coffee, tea, or your morning drink" },
+    { "text": "Frozen vegetables and a bag of frozen fruit for smoothies", "note": "Frozen is just as nutritious and cuts waste." },
+    { "text": "Household basics you're low on — dish soap, paper towels, or trash bags" }
+  ],
+  "faq": [
+    { "q": "How do I make a weekly grocery list?", "a": "Start from your meal plan for the week, then list what each recipe needs and check it against what you already have. Group the list by aisle — produce, protein, dairy, pantry, frozen, and household — so you shop in one loop without backtracking. Add any staples you're running low on before you leave." },
+    { "q": "What are the basics everyone should buy at the grocery store?", "a": "A balanced weekly staple list usually includes fresh produce, a couple of proteins like chicken and eggs, dairy or an alternative, a grain such as rice or pasta, bread, and some frozen vegetables. Keep canned beans, tomatoes, and cooking oil on hand too — they turn those basics into full meals." },
+    { "q": "How do I keep my grocery bill down?", "a": "Shop from a list built around a meal plan so you buy only what you'll use, and lean on cheaper proteins like eggs, beans, and lentils. Buy frozen vegetables to cut waste, choose store brands for staples, and avoid shopping hungry — impulse buys are where budgets slip." }
+  ],
+  "related": ["pantry-staples-checklist", "healthy-grocery-list", "meal-plan-shopping-list", "party-grocery-list"]
+}

@@ -1,0 +1,37 @@
+{
+  "category": "baby",
+  "slug": "baby-proofing-checklist",
+  "order": 5,
+  "title": "Baby-Proofing Checklist",
+  "metaTitle": "Baby-Proofing Checklist (Room by Room) | Gisti",
+  "metaDescription": "A room-by-room baby-proofing checklist: anchor furniture, secure chemicals and cords, stair gates, outlet covers, and button-battery safety. Free, or tailor it with AI in Gisti.",
+  "cardDesc": "Room-by-room home safety — anchor furniture, secure chemicals and cords, gates, and battery safety.",
+  "ordered": false,
+  "intro": "Baby-proofing is best done before your baby is mobile, around 4-6 months, so the home is safe before the crawling starts. This checklist prioritizes the highest-risk hazards first — furniture tip-overs, chemicals, and cords — then works room by room. See more <a href=\"/checklists/baby/\" class=\"text-primary hover:underline\">baby and parenting checklists</a>.",
+  "items": [
+    { "text": "Anchor bookcases, dressers, and the TV to the wall", "note": "Furniture tip-overs are a leading home injury for toddlers." },
+    { "text": "Cover unused electrical outlets with safety plugs" },
+    { "text": "Install safety gates at the top and bottom of stairs" },
+    { "text": "Add cabinet and drawer latches, especially where cleaning products or knives live" },
+    { "text": "Move all medicines, cleaning products, and chemicals up high and locked away" },
+    { "text": "Fit stove knob covers and turn pot handles toward the back" },
+    { "text": "Secure blind and curtain cords out of reach", "note": "Looped cords are a strangulation hazard." },
+    { "text": "Pad sharp furniture corners and edges" },
+    { "text": "Set your water heater to 49°C / 120°F to prevent scalds" },
+    { "text": "Keep small objects, button batteries, and magnets off the floor and out of reach", "note": "Button batteries are a medical emergency if swallowed." },
+    { "text": "Use door-knob covers or locks on rooms that are off-limits" },
+    { "text": "Check that smoke and carbon-monoxide alarms work, on every level" },
+    { "text": "Keep the crib clear of pillows, bumpers, and toys, and away from windows and cords" },
+    { "text": "Latch the toilet lid and keep the bathroom door closed" },
+    { "text": "Tuck away or cover trailing electrical cords" },
+    { "text": "Move toxic houseplants out of reach, or remove them" },
+    { "text": "Crawl each room at your baby's eye level to spot hazards you'd miss standing up" },
+    { "text": "Save poison-control and emergency numbers where everyone can find them" }
+  ],
+  "faq": [
+    { "q": "When should I baby-proof my house?", "a": "Start before your baby becomes mobile — around 4-6 months — so it's done before they begin crawling and pulling up. Anchoring furniture, securing chemicals, and covering outlets are the priorities; add stair gates and latches as they get more active." },
+    { "q": "What are the most important things to baby-proof?", "a": "The highest-risk hazards are unanchored furniture and TVs (tip-overs), accessible medicines and chemicals, blind and curtain cords, stairs, and small objects or button batteries. Tackle those first, then work room by room." },
+    { "q": "How do I baby-proof on a budget?", "a": "Many fixes are cheap or free: move chemicals and medicines up high, tie up blind cords, keep small objects off the floor, and anchor furniture with inexpensive straps. Outlet covers, cabinet latches, and a stair gate cover most of the rest for very little." }
+  ],
+  "related": ["newborn-first-month-checklist", "hospital-bag-checklist", "baby-registry-checklist", "moving/new-home-setup-checklist"]
+}

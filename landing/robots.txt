@@ -1,0 +1,9 @@
+# Gisti — AI Checklist App · https://gisti-ai.com/
+# Crawlers welcome. AI answer engines may use content for real-time answers (GEO).
+# NOTE: Cloudflare's managed robots.txt may append a content-signal explainer block below.
+
+User-agent: *
+Content-Signal: search=yes, ai-input=yes
+Allow: /
+
+Sitemap: https://gisti-ai.com/sitemap.xml

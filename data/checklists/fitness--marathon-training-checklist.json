@@ -1,0 +1,36 @@
+{
+  "category": "fitness",
+  "slug": "marathon-training-checklist",
+  "order": 5,
+  "title": "Marathon Training Checklist",
+  "metaTitle": "Marathon Training Checklist & Plan | Gisti",
+  "metaDescription": "A step-by-step marathon training checklist: shoes, a training plan, long runs, tapering, and race day. Free, or tailor it to your goal time with AI in Gisti.",
+  "cardDesc": "From first run to finish line — shoes, a plan, long runs, tapering, and race day, in order.",
+  "ordered": true,
+  "intro": "Finishing a marathon comes down to preparation done in the right order — build a base before you chase speed, and taper before you race. This checklist runs from your first easy miles through the finish line, covering the gear, the training blocks, fueling, and race day. It's general guidance, not medical or coaching advice — adjust it to your level, and see the rest of our <a href=\"/checklists/fitness/\" class=\"text-primary hover:underline\">health and fitness checklists</a>.",
+  "items": [
+    { "text": "Get a medical check-up before you start, especially if you're new to running or have any health concerns" },
+    { "text": "Buy properly fitted running shoes, ideally after a gait analysis at a running store", "note": "The wrong shoes are the fastest route to injury over hundreds of training miles." },
+    { "text": "Choose a 16 to 20 week training plan that matches your current fitness", "note": "Beginners need the full 20 weeks; don't rush a compressed plan." },
+    { "text": "Set a realistic goal: to finish, or a specific target time" },
+    { "text": "Base phase (weeks 1 to 4): build easy, conversational mileage running 3 to 4 times a week" },
+    { "text": "Add one weekly long run and increase its distance gradually", "note": "Raise weekly mileage by no more than about 10% to avoid overuse injuries." },
+    { "text": "Include one speed or tempo session each week to build pace" },
+    { "text": "Strength-train twice a week, focusing on core, glutes, and legs" },
+    { "text": "Cross-train on off days with cycling or swimming to build fitness without pounding" },
+    { "text": "Dial in your race-day nutrition and practice fueling on long runs", "note": "Never try a new gel or drink on race day — test everything in training." },
+    { "text": "Prioritize hydration, sleep, and recovery throughout the block" },
+    { "text": "Peak weeks: reach your longest run of about 20 miles (32 km) around 3 weeks out" },
+    { "text": "Taper: cut your mileage over the final 2 to 3 weeks so you arrive fresh", "note": "Resist the urge to cram fitness late — the work is already done." },
+    { "text": "Lay out your race-day gear the night before, using nothing new", "note": "Wear only clothes and shoes you've already run long in." },
+    { "text": "Carb-load and hydrate well over the final few days" },
+    { "text": "Race day: start slower than feels easy and stick to your pace and fueling plan", "note": "Going out too fast is the classic first-marathon mistake." },
+    { "text": "After the race: keep moving to cool down, refuel, hydrate, and rest before running again", "note": "Give yourself at least a week of easy recovery before hard training resumes." }
+  ],
+  "faq": [
+    { "q": "How long does it take to train for a marathon?", "a": "Most training plans run 16 to 20 weeks. Beginners should give themselves the full 20 weeks to build mileage safely, while experienced runners with a solid base can use a shorter block. The key is a gradual buildup — jumping into high mileage too fast is what causes injuries." },
+    { "q": "How far should my longest training run be?", "a": "Most plans peak at a long run of around 20 miles (32 km), roughly three weeks before race day, then taper. You don't need to run the full 26.2 in training — race-day adrenaline, fueling, and the taper carry you through the final miles. Build up to that peak gradually week by week." },
+    { "q": "What is tapering and why does it matter?", "a": "Tapering means reducing your training volume over the final 2 to 3 weeks so your body repairs, restocks energy, and arrives at the start line fresh instead of fatigued. It feels counterintuitive to run less right before the biggest effort, but the fitness is already banked — the taper is what lets you use it." }
+  ],
+  "related": ["gym-bag-checklist", "meal-prep-checklist", "morning-routine-checklist"]
+}

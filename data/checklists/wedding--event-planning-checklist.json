@@ -1,0 +1,37 @@
+{
+  "category": "wedding",
+  "slug": "event-planning-checklist",
+  "order": 4,
+  "title": "Event Planning Checklist",
+  "metaTitle": "Event Planning Checklist (Free Template) | Gisti",
+  "metaDescription": "An event planning checklist for any occasion: goals, budget, venue, catering, AV, run-of-show, and teardown. Free, or tailor it to your event with AI in Gisti.",
+  "cardDesc": "A full planning list for any event — goals, budget, venue, catering, AV, run-of-show, and teardown.",
+  "ordered": false,
+  "intro": "Whether it's a conference, a fundraiser, or a company party, every event runs on the same backbone: a clear goal, a locked budget, the right venue, and a run-of-show nobody has to guess at. This checklist gathers the tasks that make or break an event so you can delegate with confidence. Use it as-is, or open it in Gisti to assign owners, and see the rest of our <a href=\"/checklists/wedding/\" class=\"text-primary hover:underline\">event and party checklists</a>.",
+  "items": [
+    { "text": "Define the event's goal and how you'll measure success", "note": "Attendance, funds raised, or leads booked — pick the metric up front." },
+    { "text": "Set the date and hold a backup date" },
+    { "text": "Set the budget and set up a simple way to track spending against it" },
+    { "text": "Estimate the headcount and build the guest or attendee list" },
+    { "text": "Book the venue and confirm its capacity and layout" },
+    { "text": "Confirm exactly what the venue includes: tables, chairs, AV, wifi, parking" },
+    { "text": "Hire the caterer and confirm dietary and allergy options", "note": "Ask for a vegetarian, vegan, and gluten-free count on the RSVP." },
+    { "text": "Arrange AV: sound, microphones, projector, and screens", "note": "Always schedule a tech check the day before or morning of." },
+    { "text": "Book speakers, entertainment, or a host, and confirm their needs" },
+    { "text": "Build the run-of-show: a minute-by-minute timeline for the day" },
+    { "text": "Send invitations or open registration, and track RSVPs" },
+    { "text": "Plan decor, signage, and any branding or printed materials" },
+    { "text": "Sort transportation, directions, and parking for attendees" },
+    { "text": "Confirm permits, licenses, and event insurance", "note": "Alcohol, amplified music, and public spaces often need permits." },
+    { "text": "Line up staff or volunteers and give each a clear role" },
+    { "text": "Prepare a day-of contact sheet with every vendor and lead's number" },
+    { "text": "Plan cleanup, teardown, and who returns rentals" },
+    { "text": "After the event: send thank-yous and gather feedback while it's fresh" }
+  ],
+  "faq": [
+    { "q": "How do I start planning an event?", "a": "Start with the goal and the budget — everything else flows from those two. Once you know what success looks like and what you can spend, set the date, book the venue, and confirm your headcount. From there you can layer in catering, AV, and the run-of-show." },
+    { "q": "What is a run-of-show?", "a": "A run-of-show is a minute-by-minute timeline of the event: when doors open, when each speaker or activity starts, cue points for AV, and when things wrap. It keeps staff, vendors, and hosts in sync so no one has to improvise on the day." },
+    { "q": "How far ahead should I plan an event?", "a": "For a small event, 6 to 8 weeks is usually enough. For a large conference or gala, start 4 to 6 months out so you can secure the venue, speakers, and catering. Book the venue and any keynote speakers first, since they have the least flexibility." }
+  ],
+  "related": ["party-planning-checklist", "wedding-planning-checklist", "birthday-party-checklist", "wedding-day-timeline"]
+}

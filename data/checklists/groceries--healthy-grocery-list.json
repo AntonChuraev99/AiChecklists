@@ -1,0 +1,41 @@
+{
+  "category": "groceries",
+  "slug": "healthy-grocery-list",
+  "order": 2,
+  "title": "Healthy Grocery List",
+  "metaTitle": "Healthy Grocery List (Clean-Eating Staples) | Gisti",
+  "metaDescription": "A healthy grocery list of whole-food staples: vegetables, fruit, lean protein, whole grains, and healthy fats. Free, or tailor it with AI in Gisti.",
+  "cardDesc": "Whole-food staples for eating well — vegetables, fruit, lean protein, whole grains, and good fats.",
+  "ordered": false,
+  "intro": "Eating well is mostly a shopping problem — if the right foods are in the house, the meals follow. This healthy grocery list sticks to whole-food staples across vegetables, fruit, lean protein, whole grains, and healthy fats, with minimal processed extras. Use it as a base and swap in whatever's in season near you. See more <a href=\"/checklists/groceries/\" class=\"text-primary hover:underline\">grocery and shopping lists</a>.",
+  "items": [
+    { "text": "Leafy greens — spinach, kale, or a mixed salad" },
+    { "text": "Broccoli, cauliflower, or green beans" },
+    { "text": "Peppers, carrots, and cucumber for snacking" },
+    { "text": "Onions, garlic, and sweet potatoes" },
+    { "text": "Avocados", "note": "A healthy fat that works in meals and snacks alike." },
+    { "text": "Berries, fresh or frozen", "note": "Frozen is cheaper year-round and just as nutritious." },
+    { "text": "Bananas and apples" },
+    { "text": "Oranges or another citrus for vitamin C" },
+    { "text": "Chicken or turkey breast" },
+    { "text": "Eggs" },
+    { "text": "Fish like salmon, or a canned option", "note": "Oily fish adds omega-3s a couple of times a week." },
+    { "text": "Greek yogurt, plain and unsweetened" },
+    { "text": "Beans, lentils, or chickpeas", "note": "Plant protein plus fiber, and very cheap." },
+    { "text": "Tofu or tempeh, if you eat it" },
+    { "text": "Oats for breakfast", "note": "Plain rolled oats beat sugary cereal." },
+    { "text": "Brown rice or quinoa" },
+    { "text": "Whole-grain bread or wraps" },
+    { "text": "Nuts and seeds — almonds, walnuts, or chia", "note": "Great for snacks, but watch the portion size." },
+    { "text": "Olive oil for cooking and dressing" },
+    { "text": "Natural nut butter with no added sugar", "note": "Check the label — the ingredient list should be just nuts." },
+    { "text": "Hummus or a bean dip for veggies" },
+    { "text": "Herbs, spices, and lemon to flavor food without extra salt or sauce" }
+  ],
+  "faq": [
+    { "q": "What should be on a healthy grocery list?", "a": "Build it around whole foods: plenty of vegetables and fruit, lean proteins like chicken, eggs, fish, and beans, whole grains such as oats and brown rice, and healthy fats like olive oil, nuts, and avocado. Add plain Greek yogurt, and use herbs and spices for flavor while keeping processed snacks to a minimum." },
+    { "q": "How do I shop healthy on a budget?", "a": "Lean on cheap, nutritious staples — eggs, beans, lentils, oats, frozen vegetables, and frozen berries all cost little and keep well. Buy whole ingredients rather than pre-made meals, choose store brands, and plan meals around what's on offer. Frozen produce is as nutritious as fresh and cuts waste." },
+    { "q": "What foods should I avoid buying to eat healthier?", "a": "The easiest wins are cutting back on sugary drinks, sweetened cereals, packaged snacks, and processed meats. You don't have to ban them, but keeping them out of the cart makes the default choice at home a healthy one. Read labels for added sugar, and check that nut butters and sauces aren't loaded with extras." }
+  ],
+  "related": ["weekly-grocery-list", "meal-plan-shopping-list", "pantry-staples-checklist"]
+}

@@ -1,0 +1,39 @@
+{
+  "category": "wedding",
+  "slug": "wedding-day-timeline",
+  "order": 2,
+  "title": "Wedding Day Timeline",
+  "metaTitle": "Wedding Day Timeline (Hour-by-Hour) | Gisti",
+  "metaDescription": "An hour-by-hour wedding day timeline from hair and makeup to the grand send-off, built around a 4pm ceremony. Free, or shift it to your own schedule with AI in Gisti.",
+  "cardDesc": "An hour-by-hour sample schedule from getting ready to the send-off, built around a 4pm ceremony.",
+  "ordered": true,
+  "intro": "A smooth wedding day runs on a timeline everyone can see. This hour-by-hour schedule is built around a classic 4pm ceremony with a first look and dinner reception — the most common shape — so you can slide the times to match your own start and hand the same plan to your vendors and wedding party. Adjust it and see the rest of our <a href=\"/checklists/wedding/\" class=\"text-primary hover:underline\">wedding and event checklists</a> for the full run-up.",
+  "items": [
+    { "text": "8:00 am — Light breakfast, hydrate, and shower", "note": "Eat something real; it's a long day and the next full meal is dinner." },
+    { "text": "9:00 am — Hair and makeup begins for the wedding party", "note": "The person getting married goes last so the look is freshest for photos." },
+    { "text": "11:00 am — Photographer arrives for detail shots: rings, dress, invitations, shoes" },
+    { "text": "12:00 pm — Getting-ready photos; the wedding party gets dressed" },
+    { "text": "12:30 pm — Light lunch and drinks for everyone getting ready" },
+    { "text": "1:00 pm — Get into the dress or suit with help on hand for buttons and ties" },
+    { "text": "1:30 pm — First look and private couple portraits", "note": "A first look front-loads photos so you can enjoy cocktail hour later." },
+    { "text": "2:00 pm — Wedding-party and immediate-family group photos" },
+    { "text": "3:00 pm — Tuck away to freshen up as early guests start arriving" },
+    { "text": "3:30 pm — Pre-ceremony music starts and ushers seat guests" },
+    { "text": "4:00 pm — Ceremony begins" },
+    { "text": "4:30 pm — Ceremony ends; cocktail hour starts and any remaining family photos are taken" },
+    { "text": "5:30 pm — Guests move to the reception; the couple is announced in" },
+    { "text": "5:45 pm — First dance" },
+    { "text": "6:00 pm — Dinner is served, opening with a short welcome toast" },
+    { "text": "7:00 pm — Speeches and toasts", "note": "Ask speakers to keep it to 3 to 5 minutes each and cap the total." },
+    { "text": "7:45 pm — Cake cutting" },
+    { "text": "8:00 pm — Dance floor opens with the parent dances" },
+    { "text": "10:30 pm — Last dance and grand send-off", "note": "Line up sparklers, petals, or bubbles a few minutes ahead." },
+    { "text": "11:00 pm — Vendors break down; assign someone to collect gifts, cards, and decor", "note": "Don't leave the gift and card box for the venue staff to gather." }
+  ],
+  "faq": [
+    { "q": "How long should a wedding day timeline be?", "a": "Most weddings run about 10 to 12 hours from the start of hair and makeup to the send-off, with the reception itself lasting 4 to 5 hours. Build in buffer time between blocks — things always run a little late, and a padded timeline keeps the day relaxed." },
+    { "q": "Do I need a first look?", "a": "It's optional. A first look lets you take most couple and wedding-party photos before the ceremony, so you can join cocktail hour instead of missing it for pictures. If you'd rather keep the tradition of seeing each other at the aisle, add about 45 minutes of photo time after the ceremony instead." },
+    { "q": "When should the ceremony start?", "a": "A late-afternoon start, around 3 to 4pm, is the most common and gives you daylight for photos plus a natural roll into cocktail hour and dinner. Check your sunset time so golden-hour portraits land during a gap in the schedule." }
+  ],
+  "related": ["wedding-planning-checklist", "event-planning-checklist", "party-planning-checklist"]
+}

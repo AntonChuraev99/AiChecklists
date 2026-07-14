@@ -1,0 +1,35 @@
+{
+  "category": "fitness",
+  "slug": "meal-prep-checklist",
+  "order": 2,
+  "title": "Meal Prep Checklist",
+  "metaTitle": "Meal Prep Checklist for the Week | Gisti",
+  "metaDescription": "A weekly meal prep checklist: plan, shop, batch-cook, and portion so healthy meals are ready all week. Free, or tailor it to your diet and goals with AI in Gisti.",
+  "cardDesc": "Plan, shop, batch-cook, and portion — everything to prep a week of meals in one session.",
+  "ordered": false,
+  "intro": "Meal prep saves the two things that derail healthy eating: time and willpower on a busy weeknight. This checklist walks through a single prep session — planning, one shop, batch-cooking, and portioning — so lunches and dinners are ready to grab all week. Use it as-is, or open it in Gisti to tailor it to your diet, and see the rest of our <a href=\"/checklists/fitness/\" class=\"text-primary hover:underline\">health and fitness checklists</a>.",
+  "items": [
+    { "text": "Pick 2 to 3 recipes that reheat well", "note": "Stews, grain bowls, roasted veg, and curries hold up far better than salads or crispy foods." },
+    { "text": "Plan the week's meals: breakfasts, lunches, dinners, and snacks" },
+    { "text": "Check what you already have in the fridge, freezer, and pantry" },
+    { "text": "Write a shopping list grouped by store section", "note": "Grouping by aisle turns the shop into one fast lap." },
+    { "text": "Do a single grocery run for the whole week" },
+    { "text": "Wash and chop all your vegetables at once" },
+    { "text": "Cook grains and starches in bulk: rice, quinoa, pasta, or potatoes" },
+    { "text": "Batch-cook proteins: chicken, ground meat, beans, tofu, or hard-boiled eggs" },
+    { "text": "Roast a big tray of mixed vegetables" },
+    { "text": "Make one sauce or dressing to vary the flavor across meals", "note": "The same base tastes new with pesto one day and a peanut sauce the next." },
+    { "text": "Portion meals into containers and label each with the date" },
+    { "text": "Cool food fully before sealing the lids", "note": "Sealing warm food traps steam, goes soggy, and spoils faster." },
+    { "text": "Freeze any portions you won't eat within 3 to 4 days", "note": "Cooked meals keep about 3 to 4 days in the fridge; freeze the rest." },
+    { "text": "Prep grab-and-go snacks: cut fruit, portioned nuts, or yogurt cups" },
+    { "text": "Arrange the fridge by day or meal so the right container is easy to grab" },
+    { "text": "Clean as you go and wash your containers so next week is easy" }
+  ],
+  "faq": [
+    { "q": "How long does meal-prepped food last?", "a": "Most cooked meals keep 3 to 4 days in the fridge in airtight containers. Anything you won't eat in that window should go in the freezer, where most dishes last 2 to 3 months. Always cool food fully before sealing and refrigerating, and label containers with the date." },
+    { "q": "How do I start meal prepping?", "a": "Start small: prep just lunches, or just one or two dinners, before trying to cook a whole week at once. Pick recipes that reheat well, do one grocery shop, and batch-cook a protein, a grain, and a tray of veg you can mix and match. Build up as the habit sticks." },
+    { "q": "What foods are best for meal prep?", "a": "Choose foods that reheat without going soggy or mushy: stews, chili, curries, grain bowls, roasted vegetables, cooked grains, and proteins like chicken, beans, and hard-boiled eggs. Store crunchy items, dressings, and fresh greens separately and add them just before eating." }
+  ],
+  "related": ["morning-routine-checklist", "self-care-checklist", "gym-bag-checklist"]
+}

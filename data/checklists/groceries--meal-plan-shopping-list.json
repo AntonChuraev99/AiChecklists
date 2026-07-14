@@ -1,0 +1,40 @@
+{
+  "category": "groceries",
+  "slug": "meal-plan-shopping-list",
+  "order": 3,
+  "title": "Meal Plan Shopping List",
+  "metaTitle": "Meal Plan Shopping List (7-Day Template) | Gisti",
+  "metaDescription": "A meal plan shopping list built from a 7-day plan: breakfasts, lunches, dinners, snacks, and the staples that tie them together. Free, or tailor it with AI in Gisti.",
+  "cardDesc": "A 7-day meal-plan shop — breakfasts, lunches, dinners, snacks, and the staples that tie them together.",
+  "ordered": false,
+  "intro": "The point of meal planning is to shop once and cook without the last-minute takeout. This meal plan shopping list is built the way a week of meals actually breaks down — breakfasts, lunches, dinners, and snacks — plus the shared staples that appear across several recipes. Map it to your own menu, then buy only what you're missing. See more <a href=\"/checklists/groceries/\" class=\"text-primary hover:underline\">grocery and shopping lists</a>.",
+  "items": [
+    { "text": "Oats, eggs, or yogurt for weekday breakfasts" },
+    { "text": "Bread or bagels and a spread" },
+    { "text": "Fruit for breakfasts and grab-and-go", "note": "Bananas and berries top oats and yogurt." },
+    { "text": "Salad greens, a protein, and a dressing for build-your-own lunches" },
+    { "text": "Wraps or a sandwich loaf and a deli filling" },
+    { "text": "Canned tuna, beans, or leftovers portioned for the week", "note": "Cook once, eat twice — plan dinners that reheat well." },
+    { "text": "Two to three dinner proteins — chicken, mince, fish, or tofu" },
+    { "text": "A base for each dinner: rice, pasta, potatoes, or noodles" },
+    { "text": "Vegetables to go with each dinner, fresh or frozen" },
+    { "text": "Pasta sauce, curry paste, or canned tomatoes for quick dinner bases", "note": "One jar or can turns a protein and grain into a meal." },
+    { "text": "Onions, garlic, and stock cubes — the backbone of most dinners" },
+    { "text": "Nuts, crackers, or a cheese for snacks" },
+    { "text": "Hummus and veggie sticks" },
+    { "text": "A treat or two so the plan is sustainable", "note": "A plan you can stick to beats a perfect one you abandon." },
+    { "text": "Cooking oil, butter, salt, pepper, and everyday spices" },
+    { "text": "Milk or a plant-based alternative" },
+    { "text": "Eggs — they cross breakfast, lunch, and dinner" },
+    { "text": "Cheese for cooking and sandwiches" },
+    { "text": "Herbs or a lemon to finish dishes" },
+    { "text": "Flour, sugar, or anything a planned recipe specifically calls for" },
+    { "text": "Freezer backups — a bag of frozen veg and a spare protein", "note": "A safety net for the night a plan falls through." }
+  ],
+  "faq": [
+    { "q": "How do I turn a meal plan into a shopping list?", "a": "Write out your meals for the week, then list every ingredient each one needs. Combine duplicates — if three dinners use onions, add them once with the right quantity — and check the total against what's already in your fridge and pantry. Group the final list by aisle so shopping is quick." },
+    { "q": "How many meals should I plan for a week?", "a": "Plan the meals you'll actually cook rather than all 21. Many people plan dinners plus a repeatable breakfast and lunch, and leave a night or two flexible for leftovers or eating out. Planning meals that reuse the same ingredients cuts both cost and waste." },
+    { "q": "How do I meal plan to save money and reduce waste?", "a": "Build meals around shared ingredients so nothing is bought for a single recipe and left to spoil. Plan a leftovers night, cook proteins that reheat well, and keep frozen vegetables and a spare protein as a backup. Shopping strictly from the list — and not while hungry — keeps impulse buys out of the cart." }
+  ],
+  "related": ["weekly-grocery-list", "pantry-staples-checklist", "healthy-grocery-list", "party-grocery-list"]
+}

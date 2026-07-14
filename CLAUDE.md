@@ -121,6 +121,15 @@ Simple, clear, benefit-focused, action-oriented. Do: "Create Checklist", "Fill v
 
 **Play Store listing — source of truth: `docs/store-screenshots/store-listing-en.md`** (tracked in git via force-add; the rest of `docs/` stays ignored). Any listing change starts in this doc (title/short/full with char limits 30/80/4000, keyword-coverage table), then is pasted into Play Console → Main store listing — and any console edit must be mirrored back, otherwise the doc silently drifts from prod (this happened before the 2026-07-02 ASO audit).
 
+## SEO / Organic Growth
+
+Strategy + phased plan: **`docs/plans/2026-07-14-seo-organic-growth-strategy.md`** (Tier 1 programmatic-SEO checklist gallery · Tier 2 Pinterest · Tier 3 GEO). Read it before any organic-traffic / landing / gallery / indexing work.
+
+- **Indexable pages are static files under `landing/`, served by worker `gisti-landing` (`wrangler.landing.jsonc`, apex + www). NEVER an app route** — `app.gisti-ai.com` is wasmJs Compose (Skiko `<canvas>`) = empty DOM for crawlers = SEO-zero. Replicate the `landing/mcp/index.html` pattern for new pages.
+- **Public gallery = curated/opt-in content ONLY** — never expose Firestore user checklists (private data under `users/{google_uid}`).
+- Gaps to close first: no `robots.txt`, no `sitemap.xml`, no IndexNow, GSC apex re-index deferred (Phase 0 in the plan).
+- Landing infra + deploy account trap (gmail acct, `wrangler whoami` first): `docs/plans/2026-07-01-landing-root-swap-migration-plan.md`; SEO-landing history: `docs/completed/seo-landing-page-2026-07-01.md`.
+
 ## Dependencies & Economics
 
 All dependency versions live in `gradle/libs.versions.toml` — the single source of truth; check it, don't trust a number duplicated in prose. **Gemini SDK is intentionally NOT a client dependency** — all AI inference is server-side. Unit economics: `docs/unit-economics.md` (gemini-2.5-flash-lite ~$0.0002/req, positive at max usage). Geo-tiered pricing & organic-growth strategy (India + low-ARPU markets priced at minimal markup to drive organic installs/ratings; **gitignored, business-sensitive**): `docs/pricing-strategy.md`.

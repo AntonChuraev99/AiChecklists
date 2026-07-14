@@ -1,0 +1,39 @@
+{
+  "category": "business",
+  "slug": "product-launch-checklist",
+  "order": 1,
+  "title": "Product Launch Checklist",
+  "metaTitle": "Product Launch Checklist (Pre-Launch to Post-Launch) | Gisti",
+  "metaDescription": "A step-by-step product launch checklist from pre-launch to post-launch: positioning, beta, pricing, launch-day assets, and the follow-up. Free in Gisti.",
+  "cardDesc": "A step-by-step launch plan — positioning, beta, pricing, launch day, and the follow-up.",
+  "ordered": true,
+  "intro": "A product launch lives or dies on preparation — the loudest launch day can't rescue a product no one was primed for. This checklist runs in order across three phases: the weeks of pre-launch groundwork, the launch itself, and the follow-up that turns a spike into momentum. Adapt the timeline to your product, but keep the sequence. See more <a href=\"/checklists/business/\" class=\"text-primary hover:underline\">business and launch checklists</a>.",
+  "items": [
+    { "text": "Nail your positioning: who it's for, the problem it solves, and why it's different", "note": "Everything downstream — copy, pricing, targeting — flows from this one paragraph." },
+    { "text": "Define the launch goal and the metrics you'll judge it by (signups, revenue, installs)" },
+    { "text": "Set the launch date and work backward into a dated pre-launch timeline" },
+    { "text": "Run a private beta and collect feedback, testimonials, and bug reports" },
+    { "text": "Fix the launch-blocking issues from beta and confirm the release candidate" },
+    { "text": "Finalize pricing, packaging, and any launch-day offer or trial" },
+    { "text": "Write the core messaging and prepare the landing or product page" },
+    { "text": "Prepare launch assets: demo video, screenshots, press kit, and FAQ" },
+    { "text": "Line up distribution: email list, social posts, communities, and any press or creators", "note": "Warm your audience with teasers before launch day, not on it." },
+    { "text": "Set up analytics, event tracking, and dashboards to measure the launch", "note": "Verify events fire in a staging environment before launch day." },
+    { "text": "Brief support and sales, and prepare canned answers to the likely questions" },
+    { "text": "Do a full dry run: test signup, checkout, onboarding, and the support path end to end" },
+    { "text": "Schedule the launch-day posts, emails, and any submission (directory, marketplace, or press embargo)" },
+    { "text": "Launch: publish the page, send the announcement, and post across your channels" },
+    { "text": "Monitor systems, error rates, and payments closely for the first hours" },
+    { "text": "Engage in real time: reply to comments, questions, and reviews as they come in" },
+    { "text": "Track results against your launch metrics and note what converted best" },
+    { "text": "Follow up with leads, trials, and press who engaged but didn't convert" },
+    { "text": "Gather feedback from new users and triage the first round of fixes" },
+    { "text": "Run a launch retrospective: what worked, what didn't, and what to repeat next time" }
+  ],
+  "faq": [
+    { "q": "What should a product launch checklist include?", "a": "It should span three phases: pre-launch (positioning, beta, pricing, assets, and analytics), launch day (publishing, announcing, and monitoring), and post-launch (following up with leads, gathering feedback, and running a retrospective). Preparation is the bulk of it — launch day is mostly executing what you set up." },
+    { "q": "How far in advance should I plan a product launch?", "a": "For most products, start four to eight weeks out. That leaves time for a beta, fixing what it surfaces, preparing assets, and warming your audience. Bigger launches with press or a physical product need longer; a small feature can go in a week or two." },
+    { "q": "What metrics matter for a product launch?", "a": "Pick your metrics before you launch so you know what success looks like. Common ones are signups or installs, activation (people who actually use it), revenue or trial starts, and traffic-to-signup conversion. Tracking which channels drove the best conversions tells you where to invest next time." }
+  ],
+  "related": ["website-launch-checklist", "social-media-content-checklist", "startup-checklist", "small-business-setup-checklist"]
+}

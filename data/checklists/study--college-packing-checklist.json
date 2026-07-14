@@ -1,0 +1,39 @@
+{
+  "category": "study",
+  "slug": "college-packing-checklist",
+  "order": 2,
+  "title": "College Packing Checklist",
+  "metaTitle": "College Packing Checklist (Dorm Essentials) | Gisti",
+  "metaDescription": "A complete college packing checklist for dorm move-in: bedding, storage, study gear, kitchen basics, and toiletries. Free, or tailor it with AI in Gisti.",
+  "cardDesc": "Dorm move-in essentials — bedding, storage, study gear, kitchen basics, and documents.",
+  "ordered": false,
+  "intro": "Packing for college is a balancing act — bring enough to feel at home in a small dorm room, but not so much it won't fit. This college packing checklist covers the essentials students actually use, from twin XL bedding to a power strip and a basic first-aid kit, and flags what to check with your roommate before doubling up. See more <a href=\"/checklists/study/\" class=\"text-primary hover:underline\">study and school checklists</a>.",
+  "items": [
+    { "text": "Twin XL sheets, a mattress topper, pillows, and a comforter", "note": "Most dorm beds are twin XL, not standard twin — check first." },
+    { "text": "Mattress protector and an extra set of sheets" },
+    { "text": "Bath towels, a hand towel, and a quick-dry shower towel" },
+    { "text": "Shower caddy and flip-flops for shared bathrooms", "note": "Flip-flops are non-negotiable in communal showers." },
+    { "text": "Toiletries, a toothbrush holder, and a refillable water bottle" },
+    { "text": "Laptop, charger, and a padded sleeve or bag" },
+    { "text": "Power strip with surge protection and a couple of extension cords", "note": "Dorm outlets are always too few and too far away." },
+    { "text": "Phone charger, headphones, and any adapters you need" },
+    { "text": "Desk lamp and a small clip-on reading light" },
+    { "text": "Notebooks, pens, highlighters, sticky notes, and a planner" },
+    { "text": "Backpack for class and a reusable water bottle" },
+    { "text": "Under-bed storage bins and a few drawer organizers", "note": "Vertical and under-bed space is where dorms hide extra room." },
+    { "text": "Laundry hamper, detergent pods, and a roll of quarters or a laundry card" },
+    { "text": "Basic first-aid kit and any daily medications", "note": "Include pain relievers, bandages, and a thermometer." },
+    { "text": "Mini fridge or microwave — coordinate so you and your roommate don't both bring one", "note": "Message your roommate before move-in day." },
+    { "text": "A few mugs, plates, utensils, and a reusable food container" },
+    { "text": "Command hooks, poster strips, and a small toolkit", "note": "Adhesive hooks save your deposit — no nails in dorm walls." },
+    { "text": "Fan, plus a warm blanket or throw for cold nights" },
+    { "text": "Important documents: ID, insurance card, and a copy of your housing and class schedule" },
+    { "text": "A little decor — photos, string lights, or a rug to make the room yours" }
+  ],
+  "faq": [
+    { "q": "What size sheets do I need for a dorm bed?", "a": "Most college dorm beds use a twin XL mattress, which is longer than a standard twin. Buy twin XL sheets and a twin XL mattress topper, and confirm the size with your housing office before you shop, since a small number of dorms use standard twin or full beds." },
+    { "q": "What should I not bring to college?", "a": "Skip candles, halogen lamps, and most hot plates or space heaters — they usually break fire-safety rules. Don't double up on big items like a fridge, microwave, or TV; coordinate with your roommate first. And leave anything you rarely use at home, since dorm rooms are small and storage is tight." },
+    { "q": "What is the most forgotten item when packing for college?", "a": "The commonly forgotten ones are a surge-protected power strip, shower flip-flops, a basic first-aid kit, and spare phone and laptop chargers. A small toolkit, command hooks, and a mattress topper are also easy to overlook but make dorm life much more comfortable." }
+  ],
+  "related": ["back-to-school-supplies-checklist", "exam-prep-checklist", "study-plan-checklist", "groceries/pantry-staples-checklist"]
+}

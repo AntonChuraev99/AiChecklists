@@ -1,0 +1,37 @@
+{
+  "category": "moving",
+  "slug": "packing-to-move-checklist",
+  "order": 5,
+  "title": "Packing to Move Checklist",
+  "metaTitle": "Packing to Move Checklist (Box Everything Right) | Gisti",
+  "metaDescription": "A packing-to-move checklist: supplies, room-by-room method, labelling, a first-night box, and a valuables bag. Free to use, or tailor it to your move with AI in Gisti.",
+  "cardDesc": "Supplies, a room-by-room method, labelling, and the first-night box that saves your first evening.",
+  "ordered": false,
+  "intro": "Good packing turns a chaotic move into an orderly one: the right supplies, a room-by-room method, and boxes labelled well enough to unpack without opening them. This checklist keeps your belongings safe and your first night livable. See the rest of our <a href=\"/checklists/moving/\" class=\"text-primary hover:underline\">moving and home checklists</a>.",
+  "items": [
+    { "text": "Gather supplies: sturdy boxes in a few sizes, packing tape, bubble wrap, packing paper, and markers" },
+    { "text": "Declutter first — donate, sell, or bin anything you won't use", "note": "Don't pay to move what you'll throw away." },
+    { "text": "Pack room by room, finishing one before you start the next" },
+    { "text": "Label every box with its room and contents, and mark fragile boxes clearly", "note": "Label the sides, not the top — you'll stack them." },
+    { "text": "Keep boxes under about 15kg", "note": "Heavy items in small boxes, light items in big ones." },
+    { "text": "Wrap breakables individually and fill gaps so nothing shifts" },
+    { "text": "Use towels, blankets, and clothing as padding to save on bubble wrap" },
+    { "text": "Keep screws and small parts in labelled bags taped to the furniture they belong to" },
+    { "text": "Photograph the back of your TV and electronics before unplugging them" },
+    { "text": "Pack a \"first night\" essentials box and keep it with you", "note": "Bedding, toiletries, chargers, meds, snacks." },
+    { "text": "Pack a separate valuables bag: documents, jewellery, medications, and small electronics you carry yourself" },
+    { "text": "Empty, clean, and dry appliances, and defrost the freezer at least a day ahead" },
+    { "text": "Seal liquids in bags and pack them upright to stop leaks" },
+    { "text": "Keep a \"packing kit\" of tape, scissors, and a marker you can always find" },
+    { "text": "Leave clothes on hangers and slip a bin bag over them as a quick wardrobe box" },
+    { "text": "Either empty drawers or wrap the whole unit closed — don't overpack them" },
+    { "text": "Count and number your boxes so you know if any go missing" },
+    { "text": "Load the truck with the heaviest items first and against the cab" }
+  ],
+  "faq": [
+    { "q": "How do I pack efficiently for a move?", "a": "Declutter before you pack, gather proper supplies, and work room by room, labelling every box with its room and contents. Keep boxes under about 15kg, use soft items as padding, and pack a \"first night\" box and a valuables bag you carry yourself." },
+    { "q": "What should I pack first when moving?", "a": "Start with the rooms and items you use least — off-season clothes, books, spare crockery, décor. Leave daily essentials like kitchen basics, toiletries, and a few clothes for last, and unpack them first at the new place." },
+    { "q": "How do I keep track of what's in each box?", "a": "Label the sides of every box with the room and a short contents list, number your boxes and keep a running list, and mark fragile ones clearly. A quick photo of a box's contents before you seal it makes unpacking much faster." }
+  ],
+  "related": ["moving-house-checklist", "change-of-address-checklist", "first-apartment-essentials", "new-home-setup-checklist"]
+}

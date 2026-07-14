@@ -1,0 +1,37 @@
+{
+  "category": "work",
+  "slug": "new-employee-onboarding-checklist",
+  "order": 1,
+  "title": "New Employee Onboarding Checklist",
+  "metaTitle": "New Employee Onboarding Checklist | Gisti",
+  "metaDescription": "A step-by-step new employee onboarding checklist from before day one through the first month: accounts, paperwork, goals, and check-ins. Free, or tailor it with AI in Gisti.",
+  "cardDesc": "From before day one to the 30-day review — accounts, paperwork, goals, and check-ins, in order.",
+  "ordered": true,
+  "intro": "Great onboarding starts before day one and runs well past it — a new hire who has a working laptop, a clear plan, and a friendly face on day one ramps up far faster. This checklist sequences the whole process, from pre-start setup through the 30-day review, so nothing gets dropped. Adapt it to your team, and see the rest of our <a href=\"/checklists/work/\" class=\"text-primary hover:underline\">work and onboarding checklists</a>.",
+  "items": [
+    { "text": "Before day 1: confirm the signed offer, contract, and start details" },
+    { "text": "Before day 1: set up their email, accounts, and hardware — laptop, badge, and logins", "note": "Nothing kills day-one momentum like waiting on IT for a login." },
+    { "text": "Before day 1: prepare their desk, or ship equipment ahead for a remote start" },
+    { "text": "Before day 1: assign a buddy or mentor and share a first-week schedule", "note": "A go-to peer for small questions speeds up ramp-up more than any doc." },
+    { "text": "Day 1: welcome them, give an office or virtual tour, and introduce the team" },
+    { "text": "Day 1: complete HR paperwork, tax forms, and payroll setup" },
+    { "text": "Day 1: review the role, expectations, and 30/60/90-day goals" },
+    { "text": "Day 1: grant system access and walk through the key tools they'll use" },
+    { "text": "Week 1: set up recurring 1:1s with their manager and key teammates" },
+    { "text": "Week 1: share team docs, processes, and communication norms", "note": "Point them to where things live: the wiki, channels, and who owns what." },
+    { "text": "Week 1: assign a small, achievable first task to build early momentum" },
+    { "text": "Week 1: complete required training and any compliance or security modules" },
+    { "text": "Week 1: add them to relevant meetings, channels, and mailing lists" },
+    { "text": "First month: check in regularly and ask for their early feedback", "note": "A fresh hire spots onboarding gaps you've stopped noticing." },
+    { "text": "First month: review the 30-day goals together and adjust" },
+    { "text": "First month: introduce them to cross-functional partners they'll work with" },
+    { "text": "First month: confirm benefits enrollment is complete" },
+    { "text": "First month: run a 30-day onboarding review to see how they're settling in" }
+  ],
+  "faq": [
+    { "q": "What should be included in employee onboarding?", "a": "Good onboarding covers logistics (accounts, hardware, paperwork, and system access), people (a manager 1:1, team introductions, and a buddy), and clarity (the role, expectations, and 30/60/90-day goals). It runs from before the start date through at least the first month, not just day one." },
+    { "q": "How long should onboarding last?", "a": "Meaningful onboarding lasts at least 90 days, even though the paperwork and setup happen in the first week. The first month is about building context and momentum, and the following two months are about the new hire taking on real ownership. Regular check-ins throughout make it stick." },
+    { "q": "What should you do before a new employee's first day?", "a": "Before day one, confirm the signed paperwork, set up their email, accounts, and hardware, prepare their workspace or ship equipment for a remote start, and assign a buddy plus a first-week schedule. Walking in to a working laptop and a clear plan makes a huge difference to the first impression." }
+  ],
+  "related": ["project-kickoff-checklist", "remote-work-setup-checklist", "meeting-prep-checklist", "daily-standup-checklist"]
+}

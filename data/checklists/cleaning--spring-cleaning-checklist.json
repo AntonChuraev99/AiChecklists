@@ -1,0 +1,39 @@
+{
+  "category": "cleaning",
+  "slug": "spring-cleaning-checklist",
+  "order": 3,
+  "title": "Spring Cleaning Checklist",
+  "metaTitle": "Spring Cleaning Checklist (Room by Room) | Gisti",
+  "metaDescription": "A room-by-room spring cleaning checklist — declutter, wash windows, flip mattresses, and refresh every room after winter. Free, or tailor it with AI in Gisti.",
+  "cardDesc": "The once-a-year refresh — declutter, wash away winter, and reset every room.",
+  "ordered": false,
+  "intro": "Spring cleaning is the annual reset that clears out winter — the dust that settled while the windows stayed shut, the wardrobe full of clothes you never wore, the corners a weekly tidy skips. This checklist pairs a top-to-bottom clean with a declutter, so you finish with a home that feels genuinely lighter, not just wiped down. Pick a bright weekend and open every window. See more <a href=\"/checklists/cleaning/\" class=\"text-primary hover:underline\">cleaning and chore checklists</a>.",
+  "items": [
+    { "text": "Open every window to air out the whole home before you start" },
+    { "text": "Declutter room by room, sorting into keep, donate, sell, and bin piles", "note": "Declutter first — there's no point cleaning around things you're getting rid of." },
+    { "text": "Wash the windows inside and out, and clean the tracks, sills, and screens" },
+    { "text": "Launder or dry-clean the curtains, and dust the blinds slat by slat" },
+    { "text": "Take down and wash light fittings and lampshades, and replace any dead bulbs" },
+    { "text": "Dust ceiling corners, cornices, and the tops of doorframes and wardrobes" },
+    { "text": "Wipe walls, skirting boards, switch plates, and door handles" },
+    { "text": "Vacuum and flip the mattresses, and wash duvets, pillows, and protectors", "note": "A sunny, breezy day is ideal for airing bedding outside." },
+    { "text": "Swap the wardrobe over to the new season, and donate what didn't get worn" },
+    { "text": "Empty, wipe, and reorganize kitchen cupboards, checking food dates as you go" },
+    { "text": "Deep-clean the oven, and degrease the extractor hood and its filter" },
+    { "text": "Defrost the freezer, and wipe the fridge shelves and door seals" },
+    { "text": "Descale the kettle, coffee machine, and showerhead" },
+    { "text": "Scrub the bathroom grout and refresh any discoloured sealant" },
+    { "text": "Wipe down radiators and clear the dust from between the fins" },
+    { "text": "Clean behind and underneath the heavy furniture and appliances" },
+    { "text": "Shampoo carpets and rugs, and mop and polish the hard floors" },
+    { "text": "Wipe the front and inside of every kitchen appliance and small gadget" },
+    { "text": "Clean and disinfect the bins, and replace worn cloths and sponges" },
+    { "text": "Tackle one outdoor job: sweep the patio, wash the doormat, or clean the bins" }
+  ],
+  "faq": [
+    { "q": "What should be included in a spring clean?", "a": "A spring clean combines a declutter with the deep jobs a weekly routine skips: washing windows and curtains, flipping mattresses, clearing out cupboards and wardrobes, cleaning the oven and behind appliances, and airing out every room after a closed-up winter." },
+    { "q": "What order should I spring clean in?", "a": "Declutter first, then clean top to bottom and room by room. Getting rid of what you don't need means you're not cleaning around clutter. Then dust high surfaces before low ones so debris falls onto floors you clean last, and save the vacuuming and mopping for the very end." },
+    { "q": "How long does spring cleaning take?", "a": "A full spring clean of an average home is usually a weekend of work, or a week if you spread it over an evening or two per room. Doing one room from start to finish before moving on keeps it manageable and gives you a visible win to stay motivated." }
+  ],
+  "related": ["deep-cleaning-checklist", "house-chores-checklist", "daily-cleaning-checklist", "move-out-cleaning-checklist"]
+}

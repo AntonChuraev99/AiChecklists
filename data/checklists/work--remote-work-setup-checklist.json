@@ -1,0 +1,37 @@
+{
+  "category": "work",
+  "slug": "remote-work-setup-checklist",
+  "order": 4,
+  "title": "Remote Work Setup Checklist",
+  "metaTitle": "Remote Work Setup Checklist (Home Office) | Gisti",
+  "metaDescription": "A remote work setup checklist for a productive home office: internet, ergonomics, gear, security, and healthy boundaries. Free, or tailor it to your role with AI in Gisti.",
+  "cardDesc": "Set up a productive home office — internet, ergonomics, gear, security, and healthy boundaries.",
+  "ordered": false,
+  "intro": "A good remote setup is the difference between working from home and fighting your home to get work done. This checklist covers the essentials — reliable internet, a body-friendly desk, the right gear, security, and the boundaries that stop work from bleeding into everything. Use it as-is, or open it in Gisti to tailor it, and see the rest of our <a href=\"/checklists/work/\" class=\"text-primary hover:underline\">work and onboarding checklists</a>.",
+  "items": [
+    { "text": "Reliable high-speed internet, plus a backup like a phone hotspot", "note": "A hotspot saves the day when the router dies mid-call." },
+    { "text": "A dedicated desk or workspace, separate from where you relax" },
+    { "text": "An ergonomic, adjustable chair that supports your back" },
+    { "text": "An external monitor at eye level to keep your neck neutral", "note": "The top of the screen should sit roughly at eye height." },
+    { "text": "An external keyboard and mouse" },
+    { "text": "Good lighting: natural light plus a task lamp" },
+    { "text": "A quality webcam and a headset with a mic for clear calls" },
+    { "text": "A reliable laptop or computer that meets your job's requirements" },
+    { "text": "VPN and security tools installed and configured", "note": "Ask IT for the required setup before you handle any work data." },
+    { "text": "Access to all work accounts and tools, ideally via SSO and a password manager" },
+    { "text": "Communication apps set up: chat, video, and email" },
+    { "text": "Cloud storage and file access configured" },
+    { "text": "A tidy or virtual background for video calls" },
+    { "text": "Cable management and a surge-protected power strip" },
+    { "text": "Set working hours and share your availability and status", "note": "Visible hours help teammates in other time zones know when to reach you." },
+    { "text": "A shutdown routine to end the workday and protect your time off", "note": "A clear stop signal is what keeps remote work from becoming always-on." },
+    { "text": "Know who to contact for IT support" },
+    { "text": "A water bottle and a plan for regular breaks" }
+  ],
+  "faq": [
+    { "q": "What do I need to work from home effectively?", "a": "At minimum, reliable internet, a dedicated workspace, an ergonomic chair, and the right computer and accounts to do your job. Add an external monitor, keyboard, and a good webcam and headset for calls. Just as important are the non-physical pieces: security tools, clear working hours, and boundaries between work and home." },
+    { "q": "How do I set up an ergonomic home office?", "a": "Position your monitor so the top of the screen is at eye level and about an arm's length away, keep your elbows at roughly 90 degrees on the desk, and use a chair that supports your lower back with your feet flat on the floor. An external keyboard and mouse let you set the screen height independently of your hands." },
+    { "q": "How do I stay productive working remotely?", "a": "Keep a dedicated workspace, set consistent working hours, and use a start and shutdown routine so work has a clear beginning and end. Communicate your status so teammates know when you're available, take real breaks away from the screen, and protect focus time by batching meetings and muting notifications when you need to concentrate." }
+  ],
+  "related": ["meeting-prep-checklist", "daily-standup-checklist", "new-employee-onboarding-checklist", "fitness/morning-routine-checklist"]
+}

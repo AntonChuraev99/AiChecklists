@@ -1,0 +1,34 @@
+{
+  "category": "work",
+  "slug": "daily-standup-checklist",
+  "order": 5,
+  "title": "Daily Standup Checklist",
+  "metaTitle": "Daily Standup Checklist (Agile Team) | Gisti",
+  "metaDescription": "A daily standup checklist to keep your agile team's daily meeting short, focused, and useful: the three questions, blockers, and next steps. Free, or tailor it with AI in Gisti.",
+  "cardDesc": "Keep the daily standup short and useful — the three questions, blockers, and clear next steps.",
+  "ordered": false,
+  "intro": "The daily standup should take 15 minutes and leave the team clearer, not drained. It slides into a status report or a problem-solving session the moment it loses discipline. This checklist keeps it tight and genuinely useful. Use it as-is, or open it in Gisti to adapt it to your team, and see the rest of our <a href=\"/checklists/work/\" class=\"text-primary hover:underline\">work and onboarding checklists</a>.",
+  "items": [
+    { "text": "Keep it to 15 minutes, timeboxed", "note": "A visible timer keeps everyone honest." },
+    { "text": "Same time, same place (or link), every working day" },
+    { "text": "Everyone stands or stays on camera to keep it brief" },
+    { "text": "Each person shares what they did yesterday" },
+    { "text": "Each person shares what they're doing today" },
+    { "text": "Each person names any blockers", "note": "The blockers are the real point of the meeting — surface them clearly." },
+    { "text": "Update the board or tracker before or during standup so it reflects reality" },
+    { "text": "Flag blockers clearly and name who can help unblock them" },
+    { "text": "Take detailed discussions offline: \"let's take that after standup\"", "note": "A quick parking lot keeps two people from stalling the whole team." },
+    { "text": "Note action items and their owners" },
+    { "text": "Keep the focus on progress toward the sprint or team goal" },
+    { "text": "Don't let it become a status report aimed at the manager", "note": "Standup is for the team to coordinate with each other, not to report upward." },
+    { "text": "Rotate or assign a facilitator to keep time and flow" },
+    { "text": "Follow up on yesterday's blockers to make sure they got resolved" },
+    { "text": "End with clear next steps and who's doing what" }
+  ],
+  "faq": [
+    { "q": "What are the three questions in a daily standup?", "a": "Each team member answers: what did I do yesterday, what am I doing today, and are there any blockers in my way? The first two keep the team aware of progress, and the third — blockers — is the most important, because it's where the team can actually help each other move faster." },
+    { "q": "How long should a daily standup be?", "a": "Fifteen minutes or less. It's meant to be a quick sync, not a working session. If a topic needs deeper discussion, note it and take it offline with just the people involved right after standup, so the rest of the team isn't held hostage to a two-person conversation." },
+    { "q": "How do I make standups more effective?", "a": "Keep it timeboxed and at the same time each day, have everyone update the board beforehand, and focus on blockers and coordination rather than status reporting to a manager. Move detailed problem-solving to a parking lot after the meeting, rotate the facilitator, and always follow up on yesterday's blockers so they don't linger." }
+  ],
+  "related": ["meeting-prep-checklist", "project-kickoff-checklist", "remote-work-setup-checklist"]
+}

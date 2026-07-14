@@ -1,0 +1,35 @@
+{
+  "category": "study",
+  "slug": "thesis-writing-checklist",
+  "order": 4,
+  "title": "Thesis Writing Checklist",
+  "metaTitle": "Thesis Writing Checklist (Step-by-Step) | Gisti",
+  "metaDescription": "A step-by-step thesis writing checklist: from topic and proposal through research, drafting, editing, and final submission. Free, or tailor it with AI in Gisti.",
+  "cardDesc": "A step-by-step path from topic and proposal through drafting, editing, and submission, in order.",
+  "ordered": true,
+  "intro": "A thesis is a long project that lives or dies on structure, and the biggest mistake is treating it as one huge block of writing. This thesis writing checklist breaks it into stages you tackle in order — narrowing a question, planning research, drafting chapter by chapter, then editing and formatting for submission. Work through it in sequence, and see more <a href=\"/checklists/study/\" class=\"text-primary hover:underline\">study and exam checklists</a>.",
+  "items": [
+    { "text": "Choose and narrow your topic into a specific, answerable research question", "note": "Too broad is the number-one reason a thesis stalls." },
+    { "text": "Confirm your supervisor and agree on scope, expectations, and a rough timeline" },
+    { "text": "Do a literature review and map what has already been written on your question", "note": "Note the gap your work will fill." },
+    { "text": "Write and get approval for your proposal or research plan" },
+    { "text": "Choose your methodology and, if needed, get ethics or data approval", "note": "Ethics review can take weeks — start it early." },
+    { "text": "Set up a reference manager and log every source as you read", "note": "A citation manager saves days of cleanup later — set it up before you read." },
+    { "text": "Build a chapter outline with a target word count for each section" },
+    { "text": "Collect and analyze your data or primary material" },
+    { "text": "Draft the body chapters first — methods, results, and discussion", "note": "The introduction is easiest to write once you know what you found." },
+    { "text": "Write the introduction and literature review to frame the finished body" },
+    { "text": "Write the conclusion, tying findings back to your original question" },
+    { "text": "Write the abstract last, summarizing the whole thesis in one page" },
+    { "text": "Revise for argument and structure — does each chapter earn its place?", "note": "Fix the big-picture flow before line-editing." },
+    { "text": "Proofread for grammar, and check every citation and reference for accuracy" },
+    { "text": "Format to your department's guidelines: title page, contents, margins, and numbering", "note": "Follow the official template exactly — formatting rejections cost time." },
+    { "text": "Run a final plagiarism check and submit before the deadline, keeping a backup copy", "note": "Submit a day early to absorb any upload problems." }
+  ],
+  "faq": [
+    { "q": "How do I start writing a thesis?", "a": "Start by narrowing a broad interest into one specific, answerable research question, then agree the scope with your supervisor. Do a literature review to see what already exists and where your work fits, and write a proposal before any real writing. A clear question and an approved plan prevent the most common cause of a stalled thesis." },
+    { "q": "In what order should I write thesis chapters?", "a": "Write the body chapters first — methodology, results, and discussion — because they are grounded in your actual work. Then write the introduction and literature review to frame what the reader is about to see, followed by the conclusion. Write the abstract last, once the whole thesis exists to summarize." },
+    { "q": "How long does it take to write a thesis?", "a": "It varies widely by level and field, but a master's thesis often takes three to six months of focused work and a doctoral thesis a year or more. The writing itself is only part of it — research, data collection, ethics approval, and multiple rounds of editing all take time, which is why a timeline and an early start matter so much." }
+  ],
+  "related": ["study-plan-checklist", "exam-prep-checklist", "back-to-school-supplies-checklist"]
+}

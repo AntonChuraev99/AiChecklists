@@ -1,0 +1,36 @@
+{
+  "category": "travel",
+  "slug": "weekend-trip-packing-list",
+  "order": 2,
+  "title": "Weekend Trip Packing List",
+  "metaTitle": "Weekend Trip Packing List (Carry-On Friendly) | Gisti",
+  "metaDescription": "A carry-on-friendly weekend packing list for a 2-3 day getaway: outfits, toiletries, tech, and the easy-to-forget extras. Free to use, or tailor it with AI in Gisti.",
+  "cardDesc": "A carry-on-friendly list for a 2-3 day getaway — outfits, toiletries, tech, and easy-to-forget extras.",
+  "ordered": false,
+  "intro": "This weekend packing list keeps a 2-3 day getaway to a single carry-on. The trick is a one-color-family wardrobe, so a handful of pieces mix into every outfit. It works for a city break, a countryside escape, or a visit home. Browse more <a href=\"/checklists/travel/\" class=\"text-primary hover:underline\">travel and packing checklists</a>.",
+  "items": [
+    { "text": "ID or passport and your booking confirmations", "note": "Screenshot them in case there's no signal." },
+    { "text": "Phone charger and a power bank" },
+    { "text": "Two-to-three days of clothes in one color family", "note": "Everything mixes, nothing is wasted." },
+    { "text": "One \"nice\" outfit for dinner out" },
+    { "text": "Pajamas, plus fresh socks and underwear per day and one spare" },
+    { "text": "A light layer — sweater or jacket — for evenings" },
+    { "text": "Comfortable walking shoes, plus one dressier pair" },
+    { "text": "Toiletries in travel-size bottles under 100ml", "note": "The cabin liquid limit for carry-on." },
+    { "text": "Toothbrush, toothpaste, deodorant, and skincare" },
+    { "text": "Daily medications, painkillers, and plasters" },
+    { "text": "Sunglasses and, if sunny, sunscreen" },
+    { "text": "Reusable water bottle" },
+    { "text": "Chargers and cables for every device" },
+    { "text": "A book, headphones, or downloaded shows for the journey" },
+    { "text": "A small day bag or tote for outings" },
+    { "text": "House keys and a card for parking or transit" },
+    { "text": "A foldable tote or laundry bag for dirty clothes" }
+  ],
+  "faq": [
+    { "q": "What do I need for a weekend trip?", "a": "For a 2-3 day trip, pack documents and chargers, two-to-three mix-and-match outfits, one dressier option, travel-size toiletries, medications, and a day bag. Keeping to one color family means fewer clothes that still all work together." },
+    { "q": "How many outfits for a 2-night trip?", "a": "Two to three tops, one or two bottoms, and one \"nice\" outfit is plenty for two nights. Choose pieces in the same color family so they layer and mix, and you'll rarely need more." },
+    { "q": "Can I pack for a weekend in a carry-on only?", "a": "Yes. A weekend easily fits a carry-on if you keep toiletries under 100ml, wear your bulkiest shoes and jacket on the journey, and stick to one color family so a few pieces cover every outfit." }
+  ],
+  "related": ["5-day-paris-packing-list", "international-flight-checklist", "beach-vacation-packing-list", "business-trip-checklist"]
+}

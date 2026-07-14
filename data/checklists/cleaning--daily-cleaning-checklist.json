@@ -1,0 +1,34 @@
+{
+  "category": "cleaning",
+  "slug": "daily-cleaning-checklist",
+  "order": 4,
+  "title": "Daily Cleaning Checklist",
+  "metaTitle": "Daily Cleaning Checklist (15-Minute Routine) | Gisti",
+  "metaDescription": "A quick daily cleaning checklist to keep the house tidy in about 15 minutes — dishes, surfaces, a load of laundry, and a fast tidy of every room. Free in Gisti.",
+  "cardDesc": "The 15-minute daily reset that stops mess piling up — dishes, surfaces, and a quick tidy.",
+  "ordered": false,
+  "intro": "Staying on top of a home is far easier than digging out from under it, and a short daily routine is what keeps the big cleans small. This checklist covers the handful of habits — dishes, surfaces, a quick tidy — that stop mess from snowballing across the week. None of it takes long on its own; the point is doing it every day. See more <a href=\"/checklists/cleaning/\" class=\"text-primary hover:underline\">cleaning and chore checklists</a>.",
+  "items": [
+    { "text": "Make the beds as soon as everyone is up", "note": "A made bed makes the whole room read as tidy." },
+    { "text": "Wash the dishes, or load and run the dishwasher, after each meal" },
+    { "text": "Wipe down the kitchen counters and the hob after cooking" },
+    { "text": "Clear and wipe the dining table once the plates are gone" },
+    { "text": "Do a 10-minute tidy: put stray items back where they belong, room by room" },
+    { "text": "Wipe the bathroom sink and taps, and squeegee the shower after use", "note": "A quick squeegee stops limescale and mould building up." },
+    { "text": "Run, hang, or fold one load of laundry to stop it piling up" },
+    { "text": "Sweep or spot-vacuum the kitchen floor for crumbs and spills" },
+    { "text": "Take out the kitchen bin if it's full, and reset a fresh liner" },
+    { "text": "Wipe down high-touch spots: door handles, light switches, and taps" },
+    { "text": "Sort the day's post and paperwork so it doesn't pile up" },
+    { "text": "Empty pockets, and put shoes, coats, and bags away by the door" },
+    { "text": "Give the toilet a quick brush and wipe the seat" },
+    { "text": "Fluff the sofa cushions and fold any blankets before bed" },
+    { "text": "Set out what you need for the morning, and give the sink a final wipe" }
+  ],
+  "faq": [
+    { "q": "What should I clean every day?", "a": "Focus on the spots that get dirty fastest: dishes after each meal, kitchen counters and the hob, the dining table, the bathroom sink, and a quick tidy of stray items. Making the beds and running one load of laundry keeps the rest of the house from feeling chaotic." },
+    { "q": "How long should a daily cleaning routine take?", "a": "Around 15-20 minutes if you keep up with it. Splitting the tasks across the day — dishes after meals, a tidy before bed — means it never feels like one big block of cleaning, and it stops jobs snowballing into a weekend-long catch-up." },
+    { "q": "What's the difference between daily and weekly cleaning?", "a": "Daily cleaning is maintenance — dishes, surfaces, and a quick tidy that stop mess accumulating. Weekly cleaning is the deeper pass: vacuuming and mopping every room, changing bed sheets, scrubbing the bathroom, and dusting. Keeping up daily makes the weekly clean much faster." }
+  ],
+  "related": ["house-chores-checklist", "spring-cleaning-checklist", "deep-cleaning-checklist"]
+}

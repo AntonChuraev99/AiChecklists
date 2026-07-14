@@ -1,0 +1,37 @@
+{
+  "category": "baby",
+  "slug": "baby-registry-checklist",
+  "order": 3,
+  "title": "Baby Registry Checklist",
+  "metaTitle": "Baby Registry Checklist (What to Add) | Gisti",
+  "metaDescription": "A baby registry checklist covering the essentials: car seat and stroller, safe sleep, clothing sizes, feeding, bath, and a cash fund. Free, or tailor it with AI in Gisti.",
+  "cardDesc": "The essentials to register — car seat and stroller, sleep, clothing sizes, feeding, and a cash fund.",
+  "ordered": false,
+  "intro": "A baby registry works best when it covers the real essentials first and leaves room for the big or unexpected costs. This checklist lists what to add across sleep, travel, feeding, and bath — plus a note on registering the right clothing sizes and a practical cash fund. See more <a href=\"/checklists/baby/\" class=\"text-primary hover:underline\">baby and parenting checklists</a>.",
+  "items": [
+    { "text": "Car seat (infant or convertible), rear-facing and correctly rated", "note": "The one item you cannot skip." },
+    { "text": "Stroller or travel system that fits your car seat" },
+    { "text": "Crib or bassinet with a firm, flat mattress and 2-4 fitted sheets" },
+    { "text": "Swaddles and sleep sacks" },
+    { "text": "6-8 bodysuits and sleepers each in 0-3 and 3-6 months", "note": "Register the bigger sizes too — newborn is outgrown fast." },
+    { "text": "Diapers in a range of sizes and plenty of wipes" },
+    { "text": "Changing pad and a diaper caddy or diaper bag" },
+    { "text": "Feeding gear: bottles and teats, plus a breast pump or nursing pillow if breastfeeding" },
+    { "text": "Burp cloths, bibs, and muslins" },
+    { "text": "Baby bath, hooded towels, and fragrance-free wash" },
+    { "text": "A carrier or sling for hands-free days" },
+    { "text": "A baby monitor" },
+    { "text": "High chair (for later, but useful to register now)" },
+    { "text": "Thermometer, nail clippers, and a basic grooming kit" },
+    { "text": "A few developmental toys, board books, and a play mat" },
+    { "text": "Blackout blinds or a night light" },
+    { "text": "A comfortable feeding chair, or a spot set up for feeds" },
+    { "text": "Gift cards or a \"cash fund\" for big-ticket items and post-birth needs", "note": "Practical, and easy for guests." }
+  ],
+  "faq": [
+    { "q": "What should I put on my baby registry?", "a": "Cover the essentials first: a car seat and stroller, a safe sleep space with sheets, clothing in 0-3 and 3-6 months, diapers and wipes, feeding gear, bath and grooming basics, a carrier, and a monitor. Add a few toys and a gift-card fund for the big or unexpected costs." },
+    { "q": "How many clothes should I add to a baby registry?", "a": "Register around 6-8 bodysuits and 6-8 sleepers each in 0-3 and 3-6 months. Babies grow out of newborn sizes quickly, so lean toward the slightly larger sizes and don't over-register tiny outfits." },
+    { "q": "When should I make my baby registry?", "a": "Most parents set up a registry in the second trimester, around 20-24 weeks, so there's time before a baby shower and time for shipping. You can keep editing it right up to the birth as you decide what you actually want." }
+  ],
+  "related": ["newborn-first-month-checklist", "hospital-bag-checklist", "diaper-bag-checklist", "baby-proofing-checklist"]
+}

@@ -1,0 +1,32 @@
+  <main class="wrap">
+    {{breadcrumb}}
+
+    <header class="max-w-[52ch] pt-2 pb-2">
+      <h1 class="t-display-s md:t-display-l mb-4">AI Checklist Gallery — Ready-Made Lists for Anything</h1>
+      <p class="t-body-l text-on-surface-variant">{{intro}}</p>
+    </header>
+
+    <section class="mt-8 mb-16" aria-label="Checklist categories">
+      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+{{tiles}}
+      </div>
+    </section>
+  </main>
+
+  <!-- Bottom CTA band (reuse home final-CTA, full-bleed) -->
+  <section class="ai-fill-hero text-white" aria-label="Start your own checklist with AI">
+    <div class="wrap py-20 lg:py-24 text-center">
+      <h2 class="t-headline-l md:t-display-s mb-4">Turn your next idea into a checklist</h2>
+      <p class="t-body-l text-white/90 max-w-[48ch] mx-auto mb-8">Free on Android and the web — snap a photo, paste a link, or just speak, and let AI do the rest. No signup wall to try it.</p>
+      <div class="flex flex-wrap items-center justify-center gap-3">
+        <a href="https://play.google.com/store/apps/details?id=com.antonchuraev.aichecklists&amp;utm_source=gallery&amp;utm_medium=organic&amp;utm_campaign=checklist_index"
+           class="inline-flex items-center" aria-label="Get Gisti on Google Play">
+          <img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png"
+               alt="Get it on Google Play" style="height:72px;display:block" />
+        </a>
+        <a href="https://app.gisti-ai.com" class="btn btn-on-gradient btn-pill" style="height:52px;font-size:16px">
+          <span aria-hidden="true" class="material-symbols-outlined" style="font-size:18px">public</span>Open the web app
+        </a>
+      </div>
+    </div>
+  </section>

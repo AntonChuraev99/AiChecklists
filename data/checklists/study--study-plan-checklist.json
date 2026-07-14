@@ -1,0 +1,34 @@
+{
+  "category": "study",
+  "slug": "study-plan-checklist",
+  "order": 5,
+  "title": "Study Plan Checklist",
+  "metaTitle": "Study Plan Checklist (Build One Step-by-Step) | Gisti",
+  "metaDescription": "A study plan checklist to build a realistic schedule: set goals, map topics, block time, and track progress with proven study methods. Free, or tailor it with AI in Gisti.",
+  "cardDesc": "Build a realistic study schedule step by step — goals, topics, time blocks, and progress tracking.",
+  "ordered": true,
+  "intro": "A study plan turns a vague I should study more into a schedule you can actually follow. This checklist walks you through building one step by step — setting a clear goal, breaking the material into sessions, blocking real time in your week, and using methods like active recall and spaced repetition so the hours you put in actually stick. Follow it in order, and see more <a href=\"/checklists/study/\" class=\"text-primary hover:underline\">study and exam checklists</a>.",
+  "items": [
+    { "text": "Set a specific, measurable goal and its deadline", "note": "Pass the chemistry final on the 14th beats study more." },
+    { "text": "List every topic or chapter you need to cover" },
+    { "text": "Rate each topic by how well you know it and how heavily it is weighted", "note": "Weak, high-weight topics get first claim on your time." },
+    { "text": "Estimate how many study sessions each topic needs" },
+    { "text": "Look at your real week and find the hours you can protect for study", "note": "Plan around classes, work, and sleep — not on top of them." },
+    { "text": "Block those hours in a calendar as fixed appointments", "note": "A session with a time and a place is far more likely to happen." },
+    { "text": "Break study into focused blocks with short breaks, like 25 or 50 minutes on, then a rest", "note": "A steady on-off rhythm keeps focus from sagging." },
+    { "text": "Front-load weak topics early, while your energy and runway are highest" },
+    { "text": "Build in spaced repetition — revisit each topic several times, not once", "note": "Spacing sessions out beats one long cram." },
+    { "text": "Choose an active method for each session: recall, past questions, or teaching it aloud", "note": "Doing beats re-reading every time." },
+    { "text": "Add buffer days for catch-up and the topics that run long", "note": "Something always takes longer than planned." },
+    { "text": "Track what you finish and check off each session as you go", "note": "Visible progress is its own motivation." },
+    { "text": "Review the plan weekly and shift time toward whatever is still shaky" },
+    { "text": "Protect sleep, meals, and one rest day so you don't burn out", "note": "A rested brain retains more than an exhausted one." },
+    { "text": "Do a final review pass over everything a few days before the deadline" }
+  ],
+  "faq": [
+    { "q": "How do I make a study plan?", "a": "Start with a specific goal and deadline, then list every topic and rate how well you know each. Estimate the sessions each needs, block real hours in your calendar around your existing commitments, and assign an active method — like recall or past papers — to each session. Review weekly and shift time toward whatever is still weak." },
+    { "q": "What is the best study schedule?", "a": "The best schedule is one you will actually follow: realistic blocks around your real week, weak topics first, and spaced repetition so you revisit material several times instead of cramming once. Focused sessions of 25 to 50 minutes with short breaks tend to hold attention better than marathon stretches, and a rest day prevents burnout." },
+    { "q": "How many hours a day should I study?", "a": "Quality matters more than raw hours — two to four hours of focused, active study usually beats a distracted all-day session. Break it into blocks with breaks, and match the total to your deadline and how much material is left. Consistent daily sessions across two weeks outperform one exhausting marathon the day before." }
+  ],
+  "related": ["exam-prep-checklist", "thesis-writing-checklist", "back-to-school-supplies-checklist", "college-packing-checklist"]
+}

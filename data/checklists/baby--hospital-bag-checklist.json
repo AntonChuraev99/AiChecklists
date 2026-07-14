@@ -1,0 +1,37 @@
+{
+  "category": "baby",
+  "slug": "hospital-bag-checklist",
+  "order": 2,
+  "title": "Hospital Bag Checklist",
+  "metaTitle": "Hospital Bag Checklist for Labor & Delivery | Gisti",
+  "metaDescription": "A hospital bag checklist for you, baby, and your partner: nightwear, maternity pads, going-home outfits, the car seat, and the things first-time moms forget. Free, or tailor in Gisti.",
+  "cardDesc": "Packed in three parts — for you, for baby, and for your partner — with the easy-to-forget extras.",
+  "ordered": false,
+  "intro": "A hospital bag is easiest to pack in three parts: for you, for the baby, and for your partner. Have it ready by around 36 weeks, since babies don't always wait for the due date. This checklist covers the comfort items, the practical must-haves, and the things first-time parents most often forget. More <a href=\"/checklists/baby/\" class=\"text-primary hover:underline\">baby checklists</a> here.",
+  "items": [
+    { "text": "Photo ID, insurance details, and your hospital notes or birth plan" },
+    { "text": "A comfortable, loose nightgown or two", "note": "Dark colours hide stains; front-opening helps with feeding." },
+    { "text": "A warm robe, non-slip socks, and slippers for the ward" },
+    { "text": "Several pairs of high-waisted, disposable, or old underwear", "note": "They'll get ruined — don't bring your favourites." },
+    { "text": "Maternity or heavy-flow pads for after the birth", "note": "Not tampons." },
+    { "text": "A nursing bra and breast pads if you plan to breastfeed" },
+    { "text": "Toiletries: toothbrush, toothpaste, lip balm, hair ties, and travel-size wash" },
+    { "text": "A going-home outfit for you", "note": "Loose and comfortable — roughly your 6-months-pregnant size." },
+    { "text": "Phone, a long charging cable, and a power bank" },
+    { "text": "Snacks and drinks for a long labour, plus a card for vending machines" },
+    { "text": "For baby: 2-3 bodysuits and sleepers in newborn and 0-3 sizes" },
+    { "text": "For baby: a hat, scratch mittens, and socks" },
+    { "text": "For baby: a swaddle or blanket and a going-home outfit for the season" },
+    { "text": "Newborn diapers and a small pack of wipes", "note": "The hospital may provide some, but bring your own." },
+    { "text": "An installed, rear-facing car seat for the drive home", "note": "Fit it before your due date." },
+    { "text": "For your partner: a change of clothes, snacks, toiletries, and their own phone charger" },
+    { "text": "Any regular medications you take, in their original packaging" },
+    { "text": "A pillow from home", "note": "Use a bright case so it doesn't get lost." }
+  ],
+  "faq": [
+    { "q": "What should I pack in my hospital bag?", "a": "Pack in three parts: for you (ID and notes, comfy nightwear, dark old underwear, maternity pads, toiletries, a going-home outfit, phone charger and snacks); for baby (bodysuits, hat and mittens, a swaddle, diapers, and an installed car seat); and for your partner (clothes, snacks, and a charger)." },
+    { "q": "When should I have my hospital bag ready?", "a": "Have it packed by around 36 weeks, since babies can arrive early. Keep it by the door or in the car, and fit the car seat before your due date so nothing's left to the last minute." },
+    { "q": "What do first-time moms forget to pack?", "a": "Commonly forgotten items are a long phone charging cable and power bank, dark comfortable going-home clothes (you'll still look pregnant), lip balm and hair ties, snacks for a long labour, and a pillow from home. Bring your own maternity pads and newborn diapers too." }
+  ],
+  "related": ["newborn-first-month-checklist", "baby-registry-checklist", "diaper-bag-checklist", "baby-proofing-checklist"]
+}

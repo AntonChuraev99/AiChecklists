@@ -1,0 +1,35 @@
+{
+  "category": "wedding",
+  "slug": "birthday-party-checklist",
+  "order": 3,
+  "title": "Birthday Party Checklist",
+  "metaTitle": "Birthday Party Planning Checklist | Gisti",
+  "metaDescription": "A birthday party checklist covering invites, cake, food, decor, games, and the day-of setup so nothing gets forgotten. Free, or tailor it to your party with AI in Gisti.",
+  "cardDesc": "Everything for a birthday party — invites, cake, food, decor, games, and the day-of setup.",
+  "ordered": false,
+  "intro": "A great birthday party is really just a handful of things done on time — the invites out early, the cake ordered, and the space ready before the first guest knocks. This checklist covers the essentials for a kids' or adult birthday so nothing slips through the cracks. Use it as-is, or open it in Gisti to tick things off, and browse the rest of our <a href=\"/checklists/wedding/\" class=\"text-primary hover:underline\">party and event checklists</a>.",
+  "items": [
+    { "text": "Set the date, start and end time, and a rough guest count" },
+    { "text": "Set a budget and split it across food, cake, decor, and entertainment" },
+    { "text": "Pick a theme or color scheme", "note": "A theme makes every other choice — invites, decor, cake — easier." },
+    { "text": "Choose and book the venue, or prep your home", "note": "Book venues 4 to 6 weeks ahead; popular kids' spots go fast on weekends." },
+    { "text": "Send invitations 3 to 4 weeks ahead with an RSVP date", "note": "A clear RSVP date lets you finalize food and favor counts." },
+    { "text": "Plan the menu: food, drinks, and any dietary or allergy needs" },
+    { "text": "Order or bake the cake, and buy candles and a lighter", "note": "Confirm any allergy-safe cake needs when you order." },
+    { "text": "Plan decorations: balloons, banner, tablecloth, and centerpieces" },
+    { "text": "Plan activities and entertainment: games, a playlist, or a photo backdrop" },
+    { "text": "Buy party favors or goodie bags" },
+    { "text": "Buy or wrap the birthday gift" },
+    { "text": "Stock disposables: plates, cups, napkins, utensils, and trash bags" },
+    { "text": "Prep a music playlist and test the speaker" },
+    { "text": "Charge your phone or camera for photos" },
+    { "text": "Day-of: set up 1 to 2 hours early, chill the drinks, and set out food just before guests arrive" },
+    { "text": "Assign someone to greet guests and someone to manage the cake and candles moment", "note": "You'll want a free hand to actually enjoy it." }
+  ],
+  "faq": [
+    { "q": "How far in advance should I plan a birthday party?", "a": "Start about 4 to 6 weeks out. Book the venue and send invitations 3 to 4 weeks ahead so guests can RSVP, then handle the cake, decor, and favors in the final two weeks. A milestone party with a big guest list needs a longer runway." },
+    { "q": "How much food should I plan for a birthday party?", "a": "Plan roughly 6 to 8 small bites or appetizer portions per person for a 2 to 3 hour party, plus cake. If it spans a mealtime, plan a full meal instead. Always over-cater slightly on drinks and add a non-alcoholic option for every guest." },
+    { "q": "What do people forget when planning a birthday party?", "a": "The most-forgotten items are candles and a lighter, enough ice, trash bags, serving utensils, and a phone charger for photos. It also helps to assign someone to handle the cake moment so the host isn't juggling matches and a camera at once." }
+  ],
+  "related": ["party-planning-checklist", "event-planning-checklist", "wedding-planning-checklist"]
+}

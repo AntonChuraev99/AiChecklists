@@ -1,0 +1,35 @@
+{
+  "category": "study",
+  "slug": "exam-prep-checklist",
+  "order": 1,
+  "title": "Exam Prep Checklist",
+  "metaTitle": "Exam Prep Checklist (2-Week Study Plan) | Gisti",
+  "metaDescription": "A 2-week exam prep checklist: build a revision timeline, make a study schedule, do past papers, and get ready the night before. Free, or tailor it with AI in Gisti.",
+  "cardDesc": "A 2-week timeline to revision — schedule, past papers, active recall, and the night before, in order.",
+  "ordered": true,
+  "intro": "Cramming the night before is stressful and it rarely sticks. This exam prep checklist lays out the last two weeks as a timeline, so you spread revision across active recall, past papers, and rest instead of one panicked all-nighter. Work through it in order, adjusting the days to your own exam date. See more <a href=\"/checklists/study/\" class=\"text-primary hover:underline\">study and exam checklists</a>.",
+  "items": [
+    { "text": "Two weeks out: list every topic on the syllabus and mark each as strong, shaky, or not started", "note": "Be honest — the shaky ones need the most time." },
+    { "text": "Two weeks out: gather your notes, textbook, past papers, and the exam format and mark scheme", "note": "Know how many questions, how long, and what's weighted." },
+    { "text": "Two weeks out: build a revision timetable that gives weak topics more sessions than strong ones" },
+    { "text": "12 days out: start with active recall — close the book and write what you remember, then check", "note": "Re-reading feels productive, but recall is what builds memory." },
+    { "text": "10 days out: turn your weak topics into flashcards or a one-page summary each", "note": "Condensing forces you to understand, not just copy." },
+    { "text": "9 days out: do your first past paper untimed, with notes, to find the gaps" },
+    { "text": "7 days out: teach a tricky topic out loud to someone, or to an empty room", "note": "If you can explain it simply, you know it." },
+    { "text": "6 days out: do a full past paper under real exam conditions and time yourself", "note": "Practice the pressure, not just the content." },
+    { "text": "5 days out: mark your paper against the scheme and re-revise every question you lost marks on" },
+    { "text": "4 days out: space short recall sessions across all topics rather than one long block", "note": "Spaced practice beats massed cramming." },
+    { "text": "3 days out: memorize the formulas, dates, or definitions you still can't recall cold" },
+    { "text": "2 days out: do a final timed paper, then review only your weakest two topics" },
+    { "text": "Day before: pack your bag — ID, pens, calculator, water, and any permitted notes", "note": "Check the calculator batteries and any allowed materials." },
+    { "text": "Day before: confirm the exam time, room, and route, and set two alarms", "note": "Plan to arrive early enough to settle your nerves." },
+    { "text": "Day before: stop revising by early evening, eat well, and get a full night's sleep", "note": "Sleep consolidates memory better than one more hour of cramming." },
+    { "text": "Exam morning: eat breakfast, skim your one-page summaries, and arrive early", "note": "Light review only — no new material on the day." }
+  ],
+  "faq": [
+    { "q": "How far in advance should I start studying for an exam?", "a": "For most exams, two to three weeks of steady revision beats one long cram. Start by mapping every topic and grading how well you know each, then give the weak ones more sessions. Spreading study across days with active recall and spaced practice helps memory stick far better than an all-nighter." },
+    { "q": "What is the best way to revise for an exam?", "a": "Active recall and past papers are the two most effective methods. Instead of re-reading notes, close the book and write or say what you remember, then check. Do past papers under timed conditions to practice the pressure, and re-revise every question you lost marks on. Re-reading feels productive but rarely holds up under exam stress." },
+    { "q": "Should I study the night before an exam?", "a": "Do only light review the night before — skim your summaries and stop by early evening. Learning brand-new material at the last minute adds stress without much payoff, and sleep is what consolidates everything you have already revised. A full night's rest, a good breakfast, and arriving early will help more than one extra hour of cramming." }
+  ],
+  "related": ["study-plan-checklist", "thesis-writing-checklist", "back-to-school-supplies-checklist", "college-packing-checklist"]
+}

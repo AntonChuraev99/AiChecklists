@@ -1,0 +1,37 @@
+{
+  "category": "travel",
+  "slug": "5-day-paris-packing-list",
+  "order": 1,
+  "title": "5-Day Paris Packing List",
+  "metaTitle": "5-Day Paris Packing List (Free Checklist) | Gisti",
+  "metaDescription": "A complete 5-day Paris packing list: documents, layers, walking shoes, and the anti-pickpocket essentials. Use it free, or tailor it to your trip with AI in Gisti.",
+  "cardDesc": "Everything for a 5-day Paris city break — documents, layers, walking shoes, and anti-theft essentials.",
+  "ordered": false,
+  "intro": "This 5-day Paris packing list is built for a short city break — enough to cover long museum days and cool evenings without dragging a heavy case up Metro stairs. The core list is season-agnostic; add or swap a few items for summer heat or winter cold. Everything below is something people actually reach for in Paris, from the anti-pickpocket bag to the skip-the-line tickets. See more <a href=\"/checklists/travel/\" class=\"text-primary hover:underline\">travel and packing checklists</a>.",
+  "items": [
+    { "text": "Passport, plus a printed and offline photo of your ID", "note": "Keep the copy separate from the original." },
+    { "text": "Visa or ETIAS authorization, if your nationality needs one", "note": "Check before you fly — approval isn't instant." },
+    { "text": "Two cards and about €50 in cash", "note": "Split them between bags in case one is lost." },
+    { "text": "Phone and a charger with an EU plug adapter", "note": "France uses Type C/E plugs at 230V." },
+    { "text": "Universal travel adapter", "note": "A back-up if your charger is US or UK only." },
+    { "text": "Comfortable, broken-in walking shoes", "note": "Paris is cobblestones — new shoes will blister." },
+    { "text": "Five layerable tops and two bottoms", "note": "Mix-and-match neutrals cut the volume." },
+    { "text": "A light jacket or trench", "note": "Paris evenings are cool even in summer." },
+    { "text": "Compact umbrella", "note": "Rain is common and unpredictable." },
+    { "text": "Crossbody anti-theft bag with a zip", "note": "Pickpockets work the Metro and the queues at big landmarks." },
+    { "text": "Reusable water bottle", "note": "Refill free at the city's Wallace fountains." },
+    { "text": "Pre-booked Louvre and Eiffel Tower tickets, or a Paris Museum Pass", "note": "Skip-the-line — they sell out in peak season." },
+    { "text": "Metro (RATP) app and an offline map", "note": "Download the map before you land." },
+    { "text": "A translation app and a few basic French phrases", "note": "A \"bonjour\" first goes a long way." },
+    { "text": "Daily medications and a small first-aid kit", "note": "Bring enough for the whole trip plus a spare day." },
+    { "text": "Sunglasses" },
+    { "text": "Portable power bank", "note": "A day of maps and photos will drain your phone." },
+    { "text": "Toiletries in a clear bag, packed for 3 days", "note": "Plan one laundry run or a quick sink wash." }
+  ],
+  "faq": [
+    { "q": "What should I not forget for a trip to Paris?", "a": "The easy-to-forget essentials are your passport, a travel plug adapter (France uses Type C/E), comfortable broken-in walking shoes for the cobblestones, and an anti-theft crossbody bag for the Metro. Pre-booked Louvre and Eiffel Tower tickets save hours of queuing." },
+    { "q": "Do I need a power adapter in France?", "a": "Yes. France uses Type C and Type E plugs at 230V. If your devices have US or UK plugs, bring a universal travel adapter. Most modern phone and laptop chargers already handle 230V, so you only need the plug-shape adapter, not a voltage converter." },
+    { "q": "How much should I pack for 5 days in Paris?", "a": "Pack for about 3 days and plan one laundry wash or sink-rinse. Five layerable tops, two bottoms, one light jacket, and one pair of broken-in walking shoes cover a 5-day city break without overpacking." }
+  ],
+  "related": ["weekend-trip-packing-list", "international-flight-checklist", "business-trip-checklist", "beach-vacation-packing-list"]
+}

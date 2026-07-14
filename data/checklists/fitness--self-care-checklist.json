@@ -1,0 +1,36 @@
+{
+  "category": "fitness",
+  "slug": "self-care-checklist",
+  "order": 4,
+  "title": "Self-Care Checklist",
+  "metaTitle": "Self-Care Checklist (Daily & Weekly) | Gisti",
+  "metaDescription": "A self-care checklist across mind and body: sleep, movement, connection, and rest so you actually recharge. Free, or tailor it to your week with AI in Gisti.",
+  "cardDesc": "A menu for mind and body — sleep, movement, connection, and real rest to actually recharge.",
+  "ordered": false,
+  "intro": "Self-care isn't just bubble baths — it's the small, boring maintenance that keeps your mind and body running: sleep, movement, connection, and genuine downtime. This checklist is a menu, not a to-do list; pick a few each day rather than aiming for all of them. Use it as-is, or open it in Gisti to build your own, and see the rest of our <a href=\"/checklists/fitness/\" class=\"text-primary hover:underline\">health and fitness checklists</a>.",
+  "items": [
+    { "text": "Drink enough water through the day" },
+    { "text": "Get 7 to 9 hours of sleep", "note": "A consistent bedtime and wake time matters as much as the hours." },
+    { "text": "Move your body for 20 to 30 minutes, even just a walk" },
+    { "text": "Eat at least one balanced, home-cooked meal" },
+    { "text": "Step outside for fresh air and daylight" },
+    { "text": "Take a real break from screens", "note": "Even 20 minutes away from a screen resets your focus." },
+    { "text": "Do one thing purely because you enjoy it" },
+    { "text": "Connect with a friend or someone you love", "note": "A short call or message counts — connection is a core need, not a luxury." },
+    { "text": "Write down 3 things you're grateful for" },
+    { "text": "Tidy one small space to clear your head" },
+    { "text": "Say no to one thing that drains you", "note": "Protecting your energy is self-care, not selfishness." },
+    { "text": "Do a 5-minute breathing or meditation session" },
+    { "text": "Stretch or take a warm bath to release tension" },
+    { "text": "Set a limit on doomscrolling and social media" },
+    { "text": "Take any medications or supplements you need" },
+    { "text": "Plan something small to look forward to" },
+    { "text": "Check in with yourself: how am I actually feeling today?", "note": "Naming an emotion takes the edge off it." }
+  ],
+  "faq": [
+    { "q": "What are examples of self-care?", "a": "Self-care spans the basics of physical health — sleep, hydration, movement, and decent food — plus mental and emotional upkeep like time outside, breaks from screens, connecting with people, and setting boundaries. It's less about pampering and more about the small habits that keep you resourced." },
+    { "q": "How do I build a self-care routine?", "a": "Don't try to do everything at once. Pick two or three items from a list like this that you can realistically do most days, anchor them to something you already do, and add more only once they stick. Treat the checklist as a menu you draw from, not a set of tasks you must complete." },
+    { "q": "What is the difference between daily and weekly self-care?", "a": "Daily self-care is the small, repeatable stuff — water, movement, sleep, a screen break, a moment of gratitude. Weekly self-care is the bigger recharge you plan for: a longer workout, time with friends, a hobby, meal prep, or a proper rest day. You need both." }
+  ],
+  "related": ["morning-routine-checklist", "meal-prep-checklist", "work/remote-work-setup-checklist"]
+}

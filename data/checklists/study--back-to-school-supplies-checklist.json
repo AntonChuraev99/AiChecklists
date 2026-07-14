@@ -1,0 +1,38 @@
+{
+  "category": "study",
+  "slug": "back-to-school-supplies-checklist",
+  "order": 3,
+  "title": "Back to School Supplies Checklist",
+  "metaTitle": "Back to School Supplies Checklist (Free) | Gisti",
+  "metaDescription": "A back to school supplies checklist covering the basics: notebooks, writing tools, backpack, organizers, and a first-day kit. Free, or tailor it with AI in Gisti.",
+  "cardDesc": "The school-supply basics — notebooks, writing tools, backpack, organizers, and a first-day kit.",
+  "ordered": false,
+  "intro": "A good back to school supplies checklist saves you two trips to the store and a stressful first week. This list covers the classroom basics most students need across subjects — writing tools, paper, organization, and a small tech kit — so you can check the school's own supply list against it and only buy what's missing. See more <a href=\"/checklists/study/\" class=\"text-primary hover:underline\">study and school checklists</a>.",
+  "items": [
+    { "text": "Backpack that fits a laptop or binders comfortably", "note": "Padded straps matter if your books are heavy." },
+    { "text": "Spiral notebooks, or a binder with loose-leaf paper, for each subject" },
+    { "text": "Pens in black and blue, pencils, and a good eraser" },
+    { "text": "Highlighters in a few colors and a set of markers" },
+    { "text": "Pencil case or pouch to keep it all in one place" },
+    { "text": "Ruler, scissors, and a glue stick" },
+    { "text": "Sticky notes, index cards, and paper clips" },
+    { "text": "Folders or dividers to sort handouts by subject", "note": "One color per subject makes grabbing the right one automatic." },
+    { "text": "A planner or academic calendar for deadlines", "note": "Even with a phone, a paper planner is easy to glance at." },
+    { "text": "Scientific or graphing calculator, if your math class needs one", "note": "Check which model is allowed on tests." },
+    { "text": "Laptop or tablet and its charger" },
+    { "text": "Headphones for library work and online lessons" },
+    { "text": "USB drive or a cloud storage account for backups" },
+    { "text": "Water bottle and a reusable lunch bag or box" },
+    { "text": "Hand sanitizer and a small pack of tissues" },
+    { "text": "Sticky tabs and a stapler for organizing notes" },
+    { "text": "Whiteboard markers or a small dry-erase board for revision" },
+    { "text": "A reusable tote for gym kit or extra books" },
+    { "text": "A first-day kit: schedule, locker combo, ID, and a bit of cash", "note": "Have these ready the night before." }
+  ],
+  "faq": [
+    { "q": "What supplies do I need for back to school?", "a": "The core set is a backpack, notebooks or a binder with paper, pens and pencils, highlighters, folders or dividers, and a planner. Add a calculator, a laptop or tablet with its charger, and headphones for older students. Always check your school's or teacher's own supply list first, since some subjects need specific items." },
+    { "q": "How do I organize school supplies by subject?", "a": "Assign one color to each subject and stick to it — a blue folder, blue notebook, and blue divider tab for the same class, for example. Keep loose handouts in dividers inside one binder rather than several notebooks, and use a planner or calendar so every deadline lives in one place." },
+    { "q": "When should I buy school supplies?", "a": "Buy the basics a couple of weeks before term starts, when sales are on, but wait on subject-specific items like a particular calculator or lab kit until teachers hand out their supply lists. That way you avoid buying the wrong model or duplicating something the class provides." }
+  ],
+  "related": ["college-packing-checklist", "study-plan-checklist", "exam-prep-checklist"]
+}

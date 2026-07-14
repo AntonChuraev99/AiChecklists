@@ -1,0 +1,39 @@
+{
+  "category": "business",
+  "slug": "startup-checklist",
+  "order": 4,
+  "title": "Startup Checklist",
+  "metaTitle": "Startup Checklist (Idea to Launch) | Gisti",
+  "metaDescription": "A step-by-step startup checklist from idea to launch: validation, legal setup, finances, MVP, branding, and first customers. Free, or tailor it in Gisti.",
+  "cardDesc": "From idea to first customers — validation, legal, finances, MVP, and launch, in order.",
+  "ordered": true,
+  "intro": "Starting a company is a long sequence of decisions where doing them in the wrong order wastes time and money — building before validating is the classic, expensive mistake. This checklist lays out the path from raw idea to first paying customers, front-loading the cheap steps (talking to customers, testing demand) before the costly ones (building, hiring, spending). Move through it in order, and don't skip the validation. See more <a href=\"/checklists/business/\" class=\"text-primary hover:underline\">business and launch checklists</a>.",
+  "items": [
+    { "text": "Write down the problem you're solving and who has it most painfully", "note": "A startup that solves a real, urgent problem beats a clever idea nobody needs." },
+    { "text": "Talk to 20-30 potential customers before building anything" },
+    { "text": "Research the market size, the competitors, and how people solve this today" },
+    { "text": "Define your unique value: why you, why now, and why different" },
+    { "text": "Test demand with a landing page, waitlist, or pre-sale before you build" },
+    { "text": "Sketch a business model: how you make money and what it costs to deliver" },
+    { "text": "Choose a business structure and register the company" },
+    { "text": "Sort the legal basics: licenses, contracts, terms, and a privacy policy" },
+    { "text": "Open a business bank account and set up bookkeeping", "note": "Keep business and personal money separate from day one." },
+    { "text": "Secure the name: domain, a trademark check, and social handles" },
+    { "text": "Build a minimum viable product — the smallest thing that solves the core problem" },
+    { "text": "Set up basic branding: a logo, colours, and a simple one-page website" },
+    { "text": "Get a few pilot users onto the MVP and gather honest feedback" },
+    { "text": "Iterate on the product until users see clear, repeatable value" },
+    { "text": "Set pricing based on value and what the market will bear" },
+    { "text": "Set up payments, invoicing, and the tools to fulfill or deliver" },
+    { "text": "Plan how you'll reach customers: the one or two channels you'll focus on" },
+    { "text": "Launch to your waitlist and first target audience" },
+    { "text": "Land your first paying customers and learn from every objection" },
+    { "text": "Track your key numbers and decide what to double down on or change" }
+  ],
+  "faq": [
+    { "q": "What are the first steps to starting a startup?", "a": "Before anything else, validate the problem: write down who has it and how painfully, then talk to 20-30 potential customers and test demand with a landing page or waitlist. Only once there's real interest should you register the business, build a minimum viable product, and chase your first paying customers." },
+    { "q": "Do I need to register my business before launching?", "a": "For anything beyond a quick test, yes — you'll need a registered business structure to open a business bank account, sign contracts, and handle tax properly. You can validate the idea informally first, but register before you take real money, hire anyone, or sign anything binding." },
+    { "q": "What is a minimum viable product (MVP)?", "a": "An MVP is the smallest version of your product that solves the core problem for real users, built to learn rather than to impress. It lets you test whether people actually want and will pay for the solution before you invest in a full build — so you fail cheap, or double down early." }
+  ],
+  "related": ["small-business-setup-checklist", "product-launch-checklist", "website-launch-checklist"]
+}

@@ -1,0 +1,37 @@
+{
+  "category": "business",
+  "slug": "social-media-content-checklist",
+  "order": 3,
+  "title": "Social Media Content Checklist",
+  "metaTitle": "Social Media Content Checklist (Before You Post) | Gisti",
+  "metaDescription": "A social media content checklist to run before every post: hook, value, visuals, hashtags, links, and a final proofread. Free, or tailor it with AI in Gisti.",
+  "cardDesc": "Run this before every post — hook, value, visuals, tags, and a final proofread.",
+  "ordered": false,
+  "intro": "Consistent social media isn't about posting more — it's about posting with intent, every time. This checklist is the quick quality pass to run before anything goes out, so each post has a reason to exist, reads well, and points somewhere useful. Keep it beside you when you draft and schedule; it turns scattered posting into a repeatable routine. See more <a href=\"/checklists/business/\" class=\"text-primary hover:underline\">business and launch checklists</a>.",
+  "items": [
+    { "text": "Tie the post to a goal: awareness, engagement, traffic, or conversion" },
+    { "text": "Lead with a strong hook in the first line or frame", "note": "Feeds are scrolled fast; the first line decides whether anyone reads the rest." },
+    { "text": "Deliver one clear idea or piece of value per post" },
+    { "text": "Match the format to the platform (aspect ratio, length, and style)" },
+    { "text": "Write in the platform's native voice, not one caption copied across all of them" },
+    { "text": "Add a clear call to action — comment, save, share, or click" },
+    { "text": "Include high-quality visuals or video sized correctly for the platform" },
+    { "text": "Add captions or subtitles to any video", "note": "Most video is watched on mute." },
+    { "text": "Add descriptive alt text to images for accessibility and reach" },
+    { "text": "Use a focused set of relevant hashtags, not a generic wall of them" },
+    { "text": "Check that any link works and is tracked with a UTM or short link" },
+    { "text": "Tag relevant people, brands, or locations where it adds value" },
+    { "text": "Proofread for spelling, grammar, and factual accuracy" },
+    { "text": "Confirm you have the rights to any image, music, or clip you've used" },
+    { "text": "Schedule the post for when your audience is actually active" },
+    { "text": "Cross-post or adapt the content for other channels where it fits" },
+    { "text": "Plan to reply to comments and DMs within the first hour or two", "note": "Early engagement signals the algorithm to show the post more widely." },
+    { "text": "Log the post so you can review what performed and repeat what worked" }
+  ],
+  "faq": [
+    { "q": "What should I check before posting on social media?", "a": "Confirm the post has a clear goal and a strong opening hook, delivers one idea, has correctly-sized visuals with captions and alt text, uses relevant hashtags, and includes a working, tracked link. Proofread it, check you have rights to any media, and schedule it for when your audience is active." },
+    { "q": "How often should a business post on social media?", "a": "Consistency beats volume. A sustainable cadence you can keep — say three to five quality posts a week per platform — outperforms a burst that fizzles out. It's better to post well on one or two platforms your audience actually uses than to spread thin across all of them." },
+    { "q": "How do I keep my social media content consistent?", "a": "Work from a content calendar and batch-create posts in advance, then run each one through the same pre-post checklist so quality doesn't slip on busy days. Reusing a few proven post formats and adapting one idea across platforms keeps output steady without starting from scratch every time." }
+  ],
+  "related": ["product-launch-checklist", "website-launch-checklist", "startup-checklist"]
+}

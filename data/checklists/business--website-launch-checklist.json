@@ -1,0 +1,39 @@
+{
+  "category": "business",
+  "slug": "website-launch-checklist",
+  "order": 2,
+  "title": "Website Launch Checklist",
+  "metaTitle": "Website Launch Checklist (Pre-Launch QA to Go-Live) | Gisti",
+  "metaDescription": "A step-by-step website launch checklist — content, SEO, analytics, performance, security, and the go-live checks. Free, or tailor it with AI in Gisti.",
+  "cardDesc": "Everything to check before and after go-live — content, SEO, analytics, speed, and security.",
+  "ordered": true,
+  "intro": "Launching a website is the moment dozens of small details all have to be right at once — a missing redirect, an unindexed page, or a broken form can quietly cost you traffic and trust from day one. This checklist runs in order through the pre-launch QA, the go-live switch, and the checks you can only make once the site is live. Work through it top to bottom before you point the domain. See more <a href=\"/checklists/business/\" class=\"text-primary hover:underline\">business and launch checklists</a>.",
+  "items": [
+    { "text": "Proofread every page for typos, broken sentences, and leftover placeholder text" },
+    { "text": "Test every link, button, and navigation menu for dead ends", "note": "Broken internal links hurt both users and crawlers." },
+    { "text": "Check the site on real phones, tablets, and desktop, and across the major browsers" },
+    { "text": "Confirm all images have alt text and are compressed for fast loading" },
+    { "text": "Set up and test every form, and confirm submissions arrive where they should" },
+    { "text": "Add page titles, meta descriptions, and Open Graph tags to each page" },
+    { "text": "Create and submit an XML sitemap and a robots.txt file" },
+    { "text": "Set canonical URLs and resolve any duplicate-content issues" },
+    { "text": "Install analytics and confirm events and conversions actually fire", "note": "Test in a real browser, not just the tag preview." },
+    { "text": "Run a performance audit and fix slow-loading pages and oversized assets" },
+    { "text": "Confirm HTTPS is enforced and the SSL certificate is valid" },
+    { "text": "Set up 301 redirects from every old URL to its new equivalent", "note": "Skipping redirects on a redesign is the fastest way to lose your rankings." },
+    { "text": "Add a custom 404 page and test that it works" },
+    { "text": "Check accessibility: colour contrast, keyboard navigation, and heading structure" },
+    { "text": "Back up the site and confirm you can actually restore it" },
+    { "text": "Configure security: firewall, spam protection, and two-factor auth on admin" },
+    { "text": "Point the domain and DNS, and confirm the site resolves on www and non-www" },
+    { "text": "Go live, then immediately test the homepage, the checkout or contact path, and the forms" },
+    { "text": "Submit the site to search engines and request indexing of the key pages" },
+    { "text": "Monitor analytics, error logs, and uptime for the first days, and fix what breaks" }
+  ],
+  "faq": [
+    { "q": "What should I check before launching a website?", "a": "Proofread all content, test every link and form, check the site on phones and multiple browsers, and confirm the SEO basics (titles, meta descriptions, sitemap, and redirects). Verify analytics fires, HTTPS is enforced, performance is fast, and you have a working backup before you point the domain." },
+    { "q": "Why are 301 redirects important when launching a new site?", "a": "If you're replacing an existing site, every old URL that changes needs a 301 redirect to its new location. Without them, search engines and bookmarked links hit dead 404s, and you lose the ranking authority those pages had built — often the single biggest cause of a traffic drop after a redesign." },
+    { "q": "What should I do right after a website goes live?", "a": "Immediately test the live homepage, key conversion paths, and forms, since staging and production can behave differently. Submit the sitemap and request indexing, then watch analytics, error logs, and uptime closely for the first few days to catch anything that only breaks in production." }
+  ],
+  "related": ["product-launch-checklist", "social-media-content-checklist", "small-business-setup-checklist"]
+}

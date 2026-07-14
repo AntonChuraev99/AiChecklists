@@ -1,0 +1,33 @@
+{
+  "category": "fitness",
+  "slug": "morning-routine-checklist",
+  "order": 1,
+  "title": "Morning Routine Checklist",
+  "metaTitle": "Morning Routine Checklist (Step-by-Step) | Gisti",
+  "metaDescription": "A step-by-step morning routine checklist to start the day with energy and focus: light, water, movement, and a clear plan. Free, or build your own with AI in Gisti.",
+  "cardDesc": "A step-by-step routine to start the day right — light, water, movement, and a clear plan.",
+  "ordered": true,
+  "intro": "A good morning routine isn't about waking at 5am — it's a short, repeatable sequence that sets your energy and focus before the day pulls you around. This checklist runs from wake-up to out-the-door in the order that actually works, based on simple habits like early light and delayed caffeine. Follow it and adapt as you go, and see the rest of our <a href=\"/checklists/fitness/\" class=\"text-primary hover:underline\">health and fitness checklists</a>.",
+  "items": [
+    { "text": "Wake at a consistent time and get up without hitting snooze", "note": "A steady wake time anchors your whole body clock, even on weekends." },
+    { "text": "Get bright light within 30 to 60 minutes: open the curtains or step outside", "note": "Morning daylight is the strongest signal for alertness and better sleep that night." },
+    { "text": "Drink a large glass of water", "note": "You wake up mildly dehydrated after 7 to 8 hours without fluids." },
+    { "text": "Make your bed" },
+    { "text": "Move your body for 5 to 10 minutes: stretch, walk, or a light workout" },
+    { "text": "Brush your teeth and wash your face, or splash with cold water to wake up" },
+    { "text": "Do 5 minutes of breathing, meditation, or quiet before the noise starts" },
+    { "text": "Write your top 3 priorities for the day", "note": "Deciding what matters before you open email keeps the day on your terms." },
+    { "text": "Eat a protein-forward breakfast", "note": "Protein keeps you full and steadies energy better than a sugary start." },
+    { "text": "Take any vitamins or supplements" },
+    { "text": "Delay caffeine until about 90 minutes after waking", "note": "It smooths out the mid-morning crash — optional, but many people notice the difference." },
+    { "text": "Shower and get dressed" },
+    { "text": "Review your calendar and to-do list for the day" },
+    { "text": "Keep your phone and email out of the first 30 to 60 minutes", "note": "Starting on your own priorities beats reacting to everyone else's." }
+  ],
+  "faq": [
+    { "q": "What should a morning routine include?", "a": "A solid routine covers four things: getting bright light early, hydrating and eating something with protein, moving your body even briefly, and setting your intentions for the day before you touch your phone. Keep it short enough that you'll actually do it every day." },
+    { "q": "How long should a morning routine be?", "a": "Anywhere from 20 minutes to an hour works — consistency matters far more than length. A tight 20-minute routine you do every day beats a 90-minute one you abandon after a week. Start small and add habits only once the core ones stick." },
+    { "q": "Why should I delay caffeine in the morning?", "a": "Waiting about 90 minutes after waking to have coffee lets your natural cortisol wake-up peak pass first, which many people find reduces the mid-morning slump and afternoon crash. It's optional — if your current coffee timing works for you, keep it. The bigger wins are early light and hydration." }
+  ],
+  "related": ["self-care-checklist", "meal-prep-checklist", "gym-bag-checklist"]
+}

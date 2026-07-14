@@ -1,0 +1,39 @@
+{
+  "category": "moving",
+  "slug": "first-apartment-essentials",
+  "order": 2,
+  "title": "First Apartment Essentials Checklist",
+  "metaTitle": "First Apartment Essentials Checklist (What to Buy) | Gisti",
+  "metaDescription": "A first-apartment essentials checklist: bedding, a starter kitchen, cleaning and laundry, tools, and the admin. Free to use, or tailor it to your place with AI in Gisti.",
+  "cardDesc": "Bedding, a starter kitchen, cleaning and tools, plus the renter admin for your first place.",
+  "ordered": false,
+  "intro": "Your first apartment needs less than the internet's endless \"must-have\" lists suggest — but a few things you'll really miss on night one. This checklist covers the genuine essentials to sleep, cook, clean, and stay safe from day one, so you can add furniture and décor at your own pace. More in our <a href=\"/checklists/moving/\" class=\"text-primary hover:underline\">moving and home checklists</a>.",
+  "items": [
+    { "text": "Bed, mattress, pillows, and two sets of sheets" },
+    { "text": "Bath towels, hand towels, and a shower curtain" },
+    { "text": "A basic kitchen kit: pots, a pan, a chef's knife, a cutting board, and a can opener" },
+    { "text": "Plates, bowls, glasses, mugs, and cutlery for four", "note": "Four covers guests without the clutter." },
+    { "text": "Cooking basics: spatula, wooden spoon, measuring cups, a mixing bowl, a colander" },
+    { "text": "Food storage containers, foil, cling film, and bin bags" },
+    { "text": "A microwave, kettle, or toaster if not already provided" },
+    { "text": "Cleaning kit: all-purpose spray, dish soap, sponges, a mop, broom, and vacuum" },
+    { "text": "Laundry basket, detergent, and a drying rack" },
+    { "text": "Toilet paper, hand soap, and a plunger", "note": "Buy the plunger before you need it." },
+    { "text": "A basic toolkit: hammer, screwdrivers, tape measure, and picture hooks" },
+    { "text": "Extension leads and enough phone and laptop chargers" },
+    { "text": "A first-aid kit and basic medicines" },
+    { "text": "Working smoke and carbon-monoxide detectors", "note": "Test the ones provided, or fit your own." },
+    { "text": "Trash and recycling bins" },
+    { "text": "Light bulbs and a lamp or nightlight for each room" },
+    { "text": "Renter's insurance and copies of your lease and inventory", "note": "Photograph any existing damage on day one." },
+    { "text": "A shower caddy, bath mat, and toothbrush holder" },
+    { "text": "Pantry staples: salt, oil, pasta, coffee or tea" },
+    { "text": "A doormat and a few command hooks for keys" }
+  ],
+  "faq": [
+    { "q": "What do I need for my first apartment?", "a": "The essentials are a bed and bedding, towels, a small kitchen kit (pots, a knife, plates and cutlery for four), a cleaning and laundry kit, toilet paper and a plunger, a basic toolkit, and renter's insurance. Add furniture and décor once the basics are covered." },
+    { "q": "What's the most commonly forgotten first-apartment item?", "a": "A plunger, a first-aid kit, extension leads, and a shower curtain top the forgotten list — plus checking that the smoke and carbon-monoxide detectors actually work. Buy the plunger before you need it." },
+    { "q": "How much does it cost to furnish a first apartment?", "a": "Bare essentials can run a few hundred dollars if you shop second-hand and prioritize a bed, kitchen basics, and cleaning supplies first. Spread bigger purchases like a sofa or desk over the first few months rather than buying everything at once." }
+  ],
+  "related": ["new-home-setup-checklist", "moving-house-checklist", "packing-to-move-checklist", "change-of-address-checklist"]
+}

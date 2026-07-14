@@ -1,0 +1,35 @@
+{
+  "category": "work",
+  "slug": "project-kickoff-checklist",
+  "order": 2,
+  "title": "Project Kickoff Checklist",
+  "metaTitle": "Project Kickoff Checklist (Step-by-Step) | Gisti",
+  "metaDescription": "A step-by-step project kickoff checklist: goals, scope, stakeholders, roles, timeline, risks, and a clean kickoff meeting. Free, or tailor it to your project with AI in Gisti.",
+  "cardDesc": "Set a project up to succeed — goals, scope, roles, timeline, risks, and a clean kickoff meeting.",
+  "ordered": true,
+  "intro": "Most projects that go sideways were set up wrong, not run wrong — unclear scope, a missing decision-maker, or a team that never agreed on what done means. This checklist walks the kickoff in order so everyone starts aligned. Work through it before you write a line of the plan, and see the rest of our <a href=\"/checklists/work/\" class=\"text-primary hover:underline\">work and onboarding checklists</a>.",
+  "items": [
+    { "text": "Define the project goal, scope, and success criteria", "note": "Write down what's explicitly out of scope, too — that's where scope creep starts." },
+    { "text": "Identify the stakeholders and, crucially, the single decision-maker", "note": "One clear owner of the final call prevents deadlock later." },
+    { "text": "Confirm the budget and the resources you actually have" },
+    { "text": "Assemble the team and confirm each person's availability" },
+    { "text": "Define roles and responsibilities so ownership is unambiguous", "note": "A simple RACI (who's responsible, accountable, consulted, informed) works well." },
+    { "text": "Gather and document the requirements" },
+    { "text": "Break the work into milestones and a realistic timeline" },
+    { "text": "Identify dependencies and risks, and note a mitigation for each" },
+    { "text": "Choose your tools for tracking, docs, and communication" },
+    { "text": "Set up the project workspace: the board, repo, or shared folder" },
+    { "text": "Agree on a communication cadence and how status gets reported" },
+    { "text": "Define what done looks like for the first milestone" },
+    { "text": "Schedule the kickoff meeting and send an agenda in advance" },
+    { "text": "Run the kickoff: align on goals, plan, roles, and next steps", "note": "Leave the room only when everyone can state the goal in one sentence." },
+    { "text": "Document the decisions made and share the notes with everyone" },
+    { "text": "Confirm the first tasks and their owners before you close the kickoff" }
+  ],
+  "faq": [
+    { "q": "What is a project kickoff meeting?", "a": "A kickoff meeting is the first formal meeting of a project where the team and stakeholders align on the goal, scope, roles, timeline, and next steps. Its purpose is to make sure everyone leaves with the same understanding of what's being built, who owns what, and how success will be measured." },
+    { "q": "What should a project kickoff cover?", "a": "A strong kickoff covers the goal and success criteria, the scope (including what's out of scope), the stakeholders and decision-maker, roles and responsibilities, the timeline and milestones, the main risks and dependencies, and how the team will communicate. It should end with agreed first tasks and owners." },
+    { "q": "Who should be in a project kickoff meeting?", "a": "Invite the core team who'll do the work, the project sponsor or decision-maker, and any key stakeholders whose input shapes the outcome. Keep it to people who genuinely need to align — anyone who only needs the outcome can be sent the notes afterward instead of attending." }
+  ],
+  "related": ["new-employee-onboarding-checklist", "meeting-prep-checklist", "daily-standup-checklist"]
+}
