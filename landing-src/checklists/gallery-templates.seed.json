@@ -1,0 +1,3348 @@
+[
+  {
+    "slug": "baby-proofing-checklist",
+    "category": "baby",
+    "title": "Baby-Proofing Checklist",
+    "ordered": false,
+    "items": [
+      {
+        "text": "Anchor bookcases, dressers, and the TV to the wall",
+        "note": "Furniture tip-overs are a leading home injury for toddlers."
+      },
+      {
+        "text": "Cover unused electrical outlets with safety plugs"
+      },
+      {
+        "text": "Install safety gates at the top and bottom of stairs"
+      },
+      {
+        "text": "Add cabinet and drawer latches, especially where cleaning products or knives live"
+      },
+      {
+        "text": "Move all medicines, cleaning products, and chemicals up high and locked away"
+      },
+      {
+        "text": "Fit stove knob covers and turn pot handles toward the back"
+      },
+      {
+        "text": "Secure blind and curtain cords out of reach",
+        "note": "Looped cords are a strangulation hazard."
+      },
+      {
+        "text": "Pad sharp furniture corners and edges"
+      },
+      {
+        "text": "Set your water heater to 49°C / 120°F to prevent scalds"
+      },
+      {
+        "text": "Keep small objects, button batteries, and magnets off the floor and out of reach",
+        "note": "Button batteries are a medical emergency if swallowed."
+      },
+      {
+        "text": "Use door-knob covers or locks on rooms that are off-limits"
+      },
+      {
+        "text": "Check that smoke and carbon-monoxide alarms work, on every level"
+      },
+      {
+        "text": "Keep the crib clear of pillows, bumpers, and toys, and away from windows and cords"
+      },
+      {
+        "text": "Latch the toilet lid and keep the bathroom door closed"
+      },
+      {
+        "text": "Tuck away or cover trailing electrical cords"
+      },
+      {
+        "text": "Move toxic houseplants out of reach, or remove them"
+      },
+      {
+        "text": "Crawl each room at your baby's eye level to spot hazards you'd miss standing up"
+      },
+      {
+        "text": "Save poison-control and emergency numbers where everyone can find them"
+      }
+    ]
+  },
+  {
+    "slug": "baby-registry-checklist",
+    "category": "baby",
+    "title": "Baby Registry Checklist",
+    "ordered": false,
+    "items": [
+      {
+        "text": "Car seat (infant or convertible), rear-facing and correctly rated",
+        "note": "The one item you cannot skip."
+      },
+      {
+        "text": "Stroller or travel system that fits your car seat"
+      },
+      {
+        "text": "Crib or bassinet with a firm, flat mattress and 2-4 fitted sheets"
+      },
+      {
+        "text": "Swaddles and sleep sacks"
+      },
+      {
+        "text": "6-8 bodysuits and sleepers each in 0-3 and 3-6 months",
+        "note": "Register the bigger sizes too — newborn is outgrown fast."
+      },
+      {
+        "text": "Diapers in a range of sizes and plenty of wipes"
+      },
+      {
+        "text": "Changing pad and a diaper caddy or diaper bag"
+      },
+      {
+        "text": "Feeding gear: bottles and teats, plus a breast pump or nursing pillow if breastfeeding"
+      },
+      {
+        "text": "Burp cloths, bibs, and muslins"
+      },
+      {
+        "text": "Baby bath, hooded towels, and fragrance-free wash"
+      },
+      {
+        "text": "A carrier or sling for hands-free days"
+      },
+      {
+        "text": "A baby monitor"
+      },
+      {
+        "text": "High chair (for later, but useful to register now)"
+      },
+      {
+        "text": "Thermometer, nail clippers, and a basic grooming kit"
+      },
+      {
+        "text": "A few developmental toys, board books, and a play mat"
+      },
+      {
+        "text": "Blackout blinds or a night light"
+      },
+      {
+        "text": "A comfortable feeding chair, or a spot set up for feeds"
+      },
+      {
+        "text": "Gift cards or a \"cash fund\" for big-ticket items and post-birth needs",
+        "note": "Practical, and easy for guests."
+      }
+    ]
+  },
+  {
+    "slug": "diaper-bag-checklist",
+    "category": "baby",
+    "title": "Diaper Bag Checklist",
+    "ordered": false,
+    "items": [
+      {
+        "text": "4-6 diapers, more for a long day out",
+        "note": "Roughly one per hour out, plus a couple of spares."
+      },
+      {
+        "text": "A travel pack of wipes"
+      },
+      {
+        "text": "A portable, foldable changing mat"
+      },
+      {
+        "text": "Diaper cream in a small tube"
+      },
+      {
+        "text": "Scented bags for dirty diapers"
+      },
+      {
+        "text": "1-2 full changes of clothes for baby",
+        "note": "Blowouts happen at the worst time."
+      },
+      {
+        "text": "Muslins or burp cloths"
+      },
+      {
+        "text": "Feeding supplies: a bottle and formula, or a nursing cover if you prefer one"
+      },
+      {
+        "text": "A bib and a few napkins"
+      },
+      {
+        "text": "A pacifier or two, in a clean case"
+      },
+      {
+        "text": "Hand sanitizer and a few tissues"
+      },
+      {
+        "text": "A small first-aid kit: a thermometer, plasters, and infant paracetamol",
+        "note": "Only give medication on your doctor's advice."
+      },
+      {
+        "text": "Sun hat and baby-safe sunscreen in summer, or an extra layer and hat in winter"
+      },
+      {
+        "text": "A light blanket or swaddle"
+      },
+      {
+        "text": "A small toy or two to distract a fussy baby"
+      },
+      {
+        "text": "A snack and water for you",
+        "note": "Parents forget themselves."
+      },
+      {
+        "text": "A spare shirt for you",
+        "note": "For the same blowout reasons."
+      },
+      {
+        "text": "Restock it after every outing so it's always ready to grab"
+      }
+    ]
+  },
+  {
+    "slug": "hospital-bag-checklist",
+    "category": "baby",
+    "title": "Hospital Bag Checklist",
+    "ordered": false,
+    "items": [
+      {
+        "text": "Photo ID, insurance details, and your hospital notes or birth plan"
+      },
+      {
+        "text": "A comfortable, loose nightgown or two",
+        "note": "Dark colours hide stains; front-opening helps with feeding."
+      },
+      {
+        "text": "A warm robe, non-slip socks, and slippers for the ward"
+      },
+      {
+        "text": "Several pairs of high-waisted, disposable, or old underwear",
+        "note": "They'll get ruined — don't bring your favourites."
+      },
+      {
+        "text": "Maternity or heavy-flow pads for after the birth",
+        "note": "Not tampons."
+      },
+      {
+        "text": "A nursing bra and breast pads if you plan to breastfeed"
+      },
+      {
+        "text": "Toiletries: toothbrush, toothpaste, lip balm, hair ties, and travel-size wash"
+      },
+      {
+        "text": "A going-home outfit for you",
+        "note": "Loose and comfortable — roughly your 6-months-pregnant size."
+      },
+      {
+        "text": "Phone, a long charging cable, and a power bank"
+      },
+      {
+        "text": "Snacks and drinks for a long labour, plus a card for vending machines"
+      },
+      {
+        "text": "For baby: 2-3 bodysuits and sleepers in newborn and 0-3 sizes"
+      },
+      {
+        "text": "For baby: a hat, scratch mittens, and socks"
+      },
+      {
+        "text": "For baby: a swaddle or blanket and a going-home outfit for the season"
+      },
+      {
+        "text": "Newborn diapers and a small pack of wipes",
+        "note": "The hospital may provide some, but bring your own."
+      },
+      {
+        "text": "An installed, rear-facing car seat for the drive home",
+        "note": "Fit it before your due date."
+      },
+      {
+        "text": "For your partner: a change of clothes, snacks, toiletries, and their own phone charger"
+      },
+      {
+        "text": "Any regular medications you take, in their original packaging"
+      },
+      {
+        "text": "A pillow from home",
+        "note": "Use a bright case so it doesn't get lost."
+      }
+    ]
+  },
+  {
+    "slug": "newborn-first-month-checklist",
+    "category": "baby",
+    "title": "Newborn First Month Checklist",
+    "ordered": false,
+    "items": [
+      {
+        "text": "6-8 newborn and 0-3 month bodysuits and sleepers",
+        "note": "Babies grow fast — don't overbuy newborn size."
+      },
+      {
+        "text": "A safe sleep space (crib, bassinet, or Moses basket) with a firm, flat mattress",
+        "note": "No pillows, bumpers, or loose blankets."
+      },
+      {
+        "text": "4-6 fitted sheets for the mattress"
+      },
+      {
+        "text": "Swaddles or sleep sacks",
+        "note": "Safer than loose blankets."
+      },
+      {
+        "text": "Newborn diapers and plenty of wipes",
+        "note": "Newborns go through 10-12 a day."
+      },
+      {
+        "text": "Diaper cream and a changing pad"
+      },
+      {
+        "text": "If breastfeeding: nursing bras, breast pads, nipple cream, and a pump if you'll express"
+      },
+      {
+        "text": "If formula feeding: bottles, newborn-flow teats, formula, and a bottle brush"
+      },
+      {
+        "text": "Burp cloths and bibs",
+        "note": "Buy more than you think you'll need."
+      },
+      {
+        "text": "A car seat, correctly installed and rear-facing",
+        "note": "Most hospitals won't discharge you without one."
+      },
+      {
+        "text": "A soft carrier or sling, and a stroller or pram"
+      },
+      {
+        "text": "Baby bath support, hooded towels, and fragrance-free baby wash"
+      },
+      {
+        "text": "Soft washcloths and a soft-bristle baby brush"
+      },
+      {
+        "text": "A digital thermometer and infant paracetamol",
+        "note": "Only on your doctor's advice."
+      },
+      {
+        "text": "Baby nail clippers or a file"
+      },
+      {
+        "text": "A stack of muslin cloths for everything"
+      },
+      {
+        "text": "Blackout blinds or a dim night light for night feeds"
+      },
+      {
+        "text": "Contact details for your pediatrician and the out-of-hours line"
+      },
+      {
+        "text": "Warm layers, a hat, and mittens if the weather's cold"
+      },
+      {
+        "text": "Postpartum supplies for you: pads, comfortable clothing, and easy snacks",
+        "note": "Caring for yourself is part of the first month."
+      }
+    ]
+  },
+  {
+    "slug": "product-launch-checklist",
+    "category": "business",
+    "title": "Product Launch Checklist",
+    "ordered": true,
+    "items": [
+      {
+        "text": "Nail your positioning: who it's for, the problem it solves, and why it's different",
+        "note": "Everything downstream — copy, pricing, targeting — flows from this one paragraph."
+      },
+      {
+        "text": "Define the launch goal and the metrics you'll judge it by (signups, revenue, installs)"
+      },
+      {
+        "text": "Set the launch date and work backward into a dated pre-launch timeline"
+      },
+      {
+        "text": "Run a private beta and collect feedback, testimonials, and bug reports"
+      },
+      {
+        "text": "Fix the launch-blocking issues from beta and confirm the release candidate"
+      },
+      {
+        "text": "Finalize pricing, packaging, and any launch-day offer or trial"
+      },
+      {
+        "text": "Write the core messaging and prepare the landing or product page"
+      },
+      {
+        "text": "Prepare launch assets: demo video, screenshots, press kit, and FAQ"
+      },
+      {
+        "text": "Line up distribution: email list, social posts, communities, and any press or creators",
+        "note": "Warm your audience with teasers before launch day, not on it."
+      },
+      {
+        "text": "Set up analytics, event tracking, and dashboards to measure the launch",
+        "note": "Verify events fire in a staging environment before launch day."
+      },
+      {
+        "text": "Brief support and sales, and prepare canned answers to the likely questions"
+      },
+      {
+        "text": "Do a full dry run: test signup, checkout, onboarding, and the support path end to end"
+      },
+      {
+        "text": "Schedule the launch-day posts, emails, and any submission (directory, marketplace, or press embargo)"
+      },
+      {
+        "text": "Launch: publish the page, send the announcement, and post across your channels"
+      },
+      {
+        "text": "Monitor systems, error rates, and payments closely for the first hours"
+      },
+      {
+        "text": "Engage in real time: reply to comments, questions, and reviews as they come in"
+      },
+      {
+        "text": "Track results against your launch metrics and note what converted best"
+      },
+      {
+        "text": "Follow up with leads, trials, and press who engaged but didn't convert"
+      },
+      {
+        "text": "Gather feedback from new users and triage the first round of fixes"
+      },
+      {
+        "text": "Run a launch retrospective: what worked, what didn't, and what to repeat next time"
+      }
+    ]
+  },
+  {
+    "slug": "small-business-setup-checklist",
+    "category": "business",
+    "title": "Small Business Setup Checklist",
+    "ordered": true,
+    "items": [
+      {
+        "text": "Write a simple business plan: what you sell, to whom, and how you'll make money"
+      },
+      {
+        "text": "Choose a business structure (sole trader, LLC, partnership, or company)",
+        "note": "It affects your tax, paperwork, and personal liability — ask an accountant if you're unsure."
+      },
+      {
+        "text": "Pick and check your business name for availability and trademark conflicts"
+      },
+      {
+        "text": "Register the business with the relevant government authority"
+      },
+      {
+        "text": "Register for tax and get any required tax ID or number"
+      },
+      {
+        "text": "Check which licenses or permits your trade and location require",
+        "note": "Requirements vary a lot by industry and region — don't assume you need none."
+      },
+      {
+        "text": "Open a dedicated business bank account"
+      },
+      {
+        "text": "Set up bookkeeping or accounting software from day one"
+      },
+      {
+        "text": "Get the business insurance your trade needs (liability, professional, contents)"
+      },
+      {
+        "text": "Set up a system to track income, expenses, and receipts for tax time"
+      },
+      {
+        "text": "Choose how you'll take payment: card reader, online checkout, or invoicing"
+      },
+      {
+        "text": "Set your prices and payment terms, and prepare an invoice template"
+      },
+      {
+        "text": "Register a domain and set up a professional email address"
+      },
+      {
+        "text": "Build a simple website or listing so customers can find and contact you"
+      },
+      {
+        "text": "Set up the tools you'll run the business on (calendar, storage, comms)"
+      },
+      {
+        "text": "Sort out suppliers, stock, or the equipment you need to deliver"
+      },
+      {
+        "text": "Understand your record-keeping and tax-filing deadlines"
+      },
+      {
+        "text": "Do a soft launch to test your systems before you open fully"
+      }
+    ]
+  },
+  {
+    "slug": "social-media-content-checklist",
+    "category": "business",
+    "title": "Social Media Content Checklist",
+    "ordered": false,
+    "items": [
+      {
+        "text": "Tie the post to a goal: awareness, engagement, traffic, or conversion"
+      },
+      {
+        "text": "Lead with a strong hook in the first line or frame",
+        "note": "Feeds are scrolled fast; the first line decides whether anyone reads the rest."
+      },
+      {
+        "text": "Deliver one clear idea or piece of value per post"
+      },
+      {
+        "text": "Match the format to the platform (aspect ratio, length, and style)"
+      },
+      {
+        "text": "Write in the platform's native voice, not one caption copied across all of them"
+      },
+      {
+        "text": "Add a clear call to action — comment, save, share, or click"
+      },
+      {
+        "text": "Include high-quality visuals or video sized correctly for the platform"
+      },
+      {
+        "text": "Add captions or subtitles to any video",
+        "note": "Most video is watched on mute."
+      },
+      {
+        "text": "Add descriptive alt text to images for accessibility and reach"
+      },
+      {
+        "text": "Use a focused set of relevant hashtags, not a generic wall of them"
+      },
+      {
+        "text": "Check that any link works and is tracked with a UTM or short link"
+      },
+      {
+        "text": "Tag relevant people, brands, or locations where it adds value"
+      },
+      {
+        "text": "Proofread for spelling, grammar, and factual accuracy"
+      },
+      {
+        "text": "Confirm you have the rights to any image, music, or clip you've used"
+      },
+      {
+        "text": "Schedule the post for when your audience is actually active"
+      },
+      {
+        "text": "Cross-post or adapt the content for other channels where it fits"
+      },
+      {
+        "text": "Plan to reply to comments and DMs within the first hour or two",
+        "note": "Early engagement signals the algorithm to show the post more widely."
+      },
+      {
+        "text": "Log the post so you can review what performed and repeat what worked"
+      }
+    ]
+  },
+  {
+    "slug": "startup-checklist",
+    "category": "business",
+    "title": "Startup Checklist",
+    "ordered": true,
+    "items": [
+      {
+        "text": "Write down the problem you're solving and who has it most painfully",
+        "note": "A startup that solves a real, urgent problem beats a clever idea nobody needs."
+      },
+      {
+        "text": "Talk to 20-30 potential customers before building anything"
+      },
+      {
+        "text": "Research the market size, the competitors, and how people solve this today"
+      },
+      {
+        "text": "Define your unique value: why you, why now, and why different"
+      },
+      {
+        "text": "Test demand with a landing page, waitlist, or pre-sale before you build"
+      },
+      {
+        "text": "Sketch a business model: how you make money and what it costs to deliver"
+      },
+      {
+        "text": "Choose a business structure and register the company"
+      },
+      {
+        "text": "Sort the legal basics: licenses, contracts, terms, and a privacy policy"
+      },
+      {
+        "text": "Open a business bank account and set up bookkeeping",
+        "note": "Keep business and personal money separate from day one."
+      },
+      {
+        "text": "Secure the name: domain, a trademark check, and social handles"
+      },
+      {
+        "text": "Build a minimum viable product — the smallest thing that solves the core problem"
+      },
+      {
+        "text": "Set up basic branding: a logo, colours, and a simple one-page website"
+      },
+      {
+        "text": "Get a few pilot users onto the MVP and gather honest feedback"
+      },
+      {
+        "text": "Iterate on the product until users see clear, repeatable value"
+      },
+      {
+        "text": "Set pricing based on value and what the market will bear"
+      },
+      {
+        "text": "Set up payments, invoicing, and the tools to fulfill or deliver"
+      },
+      {
+        "text": "Plan how you'll reach customers: the one or two channels you'll focus on"
+      },
+      {
+        "text": "Launch to your waitlist and first target audience"
+      },
+      {
+        "text": "Land your first paying customers and learn from every objection"
+      },
+      {
+        "text": "Track your key numbers and decide what to double down on or change"
+      }
+    ]
+  },
+  {
+    "slug": "website-launch-checklist",
+    "category": "business",
+    "title": "Website Launch Checklist",
+    "ordered": true,
+    "items": [
+      {
+        "text": "Proofread every page for typos, broken sentences, and leftover placeholder text"
+      },
+      {
+        "text": "Test every link, button, and navigation menu for dead ends",
+        "note": "Broken internal links hurt both users and crawlers."
+      },
+      {
+        "text": "Check the site on real phones, tablets, and desktop, and across the major browsers"
+      },
+      {
+        "text": "Confirm all images have alt text and are compressed for fast loading"
+      },
+      {
+        "text": "Set up and test every form, and confirm submissions arrive where they should"
+      },
+      {
+        "text": "Add page titles, meta descriptions, and Open Graph tags to each page"
+      },
+      {
+        "text": "Create and submit an XML sitemap and a robots.txt file"
+      },
+      {
+        "text": "Set canonical URLs and resolve any duplicate-content issues"
+      },
+      {
+        "text": "Install analytics and confirm events and conversions actually fire",
+        "note": "Test in a real browser, not just the tag preview."
+      },
+      {
+        "text": "Run a performance audit and fix slow-loading pages and oversized assets"
+      },
+      {
+        "text": "Confirm HTTPS is enforced and the SSL certificate is valid"
+      },
+      {
+        "text": "Set up 301 redirects from every old URL to its new equivalent",
+        "note": "Skipping redirects on a redesign is the fastest way to lose your rankings."
+      },
+      {
+        "text": "Add a custom 404 page and test that it works"
+      },
+      {
+        "text": "Check accessibility: colour contrast, keyboard navigation, and heading structure"
+      },
+      {
+        "text": "Back up the site and confirm you can actually restore it"
+      },
+      {
+        "text": "Configure security: firewall, spam protection, and two-factor auth on admin"
+      },
+      {
+        "text": "Point the domain and DNS, and confirm the site resolves on www and non-www"
+      },
+      {
+        "text": "Go live, then immediately test the homepage, the checkout or contact path, and the forms"
+      },
+      {
+        "text": "Submit the site to search engines and request indexing of the key pages"
+      },
+      {
+        "text": "Monitor analytics, error logs, and uptime for the first days, and fix what breaks"
+      }
+    ]
+  },
+  {
+    "slug": "daily-cleaning-checklist",
+    "category": "cleaning",
+    "title": "Daily Cleaning Checklist",
+    "ordered": false,
+    "items": [
+      {
+        "text": "Make the beds as soon as everyone is up",
+        "note": "A made bed makes the whole room read as tidy."
+      },
+      {
+        "text": "Wash the dishes, or load and run the dishwasher, after each meal"
+      },
+      {
+        "text": "Wipe down the kitchen counters and the hob after cooking"
+      },
+      {
+        "text": "Clear and wipe the dining table once the plates are gone"
+      },
+      {
+        "text": "Do a 10-minute tidy: put stray items back where they belong, room by room"
+      },
+      {
+        "text": "Wipe the bathroom sink and taps, and squeegee the shower after use",
+        "note": "A quick squeegee stops limescale and mould building up."
+      },
+      {
+        "text": "Run, hang, or fold one load of laundry to stop it piling up"
+      },
+      {
+        "text": "Sweep or spot-vacuum the kitchen floor for crumbs and spills"
+      },
+      {
+        "text": "Take out the kitchen bin if it's full, and reset a fresh liner"
+      },
+      {
+        "text": "Wipe down high-touch spots: door handles, light switches, and taps"
+      },
+      {
+        "text": "Sort the day's post and paperwork so it doesn't pile up"
+      },
+      {
+        "text": "Empty pockets, and put shoes, coats, and bags away by the door"
+      },
+      {
+        "text": "Give the toilet a quick brush and wipe the seat"
+      },
+      {
+        "text": "Fluff the sofa cushions and fold any blankets before bed"
+      },
+      {
+        "text": "Set out what you need for the morning, and give the sink a final wipe"
+      }
+    ]
+  },
+  {
+    "slug": "deep-cleaning-checklist",
+    "category": "cleaning",
+    "title": "Deep Cleaning Checklist",
+    "ordered": false,
+    "items": [
+      {
+        "text": "Dust from the top down: light fixtures, ceiling corners, and the tops of doorframes and wardrobes",
+        "note": "Dust falls, so always start high and finish at the floor."
+      },
+      {
+        "text": "Wash walls, switch plates, and skirting boards with a damp microfiber cloth"
+      },
+      {
+        "text": "Clean windows inside and out, including the tracks and sills",
+        "note": "A cotton bud lifts the grime packed into the corners of the tracks."
+      },
+      {
+        "text": "Launder the curtains and wipe down blinds slat by slat"
+      },
+      {
+        "text": "Descale the kettle and coffee machine with a vinegar or citric-acid solution"
+      },
+      {
+        "text": "Degrease the extractor hood and soak or replace its filter",
+        "note": "Metal filters can go through a hot dishwasher cycle."
+      },
+      {
+        "text": "Deep-clean the oven: remove the racks to soak, and scrub the interior glass"
+      },
+      {
+        "text": "Pull out the fridge, defrost the freezer, and wipe the coils and door seals"
+      },
+      {
+        "text": "Empty and wipe every kitchen cupboard, checking food dates while you're in there"
+      },
+      {
+        "text": "Run an empty hot cycle with cleaner in the washing machine and dishwasher",
+        "note": "Wipe the rubber door seal and clear the dishwasher filter."
+      },
+      {
+        "text": "Scrub the grout and re-caulk any mouldy sealant around the bath and sink"
+      },
+      {
+        "text": "Descale the showerhead by soaking it in vinegar overnight"
+      },
+      {
+        "text": "Disinfect and descale the toilet, including the base and behind the bowl"
+      },
+      {
+        "text": "Vacuum and flip the mattresses, and wash mattress protectors and pillows"
+      },
+      {
+        "text": "Wash or dry-clean duvets, and vacuum the divan or bed base"
+      },
+      {
+        "text": "Move furniture to vacuum underneath, then shampoo carpets or mop hard floors"
+      },
+      {
+        "text": "Wipe down radiators and vacuum the dust from between the fins"
+      },
+      {
+        "text": "Disinfect high-touch spots: light switches, door handles, and remote controls"
+      },
+      {
+        "text": "Vacuum upholstered sofas and chairs, including under the cushions"
+      },
+      {
+        "text": "Empty, wash, and disinfect every bin, including the kitchen caddy"
+      }
+    ]
+  },
+  {
+    "slug": "house-chores-checklist",
+    "category": "cleaning",
+    "title": "House Chores Checklist",
+    "ordered": false,
+    "items": [
+      {
+        "text": "Daily: wash up or run the dishwasher after meals"
+      },
+      {
+        "text": "Daily: wipe the kitchen counters and the hob"
+      },
+      {
+        "text": "Daily: make the beds and do a quick tidy of each room"
+      },
+      {
+        "text": "Daily: take out the kitchen bin when full and reset the liner"
+      },
+      {
+        "text": "Weekly: change and wash the bed sheets and pillowcases",
+        "note": "Weekly in summer; every two weeks is fine in winter."
+      },
+      {
+        "text": "Weekly: vacuum all carpets and rugs, and mop the hard floors"
+      },
+      {
+        "text": "Weekly: clean the bathroom — toilet, sink, bath, shower, and mirror"
+      },
+      {
+        "text": "Weekly: dust the surfaces, shelves, and electronics throughout"
+      },
+      {
+        "text": "Weekly: wipe the kitchen appliance fronts, the microwave, and the sink"
+      },
+      {
+        "text": "Weekly: do the full laundry, including towels and tea towels"
+      },
+      {
+        "text": "Weekly: empty and wipe out all the household bins"
+      },
+      {
+        "text": "Weekly: water the houseplants and clear away any dead leaves"
+      },
+      {
+        "text": "Monthly: wipe down skirting boards, door handles, and light switches"
+      },
+      {
+        "text": "Monthly: clean the oven and degrease the extractor hood",
+        "note": "Doing it monthly stops grease baking on and needing a deep scrub."
+      },
+      {
+        "text": "Monthly: descale the kettle, coffee machine, and showerhead"
+      },
+      {
+        "text": "Monthly: wash the bins, doormats, and any pet bedding"
+      },
+      {
+        "text": "Monthly: run a hot maintenance cycle in the washing machine and dishwasher"
+      },
+      {
+        "text": "Monthly: clean the windows and wipe the sills"
+      },
+      {
+        "text": "Monthly: vacuum under the furniture and behind large appliances"
+      },
+      {
+        "text": "Monthly: check and restock cleaning supplies, and replace worn sponges and cloths"
+      }
+    ]
+  },
+  {
+    "slug": "move-out-cleaning-checklist",
+    "category": "cleaning",
+    "title": "Move Out Cleaning Checklist",
+    "ordered": true,
+    "items": [
+      {
+        "text": "Start once the place is empty: open the windows, and gather bin bags, cloths, and cleaners before you begin"
+      },
+      {
+        "text": "Kitchen first: empty every cupboard and drawer, then wipe them inside and out"
+      },
+      {
+        "text": "Deep-clean the oven, hob, grill, and extractor filter",
+        "note": "Grease inside the oven is the single most-docked item on an inventory."
+      },
+      {
+        "text": "Defrost, empty, and wipe the fridge and freezer, and leave the doors ajar if you're switching them off"
+      },
+      {
+        "text": "Descale the kettle, and clean the sink, taps, and any tiled splashback"
+      },
+      {
+        "text": "Bathroom next: descale the toilet, taps, and showerhead, and scrub limescale off the screen"
+      },
+      {
+        "text": "Clean and re-whiten the grout, and wipe mould off the silicone sealant",
+        "note": "A dab of mould remover left for an hour lifts black spotting."
+      },
+      {
+        "text": "Polish the mirrors, chrome, and glass until they're streak-free"
+      },
+      {
+        "text": "Wipe down all interior doors, handles, and light switches"
+      },
+      {
+        "text": "Clean the inside and outside of every window, plus the sills and tracks"
+      },
+      {
+        "text": "Dust and wipe skirting boards, radiators, and picture rails throughout"
+      },
+      {
+        "text": "Remove cobwebs from ceiling corners and light fittings in every room"
+      },
+      {
+        "text": "Fill nail holes and wipe scuffs off the walls",
+        "note": "Check your tenancy agreement on whether small holes need filling."
+      },
+      {
+        "text": "Wipe inside all built-in wardrobes and storage cupboards"
+      },
+      {
+        "text": "Clean any supplied appliances — the washing machine drawer, dishwasher filter, and microwave"
+      },
+      {
+        "text": "Take a full set of dated photos once each room is done, as proof of its condition"
+      },
+      {
+        "text": "Vacuum every room, including inside the cupboards and along the edges"
+      },
+      {
+        "text": "Mop the hard floors and shampoo or spot-clean the carpets, working toward the front door last"
+      }
+    ]
+  },
+  {
+    "slug": "spring-cleaning-checklist",
+    "category": "cleaning",
+    "title": "Spring Cleaning Checklist",
+    "ordered": false,
+    "items": [
+      {
+        "text": "Open every window to air out the whole home before you start"
+      },
+      {
+        "text": "Declutter room by room, sorting into keep, donate, sell, and bin piles",
+        "note": "Declutter first — there's no point cleaning around things you're getting rid of."
+      },
+      {
+        "text": "Wash the windows inside and out, and clean the tracks, sills, and screens"
+      },
+      {
+        "text": "Launder or dry-clean the curtains, and dust the blinds slat by slat"
+      },
+      {
+        "text": "Take down and wash light fittings and lampshades, and replace any dead bulbs"
+      },
+      {
+        "text": "Dust ceiling corners, cornices, and the tops of doorframes and wardrobes"
+      },
+      {
+        "text": "Wipe walls, skirting boards, switch plates, and door handles"
+      },
+      {
+        "text": "Vacuum and flip the mattresses, and wash duvets, pillows, and protectors",
+        "note": "A sunny, breezy day is ideal for airing bedding outside."
+      },
+      {
+        "text": "Swap the wardrobe over to the new season, and donate what didn't get worn"
+      },
+      {
+        "text": "Empty, wipe, and reorganize kitchen cupboards, checking food dates as you go"
+      },
+      {
+        "text": "Deep-clean the oven, and degrease the extractor hood and its filter"
+      },
+      {
+        "text": "Defrost the freezer, and wipe the fridge shelves and door seals"
+      },
+      {
+        "text": "Descale the kettle, coffee machine, and showerhead"
+      },
+      {
+        "text": "Scrub the bathroom grout and refresh any discoloured sealant"
+      },
+      {
+        "text": "Wipe down radiators and clear the dust from between the fins"
+      },
+      {
+        "text": "Clean behind and underneath the heavy furniture and appliances"
+      },
+      {
+        "text": "Shampoo carpets and rugs, and mop and polish the hard floors"
+      },
+      {
+        "text": "Wipe the front and inside of every kitchen appliance and small gadget"
+      },
+      {
+        "text": "Clean and disinfect the bins, and replace worn cloths and sponges"
+      },
+      {
+        "text": "Tackle one outdoor job: sweep the patio, wash the doormat, or clean the bins"
+      }
+    ]
+  },
+  {
+    "slug": "gym-bag-checklist",
+    "category": "fitness",
+    "title": "Gym Bag Checklist",
+    "ordered": false,
+    "items": [
+      {
+        "text": "Workout clothes: a moisture-wicking top and shorts or leggings",
+        "note": "Sweat-wicking fabric beats cotton, which stays wet and chafes."
+      },
+      {
+        "text": "Proper training shoes for your workout"
+      },
+      {
+        "text": "A spare pair of socks"
+      },
+      {
+        "text": "Water bottle",
+        "note": "Fill it before you leave so you're not queuing at the fountain."
+      },
+      {
+        "text": "Small sweat towel for wiping down equipment and yourself"
+      },
+      {
+        "text": "Padlock for the locker"
+      },
+      {
+        "text": "Headphones, charged"
+      },
+      {
+        "text": "Lifting gloves or wrist straps, if you lift heavy"
+      },
+      {
+        "text": "A resistance band for warm-ups and activation"
+      },
+      {
+        "text": "A pre- or post-workout snack or protein shake",
+        "note": "Protein plus carbs within an hour or two of training supports recovery."
+      },
+      {
+        "text": "Deodorant"
+      },
+      {
+        "text": "Shower kit: travel soap or body wash, shampoo, and flip-flops",
+        "note": "Flip-flops keep you off shared shower floors."
+      },
+      {
+        "text": "A quick-dry towel for showering"
+      },
+      {
+        "text": "A full change of clean clothes and underwear"
+      },
+      {
+        "text": "A dry bag or plastic bag for sweaty clothes",
+        "note": "Keeps the wet kit from soaking everything else in the bag."
+      },
+      {
+        "text": "Membership card or the gym app on your phone"
+      },
+      {
+        "text": "Hair ties or a headband"
+      },
+      {
+        "text": "Phone plus a charger or power bank"
+      }
+    ]
+  },
+  {
+    "slug": "marathon-training-checklist",
+    "category": "fitness",
+    "title": "Marathon Training Checklist",
+    "ordered": true,
+    "items": [
+      {
+        "text": "Get a medical check-up before you start, especially if you're new to running or have any health concerns"
+      },
+      {
+        "text": "Buy properly fitted running shoes, ideally after a gait analysis at a running store",
+        "note": "The wrong shoes are the fastest route to injury over hundreds of training miles."
+      },
+      {
+        "text": "Choose a 16 to 20 week training plan that matches your current fitness",
+        "note": "Beginners need the full 20 weeks; don't rush a compressed plan."
+      },
+      {
+        "text": "Set a realistic goal: to finish, or a specific target time"
+      },
+      {
+        "text": "Base phase (weeks 1 to 4): build easy, conversational mileage running 3 to 4 times a week"
+      },
+      {
+        "text": "Add one weekly long run and increase its distance gradually",
+        "note": "Raise weekly mileage by no more than about 10% to avoid overuse injuries."
+      },
+      {
+        "text": "Include one speed or tempo session each week to build pace"
+      },
+      {
+        "text": "Strength-train twice a week, focusing on core, glutes, and legs"
+      },
+      {
+        "text": "Cross-train on off days with cycling or swimming to build fitness without pounding"
+      },
+      {
+        "text": "Dial in your race-day nutrition and practice fueling on long runs",
+        "note": "Never try a new gel or drink on race day — test everything in training."
+      },
+      {
+        "text": "Prioritize hydration, sleep, and recovery throughout the block"
+      },
+      {
+        "text": "Peak weeks: reach your longest run of about 20 miles (32 km) around 3 weeks out"
+      },
+      {
+        "text": "Taper: cut your mileage over the final 2 to 3 weeks so you arrive fresh",
+        "note": "Resist the urge to cram fitness late — the work is already done."
+      },
+      {
+        "text": "Lay out your race-day gear the night before, using nothing new",
+        "note": "Wear only clothes and shoes you've already run long in."
+      },
+      {
+        "text": "Carb-load and hydrate well over the final few days"
+      },
+      {
+        "text": "Race day: start slower than feels easy and stick to your pace and fueling plan",
+        "note": "Going out too fast is the classic first-marathon mistake."
+      },
+      {
+        "text": "After the race: keep moving to cool down, refuel, hydrate, and rest before running again",
+        "note": "Give yourself at least a week of easy recovery before hard training resumes."
+      }
+    ]
+  },
+  {
+    "slug": "meal-prep-checklist",
+    "category": "fitness",
+    "title": "Meal Prep Checklist",
+    "ordered": false,
+    "items": [
+      {
+        "text": "Pick 2 to 3 recipes that reheat well",
+        "note": "Stews, grain bowls, roasted veg, and curries hold up far better than salads or crispy foods."
+      },
+      {
+        "text": "Plan the week's meals: breakfasts, lunches, dinners, and snacks"
+      },
+      {
+        "text": "Check what you already have in the fridge, freezer, and pantry"
+      },
+      {
+        "text": "Write a shopping list grouped by store section",
+        "note": "Grouping by aisle turns the shop into one fast lap."
+      },
+      {
+        "text": "Do a single grocery run for the whole week"
+      },
+      {
+        "text": "Wash and chop all your vegetables at once"
+      },
+      {
+        "text": "Cook grains and starches in bulk: rice, quinoa, pasta, or potatoes"
+      },
+      {
+        "text": "Batch-cook proteins: chicken, ground meat, beans, tofu, or hard-boiled eggs"
+      },
+      {
+        "text": "Roast a big tray of mixed vegetables"
+      },
+      {
+        "text": "Make one sauce or dressing to vary the flavor across meals",
+        "note": "The same base tastes new with pesto one day and a peanut sauce the next."
+      },
+      {
+        "text": "Portion meals into containers and label each with the date"
+      },
+      {
+        "text": "Cool food fully before sealing the lids",
+        "note": "Sealing warm food traps steam, goes soggy, and spoils faster."
+      },
+      {
+        "text": "Freeze any portions you won't eat within 3 to 4 days",
+        "note": "Cooked meals keep about 3 to 4 days in the fridge; freeze the rest."
+      },
+      {
+        "text": "Prep grab-and-go snacks: cut fruit, portioned nuts, or yogurt cups"
+      },
+      {
+        "text": "Arrange the fridge by day or meal so the right container is easy to grab"
+      },
+      {
+        "text": "Clean as you go and wash your containers so next week is easy"
+      }
+    ]
+  },
+  {
+    "slug": "morning-routine-checklist",
+    "category": "fitness",
+    "title": "Morning Routine Checklist",
+    "ordered": true,
+    "items": [
+      {
+        "text": "Wake at a consistent time and get up without hitting snooze",
+        "note": "A steady wake time anchors your whole body clock, even on weekends."
+      },
+      {
+        "text": "Get bright light within 30 to 60 minutes: open the curtains or step outside",
+        "note": "Morning daylight is the strongest signal for alertness and better sleep that night."
+      },
+      {
+        "text": "Drink a large glass of water",
+        "note": "You wake up mildly dehydrated after 7 to 8 hours without fluids."
+      },
+      {
+        "text": "Make your bed"
+      },
+      {
+        "text": "Move your body for 5 to 10 minutes: stretch, walk, or a light workout"
+      },
+      {
+        "text": "Brush your teeth and wash your face, or splash with cold water to wake up"
+      },
+      {
+        "text": "Do 5 minutes of breathing, meditation, or quiet before the noise starts"
+      },
+      {
+        "text": "Write your top 3 priorities for the day",
+        "note": "Deciding what matters before you open email keeps the day on your terms."
+      },
+      {
+        "text": "Eat a protein-forward breakfast",
+        "note": "Protein keeps you full and steadies energy better than a sugary start."
+      },
+      {
+        "text": "Take any vitamins or supplements"
+      },
+      {
+        "text": "Delay caffeine until about 90 minutes after waking",
+        "note": "It smooths out the mid-morning crash — optional, but many people notice the difference."
+      },
+      {
+        "text": "Shower and get dressed"
+      },
+      {
+        "text": "Review your calendar and to-do list for the day"
+      },
+      {
+        "text": "Keep your phone and email out of the first 30 to 60 minutes",
+        "note": "Starting on your own priorities beats reacting to everyone else's."
+      }
+    ]
+  },
+  {
+    "slug": "self-care-checklist",
+    "category": "fitness",
+    "title": "Self-Care Checklist",
+    "ordered": false,
+    "items": [
+      {
+        "text": "Drink enough water through the day"
+      },
+      {
+        "text": "Get 7 to 9 hours of sleep",
+        "note": "A consistent bedtime and wake time matters as much as the hours."
+      },
+      {
+        "text": "Move your body for 20 to 30 minutes, even just a walk"
+      },
+      {
+        "text": "Eat at least one balanced, home-cooked meal"
+      },
+      {
+        "text": "Step outside for fresh air and daylight"
+      },
+      {
+        "text": "Take a real break from screens",
+        "note": "Even 20 minutes away from a screen resets your focus."
+      },
+      {
+        "text": "Do one thing purely because you enjoy it"
+      },
+      {
+        "text": "Connect with a friend or someone you love",
+        "note": "A short call or message counts — connection is a core need, not a luxury."
+      },
+      {
+        "text": "Write down 3 things you're grateful for"
+      },
+      {
+        "text": "Tidy one small space to clear your head"
+      },
+      {
+        "text": "Say no to one thing that drains you",
+        "note": "Protecting your energy is self-care, not selfishness."
+      },
+      {
+        "text": "Do a 5-minute breathing or meditation session"
+      },
+      {
+        "text": "Stretch or take a warm bath to release tension"
+      },
+      {
+        "text": "Set a limit on doomscrolling and social media"
+      },
+      {
+        "text": "Take any medications or supplements you need"
+      },
+      {
+        "text": "Plan something small to look forward to"
+      },
+      {
+        "text": "Check in with yourself: how am I actually feeling today?",
+        "note": "Naming an emotion takes the edge off it."
+      }
+    ]
+  },
+  {
+    "slug": "healthy-grocery-list",
+    "category": "groceries",
+    "title": "Healthy Grocery List",
+    "ordered": false,
+    "items": [
+      {
+        "text": "Leafy greens — spinach, kale, or a mixed salad"
+      },
+      {
+        "text": "Broccoli, cauliflower, or green beans"
+      },
+      {
+        "text": "Peppers, carrots, and cucumber for snacking"
+      },
+      {
+        "text": "Onions, garlic, and sweet potatoes"
+      },
+      {
+        "text": "Avocados",
+        "note": "A healthy fat that works in meals and snacks alike."
+      },
+      {
+        "text": "Berries, fresh or frozen",
+        "note": "Frozen is cheaper year-round and just as nutritious."
+      },
+      {
+        "text": "Bananas and apples"
+      },
+      {
+        "text": "Oranges or another citrus for vitamin C"
+      },
+      {
+        "text": "Chicken or turkey breast"
+      },
+      {
+        "text": "Eggs"
+      },
+      {
+        "text": "Fish like salmon, or a canned option",
+        "note": "Oily fish adds omega-3s a couple of times a week."
+      },
+      {
+        "text": "Greek yogurt, plain and unsweetened"
+      },
+      {
+        "text": "Beans, lentils, or chickpeas",
+        "note": "Plant protein plus fiber, and very cheap."
+      },
+      {
+        "text": "Tofu or tempeh, if you eat it"
+      },
+      {
+        "text": "Oats for breakfast",
+        "note": "Plain rolled oats beat sugary cereal."
+      },
+      {
+        "text": "Brown rice or quinoa"
+      },
+      {
+        "text": "Whole-grain bread or wraps"
+      },
+      {
+        "text": "Nuts and seeds — almonds, walnuts, or chia",
+        "note": "Great for snacks, but watch the portion size."
+      },
+      {
+        "text": "Olive oil for cooking and dressing"
+      },
+      {
+        "text": "Natural nut butter with no added sugar",
+        "note": "Check the label — the ingredient list should be just nuts."
+      },
+      {
+        "text": "Hummus or a bean dip for veggies"
+      },
+      {
+        "text": "Herbs, spices, and lemon to flavor food without extra salt or sauce"
+      }
+    ]
+  },
+  {
+    "slug": "meal-plan-shopping-list",
+    "category": "groceries",
+    "title": "Meal Plan Shopping List",
+    "ordered": false,
+    "items": [
+      {
+        "text": "Oats, eggs, or yogurt for weekday breakfasts"
+      },
+      {
+        "text": "Bread or bagels and a spread"
+      },
+      {
+        "text": "Fruit for breakfasts and grab-and-go",
+        "note": "Bananas and berries top oats and yogurt."
+      },
+      {
+        "text": "Salad greens, a protein, and a dressing for build-your-own lunches"
+      },
+      {
+        "text": "Wraps or a sandwich loaf and a deli filling"
+      },
+      {
+        "text": "Canned tuna, beans, or leftovers portioned for the week",
+        "note": "Cook once, eat twice — plan dinners that reheat well."
+      },
+      {
+        "text": "Two to three dinner proteins — chicken, mince, fish, or tofu"
+      },
+      {
+        "text": "A base for each dinner: rice, pasta, potatoes, or noodles"
+      },
+      {
+        "text": "Vegetables to go with each dinner, fresh or frozen"
+      },
+      {
+        "text": "Pasta sauce, curry paste, or canned tomatoes for quick dinner bases",
+        "note": "One jar or can turns a protein and grain into a meal."
+      },
+      {
+        "text": "Onions, garlic, and stock cubes — the backbone of most dinners"
+      },
+      {
+        "text": "Nuts, crackers, or a cheese for snacks"
+      },
+      {
+        "text": "Hummus and veggie sticks"
+      },
+      {
+        "text": "A treat or two so the plan is sustainable",
+        "note": "A plan you can stick to beats a perfect one you abandon."
+      },
+      {
+        "text": "Cooking oil, butter, salt, pepper, and everyday spices"
+      },
+      {
+        "text": "Milk or a plant-based alternative"
+      },
+      {
+        "text": "Eggs — they cross breakfast, lunch, and dinner"
+      },
+      {
+        "text": "Cheese for cooking and sandwiches"
+      },
+      {
+        "text": "Herbs or a lemon to finish dishes"
+      },
+      {
+        "text": "Flour, sugar, or anything a planned recipe specifically calls for"
+      },
+      {
+        "text": "Freezer backups — a bag of frozen veg and a spare protein",
+        "note": "A safety net for the night a plan falls through."
+      }
+    ]
+  },
+  {
+    "slug": "pantry-staples-checklist",
+    "category": "groceries",
+    "title": "Pantry Staples Checklist",
+    "ordered": false,
+    "items": [
+      {
+        "text": "Rice — white, brown, or both"
+      },
+      {
+        "text": "Pasta in a couple of shapes, and noodles"
+      },
+      {
+        "text": "Oats and a breakfast cereal"
+      },
+      {
+        "text": "Flour — all-purpose, plus any you bake with"
+      },
+      {
+        "text": "Breadcrumbs or a stuffing mix"
+      },
+      {
+        "text": "Canned tomatoes — whole and chopped",
+        "note": "The base of countless quick dinners."
+      },
+      {
+        "text": "Canned beans, chickpeas, and lentils"
+      },
+      {
+        "text": "Canned tuna, and coconut milk for curries"
+      },
+      {
+        "text": "Stock cubes or bouillon",
+        "note": "Turns water into the base of soups, rice, and sauces."
+      },
+      {
+        "text": "Pasta sauce, and a jar of pesto or curry paste"
+      },
+      {
+        "text": "Peanut butter, and a jam or honey"
+      },
+      {
+        "text": "Cooking oil and olive oil"
+      },
+      {
+        "text": "Vinegar — white, plus a balsamic or wine vinegar"
+      },
+      {
+        "text": "Soy sauce, hot sauce, and Worcestershire or fish sauce"
+      },
+      {
+        "text": "Ketchup, mustard, and mayonnaise"
+      },
+      {
+        "text": "Salt, black pepper, and a pepper mill"
+      },
+      {
+        "text": "Everyday spices — cumin, paprika, chili, cinnamon, and mixed herbs",
+        "note": "Buy the ones you actually cook with, not a giant rack that goes stale."
+      },
+      {
+        "text": "Garlic and onion powder, plus a stock of fresh garlic and onions"
+      },
+      {
+        "text": "Sugar — white and brown — plus baking soda and baking powder"
+      },
+      {
+        "text": "Vanilla extract, and a bar of chocolate or cocoa"
+      },
+      {
+        "text": "Coffee, tea, and long-life or powdered milk as a backup"
+      },
+      {
+        "text": "Nuts, dried fruit, and a couple of snack bars",
+        "note": "Store opened nuts sealed — they go rancid over time."
+      }
+    ]
+  },
+  {
+    "slug": "party-grocery-list",
+    "category": "groceries",
+    "title": "Party Grocery List",
+    "ordered": false,
+    "items": [
+      {
+        "text": "A mix of soft drinks, juice, and sparkling water",
+        "note": "Plan about 2-3 drinks per guest for the first few hours."
+      },
+      {
+        "text": "Beer, wine, or a batch cocktail, if you're serving alcohol"
+      },
+      {
+        "text": "Plenty of ice — more than you think you'll need",
+        "note": "Roughly 1-2 lbs (0.5-1 kg) per guest for drinks and coolers."
+      },
+      {
+        "text": "Coffee, tea, and milk for later in the night"
+      },
+      {
+        "text": "A main or two — a platter, tray bake, pizzas, or something on the grill"
+      },
+      {
+        "text": "Buns, bread, or wraps if you're serving anything handheld"
+      },
+      {
+        "text": "A couple of dips — hummus, salsa, guacamole, or a cheese dip"
+      },
+      {
+        "text": "Chips, crackers, pretzels, and nuts for grazing",
+        "note": "Set snacks out before guests arrive to cover the early lull."
+      },
+      {
+        "text": "A cheese and charcuterie board — cheeses, cured meats, and crackers"
+      },
+      {
+        "text": "A veggie platter and fruit for lighter and dietary options",
+        "note": "Always include a vegetarian and a non-alcoholic option."
+      },
+      {
+        "text": "Dessert — a cake, cookies, or something easy to serve"
+      },
+      {
+        "text": "Condiments: ketchup, mustard, mayo, and any sauces your mains need"
+      },
+      {
+        "text": "Paper plates, napkins, cups, and cutlery",
+        "note": "Buy about 1.5x your guest count — plates and cups get swapped."
+      },
+      {
+        "text": "Serving bowls, platters, and a couple of serving spoons"
+      },
+      {
+        "text": "Trash bags and a recycling bag, set out where guests can see them"
+      },
+      {
+        "text": "Paper towels and cleaning wipes for spills"
+      },
+      {
+        "text": "A cooler or two, plus bags of ice to fill them"
+      },
+      {
+        "text": "Bottle opener, corkscrew, and a can opener"
+      },
+      {
+        "text": "Aluminum foil, cling film, and containers for leftovers"
+      },
+      {
+        "text": "Candles, a lighter, and music or a speaker for atmosphere"
+      },
+      {
+        "text": "A few extras for allergies or kids — a gluten-free snack and a juice option",
+        "note": "Ask guests about allergies when they RSVP."
+      }
+    ]
+  },
+  {
+    "slug": "weekly-grocery-list",
+    "category": "groceries",
+    "title": "Weekly Grocery List",
+    "ordered": false,
+    "items": [
+      {
+        "text": "Bananas, plus a couple of apples or oranges"
+      },
+      {
+        "text": "Leafy greens — spinach, lettuce, or a salad mix",
+        "note": "Buy loose if you'll use it fast; bagged wilts quicker."
+      },
+      {
+        "text": "Tomatoes, cucumber, and bell peppers"
+      },
+      {
+        "text": "Onions, garlic, and potatoes",
+        "note": "Store these cool and dark, and keep onions away from potatoes."
+      },
+      {
+        "text": "Carrots and a broccoli or seasonal vegetable"
+      },
+      {
+        "text": "A bunch of fresh herbs and a lemon"
+      },
+      {
+        "text": "Chicken breasts or thighs"
+      },
+      {
+        "text": "Ground beef, turkey, or a plant-based mince"
+      },
+      {
+        "text": "A dozen eggs"
+      },
+      {
+        "text": "Fish, or canned tuna or salmon"
+      },
+      {
+        "text": "Beans, chickpeas, or lentils, canned or dried",
+        "note": "A cheap protein that stretches any meal."
+      },
+      {
+        "text": "Milk or a plant-based alternative"
+      },
+      {
+        "text": "Butter and a block or wedge of cheese"
+      },
+      {
+        "text": "Yogurt — plain or Greek"
+      },
+      {
+        "text": "Bread, wraps, or bagels"
+      },
+      {
+        "text": "Pasta, rice, or noodles"
+      },
+      {
+        "text": "Cooking oil, plus salt, pepper, and a spice you're low on"
+      },
+      {
+        "text": "Pasta sauce or canned tomatoes"
+      },
+      {
+        "text": "Breakfast cereal or oats"
+      },
+      {
+        "text": "Coffee, tea, or your morning drink"
+      },
+      {
+        "text": "Frozen vegetables and a bag of frozen fruit for smoothies",
+        "note": "Frozen is just as nutritious and cuts waste."
+      },
+      {
+        "text": "Household basics you're low on — dish soap, paper towels, or trash bags"
+      }
+    ]
+  },
+  {
+    "slug": "change-of-address-checklist",
+    "category": "moving",
+    "title": "Change of Address Checklist",
+    "ordered": true,
+    "items": [
+      {
+        "text": "Redirect your mail with your postal service",
+        "note": "Set it to start on your move date — it buys time to update everyone else."
+      },
+      {
+        "text": "File your official change of address with the government: voter roll, tax authority, and driver's license agency"
+      },
+      {
+        "text": "Update your bank, credit cards, and any loan or mortgage providers"
+      },
+      {
+        "text": "Tell your employer's payroll and HR, and update pension or retirement accounts"
+      },
+      {
+        "text": "Update your insurance: home or renter's, car, health, and life policies"
+      },
+      {
+        "text": "Switch or transfer utilities: electricity, gas, water, internet, and phone"
+      },
+      {
+        "text": "Update your doctor, dentist, and pharmacy, and transfer prescriptions"
+      },
+      {
+        "text": "Change your address on subscriptions and deliveries",
+        "note": "Streaming billing, meal kits, Amazon, and any recurring boxes."
+      },
+      {
+        "text": "Update your driving license and vehicle registration",
+        "note": "Many places require this within a set number of days."
+      },
+      {
+        "text": "Tell schools or childcare and transfer any records"
+      },
+      {
+        "text": "Update online shopping accounts and digital wallets"
+      },
+      {
+        "text": "Let friends and family know, and update your address on any wills or legal documents"
+      }
+    ]
+  },
+  {
+    "slug": "first-apartment-essentials",
+    "category": "moving",
+    "title": "First Apartment Essentials Checklist",
+    "ordered": false,
+    "items": [
+      {
+        "text": "Bed, mattress, pillows, and two sets of sheets"
+      },
+      {
+        "text": "Bath towels, hand towels, and a shower curtain"
+      },
+      {
+        "text": "A basic kitchen kit: pots, a pan, a chef's knife, a cutting board, and a can opener"
+      },
+      {
+        "text": "Plates, bowls, glasses, mugs, and cutlery for four",
+        "note": "Four covers guests without the clutter."
+      },
+      {
+        "text": "Cooking basics: spatula, wooden spoon, measuring cups, a mixing bowl, a colander"
+      },
+      {
+        "text": "Food storage containers, foil, cling film, and bin bags"
+      },
+      {
+        "text": "A microwave, kettle, or toaster if not already provided"
+      },
+      {
+        "text": "Cleaning kit: all-purpose spray, dish soap, sponges, a mop, broom, and vacuum"
+      },
+      {
+        "text": "Laundry basket, detergent, and a drying rack"
+      },
+      {
+        "text": "Toilet paper, hand soap, and a plunger",
+        "note": "Buy the plunger before you need it."
+      },
+      {
+        "text": "A basic toolkit: hammer, screwdrivers, tape measure, and picture hooks"
+      },
+      {
+        "text": "Extension leads and enough phone and laptop chargers"
+      },
+      {
+        "text": "A first-aid kit and basic medicines"
+      },
+      {
+        "text": "Working smoke and carbon-monoxide detectors",
+        "note": "Test the ones provided, or fit your own."
+      },
+      {
+        "text": "Trash and recycling bins"
+      },
+      {
+        "text": "Light bulbs and a lamp or nightlight for each room"
+      },
+      {
+        "text": "Renter's insurance and copies of your lease and inventory",
+        "note": "Photograph any existing damage on day one."
+      },
+      {
+        "text": "A shower caddy, bath mat, and toothbrush holder"
+      },
+      {
+        "text": "Pantry staples: salt, oil, pasta, coffee or tea"
+      },
+      {
+        "text": "A doormat and a few command hooks for keys"
+      }
+    ]
+  },
+  {
+    "slug": "moving-house-checklist",
+    "category": "moving",
+    "title": "Moving House Checklist",
+    "ordered": true,
+    "items": [
+      {
+        "text": "Eight weeks out: set your moving date and budget, and decide between movers and a DIY van",
+        "note": "Get three quotes before you book."
+      },
+      {
+        "text": "Seven weeks out: declutter room by room and sell, donate, or bin what you won't take",
+        "note": "You pay to move everything, so lighten the load first."
+      },
+      {
+        "text": "Six weeks out: book your movers or hire van, and reserve any elevator or parking permits",
+        "note": "Good movers book out early in summer."
+      },
+      {
+        "text": "Five weeks out: gather boxes, tape, bubble wrap, and markers, and start packing rarely-used rooms"
+      },
+      {
+        "text": "Four weeks out: notify your landlord or list your home, and confirm your new address details"
+      },
+      {
+        "text": "Three weeks out: transfer or set up utilities, internet, and insurance at the new place",
+        "note": "Book the internet install early — slots fill up."
+      },
+      {
+        "text": "Two weeks out: file your change of address and redirect your mail",
+        "note": "See our change-of-address checklist for who to tell."
+      },
+      {
+        "text": "One week out: pack everything but essentials, label boxes by room, and defrost the freezer"
+      },
+      {
+        "text": "Two days out: pack an essentials box (chargers, toiletries, meds, a change of clothes) and keep it with you"
+      },
+      {
+        "text": "Moving day: photograph meter readings, do a final walkthrough, and check every room and cupboard before you leave"
+      },
+      {
+        "text": "First day in: find the fuse box, stopcock, and thermostat, and test that the utilities work"
+      },
+      {
+        "text": "First week in: unpack essentials, update your address on IDs and accounts, and register with a local doctor"
+      }
+    ]
+  },
+  {
+    "slug": "new-home-setup-checklist",
+    "category": "moving",
+    "title": "New Home Setup Checklist",
+    "ordered": false,
+    "items": [
+      {
+        "text": "Locate and label the fuse box, water stopcock, and gas shut-off",
+        "note": "You'll want these in an emergency, not during one."
+      },
+      {
+        "text": "Test smoke and carbon-monoxide alarms and replace any dead batteries"
+      },
+      {
+        "text": "Take meter readings (gas, electric, water) and send them to your providers"
+      },
+      {
+        "text": "Confirm utilities, heating, and hot water all work"
+      },
+      {
+        "text": "Change the locks, or at least have the keys re-keyed",
+        "note": "You don't know who else still has a copy."
+      },
+      {
+        "text": "Set up and test your internet and Wi-Fi"
+      },
+      {
+        "text": "Do a deep clean before furniture arrives",
+        "note": "Kitchen, bathroom, and floors are easiest empty."
+      },
+      {
+        "text": "Check for leaks, damp, or pest signs and photograph any issues for your records"
+      },
+      {
+        "text": "Find the nearest hospital, pharmacy, and grocery store"
+      },
+      {
+        "text": "Learn your bin and recycling collection days and where the bins go"
+      },
+      {
+        "text": "Unpack your essentials box first: bedding, toiletries, chargers, and a kettle"
+      },
+      {
+        "text": "Register with a local doctor and dentist"
+      },
+      {
+        "text": "Introduce yourself to the neighbours and ask about parking and building quirks"
+      },
+      {
+        "text": "Update your address on IDs, accounts, and deliveries",
+        "note": "See the change-of-address checklist."
+      },
+      {
+        "text": "Set up a basic first-aid kit and a fire extinguisher"
+      },
+      {
+        "text": "Note your landlord's or property manager's emergency contact"
+      },
+      {
+        "text": "Program the thermostat and check every window and door lock"
+      },
+      {
+        "text": "Plan your furniture layout before hauling heavy items around"
+      }
+    ]
+  },
+  {
+    "slug": "packing-to-move-checklist",
+    "category": "moving",
+    "title": "Packing to Move Checklist",
+    "ordered": false,
+    "items": [
+      {
+        "text": "Gather supplies: sturdy boxes in a few sizes, packing tape, bubble wrap, packing paper, and markers"
+      },
+      {
+        "text": "Declutter first — donate, sell, or bin anything you won't use",
+        "note": "Don't pay to move what you'll throw away."
+      },
+      {
+        "text": "Pack room by room, finishing one before you start the next"
+      },
+      {
+        "text": "Label every box with its room and contents, and mark fragile boxes clearly",
+        "note": "Label the sides, not the top — you'll stack them."
+      },
+      {
+        "text": "Keep boxes under about 15kg",
+        "note": "Heavy items in small boxes, light items in big ones."
+      },
+      {
+        "text": "Wrap breakables individually and fill gaps so nothing shifts"
+      },
+      {
+        "text": "Use towels, blankets, and clothing as padding to save on bubble wrap"
+      },
+      {
+        "text": "Keep screws and small parts in labelled bags taped to the furniture they belong to"
+      },
+      {
+        "text": "Photograph the back of your TV and electronics before unplugging them"
+      },
+      {
+        "text": "Pack a \"first night\" essentials box and keep it with you",
+        "note": "Bedding, toiletries, chargers, meds, snacks."
+      },
+      {
+        "text": "Pack a separate valuables bag: documents, jewellery, medications, and small electronics you carry yourself"
+      },
+      {
+        "text": "Empty, clean, and dry appliances, and defrost the freezer at least a day ahead"
+      },
+      {
+        "text": "Seal liquids in bags and pack them upright to stop leaks"
+      },
+      {
+        "text": "Keep a \"packing kit\" of tape, scissors, and a marker you can always find"
+      },
+      {
+        "text": "Leave clothes on hangers and slip a bin bag over them as a quick wardrobe box"
+      },
+      {
+        "text": "Either empty drawers or wrap the whole unit closed — don't overpack them"
+      },
+      {
+        "text": "Count and number your boxes so you know if any go missing"
+      },
+      {
+        "text": "Load the truck with the heaviest items first and against the cab"
+      }
+    ]
+  },
+  {
+    "slug": "back-to-school-supplies-checklist",
+    "category": "study",
+    "title": "Back to School Supplies Checklist",
+    "ordered": false,
+    "items": [
+      {
+        "text": "Backpack that fits a laptop or binders comfortably",
+        "note": "Padded straps matter if your books are heavy."
+      },
+      {
+        "text": "Spiral notebooks, or a binder with loose-leaf paper, for each subject"
+      },
+      {
+        "text": "Pens in black and blue, pencils, and a good eraser"
+      },
+      {
+        "text": "Highlighters in a few colors and a set of markers"
+      },
+      {
+        "text": "Pencil case or pouch to keep it all in one place"
+      },
+      {
+        "text": "Ruler, scissors, and a glue stick"
+      },
+      {
+        "text": "Sticky notes, index cards, and paper clips"
+      },
+      {
+        "text": "Folders or dividers to sort handouts by subject",
+        "note": "One color per subject makes grabbing the right one automatic."
+      },
+      {
+        "text": "A planner or academic calendar for deadlines",
+        "note": "Even with a phone, a paper planner is easy to glance at."
+      },
+      {
+        "text": "Scientific or graphing calculator, if your math class needs one",
+        "note": "Check which model is allowed on tests."
+      },
+      {
+        "text": "Laptop or tablet and its charger"
+      },
+      {
+        "text": "Headphones for library work and online lessons"
+      },
+      {
+        "text": "USB drive or a cloud storage account for backups"
+      },
+      {
+        "text": "Water bottle and a reusable lunch bag or box"
+      },
+      {
+        "text": "Hand sanitizer and a small pack of tissues"
+      },
+      {
+        "text": "Sticky tabs and a stapler for organizing notes"
+      },
+      {
+        "text": "Whiteboard markers or a small dry-erase board for revision"
+      },
+      {
+        "text": "A reusable tote for gym kit or extra books"
+      },
+      {
+        "text": "A first-day kit: schedule, locker combo, ID, and a bit of cash",
+        "note": "Have these ready the night before."
+      }
+    ]
+  },
+  {
+    "slug": "college-packing-checklist",
+    "category": "study",
+    "title": "College Packing Checklist",
+    "ordered": false,
+    "items": [
+      {
+        "text": "Twin XL sheets, a mattress topper, pillows, and a comforter",
+        "note": "Most dorm beds are twin XL, not standard twin — check first."
+      },
+      {
+        "text": "Mattress protector and an extra set of sheets"
+      },
+      {
+        "text": "Bath towels, a hand towel, and a quick-dry shower towel"
+      },
+      {
+        "text": "Shower caddy and flip-flops for shared bathrooms",
+        "note": "Flip-flops are non-negotiable in communal showers."
+      },
+      {
+        "text": "Toiletries, a toothbrush holder, and a refillable water bottle"
+      },
+      {
+        "text": "Laptop, charger, and a padded sleeve or bag"
+      },
+      {
+        "text": "Power strip with surge protection and a couple of extension cords",
+        "note": "Dorm outlets are always too few and too far away."
+      },
+      {
+        "text": "Phone charger, headphones, and any adapters you need"
+      },
+      {
+        "text": "Desk lamp and a small clip-on reading light"
+      },
+      {
+        "text": "Notebooks, pens, highlighters, sticky notes, and a planner"
+      },
+      {
+        "text": "Backpack for class and a reusable water bottle"
+      },
+      {
+        "text": "Under-bed storage bins and a few drawer organizers",
+        "note": "Vertical and under-bed space is where dorms hide extra room."
+      },
+      {
+        "text": "Laundry hamper, detergent pods, and a roll of quarters or a laundry card"
+      },
+      {
+        "text": "Basic first-aid kit and any daily medications",
+        "note": "Include pain relievers, bandages, and a thermometer."
+      },
+      {
+        "text": "Mini fridge or microwave — coordinate so you and your roommate don't both bring one",
+        "note": "Message your roommate before move-in day."
+      },
+      {
+        "text": "A few mugs, plates, utensils, and a reusable food container"
+      },
+      {
+        "text": "Command hooks, poster strips, and a small toolkit",
+        "note": "Adhesive hooks save your deposit — no nails in dorm walls."
+      },
+      {
+        "text": "Fan, plus a warm blanket or throw for cold nights"
+      },
+      {
+        "text": "Important documents: ID, insurance card, and a copy of your housing and class schedule"
+      },
+      {
+        "text": "A little decor — photos, string lights, or a rug to make the room yours"
+      }
+    ]
+  },
+  {
+    "slug": "exam-prep-checklist",
+    "category": "study",
+    "title": "Exam Prep Checklist",
+    "ordered": true,
+    "items": [
+      {
+        "text": "Two weeks out: list every topic on the syllabus and mark each as strong, shaky, or not started",
+        "note": "Be honest — the shaky ones need the most time."
+      },
+      {
+        "text": "Two weeks out: gather your notes, textbook, past papers, and the exam format and mark scheme",
+        "note": "Know how many questions, how long, and what's weighted."
+      },
+      {
+        "text": "Two weeks out: build a revision timetable that gives weak topics more sessions than strong ones"
+      },
+      {
+        "text": "12 days out: start with active recall — close the book and write what you remember, then check",
+        "note": "Re-reading feels productive, but recall is what builds memory."
+      },
+      {
+        "text": "10 days out: turn your weak topics into flashcards or a one-page summary each",
+        "note": "Condensing forces you to understand, not just copy."
+      },
+      {
+        "text": "9 days out: do your first past paper untimed, with notes, to find the gaps"
+      },
+      {
+        "text": "7 days out: teach a tricky topic out loud to someone, or to an empty room",
+        "note": "If you can explain it simply, you know it."
+      },
+      {
+        "text": "6 days out: do a full past paper under real exam conditions and time yourself",
+        "note": "Practice the pressure, not just the content."
+      },
+      {
+        "text": "5 days out: mark your paper against the scheme and re-revise every question you lost marks on"
+      },
+      {
+        "text": "4 days out: space short recall sessions across all topics rather than one long block",
+        "note": "Spaced practice beats massed cramming."
+      },
+      {
+        "text": "3 days out: memorize the formulas, dates, or definitions you still can't recall cold"
+      },
+      {
+        "text": "2 days out: do a final timed paper, then review only your weakest two topics"
+      },
+      {
+        "text": "Day before: pack your bag — ID, pens, calculator, water, and any permitted notes",
+        "note": "Check the calculator batteries and any allowed materials."
+      },
+      {
+        "text": "Day before: confirm the exam time, room, and route, and set two alarms",
+        "note": "Plan to arrive early enough to settle your nerves."
+      },
+      {
+        "text": "Day before: stop revising by early evening, eat well, and get a full night's sleep",
+        "note": "Sleep consolidates memory better than one more hour of cramming."
+      },
+      {
+        "text": "Exam morning: eat breakfast, skim your one-page summaries, and arrive early",
+        "note": "Light review only — no new material on the day."
+      }
+    ]
+  },
+  {
+    "slug": "study-plan-checklist",
+    "category": "study",
+    "title": "Study Plan Checklist",
+    "ordered": true,
+    "items": [
+      {
+        "text": "Set a specific, measurable goal and its deadline",
+        "note": "Pass the chemistry final on the 14th beats study more."
+      },
+      {
+        "text": "List every topic or chapter you need to cover"
+      },
+      {
+        "text": "Rate each topic by how well you know it and how heavily it is weighted",
+        "note": "Weak, high-weight topics get first claim on your time."
+      },
+      {
+        "text": "Estimate how many study sessions each topic needs"
+      },
+      {
+        "text": "Look at your real week and find the hours you can protect for study",
+        "note": "Plan around classes, work, and sleep — not on top of them."
+      },
+      {
+        "text": "Block those hours in a calendar as fixed appointments",
+        "note": "A session with a time and a place is far more likely to happen."
+      },
+      {
+        "text": "Break study into focused blocks with short breaks, like 25 or 50 minutes on, then a rest",
+        "note": "A steady on-off rhythm keeps focus from sagging."
+      },
+      {
+        "text": "Front-load weak topics early, while your energy and runway are highest"
+      },
+      {
+        "text": "Build in spaced repetition — revisit each topic several times, not once",
+        "note": "Spacing sessions out beats one long cram."
+      },
+      {
+        "text": "Choose an active method for each session: recall, past questions, or teaching it aloud",
+        "note": "Doing beats re-reading every time."
+      },
+      {
+        "text": "Add buffer days for catch-up and the topics that run long",
+        "note": "Something always takes longer than planned."
+      },
+      {
+        "text": "Track what you finish and check off each session as you go",
+        "note": "Visible progress is its own motivation."
+      },
+      {
+        "text": "Review the plan weekly and shift time toward whatever is still shaky"
+      },
+      {
+        "text": "Protect sleep, meals, and one rest day so you don't burn out",
+        "note": "A rested brain retains more than an exhausted one."
+      },
+      {
+        "text": "Do a final review pass over everything a few days before the deadline"
+      }
+    ]
+  },
+  {
+    "slug": "thesis-writing-checklist",
+    "category": "study",
+    "title": "Thesis Writing Checklist",
+    "ordered": true,
+    "items": [
+      {
+        "text": "Choose and narrow your topic into a specific, answerable research question",
+        "note": "Too broad is the number-one reason a thesis stalls."
+      },
+      {
+        "text": "Confirm your supervisor and agree on scope, expectations, and a rough timeline"
+      },
+      {
+        "text": "Do a literature review and map what has already been written on your question",
+        "note": "Note the gap your work will fill."
+      },
+      {
+        "text": "Write and get approval for your proposal or research plan"
+      },
+      {
+        "text": "Choose your methodology and, if needed, get ethics or data approval",
+        "note": "Ethics review can take weeks — start it early."
+      },
+      {
+        "text": "Set up a reference manager and log every source as you read",
+        "note": "A citation manager saves days of cleanup later — set it up before you read."
+      },
+      {
+        "text": "Build a chapter outline with a target word count for each section"
+      },
+      {
+        "text": "Collect and analyze your data or primary material"
+      },
+      {
+        "text": "Draft the body chapters first — methods, results, and discussion",
+        "note": "The introduction is easiest to write once you know what you found."
+      },
+      {
+        "text": "Write the introduction and literature review to frame the finished body"
+      },
+      {
+        "text": "Write the conclusion, tying findings back to your original question"
+      },
+      {
+        "text": "Write the abstract last, summarizing the whole thesis in one page"
+      },
+      {
+        "text": "Revise for argument and structure — does each chapter earn its place?",
+        "note": "Fix the big-picture flow before line-editing."
+      },
+      {
+        "text": "Proofread for grammar, and check every citation and reference for accuracy"
+      },
+      {
+        "text": "Format to your department's guidelines: title page, contents, margins, and numbering",
+        "note": "Follow the official template exactly — formatting rejections cost time."
+      },
+      {
+        "text": "Run a final plagiarism check and submit before the deadline, keeping a backup copy",
+        "note": "Submit a day early to absorb any upload problems."
+      }
+    ]
+  },
+  {
+    "slug": "5-day-paris-packing-list",
+    "category": "travel",
+    "title": "5-Day Paris Packing List",
+    "ordered": false,
+    "items": [
+      {
+        "text": "Passport, plus a printed and offline photo of your ID",
+        "note": "Keep the copy separate from the original."
+      },
+      {
+        "text": "Visa or ETIAS authorization, if your nationality needs one",
+        "note": "Check before you fly — approval isn't instant."
+      },
+      {
+        "text": "Two cards and about €50 in cash",
+        "note": "Split them between bags in case one is lost."
+      },
+      {
+        "text": "Phone and a charger with an EU plug adapter",
+        "note": "France uses Type C/E plugs at 230V."
+      },
+      {
+        "text": "Universal travel adapter",
+        "note": "A back-up if your charger is US or UK only."
+      },
+      {
+        "text": "Comfortable, broken-in walking shoes",
+        "note": "Paris is cobblestones — new shoes will blister."
+      },
+      {
+        "text": "Five layerable tops and two bottoms",
+        "note": "Mix-and-match neutrals cut the volume."
+      },
+      {
+        "text": "A light jacket or trench",
+        "note": "Paris evenings are cool even in summer."
+      },
+      {
+        "text": "Compact umbrella",
+        "note": "Rain is common and unpredictable."
+      },
+      {
+        "text": "Crossbody anti-theft bag with a zip",
+        "note": "Pickpockets work the Metro and the queues at big landmarks."
+      },
+      {
+        "text": "Reusable water bottle",
+        "note": "Refill free at the city's Wallace fountains."
+      },
+      {
+        "text": "Pre-booked Louvre and Eiffel Tower tickets, or a Paris Museum Pass",
+        "note": "Skip-the-line — they sell out in peak season."
+      },
+      {
+        "text": "Metro (RATP) app and an offline map",
+        "note": "Download the map before you land."
+      },
+      {
+        "text": "A translation app and a few basic French phrases",
+        "note": "A \"bonjour\" first goes a long way."
+      },
+      {
+        "text": "Daily medications and a small first-aid kit",
+        "note": "Bring enough for the whole trip plus a spare day."
+      },
+      {
+        "text": "Sunglasses"
+      },
+      {
+        "text": "Portable power bank",
+        "note": "A day of maps and photos will drain your phone."
+      },
+      {
+        "text": "Toiletries in a clear bag, packed for 3 days",
+        "note": "Plan one laundry run or a quick sink wash."
+      }
+    ]
+  },
+  {
+    "slug": "beach-vacation-packing-list",
+    "category": "travel",
+    "title": "Beach Vacation Packing List",
+    "ordered": false,
+    "items": [
+      {
+        "text": "Passport or ID and travel documents"
+      },
+      {
+        "text": "Two or three swimsuits",
+        "note": "One's always drying."
+      },
+      {
+        "text": "Reef-safe sunscreen SPF 30+ and after-sun",
+        "note": "Reef-safe is legally required in some destinations."
+      },
+      {
+        "text": "Wide-brim hat and UV-protection sunglasses"
+      },
+      {
+        "text": "Lightweight cover-up or kaftan"
+      },
+      {
+        "text": "Flip-flops plus one pair of walking sandals"
+      },
+      {
+        "text": "Quick-dry beach towel",
+        "note": "Sand-resistant ones pack smaller."
+      },
+      {
+        "text": "Breathable, light clothing for hot days"
+      },
+      {
+        "text": "One warm layer for air-conditioned restaurants and evenings"
+      },
+      {
+        "text": "Aloe vera or after-sun for sunburn"
+      },
+      {
+        "text": "Insect repellent",
+        "note": "Essential for tropical evenings."
+      },
+      {
+        "text": "Waterproof phone pouch and a dry bag for valuables"
+      },
+      {
+        "text": "Refillable water bottle",
+        "note": "Hydration matters in the heat."
+      },
+      {
+        "text": "Beach bag or tote"
+      },
+      {
+        "text": "Daily medications plus motion-sickness tablets for boat trips"
+      },
+      {
+        "text": "Basic first-aid: plasters, antiseptic, painkillers"
+      },
+      {
+        "text": "Portable fan or cooling towel for extreme heat"
+      },
+      {
+        "text": "Snorkel gear if you have it",
+        "note": "Rentals add up fast."
+      },
+      {
+        "text": "E-reader or book with a waterproof case"
+      },
+      {
+        "text": "Power bank and travel adapter"
+      }
+    ]
+  },
+  {
+    "slug": "business-trip-checklist",
+    "category": "travel",
+    "title": "Business Trip Checklist",
+    "ordered": false,
+    "items": [
+      {
+        "text": "Photo ID or passport and any visa needed"
+      },
+      {
+        "text": "Boarding passes, hotel, and rental-car confirmations"
+      },
+      {
+        "text": "Laptop, charger, and a spare charging cable"
+      },
+      {
+        "text": "Phone, power bank, and adapter for your destination"
+      },
+      {
+        "text": "Business cards"
+      },
+      {
+        "text": "Notebook and pens, or a tablet and stylus"
+      },
+      {
+        "text": "Two or three wrinkle-resistant business outfits",
+        "note": "Hang them the moment you arrive."
+      },
+      {
+        "text": "One smart-casual outfit for dinners or downtime"
+      },
+      {
+        "text": "Comfortable dress shoes you've already worn in"
+      },
+      {
+        "text": "Toiletries and a grooming kit in travel sizes"
+      },
+      {
+        "text": "Presentation dongles and an HDMI or USB-C adapter",
+        "note": "Hotels and clients rarely have the right cable."
+      },
+      {
+        "text": "Printed copies of key documents as a backup"
+      },
+      {
+        "text": "Daily medications and basic painkillers"
+      },
+      {
+        "text": "Reusable water bottle and a few snacks"
+      },
+      {
+        "text": "Noise-cancelling headphones for the flight and the hotel"
+      },
+      {
+        "text": "Expense receipts folder or app set up before you go"
+      },
+      {
+        "text": "A small multi-port charger",
+        "note": "Hotel outlets are always in short supply."
+      },
+      {
+        "text": "A light layer for cold conference rooms and planes"
+      }
+    ]
+  },
+  {
+    "slug": "international-flight-checklist",
+    "category": "travel",
+    "title": "International Flight Checklist",
+    "ordered": false,
+    "items": [
+      {
+        "text": "Passport valid for at least 6 months beyond your travel dates",
+        "note": "Many countries refuse entry otherwise."
+      },
+      {
+        "text": "Visa, ETA, or ETIAS for your destination",
+        "note": "Apply well ahead — some take days to approve."
+      },
+      {
+        "text": "Printed or offline boarding pass and hotel confirmation"
+      },
+      {
+        "text": "Travel insurance details and an emergency contact card"
+      },
+      {
+        "text": "Copies of your passport, stored separately and in the cloud"
+      },
+      {
+        "text": "Local currency plus a card that works abroad",
+        "note": "Tell your bank you're travelling so it isn't frozen."
+      },
+      {
+        "text": "Universal power adapter for your destination's plug type"
+      },
+      {
+        "text": "Power bank in your carry-on",
+        "note": "Lithium batteries are banned from checked bags."
+      },
+      {
+        "text": "Medications in your carry-on, in original packaging",
+        "note": "With a doctor's note for anything unusual."
+      },
+      {
+        "text": "Liquids under 100ml in a clear resealable bag for cabin security"
+      },
+      {
+        "text": "Noise-cancelling headphones or earbuds, with content downloaded"
+      },
+      {
+        "text": "Neck pillow, eye mask, and earplugs for long-haul"
+      },
+      {
+        "text": "Refillable water bottle — empty through security, fill after"
+      },
+      {
+        "text": "Snacks that clear customs",
+        "note": "Avoid fresh fruit, meat, or seeds."
+      },
+      {
+        "text": "A change of clothes and essentials in your carry-on",
+        "note": "In case checked luggage is delayed."
+      },
+      {
+        "text": "Check your baggage allowance and weigh your bag at home",
+        "note": "Overweight fees are steep at the airport."
+      },
+      {
+        "text": "Offline maps and a translation app downloaded before you fly"
+      },
+      {
+        "text": "A roaming plan or local eSIM set up before departure"
+      },
+      {
+        "text": "Arrive at the airport about 3 hours before an international departure"
+      }
+    ]
+  },
+  {
+    "slug": "weekend-trip-packing-list",
+    "category": "travel",
+    "title": "Weekend Trip Packing List",
+    "ordered": false,
+    "items": [
+      {
+        "text": "ID or passport and your booking confirmations",
+        "note": "Screenshot them in case there's no signal."
+      },
+      {
+        "text": "Phone charger and a power bank"
+      },
+      {
+        "text": "Two-to-three days of clothes in one color family",
+        "note": "Everything mixes, nothing is wasted."
+      },
+      {
+        "text": "One \"nice\" outfit for dinner out"
+      },
+      {
+        "text": "Pajamas, plus fresh socks and underwear per day and one spare"
+      },
+      {
+        "text": "A light layer — sweater or jacket — for evenings"
+      },
+      {
+        "text": "Comfortable walking shoes, plus one dressier pair"
+      },
+      {
+        "text": "Toiletries in travel-size bottles under 100ml",
+        "note": "The cabin liquid limit for carry-on."
+      },
+      {
+        "text": "Toothbrush, toothpaste, deodorant, and skincare"
+      },
+      {
+        "text": "Daily medications, painkillers, and plasters"
+      },
+      {
+        "text": "Sunglasses and, if sunny, sunscreen"
+      },
+      {
+        "text": "Reusable water bottle"
+      },
+      {
+        "text": "Chargers and cables for every device"
+      },
+      {
+        "text": "A book, headphones, or downloaded shows for the journey"
+      },
+      {
+        "text": "A small day bag or tote for outings"
+      },
+      {
+        "text": "House keys and a card for parking or transit"
+      },
+      {
+        "text": "A foldable tote or laundry bag for dirty clothes"
+      }
+    ]
+  },
+  {
+    "slug": "birthday-party-checklist",
+    "category": "wedding",
+    "title": "Birthday Party Checklist",
+    "ordered": false,
+    "items": [
+      {
+        "text": "Set the date, start and end time, and a rough guest count"
+      },
+      {
+        "text": "Set a budget and split it across food, cake, decor, and entertainment"
+      },
+      {
+        "text": "Pick a theme or color scheme",
+        "note": "A theme makes every other choice — invites, decor, cake — easier."
+      },
+      {
+        "text": "Choose and book the venue, or prep your home",
+        "note": "Book venues 4 to 6 weeks ahead; popular kids' spots go fast on weekends."
+      },
+      {
+        "text": "Send invitations 3 to 4 weeks ahead with an RSVP date",
+        "note": "A clear RSVP date lets you finalize food and favor counts."
+      },
+      {
+        "text": "Plan the menu: food, drinks, and any dietary or allergy needs"
+      },
+      {
+        "text": "Order or bake the cake, and buy candles and a lighter",
+        "note": "Confirm any allergy-safe cake needs when you order."
+      },
+      {
+        "text": "Plan decorations: balloons, banner, tablecloth, and centerpieces"
+      },
+      {
+        "text": "Plan activities and entertainment: games, a playlist, or a photo backdrop"
+      },
+      {
+        "text": "Buy party favors or goodie bags"
+      },
+      {
+        "text": "Buy or wrap the birthday gift"
+      },
+      {
+        "text": "Stock disposables: plates, cups, napkins, utensils, and trash bags"
+      },
+      {
+        "text": "Prep a music playlist and test the speaker"
+      },
+      {
+        "text": "Charge your phone or camera for photos"
+      },
+      {
+        "text": "Day-of: set up 1 to 2 hours early, chill the drinks, and set out food just before guests arrive"
+      },
+      {
+        "text": "Assign someone to greet guests and someone to manage the cake and candles moment",
+        "note": "You'll want a free hand to actually enjoy it."
+      }
+    ]
+  },
+  {
+    "slug": "event-planning-checklist",
+    "category": "wedding",
+    "title": "Event Planning Checklist",
+    "ordered": false,
+    "items": [
+      {
+        "text": "Define the event's goal and how you'll measure success",
+        "note": "Attendance, funds raised, or leads booked — pick the metric up front."
+      },
+      {
+        "text": "Set the date and hold a backup date"
+      },
+      {
+        "text": "Set the budget and set up a simple way to track spending against it"
+      },
+      {
+        "text": "Estimate the headcount and build the guest or attendee list"
+      },
+      {
+        "text": "Book the venue and confirm its capacity and layout"
+      },
+      {
+        "text": "Confirm exactly what the venue includes: tables, chairs, AV, wifi, parking"
+      },
+      {
+        "text": "Hire the caterer and confirm dietary and allergy options",
+        "note": "Ask for a vegetarian, vegan, and gluten-free count on the RSVP."
+      },
+      {
+        "text": "Arrange AV: sound, microphones, projector, and screens",
+        "note": "Always schedule a tech check the day before or morning of."
+      },
+      {
+        "text": "Book speakers, entertainment, or a host, and confirm their needs"
+      },
+      {
+        "text": "Build the run-of-show: a minute-by-minute timeline for the day"
+      },
+      {
+        "text": "Send invitations or open registration, and track RSVPs"
+      },
+      {
+        "text": "Plan decor, signage, and any branding or printed materials"
+      },
+      {
+        "text": "Sort transportation, directions, and parking for attendees"
+      },
+      {
+        "text": "Confirm permits, licenses, and event insurance",
+        "note": "Alcohol, amplified music, and public spaces often need permits."
+      },
+      {
+        "text": "Line up staff or volunteers and give each a clear role"
+      },
+      {
+        "text": "Prepare a day-of contact sheet with every vendor and lead's number"
+      },
+      {
+        "text": "Plan cleanup, teardown, and who returns rentals"
+      },
+      {
+        "text": "After the event: send thank-yous and gather feedback while it's fresh"
+      }
+    ]
+  },
+  {
+    "slug": "party-planning-checklist",
+    "category": "wedding",
+    "title": "Party Planning Checklist",
+    "ordered": false,
+    "items": [
+      {
+        "text": "Pick the occasion, date, and start and end time"
+      },
+      {
+        "text": "Set a headcount and a budget"
+      },
+      {
+        "text": "Choose a venue or prep your own space"
+      },
+      {
+        "text": "Send invites 2 to 3 weeks ahead with an RSVP request",
+        "note": "A group chat or a quick form is enough for a casual party."
+      },
+      {
+        "text": "Plan the menu and quantities, allowing for dietary needs",
+        "note": "Ask about allergies and vegetarians when people RSVP."
+      },
+      {
+        "text": "Plan drinks: alcoholic and non-alcoholic, plus plenty of ice",
+        "note": "Ice is the most-forgotten item — buy more than you think."
+      },
+      {
+        "text": "Write a shopping list and shop 1 to 2 days ahead"
+      },
+      {
+        "text": "Plan decor and lighting for the mood you want",
+        "note": "Dimmer, warmer light instantly makes a room feel like a party."
+      },
+      {
+        "text": "Build a playlist long enough to cover the whole night, and test the speaker"
+      },
+      {
+        "text": "Plan one activity or icebreaker if guests won't all know each other"
+      },
+      {
+        "text": "Arrange seating and flow so people naturally mingle"
+      },
+      {
+        "text": "Stock essentials: cups, plates, napkins, serving utensils, and trash bags"
+      },
+      {
+        "text": "Clear space and set up a spot for coats and bags"
+      },
+      {
+        "text": "Day-of: cook and prep early, chill the drinks, and give the bathroom a quick tidy"
+      },
+      {
+        "text": "Ask a friend to co-host: manage the door and keep drinks and food topped up"
+      },
+      {
+        "text": "Set out food about 15 minutes before guests are due",
+        "note": "First guests always arrive right on time — be ready."
+      }
+    ]
+  },
+  {
+    "slug": "wedding-day-timeline",
+    "category": "wedding",
+    "title": "Wedding Day Timeline",
+    "ordered": true,
+    "items": [
+      {
+        "text": "8:00 am — Light breakfast, hydrate, and shower",
+        "note": "Eat something real; it's a long day and the next full meal is dinner."
+      },
+      {
+        "text": "9:00 am — Hair and makeup begins for the wedding party",
+        "note": "The person getting married goes last so the look is freshest for photos."
+      },
+      {
+        "text": "11:00 am — Photographer arrives for detail shots: rings, dress, invitations, shoes"
+      },
+      {
+        "text": "12:00 pm — Getting-ready photos; the wedding party gets dressed"
+      },
+      {
+        "text": "12:30 pm — Light lunch and drinks for everyone getting ready"
+      },
+      {
+        "text": "1:00 pm — Get into the dress or suit with help on hand for buttons and ties"
+      },
+      {
+        "text": "1:30 pm — First look and private couple portraits",
+        "note": "A first look front-loads photos so you can enjoy cocktail hour later."
+      },
+      {
+        "text": "2:00 pm — Wedding-party and immediate-family group photos"
+      },
+      {
+        "text": "3:00 pm — Tuck away to freshen up as early guests start arriving"
+      },
+      {
+        "text": "3:30 pm — Pre-ceremony music starts and ushers seat guests"
+      },
+      {
+        "text": "4:00 pm — Ceremony begins"
+      },
+      {
+        "text": "4:30 pm — Ceremony ends; cocktail hour starts and any remaining family photos are taken"
+      },
+      {
+        "text": "5:30 pm — Guests move to the reception; the couple is announced in"
+      },
+      {
+        "text": "5:45 pm — First dance"
+      },
+      {
+        "text": "6:00 pm — Dinner is served, opening with a short welcome toast"
+      },
+      {
+        "text": "7:00 pm — Speeches and toasts",
+        "note": "Ask speakers to keep it to 3 to 5 minutes each and cap the total."
+      },
+      {
+        "text": "7:45 pm — Cake cutting"
+      },
+      {
+        "text": "8:00 pm — Dance floor opens with the parent dances"
+      },
+      {
+        "text": "10:30 pm — Last dance and grand send-off",
+        "note": "Line up sparklers, petals, or bubbles a few minutes ahead."
+      },
+      {
+        "text": "11:00 pm — Vendors break down; assign someone to collect gifts, cards, and decor",
+        "note": "Don't leave the gift and card box for the venue staff to gather."
+      }
+    ]
+  },
+  {
+    "slug": "wedding-planning-checklist",
+    "category": "wedding",
+    "title": "Wedding Planning Checklist",
+    "ordered": true,
+    "items": [
+      {
+        "text": "12+ months out: set your total budget, rough guest count, and your top 3 priorities as a couple",
+        "note": "Agree on what you'll splurge on and what you'll skip before you spend a cent."
+      },
+      {
+        "text": "11 months out: tour and book your venue and lock in the date",
+        "note": "Popular venues book a year ahead — the date follows the venue, not the other way around."
+      },
+      {
+        "text": "10 months out: book the photographer and videographer, and hire a planner if you want one"
+      },
+      {
+        "text": "9 months out: book the caterer and start dress and suit shopping",
+        "note": "Wedding dresses can take 6+ months to order and alter."
+      },
+      {
+        "text": "8 months out: book the band or DJ, the officiant, and the florist"
+      },
+      {
+        "text": "7 months out: order your dress, book hotel room blocks for guests, and plan the honeymoon",
+        "note": "Reserve room blocks early so guests get a group rate."
+      },
+      {
+        "text": "6 months out: send save-the-dates and start building your gift registry",
+        "note": "Save-the-dates matter most for destination weddings and holiday-season dates."
+      },
+      {
+        "text": "5 months out: order invitations, plan the ceremony, and choose your wedding party's attire"
+      },
+      {
+        "text": "4 months out: do a cake tasting and order the cake, and buy the wedding rings"
+      },
+      {
+        "text": "3 months out: finalize the menu, book hair and makeup, and apply for the marriage license",
+        "note": "Check your license's validity window — many expire 30 to 90 days after issue."
+      },
+      {
+        "text": "2 months out: mail the invitations with a clear RSVP date, and do a hair and makeup trial",
+        "note": "RSVP deadline about 3 weeks before the wedding gives you time to chase stragglers."
+      },
+      {
+        "text": "6 weeks out: final dress fitting, and start the seating chart"
+      },
+      {
+        "text": "1 month out: confirm the final headcount with all vendors, make final payments, and write your vows"
+      },
+      {
+        "text": "2 weeks out: finalize the seating chart, break in your shoes, and confirm the day-of timeline with every vendor"
+      },
+      {
+        "text": "1 week out: pack for the honeymoon, assemble welcome bags, and delegate day-of tasks to trusted people",
+        "note": "Give someone the vendor contact list so you're not fielding calls in your dress."
+      },
+      {
+        "text": "Day before: attend the rehearsal and rehearsal dinner, drop off items at the venue, and get an early night"
+      }
+    ]
+  },
+  {
+    "slug": "daily-standup-checklist",
+    "category": "work",
+    "title": "Daily Standup Checklist",
+    "ordered": false,
+    "items": [
+      {
+        "text": "Keep it to 15 minutes, timeboxed",
+        "note": "A visible timer keeps everyone honest."
+      },
+      {
+        "text": "Same time, same place (or link), every working day"
+      },
+      {
+        "text": "Everyone stands or stays on camera to keep it brief"
+      },
+      {
+        "text": "Each person shares what they did yesterday"
+      },
+      {
+        "text": "Each person shares what they're doing today"
+      },
+      {
+        "text": "Each person names any blockers",
+        "note": "The blockers are the real point of the meeting — surface them clearly."
+      },
+      {
+        "text": "Update the board or tracker before or during standup so it reflects reality"
+      },
+      {
+        "text": "Flag blockers clearly and name who can help unblock them"
+      },
+      {
+        "text": "Take detailed discussions offline: \"let's take that after standup\"",
+        "note": "A quick parking lot keeps two people from stalling the whole team."
+      },
+      {
+        "text": "Note action items and their owners"
+      },
+      {
+        "text": "Keep the focus on progress toward the sprint or team goal"
+      },
+      {
+        "text": "Don't let it become a status report aimed at the manager",
+        "note": "Standup is for the team to coordinate with each other, not to report upward."
+      },
+      {
+        "text": "Rotate or assign a facilitator to keep time and flow"
+      },
+      {
+        "text": "Follow up on yesterday's blockers to make sure they got resolved"
+      },
+      {
+        "text": "End with clear next steps and who's doing what"
+      }
+    ]
+  },
+  {
+    "slug": "meeting-prep-checklist",
+    "category": "work",
+    "title": "Meeting Prep Checklist",
+    "ordered": false,
+    "items": [
+      {
+        "text": "Define the meeting's purpose and the outcome you want",
+        "note": "If you can't name a clear outcome, you may not need the meeting."
+      },
+      {
+        "text": "Decide whether a meeting is actually needed, or if an email or doc would do"
+      },
+      {
+        "text": "Invite only the people who genuinely need to be there",
+        "note": "Every extra attendee lowers the odds of a decision and raises the cost."
+      },
+      {
+        "text": "Write an agenda and share it ahead of time"
+      },
+      {
+        "text": "Set a clear start and end time, and keep it as short as it can be"
+      },
+      {
+        "text": "Assign a facilitator to run it and a note-taker to capture decisions"
+      },
+      {
+        "text": "Send any pre-reads or materials in advance",
+        "note": "Reading time inside the meeting is wasted group time."
+      },
+      {
+        "text": "Book the room or set up and share the video link"
+      },
+      {
+        "text": "Test the AV, screen sharing, and any demo beforehand"
+      },
+      {
+        "text": "Prepare your slides, data, or demo"
+      },
+      {
+        "text": "List the specific decisions that must be made in the meeting"
+      },
+      {
+        "text": "Come with a proposed recommendation, not just open questions",
+        "note": "It's faster to react to a proposal than to build one from scratch live."
+      },
+      {
+        "text": "Plan time for discussion and for agreeing next steps"
+      },
+      {
+        "text": "Keep a parking lot for off-topic items so they don't derail the agenda"
+      },
+      {
+        "text": "Know who owns following up on the action items afterward"
+      }
+    ]
+  },
+  {
+    "slug": "new-employee-onboarding-checklist",
+    "category": "work",
+    "title": "New Employee Onboarding Checklist",
+    "ordered": true,
+    "items": [
+      {
+        "text": "Before day 1: confirm the signed offer, contract, and start details"
+      },
+      {
+        "text": "Before day 1: set up their email, accounts, and hardware — laptop, badge, and logins",
+        "note": "Nothing kills day-one momentum like waiting on IT for a login."
+      },
+      {
+        "text": "Before day 1: prepare their desk, or ship equipment ahead for a remote start"
+      },
+      {
+        "text": "Before day 1: assign a buddy or mentor and share a first-week schedule",
+        "note": "A go-to peer for small questions speeds up ramp-up more than any doc."
+      },
+      {
+        "text": "Day 1: welcome them, give an office or virtual tour, and introduce the team"
+      },
+      {
+        "text": "Day 1: complete HR paperwork, tax forms, and payroll setup"
+      },
+      {
+        "text": "Day 1: review the role, expectations, and 30/60/90-day goals"
+      },
+      {
+        "text": "Day 1: grant system access and walk through the key tools they'll use"
+      },
+      {
+        "text": "Week 1: set up recurring 1:1s with their manager and key teammates"
+      },
+      {
+        "text": "Week 1: share team docs, processes, and communication norms",
+        "note": "Point them to where things live: the wiki, channels, and who owns what."
+      },
+      {
+        "text": "Week 1: assign a small, achievable first task to build early momentum"
+      },
+      {
+        "text": "Week 1: complete required training and any compliance or security modules"
+      },
+      {
+        "text": "Week 1: add them to relevant meetings, channels, and mailing lists"
+      },
+      {
+        "text": "First month: check in regularly and ask for their early feedback",
+        "note": "A fresh hire spots onboarding gaps you've stopped noticing."
+      },
+      {
+        "text": "First month: review the 30-day goals together and adjust"
+      },
+      {
+        "text": "First month: introduce them to cross-functional partners they'll work with"
+      },
+      {
+        "text": "First month: confirm benefits enrollment is complete"
+      },
+      {
+        "text": "First month: run a 30-day onboarding review to see how they're settling in"
+      }
+    ]
+  },
+  {
+    "slug": "project-kickoff-checklist",
+    "category": "work",
+    "title": "Project Kickoff Checklist",
+    "ordered": true,
+    "items": [
+      {
+        "text": "Define the project goal, scope, and success criteria",
+        "note": "Write down what's explicitly out of scope, too — that's where scope creep starts."
+      },
+      {
+        "text": "Identify the stakeholders and, crucially, the single decision-maker",
+        "note": "One clear owner of the final call prevents deadlock later."
+      },
+      {
+        "text": "Confirm the budget and the resources you actually have"
+      },
+      {
+        "text": "Assemble the team and confirm each person's availability"
+      },
+      {
+        "text": "Define roles and responsibilities so ownership is unambiguous",
+        "note": "A simple RACI (who's responsible, accountable, consulted, informed) works well."
+      },
+      {
+        "text": "Gather and document the requirements"
+      },
+      {
+        "text": "Break the work into milestones and a realistic timeline"
+      },
+      {
+        "text": "Identify dependencies and risks, and note a mitigation for each"
+      },
+      {
+        "text": "Choose your tools for tracking, docs, and communication"
+      },
+      {
+        "text": "Set up the project workspace: the board, repo, or shared folder"
+      },
+      {
+        "text": "Agree on a communication cadence and how status gets reported"
+      },
+      {
+        "text": "Define what done looks like for the first milestone"
+      },
+      {
+        "text": "Schedule the kickoff meeting and send an agenda in advance"
+      },
+      {
+        "text": "Run the kickoff: align on goals, plan, roles, and next steps",
+        "note": "Leave the room only when everyone can state the goal in one sentence."
+      },
+      {
+        "text": "Document the decisions made and share the notes with everyone"
+      },
+      {
+        "text": "Confirm the first tasks and their owners before you close the kickoff"
+      }
+    ]
+  },
+  {
+    "slug": "remote-work-setup-checklist",
+    "category": "work",
+    "title": "Remote Work Setup Checklist",
+    "ordered": false,
+    "items": [
+      {
+        "text": "Reliable high-speed internet, plus a backup like a phone hotspot",
+        "note": "A hotspot saves the day when the router dies mid-call."
+      },
+      {
+        "text": "A dedicated desk or workspace, separate from where you relax"
+      },
+      {
+        "text": "An ergonomic, adjustable chair that supports your back"
+      },
+      {
+        "text": "An external monitor at eye level to keep your neck neutral",
+        "note": "The top of the screen should sit roughly at eye height."
+      },
+      {
+        "text": "An external keyboard and mouse"
+      },
+      {
+        "text": "Good lighting: natural light plus a task lamp"
+      },
+      {
+        "text": "A quality webcam and a headset with a mic for clear calls"
+      },
+      {
+        "text": "A reliable laptop or computer that meets your job's requirements"
+      },
+      {
+        "text": "VPN and security tools installed and configured",
+        "note": "Ask IT for the required setup before you handle any work data."
+      },
+      {
+        "text": "Access to all work accounts and tools, ideally via SSO and a password manager"
+      },
+      {
+        "text": "Communication apps set up: chat, video, and email"
+      },
+      {
+        "text": "Cloud storage and file access configured"
+      },
+      {
+        "text": "A tidy or virtual background for video calls"
+      },
+      {
+        "text": "Cable management and a surge-protected power strip"
+      },
+      {
+        "text": "Set working hours and share your availability and status",
+        "note": "Visible hours help teammates in other time zones know when to reach you."
+      },
+      {
+        "text": "A shutdown routine to end the workday and protect your time off",
+        "note": "A clear stop signal is what keeps remote work from becoming always-on."
+      },
+      {
+        "text": "Know who to contact for IT support"
+      },
+      {
+        "text": "A water bottle and a plan for regular breaks"
+      }
+    ]
+  }
+]

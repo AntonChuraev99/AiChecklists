@@ -34,6 +34,16 @@ service cloud.firestore {
       }
     }
 
+    // Public curated gallery templates — the seed source for the SEO-gallery deep-link
+    // ("Use this checklist" → create-from-template). World-readable (anonymous web + Android
+    // users must read it without sign-in), NEVER client-writable — seeded server-side only.
+    // Contains ONLY curated content (title + item texts), NEVER user data. Keeping it a
+    // top-level collection (NOT under users/{userId}) is what makes public read safe.
+    match /gallery_templates/{templateId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // Existing collections used by Cloud Functions (server-side access via Admin SDK)
     // usage, credits_restore_log, credits_refill_log, premium_events_log,
     // rc_customers, rc_events — accessed only by Admin SDK, default deny is correct.

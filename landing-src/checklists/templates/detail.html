@@ -3,7 +3,12 @@
 
     <article class="max-w-[760px]">
       <h1 class="t-display-s md:t-display-l mb-4">{{h1}}</h1>
-      <p class="t-body-l text-on-surface-variant max-w-[60ch] mb-8">{{intro}}</p>
+      <p class="t-body-l text-on-surface-variant max-w-[60ch] mb-3">{{intro}}</p>
+      <!-- Byline — visible author + freshness, matching the WebPage schema dateModified (GEO E-E-A-T). -->
+      <p class="t-body-m text-on-surface-variant mb-8 flex items-center gap-2">
+        <span aria-hidden="true" class="material-symbols-outlined text-success" style="font-size:18px">verified</span>
+        Curated by the Gisti team · Updated <time datetime="{{reviewedIso}}">{{reviewedLabel}}</time>
+      </p>
 
       <!-- D. The checklist (crawlable list — the core asset) -->
       <h2 class="t-headline-s mt-10 mb-1">{{title}} <span class="t-body-m text-on-surface-variant font-normal">· {{count}} items</span></h2>

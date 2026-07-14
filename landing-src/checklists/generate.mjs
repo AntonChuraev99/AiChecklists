@@ -30,9 +30,52 @@ const OUT_DIR = join(REPO, "landing", "checklists");
 const SITEMAP = join(REPO, "landing", "sitemap.xml");
 
 const BASE = "https://gisti-ai.com";
-const BUILD_DATE = "2026-07-14";       // <loc> lastmod + used everywhere a date is needed
-const BUILD_VERSION = "20260714";      // CSS cache-bust ?v=
+const BUILD_VERSION = "20260714";      // CSS cache-bust ?v= (bump on asset change — NOT a content date)
 const PLAY_URL = "https://play.google.com/store/apps/details?id=com.antonchuraev.aichecklists";
+const APP_URL = "https://app.gisti-ai.com/";
+const LOGO_URL = `${BASE}/apple-touch-icon.png`;
+const OG_IMAGE = `${BASE}/og-image.png`;
+
+// ── GEO / freshness dates ─────────────────────────────────────────────────────
+// datePublished = when this dataset was authored & human-reviewed (FIXED — never
+// auto-bumped). dateModified is per-file `updated` (see checklistDates) and defaults
+// to this — so a re-deploy that changes NOTHING does NOT fake a fresher date.
+// (best-practices-scout 2026: only bump dateModified on genuine content edits, and
+//  keep the visible "Updated" label matching the schema value.)
+const DATASET_PUBLISHED = "2026-07-14";
+
+// ── Shared entity graph (GEO: entity consolidation) ───────────────────────────
+// One Gisti Organization + WebSite repeated (by @id) across every gallery page so an
+// AI engine building a knowledge graph sees a single, consistent publisher entity.
+// sameAs lists only REAL Gisti properties (no fabricated social profiles).
+const ORG_ID = `${BASE}/#organization`;
+const WEBSITE_ID = `${BASE}/#website`;
+const ORG_NODE = {
+  "@type": "Organization",
+  "@id": ORG_ID,
+  name: "Gisti",
+  url: `${BASE}/`,
+  logo: LOGO_URL,
+  sameAs: [PLAY_URL, APP_URL],
+};
+const WEBSITE_NODE = {
+  "@type": "WebSite",
+  "@id": WEBSITE_ID,
+  name: "Gisti",
+  url: `${BASE}/`,
+  inLanguage: "en",
+  publisher: { "@id": ORG_ID },
+};
+
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+// "2026-07-14" -> "July 2026" — honest, low-precision visible freshness label.
+const humanMonth = (iso) => { const [y, m] = iso.split("-").map(Number); return `${MONTHS[m - 1]} ${y}`; };
+// datePublished fixed; dateModified only advances when a file declares `updated`.
+const checklistDates = (cl) => {
+  const published = cl.datePublished || DATASET_PUBLISHED;
+  const modified = cl.updated || published;
+  return { published, modified };
+};
 
 // ── Category registry (spec §5). H1 / icon / tint are the deterministic §5 map;
 //    hubIntro / tileDesc / meta* are authored copy. All 10 categories are present so
@@ -124,8 +167,8 @@ const T = {
 
 // ── Builders: each returns { html, ...jsonLd } from ONE array (no drift) ─────
 
-// crumbs: [{ name, url? }]  (last = current page, no url)
-function buildBreadcrumb(crumbs) {
+// crumbs: [{ name, url? }]  (last = current page, no url) ; id → @id for @graph cross-ref
+function buildBreadcrumb(crumbs, id) {
   const lis = crumbs
     .map((c, i) => {
       const last = i === crumbs.length - 1;
@@ -140,6 +183,7 @@ function buildBreadcrumb(crumbs) {
   const ld = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
+    ...(id ? { "@id": id } : {}),
     itemListElement: crumbs.map((c, i) => ({
       "@type": "ListItem",
       position: i + 1,
@@ -150,8 +194,8 @@ function buildBreadcrumb(crumbs) {
   return { html, ld };
 }
 
-// items: [{ text, note? }] ; ordered: boolean ; title used for ItemList/HowTo name
-function buildItems(items, ordered, title) {
+// items: [{ text, note? }] ; ordered: boolean ; title used for ItemList/HowTo name ; id → @id
+function buildItems(items, ordered, title, id) {
   const rows = items
     .map((it, i) => {
       const marker = ordered
@@ -171,6 +215,7 @@ function buildItems(items, ordered, title) {
   const itemListLd = {
     "@context": "https://schema.org",
     "@type": "ItemList",
+    ...(id ? { "@id": id } : {}),
     name: title,
     numberOfItems: items.length,
     itemListElement: items.map((it, i) => ({
@@ -232,12 +277,20 @@ function buildCard(card) {
 
 // ── Assemble a full page from a body-<main> + head vars ──────────────────────
 function renderPage({ metaTitle, metaDescription, canonical, jsonLdBlocks, main }) {
+  // GEO: emit ONE @graph (nodes cross-referenced by @id) instead of disconnected
+  // <script> blocks — cleaner entity graph for AI crawlers. Strip each node's own
+  // @context (the graph carries it once at the top).
+  const graphNodes = jsonLdBlocks.map((n) => {
+    const { ["@context"]: _ctx, ...rest } = n;
+    return rest;
+  });
+  const graph = { "@context": "https://schema.org", "@graph": graphNodes };
   const head = fill(P.head, {
     title: escAttr(metaTitle),
     description: escAttr(metaDescription),
     canonical: escAttr(canonical),
     v: BUILD_VERSION,
-    jsonld: jsonLdBlocks.map(jsonLdScript).join("\n"),
+    jsonld: jsonLdScript(graph),
   });
   return fill(T.page, { head, style: P.style, header: P.header, footer: P.footer, main });
 }
@@ -251,13 +304,18 @@ function writePage(relDir, html) {
 // ── Detail page ──────────────────────────────────────────────────────────────
 function renderDetail(cl, byKey) {
   const cat = CATEGORIES[cl.category];
-  const crumbs = buildBreadcrumb([
-    { name: "Home", url: homeUrl },
-    { name: "Checklists", url: indexUrl },
-    { name: cat.name, url: hubUrl(cl.category) },
-    { name: cl.title },
-  ]);
-  const list = buildItems(cl.items, !!cl.ordered, cl.title);
+  const url = detailUrl(cl.category, cl.slug);
+  const { published, modified } = checklistDates(cl);
+  const crumbs = buildBreadcrumb(
+    [
+      { name: "Home", url: homeUrl },
+      { name: "Checklists", url: indexUrl },
+      { name: cat.name, url: hubUrl(cl.category) },
+      { name: cl.title },
+    ],
+    `${url}#breadcrumb`
+  );
+  const list = buildItems(cl.items, !!cl.ordered, cl.title, `${url}#checklist`);
   const faq = buildFaq(cl.faq);
 
   // Related cards — resolve slugs (same-cat "slug" or cross-cat "cat/slug").
@@ -285,6 +343,8 @@ function renderDetail(cl, byKey) {
     breadcrumb: crumbs.html,
     h1: escHtml(cl.title),
     intro: cl.intro, // authored raw HTML (may contain <a> to hub)
+    reviewedIso: modified,
+    reviewedLabel: humanMonth(modified),
     title: escHtml(cl.title),
     count: cl.items.length,
     listOpen: list.listOpen,
@@ -295,26 +355,61 @@ function renderDetail(cl, byKey) {
     faq: faq.html,
   });
 
-  const jsonLdBlocks = [crumbs.ld, list.itemListLd, ...(list.howToLd ? [list.howToLd] : []), faq.ld];
+  // WebPage wrapper — ties the page to the Gisti WebSite/Organization entities and
+  // carries the freshness dates + author/publisher (GEO E-E-A-T + entity graph).
+  const webPageLd = {
+    "@type": "WebPage",
+    "@id": `${url}#webpage`,
+    url,
+    name: cl.title,
+    description: cl.metaDescription,
+    inLanguage: "en",
+    isPartOf: { "@id": WEBSITE_ID },
+    breadcrumb: { "@id": `${url}#breadcrumb` },
+    mainEntity: { "@id": `${url}#checklist` },
+    about: { "@type": "Thing", name: cl.title },
+    datePublished: published,
+    dateModified: modified,
+    author: { "@id": ORG_ID },
+    publisher: { "@id": ORG_ID },
+    primaryImageOfPage: { "@type": "ImageObject", url: OG_IMAGE },
+  };
+
+  const jsonLdBlocks = [
+    webPageLd,
+    crumbs.ld,
+    list.itemListLd,
+    ...(list.howToLd ? [list.howToLd] : []),
+    faq.ld,
+    WEBSITE_NODE,
+    ORG_NODE,
+  ];
   const html = renderPage({
     metaTitle: cl.metaTitle,
     metaDescription: cl.metaDescription,
-    canonical: detailUrl(cl.category, cl.slug),
+    canonical: url,
     jsonLdBlocks,
     main,
   });
   writePage(join(cl.category, cl.slug), html);
-  return detailUrl(cl.category, cl.slug);
+  return { url, lastmod: modified };
 }
 
 // ── Hub page ─────────────────────────────────────────────────────────────────
 function renderHub(catKey, children) {
   const cat = CATEGORIES[catKey];
-  const crumbs = buildBreadcrumb([
-    { name: "Home", url: homeUrl },
-    { name: "Checklists", url: indexUrl },
-    { name: cat.name },
-  ]);
+  const url = hubUrl(catKey);
+  // Hub freshness = the newest child's dateModified (honest: the hub changed when its
+  // most-recently-edited checklist did). Falls back to the dataset date.
+  const modified = children.map((c) => checklistDates(c).modified).sort().pop() || DATASET_PUBLISHED;
+  const crumbs = buildBreadcrumb(
+    [
+      { name: "Home", url: homeUrl },
+      { name: "Checklists", url: indexUrl },
+      { name: cat.name },
+    ],
+    `${url}#breadcrumb`
+  );
   const cards = children
     .map((c) =>
       buildCard({
@@ -336,8 +431,16 @@ function renderHub(catKey, children) {
   const collectionLd = {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
+    "@id": `${url}#webpage`,
     name: cat.h1,
-    url: hubUrl(catKey),
+    description: cat.metaDescription,
+    url,
+    inLanguage: "en",
+    isPartOf: { "@id": WEBSITE_ID },
+    breadcrumb: { "@id": `${url}#breadcrumb` },
+    datePublished: DATASET_PUBLISHED,
+    dateModified: modified,
+    publisher: { "@id": ORG_ID },
     mainEntity: {
       "@type": "ItemList",
       numberOfItems: children.length,
@@ -352,17 +455,17 @@ function renderHub(catKey, children) {
   const html = renderPage({
     metaTitle: cat.metaTitle,
     metaDescription: cat.metaDescription,
-    canonical: hubUrl(catKey),
-    jsonLdBlocks: [crumbs.ld, collectionLd],
+    canonical: url,
+    jsonLdBlocks: [collectionLd, crumbs.ld, WEBSITE_NODE, ORG_NODE],
     main,
   });
   writePage(catKey, html);
-  return hubUrl(catKey);
+  return { url, lastmod: modified };
 }
 
 // ── Gallery index ────────────────────────────────────────────────────────────
-function renderIndex(catKeys, countByCat) {
-  const crumbs = buildBreadcrumb([{ name: "Home", url: homeUrl }, { name: "Checklists" }]);
+function renderIndex(catKeys, countByCat, modified) {
+  const crumbs = buildBreadcrumb([{ name: "Home", url: homeUrl }, { name: "Checklists" }], `${indexUrl}#breadcrumb`);
   const tiles = catKeys
     .map((k) => {
       const cat = CATEGORIES[k];
@@ -376,40 +479,55 @@ function renderIndex(catKeys, countByCat) {
 
   const main = fill(T.index, { breadcrumb: crumbs.html, intro: INDEX_INTRO, tiles });
 
-  const itemListLd = {
+  const collectionLd = {
     "@context": "https://schema.org",
-    "@type": "ItemList",
+    "@type": "CollectionPage",
+    "@id": `${indexUrl}#webpage`,
     name: "AI Checklist Gallery",
-    numberOfItems: catKeys.length,
-    itemListElement: catKeys.map((k, i) => ({
-      "@type": "ListItem",
-      position: i + 1,
-      url: hubUrl(k),
-      name: CATEGORIES[k].h1,
-    })),
+    description:
+      "Free, ready-to-use AI checklists for travel, moving, new babies, and more — read the full list on the page, then open it in Gisti.",
+    url: indexUrl,
+    inLanguage: "en",
+    isPartOf: { "@id": WEBSITE_ID },
+    breadcrumb: { "@id": `${indexUrl}#breadcrumb` },
+    datePublished: DATASET_PUBLISHED,
+    dateModified: modified,
+    publisher: { "@id": ORG_ID },
+    mainEntity: {
+      "@type": "ItemList",
+      name: "AI Checklist Gallery",
+      numberOfItems: catKeys.length,
+      itemListElement: catKeys.map((k, i) => ({
+        "@type": "ListItem",
+        position: i + 1,
+        url: hubUrl(k),
+        name: CATEGORIES[k].h1,
+      })),
+    },
   };
   const html = renderPage({
     metaTitle: "AI Checklist Gallery — Free Ready-Made Checklists | Gisti",
     metaDescription:
       "Free, ready-to-use AI checklists for travel, moving, new babies, and more. Read the full list on the page, then open it in Gisti to track and tailor it on Android and the web.",
     canonical: indexUrl,
-    jsonLdBlocks: [crumbs.ld, itemListLd],
+    jsonLdBlocks: [collectionLd, crumbs.ld, WEBSITE_NODE, ORG_NODE],
     main,
   });
   writePage("", html);
-  return indexUrl;
+  return { url: indexUrl, lastmod: modified };
 }
 
 // ── Sitemap ──────────────────────────────────────────────────────────────────
-function writeSitemap(hubUrls, detailUrls) {
-  const entry = (loc, changefreq, priority) =>
-    `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${BUILD_DATE}</lastmod>\n    <changefreq>${changefreq}</changefreq>\n    <priority>${priority}</priority>\n  </url>`;
+function writeSitemap(indexEntry, hubs, details) {
+  // lastmod carries each page's real dateModified (honest freshness — not a build stamp).
+  const entry = (loc, lastmod, changefreq, priority) =>
+    `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>${changefreq}</changefreq>\n    <priority>${priority}</priority>\n  </url>`;
   const rows = [
-    entry(`${BASE}/`, "weekly", "1.0"),
-    entry(`${BASE}/mcp/`, "monthly", "0.8"),
-    entry(indexUrl, "weekly", "0.9"),
-    ...hubUrls.map((u) => entry(u, "weekly", "0.7")),
-    ...detailUrls.map((u) => entry(u, "monthly", "0.6")),
+    entry(`${BASE}/`, DATASET_PUBLISHED, "weekly", "1.0"),
+    entry(`${BASE}/mcp/`, DATASET_PUBLISHED, "monthly", "0.8"),
+    entry(indexEntry.url, indexEntry.lastmod, "weekly", "0.9"),
+    ...hubs.map((h) => entry(h.url, h.lastmod, "weekly", "0.7")),
+    ...details.map((d) => entry(d.url, d.lastmod, "monthly", "0.6")),
   ];
   const xml =
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
@@ -449,25 +567,27 @@ function main() {
 
   // Render, following the fixed CATEGORIES order for anything with data.
   const catKeys = Object.keys(CATEGORIES).filter((k) => cats[k]?.length);
-  const detailUrls = [];
-  const hubUrls = [];
+  const details = [];   // [{ url, lastmod }]
+  const hubs = [];      // [{ url, lastmod }]
   const countByCat = {};
 
   for (const k of catKeys) {
-    for (const cl of cats[k]) detailUrls.push(renderDetail(cl, byKey));
-    hubUrls.push(renderHub(k, cats[k]));
+    for (const cl of cats[k]) details.push(renderDetail(cl, byKey));
+    hubs.push(renderHub(k, cats[k]));
     countByCat[k] = cats[k].length;
   }
-  renderIndex(catKeys, countByCat);
+  // Gallery index freshness = newest checklist edit across the whole set.
+  const siteModified = details.map((d) => d.lastmod).sort().pop() || DATASET_PUBLISHED;
+  const indexEntry = renderIndex(catKeys, countByCat, siteModified);
 
-  const urlCount = writeSitemap(hubUrls, detailUrls);
+  const urlCount = writeSitemap(indexEntry, hubs, details);
 
   console.log(`Generated:`);
-  console.log(`  ${detailUrls.length} detail pages`);
-  console.log(`  ${hubUrls.length} hub pages (${catKeys.join(", ")})`);
+  console.log(`  ${details.length} detail pages`);
+  console.log(`  ${hubs.length} hub pages (${catKeys.join(", ")})`);
   console.log(`  1 gallery index`);
   console.log(`  sitemap.xml with ${urlCount} URLs`);
-  console.log(`Total: ${detailUrls.length + hubUrls.length + 1} pages under landing/checklists/`);
+  console.log(`Total: ${details.length + hubs.length + 1} pages under landing/checklists/`);
 }
 
 main();
