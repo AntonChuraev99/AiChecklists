@@ -1,8 +1,8 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.antonchuraev99/gisti-mcp",
+  "name": "io.github.AntonChuraev99/gisti-mcp",
   "title": "Gisti — AI Checklists",
-  "description": "Read, AI-generate, and edit your Gisti checklists in natural language from any MCP client. Turn a photo, PDF, link, text, or idea into a smart checklist; cross-device and cloud-synced.",
+  "description": "Read, AI-create, and edit your Gisti checklists in plain language from any MCP client.",
   "version": "0.4.0",
   "repository": {
     "url": "https://github.com/AntonChuraev99/AiChecklists",

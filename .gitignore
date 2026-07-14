@@ -116,3 +116,5 @@ client_secret_*.json
 
 # local wrangler dev log
 *.wrangler-dev.log
+mcp-publisher.exe
+mcp-server/mcp-publisher.exe
