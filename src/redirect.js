@@ -25,6 +25,31 @@ const REDIRECT_HOSTS = new Set([
 // Pairs with firebaseConfig.authDomain === "app.gisti-ai.com" (build.gradle.kts).
 const FIREBASE_AUTH_HOST = "aichecklists-40230.firebaseapp.com";
 
+// Digital Asset Links for Android App Links on app.gisti-ai.com. Served by the WORKER
+// (not a static asset) so it survives every wasm rebuild — the assets dir is build
+// output and gets wiped — and is never shadowed by the SPA not_found fallback (which
+// would return the empty-canvas index.html and fail Google's verifier). Lets the gallery
+// deep-link (https://app.gisti-ai.com/?g=create&template=…) open the installed app.
+// Fingerprints:
+//  [0] Play App Signing key SHA-256 — matches Play Console → App integrity → "Digital Asset
+//      Links JSON" (Play re-signs uploads with this key, so Play-installed builds present it).
+//      Required for production. If Play rotates the app-signing key, add the new hash too.
+//  [1] Upload-key SHA-256 (local gisti-release.keystore) — so a LOCAL installRelease build
+//      also auto-verifies App Links during on-device testing. Kept intentionally.
+const ASSETLINKS_JSON = JSON.stringify([
+  {
+    relation: ["delegate_permission/common.handle_all_urls"],
+    target: {
+      namespace: "android_app",
+      package_name: "com.antonchuraev.aichecklists",
+      sha256_cert_fingerprints: [
+        "2C:05:D3:91:76:3C:C9:C2:7C:5E:42:1B:E2:3A:42:DD:6C:7E:E7:EB:86:F9:97:E1:70:A3:A2:10:3B:E4:99:80",
+        "E9:A4:2B:7F:34:2B:43:EE:15:24:57:FE:9E:76:40:44:0B:CD:40:29:F9:12:B2:6B:6D:C3:7B:EF:73:59:04:D2",
+      ],
+    },
+  },
+]);
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -33,6 +58,13 @@ export default {
       url.protocol = "https:";
       url.port = "";
       return Response.redirect(url.toString(), 301);
+    }
+    // Android App Links verification file — must return the JSON directly (200, no
+    // redirect) before the asset/SPA fallback can turn it into index.html.
+    if (url.pathname === "/.well-known/assetlinks.json") {
+      return new Response(ASSETLINKS_JSON, {
+        headers: { "content-type": "application/json", "cache-control": "no-cache" },
+      });
     }
     // Transparent reverse-proxy for Firebase Auth's helper endpoints. MUST run
     // before the asset fallback — otherwise /__/auth/* hits the SPA not_found

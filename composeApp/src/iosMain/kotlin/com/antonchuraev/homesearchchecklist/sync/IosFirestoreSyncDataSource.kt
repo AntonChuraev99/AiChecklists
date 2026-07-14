@@ -3,6 +3,7 @@ package com.antonchuraev.homesearchchecklist.sync
 import com.antonchuraev.homesearchchecklist.core.common.api.AppResult
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.ChecklistSyncData
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.FirestoreSyncDataSource
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.GalleryTemplateSyncData
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.UserDocSyncData
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
@@ -30,5 +31,9 @@ class IosFirestoreSyncDataSource : FirestoreSyncDataSource {
         flowOf(AppResult.Error(Exception("iOS Firestore not implemented")))
 
     override suspend fun findUserIdByGoogleUid(googleUid: String): AppResult<String?> =
+        AppResult.Error(Exception("iOS Firestore not implemented"))
+
+    // iOS is code-only / not released — final stub (matches every sibling above).
+    override suspend fun fetchGalleryTemplate(slug: String): AppResult<GalleryTemplateSyncData?> =
         AppResult.Error(Exception("iOS Firestore not implemented"))
 }

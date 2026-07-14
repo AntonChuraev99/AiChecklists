@@ -10,7 +10,9 @@ import androidx.navigation3.scene.SinglePaneSceneStrategy
 import com.antonchuraev.homesearchchecklist.core.auth.api.GoogleAuthRepository
 import com.antonchuraev.homesearchchecklist.core.auth.api.GoogleAuthState
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
+import com.antonchuraev.homesearchchecklist.feature.create.domain.usecase.CreateChecklistFromGalleryTemplateUseCase
 import com.antonchuraev.homesearchchecklist.feature.create.domain.usecase.CreateWeeklyChecklistUseCase
+import com.antonchuraev.homesearchchecklist.deeplink.PendingGalleryDeepLink
 import com.antonchuraev.homesearchchecklist.csat.CsatBottomSheet
 import com.antonchuraev.homesearchchecklist.csat.CsatIntent
 import com.antonchuraev.homesearchchecklist.csat.CsatViewModel
@@ -73,6 +75,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.weekly_checklist_default_name
+import aichecklists.core.designsystem.generated.resources.gallery_deeplink_not_found
+import aichecklists.core.designsystem.generated.resources.gallery_deeplink_error
 import aichecklists.core.designsystem.generated.resources.feedback_thanks_message
 import aichecklists.core.designsystem.generated.resources.chat_dock_ask_about
 import aichecklists.core.designsystem.generated.resources.chat_ambiguous_match
@@ -443,6 +447,30 @@ fun App() {
                 if (csatState.showFeedbackThanks) {
                     snackbarHostState.showSnackbar(feedbackThanksMessage)
                     csatViewModel.sendIntent(CsatIntent.FeedbackThanksShown)
+                }
+            }
+
+            // ── Gallery deep-link (app.gisti-ai.com/?g=create&template={slug}) ─────────
+            // Platform entry points (wasmJs main.kt / Android MainActivity) parse the slug and
+            // push it into PendingGalleryDeepLink; we observe it here, create the checklist
+            // AS-IS (no AI credit) and land on it. Unknown slug / fetch error → snackbar
+            // (visible feedback — no silent skip). consume() prevents a recompose re-fire.
+            val pendingGalleryDeepLink: PendingGalleryDeepLink = koinInject()
+            val createFromGalleryUseCase: CreateChecklistFromGalleryTemplateUseCase = koinInject()
+            val galleryNotFoundMessage = stringResource(Res.string.gallery_deeplink_not_found)
+            val galleryErrorMessage = stringResource(Res.string.gallery_deeplink_error)
+            LaunchedEffect(Unit) {
+                pendingGalleryDeepLink.pending.collect { slug ->
+                    if (slug.isNullOrBlank()) return@collect
+                    when (val result = createFromGalleryUseCase(slug)) {
+                        is CreateChecklistFromGalleryTemplateUseCase.Result.Created ->
+                            navigator.navigateToChecklistDetail(result.checklistId, clearBackStack = true)
+                        CreateChecklistFromGalleryTemplateUseCase.Result.NotFound ->
+                            snackbarHostState.showSnackbar(galleryNotFoundMessage)
+                        is CreateChecklistFromGalleryTemplateUseCase.Result.Error ->
+                            snackbarHostState.showSnackbar(galleryErrorMessage)
+                    }
+                    pendingGalleryDeepLink.consume()
                 }
             }
 

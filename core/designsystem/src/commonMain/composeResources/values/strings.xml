@@ -636,6 +636,10 @@
     <string name="default_fill_name">AI Fill</string>
     <string name="weekly_checklist_default_name">My Week</string>
 
+    <!-- Gallery deep-link (app.gisti-ai.com/?g=create&template=…) -->
+    <string name="gallery_deeplink_not_found">That checklist template isn't available anymore</string>
+    <string name="gallery_deeplink_error">Couldn't open that checklist. Check your connection and try again</string>
+
     <!-- Share Screen -->
     <string name="share">Share</string>
     <string name="share_screen_title">Share Checklist</string>

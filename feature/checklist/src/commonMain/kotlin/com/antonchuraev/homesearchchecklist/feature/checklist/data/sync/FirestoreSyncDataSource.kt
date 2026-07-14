@@ -39,6 +39,18 @@ interface FirestoreSyncDataSource {
      * doc lets the device converge onto the shared balance.
      */
     suspend fun findUserIdByGoogleUid(googleUid: String): AppResult<String?>
+
+    /**
+     * One-shot read of a public gallery template doc `gallery_templates/{slug}` (top-level,
+     * public read — NOT under `users/{uid}`). Backs the gallery deep-link create-as-is flow.
+     *
+     * Returns:
+     * - [AppResult.Success] with the decoded [GalleryTemplateSyncData] when the doc exists,
+     * - [AppResult.Success] with `null` when no doc matches [slug] (unknown slug — caller
+     *   surfaces "template not found", NOT an error),
+     * - [AppResult.Error] on a transport/decode failure.
+     */
+    suspend fun fetchGalleryTemplate(slug: String): AppResult<GalleryTemplateSyncData?>
 }
 
 @Serializable

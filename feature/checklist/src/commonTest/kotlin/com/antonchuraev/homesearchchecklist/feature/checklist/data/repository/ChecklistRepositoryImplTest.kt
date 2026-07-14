@@ -362,6 +362,7 @@ class ChecklistRepositoryImplTest {
         override suspend fun getAllOrderedByPosition(): List<ChecklistEntity> = emptyList()
         override suspend fun getAllActive(): List<ChecklistEntity> = checklists.filter { !it.isDeleted }
         override suspend fun updateReminder(id: Long, reminderAt: Long?) {}
+        override suspend fun updateReminderFullScreen(id: Long, fullScreen: Boolean) {}
         override suspend fun countActiveReminders(nowMillis: Long): Int = 0
         override suspend fun getActiveReminders(nowMillis: Long): List<ChecklistReminderInfo> = emptyList()
         override suspend fun setRepeatSchedule(id: Long, repeatRuleJson: String?, timeMinutes: Int?, nextAt: Long?) {}

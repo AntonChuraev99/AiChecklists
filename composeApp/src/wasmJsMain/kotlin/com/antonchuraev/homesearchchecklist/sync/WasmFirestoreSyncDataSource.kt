@@ -5,6 +5,7 @@ package com.antonchuraev.homesearchchecklist.sync
 import com.antonchuraev.homesearchchecklist.core.common.api.AppResult
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.ChecklistSyncData
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.FirestoreSyncDataSource
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.GalleryTemplateSyncData
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.UserDocSyncData
 import kotlin.js.Promise
 import kotlinx.coroutines.channels.awaitClose
@@ -262,6 +263,21 @@ internal class WasmFirestoreSyncDataSource : FirestoreSyncDataSource {
                 AppResult.Error(Exception(resp.error ?: "google_uid query failed"))
             }
         }.getOrElse { AppResult.Error(Exception(it.message ?: "findUserIdByGoogleUid failed")) }
+
+    override suspend fun fetchGalleryTemplate(slug: String): AppResult<GalleryTemplateSyncData?> =
+        runCatching {
+            val response = jsFirestoreGetDoc("gallery_templates", slug)
+                .awaitAsString() ?: return AppResult.Error(Exception("Null response"))
+            val resp = jsonParser.decodeFromString(JsResponse.serializer(), response)
+            if (resp.ok) {
+                val data = resp.data?.let {
+                    jsonParser.decodeFromString(GalleryTemplateSyncData.serializer(), it.toString())
+                }
+                AppResult.Success(data)   // data==null → unknown slug
+            } else {
+                AppResult.Error(Exception(resp.error ?: "fetchGalleryTemplate failed"))
+            }
+        }.getOrElse { AppResult.Error(Exception(it.message ?: "fetchGalleryTemplate failed")) }
 }
 
 @Serializable

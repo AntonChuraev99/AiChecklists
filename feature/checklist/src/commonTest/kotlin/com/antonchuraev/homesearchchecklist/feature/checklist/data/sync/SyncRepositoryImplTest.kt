@@ -967,6 +967,7 @@ class SyncRepositoryImplTest {
         override suspend fun incrementAllPositions() {}
         override suspend fun getAllOrderedByPosition(): List<ChecklistEntity> = emptyList()
         override suspend fun updateReminder(id: Long, reminderAt: Long?) {}
+        override suspend fun updateReminderFullScreen(id: Long, fullScreen: Boolean) {}
         override suspend fun countActiveReminders(nowMillis: Long): Int = 0
         override suspend fun getActiveReminders(nowMillis: Long): List<ChecklistReminderInfo> = emptyList()
         override suspend fun setRepeatSchedule(id: Long, repeatRuleJson: String?, timeMinutes: Int?, nextAt: Long?) {}
@@ -1127,6 +1128,9 @@ class SyncRepositoryImplTest {
         }
 
         override suspend fun fetchAllChecklists(userId: String): AppResult<List<ChecklistSyncData>> = fetchResult
+
+        override suspend fun fetchGalleryTemplate(slug: String): AppResult<GalleryTemplateSyncData?> =
+            AppResult.Success(null)
     }
 }
 

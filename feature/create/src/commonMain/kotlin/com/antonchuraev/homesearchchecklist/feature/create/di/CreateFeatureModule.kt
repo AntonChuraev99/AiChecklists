@@ -2,6 +2,7 @@ package com.antonchuraev.homesearchchecklist.feature.create.di
 
 import com.antonchuraev.homesearchchecklist.feature.create.data.repository.TemplatesRepositoryImpl
 import com.antonchuraev.homesearchchecklist.feature.create.domain.repository.TemplatesRepository
+import com.antonchuraev.homesearchchecklist.feature.create.domain.usecase.CreateChecklistFromGalleryTemplateUseCase
 import com.antonchuraev.homesearchchecklist.feature.create.domain.usecase.CreateWeeklyChecklistUseCase
 import com.antonchuraev.homesearchchecklist.feature.create.presentation.create.CreateChecklistViewModel
 import com.antonchuraev.homesearchchecklist.feature.create.presentation.preview.TemplatePreviewViewModel
@@ -20,6 +21,9 @@ val createFeatureModule = module {
 
     // Use cases
     factoryOf(::CreateWeeklyChecklistUseCase)
+    // Gallery deep-link create-as-is. Resolves FirestoreSyncDataSource (single, platformModule),
+    // ChecklistRepository (checklistFeatureModule) and AppLogger (commonCoreModule) automatically.
+    factoryOf(::CreateChecklistFromGalleryTemplateUseCase)
 
     // ViewModels
     viewModel { params ->

@@ -4,6 +4,8 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AppResult
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.ChecklistSyncData
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.FillSyncData
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.FirestoreSyncDataSource
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.GalleryTemplateItemData
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.GalleryTemplateSyncData
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.UserDocSyncData
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
@@ -243,4 +245,22 @@ class AndroidFirestoreSyncDataSource : FirestoreSyncDataSource {
     }.getOrElse { e ->
         AppResult.Error(Exception(e.message ?: "google_uid lookup failed", e))
     }
+
+    override suspend fun fetchGalleryTemplate(slug: String): AppResult<GalleryTemplateSyncData?> = runCatching {
+        val snapshot = firestore.collection("gallery_templates").document(slug).get().await()
+        val data = snapshot.data ?: return AppResult.Success(null)
+        @Suppress("UNCHECKED_CAST")
+        val items = (data["items"] as? List<*>)?.filterIsInstance<Map<String, Any?>>()?.map {
+            GalleryTemplateItemData(text = it["text"] as? String ?: "", note = it["note"] as? String)
+        } ?: emptyList()
+        AppResult.Success(
+            GalleryTemplateSyncData(
+                slug = data["slug"] as? String ?: slug,
+                category = data["category"] as? String ?: "",
+                title = data["title"] as? String ?: "",
+                ordered = (data["ordered"] as? Boolean) ?: false,
+                items = items,
+            )
+        )
+    }.getOrElse { e -> AppResult.Error(Exception(e.message ?: "fetchGalleryTemplate failed", e)) }
 }

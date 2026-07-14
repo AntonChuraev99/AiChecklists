@@ -32,6 +32,20 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!--
+              App Links for the SEO-gallery deep-link. Claims the whole app.gisti-ai.com host
+              (App Links can't match a query string); the app inspects g=create&template={slug} in
+              MainActivity code. SEO gallery pages live on the DIFFERENT host gisti-ai.com (NOT
+              claimed) so they keep opening in the browser. autoVerify uses the assetlinks.json
+              served at https://app.gisti-ai.com/.well-known/assetlinks.json.
+            -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="app.gisti-ai.com" />
+            </intent-filter>
         </activity>
 
         <!--

@@ -23,6 +23,7 @@ import com.antonchuraev.homesearchchecklist.settings.di.settingsModule
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.impl.di.remoteConfigModule
 import com.antonchuraev.homesearchchecklist.core.auth.impl.googleAuthModule
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.di.aiChatFeatureModule
+import com.antonchuraev.homesearchchecklist.deeplink.PendingGalleryDeepLink
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.InitialUploadGate
 import com.antonchuraev.homesearchchecklist.sync.InitialUploadGateImpl
 import com.antonchuraev.homesearchchecklist.sync.UserCreditsSync
@@ -57,6 +58,9 @@ val appModule = module {
         platformModule()
     )
     single<AppDatastore> { UserAppDatastoreProvider.instance }
+    // Platform-agnostic hand-off for a gallery deep-link slug. Platform entry points
+    // (wasmJs main.kt / Android MainActivity) push the parsed slug; App.kt observes + handles it.
+    single { PendingGalleryDeepLink() }
     // Gate for the one-time initial upload step of the sync pipeline.
     // Interface lives in :feature:checklist; impl is here so the feature module
     // stays free of any DataStore dependency (same boundary as FirestoreSyncDataSource).

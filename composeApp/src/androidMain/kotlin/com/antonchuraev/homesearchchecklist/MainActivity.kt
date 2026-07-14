@@ -32,6 +32,7 @@ import com.antonchuraev.homesearchchecklist.core.datastore.api.AppThemeMode
 import com.antonchuraev.homesearchchecklist.core.datastore.api.ThemeRepository
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AddToChecklistPurpose
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
+import com.antonchuraev.homesearchchecklist.deeplink.PendingGalleryDeepLink
 import com.antonchuraev.homesearchchecklist.notification.ReminderReceiver
 import com.antonchuraev.homesearchchecklist.push.PushAnalytics
 import com.antonchuraev.homesearchchecklist.retention.RetentionPrefs
@@ -46,6 +47,7 @@ class MainActivity : ComponentActivity() {
     private val appNavigator: AppNavigator by inject()
     private val analyticsTracker: AnalyticsTracker by inject()
     private val retentionPrefs: RetentionPrefs by inject()
+    private val pendingGalleryDeepLink: PendingGalleryDeepLink by inject()
     private val debugMenuDetector = if (AppBuildConfig.isDebug) {
         DebugMenuDetector { appNavigator.navigateToDebugMenu() }
     } else {
@@ -122,6 +124,10 @@ class MainActivity : ComponentActivity() {
         extractProcessTextRequest(intent)?.let { request ->
             pendingProcessText = request
         }
+
+        // Cold start from a gallery App Link (app.gisti-ai.com/?g=create&template={slug}). The slug
+        // is stashed in the retained StateFlow; App.kt's LaunchedEffect consumes it once mounted.
+        submitGalleryDeepLinkIfPresent(intent)
 
         setContent {
             // Reactive edge-to-edge: switch status bar icon style when app theme changes
@@ -248,6 +254,9 @@ class MainActivity : ComponentActivity() {
         extractProcessTextRequest(intent)?.let { request ->
             routeProcessText(request)
         }
+        // Warm start from a gallery App Link — submit the slug; App.kt's collector re-fires on the
+        // distinct value and invokes the create-from-template UseCase.
+        submitGalleryDeepLinkIfPresent(intent)
         // Warm-start push tap: emit push_opened. Cold vs warm are mutually exclusive per tap
         // (onCreate handles cold, onNewIntent handles warm), so this fires exactly once.
         emitPushOpenedIfPresent(intent)
@@ -268,6 +277,22 @@ class MainActivity : ComponentActivity() {
         if (intent?.action != ReminderReceiver.ACTION_OPEN_CHECKLIST) return null
         val id = intent.getLongExtra(ReminderReceiver.EXTRA_NAVIGATE_CHECKLIST_ID, -1L)
         return if (id != -1L) id else null
+    }
+
+    /**
+     * App Links entry for the SEO-gallery deep-link
+     * `https://app.gisti-ai.com/?g=create&template={slug}`. The manifest claims the whole
+     * `app.gisti-ai.com` host (App Links can't match a query string), so we inspect the query
+     * params here: only `g=create` with a non-blank `template` slug is a gallery link. The slug is
+     * stashed in [PendingGalleryDeepLink] (a StateFlow retained until App.kt's collector mounts), so
+     * submitting on cold start in onCreate — before navigation is ready — is enough. Non-matching
+     * VIEW intents (or a normal launcher launch) return null and do nothing.
+     */
+    private fun submitGalleryDeepLinkIfPresent(intent: Intent?) {
+        val uri = intent?.data ?: return
+        if (uri.getQueryParameter("g") != "create") return
+        val slug = uri.getQueryParameter("template")?.takeIf { it.isNotBlank() } ?: return
+        pendingGalleryDeepLink.submit(slug)
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
