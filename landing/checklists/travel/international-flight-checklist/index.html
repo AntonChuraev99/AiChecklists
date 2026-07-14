@@ -14,6 +14,9 @@
   <title>International Flight Checklist (Documents &amp; Carry-On) | Gisti</title>
   <meta name="description" content="Everything to check before an international flight: passport validity, visas, carry-on rules for liquids and power banks, and airport timing. Free, or tailor it in Gisti." />
   <link rel="canonical" href="https://gisti-ai.com/checklists/travel/international-flight-checklist/" />
+  <link rel="alternate" hreflang="en" href="https://gisti-ai.com/checklists/travel/international-flight-checklist/" />
+  <link rel="alternate" hreflang="hi" href="https://gisti-ai.com/hi/checklists/travel/international-flight-checklist/" />
+  <link rel="alternate" hreflang="x-default" href="https://gisti-ai.com/checklists/travel/international-flight-checklist/" />
   <meta name="robots" content="index, follow" />
 
   <!-- Open Graph -->
@@ -41,6 +44,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" rel="stylesheet" />
+
   <!-- Compiled Tailwind utilities (static, minified, zero JS — regenerate with:
        npx tailwindcss@3 -c landing-src/tailwind.config.js -i landing-src/src.css -o landing/tailwind.css --minify).
        Absolute paths: these pages are served deeper than the assets. -->
@@ -342,6 +346,13 @@
     .crumbs li { display: inline-flex; align-items: center; gap: 8px; }
     .crumbs .sep { color: var(--on-surface-variant); }
     ul.checklist, ol.checklist { margin: 0; padding: 0; list-style: none; }
+
+    /* Hindi (Devanagari) — Noto Sans Devanagari carries the script; Roboto stays
+       the primary for Latin/numerals/brand. t-* type-scale classes set no
+       font-family, so they inherit from body; .btn/.src-chip set their own. */
+    html[lang="hi"] body,
+    html[lang="hi"] .btn,
+    html[lang="hi"] .src-chip { font-family: 'Noto Sans Devanagari', Roboto, system-ui, sans-serif; }
   </style>
 
 </head>
@@ -406,135 +417,135 @@
       </p>
 
       <!-- D. The checklist (crawlable list — the core asset) -->
-      <h2 class="t-headline-s mt-10 mb-1">International Flight Checklist <span class="t-body-m text-on-surface-variant font-normal">· 19 items</span></h2>
+      <h2 class="t-headline-s mt-10 mb-4">International Flight Checklist <span class="t-body-m text-on-surface-variant font-normal">· 19 items</span></h2>
       <ul class="checklist space-y-2 mt-4">
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Passport valid for at least 6 months beyond your travel dates</span>
           <p class="t-body-m text-on-surface-variant mt-0.5">Many countries refuse entry otherwise.</p>
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Visa, ETA, or ETIAS for your destination</span>
           <p class="t-body-m text-on-surface-variant mt-0.5">Apply well ahead — some take days to approve.</p>
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Printed or offline boarding pass and hotel confirmation</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Travel insurance details and an emergency contact card</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Copies of your passport, stored separately and in the cloud</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Local currency plus a card that works abroad</span>
           <p class="t-body-m text-on-surface-variant mt-0.5">Tell your bank you're travelling so it isn't frozen.</p>
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Universal power adapter for your destination's plug type</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Power bank in your carry-on</span>
           <p class="t-body-m text-on-surface-variant mt-0.5">Lithium batteries are banned from checked bags.</p>
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Medications in your carry-on, in original packaging</span>
           <p class="t-body-m text-on-surface-variant mt-0.5">With a doctor's note for anything unusual.</p>
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Liquids under 100ml in a clear resealable bag for cabin security</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Noise-cancelling headphones or earbuds, with content downloaded</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Neck pillow, eye mask, and earplugs for long-haul</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Refillable water bottle — empty through security, fill after</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Snacks that clear customs</span>
           <p class="t-body-m text-on-surface-variant mt-0.5">Avoid fresh fruit, meat, or seeds.</p>
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">A change of clothes and essentials in your carry-on</span>
           <p class="t-body-m text-on-surface-variant mt-0.5">In case checked luggage is delayed.</p>
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Check your baggage allowance and weigh your bag at home</span>
           <p class="t-body-m text-on-surface-variant mt-0.5">Overweight fees are steep at the airport.</p>
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Offline maps and a translation app downloaded before you fly</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">A roaming plan or local eSIM set up before departure</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Arrive at the airport about 3 hours before an international departure</span>
@@ -595,8 +606,8 @@
     <section class="mt-16" aria-label="Related checklists">
       <h2 class="t-headline-s mb-6">Related checklists</h2>
       <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-<a href="https://gisti-ai.com/checklists/travel/5-day-paris-packing-list/" class="block reveal lift">
-        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full">
+<a href="https://gisti-ai.com/checklists/travel/5-day-paris-packing-list/" class="block reveal">
+        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full lift">
           <span class="w-12 h-12 rounded-xl grid place-items-center mb-4" style="background:#DDF3F5;color:#006874">
             <span aria-hidden="true" class="material-symbols-outlined">luggage</span>
           </span>
@@ -606,8 +617,8 @@
         </article>
       </a>
 
-<a href="https://gisti-ai.com/checklists/travel/weekend-trip-packing-list/" class="block reveal lift">
-        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full">
+<a href="https://gisti-ai.com/checklists/travel/weekend-trip-packing-list/" class="block reveal">
+        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full lift">
           <span class="w-12 h-12 rounded-xl grid place-items-center mb-4" style="background:#DDF3F5;color:#006874">
             <span aria-hidden="true" class="material-symbols-outlined">luggage</span>
           </span>
@@ -617,8 +628,8 @@
         </article>
       </a>
 
-<a href="https://gisti-ai.com/checklists/travel/beach-vacation-packing-list/" class="block reveal lift">
-        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full">
+<a href="https://gisti-ai.com/checklists/travel/beach-vacation-packing-list/" class="block reveal">
+        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full lift">
           <span class="w-12 h-12 rounded-xl grid place-items-center mb-4" style="background:#DDF3F5;color:#006874">
             <span aria-hidden="true" class="material-symbols-outlined">luggage</span>
           </span>
@@ -628,8 +639,8 @@
         </article>
       </a>
 
-<a href="https://gisti-ai.com/checklists/travel/business-trip-checklist/" class="block reveal lift">
-        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full">
+<a href="https://gisti-ai.com/checklists/travel/business-trip-checklist/" class="block reveal">
+        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full lift">
           <span class="w-12 h-12 rounded-xl grid place-items-center mb-4" style="background:#DDF3F5;color:#006874">
             <span aria-hidden="true" class="material-symbols-outlined">luggage</span>
           </span>

@@ -14,6 +14,9 @@
   <title>Healthy Grocery List (Clean-Eating Staples) | Gisti</title>
   <meta name="description" content="A healthy grocery list of whole-food staples: vegetables, fruit, lean protein, whole grains, and healthy fats. Free, or tailor it with AI in Gisti." />
   <link rel="canonical" href="https://gisti-ai.com/checklists/groceries/healthy-grocery-list/" />
+  <link rel="alternate" hreflang="en" href="https://gisti-ai.com/checklists/groceries/healthy-grocery-list/" />
+  <link rel="alternate" hreflang="hi" href="https://gisti-ai.com/hi/checklists/groceries/healthy-grocery-list/" />
+  <link rel="alternate" hreflang="x-default" href="https://gisti-ai.com/checklists/groceries/healthy-grocery-list/" />
   <meta name="robots" content="index, follow" />
 
   <!-- Open Graph -->
@@ -41,6 +44,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" rel="stylesheet" />
+
   <!-- Compiled Tailwind utilities (static, minified, zero JS — regenerate with:
        npx tailwindcss@3 -c landing-src/tailwind.config.js -i landing-src/src.css -o landing/tailwind.css --minify).
        Absolute paths: these pages are served deeper than the assets. -->
@@ -356,6 +360,13 @@
     .crumbs li { display: inline-flex; align-items: center; gap: 8px; }
     .crumbs .sep { color: var(--on-surface-variant); }
     ul.checklist, ol.checklist { margin: 0; padding: 0; list-style: none; }
+
+    /* Hindi (Devanagari) — Noto Sans Devanagari carries the script; Roboto stays
+       the primary for Latin/numerals/brand. t-* type-scale classes set no
+       font-family, so they inherit from body; .btn/.src-chip set their own. */
+    html[lang="hi"] body,
+    html[lang="hi"] .btn,
+    html[lang="hi"] .src-chip { font-family: 'Noto Sans Devanagari', Roboto, system-ui, sans-serif; }
   </style>
 
 </head>
@@ -420,156 +431,156 @@
       </p>
 
       <!-- D. The checklist (crawlable list — the core asset) -->
-      <h2 class="t-headline-s mt-10 mb-1">Healthy Grocery List <span class="t-body-m text-on-surface-variant font-normal">· 22 items</span></h2>
+      <h2 class="t-headline-s mt-10 mb-4">Healthy Grocery List <span class="t-body-m text-on-surface-variant font-normal">· 22 items</span></h2>
       <ul class="checklist space-y-2 mt-4">
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Leafy greens — spinach, kale, or a mixed salad</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Broccoli, cauliflower, or green beans</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Peppers, carrots, and cucumber for snacking</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Onions, garlic, and sweet potatoes</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Avocados</span>
           <p class="t-body-m text-on-surface-variant mt-0.5">A healthy fat that works in meals and snacks alike.</p>
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Berries, fresh or frozen</span>
           <p class="t-body-m text-on-surface-variant mt-0.5">Frozen is cheaper year-round and just as nutritious.</p>
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Bananas and apples</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Oranges or another citrus for vitamin C</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Chicken or turkey breast</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Eggs</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Fish like salmon, or a canned option</span>
           <p class="t-body-m text-on-surface-variant mt-0.5">Oily fish adds omega-3s a couple of times a week.</p>
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Greek yogurt, plain and unsweetened</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Beans, lentils, or chickpeas</span>
           <p class="t-body-m text-on-surface-variant mt-0.5">Plant protein plus fiber, and very cheap.</p>
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Tofu or tempeh, if you eat it</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Oats for breakfast</span>
           <p class="t-body-m text-on-surface-variant mt-0.5">Plain rolled oats beat sugary cereal.</p>
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Brown rice or quinoa</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Whole-grain bread or wraps</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Nuts and seeds — almonds, walnuts, or chia</span>
           <p class="t-body-m text-on-surface-variant mt-0.5">Great for snacks, but watch the portion size.</p>
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Olive oil for cooking and dressing</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Natural nut butter with no added sugar</span>
           <p class="t-body-m text-on-surface-variant mt-0.5">Check the label — the ingredient list should be just nuts.</p>
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Hummus or a bean dip for veggies</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Herbs, spices, and lemon to flavor food without extra salt or sauce</span>
@@ -630,8 +641,8 @@
     <section class="mt-16" aria-label="Related checklists">
       <h2 class="t-headline-s mb-6">Related checklists</h2>
       <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-<a href="https://gisti-ai.com/checklists/groceries/weekly-grocery-list/" class="block reveal lift">
-        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full">
+<a href="https://gisti-ai.com/checklists/groceries/weekly-grocery-list/" class="block reveal">
+        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full lift">
           <span class="w-12 h-12 rounded-xl grid place-items-center mb-4" style="background:#E7F4EC;color:#2E9E5B">
             <span aria-hidden="true" class="material-symbols-outlined">shopping_cart</span>
           </span>
@@ -641,8 +652,8 @@
         </article>
       </a>
 
-<a href="https://gisti-ai.com/checklists/groceries/meal-plan-shopping-list/" class="block reveal lift">
-        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full">
+<a href="https://gisti-ai.com/checklists/groceries/meal-plan-shopping-list/" class="block reveal">
+        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full lift">
           <span class="w-12 h-12 rounded-xl grid place-items-center mb-4" style="background:#E7F4EC;color:#2E9E5B">
             <span aria-hidden="true" class="material-symbols-outlined">shopping_cart</span>
           </span>
@@ -652,8 +663,8 @@
         </article>
       </a>
 
-<a href="https://gisti-ai.com/checklists/groceries/pantry-staples-checklist/" class="block reveal lift">
-        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full">
+<a href="https://gisti-ai.com/checklists/groceries/pantry-staples-checklist/" class="block reveal">
+        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full lift">
           <span class="w-12 h-12 rounded-xl grid place-items-center mb-4" style="background:#E7F4EC;color:#2E9E5B">
             <span aria-hidden="true" class="material-symbols-outlined">shopping_cart</span>
           </span>

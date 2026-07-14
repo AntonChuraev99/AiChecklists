@@ -7,11 +7,11 @@
       <!-- Byline — visible author + freshness, matching the WebPage schema dateModified (GEO E-E-A-T). -->
       <p class="t-body-m text-on-surface-variant mb-8 flex items-center gap-2">
         <span aria-hidden="true" class="material-symbols-outlined text-success" style="font-size:18px">verified</span>
-        Curated by the Gisti team · Updated <time datetime="{{reviewedIso}}">{{reviewedLabel}}</time>
+        {{uiCurated}} <time datetime="{{reviewedIso}}">{{reviewedLabel}}</time>
       </p>
 
       <!-- D. The checklist (crawlable list — the core asset) -->
-      <h2 class="t-headline-s mt-10 mb-1">{{title}} <span class="t-body-m text-on-surface-variant font-normal">· {{count}} items</span></h2>
+      <h2 class="t-headline-s mt-10 mb-4">{{title}} <span class="t-body-m text-on-surface-variant font-normal">· {{count}} {{uiItems}}</span></h2>
       {{listOpen}}
 {{items}}
       {{listClose}}
@@ -21,11 +21,11 @@
         <div class="flex items-start gap-3">
           <span aria-hidden="true" class="material-symbols-outlined ai-text shrink-0" style="font-size:24px">auto_awesome</span>
           <div>
-            <h3 class="t-title-m mb-1">Make it yours in Gisti</h3>
-            <p class="t-body-m text-on-surface-variant mb-3">Open this checklist in Gisti to tick items off, add your own, set reminders, and keep it in sync across Android and the web. AI can tailor every item to your exact situation.</p>
+            <h3 class="t-title-m mb-1">{{uiMakeTitle}}</h3>
+            <p class="t-body-m text-on-surface-variant mb-3">{{uiMakeBody}}</p>
             <a href="https://app.gisti-ai.com" class="btn btn-secondary btn-pill h-10 px-4 t-label-l">
               <span aria-hidden="true" class="material-symbols-outlined" style="font-size:18px">open_in_new</span>
-              Open Gisti
+              {{uiOpenGisti}}
             </a>
           </div>
         </div>
@@ -39,7 +39,7 @@
 
     <!-- G. Related checklists (full wrap) -->
     <section class="mt-16" aria-label="Related checklists">
-      <h2 class="t-headline-s mb-6">Related checklists</h2>
+      <h2 class="t-headline-s mb-6">{{uiRelated}}</h2>
       <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
 {{related}}
       </div>
@@ -47,7 +47,7 @@
 
     <!-- H. FAQ -->
     <section class="mt-16 mb-20 max-w-[760px]" aria-label="Frequently asked questions">
-      <h2 class="t-headline-s mb-6">Frequently asked questions</h2>
+      <h2 class="t-headline-s mb-6">{{uiFaqHeading}}</h2>
 {{faq}}
     </section>
   </main>

@@ -14,6 +14,9 @@
   <title>Self-Care Checklist (Daily &amp; Weekly) | Gisti</title>
   <meta name="description" content="A self-care checklist across mind and body: sleep, movement, connection, and rest so you actually recharge. Free, or tailor it to your week with AI in Gisti." />
   <link rel="canonical" href="https://gisti-ai.com/checklists/fitness/self-care-checklist/" />
+  <link rel="alternate" hreflang="en" href="https://gisti-ai.com/checklists/fitness/self-care-checklist/" />
+  <link rel="alternate" hreflang="hi" href="https://gisti-ai.com/hi/checklists/fitness/self-care-checklist/" />
+  <link rel="alternate" hreflang="x-default" href="https://gisti-ai.com/checklists/fitness/self-care-checklist/" />
   <meta name="robots" content="index, follow" />
 
   <!-- Open Graph -->
@@ -41,6 +44,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" rel="stylesheet" />
+
   <!-- Compiled Tailwind utilities (static, minified, zero JS — regenerate with:
        npx tailwindcss@3 -c landing-src/tailwind.config.js -i landing-src/src.css -o landing/tailwind.css --minify).
        Absolute paths: these pages are served deeper than the assets. -->
@@ -329,6 +333,13 @@
     .crumbs li { display: inline-flex; align-items: center; gap: 8px; }
     .crumbs .sep { color: var(--on-surface-variant); }
     ul.checklist, ol.checklist { margin: 0; padding: 0; list-style: none; }
+
+    /* Hindi (Devanagari) — Noto Sans Devanagari carries the script; Roboto stays
+       the primary for Latin/numerals/brand. t-* type-scale classes set no
+       font-family, so they inherit from body; .btn/.src-chip set their own. */
+    html[lang="hi"] body,
+    html[lang="hi"] .btn,
+    html[lang="hi"] .src-chip { font-family: 'Noto Sans Devanagari', Roboto, system-ui, sans-serif; }
   </style>
 
 </head>
@@ -393,121 +404,121 @@
       </p>
 
       <!-- D. The checklist (crawlable list — the core asset) -->
-      <h2 class="t-headline-s mt-10 mb-1">Self-Care Checklist <span class="t-body-m text-on-surface-variant font-normal">· 17 items</span></h2>
+      <h2 class="t-headline-s mt-10 mb-4">Self-Care Checklist <span class="t-body-m text-on-surface-variant font-normal">· 17 items</span></h2>
       <ul class="checklist space-y-2 mt-4">
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Drink enough water through the day</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Get 7 to 9 hours of sleep</span>
           <p class="t-body-m text-on-surface-variant mt-0.5">A consistent bedtime and wake time matters as much as the hours.</p>
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Move your body for 20 to 30 minutes, even just a walk</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Eat at least one balanced, home-cooked meal</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Step outside for fresh air and daylight</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Take a real break from screens</span>
           <p class="t-body-m text-on-surface-variant mt-0.5">Even 20 minutes away from a screen resets your focus.</p>
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Do one thing purely because you enjoy it</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Connect with a friend or someone you love</span>
           <p class="t-body-m text-on-surface-variant mt-0.5">A short call or message counts — connection is a core need, not a luxury.</p>
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Write down 3 things you're grateful for</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Tidy one small space to clear your head</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Say no to one thing that drains you</span>
           <p class="t-body-m text-on-surface-variant mt-0.5">Protecting your energy is self-care, not selfishness.</p>
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Do a 5-minute breathing or meditation session</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Stretch or take a warm bath to release tension</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Set a limit on doomscrolling and social media</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Take any medications or supplements you need</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Plan something small to look forward to</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Check in with yourself: how am I actually feeling today?</span>
@@ -568,8 +579,8 @@
     <section class="mt-16" aria-label="Related checklists">
       <h2 class="t-headline-s mb-6">Related checklists</h2>
       <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-<a href="https://gisti-ai.com/checklists/fitness/morning-routine-checklist/" class="block reveal lift">
-        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full">
+<a href="https://gisti-ai.com/checklists/fitness/morning-routine-checklist/" class="block reveal">
+        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full lift">
           <span class="w-12 h-12 rounded-xl grid place-items-center mb-4" style="background:#E7F4EC;color:#2E9E5B">
             <span aria-hidden="true" class="material-symbols-outlined">fitness_center</span>
           </span>
@@ -579,8 +590,8 @@
         </article>
       </a>
 
-<a href="https://gisti-ai.com/checklists/fitness/meal-prep-checklist/" class="block reveal lift">
-        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full">
+<a href="https://gisti-ai.com/checklists/fitness/meal-prep-checklist/" class="block reveal">
+        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full lift">
           <span class="w-12 h-12 rounded-xl grid place-items-center mb-4" style="background:#E7F4EC;color:#2E9E5B">
             <span aria-hidden="true" class="material-symbols-outlined">fitness_center</span>
           </span>
@@ -590,8 +601,8 @@
         </article>
       </a>
 
-<a href="https://gisti-ai.com/checklists/work/remote-work-setup-checklist/" class="block reveal lift">
-        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full">
+<a href="https://gisti-ai.com/checklists/work/remote-work-setup-checklist/" class="block reveal">
+        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full lift">
           <span class="w-12 h-12 rounded-xl grid place-items-center mb-4" style="background:#E8EAFD;color:#6366F1">
             <span aria-hidden="true" class="material-symbols-outlined">work</span>
           </span>

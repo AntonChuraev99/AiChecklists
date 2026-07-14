@@ -14,6 +14,9 @@
   <title>Spring Cleaning Checklist (Room by Room) | Gisti</title>
   <meta name="description" content="A room-by-room spring cleaning checklist — declutter, wash windows, flip mattresses, and refresh every room after winter. Free, or tailor it with AI in Gisti." />
   <link rel="canonical" href="https://gisti-ai.com/checklists/cleaning/spring-cleaning-checklist/" />
+  <link rel="alternate" hreflang="en" href="https://gisti-ai.com/checklists/cleaning/spring-cleaning-checklist/" />
+  <link rel="alternate" hreflang="hi" href="https://gisti-ai.com/hi/checklists/cleaning/spring-cleaning-checklist/" />
+  <link rel="alternate" hreflang="x-default" href="https://gisti-ai.com/checklists/cleaning/spring-cleaning-checklist/" />
   <meta name="robots" content="index, follow" />
 
   <!-- Open Graph -->
@@ -41,6 +44,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" rel="stylesheet" />
+
   <!-- Compiled Tailwind utilities (static, minified, zero JS — regenerate with:
        npx tailwindcss@3 -c landing-src/tailwind.config.js -i landing-src/src.css -o landing/tailwind.css --minify).
        Absolute paths: these pages are served deeper than the assets. -->
@@ -341,6 +345,13 @@
     .crumbs li { display: inline-flex; align-items: center; gap: 8px; }
     .crumbs .sep { color: var(--on-surface-variant); }
     ul.checklist, ol.checklist { margin: 0; padding: 0; list-style: none; }
+
+    /* Hindi (Devanagari) — Noto Sans Devanagari carries the script; Roboto stays
+       the primary for Latin/numerals/brand. t-* type-scale classes set no
+       font-family, so they inherit from body; .btn/.src-chip set their own. */
+    html[lang="hi"] body,
+    html[lang="hi"] .btn,
+    html[lang="hi"] .src-chip { font-family: 'Noto Sans Devanagari', Roboto, system-ui, sans-serif; }
   </style>
 
 </head>
@@ -405,142 +416,142 @@
       </p>
 
       <!-- D. The checklist (crawlable list — the core asset) -->
-      <h2 class="t-headline-s mt-10 mb-1">Spring Cleaning Checklist <span class="t-body-m text-on-surface-variant font-normal">· 20 items</span></h2>
+      <h2 class="t-headline-s mt-10 mb-4">Spring Cleaning Checklist <span class="t-body-m text-on-surface-variant font-normal">· 20 items</span></h2>
       <ul class="checklist space-y-2 mt-4">
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Open every window to air out the whole home before you start</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Declutter room by room, sorting into keep, donate, sell, and bin piles</span>
           <p class="t-body-m text-on-surface-variant mt-0.5">Declutter first — there's no point cleaning around things you're getting rid of.</p>
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Wash the windows inside and out, and clean the tracks, sills, and screens</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Launder or dry-clean the curtains, and dust the blinds slat by slat</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Take down and wash light fittings and lampshades, and replace any dead bulbs</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Dust ceiling corners, cornices, and the tops of doorframes and wardrobes</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Wipe walls, skirting boards, switch plates, and door handles</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Vacuum and flip the mattresses, and wash duvets, pillows, and protectors</span>
           <p class="t-body-m text-on-surface-variant mt-0.5">A sunny, breezy day is ideal for airing bedding outside.</p>
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Swap the wardrobe over to the new season, and donate what didn't get worn</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Empty, wipe, and reorganize kitchen cupboards, checking food dates as you go</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Deep-clean the oven, and degrease the extractor hood and its filter</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Defrost the freezer, and wipe the fridge shelves and door seals</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Descale the kettle, coffee machine, and showerhead</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Scrub the bathroom grout and refresh any discoloured sealant</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Wipe down radiators and clear the dust from between the fins</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Clean behind and underneath the heavy furniture and appliances</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Shampoo carpets and rugs, and mop and polish the hard floors</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Wipe the front and inside of every kitchen appliance and small gadget</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Clean and disinfect the bins, and replace worn cloths and sponges</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Tackle one outdoor job: sweep the patio, wash the doormat, or clean the bins</span>
@@ -601,8 +612,8 @@
     <section class="mt-16" aria-label="Related checklists">
       <h2 class="t-headline-s mb-6">Related checklists</h2>
       <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-<a href="https://gisti-ai.com/checklists/cleaning/deep-cleaning-checklist/" class="block reveal lift">
-        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full">
+<a href="https://gisti-ai.com/checklists/cleaning/deep-cleaning-checklist/" class="block reveal">
+        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full lift">
           <span class="w-12 h-12 rounded-xl grid place-items-center mb-4" style="background:#DDF3F5;color:#006874">
             <span aria-hidden="true" class="material-symbols-outlined">cleaning_services</span>
           </span>
@@ -612,8 +623,8 @@
         </article>
       </a>
 
-<a href="https://gisti-ai.com/checklists/cleaning/house-chores-checklist/" class="block reveal lift">
-        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full">
+<a href="https://gisti-ai.com/checklists/cleaning/house-chores-checklist/" class="block reveal">
+        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full lift">
           <span class="w-12 h-12 rounded-xl grid place-items-center mb-4" style="background:#DDF3F5;color:#006874">
             <span aria-hidden="true" class="material-symbols-outlined">cleaning_services</span>
           </span>
@@ -623,8 +634,8 @@
         </article>
       </a>
 
-<a href="https://gisti-ai.com/checklists/cleaning/daily-cleaning-checklist/" class="block reveal lift">
-        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full">
+<a href="https://gisti-ai.com/checklists/cleaning/daily-cleaning-checklist/" class="block reveal">
+        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full lift">
           <span class="w-12 h-12 rounded-xl grid place-items-center mb-4" style="background:#DDF3F5;color:#006874">
             <span aria-hidden="true" class="material-symbols-outlined">cleaning_services</span>
           </span>
@@ -634,8 +645,8 @@
         </article>
       </a>
 
-<a href="https://gisti-ai.com/checklists/cleaning/move-out-cleaning-checklist/" class="block reveal lift">
-        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full">
+<a href="https://gisti-ai.com/checklists/cleaning/move-out-cleaning-checklist/" class="block reveal">
+        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full lift">
           <span class="w-12 h-12 rounded-xl grid place-items-center mb-4" style="background:#DDF3F5;color:#006874">
             <span aria-hidden="true" class="material-symbols-outlined">cleaning_services</span>
           </span>

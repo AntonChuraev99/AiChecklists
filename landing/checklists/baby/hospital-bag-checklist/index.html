@@ -14,6 +14,9 @@
   <title>Hospital Bag Checklist for Labor &amp; Delivery | Gisti</title>
   <meta name="description" content="A hospital bag checklist for you, baby, and your partner: nightwear, maternity pads, going-home outfits, the car seat, and the things first-time moms forget. Free, or tailor in Gisti." />
   <link rel="canonical" href="https://gisti-ai.com/checklists/baby/hospital-bag-checklist/" />
+  <link rel="alternate" hreflang="en" href="https://gisti-ai.com/checklists/baby/hospital-bag-checklist/" />
+  <link rel="alternate" hreflang="hi" href="https://gisti-ai.com/hi/checklists/baby/hospital-bag-checklist/" />
+  <link rel="alternate" hreflang="x-default" href="https://gisti-ai.com/checklists/baby/hospital-bag-checklist/" />
   <meta name="robots" content="index, follow" />
 
   <!-- Open Graph -->
@@ -41,6 +44,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" rel="stylesheet" />
+
   <!-- Compiled Tailwind utilities (static, minified, zero JS — regenerate with:
        npx tailwindcss@3 -c landing-src/tailwind.config.js -i landing-src/src.css -o landing/tailwind.css --minify).
        Absolute paths: these pages are served deeper than the assets. -->
@@ -336,6 +340,13 @@
     .crumbs li { display: inline-flex; align-items: center; gap: 8px; }
     .crumbs .sep { color: var(--on-surface-variant); }
     ul.checklist, ol.checklist { margin: 0; padding: 0; list-style: none; }
+
+    /* Hindi (Devanagari) — Noto Sans Devanagari carries the script; Roboto stays
+       the primary for Latin/numerals/brand. t-* type-scale classes set no
+       font-family, so they inherit from body; .btn/.src-chip set their own. */
+    html[lang="hi"] body,
+    html[lang="hi"] .btn,
+    html[lang="hi"] .src-chip { font-family: 'Noto Sans Devanagari', Roboto, system-ui, sans-serif; }
   </style>
 
 </head>
@@ -400,128 +411,128 @@
       </p>
 
       <!-- D. The checklist (crawlable list — the core asset) -->
-      <h2 class="t-headline-s mt-10 mb-1">Hospital Bag Checklist <span class="t-body-m text-on-surface-variant font-normal">· 18 items</span></h2>
+      <h2 class="t-headline-s mt-10 mb-4">Hospital Bag Checklist <span class="t-body-m text-on-surface-variant font-normal">· 18 items</span></h2>
       <ul class="checklist space-y-2 mt-4">
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Photo ID, insurance details, and your hospital notes or birth plan</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">A comfortable, loose nightgown or two</span>
           <p class="t-body-m text-on-surface-variant mt-0.5">Dark colours hide stains; front-opening helps with feeding.</p>
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">A warm robe, non-slip socks, and slippers for the ward</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Several pairs of high-waisted, disposable, or old underwear</span>
           <p class="t-body-m text-on-surface-variant mt-0.5">They'll get ruined — don't bring your favourites.</p>
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Maternity or heavy-flow pads for after the birth</span>
           <p class="t-body-m text-on-surface-variant mt-0.5">Not tampons.</p>
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">A nursing bra and breast pads if you plan to breastfeed</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Toiletries: toothbrush, toothpaste, lip balm, hair ties, and travel-size wash</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">A going-home outfit for you</span>
           <p class="t-body-m text-on-surface-variant mt-0.5">Loose and comfortable — roughly your 6-months-pregnant size.</p>
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Phone, a long charging cable, and a power bank</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Snacks and drinks for a long labour, plus a card for vending machines</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">For baby: 2-3 bodysuits and sleepers in newborn and 0-3 sizes</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">For baby: a hat, scratch mittens, and socks</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">For baby: a swaddle or blanket and a going-home outfit for the season</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Newborn diapers and a small pack of wipes</span>
           <p class="t-body-m text-on-surface-variant mt-0.5">The hospital may provide some, but bring your own.</p>
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">An installed, rear-facing car seat for the drive home</span>
           <p class="t-body-m text-on-surface-variant mt-0.5">Fit it before your due date.</p>
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">For your partner: a change of clothes, snacks, toiletries, and their own phone charger</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">Any regular medications you take, in their original packaging</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="material-symbols-outlined text-outline" style="font-size:22px">check_box_outline_blank</span>
         <div>
           <span class="t-body-m text-on-surface">A pillow from home</span>
@@ -582,8 +593,8 @@
     <section class="mt-16" aria-label="Related checklists">
       <h2 class="t-headline-s mb-6">Related checklists</h2>
       <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-<a href="https://gisti-ai.com/checklists/baby/newborn-first-month-checklist/" class="block reveal lift">
-        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full">
+<a href="https://gisti-ai.com/checklists/baby/newborn-first-month-checklist/" class="block reveal">
+        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full lift">
           <span class="w-12 h-12 rounded-xl grid place-items-center mb-4" style="background:#F0EAFB;color:#7E5BD0">
             <span aria-hidden="true" class="material-symbols-outlined">child_friendly</span>
           </span>
@@ -593,8 +604,8 @@
         </article>
       </a>
 
-<a href="https://gisti-ai.com/checklists/baby/baby-registry-checklist/" class="block reveal lift">
-        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full">
+<a href="https://gisti-ai.com/checklists/baby/baby-registry-checklist/" class="block reveal">
+        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full lift">
           <span class="w-12 h-12 rounded-xl grid place-items-center mb-4" style="background:#F0EAFB;color:#7E5BD0">
             <span aria-hidden="true" class="material-symbols-outlined">child_friendly</span>
           </span>
@@ -604,8 +615,8 @@
         </article>
       </a>
 
-<a href="https://gisti-ai.com/checklists/baby/diaper-bag-checklist/" class="block reveal lift">
-        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full">
+<a href="https://gisti-ai.com/checklists/baby/diaper-bag-checklist/" class="block reveal">
+        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full lift">
           <span class="w-12 h-12 rounded-xl grid place-items-center mb-4" style="background:#F0EAFB;color:#7E5BD0">
             <span aria-hidden="true" class="material-symbols-outlined">child_friendly</span>
           </span>
@@ -615,8 +626,8 @@
         </article>
       </a>
 
-<a href="https://gisti-ai.com/checklists/baby/baby-proofing-checklist/" class="block reveal lift">
-        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full">
+<a href="https://gisti-ai.com/checklists/baby/baby-proofing-checklist/" class="block reveal">
+        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full lift">
           <span class="w-12 h-12 rounded-xl grid place-items-center mb-4" style="background:#F0EAFB;color:#7E5BD0">
             <span aria-hidden="true" class="material-symbols-outlined">child_friendly</span>
           </span>

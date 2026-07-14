@@ -14,6 +14,9 @@
   <title>Website Launch Checklist (Pre-Launch QA to Go-Live) | Gisti</title>
   <meta name="description" content="A step-by-step website launch checklist — content, SEO, analytics, performance, security, and the go-live checks. Free, or tailor it with AI in Gisti." />
   <link rel="canonical" href="https://gisti-ai.com/checklists/business/website-launch-checklist/" />
+  <link rel="alternate" hreflang="en" href="https://gisti-ai.com/checklists/business/website-launch-checklist/" />
+  <link rel="alternate" hreflang="hi" href="https://gisti-ai.com/hi/checklists/business/website-launch-checklist/" />
+  <link rel="alternate" hreflang="x-default" href="https://gisti-ai.com/checklists/business/website-launch-checklist/" />
   <meta name="robots" content="index, follow" />
 
   <!-- Open Graph -->
@@ -41,6 +44,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" rel="stylesheet" />
+
   <!-- Compiled Tailwind utilities (static, minified, zero JS — regenerate with:
        npx tailwindcss@3 -c landing-src/tailwind.config.js -i landing-src/src.css -o landing/tailwind.css --minify).
        Absolute paths: these pages are served deeper than the assets. -->
@@ -468,6 +472,13 @@
     .crumbs li { display: inline-flex; align-items: center; gap: 8px; }
     .crumbs .sep { color: var(--on-surface-variant); }
     ul.checklist, ol.checklist { margin: 0; padding: 0; list-style: none; }
+
+    /* Hindi (Devanagari) — Noto Sans Devanagari carries the script; Roboto stays
+       the primary for Latin/numerals/brand. t-* type-scale classes set no
+       font-family, so they inherit from body; .btn/.src-chip set their own. */
+    html[lang="hi"] body,
+    html[lang="hi"] .btn,
+    html[lang="hi"] .src-chip { font-family: 'Noto Sans Devanagari', Roboto, system-ui, sans-serif; }
   </style>
 
 </head>
@@ -532,142 +543,142 @@
       </p>
 
       <!-- D. The checklist (crawlable list — the core asset) -->
-      <h2 class="t-headline-s mt-10 mb-1">Website Launch Checklist <span class="t-body-m text-on-surface-variant font-normal">· 20 items</span></h2>
+      <h2 class="t-headline-s mt-10 mb-4">Website Launch Checklist <span class="t-body-m text-on-surface-variant font-normal">· 20 items</span></h2>
       <ol class="checklist space-y-3 mt-4">
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="ai-fill w-8 h-8 rounded-full grid place-items-center text-white shrink-0" style="font-size:14px;font-weight:700">1</span>
         <div>
           <span class="t-body-m text-on-surface">Proofread every page for typos, broken sentences, and leftover placeholder text</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="ai-fill w-8 h-8 rounded-full grid place-items-center text-white shrink-0" style="font-size:14px;font-weight:700">2</span>
         <div>
           <span class="t-body-m text-on-surface">Test every link, button, and navigation menu for dead ends</span>
           <p class="t-body-m text-on-surface-variant mt-0.5">Broken internal links hurt both users and crawlers.</p>
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="ai-fill w-8 h-8 rounded-full grid place-items-center text-white shrink-0" style="font-size:14px;font-weight:700">3</span>
         <div>
           <span class="t-body-m text-on-surface">Check the site on real phones, tablets, and desktop, and across the major browsers</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="ai-fill w-8 h-8 rounded-full grid place-items-center text-white shrink-0" style="font-size:14px;font-weight:700">4</span>
         <div>
           <span class="t-body-m text-on-surface">Confirm all images have alt text and are compressed for fast loading</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="ai-fill w-8 h-8 rounded-full grid place-items-center text-white shrink-0" style="font-size:14px;font-weight:700">5</span>
         <div>
           <span class="t-body-m text-on-surface">Set up and test every form, and confirm submissions arrive where they should</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="ai-fill w-8 h-8 rounded-full grid place-items-center text-white shrink-0" style="font-size:14px;font-weight:700">6</span>
         <div>
           <span class="t-body-m text-on-surface">Add page titles, meta descriptions, and Open Graph tags to each page</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="ai-fill w-8 h-8 rounded-full grid place-items-center text-white shrink-0" style="font-size:14px;font-weight:700">7</span>
         <div>
           <span class="t-body-m text-on-surface">Create and submit an XML sitemap and a robots.txt file</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="ai-fill w-8 h-8 rounded-full grid place-items-center text-white shrink-0" style="font-size:14px;font-weight:700">8</span>
         <div>
           <span class="t-body-m text-on-surface">Set canonical URLs and resolve any duplicate-content issues</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="ai-fill w-8 h-8 rounded-full grid place-items-center text-white shrink-0" style="font-size:14px;font-weight:700">9</span>
         <div>
           <span class="t-body-m text-on-surface">Install analytics and confirm events and conversions actually fire</span>
           <p class="t-body-m text-on-surface-variant mt-0.5">Test in a real browser, not just the tag preview.</p>
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="ai-fill w-8 h-8 rounded-full grid place-items-center text-white shrink-0" style="font-size:14px;font-weight:700">10</span>
         <div>
           <span class="t-body-m text-on-surface">Run a performance audit and fix slow-loading pages and oversized assets</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="ai-fill w-8 h-8 rounded-full grid place-items-center text-white shrink-0" style="font-size:14px;font-weight:700">11</span>
         <div>
           <span class="t-body-m text-on-surface">Confirm HTTPS is enforced and the SSL certificate is valid</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="ai-fill w-8 h-8 rounded-full grid place-items-center text-white shrink-0" style="font-size:14px;font-weight:700">12</span>
         <div>
           <span class="t-body-m text-on-surface">Set up 301 redirects from every old URL to its new equivalent</span>
           <p class="t-body-m text-on-surface-variant mt-0.5">Skipping redirects on a redesign is the fastest way to lose your rankings.</p>
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="ai-fill w-8 h-8 rounded-full grid place-items-center text-white shrink-0" style="font-size:14px;font-weight:700">13</span>
         <div>
           <span class="t-body-m text-on-surface">Add a custom 404 page and test that it works</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="ai-fill w-8 h-8 rounded-full grid place-items-center text-white shrink-0" style="font-size:14px;font-weight:700">14</span>
         <div>
           <span class="t-body-m text-on-surface">Check accessibility: colour contrast, keyboard navigation, and heading structure</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="ai-fill w-8 h-8 rounded-full grid place-items-center text-white shrink-0" style="font-size:14px;font-weight:700">15</span>
         <div>
           <span class="t-body-m text-on-surface">Back up the site and confirm you can actually restore it</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="ai-fill w-8 h-8 rounded-full grid place-items-center text-white shrink-0" style="font-size:14px;font-weight:700">16</span>
         <div>
           <span class="t-body-m text-on-surface">Configure security: firewall, spam protection, and two-factor auth on admin</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="ai-fill w-8 h-8 rounded-full grid place-items-center text-white shrink-0" style="font-size:14px;font-weight:700">17</span>
         <div>
           <span class="t-body-m text-on-surface">Point the domain and DNS, and confirm the site resolves on www and non-www</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="ai-fill w-8 h-8 rounded-full grid place-items-center text-white shrink-0" style="font-size:14px;font-weight:700">18</span>
         <div>
           <span class="t-body-m text-on-surface">Go live, then immediately test the homepage, the checkout or contact path, and the forms</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="ai-fill w-8 h-8 rounded-full grid place-items-center text-white shrink-0" style="font-size:14px;font-weight:700">19</span>
         <div>
           <span class="t-body-m text-on-surface">Submit the site to search engines and request indexing of the key pages</span>
 
         </div>
       </li>
-<li class="flex items-start gap-3 bg-surface rounded-md p-3 border border-outline-variant">
+<li class="flex items-center gap-3 bg-surface rounded-md p-3 border border-outline-variant">
         <span aria-hidden="true" class="ai-fill w-8 h-8 rounded-full grid place-items-center text-white shrink-0" style="font-size:14px;font-weight:700">20</span>
         <div>
           <span class="t-body-m text-on-surface">Monitor analytics, error logs, and uptime for the first days, and fix what breaks</span>
@@ -728,8 +739,8 @@
     <section class="mt-16" aria-label="Related checklists">
       <h2 class="t-headline-s mb-6">Related checklists</h2>
       <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-<a href="https://gisti-ai.com/checklists/business/product-launch-checklist/" class="block reveal lift">
-        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full">
+<a href="https://gisti-ai.com/checklists/business/product-launch-checklist/" class="block reveal">
+        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full lift">
           <span class="w-12 h-12 rounded-xl grid place-items-center mb-4" style="background:#E8EAFD;color:#6366F1">
             <span aria-hidden="true" class="material-symbols-outlined">checklist</span>
           </span>
@@ -739,8 +750,8 @@
         </article>
       </a>
 
-<a href="https://gisti-ai.com/checklists/business/social-media-content-checklist/" class="block reveal lift">
-        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full">
+<a href="https://gisti-ai.com/checklists/business/social-media-content-checklist/" class="block reveal">
+        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full lift">
           <span class="w-12 h-12 rounded-xl grid place-items-center mb-4" style="background:#E8EAFD;color:#6366F1">
             <span aria-hidden="true" class="material-symbols-outlined">checklist</span>
           </span>
@@ -750,8 +761,8 @@
         </article>
       </a>
 
-<a href="https://gisti-ai.com/checklists/business/small-business-setup-checklist/" class="block reveal lift">
-        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full">
+<a href="https://gisti-ai.com/checklists/business/small-business-setup-checklist/" class="block reveal">
+        <article class="bg-surface-card rounded-xl border border-outline-variant p-6 h-full lift">
           <span class="w-12 h-12 rounded-xl grid place-items-center mb-4" style="background:#E8EAFD;color:#6366F1">
             <span aria-hidden="true" class="material-symbols-outlined">checklist</span>
           </span>

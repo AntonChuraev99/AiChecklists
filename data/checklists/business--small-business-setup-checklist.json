@@ -33,5 +33,37 @@
     { "q": "Do I need a business bank account for a small business?", "a": "It's strongly recommended, and for a registered company it's usually required. Even as a sole trader, a separate account keeps business and personal money apart, which makes bookkeeping and tax far simpler and looks more professional to customers and suppliers." },
     { "q": "How much does it cost to set up a small business?", "a": "It varies widely — a sole trader offering a service can start for very little beyond registration and insurance, while a business needing premises, stock, or equipment costs far more. Budget for registration fees, insurance, accounting software, a website, and any licenses, and keep a buffer for the first slow months." }
   ],
-  "related": ["startup-checklist", "website-launch-checklist", "social-media-content-checklist", "product-launch-checklist"]
+  "related": ["startup-checklist", "website-launch-checklist", "social-media-content-checklist", "product-launch-checklist"],
+  "hi": {
+    "title": "स्मॉल बिज़नेस सेटअप चेकलिस्ट",
+    "metaTitle": "स्मॉल बिज़नेस सेटअप चेकलिस्ट (क़दम-दर-क़दम) | Gisti",
+    "metaDescription": "एक क्रमबद्ध स्मॉल बिज़नेस सेटअप चेकलिस्ट: प्लान, रजिस्टर, पैसा, टैक्स, licenses, insurance, और कारोबार शुरू करने की तैयारी। मुफ़्त, या Gisti में ढालें।",
+    "cardDesc": "एक छोटा बिज़नेस खड़ा करने की हर चीज़ — प्लान, रजिस्टर, पैसा, टैक्स, और licenses।",
+    "intro": "एक छोटा बिज़नेस खड़ा करने का मतलब है बुनियाद सही रखना ताकि आप क़ानूनी तौर पर कारोबार कर सकें और बाद में किसी बुरी हैरानी के बिना पैसे पा सकें। यह चेकलिस्ट सेटअप को क्रम से बताती है — एक सादे प्लान और सही क़ानूनी स्ट्रक्चर से लेकर बैंक अकाउंट, टैक्स रजिस्ट्रेशन, licenses, और insurance तक। इसका मक़सद कारोबार खोलने का व्यावहारिक इंतज़ाम है, यह नहीं कि क्या बेचें। और देखें <a href=\"/hi/checklists/business/\" class=\"text-primary hover:underline\">बिज़नेस और लॉन्च चेकलिस्ट</a>।",
+    "items": [
+      { "text": "एक सादा business plan लिखें: आप क्या बेचते हैं, किसे, और पैसे कैसे कमाएँगे" },
+      { "text": "एक बिज़नेस स्ट्रक्चर चुनें (sole trader, LLC, partnership, या company)", "note": "यह आपके टैक्स, काग़ज़ी काम, और निजी देनदारी को प्रभावित करता है — शंका हो तो किसी accountant से पूछें।" },
+      { "text": "अपना बिज़नेस नाम चुनें और उसकी उपलब्धता और trademark टकराव के लिए जाँचें" },
+      { "text": "बिज़नेस को संबंधित सरकारी प्राधिकरण के पास रजिस्टर करें" },
+      { "text": "टैक्स के लिए रजिस्टर करें और ज़रूरी tax ID या नंबर लें" },
+      { "text": "जाँचें कि आपके कारोबार और जगह को कौन-से licenses या permits चाहिए", "note": "ज़रूरतें उद्योग और इलाक़े के हिसाब से बहुत बदलती हैं — यह न मान लें कि कोई नहीं चाहिए।" },
+      { "text": "एक अलग बिज़नेस बैंक अकाउंट खोलें" },
+      { "text": "पहले दिन से bookkeeping या accounting software सेट करें" },
+      { "text": "अपने कारोबार को जो business insurance चाहिए वह लें (liability, professional, contents)" },
+      { "text": "टैक्स के समय के लिए आय, ख़र्च, और रसीदें ट्रैक करने का एक सिस्टम बनाएँ" },
+      { "text": "तय करें कि आप भुगतान कैसे लेंगे: card reader, online checkout, या invoicing" },
+      { "text": "अपने दाम और भुगतान की शर्तें तय करें, और एक invoice template तैयार करें" },
+      { "text": "एक domain रजिस्टर करें और एक प्रोफ़ेशनल ईमेल पता सेट करें" },
+      { "text": "एक सादी website या listing बनाएँ ताकि ग्राहक आपको ढूँढ और संपर्क कर सकें" },
+      { "text": "वे tools सेट करें जिन पर आप बिज़नेस चलाएँगे (calendar, storage, comms)" },
+      { "text": "डिलीवर करने के लिए ज़रूरी suppliers, stock, या उपकरण का इंतज़ाम करें" },
+      { "text": "अपने record-keeping और tax-filing की समयसीमाएँ समझें" },
+      { "text": "पूरी तरह खुलने से पहले अपने सिस्टम परखने के लिए एक soft launch करें" }
+    ],
+    "faq": [
+      { "q": "एक छोटा बिज़नेस खड़ा करने के लिए मुझे क्या चाहिए?", "a": "कम से कम: एक सादा प्लान, सही क़ानूनी स्ट्रक्चर, एक रजिस्टर्ड बिज़नेस नाम, टैक्स रजिस्ट्रेशन, आपके कारोबार को जो भी licenses चाहिए, एक बिज़नेस बैंक अकाउंट, bookkeeping, और उपयुक्त insurance। ये बुनियादें तैयार हो जाने के बाद आप भुगतान ले सकते हैं, invoice बना सकते हैं, और ठीक से कारोबार कर सकते हैं।" },
+      { "q": "क्या छोटे बिज़नेस के लिए मुझे बिज़नेस बैंक अकाउंट चाहिए?", "a": "इसकी पुरज़ोर सलाह दी जाती है, और किसी रजिस्टर्ड company के लिए यह आम तौर पर ज़रूरी होता है। sole trader के रूप में भी, एक अलग अकाउंट बिज़नेस और निजी पैसा अलग रखता है, जिससे bookkeeping और टैक्स कहीं आसान हो जाते हैं और ग्राहकों व suppliers को यह ज़्यादा प्रोफ़ेशनल लगता है।" },
+      { "q": "एक छोटा बिज़नेस खड़ा करने में कितना ख़र्च आता है?", "a": "यह काफ़ी बदलता है — कोई सेवा देने वाला sole trader रजिस्ट्रेशन और insurance से आगे बहुत कम में शुरू कर सकता है, जबकि जगह, stock, या उपकरण चाहने वाले बिज़नेस का ख़र्च कहीं ज़्यादा होता है। रजिस्ट्रेशन फ़ीस, insurance, accounting software, एक website, और किसी भी license के लिए बजट बनाएँ, और शुरुआती धीमे महीनों के लिए कुछ रक़म बचाकर रखें।" }
+    ]
+  }
 }

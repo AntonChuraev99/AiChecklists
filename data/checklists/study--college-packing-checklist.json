@@ -35,5 +35,39 @@
     { "q": "What should I not bring to college?", "a": "Skip candles, halogen lamps, and most hot plates or space heaters — they usually break fire-safety rules. Don't double up on big items like a fridge, microwave, or TV; coordinate with your roommate first. And leave anything you rarely use at home, since dorm rooms are small and storage is tight." },
     { "q": "What is the most forgotten item when packing for college?", "a": "The commonly forgotten ones are a surge-protected power strip, shower flip-flops, a basic first-aid kit, and spare phone and laptop chargers. A small toolkit, command hooks, and a mattress topper are also easy to overlook but make dorm life much more comfortable." }
   ],
-  "related": ["back-to-school-supplies-checklist", "exam-prep-checklist", "study-plan-checklist", "groceries/pantry-staples-checklist"]
+  "related": ["back-to-school-supplies-checklist", "exam-prep-checklist", "study-plan-checklist", "groceries/pantry-staples-checklist"],
+  "hi": {
+    "title": "कॉलेज पैकिंग चेकलिस्ट",
+    "metaTitle": "कॉलेज पैकिंग चेकलिस्ट (डॉर्म ज़रूरी सामान) | Gisti",
+    "metaDescription": "डॉर्म मूव-इन के लिए पूरी कॉलेज पैकिंग चेकलिस्ट: बिस्तर, स्टोरेज, पढ़ाई का सामान, किचन की बुनियादी चीज़ें, और टॉयलेटरीज़। मुफ़्त, या Gisti में AI से अपने हिसाब से ढालें।",
+    "cardDesc": "डॉर्म मूव-इन की ज़रूरी चीज़ें — बिस्तर, स्टोरेज, पढ़ाई का सामान, किचन की बुनियादी चीज़ें, और दस्तावेज़।",
+    "intro": "कॉलेज के लिए पैकिंग एक संतुलन है — छोटे डॉर्म कमरे में घर जैसा महसूस कराने भर सामान लाएँ, पर इतना नहीं कि समा ही न पाए। यह कॉलेज पैकिंग चेकलिस्ट वे ज़रूरी चीज़ें कवर करती है जो छात्र सचमुच काम में लेते हैं, twin XL बिस्तर से लेकर एक power strip और एक बुनियादी first-aid किट तक, और यह भी बताती है कि दो एक जैसी चीज़ें लाने से पहले अपने रूममेट से क्या जाँच लें। और देखें <a href=\"/hi/checklists/study/\" class=\"text-primary hover:underline\">स्टडी और स्कूल चेकलिस्ट</a>।",
+    "items": [
+      { "text": "twin XL चादरें, एक mattress topper, तकिए, और एक रज़ाई", "note": "ज़्यादातर डॉर्म बेड twin XL होते हैं, सामान्य twin नहीं — पहले जाँच लें।" },
+      { "text": "गद्दे का प्रोटेक्टर और चादरों का एक अतिरिक्त सेट" },
+      { "text": "नहाने के तौलिए, एक हाथ का तौलिया, और एक जल्दी सूखने वाला शॉवर तौलिया" },
+      { "text": "साझा बाथरूम के लिए एक शॉवर caddy और flip-flops", "note": "साझा शॉवर में flip-flops पर कोई समझौता नहीं।" },
+      { "text": "टॉयलेटरीज़, एक टूथब्रश होल्डर, और एक दोबारा भरने लायक पानी की बोतल" },
+      { "text": "laptop, चार्जर, और एक गद्देदार sleeve या बैग" },
+      { "text": "सर्ज प्रोटेक्शन वाली power strip और कुछ extension cords", "note": "डॉर्म के सॉकेट हमेशा बहुत कम और बहुत दूर होते हैं।" },
+      { "text": "फ़ोन चार्जर, हेडफ़ोन, और आपको जो भी adapter चाहिए" },
+      { "text": "एक डेस्क लैंप और एक छोटी clip-on पढ़ने की लाइट" },
+      { "text": "नोटबुक, पेन, highlighter, sticky notes, और एक planner" },
+      { "text": "क्लास के लिए एक बैकपैक और एक दोबारा इस्तेमाल होने वाली पानी की बोतल" },
+      { "text": "बेड के नीचे रखने वाले storage डिब्बे और कुछ drawer organizer", "note": "खड़ी और बेड के नीचे की जगह ही वहाँ है जहाँ डॉर्म अतिरिक्त जगह छिपाते हैं।" },
+      { "text": "कपड़े धोने का hamper, detergent pods, और quarters का एक रोल या एक laundry card" },
+      { "text": "एक बुनियादी first-aid किट और कोई भी रोज़ की दवाइयाँ", "note": "दर्द निवारक, पट्टियाँ, और एक थर्मामीटर शामिल करें।" },
+      { "text": "मिनी फ़्रिज या माइक्रोवेव — तालमेल करें ताकि आप और आपका रूममेट दोनों एक न लाएँ", "note": "मूव-इन के दिन से पहले अपने रूममेट को मैसेज करें।" },
+      { "text": "कुछ मग, प्लेट, बर्तन, और एक दोबारा इस्तेमाल होने वाला फ़ूड कंटेनर" },
+      { "text": "Command hooks, poster strips, और एक छोटा toolkit", "note": "चिपकने वाले hooks आपकी जमा राशि बचाते हैं — डॉर्म की दीवारों में कील नहीं।" },
+      { "text": "एक पंखा, साथ में ठंडी रातों के लिए एक गर्म कंबल या throw" },
+      { "text": "ज़रूरी दस्तावेज़: ID, बीमा कार्ड, और अपनी हाउसिंग व क्लास शेड्यूल की एक कॉपी" },
+      { "text": "थोड़ी सजावट — फ़ोटो, string lights, या एक rug ताकि कमरा आपका लगे" }
+    ],
+    "faq": [
+      { "q": "डॉर्म बेड के लिए मुझे किस साइज़ की चादरें चाहिए?", "a": "ज़्यादातर कॉलेज डॉर्म बेड में twin XL गद्दा होता है, जो सामान्य twin से लंबा होता है। twin XL चादरें और एक twin XL mattress topper खरीदें, और खरीदारी से पहले अपने हाउसिंग ऑफ़िस से साइज़ की पुष्टि कर लें, क्योंकि कुछ डॉर्म में सामान्य twin या full बेड होते हैं।" },
+      { "q": "कॉलेज में मुझे क्या नहीं लाना चाहिए?", "a": "मोमबत्तियाँ, halogen लैंप, और ज़्यादातर hot plates या space heaters छोड़ दें — ये आमतौर पर आग-सुरक्षा नियम तोड़ते हैं। फ़्रिज, माइक्रोवेव, या TV जैसी बड़ी चीज़ें दोहराएँ नहीं; पहले अपने रूममेट से तालमेल करें। और जो चीज़ें आप शायद ही इस्तेमाल करते हैं उन्हें घर पर छोड़ दें, क्योंकि डॉर्म कमरे छोटे होते हैं और स्टोरेज कम।" },
+      { "q": "कॉलेज के लिए पैक करते समय सबसे ज़्यादा भूली जाने वाली चीज़ क्या है?", "a": "आमतौर पर भूली जाने वाली चीज़ें हैं एक सर्ज-प्रोटेक्टेड power strip, शॉवर flip-flops, एक बुनियादी first-aid किट, और फ़ोन व laptop के अतिरिक्त चार्जर। एक छोटा toolkit, command hooks, और एक mattress topper भी आसानी से नज़रअंदाज़ हो जाते हैं पर डॉर्म की ज़िंदगी को कहीं आरामदेह बना देते हैं।" }
+    ]
+  }
 }

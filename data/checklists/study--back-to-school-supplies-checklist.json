@@ -34,5 +34,38 @@
     { "q": "How do I organize school supplies by subject?", "a": "Assign one color to each subject and stick to it — a blue folder, blue notebook, and blue divider tab for the same class, for example. Keep loose handouts in dividers inside one binder rather than several notebooks, and use a planner or calendar so every deadline lives in one place." },
     { "q": "When should I buy school supplies?", "a": "Buy the basics a couple of weeks before term starts, when sales are on, but wait on subject-specific items like a particular calculator or lab kit until teachers hand out their supply lists. That way you avoid buying the wrong model or duplicating something the class provides." }
   ],
-  "related": ["college-packing-checklist", "study-plan-checklist", "exam-prep-checklist"]
+  "related": ["college-packing-checklist", "study-plan-checklist", "exam-prep-checklist"],
+  "hi": {
+    "title": "बैक टू स्कूल सप्लाई चेकलिस्ट",
+    "metaTitle": "बैक टू स्कूल सप्लाई चेकलिस्ट (मुफ़्त) | Gisti",
+    "metaDescription": "बुनियादी चीज़ों को कवर करती बैक टू स्कूल सप्लाई चेकलिस्ट: नोटबुक, लिखने के सामान, बैकपैक, organizer, और एक पहले-दिन की किट। मुफ़्त, या Gisti में AI से अपने हिसाब से ढालें।",
+    "cardDesc": "स्कूल-सप्लाई की बुनियादी चीज़ें — नोटबुक, लिखने के सामान, बैकपैक, organizer, और एक पहले-दिन की किट।",
+    "intro": "एक अच्छी बैक टू स्कूल सप्लाई चेकलिस्ट आपको दुकान के दो चक्कर और एक तनाव भरे पहले हफ़्ते से बचा लेती है। यह सूची क्लासरूम की उन बुनियादी चीज़ों को कवर करती है जो ज़्यादातर छात्रों को हर विषय में चाहिए — लिखने के सामान, कागज़, व्यवस्था, और एक छोटी टेक किट — ताकि आप स्कूल की अपनी सप्लाई सूची से इसका मिलान कर सकें और सिर्फ़ वही खरीदें जो कम है। और देखें <a href=\"/hi/checklists/study/\" class=\"text-primary hover:underline\">स्टडी और स्कूल चेकलिस्ट</a>।",
+    "items": [
+      { "text": "एक बैकपैक जिसमें laptop या binder आराम से आ जाएँ", "note": "अगर आपकी किताबें भारी हैं तो गद्देदार स्ट्रैप मायने रखते हैं।" },
+      { "text": "हर विषय के लिए spiral नोटबुक, या loose-leaf कागज़ वाला एक binder" },
+      { "text": "काले और नीले पेन, पेंसिल, और एक अच्छा रबड़" },
+      { "text": "कुछ रंगों के highlighter और markers का एक सेट" },
+      { "text": "एक पेंसिल केस या pouch ताकि सब एक जगह रहे" },
+      { "text": "एक रूलर, कैंची, और एक glue stick" },
+      { "text": "Sticky notes, index cards, और paper clips" },
+      { "text": "हैंडआउट को विषय के हिसाब से छाँटने के लिए folder या divider", "note": "हर विषय के लिए एक रंग सही वाला उठाना अपने आप आसान बना देता है।" },
+      { "text": "डेडलाइन के लिए एक planner या academic calendar", "note": "फ़ोन होते हुए भी, कागज़ का planner एक नज़र में देखना आसान है।" },
+      { "text": "एक scientific या graphing calculator, अगर आपकी गणित की क्लास को चाहिए", "note": "जाँच लें कि टेस्ट में कौन-सा मॉडल अनुमत है।" },
+      { "text": "एक laptop या tablet और उसका चार्जर" },
+      { "text": "लाइब्रेरी के काम और ऑनलाइन क्लास के लिए हेडफ़ोन" },
+      { "text": "बैकअप के लिए एक USB drive या एक क्लाउड स्टोरेज अकाउंट" },
+      { "text": "एक पानी की बोतल और एक दोबारा इस्तेमाल होने वाला लंच बैग या डिब्बा" },
+      { "text": "हैंड सैनिटाइज़र और tissues का एक छोटा पैक" },
+      { "text": "नोट्स व्यवस्थित करने के लिए sticky tabs और एक stapler" },
+      { "text": "रिवीज़न के लिए whiteboard markers या एक छोटा dry-erase बोर्ड" },
+      { "text": "जिम किट या अतिरिक्त किताबों के लिए एक दोबारा इस्तेमाल होने वाला tote" },
+      { "text": "एक पहले-दिन की किट: शेड्यूल, locker का कॉम्बो, ID, और थोड़े पैसे", "note": "इन्हें एक रात पहले तैयार रखें।" }
+    ],
+    "faq": [
+      { "q": "बैक टू स्कूल के लिए मुझे कौन-सी सप्लाई चाहिए?", "a": "मुख्य सेट है एक बैकपैक, नोटबुक या कागज़ वाला एक binder, पेन और पेंसिल, highlighter, folder या divider, और एक planner। बड़े छात्रों के लिए एक calculator, चार्जर के साथ एक laptop या tablet, और हेडफ़ोन जोड़ें। हमेशा पहले अपने स्कूल या शिक्षक की अपनी सप्लाई सूची जाँचें, क्योंकि कुछ विषयों को ख़ास सामान चाहिए।" },
+      { "q": "मैं स्कूल सप्लाई को विषय के हिसाब से कैसे व्यवस्थित करूँ?", "a": "हर विषय को एक रंग दें और उस पर टिके रहें — मसलन एक ही क्लास के लिए नीला folder, नीली नोटबुक, और नीला divider tab। खुले हैंडआउट को कई नोटबुक के बजाय एक binder के भीतर divider में रखें, और एक planner या calendar इस्तेमाल करें ताकि हर डेडलाइन एक ही जगह रहे।" },
+      { "q": "मुझे स्कूल सप्लाई कब खरीदनी चाहिए?", "a": "बुनियादी चीज़ें टर्म शुरू होने से कुछ हफ़्ते पहले खरीदें, जब सेल चल रही हो, पर किसी ख़ास calculator या lab किट जैसी विषय-विशेष चीज़ों के लिए शिक्षकों के अपनी सप्लाई सूची देने तक रुकें। इस तरह आप गलत मॉडल खरीदने या क्लास द्वारा दी जाने वाली किसी चीज़ को दोहराने से बचते हैं।" }
+    ]
+  }
 }

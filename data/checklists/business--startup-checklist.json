@@ -35,5 +35,39 @@
     { "q": "Do I need to register my business before launching?", "a": "For anything beyond a quick test, yes — you'll need a registered business structure to open a business bank account, sign contracts, and handle tax properly. You can validate the idea informally first, but register before you take real money, hire anyone, or sign anything binding." },
     { "q": "What is a minimum viable product (MVP)?", "a": "An MVP is the smallest version of your product that solves the core problem for real users, built to learn rather than to impress. It lets you test whether people actually want and will pay for the solution before you invest in a full build — so you fail cheap, or double down early." }
   ],
-  "related": ["small-business-setup-checklist", "product-launch-checklist", "website-launch-checklist"]
+  "related": ["small-business-setup-checklist", "product-launch-checklist", "website-launch-checklist"],
+  "hi": {
+    "title": "स्टार्टअप चेकलिस्ट",
+    "metaTitle": "स्टार्टअप चेकलिस्ट (आइडिया से लॉन्च तक) | Gisti",
+    "metaDescription": "आइडिया से लॉन्च तक एक क्रमबद्ध स्टार्टअप चेकलिस्ट: validation, क़ानूनी सेटअप, पैसा, MVP, ब्रांडिंग, और पहले ग्राहक। मुफ़्त, या Gisti में ढालें।",
+    "cardDesc": "आइडिया से पहले ग्राहकों तक — validation, क़ानून, पैसा, MVP, और लॉन्च, क्रम में।",
+    "intro": "कंपनी शुरू करना फ़ैसलों का एक लंबा सिलसिला है जहाँ उन्हें ग़लत क्रम में करना समय और पैसा दोनों बर्बाद करता है — validate करने से पहले बना डालना क्लासिक और महँगी ग़लती है। यह चेकलिस्ट कच्चे आइडिया से पहले पैसे देने वाले ग्राहकों तक का रास्ता बताती है, जिसमें सस्ते क़दम (ग्राहकों से बात करना, माँग परखना) महँगे क़दमों (बनाना, hiring, ख़र्च) से पहले रखे गए हैं। इसे क्रम से पूरा करें, और validation न छोड़ें। और देखें <a href=\"/hi/checklists/business/\" class=\"text-primary hover:underline\">बिज़नेस और लॉन्च चेकलिस्ट</a>।",
+    "items": [
+      { "text": "जिस समस्या को आप हल कर रहे हैं और जिसे यह सबसे तकलीफ़देह तरीक़े से है, उसे लिख लें", "note": "जो startup किसी असली, तात्कालिक समस्या को हल करता है वह उस चतुर आइडिया से आगे रहता है जिसकी किसी को ज़रूरत नहीं।" },
+      { "text": "कुछ भी बनाने से पहले 20-30 संभावित ग्राहकों से बात करें" },
+      { "text": "बाज़ार का आकार, प्रतिस्पर्धी, और लोग आज इसे कैसे हल करते हैं, इस पर रिसर्च करें" },
+      { "text": "अपना ख़ास मूल्य तय करें: क्यों आप, क्यों अभी, और क्यों अलग" },
+      { "text": "बनाने से पहले किसी landing page, waitlist, या pre-sale से माँग परखें" },
+      { "text": "एक business model का ख़ाका बनाएँ: आप पैसे कैसे कमाते हैं और डिलीवर करने में क्या ख़र्च आता है" },
+      { "text": "एक बिज़नेस स्ट्रक्चर चुनें और कंपनी रजिस्टर करें" },
+      { "text": "क़ानूनी बुनियादी बातें निपटाएँ: licenses, contracts, terms, और एक privacy policy" },
+      { "text": "एक बिज़नेस बैंक अकाउंट खोलें और bookkeeping सेट करें", "note": "पहले दिन से बिज़नेस और निजी पैसा अलग रखें।" },
+      { "text": "नाम सुरक्षित करें: domain, एक trademark जाँच, और social handles" },
+      { "text": "एक minimum viable product बनाएँ — सबसे छोटी चीज़ जो मुख्य समस्या हल करती है" },
+      { "text": "बुनियादी branding सेट करें: एक logo, रंग, और एक सादा one-page website" },
+      { "text": "कुछ pilot यूज़र्स को MVP पर लाएँ और ईमानदार फ़ीडबैक इकट्ठा करें" },
+      { "text": "प्रोडक्ट पर तब तक iterate करें जब तक यूज़र्स को साफ़, बार-बार मिलने वाला मूल्य न दिखे" },
+      { "text": "मूल्य और बाज़ार क्या सह पाएगा, इसके आधार पर प्राइसिंग तय करें" },
+      { "text": "payments, invoicing, और डिलीवर या पूरा करने के tools सेट करें" },
+      { "text": "योजना बनाएँ कि आप ग्राहकों तक कैसे पहुँचेंगे: वे एक-दो चैनल जिन पर आप ध्यान देंगे" },
+      { "text": "अपनी waitlist और पहले टारगेट ऑडियंस के लिए लॉन्च करें" },
+      { "text": "अपने पहले पैसे देने वाले ग्राहक हासिल करें और हर आपत्ति से सीखें" },
+      { "text": "अपने अहम आँकड़े ट्रैक करें और तय करें कि किस पर ज़ोर बढ़ाना है या क्या बदलना है" }
+    ],
+    "faq": [
+      { "q": "startup शुरू करने के पहले क़दम क्या हैं?", "a": "सबसे पहले समस्या को validate करें: लिखें कि यह किसे है और कितनी तकलीफ़देह तरीक़े से, फिर 20-30 संभावित ग्राहकों से बात करें और किसी landing page या waitlist से माँग परखें। असली दिलचस्पी दिखने के बाद ही बिज़नेस रजिस्टर करें, एक minimum viable product बनाएँ, और अपने पहले पैसे देने वाले ग्राहकों के पीछे लगें।" },
+      { "q": "क्या मुझे लॉन्च से पहले अपना बिज़नेस रजिस्टर करना ज़रूरी है?", "a": "किसी झटपट टेस्ट से आगे की हर चीज़ के लिए, हाँ — बिज़नेस बैंक अकाउंट खोलने, contracts साइन करने, और टैक्स ठीक से संभालने के लिए आपको एक रजिस्टर्ड बिज़नेस स्ट्रक्चर चाहिए। आप पहले आइडिया को अनौपचारिक रूप से validate कर सकते हैं, पर असली पैसा लेने, किसी को hire करने, या कोई बाध्यकारी चीज़ साइन करने से पहले रजिस्टर कर लें।" },
+      { "q": "minimum viable product (MVP) क्या है?", "a": "MVP आपके प्रोडक्ट का सबसे छोटा रूप है जो असली यूज़र्स के लिए मुख्य समस्या हल करता है, और प्रभावित करने के बजाय सीखने के लिए बनाया जाता है। यह आपको पूरी बनावट में निवेश करने से पहले परखने देता है कि लोग सचमुच समाधान चाहते हैं और उसके पैसे देंगे या नहीं — ताकि आप सस्ते में नाकाम हों, या जल्दी ज़ोर बढ़ाएँ।" }
+    ]
+  }
 }

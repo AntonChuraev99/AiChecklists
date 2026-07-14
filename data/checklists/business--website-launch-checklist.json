@@ -35,5 +35,39 @@
     { "q": "Why are 301 redirects important when launching a new site?", "a": "If you're replacing an existing site, every old URL that changes needs a 301 redirect to its new location. Without them, search engines and bookmarked links hit dead 404s, and you lose the ranking authority those pages had built — often the single biggest cause of a traffic drop after a redesign." },
     { "q": "What should I do right after a website goes live?", "a": "Immediately test the live homepage, key conversion paths, and forms, since staging and production can behave differently. Submit the sitemap and request indexing, then watch analytics, error logs, and uptime closely for the first few days to catch anything that only breaks in production." }
   ],
-  "related": ["product-launch-checklist", "social-media-content-checklist", "small-business-setup-checklist"]
+  "related": ["product-launch-checklist", "social-media-content-checklist", "small-business-setup-checklist"],
+  "hi": {
+    "title": "वेबसाइट लॉन्च चेकलिस्ट",
+    "metaTitle": "वेबसाइट लॉन्च चेकलिस्ट (प्री-लॉन्च QA से Go-Live तक) | Gisti",
+    "metaDescription": "एक क्रमबद्ध वेबसाइट लॉन्च चेकलिस्ट — कंटेंट, SEO, analytics, परफ़ॉर्मेंस, सुरक्षा, और go-live की जाँचें। मुफ़्त, या Gisti में AI से अपने मुताबिक ढालें।",
+    "cardDesc": "go-live से पहले और बाद जाँचने लायक सब कुछ — कंटेंट, SEO, analytics, स्पीड, और सुरक्षा।",
+    "intro": "किसी वेबसाइट को लॉन्च करना वह पल है जब दर्जनों छोटी-छोटी चीज़ें एक साथ सही होनी चाहिए — एक छूटा हुआ redirect, एक अनइंडेक्स्ड पेज, या एक टूटा हुआ फ़ॉर्म पहले दिन से ही चुपचाप आपका ट्रैफ़िक और भरोसा घटा सकता है। यह चेकलिस्ट क्रम से चलती है: लॉन्च से पहले की QA, go-live का स्विच, और वे जाँचें जो साइट लाइव होने के बाद ही की जा सकती हैं। डोमेन पॉइंट करने से पहले इसे ऊपर से नीचे तक पूरा करें। और देखें <a href=\"/hi/checklists/business/\" class=\"text-primary hover:underline\">बिज़नेस और लॉन्च चेकलिस्ट</a>।",
+    "items": [
+      { "text": "हर पेज को टाइपो, टूटे वाक्यों, और बचे हुए placeholder टेक्स्ट के लिए प्रूफ़रीड करें" },
+      { "text": "हर लिंक, बटन, और नेविगेशन मेन्यू को टेस्ट करें कि कहीं dead end तो नहीं", "note": "टूटे internal links यूज़र्स और crawlers दोनों को नुक़सान पहुँचाते हैं।" },
+      { "text": "साइट को असली फ़ोन, टैबलेट, और डेस्कटॉप पर, और सभी बड़े browsers में जाँचें" },
+      { "text": "पक्का करें कि सभी इमेज में alt text है और वे तेज़ लोडिंग के लिए compress की गई हैं" },
+      { "text": "हर फ़ॉर्म सेट करें और टेस्ट करें, और पक्का करें कि submissions सही जगह पहुँच रही हैं" },
+      { "text": "हर पेज पर page titles, meta descriptions, और Open Graph tags जोड़ें" },
+      { "text": "एक XML sitemap और एक robots.txt फ़ाइल बनाकर सबमिट करें" },
+      { "text": "canonical URLs सेट करें और duplicate-content की कोई भी दिक़्क़त सुलझाएँ" },
+      { "text": "analytics इंस्टॉल करें और पक्का करें कि events और conversions सचमुच ट्रिगर होते हैं", "note": "किसी असली browser में टेस्ट करें, सिर्फ़ tag preview में नहीं।" },
+      { "text": "एक performance audit चलाएँ और धीमे लोड होने वाले पेज और बड़े साइज़ के assets ठीक करें" },
+      { "text": "पक्का करें कि HTTPS लागू है और SSL certificate मान्य है" },
+      { "text": "हर पुराने URL से उसके नए समकक्ष तक 301 redirects सेट करें", "note": "redesign पर redirects छोड़ देना अपनी rankings गँवाने का सबसे तेज़ तरीक़ा है।" },
+      { "text": "एक कस्टम 404 पेज जोड़ें और जाँचें कि वह काम करता है" },
+      { "text": "accessibility जाँचें: रंगों का contrast, keyboard navigation, और heading की संरचना" },
+      { "text": "साइट का बैकअप लें और पक्का करें कि आप उसे सचमुच restore कर सकते हैं" },
+      { "text": "सुरक्षा कॉन्फ़िगर करें: firewall, spam प्रोटेक्शन, और admin पर two-factor auth" },
+      { "text": "डोमेन और DNS पॉइंट करें, और पक्का करें कि साइट www और non-www दोनों पर खुलती है" },
+      { "text": "लाइव करें, फिर तुरंत होमपेज, checkout या contact का रास्ता, और फ़ॉर्म टेस्ट करें" },
+      { "text": "साइट को search engines में सबमिट करें और मुख्य पेजों की indexing का अनुरोध करें" },
+      { "text": "पहले कुछ दिन analytics, error logs, और uptime पर नज़र रखें, और जो टूटे उसे ठीक करें" }
+    ],
+    "faq": [
+      { "q": "वेबसाइट लॉन्च करने से पहले मुझे क्या जाँचना चाहिए?", "a": "सारा कंटेंट प्रूफ़रीड करें, हर लिंक और फ़ॉर्म टेस्ट करें, साइट को फ़ोन और कई browsers पर जाँचें, और SEO की बुनियादी बातें (titles, meta descriptions, sitemap, और redirects) पक्की करें। डोमेन पॉइंट करने से पहले जाँच लें कि analytics ट्रिगर होता है, HTTPS लागू है, परफ़ॉर्मेंस तेज़ है, और आपके पास एक चालू बैकअप है।" },
+      { "q": "नई साइट लॉन्च करते समय 301 redirects क्यों ज़रूरी हैं?", "a": "अगर आप किसी मौजूदा साइट की जगह ले रहे हैं, तो हर बदलने वाले पुराने URL को उसकी नई जगह तक एक 301 redirect चाहिए। इनके बिना search engines और bookmark किए लिंक बेकार 404 पर जा टकराते हैं, और आप उन पेजों की बनाई हुई ranking authority गँवा देते हैं — redesign के बाद ट्रैफ़िक गिरने की अक्सर यही सबसे बड़ी वजह होती है।" },
+      { "q": "वेबसाइट लाइव होने के तुरंत बाद मुझे क्या करना चाहिए?", "a": "तुरंत लाइव होमपेज, मुख्य conversion रास्ते, और फ़ॉर्म टेस्ट करें, क्योंकि staging और production अलग व्यवहार कर सकते हैं। sitemap सबमिट करें और indexing का अनुरोध करें, फिर पहले कुछ दिन analytics, error logs, और uptime पर बारीकी से नज़र रखें ताकि जो सिर्फ़ production में टूटता है वह पकड़ा जाए।" }
+    ]
+  }
 }

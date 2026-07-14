@@ -33,5 +33,37 @@
     { "q": "How often should a business post on social media?", "a": "Consistency beats volume. A sustainable cadence you can keep — say three to five quality posts a week per platform — outperforms a burst that fizzles out. It's better to post well on one or two platforms your audience actually uses than to spread thin across all of them." },
     { "q": "How do I keep my social media content consistent?", "a": "Work from a content calendar and batch-create posts in advance, then run each one through the same pre-post checklist so quality doesn't slip on busy days. Reusing a few proven post formats and adapting one idea across platforms keeps output steady without starting from scratch every time." }
   ],
-  "related": ["product-launch-checklist", "website-launch-checklist", "startup-checklist"]
+  "related": ["product-launch-checklist", "website-launch-checklist", "startup-checklist"],
+  "hi": {
+    "title": "सोशल मीडिया कंटेंट चेकलिस्ट",
+    "metaTitle": "सोशल मीडिया कंटेंट चेकलिस्ट (पोस्ट करने से पहले) | Gisti",
+    "metaDescription": "हर पोस्ट से पहले चलाने के लिए एक सोशल मीडिया कंटेंट चेकलिस्ट: hook, वैल्यू, visuals, hashtags, links, और एक आख़िरी प्रूफ़रीड। मुफ़्त, या Gisti में AI से ढालें।",
+    "cardDesc": "हर पोस्ट से पहले यह चलाएँ — hook, वैल्यू, visuals, tags, और एक आख़िरी प्रूफ़रीड।",
+    "intro": "लगातार सोशल मीडिया करना ज़्यादा पोस्ट करने के बारे में नहीं है — यह हर बार इरादे के साथ पोस्ट करने के बारे में है। यह चेकलिस्ट वह झटपट क्वालिटी जाँच है जो कुछ भी बाहर जाने से पहले चलानी है, ताकि हर पोस्ट के होने की एक वजह हो, वह अच्छे से पढ़ी जाए, और कहीं काम की जगह ले जाए। जब आप ड्राफ़्ट और शेड्यूल करें तो इसे पास रखें; यह बिखरी हुई पोस्टिंग को एक दोहराने लायक रूटीन में बदल देती है। और देखें <a href=\"/hi/checklists/business/\" class=\"text-primary hover:underline\">बिज़नेस और लॉन्च चेकलिस्ट</a>।",
+    "items": [
+      { "text": "पोस्ट को किसी लक्ष्य से जोड़ें: awareness, engagement, traffic, या conversion" },
+      { "text": "पहली लाइन या फ़्रेम में एक दमदार hook से शुरुआत करें", "note": "feeds तेज़ी से स्क्रॉल होते हैं; पहली लाइन ही तय करती है कि कोई बाक़ी पढ़ेगा या नहीं।" },
+      { "text": "हर पोस्ट में एक साफ़ आइडिया या एक काम की बात दें" },
+      { "text": "फ़ॉर्मैट को platform के हिसाब से रखें (aspect ratio, लंबाई, और स्टाइल)" },
+      { "text": "हर platform की अपनी भाषा में लिखें, सभी पर एक ही caption कॉपी न करें" },
+      { "text": "एक साफ़ call to action जोड़ें — comment, save, share, या click" },
+      { "text": "platform के लिए सही साइज़ के हाई-क्वालिटी visuals या वीडियो शामिल करें" },
+      { "text": "किसी भी वीडियो में captions या subtitles जोड़ें", "note": "ज़्यादातर वीडियो mute पर देखे जाते हैं।" },
+      { "text": "accessibility और reach के लिए इमेज में वर्णनात्मक alt text जोड़ें" },
+      { "text": "प्रासंगिक hashtags का एक सटीक सेट इस्तेमाल करें, उनकी कोई आम-सी भरमार नहीं" },
+      { "text": "जाँचें कि हर लिंक काम करता है और UTM या short link से ट्रैक होता है" },
+      { "text": "जहाँ फ़ायदा हो वहाँ प्रासंगिक लोगों, brands, या locations को tag करें" },
+      { "text": "स्पेलिंग, व्याकरण, और तथ्यों की सटीकता के लिए प्रूफ़रीड करें" },
+      { "text": "पक्का करें कि आपके पास इस्तेमाल की गई हर इमेज, संगीत, या क्लिप के अधिकार हैं" },
+      { "text": "पोस्ट को तब के लिए शेड्यूल करें जब आपके ऑडियंस सचमुच सक्रिय हों" },
+      { "text": "जहाँ ठीक बैठे वहाँ कंटेंट को दूसरे चैनलों के लिए cross-post करें या ढालें" },
+      { "text": "पहले एक-दो घंटे में comments और DMs का जवाब देने की योजना बनाएँ", "note": "जल्दी engagement algorithm को संकेत देता है कि पोस्ट को और व्यापक रूप से दिखाए।" },
+      { "text": "पोस्ट को लॉग करें ताकि आप देख सकें कि क्या चला और जो काम आया उसे दोहरा सकें" }
+    ],
+    "faq": [
+      { "q": "सोशल मीडिया पर पोस्ट करने से पहले मुझे क्या जाँचना चाहिए?", "a": "पक्का करें कि पोस्ट का एक साफ़ लक्ष्य और दमदार शुरुआती hook है, वह एक आइडिया देती है, उसमें captions और alt text के साथ सही साइज़ के visuals हैं, प्रासंगिक hashtags हैं, और एक चालू, ट्रैक होने वाला लिंक है। इसे प्रूफ़रीड करें, जाँचें कि किसी भी मीडिया के अधिकार आपके पास हैं, और इसे तब के लिए शेड्यूल करें जब आपके ऑडियंस सक्रिय हों।" },
+      { "q": "किसी बिज़नेस को सोशल मीडिया पर कितनी बार पोस्ट करना चाहिए?", "a": "मात्रा से ज़्यादा निरंतरता मायने रखती है। एक ऐसी टिकाऊ रफ़्तार जिसे आप निभा सकें — मान लें हर platform पर हफ़्ते में तीन से पाँच अच्छी पोस्ट — उस झोंके से बेहतर है जो जल्दी बुझ जाता है। जिन एक-दो platforms को आपके ऑडियंस सचमुच इस्तेमाल करते हैं वहाँ अच्छे से पोस्ट करना, सभी पर पतला फैलने से बेहतर है।" },
+      { "q": "मैं अपना सोशल मीडिया कंटेंट लगातार कैसे बनाए रखूँ?", "a": "एक content calendar से काम करें और पोस्ट पहले से batch में बनाएँ, फिर हर एक को उसी pre-post चेकलिस्ट से गुज़ारें ताकि व्यस्त दिनों में क्वालिटी न गिरे। कुछ आज़माए हुए पोस्ट फ़ॉर्मैट दोबारा इस्तेमाल करना और एक आइडिया को कई platforms के लिए ढालना आउटपुट को हर बार शून्य से शुरू किए बिना स्थिर रखता है।" }
+    ]
+  }
 }

@@ -31,5 +31,35 @@
     { "q": "In what order should I write thesis chapters?", "a": "Write the body chapters first — methodology, results, and discussion — because they are grounded in your actual work. Then write the introduction and literature review to frame what the reader is about to see, followed by the conclusion. Write the abstract last, once the whole thesis exists to summarize." },
     { "q": "How long does it take to write a thesis?", "a": "It varies widely by level and field, but a master's thesis often takes three to six months of focused work and a doctoral thesis a year or more. The writing itself is only part of it — research, data collection, ethics approval, and multiple rounds of editing all take time, which is why a timeline and an early start matter so much." }
   ],
-  "related": ["study-plan-checklist", "exam-prep-checklist", "back-to-school-supplies-checklist"]
+  "related": ["study-plan-checklist", "exam-prep-checklist", "back-to-school-supplies-checklist"],
+  "hi": {
+    "title": "थीसिस लेखन चेकलिस्ट",
+    "metaTitle": "थीसिस लेखन चेकलिस्ट (कदम-दर-कदम) | Gisti",
+    "metaDescription": "कदम-दर-कदम थीसिस लेखन चेकलिस्ट: टॉपिक और प्रस्ताव से लेकर शोध, ड्राफ़्टिंग, संपादन, और अंतिम जमा करने तक। मुफ़्त, या Gisti में AI से अपने हिसाब से ढालें।",
+    "cardDesc": "टॉपिक और प्रस्ताव से लेकर ड्राफ़्टिंग, संपादन, और जमा करने तक का कदम-दर-कदम रास्ता, क्रम में।",
+    "intro": "थीसिस एक लंबा प्रोजेक्ट है जो ढाँचे पर जीता या मरता है, और सबसे बड़ी गलती इसे लेखन के एक विशाल ब्लॉक की तरह मानना है। यह थीसिस लेखन चेकलिस्ट इसे उन चरणों में बाँटती है जिन्हें आप क्रम में निपटाते हैं — एक सवाल को सीमित करना, शोध की योजना बनाना, अध्याय-दर-अध्याय ड्राफ़्ट करना, फिर जमा करने के लिए संपादन और फ़ॉर्मैटिंग। इसे क्रम में पूरा करें, और ज़्यादा <a href=\"/hi/checklists/study/\" class=\"text-primary hover:underline\">स्टडी और परीक्षा चेकलिस्ट</a> देखें।",
+    "items": [
+      { "text": "अपने टॉपिक को चुनें और एक ख़ास, जवाब देने योग्य शोध प्रश्न में सीमित करें", "note": "बहुत व्यापक होना थीसिस के अटकने की नंबर-एक वजह है।" },
+      { "text": "अपने सुपरवाइज़र की पुष्टि करें और दायरे, अपेक्षाओं व एक मोटी टाइमलाइन पर सहमत हों" },
+      { "text": "एक literature review करें और नक्शा बनाएँ कि आपके प्रश्न पर पहले क्या लिखा जा चुका है", "note": "उस कमी को नोट करें जिसे आपका काम भरेगा।" },
+      { "text": "अपने प्रस्ताव या शोध योजना को लिखें और मंज़ूरी लें" },
+      { "text": "अपनी methodology चुनें और, ज़रूरत हो तो, ethics या डेटा की मंज़ूरी लें", "note": "Ethics review में हफ़्ते लग सकते हैं — इसे जल्दी शुरू करें।" },
+      { "text": "एक reference manager सेट करें और पढ़ते समय हर स्रोत दर्ज करें", "note": "एक citation manager बाद की सफ़ाई के कई दिन बचाता है — पढ़ने से पहले इसे सेट करें।" },
+      { "text": "हर सेक्शन के लिए एक लक्ष्य शब्द-संख्या के साथ एक अध्याय outline बनाएँ" },
+      { "text": "अपना डेटा या प्राथमिक सामग्री इकट्ठा और विश्लेषित करें" },
+      { "text": "पहले body अध्याय ड्राफ़्ट करें — methods, results, और discussion", "note": "जब आपको पता हो कि आपने क्या पाया, तो introduction लिखना सबसे आसान होता है।" },
+      { "text": "तैयार body को ढाँचा देने के लिए introduction और literature review लिखें" },
+      { "text": "conclusion लिखें, निष्कर्षों को अपने मूल प्रश्न से जोड़ते हुए" },
+      { "text": "abstract सबसे आख़िर में लिखें, पूरी थीसिस को एक पन्ने में समेटते हुए" },
+      { "text": "तर्क और ढाँचे के लिए संशोधन करें — क्या हर अध्याय अपनी जगह के लायक है?", "note": "लाइन-एडिटिंग से पहले बड़े स्तर का प्रवाह ठीक करें।" },
+      { "text": "व्याकरण के लिए प्रूफ़रीड करें, और हर citation व reference की सटीकता जाँचें" },
+      { "text": "अपने विभाग के दिशानिर्देशों के मुताबिक फ़ॉर्मैट करें: title page, contents, margins, और numbering", "note": "आधिकारिक टेम्पलेट का ठीक-ठीक पालन करें — फ़ॉर्मैटिंग की वजह से रिजेक्शन समय गँवाता है।" },
+      { "text": "एक आख़िरी plagiarism जाँच चलाएँ और डेडलाइन से पहले जमा करें, एक बैकअप कॉपी रखते हुए", "note": "किसी भी अपलोड समस्या को झेलने के लिए एक दिन पहले जमा करें।" }
+    ],
+    "faq": [
+      { "q": "मैं थीसिस लिखना कैसे शुरू करूँ?", "a": "एक व्यापक रुचि को एक ख़ास, जवाब देने योग्य शोध प्रश्न में सीमित करने से शुरू करें, फिर अपने सुपरवाइज़र के साथ दायरे पर सहमत हों। यह देखने के लिए एक literature review करें कि पहले से क्या मौजूद है और आपका काम कहाँ फ़िट होता है, और किसी असली लेखन से पहले एक प्रस्ताव लिखें। एक साफ़ प्रश्न और एक मंज़ूर योजना अटकी हुई थीसिस की सबसे आम वजह रोक देते हैं।" },
+      { "q": "थीसिस के अध्याय मुझे किस क्रम में लिखने चाहिए?", "a": "पहले body अध्याय लिखें — methodology, results, और discussion — क्योंकि वे आपके असल काम पर टिके होते हैं। फिर पाठक जो देखने वाला है उसे ढाँचा देने के लिए introduction और literature review लिखें, उसके बाद conclusion। abstract सबसे आख़िर में लिखें, जब पूरी थीसिस मौजूद हो जिसे समेटा जा सके।" },
+      { "q": "थीसिस लिखने में कितना समय लगता है?", "a": "यह स्तर और क्षेत्र के हिसाब से बहुत बदलता है, पर एक master's थीसिस में अक्सर तीन से छह महीने का केंद्रित काम लगता है और एक doctoral थीसिस में एक साल या ज़्यादा। लेखन ख़ुद इसका सिर्फ़ एक हिस्सा है — शोध, डेटा संग्रह, ethics मंज़ूरी, और संपादन के कई दौर सब समय लेते हैं, यही वजह है कि एक टाइमलाइन और जल्दी शुरुआत इतने मायने रखते हैं।" }
+    ]
+  }
 }
