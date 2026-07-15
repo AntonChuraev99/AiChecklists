@@ -251,10 +251,28 @@ class HarnessUserDataRepository(
     override suspend fun getFirstLaunchAtMillis(): Long = 0L
 }
 
-class FakeAiChatPreferences(initial: Boolean = false) : AiChatPreferencesRepository {
+class FakeAiChatPreferences(
+    initial: Boolean = false,
+    initialDefaultChecklistId: Long? = null,
+) : AiChatPreferencesRepository {
     private val flow = MutableStateFlow(initial)
     override val deepThinkingEnabledFlow: Flow<Boolean> = flow
     override suspend fun setDeepThinkingEnabled(enabled: Boolean) { flow.value = enabled }
+
+    // ── D2 memory of choice ──
+    private val defaultIdFlow = MutableStateFlow(initialDefaultChecklistId)
+    override val defaultChecklistIdFlow: Flow<Long?> = defaultIdFlow
+
+    /**
+     * Every [setDefaultChecklistId] call, in order — including `null` (the reset). A list rather
+     * than a `lastSet` field so a test can tell "never persisted" from "persisted then cleared".
+     */
+    val defaultChecklistIdWrites = mutableListOf<Long?>()
+
+    override suspend fun setDefaultChecklistId(checklistId: Long?) {
+        defaultChecklistIdWrites.add(checklistId)
+        defaultIdFlow.value = checklistId
+    }
 }
 
 class FakeChatHistory : ChatHistoryRepository {
@@ -269,11 +287,16 @@ class FakeChatHistory : ChatHistoryRepository {
  * Minimal fake checklist repository: seeds [checklists] from scenario list-names so
  * context-bias and summary code paths have data, without any DB. Names are turned into
  * empty-item checklists (the dispatcher is faked, so item content is irrelevant here).
+ *
+ * [seedChecklists] takes precedence when given: D2's chip metadata (item count) and MRU ordering
+ * read fields the name-only seed cannot express (`items`, `updatedAt`), so those tests hand over
+ * whole [Checklist] objects. Name-only callers are unaffected.
  */
 class HarnessChecklistRepository(
-    listNames: List<String>,
+    listNames: List<String> = emptyList(),
+    seedChecklists: List<Checklist>? = null,
 ) : ChecklistRepository {
-    private val seed: List<Checklist> = listNames.mapIndexed { index, name ->
+    private val seed: List<Checklist> = seedChecklists ?: listNames.mapIndexed { index, name ->
         Checklist(id = (index + 1).toLong(), name = name, items = emptyList())
     }
     override val checklists: Flow<List<Checklist>> = MutableStateFlow(seed)
@@ -394,6 +417,9 @@ fun buildHarnessRig(scenario: ChatScenario): HarnessRig {
         aiChatRepository = repository,
         toolCallDispatcher = dispatcher,
         previewRenderer = HarnessPreviewRenderer,
+        // Injective + timezone-independent: the scenarios assert routing, not wording, and a real
+        // formatter would make an expected string depend on the machine's zone.
+        dateFormatter = TokenDateFormatter(),
         localeProvider = FixedLocaleProvider(scenario.locale),
         chatHistoryRepository = FakeChatHistory(),
         checklistRepository = HarnessChecklistRepository(scenario.lists),

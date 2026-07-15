@@ -128,7 +128,18 @@ import aichecklists.core.designsystem.generated.resources.chat_voice_too_short
 import aichecklists.core.designsystem.generated.resources.chat_preview_cancelled_message
 import aichecklists.core.designsystem.generated.resources.chat_agent_round_limit
 import aichecklists.core.designsystem.generated.resources.chat_move_no_other_lists
+import aichecklists.core.designsystem.generated.resources.chat_attach_analyze_empty
+import aichecklists.core.designsystem.generated.resources.chat_attach_analyze_failed
+import aichecklists.core.designsystem.generated.resources.chat_attach_limit_reached
+import aichecklists.core.designsystem.generated.resources.chat_attach_no_files
+import aichecklists.core.designsystem.generated.resources.chat_attach_store_failed
+import aichecklists.core.designsystem.generated.resources.chat_attach_unsupported_type
+import aichecklists.core.designsystem.generated.resources.chat_choice_dismissed_message
+import aichecklists.core.designsystem.generated.resources.chat_choice_edit_empty_hint
+import aichecklists.core.designsystem.generated.resources.chat_dispatch_attached_many
+import aichecklists.core.designsystem.generated.resources.chat_dispatch_attached_one
 import aichecklists.core.designsystem.generated.resources.chat_result_moved_to
+import aichecklists.core.designsystem.generated.resources.chat_result_remembered_list
 import aichecklists.core.designsystem.generated.resources.chat_result_undone_add
 import aichecklists.core.designsystem.generated.resources.chat_result_undone_complete
 import aichecklists.core.designsystem.generated.resources.chat_undo_item_gone
@@ -717,6 +728,24 @@ fun App() {
             val sm_resultMovedTo = stringResource(Res.string.chat_result_moved_to)
             val sm_undoItemGone = stringResource(Res.string.chat_undo_item_gone)
             val sm_moveNoOtherLists = stringResource(Res.string.chat_move_no_other_lists)
+            // D2 memory-of-choice disclosure. Same sync rule — also lives in ChatRoute.kt's map.
+            val sm_resultRememberedList = stringResource(Res.string.chat_result_remembered_list)
+            // Pre-existing gap found while wiring D2: emitted as a ShowAssistantMessage since D1 but
+            // never added to either map, so every choice cancel printed the raw key into the bubble.
+            val sm_choiceDismissed = stringResource(Res.string.chat_choice_dismissed_message)
+            // The whole attach contour — both success replies and the entire error surface — plus the
+            // blank-edit hint. Same gap: emitted, translated, never resolved, so the user read
+            // "chat_dispatch_attached_one" where the confirmation should be. Guarded now by
+            // ChatMessageKeyResolutionTest; keep both maps in step when adding to either.
+            val sm_attachNoFiles = stringResource(Res.string.chat_attach_no_files)
+            val sm_attachLimitReached = stringResource(Res.string.chat_attach_limit_reached)
+            val sm_attachUnsupportedType = stringResource(Res.string.chat_attach_unsupported_type)
+            val sm_attachAnalyzeEmpty = stringResource(Res.string.chat_attach_analyze_empty)
+            val sm_attachAnalyzeFailed = stringResource(Res.string.chat_attach_analyze_failed)
+            val sm_attachStoreFailed = stringResource(Res.string.chat_attach_store_failed)
+            val sm_dispatchAttachedOne = stringResource(Res.string.chat_dispatch_attached_one)
+            val sm_dispatchAttachedMany = stringResource(Res.string.chat_dispatch_attached_many)
+            val sm_choiceEditEmptyHint = stringResource(Res.string.chat_choice_edit_empty_hint)
             val chatPanelGreeting = stringResource(Res.string.chat_panel_greeting)
 
             // NOT remember()-ed. `stringResource` resolves asynchronously in Compose Multiplatform
@@ -777,6 +806,17 @@ fun App() {
                     "chat_result_moved_to" to sm_resultMovedTo,
                     "chat_undo_item_gone" to sm_undoItemGone,
                     "chat_move_no_other_lists" to sm_moveNoOtherLists,
+                    "chat_result_remembered_list" to sm_resultRememberedList,
+                    "chat_choice_dismissed_message" to sm_choiceDismissed,
+                    "chat_attach_no_files" to sm_attachNoFiles,
+                    "chat_attach_limit_reached" to sm_attachLimitReached,
+                    "chat_attach_unsupported_type" to sm_attachUnsupportedType,
+                    "chat_attach_analyze_empty" to sm_attachAnalyzeEmpty,
+                    "chat_attach_analyze_failed" to sm_attachAnalyzeFailed,
+                    "chat_attach_store_failed" to sm_attachStoreFailed,
+                    "chat_dispatch_attached_one" to sm_dispatchAttachedOne,
+                    "chat_dispatch_attached_many" to sm_dispatchAttachedMany,
+                    "chat_choice_edit_empty_hint" to sm_choiceEditEmptyHint,
                 )
             }
 
@@ -1040,7 +1080,14 @@ fun App() {
                         keepExpanded = if (itemCreateOverride != null) true else hasLastAnswer,
                         // A pending choice block (prompt + chips + escape) is taller than a one-line
                         // answer; raise the frame cap so its escape/cancel chip isn't clipped.
-                        answerMaxHeight = if (chatUiState.pendingChoice != null) 360.dp else 210.dp,
+                        // D2 adds typed object rows inside the bubble (item + list + time), so a
+                        // question that carries them needs more room again. Safe: GistiInlineChatPanel
+                        // clamps this against the real dock space, so a keyboard-up dock just scrolls.
+                        answerMaxHeight = when {
+                            chatUiState.pendingChoice?.hasObjectRows == true -> 440.dp
+                            chatUiState.pendingChoice != null -> 360.dp
+                            else -> 210.dp
+                        },
                         // Item-create shows only a short chip row — wrap it (min 0) so there's no empty
                         // gap between the chips and the pinned input; chat keeps the 125dp comfortable
                         // body. INSTANT (not animated): animating this min height sweeps panelFullPx every
@@ -1051,13 +1098,25 @@ fun App() {
                         lastAnswerContent = {
                             // Fixed-height frame: scroll a long answer inside instead of growing the
                             // dock. Priority mirrors ChatContent so the SAME confirm cards render here.
-                            // FIX C: keep the answer pinned to the BOTTOM (latest content + input
-                            // visible), not the top/oldest. Keyed on the scroll's maxValue so it
-                            // re-anchors whenever the content grows (new message / streaming) and on
-                            // first show / expand — when maxValue is laid out we jump to it.
+                            //
+                            // The anchor depends on WHAT the frame holds:
+                            //  - A QUESTION (non-blank prompt) → anchor TOP. Its object rows and the
+                            //    question itself sit above the chips, so bottom-anchoring scrolls the
+                            //    subject out of the cap and leaves bare chips — "cancel WHAT?", which
+                            //    is the exact defect the object rows exist to fix.
+                            //  - Everything else (a plain answer, or the D1 post-action offer whose
+                            //    prompt is blank and whose result bubble renders inside this frame)
+                            //    → anchor BOTTOM: the newest content and the input are what matter.
+                            // Keyed on maxValue so it re-anchors as content grows (new message /
+                            // streaming) and on first show / expand.
                             val answerScroll = rememberScrollState()
-                            LaunchedEffect(answerScroll.maxValue) {
-                                answerScroll.animateScrollTo(answerScroll.maxValue)
+                            val anchorTop = chatUiState.pendingChoice?.choice?.prompt?.isNotBlank() == true
+                            LaunchedEffect(answerScroll.maxValue, anchorTop) {
+                                if (anchorTop) {
+                                    answerScroll.animateScrollTo(0)
+                                } else {
+                                    answerScroll.animateScrollTo(answerScroll.maxValue)
+                                }
                             }
                             Column(
                                 modifier = Modifier
@@ -1100,6 +1159,11 @@ fun App() {
                                             onSelect = { id -> chatViewModel.sendIntent(ChatScreenIntent.OnChoiceSelected(id)) },
                                             onEditChange = { chatViewModel.sendIntent(ChatScreenIntent.OnChoiceEditChange(it)) },
                                             onEditConfirm = { chatViewModel.sendIntent(ChatScreenIntent.OnChoiceEditConfirmed) },
+                                            // The dock: fewer preview rows fit under the frame cap.
+                                            compact = true,
+                                            onMemoryToggle = { enabled ->
+                                                chatViewModel.sendIntent(ChatScreenIntent.OnChoiceMemoryToggle(enabled))
+                                            },
                                         )
                                     }
                                     chatUiState.isProcessing -> {

@@ -276,6 +276,7 @@ private object NoOpLogger : AppLogger {
 
 private class FakeAiChatPreferencesRepository(
     initial: Boolean = false,
+    initialDefaultChecklistId: Long? = null,
 ) : AiChatPreferencesRepository {
     private val _flow = MutableStateFlow(initial)
     var lastSet: Boolean? = null
@@ -285,6 +286,14 @@ private class FakeAiChatPreferencesRepository(
     override suspend fun setDeepThinkingEnabled(enabled: Boolean) {
         lastSet = enabled
         _flow.value = enabled
+    }
+
+    // ── D2 memory of choice (asserted in ChatMemoryOfChoiceTest) ──
+    private val _defaultChecklistId = MutableStateFlow(initialDefaultChecklistId)
+    override val defaultChecklistIdFlow: kotlinx.coroutines.flow.Flow<Long?> = _defaultChecklistId
+
+    override suspend fun setDefaultChecklistId(checklistId: Long?) {
+        _defaultChecklistId.value = checklistId
     }
 }
 
@@ -365,6 +374,8 @@ private fun makeVm(
     aiChatRepository = repo,
     toolCallDispatcher = dispatcher,
     previewRenderer = renderer,
+    // Injective + timezone-independent — see TokenDateFormatter (ChatUndoChoiceTest).
+    dateFormatter = TokenDateFormatter(),
     localeProvider = FakeLocaleProvider,
     chatHistoryRepository = historyRepo,
     checklistRepository = checklistRepo,

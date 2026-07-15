@@ -221,6 +221,8 @@ fun ChatScreen(
             },
             onClearChat = { onIntent(ChatScreenIntent.OnClearChat) },
             onDismiss = { onIntent(ChatScreenIntent.OnSettingsDismiss) },
+            defaultChecklistName = state.defaultChecklistName,
+            onResetDefaultChecklist = { onIntent(ChatScreenIntent.OnResetDefaultChecklist) },
         )
     }
 
@@ -430,6 +432,11 @@ fun ChatMessageList(
                     onEditChange = { onIntent(ChatScreenIntent.OnChoiceEditChange(it)) },
                     onEditConfirm = { onIntent(ChatScreenIntent.OnChoiceEditConfirmed) },
                     modifier = Modifier.padding(bottom = AppDimens.SpacingSm),
+                    // Full-height screen: the whole preview fits, no dock cap to respect.
+                    compact = false,
+                    onMemoryToggle = { enabled ->
+                        onIntent(ChatScreenIntent.OnChoiceMemoryToggle(enabled))
+                    },
                 )
             }
         }

@@ -548,6 +548,12 @@
         <item quantity="many">%1$d пунктов</item>
         <item quantity="other">%1$d пунктов</item>
     </plurals>
+    <plurals name="reminders_count">
+        <item quantity="one">%1$d напоминание</item>
+        <item quantity="few">%1$d напоминания</item>
+        <item quantity="many">%1$d напоминаний</item>
+        <item quantity="other">%1$d напоминаний</item>
+    </plurals>
     <string name="reminder_exact_alarm_title">Включить точные напоминания</string>
     <string name="reminder_exact_alarm_step1">Нажмите «Открыть настройки» ниже</string>
     <string name="reminder_exact_alarm_step2">Найдите «Будильники &amp; напоминания»</string>
@@ -1035,22 +1041,27 @@
     <string name="chat_pricing_caption_action">Почему?</string>
 
     <!-- AI-чат: preview card -->
-    <string name="chat_preview_apply">Применить</string>
-    <string name="chat_preview_cancel">Отмена</string>
-    <string name="chat_preview_reject">Я имел в виду другое</string>
     <string name="chat_preview_cancelled_message">Действие отменено.</string>
-    <string name="chat_preview_will_create_one">Будет создан один пункт:</string>
-    <string name="chat_preview_will_create_checklist">Новый чек-лист:</string>
-    <string name="chat_preview_will_delete">Будет удалён пункт:</string>
-    <string name="chat_preview_will_complete">Будет отмечен как выполнен:</string>
-    <string name="chat_preview_will_set_reminder">Поставить напоминание для:</string>
-    <string name="chat_preview_will_move_reminders">Перенести все напоминания:</string>
-    <string name="chat_preview_will_create_from_attachment">Создать чек-лист из файла:</string>
-    <string name="chat_preview_will_attach_to_item">Прикрепить файл к пункту:</string>
+    <!-- D2 переиспользует как contentDescription ряда назначения. -->
     <string name="chat_preview_checklist_label">В чек-лист: %1$s</string>
-    <string name="chat_preview_no_checklist_hint">Чек-лист не указан — добавим в первый.</string>
-    <string name="chat_preview_item_label">Текст пункта</string>
+    <!-- D2 переиспользует как label поля правки при создании чек-листа. -->
     <string name="chat_preview_new_list_label">Название списка</string>
+
+    <!-- D2 ряды объекта — a11y-фразы для типизированного объекта действия. -->
+    <string name="chat_object_item_a11y">Пункт: %1$s</string>
+    <string name="chat_object_time_a11y">Время: %1$s</string>
+    <string name="chat_object_file_a11y">Файл: %1$s</string>
+    <string name="chat_object_name_a11y">Название: %1$s</string>
+    <string name="chat_object_more">…и ещё %1$s</string>
+    <!-- D2: кнопка называет результат, никогда не «Применить». -->
+    <string name="chat_choice_action_create_items">Создать %1$s</string>
+    <string name="chat_choice_action_move_reminders">Перенести %1$s</string>
+    <!-- D2 память выбора — только по опту, никогда не предотмечено; раскрывается после тапа. -->
+    <string name="chat_choice_remember">Запомнить выбор</string>
+    <string name="chat_result_remembered_list">Теперь добавляю в «%1$s» по умолчанию — изменить можно в настройках чата.</string>
+    <string name="chat_settings_default_list_title">Список по умолчанию</string>
+    <string name="chat_settings_default_list_subtitle">Новые пункты из чата попадают в «%1$s».</string>
+    <string name="chat_settings_default_list_reset">Спрашивать каждый раз</string>
     <!-- AI choice response (Claude-style prompt + choice chips) -->
     <!-- Вопросы без аргументов: объект действия («• Молоко → Покупки») рендерится отдельной
          строкой под вопросом (ToolCallPreviewRenderer), а не подставляется в копирайт. -->

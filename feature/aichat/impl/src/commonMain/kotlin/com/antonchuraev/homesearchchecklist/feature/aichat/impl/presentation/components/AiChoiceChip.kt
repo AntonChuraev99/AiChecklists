@@ -3,6 +3,7 @@ package com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.co
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -41,7 +42,19 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Choi
  * Width: by default the chip wraps its content. The vertical-layout container passes
  * `Modifier.fillMaxWidth()` so the chip stretches and the label wraps to 2 lines.
  *
+ * Meta ([meta], D2): a dimmed disambiguating suffix after a [META_SEPARATOR] ("Shopping • 12").
+ * In the content-sized layout it trails the label; in the full-width layout ([fillWidth]) it is
+ * pinned right by a weight spacer. It is never dropped — the count IS what tells two identically
+ * named lists apart — so on a meta-carrying chip the LABEL yields instead: it ellipsises at
+ * [maxLines]. That is a deliberate, narrow exception to this component's never-ellipsis rule:
+ * a clipped name with a visible count still answers "which one?", a full name without the count
+ * does not. Do NOT "fix" this by clipping or dropping the meta.
+ *
  * @param leadingIcon Optional 18dp icon drawn before the label (trash for Destructive, etc.).
+ * @param meta        Optional dimmed suffix (a bare value — "12", not "12 items"). The full,
+ *                    spoken form belongs in the caller's contentDescription, not here.
+ * @param fillWidth   True when the parent stretched this chip (Column layout): the meta is then
+ *                    right-aligned rather than trailing the label.
  */
 @Composable
 internal fun AiChoiceChip(
@@ -53,6 +66,8 @@ internal fun AiChoiceChip(
     isLoading: Boolean = false,
     loadingLabel: String? = null,
     leadingIcon: ImageVector? = null,
+    meta: String? = null,
+    fillWidth: Boolean = false,
     maxLines: Int = 2,
 ) {
     val cs = MaterialTheme.colorScheme
@@ -111,12 +126,42 @@ internal fun AiChoiceChip(
                     modifier = Modifier.size(18.dp),
                 )
             }
+            // While loading the meta is suppressed: the chip is mid-execution, there is nothing
+            // left to disambiguate and "Adding… • 12" reads like noise.
+            val showMeta = meta != null && !isLoading
             Text(
                 text = if (isLoading) (loadingLabel ?: label) else label,
                 style = MaterialTheme.typography.labelLarge,
                 maxLines = maxLines,
-                overflow = TextOverflow.Clip,
+                // See the KDoc: the label — not the meta — is what gives way when a chip carries
+                // both and the name is long.
+                overflow = if (showMeta) TextOverflow.Ellipsis else TextOverflow.Clip,
+                modifier = if (showMeta && fillWidth) Modifier.weight(1f, fill = false) else Modifier,
             )
+            if (showMeta) {
+                if (fillWidth) Spacer(modifier = Modifier.weight(1f))
+                Text(
+                    text = "$META_SEPARATOR $meta",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = LocalContentColor.current.copy(alpha = META_ALPHA),
+                    maxLines = 1,
+                )
+            }
         }
     }
 }
+
+/**
+ * Separator between a chip label and its meta.
+ *
+ * U+2022, NOT "·" (U+00B7) and NOT "→": Skiko on wasmJs has no CSS-style font fallback, and D1
+ * shipped an arrow that rendered as tofu on the web canvas. The bullet is proven on that same
+ * canvas (the object rows draw it today) — do not swap it for an unverified glyph.
+ */
+private const val META_SEPARATOR = "•"
+
+/**
+ * Meta dimming. 0.6f on onPrimaryContainer over primaryContainer measures ≈ 7:1 — comfortably
+ * past WCAG AA for this text size, so the meta reads as secondary without becoming decoration.
+ */
+private const val META_ALPHA = 0.6f

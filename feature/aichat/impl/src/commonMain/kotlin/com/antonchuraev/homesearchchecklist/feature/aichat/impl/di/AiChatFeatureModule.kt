@@ -90,6 +90,7 @@ val aiChatFeatureModule = module {
             aiChatRepository = get(),
             toolCallDispatcher = get(),
             previewRenderer = get(),
+            dateFormatter = get(),
             localeProvider = get(),
             chatHistoryRepository = get(),
             checklistRepository = get(),

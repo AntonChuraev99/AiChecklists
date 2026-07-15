@@ -57,7 +57,18 @@ import aichecklists.core.designsystem.generated.resources.chat_voice_too_short
 import aichecklists.core.designsystem.generated.resources.chat_preview_cancelled_message
 import aichecklists.core.designsystem.generated.resources.chat_agent_round_limit
 import aichecklists.core.designsystem.generated.resources.chat_move_no_other_lists
+import aichecklists.core.designsystem.generated.resources.chat_attach_analyze_empty
+import aichecklists.core.designsystem.generated.resources.chat_attach_analyze_failed
+import aichecklists.core.designsystem.generated.resources.chat_attach_limit_reached
+import aichecklists.core.designsystem.generated.resources.chat_attach_no_files
+import aichecklists.core.designsystem.generated.resources.chat_attach_store_failed
+import aichecklists.core.designsystem.generated.resources.chat_attach_unsupported_type
+import aichecklists.core.designsystem.generated.resources.chat_choice_dismissed_message
+import aichecklists.core.designsystem.generated.resources.chat_choice_edit_empty_hint
+import aichecklists.core.designsystem.generated.resources.chat_dispatch_attached_many
+import aichecklists.core.designsystem.generated.resources.chat_dispatch_attached_one
 import aichecklists.core.designsystem.generated.resources.chat_result_moved_to
+import aichecklists.core.designsystem.generated.resources.chat_result_remembered_list
 import aichecklists.core.designsystem.generated.resources.chat_result_undone_add
 import aichecklists.core.designsystem.generated.resources.chat_result_undone_complete
 import aichecklists.core.designsystem.generated.resources.chat_undo_item_gone
@@ -161,6 +172,24 @@ fun ChatRoute(
     val resultMovedToFmt = stringResource(Res.string.chat_result_moved_to)
     val undoItemGoneText = stringResource(Res.string.chat_undo_item_gone)
     val moveNoOtherListsText = stringResource(Res.string.chat_move_no_other_lists)
+    // D2 memory-of-choice disclosure. Same sync rule as above — also lives in App.kt's map.
+    val resultRememberedListFmt = stringResource(Res.string.chat_result_remembered_list)
+    // Pre-existing gap found while wiring D2: emitted as a ShowAssistantMessage since D1 but never
+    // added to either map, so every choice cancel printed the raw key into the bubble.
+    val choiceDismissedText = stringResource(Res.string.chat_choice_dismissed_message)
+    // The whole attach contour — both success replies and the entire error surface — plus the
+    // blank-edit hint. Same gap: emitted, translated, never resolved, so the user read
+    // "chat_dispatch_attached_one" where the confirmation should be. Guarded now by
+    // ChatMessageKeyResolutionTest; keep both maps in step when adding to either.
+    val attachNoFilesText = stringResource(Res.string.chat_attach_no_files)
+    val attachLimitReachedText = stringResource(Res.string.chat_attach_limit_reached)
+    val attachUnsupportedTypeFmt = stringResource(Res.string.chat_attach_unsupported_type)
+    val attachAnalyzeEmptyFmt = stringResource(Res.string.chat_attach_analyze_empty)
+    val attachAnalyzeFailedFmt = stringResource(Res.string.chat_attach_analyze_failed)
+    val attachStoreFailedFmt = stringResource(Res.string.chat_attach_store_failed)
+    val dispatchAttachedOneFmt = stringResource(Res.string.chat_dispatch_attached_one)
+    val dispatchAttachedManyFmt = stringResource(Res.string.chat_dispatch_attached_many)
+    val choiceEditEmptyHintText = stringResource(Res.string.chat_choice_edit_empty_hint)
     // Phase 3 strings
     val micPermissionDeniedText = stringResource(Res.string.chat_mic_permission_denied)
     val voiceTooShortText = stringResource(Res.string.chat_voice_too_short)
@@ -234,6 +263,17 @@ fun ChatRoute(
             "chat_result_moved_to" to resultMovedToFmt,
             "chat_undo_item_gone" to undoItemGoneText,
             "chat_move_no_other_lists" to moveNoOtherListsText,
+            "chat_result_remembered_list" to resultRememberedListFmt,
+            "chat_choice_dismissed_message" to choiceDismissedText,
+            "chat_attach_no_files" to attachNoFilesText,
+            "chat_attach_limit_reached" to attachLimitReachedText,
+            "chat_attach_unsupported_type" to attachUnsupportedTypeFmt,
+            "chat_attach_analyze_empty" to attachAnalyzeEmptyFmt,
+            "chat_attach_analyze_failed" to attachAnalyzeFailedFmt,
+            "chat_attach_store_failed" to attachStoreFailedFmt,
+            "chat_dispatch_attached_one" to dispatchAttachedOneFmt,
+            "chat_dispatch_attached_many" to dispatchAttachedManyFmt,
+            "chat_choice_edit_empty_hint" to choiceEditEmptyHintText,
         )
     }
 

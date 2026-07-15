@@ -8,6 +8,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Choi
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.DispatchOutcome
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.IntentClassification
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.RoutingLayer
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.RowKind
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ToolCall
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.UndoHandle
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.format.ChatDateFormatter
@@ -18,6 +19,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.Checkl
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.RemoteCompletionResult
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.TranscriptionOutcome
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.preview.ToolCallPreviewRenderer
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -122,6 +124,8 @@ internal class VmRig(
     val viewModel: ChatViewModel,
     val dispatcher: RecordingToolCallDispatcher,
     val effects: MutableList<ChatScreenSideEffect>,
+    /** The prefs double behind the VM — D2's memory-of-choice tests assert what it was told. */
+    val prefs: FakeAiChatPreferences = FakeAiChatPreferences(),
 )
 
 /**
@@ -130,33 +134,47 @@ internal class VmRig(
  *
  * [previewRenderer] defaults to the [ChatScenarioHarness] stub because the REAL renderer needs
  * Compose Resources; the Robolectric suite passes the real one in.
+ *
+ * [checklists] overrides [lists] when given: D2 chip metadata / MRU ordering need item counts and
+ * `updatedAt`, which a bare name cannot carry.
+ *
+ * [repository] overrides the scripted-classification default for the agent path, whose branch is
+ * chosen by what `agentStep` returns rather than by a classification.
+ *
+ * [dateFormatter] defaults to the injective [TokenDateFormatter]: the VM formats D2's time and
+ * date-range rows itself, so a real formatter would make those assertions depend on the machine's
+ * timezone. RU/EN wording is covered by ChatDateFormatterLocaleTest.
  */
 internal fun buildVmRig(
     classification: IntentClassification,
     lists: List<String> = emptyList(),
+    checklists: List<Checklist>? = null,
     dispatchOutcome: DispatchOutcome = DispatchOutcome.Success("chat_dispatch_added", listOf("item")),
     undoOutcome: DispatchOutcome = DispatchOutcome.Success("chat_undo_removed", listOf("item")),
     moveOutcome: DispatchOutcome = DispatchOutcome.Success("chat_dispatch_added_to", listOf("item", "list")),
     previewRenderer: ToolCallPreviewRenderer = StubPreviewRenderer,
     locale: ChatLocale = ChatLocale.Ru,
+    prefs: FakeAiChatPreferences = FakeAiChatPreferences(initial = false),
+    repository: AiChatRepository = ScriptedAiChatRepository(classification),
+    dateFormatter: ChatDateFormatter = TokenDateFormatter(),
 ): VmRig {
     val dispatcher = RecordingToolCallDispatcher(dispatchOutcome, undoOutcome, moveOutcome)
-    val prefs = FakeAiChatPreferences(initial = false)
     val userRepo = HarnessUserDataRepository("u1")
     val viewModel = ChatViewModel(
-        aiChatRepository = ScriptedAiChatRepository(classification),
+        aiChatRepository = repository,
         toolCallDispatcher = dispatcher,
         previewRenderer = previewRenderer,
+        dateFormatter = dateFormatter,
         localeProvider = FixedLocaleProvider(locale),
         chatHistoryRepository = FakeChatHistory(),
-        checklistRepository = HarnessChecklistRepository(lists),
+        checklistRepository = HarnessChecklistRepository(lists, checklists),
         userDataRepository = userRepo,
         aiChatPreferencesRepository = prefs,
         analytics = HarnessAnalytics(),
         aiModelExperimentTracker = HarnessNoOpModelExperimentTracker,
         logger = HarnessNoOpLogger,
     )
-    return VmRig(viewModel, dispatcher, mutableListOf())
+    return VmRig(viewModel, dispatcher, mutableListOf(), prefs)
 }
 
 /** Resource-free renderer for the structural tests (never asserted on — see StubPreviewRenderer usage). */
@@ -170,13 +188,10 @@ internal fun ChatScreenState.options(): List<ChoiceOption> = pendingChoice?.choi
 
 internal fun ChatScreenState.actions(): List<ChoiceAction> = options().map { it.action }
 
-/** The single rendered preview line of the pending choice; fails loudly when absent. */
-internal fun ChatScreenState.singleBatchText(): String {
-    val items = assertNotNull(pendingChoice, "no pendingChoice shown").batchItems
-    assertNotNull(items, "pendingChoice carries no batchItems (an argless question — the D1 gap)")
-    assertEquals(1, items.size, "expected exactly one preview line, got $items")
-    return items.first().text
-}
+// singleBatchText() lived here until D2 (2026-07-15): a single-action question carried its object in
+// ONE flat batchItems line, and that helper read it. D2 replaced the line with typed
+// ChatChoice.objectRows, so the readers moved to ChatObjectRowsTest / ChatPreviewContentTest.
+// PendingChoice.batchItems now serves ONLY the agent batch (a numbered plan of several actions).
 
 internal fun ChatScreenState.optionIdFor(predicate: (ChoiceAction) -> Boolean): String {
     val option = options().firstOrNull { predicate(it.action) }
@@ -374,9 +389,11 @@ class ChatUndoChoiceTest {
             state.candidateHints(),
             "an ambiguous hint must offer the matching lists as chips",
         )
-        assertNotNull(
-            state.pendingChoice?.batchItems,
-            "the object must stay visible while the user picks a list (copy asserted in ChatPreviewContentTest)",
+        assertEquals(
+            "Молоко",
+            state.pendingChoice?.choice?.objectRows?.firstOrNull { it.kind == RowKind.Item }?.value,
+            "the object must stay visible while the user picks a list — the whole point of the picker is " +
+                "choosing a home for a THING (rows = ${state.pendingChoice?.choice?.objectRows})",
         )
     }
 

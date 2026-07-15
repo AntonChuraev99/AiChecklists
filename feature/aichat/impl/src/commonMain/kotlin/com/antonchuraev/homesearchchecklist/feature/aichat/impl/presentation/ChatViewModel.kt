@@ -17,12 +17,16 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Chat
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatRole
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceAction
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceObjectRow
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceOption
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceRole
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.DispatchOutcome
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.RowEmphasis
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.RowKind
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.RoutingLayer
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ToolCall
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.UndoHandle
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.format.ChatDateFormatter
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.locale.ChatLocaleProvider
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.ChatLocale
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AgentToolCall
@@ -51,6 +55,8 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.launch
@@ -90,7 +96,17 @@ import aichecklists.core.designsystem.generated.resources.chat_question_complete
 import aichecklists.core.designsystem.generated.resources.chat_question_create
 import aichecklists.core.designsystem.generated.resources.chat_question_delete
 import aichecklists.core.designsystem.generated.resources.chat_question_set_reminder
+import aichecklists.core.designsystem.generated.resources.chat_choice_action_create_items
+import aichecklists.core.designsystem.generated.resources.chat_object_file_a11y
+import aichecklists.core.designsystem.generated.resources.chat_object_item_a11y
+import aichecklists.core.designsystem.generated.resources.chat_object_name_a11y
+import aichecklists.core.designsystem.generated.resources.chat_object_time_a11y
+import aichecklists.core.designsystem.generated.resources.chat_preview_checklist_label
+import aichecklists.core.designsystem.generated.resources.chat_preview_files_count
+import aichecklists.core.designsystem.generated.resources.items_count
+import org.jetbrains.compose.resources.PluralStringResource
 import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.getPluralString
 import org.jetbrains.compose.resources.getString
 
 /**
@@ -111,6 +127,9 @@ class ChatViewModel(
     private val aiChatRepository: AiChatRepository,
     private val toolCallDispatcher: ToolCallDispatcher,
     private val previewRenderer: ToolCallPreviewRenderer,
+    // Shared with previewRenderer on purpose: the agent batch and the D2 object rows must spell
+    // one moment the same way, and two formatters would drift.
+    private val dateFormatter: ChatDateFormatter,
     private val localeProvider: ChatLocaleProvider,
     private val chatHistoryRepository: ChatHistoryRepository,
     private val checklistRepository: ChecklistRepository,
@@ -225,6 +244,20 @@ class ChatViewModel(
                 _screenState.value = _screenState.value.copy(deepThinkingEnabled = enabled)
             }
         }
+
+        // D2 memory of choice: resolve the remembered default id to a NAME for the settings sheet.
+        // Combined with the live checklists so a renamed list re-labels and a deleted one clears
+        // the row — a reset control pointing at a list that no longer exists is worse than none.
+        viewModelScope.launch {
+            combine(
+                aiChatPreferencesRepository.defaultChecklistIdFlow,
+                checklistRepository.checklists,
+            ) { id, checklists -> checklists.firstOrNull { it.id == id }?.name }
+                .catch { e -> logger.error(TAG, "Default checklist name flow failed", e) }
+                .collect { name ->
+                    _screenState.value = _screenState.value.copy(defaultChecklistName = name)
+                }
+        }
     }
 
     override fun onIntent(intent: ChatScreenIntent) {
@@ -256,6 +289,25 @@ class ChatViewModel(
             }
 
             is ChatScreenIntent.OnChoiceSelected -> handleChoiceSelected(intent.optionId)
+
+            is ChatScreenIntent.OnChoiceMemoryToggle -> {
+                val current = _screenState.value.pendingChoice ?: return
+                // Bookkeeping only — nothing is persisted until a candidate chip is tapped, since
+                // the preference is "that list from now on" and there is no "that list" yet.
+                _screenState.value = _screenState.value.copy(
+                    pendingChoice = current.copy(rememberChoice = intent.enabled),
+                )
+            }
+
+            ChatScreenIntent.OnResetDefaultChecklist -> {
+                viewModelScope.launch {
+                    runCatching { aiChatPreferencesRepository.setDefaultChecklistId(null) }
+                        .onFailure { e ->
+                            logger.error(TAG, "Failed to reset default checklist", e)
+                            _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_generic_error"))
+                        }
+                }
+            }
 
             ChatScreenIntent.OnChoiceDismissed -> handleChoiceDismissed()
 
@@ -767,6 +819,17 @@ class ChatViewModel(
                         val hintlessAdd = (toolCall is ToolCall.AddItem && toolCall.checklistHint == null) ||
                             (toolCall is ToolCall.AddItems && toolCall.checklistHint == null)
                         if (hintlessAdd) {
+                            // D2 memory of choice: the user explicitly asked us to stop asking, so
+                            // route to their default instead of re-opening the picker. Resolved by
+                            // NAME through the same hint path everything else uses; a default that
+                            // no longer exists resolves to null and we fall through to asking —
+                            // the safe direction.
+                            val remembered = rememberedDefaultName()
+                            if (remembered != null) {
+                                val routed = toolCall.withHint(remembered) ?: toolCall
+                                dispatchReversible(routed, sourceLayer = classification.layer)
+                                return@runCatching
+                            }
                             val names = runCatching {
                                 checklistRepository.checklists.first().map { it.name }
                             }.getOrDefault(emptyList())
@@ -849,7 +912,7 @@ class ChatViewModel(
             add(
                 ChoiceOption(
                     id = CHOICE_EXECUTE,
-                    label = choiceString(toolCall.primaryActionLabel()),
+                    label = toolCall.outcomeLabel(),
                     role = if (isDelete) ChoiceRole.Destructive else ChoiceRole.Primary,
                     action = ChoiceAction.Execute(toolCall),
                 ),
@@ -882,9 +945,9 @@ class ChatViewModel(
             )
         }
 
-        // The question is argument-less; the OBJECT of the action rides in its own line under it
-        // (same batchItems mechanism the agent plan uses). A one-slot prompt could only ever name
-        // one of item/list — which is how "Add to Shopping?" shipped never saying what.
+        // The question is argument-less; the OBJECT of the action rides in typed rows under it
+        // (D2). A one-slot prompt could only ever name one of item/list — which is how
+        // "Add to Shopping?" shipped never saying what.
         _choiceSourceLayer = sourceLayer
         _screenState.value = _screenState.value.copy(
             pendingChoice = PendingChoice(
@@ -892,15 +955,168 @@ class ChatViewModel(
                     prompt = choiceString(toolCall.questionRes()),
                     options = options,
                     escape = escape,
-                ),
-                batchItems = listOf(
-                    AgentPlanItem(text = previewRenderer.render(toolCall), isDestructive = isDelete),
+                    objectRows = buildObjectRows(toolCall),
                 ),
             ),
             isProcessing = false,
         )
         trackPreviewShown(toolCall)
         trackResponseReceived(sourceLayer, outcome = "preview")
+    }
+
+    // ─── D2 object rows — the typed WHAT of a pending action ──────────────────
+
+    /**
+     * Builds the typed object rows for a single write-intent [toolCall] (the D2 replacement for
+     * D1's one flat preview line).
+     *
+     * Each entity gets its own row, so a question with three of them (item + list + time) no
+     * longer has to pick one to say out loud. An entity the tool call does not carry produces NO
+     * row — absence, not an empty string.
+     *
+     * The contentDescription is resolved here because `getString` suspends and the renderer is a
+     * @Composable: resolving it there would either block a frame or ship an English literal.
+     */
+    private suspend fun buildObjectRows(toolCall: ToolCall): List<ChoiceObjectRow> = when (toolCall) {
+        is ToolCall.AddItem -> buildList {
+            add(itemRow(toolCall.itemText))
+            addDestination(toolCall.checklistHint)
+        }
+
+        is ToolCall.AddItems -> buildList {
+            toolCall.itemTexts.forEach { add(itemRow(it)) }
+            addDestination(toolCall.checklistHint)
+        }
+
+        // The object of a delete is tinted error and carries the trash icon; the destination stays
+        // neutral — the list is not what is being destroyed.
+        is ToolCall.DeleteItem -> buildList {
+            add(itemRow(toolCall.itemText, emphasis = RowEmphasis.Danger))
+            addDestination(toolCall.checklistHint)
+        }
+
+        is ToolCall.CompleteItem -> buildList {
+            add(itemRow(toolCall.itemText))
+            addDestination(toolCall.checklistHint)
+        }
+
+        // Time is Accent, never Detail: a silent 3 a.m. alarm is the surprise this block exists
+        // to prevent, so the moment never sits at supporting emphasis.
+        is ToolCall.SetItemReminder -> buildList {
+            add(itemRow(toolCall.itemText))
+            addDestination(toolCall.checklistHint)
+            val at = dateFormatter.formatDateTime(toolCall.at)
+            add(
+                ChoiceObjectRow(
+                    value = at,
+                    kind = RowKind.Time,
+                    emphasis = RowEmphasis.Accent,
+                    contentDescription = choiceString(Res.string.chat_object_time_a11y, at),
+                ),
+            )
+        }
+
+        is ToolCall.CreateChecklist -> buildList {
+            add(
+                ChoiceObjectRow(
+                    value = toolCall.name,
+                    kind = RowKind.Name,
+                    emphasis = RowEmphasis.Primary,
+                    contentDescription = choiceString(Res.string.chat_object_name_a11y, toolCall.name),
+                ),
+            )
+            // The proposed items preview. The renderer caps these per surface and adds the
+            // "…and N more" tail — it is the only side that knows dock vs full screen.
+            toolCall.initialItems.forEach { item ->
+                add(
+                    ChoiceObjectRow(
+                        value = item,
+                        kind = RowKind.Preview,
+                        emphasis = RowEmphasis.Detail,
+                        contentDescription = choiceString(Res.string.chat_object_item_a11y, item),
+                    ),
+                )
+            }
+        }
+
+        // Data gap: MoveAllReminders carries only from/to timestamps — no count. Without one the
+        // "5 reminders" row cannot be built, so it is omitted rather than guessed (and the chip
+        // degrades to a bare "Move" in outcomeLabel()). Adding the count is a data-layer change.
+        is ToolCall.MoveAllReminders -> listOf(
+            ChoiceObjectRow(
+                value = "${dateFormatter.formatDay(toolCall.fromDayStartMs)} $RANGE_DASH " +
+                    dateFormatter.formatDay(toolCall.toDayStartMs),
+                kind = RowKind.DateRange,
+                emphasis = RowEmphasis.Primary,
+                contentDescription = choiceString(
+                    Res.string.chat_object_time_a11y,
+                    "${dateFormatter.formatDay(toolCall.fromDayStartMs)} $RANGE_DASH " +
+                        dateFormatter.formatDay(toolCall.toDayStartMs),
+                ),
+            ),
+        )
+
+        is ToolCall.AttachToItem -> buildList {
+            add(fileRow(toolCall.attachments))
+            add(itemRow(toolCall.itemText, emphasis = RowEmphasis.Detail))
+            addDestination(toolCall.checklistHint)
+        }
+
+        is ToolCall.CreateChecklistFromAttachment -> listOf(fileRow(toolCall.attachments))
+
+        // Read-only / agent-only variants never reach a write-intent choice block.
+        is ToolCall.FindItemsQuery,
+        is ToolCall.ReadChecklist,
+        is ToolCall.RenameChecklist -> emptyList()
+    }
+
+    private suspend fun itemRow(text: String, emphasis: RowEmphasis = RowEmphasis.Primary) =
+        ChoiceObjectRow(
+            value = text,
+            kind = RowKind.Item,
+            emphasis = emphasis,
+            contentDescription = choiceString(Res.string.chat_object_item_a11y, text),
+        )
+
+    /** Adds the destination row, or nothing when the command named no list (absence, not ""). */
+    private suspend fun MutableList<ChoiceObjectRow>.addDestination(hint: String?) {
+        if (hint.isNullOrBlank()) return
+        add(
+            ChoiceObjectRow(
+                value = hint,
+                kind = RowKind.Destination,
+                emphasis = RowEmphasis.Detail,
+                // "In checklist: Shopping" — the revived chat_preview_checklist_label reads
+                // exactly right as the spoken form of this row.
+                contentDescription = choiceString(Res.string.chat_preview_checklist_label, hint),
+            ),
+        )
+    }
+
+    /**
+     * The file row: one file → "report.pdf", several → a localized "N files".
+     *
+     * Deliberately NAME-ONLY, no size. The design calls for "report.pdf • 2.4 MB", but:
+     *  1. every ChatRoute picker call site builds its ChatAttachment with `sizeBytes = 0L`, so a
+     *     size would render as "• 0 B" on every attach — a confident lie, and
+     *  2. the byte formatter lives in feature/home (`AttachmentFullscreenViewer`); reaching it
+     *     from here would be a feature→feature dependency, and its unit strings ("KB"/"MB") are
+     *     user-facing, so a local copy cannot just hardcode them.
+     * Add the size once the pickers carry a real one AND the formatter is extracted to core.
+     */
+    private suspend fun fileRow(attachments: List<ChatAttachment>): ChoiceObjectRow {
+        val first = attachments.firstOrNull()
+        val name = if (attachments.size == 1 && first != null) {
+            first.fileName
+        } else {
+            choiceString(Res.string.chat_preview_files_count, attachments.size.toString())
+        }
+        return ChoiceObjectRow(
+            value = name,
+            kind = RowKind.File,
+            emphasis = RowEmphasis.Primary,
+            contentDescription = choiceString(Res.string.chat_object_file_a11y, name),
+        )
     }
 
     /**
@@ -916,11 +1132,15 @@ class ChatViewModel(
         names: List<String>,
         sourceLayer: RoutingLayer?,
     ) {
-        val options = names.take(MAX_CHOICE_OPTIONS).mapIndexedNotNull { index, name ->
-            val tc = sourceToolCall.withHint(name) ?: return@mapIndexedNotNull null
+        val candidates = rankCandidates(names)
+        val shown = candidates.take(MAX_CHOICE_OPTIONS)
+        val metas = buildCandidateMetas(shown)
+        val options = shown.mapIndexedNotNull { index, candidate ->
+            val tc = sourceToolCall.withHint(candidate.name) ?: return@mapIndexedNotNull null
             ChoiceOption(
                 id = "$CHOICE_CANDIDATE_PREFIX$index",
-                label = name,
+                label = candidate.name,
+                meta = metas[candidate.name],
                 role = ChoiceRole.Default,
                 action = ChoiceAction.Execute(tc),
             )
@@ -931,17 +1151,34 @@ class ChatViewModel(
             role = ChoiceRole.Escape,
             action = ChoiceAction.Dismiss,
         )
+        // Truncation must be visible: silently dropping candidate 7 leaves the user hunting for a
+        // list the chat decided not to mention.
+        val prompt = if (candidates.size > MAX_CHOICE_OPTIONS) {
+            choiceString(
+                Res.string.chat_choice_which_list_truncated,
+                MAX_CHOICE_OPTIONS.toString(),
+                candidates.size.toString(),
+            )
+        } else {
+            choiceString(Res.string.chat_choice_which_list)
+        }
+        // Memory of choice is offered ONLY here, and only for an add: "always add to this list" is
+        // a routing default a user can sensibly hold. "Always delete from this list" is not.
+        val isAdd = sourceToolCall is ToolCall.AddItem || sourceToolCall is ToolCall.AddItems
         _choiceSourceLayer = sourceLayer
         _screenState.value = _screenState.value.copy(
             pendingChoice = PendingChoice(
                 choice = ChatChoice(
-                    prompt = choiceString(Res.string.chat_choice_which_list),
+                    prompt = prompt,
                     options = options,
                     escape = escape,
+                    // "Which list?" must still say WHAT is going into it — without these rows the
+                    // user picks a destination for an unnamed thing.
+                    objectRows = buildObjectRows(sourceToolCall),
                 ),
-                // "Which list?" must still say WHAT is going into it — without this line the user
-                // picks a destination for an unnamed thing.
-                batchItems = listOf(AgentPlanItem(text = previewRenderer.render(sourceToolCall))),
+                showMemoryToggle = isAdd,
+                // Never pre-checked — see PendingChoice.rememberChoice.
+                rememberChoice = false,
             ),
             isProcessing = false,
         )
@@ -949,6 +1186,79 @@ class ChatViewModel(
         // tap fires PREVIEW_CONFIRMED via executeChoice, so without this the confirms are orphaned.
         trackPreviewShown(sourceToolCall)
         if (sourceLayer != null) trackResponseReceived(sourceLayer, outcome = "preview")
+    }
+
+    /**
+     * The remembered default list's NAME, or null when the chat should keep asking.
+     *
+     * Resolves the persisted id against the live checklists on every call rather than caching:
+     * the list can be renamed or deleted between turns, and a stale name would route items into
+     * nothing. A dangling id resolves to null → the picker comes back, which is the safe failure.
+     */
+    private suspend fun rememberedDefaultName(): String? {
+        val id = runCatching { aiChatPreferencesRepository.defaultChecklistIdFlow.first() }
+            .getOrNull() ?: return null
+        return runCatching { checklistRepository.checklists.first() }
+            .getOrNull()
+            ?.firstOrNull { it.id == id }
+            ?.name
+    }
+
+    // ─── Which-list candidates — ranking + disambiguating meta (D2) ───────────
+
+    /** A candidate list for the which-list picker, with the facts needed to tell it apart. */
+    private data class ListCandidate(val name: String, val itemCount: Int, val updatedAt: Long)
+
+    /**
+     * Orders candidates most-recently-updated first.
+     *
+     * Load-bearing, not cosmetic: the picker shows at most [MAX_CHOICE_OPTIONS], so with 9 lists
+     * the order decides WHICH 6 the user is even allowed to pick. In repository order "Showing 6
+     * of 9" routinely hides the list they were just working in — the one they almost certainly
+     * mean. Names the repository doesn't know keep their original relative order, last.
+     */
+    private suspend fun rankCandidates(names: List<String>): List<ListCandidate> {
+        val known = runCatching { checklistRepository.checklists.first() }
+            .onFailure { logger.warning(TAG, "rankCandidates: checklists unavailable — ${it.message}") }
+            .getOrDefault(emptyList())
+            .associateBy { it.name }
+        return names
+            .map { name ->
+                val checklist = known[name]
+                ListCandidate(
+                    name = name,
+                    // Folders are containers, not things you tick off — counting them would make
+                    // "Shopping • 12" disagree with what the list shows.
+                    itemCount = checklist?.items?.count { it.type == ChecklistNodeType.ITEM } ?: 0,
+                    updatedAt = checklist?.updatedAt ?: 0L,
+                )
+            }
+            .sortedByDescending { it.updatedAt }
+    }
+
+    /**
+     * The chip meta per candidate — the bit that answers "which «Shopping»?".
+     *
+     * Normally the item count. When two candidates share BOTH name and count the count settles
+     * nothing, so the last-updated day is appended to EVERY candidate in the block — mixing
+     * formats inside one block ("Shopping • 12" next to "Shopping • 12 • 3 July") would read as
+     * two different kinds of fact rather than one comparison.
+     */
+    private suspend fun buildCandidateMetas(candidates: List<ListCandidate>): Map<String, String> {
+        val collides = candidates
+            .groupBy { it.name to it.itemCount }
+            .any { (_, group) -> group.size > 1 }
+        return candidates.associate { candidate ->
+            // Bare value by design ("• 12", not "• 12 items"): chips are tight, RU inflates copy
+            // 15-30%, and the spoken form lives in the chip's contentDescription instead.
+            val base = candidate.itemCount.toString()
+            val meta = if (collides && candidate.updatedAt > 0L) {
+                "$base $META_SEPARATOR ${dateFormatter.formatDay(candidate.updatedAt)}"
+            } else {
+                base
+            }
+            candidate.name to meta
+        }
     }
 
     // ─── Reversible path — apply now, offer Undo after (D1 "C-branch") ────────
@@ -1211,6 +1521,9 @@ class ChatViewModel(
             name = AnalyticsEvents.Chat.PREVIEW_CONFIRMED,
             params = mapOf(AnalyticsParams.ACTION_TYPE to (toolCall::class.simpleName ?: "unknown")),
         )
+        // Captured BEFORE the dispatch clears the choice — the checkbox state dies with the block.
+        val pending = _screenState.value.pendingChoice
+        val remember = pending?.showMemoryToggle == true && pending.rememberChoice
         viewModelScope.launch {
             // Mark the chip loading (whole block goes non-interactive in the UI).
             val loadingLabel = choiceString(toolCall.executingLabel())
@@ -1224,12 +1537,49 @@ class ChatViewModel(
                 // Clear first; handleOutcomeInline may set a NEW choice (AmbiguousMatch → "Which list?").
                 clearChoice()
                 handleOutcomeInline(outcome, sourceToolCall = toolCall)
+                // Only remember a destination the action actually reached: persisting after a
+                // NotFound would pin the chat to a list the item never landed in.
+                if (remember && outcome is DispatchOutcome.Success) {
+                    rememberDefaultChecklist(extractHint(toolCall))
+                }
             }.onFailure { e ->
                 logger.error(TAG, "executeChoice failed", e)
                 clearChoice()
                 _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_apply_error"))
             }
         }
+    }
+
+    /**
+     * Persists the user's chosen list as the chat default AND says so out loud.
+     *
+     * The disclosure is not optional. A sticky routing preference the user cannot see changed is a
+     * dark pattern: the next "add milk" would silently skip the question and land somewhere they
+     * never re-confirmed. The message names both the list and where to undo it.
+     */
+    private suspend fun rememberDefaultChecklist(listName: String?) {
+        if (listName.isNullOrBlank()) {
+            logger.warning(TAG, "rememberDefaultChecklist: no list name on the executed tool call")
+            return
+        }
+        val id = runCatching { checklistRepository.checklists.first() }
+            .getOrNull()
+            ?.firstOrNull { it.name.equals(listName, ignoreCase = true) }
+            ?.id
+        if (id == null) {
+            logger.warning(TAG, "rememberDefaultChecklist: no checklist id for '$listName'")
+            return
+        }
+        runCatching { aiChatPreferencesRepository.setDefaultChecklistId(id) }
+            .onSuccess {
+                _sideEffect.emit(
+                    ChatScreenSideEffect.ShowAssistantMessage(
+                        messageKey = "chat_result_remembered_list",
+                        args = listOf(listName),
+                    ),
+                )
+            }
+            .onFailure { e -> logger.error(TAG, "Failed to persist default checklist", e) }
     }
 
     /**
@@ -2144,6 +2494,19 @@ class ChatViewModel(
                 "…"
             }
 
+    /**
+     * Plural sibling of [choiceString] — same test-env degrade.
+     *
+     * Counts always go through a plural, never "$n items": Russian needs three forms
+     * (пункт / пункта / пунктов) and a concatenated count ships the wrong one 2 times in 3.
+     */
+    private suspend fun choicePlural(res: PluralStringResource, quantity: Int): String =
+        runCatching { getPluralString(res, quantity, quantity) }
+            .getOrElse { e ->
+                logger.warning(TAG, "choicePlural: resource resolution failed (test env?) — ${e.message}")
+                quantity.toString()
+            }
+
     // ─── Choice copy helpers (write-intent prompt / chip / loading labels) ─────
 
     /**
@@ -2169,6 +2532,28 @@ class ChatViewModel(
         is ToolCall.FindItemsQuery,
         is ToolCall.ReadChecklist,
         is ToolCall.RenameChecklist -> Res.string.chat_choice_apply_actions
+    }
+
+    /**
+     * The primary chip's label — it names the OUTCOME, never "Apply".
+     *
+     * "Create 8 items" tells the user what they are about to get; "Apply" makes them re-read the
+     * rows to find out. Only the two actions whose size is the point get counted:
+     *  - CreateChecklist → "Create 8 items" (degrades to a bare "Create" with no initial items),
+     *  - MoveAllReminders → "Move 5 reminders" — NOT reachable today: the tool call carries no
+     *    count, so it degrades to "Move". Wiring the count is a data-layer change.
+     * Everything else keeps its plain verb, which already names its outcome.
+     */
+    private suspend fun ToolCall.outcomeLabel(): String = when (this) {
+        is ToolCall.CreateChecklist -> if (initialItems.isEmpty()) {
+            choiceString(primaryActionLabel())
+        } else {
+            choiceString(
+                Res.string.chat_choice_action_create_items,
+                choicePlural(Res.plurals.items_count, initialItems.size),
+            )
+        }
+        else -> choiceString(primaryActionLabel())
     }
 
     /** Primary-chip label resource for a write-intent ("Add" / "Delete" / "Create" / …). */
@@ -2727,6 +3112,16 @@ class ChatViewModel(
         const val CHOICE_UNDO = "undo"
         const val CHOICE_MOVE_TO_LIST = "move_to_list"
         const val CHOICE_MOVE_PREFIX = "move_"
+
+        /**
+         * Separator between a value and its meta ("Shopping • 12", "Fri 17 – Sat 18").
+         *
+         * U+2022 / U+2013 only. Skiko on wasmJs has no CSS-style font fallback: D1 shipped "→"
+         * (U+2192) and it rendered as tofu on the web canvas while Android's Roboto fallback hid
+         * it. Both glyphs below are proven on that canvas — do not swap in an unverified one.
+         */
+        const val META_SEPARATOR = "•"
+        const val RANGE_DASH = "–"
         /**
          * Max tappable options shown in a choice block ("which list?" / ambiguous-match chips).
          * The adaptive FlowRow wraps to as many rows as needed, so 6 stays readable on a phone dock.

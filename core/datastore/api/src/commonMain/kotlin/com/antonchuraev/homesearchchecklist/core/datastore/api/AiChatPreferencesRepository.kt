@@ -20,4 +20,17 @@ interface AiChatPreferencesRepository {
 
     /** Persist the user's Deep Thinking opt-in. */
     suspend fun setDeepThinkingEnabled(enabled: Boolean)
+
+    /**
+     * Emits the checklist id the user chose to make their default target for chat-created items,
+     * or `null` when the chat should keep asking "which list?" every time (the default).
+     *
+     * Set ONLY through an explicit opt-in ("Remember my choice" on the which-list picker) and
+     * always disclosed in the reply that follows. Cleared from chat settings — a sticky routing
+     * preference the user cannot see or reset is a trap, not a convenience.
+     */
+    val defaultChecklistIdFlow: Flow<Long?>
+
+    /** Persist (or clear, with `null`) the user's default chat target list. */
+    suspend fun setDefaultChecklistId(checklistId: Long?)
 }

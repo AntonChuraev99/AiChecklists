@@ -8,6 +8,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Chat
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatChoice
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceAction
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ToolCall
 
 // ---------------------------------------------------------------------------
 // State
@@ -71,6 +72,13 @@ data class ChatScreenState(
      * Null when the sheet is opened from [MainScreen] with no focus context.
      */
     val contextChecklistId: Long? = null,
+    /**
+     * Name of the checklist the user chose as their chat default ("Remember my choice"), or null
+     * when the chat still asks every time. Resolved from the persisted id against the live
+     * checklists, so a deleted list resolves back to null and the chat resumes asking.
+     * Drives the chat-settings reset row — a remembered default MUST be visible and clearable.
+     */
+    val defaultChecklistName: String? = null,
 ) : State {
     /** True when the Send button should be active (text entered OR attachments pending). */
     val canSend: Boolean get() = inputText.isNotBlank() || pendingAttachments.isNotEmpty()
@@ -92,6 +100,13 @@ data class ChatScreenState(
  * @param batchItems  Non-null for the agent-batch choice: the numbered list of proposed actions
  *                    rendered inside the prompt bubble (destructive lines error-tinted). Null for
  *                    single-action / ambiguous-match choices.
+ * @param showMemoryToggle True only on the which-list picker for an ADD: the one case where the
+ *                    user's pick is a reusable routing default. Never on delete / reminder /
+ *                    attach / create (destructive or one-off), and never on the D1 post-action
+ *                    move — that is a correction of a mistake, not a preference to learn from.
+ * @param rememberChoice Current state of the memory checkbox. Starts false and is NEVER
+ *                    pre-checked: a sticky preference the user did not knowingly opt into is a
+ *                    dark pattern, and the reply after the tap must disclose it.
  */
 data class PendingChoice(
     val choice: ChatChoice,
@@ -99,6 +114,8 @@ data class PendingChoice(
     val executingLabel: String? = null,
     val editText: String? = null,
     val batchItems: List<AgentPlanItem>? = null,
+    val showMemoryToggle: Boolean = false,
+    val rememberChoice: Boolean = false,
 ) {
     /**
      * True for the D1 post-action offer (Undo / move-to-list) shown AFTER a reversible action was
@@ -115,6 +132,22 @@ data class PendingChoice(
             it.action is ChoiceAction.Undo ||
                 it.action is ChoiceAction.MoveToList ||
                 it.action is ChoiceAction.MoveTo
+        }
+
+    /**
+     * True when this block asks a QUESTION carrying typed object rows (D2). The dock uses it to
+     * pick its scroll anchor and its height cap: a question must show its object, so the frame
+     * anchors to the TOP — auto-scrolling to the bottom would leave bare chips ("cancel WHAT?").
+     */
+    val hasObjectRows: Boolean get() = choice.objectRows.isNotEmpty()
+
+    /**
+     * True when the pending action creates a checklist — the inline edit field is then naming a
+     * list, not fixing an item, and takes the "List name" label.
+     */
+    val isCreatingChecklist: Boolean
+        get() = choice.options.any {
+            (it.action as? ChoiceAction.Execute)?.toolCall is ToolCall.CreateChecklist
         }
 }
 
@@ -193,6 +226,19 @@ sealed interface ChatScreenIntent : Intent {
      * choice this also resolves the suspended agent decision with `false` (declined).
      */
     data object OnChoiceDismissed : ChatScreenIntent
+
+    /**
+     * User flipped "Remember my choice" on the which-list picker. Only bookkeeps the checkbox —
+     * nothing is persisted until a candidate chip is actually tapped, because the preference is
+     * "add to THAT list from now on" and there is no "that list" until one is chosen.
+     */
+    data class OnChoiceMemoryToggle(val enabled: Boolean) : ChatScreenIntent
+
+    /**
+     * User tapped "Ask me every time" in chat settings — clears the remembered default list.
+     * The escape hatch for [OnChoiceMemoryToggle]; without it the preference is a one-way trap.
+     */
+    data object OnResetDefaultChecklist : ChatScreenIntent
 
     /** User edited the text inside the inline edit field of the pending choice. */
     data class OnChoiceEditChange(val text: String) : ChatScreenIntent

@@ -144,6 +144,11 @@ private class FakeAiChatPreferencesRepository(
     private val _flow = MutableStateFlow(initial)
     override val deepThinkingEnabledFlow: Flow<Boolean> = _flow
     override suspend fun setDeepThinkingEnabled(enabled: Boolean) { _flow.value = enabled }
+
+    // D2's default-list preference is a ViewModel concern; the router never reads it.
+    private val _defaultChecklistId = MutableStateFlow<Long?>(null)
+    override val defaultChecklistIdFlow: Flow<Long?> = _defaultChecklistId
+    override suspend fun setDefaultChecklistId(checklistId: Long?) { _defaultChecklistId.value = checklistId }
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
