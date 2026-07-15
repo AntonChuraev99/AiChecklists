@@ -2072,10 +2072,18 @@ private fun SwipeableChecklistItemCard(
         }
     }
 
+    // SwipeToDismissBox stacks backgroundContent behind content unconditionally, so the slab is
+    // hidden only while the card fully covers it — the completion scale-pop undershoots below 1f
+    // on its bouncy settle and flashes the red slab on a plain check. dismissDirection reads the
+    // drag offset (not targetValue), so the slab still appears from the first pixel of a swipe.
+    val isSwiping by remember {
+        derivedStateOf { dismissState.dismissDirection != SwipeToDismissBoxValue.Settled }
+    }
+
     SwipeToDismissBox(
         state = dismissState,
         modifier = modifier,
-        backgroundContent = { SwipeDeleteBackground() },
+        backgroundContent = { if (isSwiping) SwipeDeleteBackground() },
         enableDismissFromStartToEnd = false,
         enableDismissFromEndToStart = true,
     ) {
