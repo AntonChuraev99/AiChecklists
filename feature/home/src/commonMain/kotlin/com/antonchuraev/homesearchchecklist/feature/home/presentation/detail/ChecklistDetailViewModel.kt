@@ -1950,14 +1950,29 @@ class ChecklistDetailViewModel(
         // land partially (fill written, template not → the folder renders back, empty) or not at
         // all (folder reappears on relaunch), and descendant alarms would outlive their items.
         appScope.launch {
-            // Cancel alarms for every deleted leaf with an active reminder (same calls as the
-            // single-item sheet delete), keyed by the leaf's FILL id.
-            for (leaf in fillItemsToCancel) {
-                reminderScheduler.cancelItemReminder(checklistId, fill.id, leaf.id)
-                reminderScheduler.cancelItemRepeat(checklistId, fill.id, leaf.id)
+            // runCatching, because appScope is shared app-wide: an uncaught throw here would reach
+            // the default handler (no CoroutineExceptionHandler installed) and crash the process,
+            // taking sync and credits convergence down with it. NB the two writes are still not one
+            // transaction — a throw between them leaves the delete half-landed. Tracked separately;
+            // fixing it needs a repository-level transaction, not a reordering.
+            runCatching {
+                // Cancel alarms for every deleted leaf with an active reminder (same calls as the
+                // single-item sheet delete), keyed by the leaf's FILL id.
+                for (leaf in fillItemsToCancel) {
+                    reminderScheduler.cancelItemReminder(checklistId, fill.id, leaf.id)
+                    reminderScheduler.cancelItemRepeat(checklistId, fill.id, leaf.id)
+                }
+                repository.updateFill(updatedFill)
+                repository.updateChecklistTemplate(updatedChecklist)
+            }.onFailure { e ->
+                logger.error(
+                    "ChecklistDetail",
+                    "confirmFolderDelete: persist failed for folder=$folderId " +
+                        "checklist=$checklistId cascade=${removeIds.size}: ${e.message}",
+                    e,
+                )
+                return@launch
             }
-            repository.updateFill(updatedFill)
-            repository.updateChecklistTemplate(updatedChecklist)
             analyticsTracker.event(
                 "folder_deleted",
                 mapOf(
