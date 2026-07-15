@@ -40,8 +40,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -77,6 +79,9 @@ class ChecklistDetailFolderAddOrderTest {
     private val leafA1 = ChecklistItem(text = "Milk", parentId = folderA.id)
     private val leafA2 = ChecklistItem(text = "Bread", parentId = folderA.id)
     private val leafA3 = ChecklistItem(text = "Eggs", parentId = folderA.id)
+    // Inside folderA AND carrying the two other node attributes that a naive recreate drops
+    // (priority = starred, weekday = Wed) — the undo tests below assert all three survive.
+    private val leafA4 = ChecklistItem(text = "Cheese", parentId = folderA.id, priority = 1, weekday = 3)
     private val leafB1 = ChecklistItem(text = "Screws", parentId = folderB.id)
     private val leafB2 = ChecklistItem(text = "Nails", parentId = folderB.id)
     private val rootLeaf1 = ChecklistItem(text = "Call plumber")
@@ -87,7 +92,7 @@ class ChecklistDetailFolderAddOrderTest {
 
     private val templateItems = listOf(
         folderA, folderB,
-        leafA1, leafA2, leafA3, leafB1, leafB2,
+        leafA1, leafA2, leafA3, leafA4, leafB1, leafB2,
         rootLeaf1, rootLeaf2, rootLeaf3, rootLeaf4, rootLeaf5,
     )
 
@@ -97,6 +102,8 @@ class ChecklistDetailFolderAddOrderTest {
     private val fillA1 = ChecklistFillItem("Milk", checked = false, templateItemId = leafA1.id)
     private val fillA2 = ChecklistFillItem("Bread", checked = true, templateItemId = leafA2.id)
     private val fillA3 = ChecklistFillItem("Eggs", checked = false, templateItemId = leafA3.id)
+    private val fillA4 = ChecklistFillItem("Cheese", checked = false, weekday = 3, templateItemId = leafA4.id)
+        .withPriority(1)
     private val fillB1 = ChecklistFillItem("Screws", checked = false, templateItemId = leafB1.id)
     private val fillB2 = ChecklistFillItem("Nails", checked = false, templateItemId = leafB2.id)
     private val fillRoot1 = ChecklistFillItem("Call plumber", checked = true, templateItemId = rootLeaf1.id)
@@ -108,7 +115,7 @@ class ChecklistDetailFolderAddOrderTest {
 
     private val fillItems = listOf(
         fillFolderA, fillFolderB,
-        fillA1, fillA2, fillA3, fillB1, fillB2,
+        fillA1, fillA2, fillA3, fillA4, fillB1, fillB2,
         fillRoot1, fillRoot2, fillRoot3, fillRoot4, fillRoot5,
     )
 
@@ -136,19 +143,35 @@ class ChecklistDetailFolderAddOrderTest {
 
     @AfterTest
     fun tearDown() {
+        // Drain work still parked on the scheduler (notably the VM's 4s pendingUndoJob) BEFORE
+        // unsetting Main. viewModelScope is NOT a child of the TestScope, so when a test body throws
+        // — as every RED assertion here does — runTest rethrows without draining, and those parked
+        // continuations resume against an already-reset Dispatchers.Main. That surfaces as
+        // "Dispatchers.Main was accessed when the platform dispatcher was absent" /
+        // "UncaughtExceptionsBeforeTest" on whichever test JUnit happens to run NEXT, which would
+        // pin the failure on an innocent test instead of the one that actually broke.
+        testDispatcher.scheduler.advanceUntilIdle()
         Dispatchers.resetMain()
     }
 
-    private fun createViewModel(): ChecklistDetailViewModel {
+    /**
+     * [currentFolderId] = null → viewing the checklist ROOT; non-null → drilled into that folder.
+     *
+     * DataStore is pinned to [backgroundScope] (the test's virtual scheduler). Its default scope is
+     * a REAL `Dispatchers.IO + SupervisorJob()`, whose work outlives the test on real threads and
+     * later resumes VM coroutines on `Dispatchers.Main` after tearDown reset it — an async race that
+     * failed whichever test JUnit ran next rather than the test that caused it.
+     */
+    private fun TestScope.createViewModel(currentFolderId: String? = null): ChecklistDetailViewModel {
         val datastore = AppDatastore(
-            PreferenceDataStoreFactory.createWithPath {
+            PreferenceDataStoreFactory.createWithPath(scope = backgroundScope) {
                 "build/test_prefs_folderorder_${Random.nextLong()}.preferences_pb".toPath()
             },
             testDispatcher,
         )
         return ChecklistDetailViewModel(
             checklistId = 1L,
-            currentFolderId = null, // viewing checklist ROOT
+            currentFolderId = currentFolderId,
             repository = repository,
             navigator = NoOpNavigator(),
             getUserLimitsUseCase = GetUserLimitsUseCase(
@@ -363,6 +386,126 @@ class ChecklistDetailFolderAddOrderTest {
             "restored row missing from levelNodes. order=${describe(state)}",
         )
         assertEveryLeafBacked(state)
+    }
+
+    // ─── Undo-delete DROPS the template node's structure (bug: item returns to ROOT) ─────
+    //
+    // Repro of "delete an item inside a folder → tap Undo → the item comes back at the checklist
+    // ROOT instead of its folder". The undo snapshot (UndoableDeleteItem) only keeps the deleted
+    // TEMPLATE node's *text*, so undoDeleteItem() rebuilds it with the plain constructor:
+    //     ChecklistItem(text = undo.checklistItemText)   // parentId=null, type=ITEM, priority=0, weekday=null
+    // Every structural field of the node is lost. parentId is the user-visible one (the item
+    // teleports out of its folder); priority/weekday are silent data loss on the same line.
+    //
+    // The fill row survives intact (the whole ChecklistFillItem is snapshotted), which is why the
+    // row's own star/weekday still look right while the TEMPLATE — the source of truth for folder
+    // structure and for the Edit screen — is degraded.
+
+    /**
+     * The template node backing [fillItemId] after a restore: resolved through the fill row's
+     * `templateItemId` link, exactly as [buildFolderState] resolves it.
+     */
+    private fun restoredTemplateNode(
+        state: ChecklistDetailState.Content,
+        fillItemId: String,
+    ): ChecklistItem {
+        val row = state.defaultFill?.items?.firstOrNull { it.id == fillItemId }
+            ?: error("restored fill row $fillItemId missing from defaultFill")
+        val templateId = row.templateItemId
+            ?: error("restored fill row $fillItemId lost its templateItemId link")
+        return state.checklist.items.firstOrNull { it.id == templateId }
+            ?: error("restored fill row $fillItemId links to template id $templateId, absent from checklist.items")
+    }
+
+    @Test
+    fun undoDeleteItem_itemInsideFolder_restoredTemplateNodeKeepsParentFolder() = runTest {
+        repository = ReEmittingFakeRepository(baseChecklist.copy(separateCompleted = false), baseFill, reEmitOnWrite = false)
+        // The user is standing INSIDE folderA ("Groceries") — that's where the swipe happens.
+        val vm = createViewModel(currentFolderId = folderA.id)
+
+        vm.onIntent(ChecklistDetailIntent.OnSwipeDeleteItem(fillA3.id)) // "Eggs", parentId = folderA
+        vm.onIntent(ChecklistDetailIntent.OnUndoDeleteItem)
+
+        val restored = restoredTemplateNode(contentState(vm), fillA3.id)
+        assertEquals(
+            folderA.id,
+            restored.parentId,
+            "undone item must return to the folder it was deleted from, not the checklist root",
+        )
+    }
+
+    @Test
+    fun undoDeleteItem_itemInsideFolder_restoredLeafRendersInsideFolderNotAtRoot() = runTest {
+        // Same bug seen through the DERIVED state the screen actually renders (levelNodes for the
+        // folder the user is looking at) rather than through the raw template field.
+        repository = ReEmittingFakeRepository(baseChecklist.copy(separateCompleted = false), baseFill, reEmitOnWrite = false)
+        val vm = createViewModel(currentFolderId = folderA.id)
+
+        vm.onIntent(ChecklistDetailIntent.OnSwipeDeleteItem(fillA3.id))
+        assertItemAbsent(contentState(vm), fillA3.id) // sanity: gone after delete
+
+        vm.onIntent(ChecklistDetailIntent.OnUndoDeleteItem)
+
+        val state = contentState(vm)
+        // Visible again at the folder level it was deleted from...
+        assertTrue(
+            state.levelNodes.filterIsInstance<LevelNode.Leaf>().any { it.fillItemId == fillA3.id },
+            "restored item must be visible inside folderA. order=${describe(state)}",
+        )
+        // ...and NOT re-parented to the checklist root.
+        val restoredNodeId = state.defaultFill?.items?.firstOrNull { it.id == fillA3.id }?.templateItemId
+        assertTrue(
+            state.checklist.items.none { it.id == restoredNodeId && it.parentId == null },
+            "restored template node $restoredNodeId must not be re-parented to the checklist ROOT",
+        )
+        assertEveryLeafBacked(state)
+    }
+
+    @Test
+    fun undoDeleteItem_starredItem_restoredTemplateNodeKeepsPriority() = runTest {
+        repository = ReEmittingFakeRepository(baseChecklist.copy(separateCompleted = false), baseFill, reEmitOnWrite = false)
+        val vm = createViewModel()
+
+        vm.onIntent(ChecklistDetailIntent.OnSwipeDeleteItem(fillRoot2.id)) // "Pay rent", priority = 1
+        vm.onIntent(ChecklistDetailIntent.OnUndoDeleteItem)
+
+        val restored = restoredTemplateNode(contentState(vm), fillRoot2.id)
+        assertEquals(1, restored.priority, "undone item must keep its starred priority on the template node")
+    }
+
+    @Test
+    fun undoDeleteItem_weekdayItemInsideFolder_restoredTemplateNodeKeepsWeekday() = runTest {
+        repository = ReEmittingFakeRepository(baseChecklist.copy(separateCompleted = false), baseFill, reEmitOnWrite = false)
+        val vm = createViewModel(currentFolderId = folderA.id)
+
+        vm.onIntent(ChecklistDetailIntent.OnSwipeDeleteItem(fillA4.id)) // "Cheese", weekday = 3, priority = 1
+        vm.onIntent(ChecklistDetailIntent.OnUndoDeleteItem)
+
+        val restored = restoredTemplateNode(contentState(vm), fillA4.id)
+        assertEquals(3, restored.weekday, "undone item must keep its weekday on the template node")
+    }
+
+    @Test
+    fun undoDeleteItem_itemInsideFolder_restoredFillRowStaysLinkedToExistingTemplateNode() = runTest {
+        // Invariant guard for the fix: however the template node is restored (recreated with the
+        // structure carried over, or re-inserted as-is), the fill row must end up linked to a node
+        // that REALLY exists in checklist.items — an orphaned link is dropped by the next
+        // updateChecklist() reconcile. This one passes today; it must keep passing after the fix.
+        repository = ReEmittingFakeRepository(baseChecklist.copy(separateCompleted = false), baseFill, reEmitOnWrite = false)
+        val vm = createViewModel(currentFolderId = folderA.id)
+
+        vm.onIntent(ChecklistDetailIntent.OnSwipeDeleteItem(fillA3.id))
+        vm.onIntent(ChecklistDetailIntent.OnUndoDeleteItem)
+
+        val state = contentState(vm)
+        val row = state.defaultFill?.items?.firstOrNull { it.id == fillA3.id }
+            ?: error("restored fill row missing from defaultFill")
+        val templateId = row.templateItemId
+        assertTrue(templateId != null, "restored fill row must carry a templateItemId link")
+        assertTrue(
+            state.checklist.items.any { it.id == templateId },
+            "restored fill row links to template id $templateId which is absent from checklist.items (orphan)",
+        )
     }
 
     // ─── Bug 2 REAL root: UNLINKED fill rows bottom-dumped in folder mode ────────

@@ -2818,7 +2818,10 @@ class ChecklistDetailViewModel(
                 levelNodes = snapshot.levelNodes,
                 pendingUndoItem = UndoableDeleteItem(
                     fillItem = item,
-                    checklistItemText = item.text,
+                    // Snapshot the template node itself: it carries parentId (which folder the
+                    // item lives in), type, priority and weekday. getOrNull covers
+                    // checklistIndex == -1 (legacy fill row with no linked node).
+                    checklistItem = state.checklist.items.getOrNull(checklistIndex),
                     originalFillIndex = itemIndex,
                     originalChecklistIndex = checklistIndex,
                 ),
@@ -2853,17 +2856,14 @@ class ChecklistDetailViewModel(
 
         pendingUndoJob?.cancel()
 
-        // The deleted template item is gone, so we recreate it (fresh id). If a template item
-        // is recreated, re-link the restored fill item to that new id so the pair stays
-        // connected — otherwise the fill item would keep pointing at the deleted template id and
-        // become an orphan on the next updateChecklist() reconcile.
-        val recreatedTemplateItem = if (undo.originalChecklistIndex >= 0) {
-            ChecklistItem(text = undo.checklistItemText)
-        } else {
-            null
-        }
-        val restoredFillItem = if (recreatedTemplateItem != null) {
-            undo.fillItem.withTemplateItemId(recreatedTemplateItem.id)
+        // Re-insert the deleted template node exactly as it was, id included. Rebuilding it from
+        // text alone would reset it to the constructor defaults — parentId = null (item jumps out
+        // of its folder to the checklist root), type = ITEM, priority = 0, weekday = null.
+        // Reusing the original id also keeps any descendant's parentId pointing at a live node.
+        val restoredTemplateItem = undo.checklistItem
+        val restoredFillItem = if (restoredTemplateItem != null) {
+            // No-op when the row already links to this node; repairs a legacy unlinked row.
+            undo.fillItem.withTemplateItemId(restoredTemplateItem.id)
         } else {
             undo.fillItem
         }
@@ -2874,8 +2874,8 @@ class ChecklistDetailViewModel(
         val restoredFill = fill.copy(items = restoredFillItems)
 
         val restoredChecklistItems = state.checklist.items.toMutableList().apply {
-            if (recreatedTemplateItem != null) {
-                add(undo.originalChecklistIndex.coerceAtMost(size), recreatedTemplateItem)
+            if (restoredTemplateItem != null) {
+                add(undo.originalChecklistIndex.coerceAtMost(size), restoredTemplateItem)
             }
         }
         val restoredChecklist = state.checklist.copy(items = restoredChecklistItems)
