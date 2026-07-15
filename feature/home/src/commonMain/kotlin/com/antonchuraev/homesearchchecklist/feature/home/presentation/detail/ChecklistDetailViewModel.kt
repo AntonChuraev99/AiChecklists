@@ -38,6 +38,7 @@ import aichecklists.core.designsystem.generated.resources.*
 import org.jetbrains.compose.resources.getString
 import kotlin.time.Clock
 import kotlin.time.Instant
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -66,6 +67,10 @@ class ChecklistDetailViewModel(
     private val attachmentStorage: AttachmentStoragePort,
     private val calendarEventLauncher: CalendarEventLauncher,
     private val logger: AppLogger,
+    // App-wide scope, outlives this back-stack entry. Needed only where a write must survive the
+    // ViewModel that started it — see [confirmFolderDelete], which pops its own entry (and so
+    // cancels viewModelScope) before the delete is persisted.
+    private val appScope: CoroutineScope,
 ) : AppViewModel<ChecklistDetailState, ChecklistDetailIntent, Nothing>() {
 
     private val _screenState = MutableStateFlow<ChecklistDetailState>(ChecklistDetailState.Loading)
@@ -1939,7 +1944,12 @@ class ChecklistDetailViewModel(
             }
         }
 
-        viewModelScope.launch {
+        // Persist on the app scope, NOT viewModelScope: the branch above may have just popped this
+        // entry, and a ChecklistDetail ViewModel is keyed per checklist+folder — the pop clears it
+        // and cancels viewModelScope at the first suspension point below. The delete would then
+        // land partially (fill written, template not → the folder renders back, empty) or not at
+        // all (folder reappears on relaunch), and descendant alarms would outlive their items.
+        appScope.launch {
             // Cancel alarms for every deleted leaf with an active reminder (same calls as the
             // single-item sheet delete), keyed by the leaf's FILL id.
             for (leaf in fillItemsToCancel) {

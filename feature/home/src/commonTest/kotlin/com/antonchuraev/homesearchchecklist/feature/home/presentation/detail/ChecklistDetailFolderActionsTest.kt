@@ -1,6 +1,10 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation.detail
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
@@ -32,6 +36,7 @@ import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetUs
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.RegistrationData
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.UserData
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -40,7 +45,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -138,10 +146,19 @@ class ChecklistDetailFolderActionsTest {
         Dispatchers.resetMain()
     }
 
-    /** [folderId] = the drill-down level this VM is scoped to (null = checklist root). */
-    private fun createViewModel(folderId: String? = null): ChecklistDetailViewModel {
+    /**
+     * [folderId] = the drill-down level this VM is scoped to (null = checklist root).
+     *
+     * [appScope] defaults to the eager [appScopeDouble] so the existing asserts read state that is
+     * already written. The race test overrides it with a non-eager scope — see
+     * [confirmFolderDelete_whileInsideDeletedFolder_persistsDespiteViewModelBeingCleared].
+     */
+    private fun TestScope.createViewModel(
+        folderId: String? = null,
+        appScope: CoroutineScope = appScopeDouble(testDispatcher),
+    ): ChecklistDetailViewModel {
         val datastore = AppDatastore(
-            PreferenceDataStoreFactory.createWithPath {
+            PreferenceDataStoreFactory.createWithPath(scope = backgroundScope) {
                 "build/test_prefs_folder_actions_${Random.nextLong()}.preferences_pb".toPath()
             },
             testDispatcher,
@@ -164,6 +181,7 @@ class ChecklistDetailFolderActionsTest {
             attachmentStorage = FakeAttachmentStorage(),
             calendarEventLauncher = FakeCalendarEventLauncher(),
             logger = NoOpAppLogger,
+            appScope = appScope,
         )
     }
 
@@ -587,6 +605,56 @@ class ChecklistDetailFolderActionsTest {
         vm.onIntent(ChecklistDetailIntent.OnConfirmDeleteFolder)
 
         assertTrue(navigator.backCalled, "must navigate back when standing inside a deleted subtree")
+    }
+
+    @Test
+    fun confirmFolderDelete_whileInsideDeletedFolder_persistsDespiteViewModelBeingCleared() = runTest {
+        // Race guard for the fix that moved confirmFolderDelete's persist off viewModelScope onto the
+        // app-wide scope. ChecklistDetail ViewModels are keyed per checklist+folder, so the
+        // SYNCHRONOUS navigator.onBack() above pops THIS ViewModel's own entry → the entry is
+        // cleared → viewModelScope is cancelled. A persist launched on viewModelScope then dies at
+        // its first suspension point: the delete lands partially (fill written, template not → the
+        // folder renders back, empty) or not at all (folder reappears on relaunch).
+        //
+        // Two deliberate deviations from the class defaults, both required for the test to
+        // DISCRIMINATE rather than pass for free:
+        //  - Main = StandardTestDispatcher. The class default is Unconfined, which would run the
+        //    persist eagerly inside onIntent — before any cancellation — and go green even on the
+        //    buggy viewModelScope version.
+        //  - appScope = backgroundScope (also non-eager). Using the eager appScopeDouble would make
+        //    dispatch, not Job ownership, the thing that saves the write. With both scopes queued,
+        //    the ONLY difference left is whose Job owns the work — exactly the bug.
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        val store = ViewModelStore()
+        val vm = ViewModelProvider.create(
+            store,
+            viewModelFactory {
+                initializer { createViewModel(folderId = folderAChild.id, appScope = backgroundScope) }
+            },
+        )[ChecklistDetailViewModel::class]
+        advanceUntilIdle() // let the VM load its initial state
+
+        vm.onIntent(ChecklistDetailIntent.OnDeleteFolder(folderA.id))
+        advanceUntilIdle()
+        vm.onIntent(ChecklistDetailIntent.OnConfirmDeleteFolder)
+
+        // The persist is queued, not yet run. This is the real pop: Nav3 removes the entry, the
+        // keyed ViewModel is cleared and viewModelScope is cancelled.
+        assertTrue(navigator.backCalled, "must navigate back when standing inside a deleted subtree")
+        store.clear()
+        advanceUntilIdle()
+
+        val template = repository.lastUpdatedTemplate
+        assertNotNull(template, "template delete must survive the ViewModel being cleared by its own pop")
+        assertTrue(
+            template.items.none { it.id == folderA.id || it.id == folderAChild.id },
+            "deleted folder + descendants must be gone from the PERSISTED template",
+        )
+        assertNotNull(
+            repository.lastUpdatedFill,
+            "fill delete must survive the ViewModel being cleared (else fill/template half-land)",
+        )
     }
 
     @Test

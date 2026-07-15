@@ -187,6 +187,7 @@ class ChecklistDetailFolderAddOrderTest {
             attachmentStorage = NoOpAttachmentStorage(),
             calendarEventLauncher = FakeCalendarEventLauncher(),
             logger = NoOpAppLogger,
+            appScope = appScopeDouble(testDispatcher),
         )
     }
 

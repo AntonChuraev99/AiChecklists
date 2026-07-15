@@ -43,6 +43,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
@@ -122,9 +123,9 @@ class ChecklistDetailSmartAddTest {
         Dispatchers.resetMain()
     }
 
-    private fun createViewModel(): ChecklistDetailViewModel {
+    private fun TestScope.createViewModel(): ChecklistDetailViewModel {
         val datastore = AppDatastore(
-            PreferenceDataStoreFactory.createWithPath {
+            PreferenceDataStoreFactory.createWithPath(scope = backgroundScope) {
                 "build/test_prefs_smartadd_${Random.nextLong()}.preferences_pb".toPath()
             },
             testDispatcher
@@ -146,6 +147,7 @@ class ChecklistDetailSmartAddTest {
             attachmentStorage = FakeAttachmentStorage(),
             calendarEventLauncher = FakeCalendarEventLauncher(),
             logger = NoOpAppLogger,
+            appScope = appScopeDouble(testDispatcher),
         )
     }
 
