@@ -201,6 +201,7 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
+import com.antonchuraev.homesearchchecklist.core.common.api.ChecklistSource
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDefaults
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigKeys
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
@@ -451,24 +452,58 @@ fun App() {
             }
 
             // ── Gallery deep-link (app.gisti-ai.com/?g=create&template={slug}) ─────────
-            // Platform entry points (wasmJs main.kt / Android MainActivity) parse the slug and
+            // Platform entry points (wasmJs main.kt / Android MainActivity) parse the link and
             // push it into PendingGalleryDeepLink; we observe it here, create the checklist
             // AS-IS (no AI credit) and land on it. Unknown slug / fetch error → snackbar
             // (visible feedback — no silent skip). consume() prevents a recompose re-fire.
+            //
+            // Analytics lives HERE, not in the UseCase: the domain layer must not know about
+            // analytics (same rule that keeps Compose Resources out of it). This is also the one
+            // place that sees BOTH the outcome and the deep-link's utm, so every branch is
+            // measurable — opened = created(gallery) + failed, with no silent third case.
             val pendingGalleryDeepLink: PendingGalleryDeepLink = koinInject()
             val createFromGalleryUseCase: CreateChecklistFromGalleryTemplateUseCase = koinInject()
+            val analyticsTracker: AnalyticsTracker = koinInject()
             val galleryNotFoundMessage = stringResource(Res.string.gallery_deeplink_not_found)
             val galleryErrorMessage = stringResource(Res.string.gallery_deeplink_error)
             LaunchedEffect(Unit) {
-                pendingGalleryDeepLink.pending.collect { slug ->
-                    if (slug.isNullOrBlank()) return@collect
-                    when (val result = createFromGalleryUseCase(slug)) {
-                        is CreateChecklistFromGalleryTemplateUseCase.Result.Created ->
+                pendingGalleryDeepLink.pending.collect { link ->
+                    if (link == null || link.slug.isBlank()) return@collect
+                    // Top-of-funnel: fires BEFORE the fetch, so an arrival is counted even when the
+                    // create then fails. Without it, "no traffic" and "all slugs broken" look identical.
+                    val linkParams: Map<String, Any> =
+                        mapOf(AnalyticsParams.TEMPLATE_SLUG to link.slug) + link.utm
+                    analyticsTracker.event(AnalyticsEvents.Gallery.DEEPLINK_OPENED, linkParams)
+                    when (val result = createFromGalleryUseCase(link.slug)) {
+                        is CreateChecklistFromGalleryTemplateUseCase.Result.Created -> {
+                            analyticsTracker.event(
+                                AnalyticsEvents.Checklist.CREATED,
+                                linkParams + mapOf(
+                                    AnalyticsParams.SOURCE to ChecklistSource.GALLERY.wire,
+                                    AnalyticsParams.CHECKLIST_ID to result.checklistId,
+                                ),
+                            )
                             navigator.navigateToChecklistDetail(result.checklistId, clearBackStack = true)
-                        CreateChecklistFromGalleryTemplateUseCase.Result.NotFound ->
+                        }
+                        // A stale slug means the live gallery page and Firestore have drifted apart —
+                        // a content bug that is otherwise invisible (the user just sees a snackbar).
+                        CreateChecklistFromGalleryTemplateUseCase.Result.NotFound -> {
+                            analyticsTracker.event(
+                                AnalyticsEvents.Gallery.DEEPLINK_FAILED,
+                                linkParams + mapOf(AnalyticsParams.REASON to "not_found"),
+                            )
                             snackbarHostState.showSnackbar(galleryNotFoundMessage)
-                        is CreateChecklistFromGalleryTemplateUseCase.Result.Error ->
+                        }
+                        is CreateChecklistFromGalleryTemplateUseCase.Result.Error -> {
+                            analyticsTracker.event(
+                                AnalyticsEvents.Gallery.DEEPLINK_FAILED,
+                                linkParams + mapOf(
+                                    AnalyticsParams.REASON to "error",
+                                    AnalyticsParams.ERROR_MESSAGE to (result.cause.message ?: "unknown"),
+                                ),
+                            )
                             snackbarHostState.showSnackbar(galleryErrorMessage)
+                        }
                     }
                     pendingGalleryDeepLink.consume()
                 }

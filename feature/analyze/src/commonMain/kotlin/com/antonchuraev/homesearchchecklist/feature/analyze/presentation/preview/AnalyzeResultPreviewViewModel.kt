@@ -3,8 +3,10 @@ package com.antonchuraev.homesearchchecklist.feature.analyze.presentation.previe
 import androidx.lifecycle.viewModelScope
 import com.antonchuraev.homesearchchecklist.core.common.api.ActivationCoordinator
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
+import com.antonchuraev.homesearchchecklist.core.common.api.ChecklistSource
 import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDefaults
@@ -268,8 +270,8 @@ class AnalyzeResultPreviewViewModel(
 
                     val checklistId = checklistRepository.addChecklist(checklist)
                     analyticsTracker.event(AnalyticsEvents.Checklist.CREATED, mapOf(
-                        "source" to "ai",
-                        "item_count" to checklist.items.size,
+                        AnalyticsParams.SOURCE to ChecklistSource.AI.wire,
+                        AnalyticsParams.ITEM_COUNT to checklist.items.size,
                         "has_folders" to state.useFolders
                     ))
                     // New-user activation funnel: when this create came from the hero, hand the

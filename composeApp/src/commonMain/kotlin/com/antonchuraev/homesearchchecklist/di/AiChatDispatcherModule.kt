@@ -39,6 +39,7 @@ val aiChatDispatcherModule = module {
             logger = get(),
             activationCoordinator = get(),
             remoteConfigProvider = get(),
+            analyticsTracker = get(),
         )
     }
     single<ChatLocaleProvider> {

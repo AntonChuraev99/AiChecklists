@@ -1,8 +1,12 @@
 package com.antonchuraev.homesearchchecklist.aichat
 
 import com.antonchuraev.homesearchchecklist.core.common.api.ActivationCoordinator
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePort
+import com.antonchuraev.homesearchchecklist.core.common.api.ChecklistSource
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDefaults
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigKeys
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
@@ -59,6 +63,7 @@ class ToolCallDispatcherImpl(
     private val logger: AppLogger,
     private val activationCoordinator: ActivationCoordinator,
     private val remoteConfigProvider: RemoteConfigProvider,
+    private val analyticsTracker: AnalyticsTracker,
 ) : ToolCallDispatcher {
 
     companion object {
@@ -186,7 +191,7 @@ class ToolCallDispatcherImpl(
             items = items,
         )
         val newChecklistId = checklistRepository.addChecklist(newChecklist)
-        notifyActivation(newChecklistId)
+        onChecklistCreated(newChecklistId, ChecklistSource.CHAT, items.size)
 
         return when (toolCall.initialItems.size) {
             0 -> DispatchOutcome.Success("chat_dispatch_created_empty", listOf(toolCall.name), linkedChecklistId = newChecklistId)
@@ -330,7 +335,7 @@ class ToolCallDispatcherImpl(
 
                 val newChecklist = Checklist(id = 0L, name = checklistName, items = items)
                 val newId = checklistRepository.addChecklist(newChecklist)
-                notifyActivation(newId)
+                onChecklistCreated(newId, ChecklistSource.ATTACHMENT, items.size)
                 logger.info(TAG, "CreateChecklistFromAttachment: created checklist '$checklistName' id=$newId items=${items.size}")
                 DispatchOutcome.Success(
                     "chat_dispatch_created_from_attachment",
@@ -561,6 +566,34 @@ class ToolCallDispatcherImpl(
      * path. Reads the `activation_bundle_v1` RC flag here (fail-open default ON — see
      * [RemoteConfigKeys.ACTIVATION_BUNDLE_V1]); never wrapped in a timeout.
      */
+    /**
+     * The single post-create hook for every checklist this dispatcher persists.
+     *
+     * Analytics + the activation funnel are folded into ONE call on purpose: they used to be two
+     * independent concerns and only [notifyActivation] was ever wired here, so both chat creation
+     * paths — including the flagship `create_checklist` tool call — were completely absent from
+     * `checklist_created`. Binding them together means a future create path cannot pick up the
+     * activation funnel while silently skipping the create funnel.
+     *
+     * Fire-and-report: an analytics failure must never turn a successful create into an error, so
+     * the tracker call is guarded and only logged (the checklist IS created either way).
+     */
+    private suspend fun onChecklistCreated(checklistId: Long, source: ChecklistSource, itemCount: Int) {
+        runCatching {
+            analyticsTracker.event(
+                AnalyticsEvents.Checklist.CREATED,
+                mapOf(
+                    AnalyticsParams.SOURCE to source.wire,
+                    AnalyticsParams.CHECKLIST_ID to checklistId,
+                    AnalyticsParams.ITEM_COUNT to itemCount,
+                ),
+            )
+        }.onFailure { e ->
+            logger.warning(TAG, "checklist_created (source=${source.wire}) not reported: ${e.message}")
+        }
+        notifyActivation(checklistId)
+    }
+
     private suspend fun notifyActivation(checklistId: Long) {
         val activationEnabled = remoteConfigProvider.getBoolean(
             RemoteConfigKeys.ACTIVATION_BUNDLE_V1,

@@ -56,12 +56,56 @@ object AnalyticsEvents {
 
     // ─── Checklist & fill lifecycle ──────────────────────────────────────────
     object Checklist {
+        /**
+         * A checklist was created. ALWAYS carries [AnalyticsParams.SOURCE] = a
+         * [ChecklistSource] wire value — never a free-text literal. The source split is the
+         * ONLY way to tell which creation path a cohort actually used; an un-sourced
+         * `checklist_created` is indistinguishable across 5 different product flows.
+         *
+         * EVERY path that persists a new checklist MUST emit this (see [ChecklistSource] for
+         * the enumerated paths). A silent path is a hole in the funnel that looks like
+         * "nobody creates checklists" rather than "we forgot to measure it" — exactly the
+         * artifact that made the web funnel unreadable until 2026-07-15.
+         *
+         * Deliberate exceptions (their own events, NOT this one):
+         *  - the splash-time seed checklist -> [Onboarding.FIRST_CHECKLIST_AUTO_CREATED]
+         *    (not a user act — counting it here would inflate the create funnel by one per install).
+         */
         const val CREATED = "checklist_created"
         const val DELETED = "checklist_deleted"
         const val FILL_CREATED = "fill_created"
         const val DEFAULT_FILL_UPDATED = "default_fill_updated"
         const val FILL_COMPLETED = "fill_completed"
         const val SHARED = "share_checklist"
+    }
+
+    /**
+     * SEO checklist-gallery deep-link funnel (`app.gisti-ai.com/?g=create&template={slug}`).
+     *
+     * The gallery (gisti-ai.com/checklists/) is the Tier-1 organic acquisition surface, so its
+     * arrival -> outcome funnel must be readable on its own:
+     *
+     *   [DEEPLINK_OPENED]  = a gallery link actually resolved into the app (top-of-funnel;
+     *                        fires BEFORE the template fetch, so it counts arrivals even when
+     *                        the create then fails)
+     *   -> [Checklist.CREATED] with [AnalyticsParams.SOURCE] = "gallery"   (success)
+     *   -> [DEEPLINK_FAILED] with [AnalyticsParams.REASON]                 (failure)
+     *
+     * opened = created(gallery) + failed. A gap between them means slugs are resolving to
+     * nothing (stale gallery page / Firestore drift) — invisible before these events existed.
+     * Every event carries [AnalyticsParams.TEMPLATE_SLUG] plus any utm_* captured off the
+     * deep-link, so organic traffic is attributable to the exact landing page.
+     */
+    object Gallery {
+        /** A gallery deep-link was parsed and handed to the create flow. Fires once per link. */
+        const val DEEPLINK_OPENED = "gallery_deeplink_opened"
+
+        /**
+         * The deep-link arrived but no checklist was created. Param [AnalyticsParams.REASON]:
+         * "not_found" (unknown/stale slug — the gallery page and Firestore have drifted apart)
+         * | "error" (fetch/persist failure — carries [AnalyticsParams.ERROR_MESSAGE]).
+         */
+        const val DEEPLINK_FAILED = "gallery_deeplink_failed"
     }
 
     // ─── Checklist detail — items & menus ────────────────────────────────────
@@ -408,6 +452,26 @@ object AnalyticsParams {
     const val CHECKLIST_ID = "checklist_id"
     const val FILL_ID = "fill_id"
     const val ITEM_COUNT = "item_count"
+
+    /** Gallery deep-link: the template slug (= Firestore doc id = the landing-page URL segment). */
+    const val TEMPLATE_SLUG = "template_slug"
+
+    /**
+     * Campaign attribution captured off a deep-link query string (see AnalyticsUtm).
+     *
+     * WEB ONLY by nature: Amplitude autocapture `attribution` stays OFF on purpose (a partial
+     * autocapture config in Amplitude 2.x defaults unlisted fields to `true`, and campaign
+     * autocapture starts a NEW SESSION on every campaign change — inflating session metrics and
+     * breaking Android/Web parity). So we attach utm to the events that need it, explicitly,
+     * instead of letting the SDK re-shape sessions. On Android the install campaign comes from
+     * the Play Install Referrer instead (Play only forwards the URL-encoded `referrer` param —
+     * bare utm_* on a store URL is dropped).
+     */
+    const val UTM_SOURCE = "utm_source"
+    const val UTM_MEDIUM = "utm_medium"
+    const val UTM_CAMPAIGN = "utm_campaign"
+    const val UTM_TERM = "utm_term"
+    const val UTM_CONTENT = "utm_content"
     const val PROGRESS = "progress"
     const val COMPLETED_COUNT = "completed_count"
     const val HAD_TEXT = "had_text"
@@ -508,6 +572,76 @@ object AnalyticsParams {
      */
     const val PUSH_AB_EXPERIMENT = "push_ab_experiment"
     const val PUSH_AB_ARM = "push_ab_arm"
+}
+
+/**
+ * The enumerated creation paths reported as [AnalyticsParams.SOURCE] on
+ * [AnalyticsEvents.Checklist.CREATED].
+ *
+ * Why a type and not a literal: the wire values used to be free-text strings duplicated at
+ * each call site, so a path could be added with NO source at all (or a typo'd one) and nothing
+ * failed — the funnel just silently lost it. Three of eight creation paths were unmeasured this
+ * way. A closed set makes "which paths exist" answerable by reading this enum, and `when`
+ * blocks over it exhaustive.
+ *
+ * CONTRACT — [wire] is the analytics wire format (see [AnalyticsEvents] header). "ai" and
+ * "manual" predate this enum and MUST keep their exact spelling: renaming either splits the
+ * historical series in GA4/Amplitude. Adding a value is safe; changing one is not.
+ *
+ * Adding a creation path? Add the value here AND emit [AnalyticsEvents.Checklist.CREATED] at
+ * the site that persists the checklist — an enum value with no emit site is a lie.
+ */
+enum class ChecklistSource(val wire: String) {
+    /** Create-checklist screen — the user typed the items. */
+    MANUAL("manual"),
+
+    /** Analyze flow (Photo/PDF/Text/Link/Voice -> checklist), incl. the editable preview. */
+    AI("ai"),
+
+    /** SEO gallery deep-link (`?g=create&template={slug}`) — created AS-IS, no AI credit. */
+    GALLERY("gallery"),
+
+    /** AI Chat `create_checklist` tool call — the flagship interaction layer. */
+    CHAT("chat"),
+
+    /** AI Chat `create_checklist_from_attachment` — a file dropped into the chat. */
+    ATTACHMENT("attachment"),
+}
+
+/**
+ * Campaign parameters carried on a deep-link query string.
+ *
+ * The [KEYS] whitelist is load-bearing, not cosmetic: it bounds what a crafted URL can inject
+ * into an event. Without it any `?foo=bar` on a deep-link would become an event param and could
+ * blow GA4's 25-params-per-event ceiling, dropping the params we actually need. Values are
+ * trimmed and capped at [MAX_VALUE_LEN] (GA4's per-value limit) for the same reason.
+ */
+object AnalyticsUtm {
+
+    /** The 5 standard utm_* keys. Wire names double as the event-param keys (no mapping layer). */
+    val KEYS: List<String> = listOf(
+        AnalyticsParams.UTM_SOURCE,
+        AnalyticsParams.UTM_MEDIUM,
+        AnalyticsParams.UTM_CAMPAIGN,
+        AnalyticsParams.UTM_TERM,
+        AnalyticsParams.UTM_CONTENT,
+    )
+
+    /** GA4 truncates event-param values beyond 100 chars — cap here so what we send is what lands. */
+    const val MAX_VALUE_LEN = 100
+
+    /**
+     * Picks the whitelisted utm_* keys out of a deep-link query. Platform-agnostic: callers pass
+     * their own lookup (wasmJs parses `window.location.search`; Android uses
+     * `Uri.getQueryParameter`), so the whitelist + sanitizing live in ONE place for both.
+     *
+     * @param lookup returns the raw value for a query key, or null when absent.
+     * @return only the present, non-blank keys — empty map when the link carries no campaign.
+     */
+    fun from(lookup: (String) -> String?): Map<String, String> =
+        KEYS.mapNotNull { key ->
+            lookup(key)?.trim()?.takeIf { it.isNotEmpty() }?.let { key to it.take(MAX_VALUE_LEN) }
+        }.toMap()
 }
 
 /**

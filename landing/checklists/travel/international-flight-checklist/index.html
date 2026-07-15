@@ -575,15 +575,20 @@
       <div class="ai-border rounded-xl p-6 md:p-8">
         <h2 class="t-title-l mb-4">Open this checklist in Gisti</h2>
         <div class="flex flex-wrap items-center gap-3">
-          <!-- Deep-link: opens the app's create flow pre-seeded with this template. Until the app-side
-               ?g=create&template= handler ships (@wasmjs-expert follow-up), it safely opens the web app. -->
+          <!-- Deep-link: opens the app's create flow pre-seeded with this template. The app-side
+               ?g=create&template= handler parses the slug AND these utm_* params (wasmJs main.kt /
+               Android MainActivity) and attaches them to checklist_created — plain query params are
+               correct here, this is a web/app link, not a Play Store link. -->
           <a href="https://app.gisti-ai.com/?g=create&amp;template=international-flight-checklist&amp;utm_source=gallery&amp;utm_medium=organic&amp;utm_campaign=checklist_detail"
              class="btn btn-primary btn-pill" style="height:52px;font-size:16px">
             <span aria-hidden="true" class="material-symbols-outlined" style="font-size:18px">public</span>
             Use this checklist in Gisti
           </a>
-          <!-- Official Google Play badge — unmodified, per Google Play brand guidelines -->
-          <a href="https://play.google.com/store/apps/details?id=com.antonchuraev.aichecklists&amp;utm_source=gallery&amp;utm_medium=organic&amp;utm_campaign=checklist_detail"
+          <!-- Official Google Play badge — unmodified, per Google Play brand guidelines.
+               ⛔ Play IGNORES bare utm_* on a details URL. Campaign data reaches the app ONLY via
+               the single `referrer` param, URL-encoded (%3D / %26), delivered by the Install
+               Referrer API. Bare utm_* here = every gallery install lands as unattributed. -->
+          <a href="https://play.google.com/store/apps/details?id=com.antonchuraev.aichecklists&amp;referrer=utm_source%3Dgallery%26utm_medium%3Dorganic%26utm_campaign%3Dchecklist_detail"
              class="inline-flex items-center" aria-label="Get Gisti on Google Play">
             <img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png"
                  alt="Get it on Google Play" style="height:72px;display:block" />

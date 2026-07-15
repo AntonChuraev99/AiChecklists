@@ -27,11 +27,13 @@ import com.antonchuraev.homesearchchecklist.desingsystem.theme.reassertAppLocale
 import com.antonchuraev.homesearchchecklist.core.auth.api.GoogleAuthRepository
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsUtm
 import com.antonchuraev.homesearchchecklist.core.common.api.AppContextHolder
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppThemeMode
 import com.antonchuraev.homesearchchecklist.core.datastore.api.ThemeRepository
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AddToChecklistPurpose
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
+import com.antonchuraev.homesearchchecklist.deeplink.GalleryDeepLink
 import com.antonchuraev.homesearchchecklist.deeplink.PendingGalleryDeepLink
 import com.antonchuraev.homesearchchecklist.notification.ReminderReceiver
 import com.antonchuraev.homesearchchecklist.push.PushAnalytics
@@ -283,16 +285,27 @@ class MainActivity : ComponentActivity() {
      * App Links entry for the SEO-gallery deep-link
      * `https://app.gisti-ai.com/?g=create&template={slug}`. The manifest claims the whole
      * `app.gisti-ai.com` host (App Links can't match a query string), so we inspect the query
-     * params here: only `g=create` with a non-blank `template` slug is a gallery link. The slug is
+     * params here: only `g=create` with a non-blank `template` slug is a gallery link. The link is
      * stashed in [PendingGalleryDeepLink] (a StateFlow retained until App.kt's collector mounts), so
      * submitting on cold start in onCreate — before navigation is ready — is enough. Non-matching
      * VIEW intents (or a normal launcher launch) return null and do nothing.
+     *
+     * utm_* is captured alongside the slug (mirrors wasmJs `main.kt`) so a gallery-sourced create
+     * is attributable to its landing page on BOTH platforms. This is the CLICK campaign of an
+     * already-installed app — distinct from the Play Install Referrer, which attributes the
+     * install itself and is delivered by Play only via the encoded `referrer` param.
+     * `getQueryParameter` percent-decodes and never throws on a malformed query.
      */
     private fun submitGalleryDeepLinkIfPresent(intent: Intent?) {
         val uri = intent?.data ?: return
         if (uri.getQueryParameter("g") != "create") return
         val slug = uri.getQueryParameter("template")?.takeIf { it.isNotBlank() } ?: return
-        pendingGalleryDeepLink.submit(slug)
+        pendingGalleryDeepLink.submit(
+            GalleryDeepLink(
+                slug = slug,
+                utm = AnalyticsUtm.from { key -> uri.getQueryParameter(key) },
+            )
+        )
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
