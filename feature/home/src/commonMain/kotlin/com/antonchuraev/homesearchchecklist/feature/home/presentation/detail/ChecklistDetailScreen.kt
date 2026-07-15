@@ -1808,6 +1808,7 @@ private fun ChecklistDetailContent(
             autoDeleteCompleted = state.autoDeleteCompleted,
             hasCompletedItems = state.defaultFill?.items?.any { it.checked } == true,
             foldersEnabled = state.foldersEnabled,
+            insideFolder = state.currentFolderId != null,
             isWeeklyMode = state.checklist.viewMode == ChecklistViewMode.Weekly,
             onEditClick = {
                 // Edit moved here from the toolbar — close this sheet, then navigate to edit.
@@ -1829,7 +1830,14 @@ private fun ChecklistDetailContent(
             onToggleSeparateCompleted = { onIntent(ChecklistDetailIntent.OnToggleSeparateCompleted) },
             onDeleteClick = {
                 onIntent(ChecklistDetailIntent.OnDismissOverflowSheet)
-                onIntent(ChecklistDetailIntent.OnDeleteChecklistClick)
+                // Inside a folder the destructive row targets that folder (cascade-confirm dialog
+                // + auto-pop of the deleted level are already handled by OnDeleteFolder).
+                val folderId = state.currentFolderId
+                if (folderId != null) {
+                    onIntent(ChecklistDetailIntent.OnDeleteFolder(folderId))
+                } else {
+                    onIntent(ChecklistDetailIntent.OnDeleteChecklistClick)
+                }
             },
             onDismiss = { onIntent(ChecklistDetailIntent.OnDismissOverflowSheet) }
         )
@@ -3529,6 +3537,10 @@ private fun OverflowMenuSheet(
     autoDeleteCompleted: Boolean,
     hasCompletedItems: Boolean,
     foldersEnabled: Boolean,
+    // True while drilled into a folder (state.currentFolderId != null). Retargets the destructive
+    // row from the whole checklist to THIS folder — deleting the checklist from inside one of its
+    // folders reads as a mis-tap, and the folder is what the user is looking at.
+    insideFolder: Boolean,
     isWeeklyMode: Boolean,
     onEditClick: () -> Unit,
     onFillClick: () -> Unit,
@@ -3755,7 +3767,9 @@ private fun OverflowMenuSheet(
 
             HorizontalDivider()
 
-            // Delete checklist
+            // Delete checklist — or, while drilled into a folder, delete that folder instead.
+            // The call site branches on the same insideFolder flag, so label and action can't
+            // drift apart.
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -3771,7 +3785,9 @@ private fun OverflowMenuSheet(
                 )
                 Spacer(modifier = Modifier.width(AppDimens.SpacingMd))
                 Text(
-                    text = stringResource(Res.string.delete_checklist),
+                    text = stringResource(
+                        if (insideFolder) Res.string.folder_delete else Res.string.delete_checklist
+                    ),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.error
                 )
