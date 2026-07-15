@@ -39,6 +39,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -101,11 +102,11 @@ class ChecklistDetailReminderGateTest {
         Dispatchers.resetMain()
     }
 
-    private fun createViewModel(
+    private fun TestScope.createViewModel(
         paywallRepository: PaywallRepository = FakePaywallRepository()
     ): ChecklistDetailViewModel {
         val datastore = AppDatastore(
-            PreferenceDataStoreFactory.createWithPath {
+            PreferenceDataStoreFactory.createWithPath(scope = backgroundScope) {
                 "build/test_prefs_reminder_gate_${Random.nextLong()}.preferences_pb".toPath()
             },
             testDispatcher
@@ -127,6 +128,7 @@ class ChecklistDetailReminderGateTest {
             attachmentStorage = FakeAttachmentStorage(),
             calendarEventLauncher = FakeCalendarEventLauncher(),
             logger = NoOpAppLogger,
+            appScope = appScopeDouble(testDispatcher),
         )
     }
 

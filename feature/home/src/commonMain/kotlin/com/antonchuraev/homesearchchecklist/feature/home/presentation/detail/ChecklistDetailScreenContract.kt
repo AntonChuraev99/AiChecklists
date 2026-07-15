@@ -5,6 +5,7 @@ import com.antonchuraev.homesearchchecklist.core.common.api.State
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatEndCondition
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.RepeatType
@@ -15,10 +16,16 @@ import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.UserLim
 
 /**
  * Holds a recently deleted item so it can be restored via undo snackbar.
+ *
+ * [checklistItem] is the deleted TEMPLATE node captured whole, not just its text: folder
+ * membership ([com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem.parentId]),
+ * node type, priority and weekday all live on that node. Rebuilding it from text alone re-parents
+ * the item to the checklist root and silently drops the rest. null = the fill row had no linked
+ * template node (legacy unlinked row), matching [originalChecklistIndex] == -1.
  */
 data class UndoableDeleteItem(
     val fillItem: ChecklistFillItem,
-    val checklistItemText: String,
+    val checklistItem: ChecklistItem?,
     val originalFillIndex: Int,
     val originalChecklistIndex: Int,
 )

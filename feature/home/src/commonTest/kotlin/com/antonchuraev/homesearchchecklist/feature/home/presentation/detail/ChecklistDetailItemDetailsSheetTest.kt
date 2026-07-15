@@ -42,6 +42,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -130,11 +131,11 @@ class ChecklistDetailItemDetailsSheetTest {
         Dispatchers.resetMain()
     }
 
-    private fun createViewModel(
+    private fun TestScope.createViewModel(
         paywallRepository: FakePaywallRepository = FakePaywallRepository()
     ): ChecklistDetailViewModel {
         val datastore = AppDatastore(
-            PreferenceDataStoreFactory.createWithPath {
+            PreferenceDataStoreFactory.createWithPath(scope = backgroundScope) {
                 "build/test_prefs_details_sheet_${Random.nextLong()}.preferences_pb".toPath()
             },
             testDispatcher
@@ -156,6 +157,7 @@ class ChecklistDetailItemDetailsSheetTest {
             attachmentStorage = FakeAttachmentStorage(),
             calendarEventLauncher = FakeCalendarEventLauncher(),
             logger = NoOpAppLogger,
+            appScope = appScopeDouble(testDispatcher),
         )
     }
 

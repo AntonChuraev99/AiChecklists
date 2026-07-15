@@ -95,7 +95,7 @@ class ChecklistDetailViewModelTest {
         val fillItem = ChecklistFillItem("Buy milk", checked = false, note = "2L")
         val undo = UndoableDeleteItem(
             fillItem = fillItem,
-            checklistItemText = "Buy milk",
+            checklistItem = ChecklistItem(text = "Buy milk"),
             originalFillIndex = 2,
             originalChecklistIndex = 1,
         )
@@ -119,7 +119,7 @@ class ChecklistDetailViewModelTest {
         val fillItem = ChecklistFillItem("Task 1", checked = false)
         val undo = UndoableDeleteItem(
             fillItem = fillItem,
-            checklistItemText = "Task 1",
+            checklistItem = ChecklistItem(text = "Task 1"),
             originalFillIndex = 0,
             originalChecklistIndex = 0,
         )
@@ -135,7 +135,7 @@ class ChecklistDetailViewModelTest {
     @Test
     fun `Clearing pendingUndoItem via copy should work`() {
         val fillItem = ChecklistFillItem("Task", checked = false)
-        val undo = UndoableDeleteItem(fillItem, "Task", 0, 0)
+        val undo = UndoableDeleteItem(fillItem, ChecklistItem(text = "Task"), 0, 0)
         val state = ChecklistDetailState.Content(
             checklist = Checklist(id = 1L, name = "Test", items = emptyList()),
             defaultFill = null,
@@ -148,7 +148,7 @@ class ChecklistDetailViewModelTest {
     @Test
     fun `UndoableDeleteItem preserves note in fill item`() {
         val fillItem = ChecklistFillItem("Item with note", checked = true, note = "Important note")
-        val undo = UndoableDeleteItem(fillItem, "Item with note", 3, 2)
+        val undo = UndoableDeleteItem(fillItem, ChecklistItem(text = "Item with note"), 3, 2)
         assertEquals("Important note", undo.fillItem.note)
         assertTrue(undo.fillItem.checked)
     }
@@ -156,8 +156,10 @@ class ChecklistDetailViewModelTest {
     @Test
     fun `UndoableDeleteItem handles negative checklist index`() {
         val fillItem = ChecklistFillItem("Orphan", checked = false)
-        val undo = UndoableDeleteItem(fillItem, "Orphan", 0, -1)
+        // index -1 = the fill row had no linked template node, so there is none to snapshot.
+        val undo = UndoableDeleteItem(fillItem, null, 0, -1)
         assertEquals(-1, undo.originalChecklistIndex)
+        assertNull(undo.checklistItem)
     }
 
     // ── Mutual exclusion: separateCompleted vs autoDeleteCompleted ──
