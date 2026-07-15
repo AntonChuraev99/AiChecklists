@@ -22,6 +22,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Choi
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.DispatchOutcome
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.RoutingLayer
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ToolCall
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.UndoHandle
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.locale.ChatLocaleProvider
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.ChatLocale
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AgentToolCall
@@ -63,15 +64,9 @@ import aichecklists.core.designsystem.generated.resources.chat_choice_action_cre
 import aichecklists.core.designsystem.generated.resources.chat_choice_action_delete
 import aichecklists.core.designsystem.generated.resources.chat_choice_action_move
 import aichecklists.core.designsystem.generated.resources.chat_choice_action_set_reminder
-import aichecklists.core.designsystem.generated.resources.chat_choice_add_default_list
-import aichecklists.core.designsystem.generated.resources.chat_choice_add_to_list
 import aichecklists.core.designsystem.generated.resources.chat_choice_apply_actions
-import aichecklists.core.designsystem.generated.resources.chat_choice_attach
 import aichecklists.core.designsystem.generated.resources.chat_choice_cancel
-import aichecklists.core.designsystem.generated.resources.chat_choice_complete
-import aichecklists.core.designsystem.generated.resources.chat_choice_create
 import aichecklists.core.designsystem.generated.resources.chat_choice_create_from_file
-import aichecklists.core.designsystem.generated.resources.chat_choice_delete
 import aichecklists.core.designsystem.generated.resources.chat_choice_edit
 import aichecklists.core.designsystem.generated.resources.chat_choice_execute_all
 import aichecklists.core.designsystem.generated.resources.chat_choice_executing_add
@@ -82,10 +77,19 @@ import aichecklists.core.designsystem.generated.resources.chat_choice_executing_
 import aichecklists.core.designsystem.generated.resources.chat_choice_executing_delete
 import aichecklists.core.designsystem.generated.resources.chat_choice_executing_move
 import aichecklists.core.designsystem.generated.resources.chat_choice_executing_set_reminder
+import aichecklists.core.designsystem.generated.resources.chat_choice_executing_undo
 import aichecklists.core.designsystem.generated.resources.chat_choice_move_reminders
+import aichecklists.core.designsystem.generated.resources.chat_choice_move_to_list
 import aichecklists.core.designsystem.generated.resources.chat_choice_other
-import aichecklists.core.designsystem.generated.resources.chat_choice_set_reminder
+import aichecklists.core.designsystem.generated.resources.chat_choice_undo
 import aichecklists.core.designsystem.generated.resources.chat_choice_which_list
+import aichecklists.core.designsystem.generated.resources.chat_choice_which_list_truncated
+import aichecklists.core.designsystem.generated.resources.chat_question_add
+import aichecklists.core.designsystem.generated.resources.chat_question_attach
+import aichecklists.core.designsystem.generated.resources.chat_question_complete
+import aichecklists.core.designsystem.generated.resources.chat_question_create
+import aichecklists.core.designsystem.generated.resources.chat_question_delete
+import aichecklists.core.designsystem.generated.resources.chat_question_set_reminder
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.getString
 
@@ -614,6 +618,11 @@ class ChatViewModel(
             return
         }
 
+        // Typing past a post-action offer (Undo / move) retires it — the user moved on, and the
+        // Undo handle belongs to the previous turn. Questions are NOT cleared here: their input is
+        // hidden, so reaching this line with one pending is not possible.
+        _screenState.value.pendingChoice?.takeIf { it.isPostAction }?.let { clearChoice() }
+
         // Append user message (with any pending attachments attached to it)
         val userMsg = ChatMessage(
             id = generateId(),
@@ -766,6 +775,15 @@ class ChatViewModel(
                                 return@runCatching
                             }
                         }
+                        // ── Ceremony proportional to reversibility (D1) ───────────────────
+                        // Adding an item and ticking one off are one-tap reversible, so a
+                        // confirmation question costs the user a round-trip and buys nothing:
+                        // apply immediately and offer Undo afterwards. Everything else
+                        // (delete / create / reminder / attach) still asks first.
+                        if (toolCall is ToolCall.AddItem || toolCall is ToolCall.CompleteItem) {
+                            dispatchReversible(toolCall, sourceLayer = classification.layer)
+                            return@runCatching
+                        }
                         showWriteChoice(toolCall, originalText = text, sourceLayer = classification.layer)
                     }
 
@@ -864,11 +882,20 @@ class ChatViewModel(
             )
         }
 
-        val prompt = choiceString(toolCall.promptRes(), *toolCall.promptArgs())
+        // The question is argument-less; the OBJECT of the action rides in its own line under it
+        // (same batchItems mechanism the agent plan uses). A one-slot prompt could only ever name
+        // one of item/list — which is how "Add to Shopping?" shipped never saying what.
         _choiceSourceLayer = sourceLayer
         _screenState.value = _screenState.value.copy(
             pendingChoice = PendingChoice(
-                choice = ChatChoice(prompt = prompt, options = options, escape = escape),
+                choice = ChatChoice(
+                    prompt = choiceString(toolCall.questionRes()),
+                    options = options,
+                    escape = escape,
+                ),
+                batchItems = listOf(
+                    AgentPlanItem(text = previewRenderer.render(toolCall), isDestructive = isDelete),
+                ),
             ),
             isProcessing = false,
         )
@@ -912,6 +939,9 @@ class ChatViewModel(
                     options = options,
                     escape = escape,
                 ),
+                // "Which list?" must still say WHAT is going into it — without this line the user
+                // picks a destination for an unnamed thing.
+                batchItems = listOf(AgentPlanItem(text = previewRenderer.render(sourceToolCall))),
             ),
             isProcessing = false,
         )
@@ -919,6 +949,204 @@ class ChatViewModel(
         // tap fires PREVIEW_CONFIRMED via executeChoice, so without this the confirms are orphaned.
         trackPreviewShown(sourceToolCall)
         if (sourceLayer != null) trackResponseReceived(sourceLayer, outcome = "preview")
+    }
+
+    // ─── Reversible path — apply now, offer Undo after (D1 "C-branch") ────────
+
+    /**
+     * Applies a reversible [toolCall] (AddItem / CompleteItem) without asking, then shows the
+     * post-action chips ([ChoiceAction.Undo] / [ChoiceAction.MoveToList]).
+     *
+     * The result itself goes out as a normal [ChatScreenSideEffect.ShowAssistantMessage] (the
+     * `chat_dispatch_added_to` copy already names both the item and the list), so it is persisted
+     * to Room like any other reply — the chips are a transient offer on top, not the record.
+     */
+    private suspend fun dispatchReversible(toolCall: ToolCall, sourceLayer: RoutingLayer) {
+        val outcome = toolCallDispatcher.dispatch(toolCall)
+
+        // The hint matched several lists → we cannot auto-apply into a guess. Fall back to the
+        // ask-first path. Handled here rather than via handleOutcomeInline so the picker is
+        // tracked as this turn's response (handleOutcomeInline passes sourceLayer = null, which
+        // would leave the turn with no response_received at all).
+        if (outcome is DispatchOutcome.AmbiguousMatch) {
+            showWhichListChoice(toolCall, outcome.candidates, sourceLayer = sourceLayer)
+            return
+        }
+
+        handleOutcomeInline(outcome, sourceToolCall = toolCall)
+
+        val undo = (outcome as? DispatchOutcome.Success)?.undo
+        if (undo == null) {
+            // NotFound / RequiresPremium / a Success the dispatcher deemed not undoable
+            // (e.g. "already done") — the user already has a visible reply; nothing to offer.
+            _screenState.value = _screenState.value.copy(isProcessing = false)
+        } else {
+            analytics.event(
+                name = AnalyticsEvents.Chat.ACTION_AUTO_APPLIED,
+                params = mapOf(
+                    AnalyticsParams.ACTION_TYPE to (toolCall::class.simpleName ?: "unknown"),
+                    AnalyticsParams.ROUTED_LAYER to sourceLayer.name,
+                ),
+            )
+            showReversibleChips(undo)
+        }
+        trackResponseReceived(sourceLayer, outcome = "action")
+    }
+
+    /**
+     * Post-action chips for a just-applied reversible mutation. The prompt is intentionally BLANK:
+     * [AiChoiceResponse] then renders chips only, because the outcome was already said in its own
+     * assistant bubble — a second "Added «Milk» to Shopping" inside a choice bubble would double it.
+     *
+     * @param includeUndo false after a move: the original row no longer exists, so "Undo" would be
+     *  a lie ("undo" what — the move? the add?). Moving again (including back) covers the need.
+     */
+    private suspend fun showReversibleChips(handle: UndoHandle, includeUndo: Boolean = true) {
+        val options = buildList {
+            if (includeUndo) {
+                add(
+                    ChoiceOption(
+                        id = CHOICE_UNDO,
+                        label = choiceString(Res.string.chat_choice_undo),
+                        role = ChoiceRole.Escape,
+                        action = ChoiceAction.Undo(handle),
+                    ),
+                )
+            }
+            if (handle is UndoHandle.AddedItem) {
+                add(
+                    ChoiceOption(
+                        id = CHOICE_MOVE_TO_LIST,
+                        label = choiceString(Res.string.chat_choice_move_to_list),
+                        role = ChoiceRole.Default,
+                        action = ChoiceAction.MoveToList(handle),
+                    ),
+                )
+            }
+        }
+        if (options.isEmpty()) {
+            _screenState.value = _screenState.value.copy(isProcessing = false)
+            return
+        }
+        _screenState.value = _screenState.value.copy(
+            pendingChoice = PendingChoice(choice = ChatChoice(prompt = "", options = options)),
+            isProcessing = false,
+        )
+    }
+
+    /** Rolls the mutation back by id and reports the result (or `chat_undo_item_gone`). */
+    private fun executeUndo(option: ChoiceOption, handle: UndoHandle) {
+        viewModelScope.launch {
+            markChipExecuting(option.id, choiceString(Res.string.chat_choice_executing_undo))
+            runCatching {
+                val outcome = toolCallDispatcher.undo(handle)
+                // Fires on the OUTCOME, not on the tap: auto_applied → undone is the regret rate,
+                // and auto_applied only counts successes. Counting a failed undo (the row was
+                // already gone) as regret would inflate it against a denominator that never saw it.
+                if (outcome is DispatchOutcome.Success) {
+                    analytics.event(
+                        name = AnalyticsEvents.Chat.ACTION_UNDONE,
+                        params = mapOf(AnalyticsParams.ACTION_TYPE to (handle::class.simpleName ?: "unknown")),
+                    )
+                }
+                clearChoice()
+                handleOutcomeInline(outcome)
+            }.onFailure { e ->
+                logger.error(TAG, "executeUndo failed", e)
+                clearChoice()
+                _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_apply_error"))
+            }
+        }
+    }
+
+    /** Replaces the post-action chips with one chip per candidate destination list. */
+    private fun showMoveTargets(handle: UndoHandle.AddedItem) {
+        viewModelScope.launch {
+            runCatching {
+                val candidates = checklistRepository.checklists.first()
+                    .map { it.name }
+                    .filter { !it.equals(handle.checklistName, ignoreCase = true) }
+                if (candidates.isEmpty()) {
+                    // Nowhere to move it — say so and keep the chips (silent skip FORBIDDEN).
+                    _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_move_no_other_lists"))
+                    return@runCatching
+                }
+                // Premium has unlimited lists, so the chip cap can hide real destinations. Say the
+                // count out loud instead of silently dropping them — an invisible 7th list reads as
+                // "the app lost my list", and the user has no way to know the picker is partial.
+                val names = candidates.take(MAX_CHOICE_OPTIONS)
+                val options = names.mapIndexed { index, name ->
+                    ChoiceOption(
+                        id = "$CHOICE_MOVE_PREFIX$index",
+                        label = name,
+                        role = ChoiceRole.Default,
+                        action = ChoiceAction.MoveTo(handle, name),
+                    )
+                }
+                val prompt = if (candidates.size > names.size) {
+                    choiceString(
+                        Res.string.chat_choice_which_list_truncated,
+                        names.size.toString(),
+                        candidates.size.toString(),
+                    )
+                } else {
+                    choiceString(Res.string.chat_choice_which_list)
+                }
+                _screenState.value = _screenState.value.copy(
+                    pendingChoice = PendingChoice(
+                        choice = ChatChoice(
+                            prompt = prompt,
+                            options = options,
+                            escape = ChoiceOption(
+                                id = CHOICE_ESCAPE,
+                                label = choiceString(Res.string.chat_choice_cancel),
+                                role = ChoiceRole.Escape,
+                                action = ChoiceAction.Dismiss,
+                            ),
+                        ),
+                    ),
+                )
+            }.onFailure { e ->
+                logger.error(TAG, "showMoveTargets failed", e)
+                _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_generic_error"))
+            }
+        }
+    }
+
+    /** Moves the just-added item to the tapped list (add-then-remove inside the dispatcher). */
+    private fun executeMove(option: ChoiceOption, handle: UndoHandle.AddedItem, targetName: String) {
+        viewModelScope.launch {
+            markChipExecuting(option.id, choiceString(Res.string.chat_choice_executing_move))
+            runCatching {
+                val outcome = toolCallDispatcher.moveAddedItem(handle, targetName)
+                // On the OUTCOME, not the tap — an ambiguous/unknown target moves nothing, and
+                // counting it as a move would report relocations that never happened.
+                if (outcome is DispatchOutcome.Success) {
+                    analytics.event(
+                        name = AnalyticsEvents.Chat.ACTION_MOVED,
+                        params = mapOf(AnalyticsParams.ACTION_TYPE to "move_list"),
+                    )
+                }
+                clearChoice()
+                handleOutcomeInline(outcome)
+                // A fresh handle → the item can be moved onwards (or back) from its new home.
+                val newHandle = (outcome as? DispatchOutcome.Success)?.undo as? UndoHandle.AddedItem
+                if (newHandle != null) showReversibleChips(newHandle, includeUndo = false)
+            }.onFailure { e ->
+                logger.error(TAG, "executeMove failed", e)
+                clearChoice()
+                _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_apply_error"))
+            }
+        }
+    }
+
+    /** Marks one chip as loading; the whole block goes non-interactive (blocks the double tap). */
+    private fun markChipExecuting(optionId: String, loadingLabel: String) {
+        _screenState.value.pendingChoice?.let { current ->
+            _screenState.value = _screenState.value.copy(
+                pendingChoice = current.copy(executingId = optionId, executingLabel = loadingLabel),
+            )
+        }
     }
 
     // ─── Choice block — handlers ──────────────────────────────────────────────
@@ -970,6 +1198,9 @@ class ChatViewModel(
                     pendingChoice = pending.copy(editText = seed),
                 )
             }
+            is ChoiceAction.Undo -> executeUndo(option, action.handle)
+            is ChoiceAction.MoveToList -> showMoveTargets(action.handle)
+            is ChoiceAction.MoveTo -> executeMove(option, action.handle, action.targetName)
             ChoiceAction.Dismiss -> handleChoiceDismissed()
         }
     }
@@ -1087,9 +1318,30 @@ class ChatViewModel(
         val pending = _screenState.value.pendingChoice ?: return
         if (pending.executingId != null) return
 
-        val isAgentBatch = pending.batchItems != null
+        // Agent batch = the choice that suspends runAgentTurn on _pendingAgentDecision. Detected by
+        // its ExecuteAll chip, NOT by batchItems: since D1 every write choice carries batchItems
+        // (the object line), so a batchItems check would misroute an ordinary dismiss into
+        // "resolve the agent decision and return" — leaving pendingChoice stuck on screen.
+        val isAgentBatch = pending.choice.options.any { it.action is ChoiceAction.ExecuteAll }
         // AI-options choice: chips are SendMessage (a fresh turn), not a write-intent confirm.
         val isOptions = pending.choice.options.any { it.action is ChoiceAction.SendMessage }
+        // Post-action chips (Undo / Move to another list): an OFFER on top of an already-applied
+        // action, not a question. Dismissing them cancels nothing, so the "Okay, cancelled." reply
+        // below would be a lie about the action that already happened — the result message already
+        // in the transcript IS the visible response here.
+        // MoveTo belongs here too: the move-target picker is reached FROM these chips and is still
+        // post-action — the item is already in a list. Without it, cancelling the picker answered
+        // "Okay, cancelled." about an add that stayed, and logged a PREVIEW_REJECTED for a choice
+        // that was never a question.
+        val isPostAction = pending.choice.options.any {
+            it.action is ChoiceAction.Undo ||
+                it.action is ChoiceAction.MoveToList ||
+                it.action is ChoiceAction.MoveTo
+        }
+        if (isPostAction) {
+            clearChoice()
+            return
+        }
         analytics.event(
             name = AnalyticsEvents.Chat.PREVIEW_REJECTED,
             params = mapOf(
@@ -1895,40 +2147,28 @@ class ChatViewModel(
     // ─── Choice copy helpers (write-intent prompt / chip / loading labels) ─────
 
     /**
-     * The prompt string resource + its positional args for a write-intent choice.
-     * e.g. AddItem → "Add to %1$s?" with the target list name (or a generic prompt when
-     * the list is unspecified). Strings are localized via [getString] at the call site.
+     * The ARGUMENT-LESS question for a write-intent choice ("Delete this?").
+     *
+     * There are deliberately no positional args left anywhere in a chat question. The old
+     * flat `promptRes()/promptArgs()` pair gave every question exactly ONE slot, so each had to
+     * pick between naming the item or naming the list — AddItem picked the list and shipped
+     * "Add to Shopping?" without ever saying what would be added. The object now always rides in
+     * its own line (see [ToolCallPreviewRenderer] + [PendingChoice.batchItems]), which fits any
+     * number of entities and stays translatable.
      */
-    private fun ToolCall.promptRes(): StringResource = when (this) {
-        is ToolCall.AddItem -> if (checklistHint.isNullOrBlank()) Res.string.chat_choice_add_default_list else Res.string.chat_choice_add_to_list
-        is ToolCall.DeleteItem -> Res.string.chat_choice_delete
-        is ToolCall.CompleteItem -> Res.string.chat_choice_complete
-        is ToolCall.CreateChecklist -> Res.string.chat_choice_create
-        is ToolCall.SetItemReminder -> Res.string.chat_choice_set_reminder
+    private fun ToolCall.questionRes(): StringResource = when (this) {
+        is ToolCall.AddItem, is ToolCall.AddItems -> Res.string.chat_question_add
+        is ToolCall.DeleteItem -> Res.string.chat_question_delete
+        is ToolCall.CompleteItem -> Res.string.chat_question_complete
+        is ToolCall.CreateChecklist -> Res.string.chat_question_create
+        is ToolCall.SetItemReminder -> Res.string.chat_question_set_reminder
         is ToolCall.MoveAllReminders -> Res.string.chat_choice_move_reminders
-        is ToolCall.AttachToItem -> Res.string.chat_choice_attach
+        is ToolCall.AttachToItem -> Res.string.chat_question_attach
         is ToolCall.CreateChecklistFromAttachment -> Res.string.chat_choice_create_from_file
         // Agent-only / read variants never produce a write-intent choice; safe fallback.
         is ToolCall.FindItemsQuery,
-        is ToolCall.AddItems,
         is ToolCall.ReadChecklist,
         is ToolCall.RenameChecklist -> Res.string.chat_choice_apply_actions
-    }
-
-    /** Positional args for [promptRes] — the item/list name highlighted in the prompt. */
-    private fun ToolCall.promptArgs(): Array<Any> = when (this) {
-        is ToolCall.AddItem -> if (checklistHint.isNullOrBlank()) emptyArray() else arrayOf(checklistHint!!)
-        is ToolCall.DeleteItem -> arrayOf(itemText)
-        is ToolCall.CompleteItem -> arrayOf(itemText)
-        is ToolCall.CreateChecklist -> arrayOf(name)
-        is ToolCall.SetItemReminder -> arrayOf(itemText)
-        is ToolCall.AttachToItem -> arrayOf(itemText)
-        is ToolCall.MoveAllReminders,
-        is ToolCall.CreateChecklistFromAttachment,
-        is ToolCall.FindItemsQuery,
-        is ToolCall.AddItems,
-        is ToolCall.ReadChecklist,
-        is ToolCall.RenameChecklist -> emptyArray()
     }
 
     /** Primary-chip label resource for a write-intent ("Add" / "Delete" / "Create" / …). */
@@ -2483,6 +2723,10 @@ class ChatViewModel(
         const val CHOICE_ESCAPE = "escape"
         const val CHOICE_CANDIDATE_PREFIX = "candidate_"
         const val CHOICE_OPTION_PREFIX = "option_"
+        // Post-action chips (D1 reversible path).
+        const val CHOICE_UNDO = "undo"
+        const val CHOICE_MOVE_TO_LIST = "move_to_list"
+        const val CHOICE_MOVE_PREFIX = "move_"
         /**
          * Max tappable options shown in a choice block ("which list?" / ambiguous-match chips).
          * The adaptive FlowRow wraps to as many rows as needed, so 6 stays readable on a phone dock.

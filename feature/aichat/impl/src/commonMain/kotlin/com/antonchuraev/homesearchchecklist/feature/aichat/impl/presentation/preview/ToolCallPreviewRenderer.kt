@@ -1,103 +1,132 @@
 package com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.preview
 
+import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.chat_preview_attach_to
+import aichecklists.core.designsystem.generated.resources.chat_preview_create_from_file
+import aichecklists.core.designsystem.generated.resources.chat_preview_files_count
+import aichecklists.core.designsystem.generated.resources.chat_preview_in_list
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ToolCall
-import kotlinx.datetime.Instant
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.format.ChatDateFormatter
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.getString
 
 /**
- * Converts a [ToolCall] into a human-readable preview string for [ChatPreviewCard].
+ * Converts a [ToolCall] into the human-readable object line shown to the user — the "what"
+ * of a proposed or applied action ("• Milk → Shopping").
  *
- * Rendering is intentionally simple in Phase A: no locale-aware formatting,
- * timestamps shown as HH:mm local time. Layer 2/3 may enrich this.
+ * Since D1 this is the ONLY place that renders the object: the choice question itself is
+ * argument-less ("Add to a list?") and the object is rendered here, into the batch-item list of
+ * the bubble. Consequently every string here is user-facing on ~11 screens and MUST come from
+ * Compose Resources — only the bullet and arrow stay literal (punctuation, not language).
+ *
+ * `suspend` for the same reason: `getString` suspends. Both call sites (the agent batch and the
+ * single-action choice) are already in coroutines.
  */
 interface ToolCallPreviewRenderer {
-    fun render(toolCall: ToolCall): String
+    suspend fun render(toolCall: ToolCall): String
 }
 
-internal class ToolCallPreviewRendererImpl : ToolCallPreviewRenderer {
+internal class ToolCallPreviewRendererImpl(
+    private val dateFormatter: ChatDateFormatter,
+) : ToolCallPreviewRenderer {
 
-    override fun render(toolCall: ToolCall): String = when (toolCall) {
+    override suspend fun render(toolCall: ToolCall): String = when (toolCall) {
         is ToolCall.AddItem -> buildString {
-            append("• ${toolCall.itemText}")
-            toolCall.checklistHint?.let { append(" → $it") }
+            append(bullet(toolCall.itemText))
+            toolCall.checklistHint?.let { append(" $ARROW $it") }
         }
 
-        is ToolCall.DeleteItem -> buildString {
-            append("• ${toolCall.itemText}")
-            toolCall.checklistHint?.let { append(" (in $it)") }
-        }
+        is ToolCall.DeleteItem -> bullet(toolCall.itemText) + inListSuffix(toolCall.checklistHint)
 
-        is ToolCall.CompleteItem -> buildString {
-            append("• ${toolCall.itemText}")
-            toolCall.checklistHint?.let { append(" (in $it)") }
-        }
+        is ToolCall.CompleteItem -> bullet(toolCall.itemText) + inListSuffix(toolCall.checklistHint)
 
         is ToolCall.CreateChecklist -> buildString {
             append(toolCall.name)
             if (toolCall.initialItems.isNotEmpty()) {
                 append("\n")
-                append(toolCall.initialItems.joinToString("\n") { "• $it" })
+                append(toolCall.initialItems.joinToString("\n") { bullet(it) })
             }
         }
 
         is ToolCall.SetItemReminder -> buildString {
-            append("• ${toolCall.itemText}")
-            toolCall.checklistHint?.let { append(" (in $it)") }
-            append(" → ${formatTimestamp(toolCall.at)}")
+            append(bullet(toolCall.itemText))
+            append(inListSuffix(toolCall.checklistHint))
+            append(" $ARROW ${dateFormatter.formatDateTime(toolCall.at)}")
         }
 
-        is ToolCall.MoveAllReminders -> buildString {
-            append("${formatDay(toolCall.fromDayStartMs)} → ${formatDay(toolCall.toDayStartMs)}")
-        }
+        is ToolCall.MoveAllReminders ->
+            "${dateFormatter.formatDay(toolCall.fromDayStartMs)} $ARROW " +
+                dateFormatter.formatDay(toolCall.toDayStartMs)
 
         // FindItemsQuery renders inline (no preview card), this is a safety fallback
         is ToolCall.FindItemsQuery -> ""
 
-        is ToolCall.CreateChecklistFromAttachment -> buildString {
-            val count = toolCall.attachments.size
-            append("Create checklist from ")
-            append(if (count == 1) toolCall.attachments.first().fileName else "$count files")
-        }
+        is ToolCall.CreateChecklistFromAttachment ->
+            previewString(
+                Res.string.chat_preview_create_from_file,
+                fileLabel(toolCall.attachments.size, toolCall.attachments.firstOrNull()?.fileName),
+            )
 
-        is ToolCall.AttachToItem -> buildString {
-            val count = toolCall.attachments.size
-            append("Attach ")
-            append(if (count == 1) toolCall.attachments.first().fileName else "$count files")
-            append(" to • ${toolCall.itemText}")
-            toolCall.checklistHint?.let { append(" (in $it)") }
-        }
+        is ToolCall.AttachToItem ->
+            previewString(
+                Res.string.chat_preview_attach_to,
+                fileLabel(toolCall.attachments.size, toolCall.attachments.firstOrNull()?.fileName),
+                toolCall.itemText,
+            ) + inListSuffix(toolCall.checklistHint)
 
         is ToolCall.AddItems -> buildString {
-            append(toolCall.itemTexts.joinToString("\n") { "• $it" })
-            toolCall.checklistHint?.let { append("\n→ $it") }
+            append(toolCall.itemTexts.joinToString("\n") { bullet(it) })
+            toolCall.checklistHint?.let { append("\n$ARROW $it") }
         }
 
         // ReadChecklist is agent-only read operation — never shown as a preview card
         is ToolCall.ReadChecklist -> ""
 
-        is ToolCall.RenameChecklist -> buildString {
-            append("${toolCall.checklistHint} → ${toolCall.newName}")
+        is ToolCall.RenameChecklist -> "${toolCall.checklistHint} $ARROW ${toolCall.newName}"
+    }
+
+    private fun bullet(text: String): String = "$BULLET $text"
+
+    /** " (in Shopping)" / " (в Покупки)" — empty when the command names no list. */
+    private suspend fun inListSuffix(hint: String?): String =
+        if (hint == null) "" else " " + previewString(Res.string.chat_preview_in_list, hint)
+
+    /** One file → its name; several → a localized "N files". */
+    private suspend fun fileLabel(count: Int, firstFileName: String?): String =
+        if (count == 1 && firstFileName != null) {
+            firstFileName
+        } else {
+            previewString(Res.string.chat_preview_files_count, count.toString())
         }
-    }
 
-    // ─── Timestamp helpers (kotlinx-datetime, KMP-safe) ──────────────────────
+    /**
+     * Resolves a preview string, degrading to the bare arguments if the resource cannot be
+     * resolved — never throwing.
+     *
+     * This line is the OBJECT of a confirmation question: if it blows up, the exception unwinds
+     * into handleSend's catch-all and the user gets a generic error instead of their action —
+     * i.e. exactly the class of bug D1 exists to kill (a question the user cannot answer). Losing
+     * the punctuation ("• Milk Shopping") is a bad day; losing the turn is a broken feature.
+     *
+     * It also keeps the renderer usable from the plain unit-test host, where Compose Resources
+     * throw "Resources.getSystem not mocked" — same environment caveat that [choiceString] in
+     * ChatViewModel documents. Locale-correct output is asserted on the Android host test, where
+     * resources actually resolve.
+     */
+    private suspend fun previewString(res: StringResource, vararg args: String): String =
+        runCatching { getString(res, *args) }.getOrElse { args.joinToString(" ") }
 
-    private fun formatTimestamp(epochMs: Long): String {
-        val tz = TimeZone.currentSystemDefault()
-        val dt = Instant.fromEpochMilliseconds(epochMs).toLocalDateTime(tz)
-        val h = dt.hour.toString().padStart(2, '0')
-        val m = dt.minute.toString().padStart(2, '0')
-        val dayName = dt.dayOfWeek.name.lowercase().replaceFirstChar { it.uppercaseChar() }
-        val monthName = dt.month.name.lowercase().replaceFirstChar { it.uppercaseChar() }
-        return "$dayName, $monthName ${dt.dayOfMonth} at $h:$m"
-    }
+    private companion object {
+        const val BULLET = "•"
 
-    private fun formatDay(epochMs: Long): String {
-        val tz = TimeZone.currentSystemDefault()
-        val dt = Instant.fromEpochMilliseconds(epochMs).toLocalDateTime(tz)
-        val dayName = dt.dayOfWeek.name.lowercase().replaceFirstChar { it.uppercaseChar() }
-        val monthName = dt.month.name.lowercase().replaceFirstChar { it.uppercaseChar() }
-        return "$dayName, $monthName ${dt.dayOfMonth}"
+        /**
+         * En dash, NOT "→" (U+2192): Skiko on wasmJs has no CSS-style font fallback, and the arrow
+         * is covered by neither the emoji font nor any web system font — it renders as tofu (an
+         * empty square) while Android's Roboto fallback hides the problem. Verified on :9090
+         * 2026-07-15: the reminder preview showed "• купить масло ⯀ Пятница, 17 июля в 09:00".
+         * U+2013 is covered (the chat header's "≈ 0–3 кредита" renders fine on the same canvas).
+         * Project precedent: review-rules wasm-bugs/premium-price-arrow-tofu-2026-05-22.
+         */
+        const val ARROW = "–"
     }
 }

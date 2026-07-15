@@ -72,4 +72,23 @@ sealed interface ChoiceAction {
 
     /** Cancel the pending choice with a visible response (the old "Cancel"). */
     data object Dismiss : ChoiceAction
+
+    /**
+     * Roll back an already-applied reversible mutation ([UndoHandle]). Shown as a chip AFTER the
+     * action ran — the D1 "ceremony proportional to reversibility" path replaces the pre-hoc
+     * "Add milk to Shopping?" question for add/complete.
+     */
+    data class Undo(val handle: UndoHandle) : ChoiceAction
+
+    /**
+     * Open the list picker for a just-added item: replaces the chips with one chip per candidate
+     * list ([MoveTo]) plus a Cancel escape.
+     */
+    data class MoveToList(val handle: UndoHandle.AddedItem) : ChoiceAction
+
+    /**
+     * Move the just-added item to [targetName] (a chip from the [MoveToList] picker).
+     * Add-then-remove; see [ToolCallDispatcher.moveAddedItem].
+     */
+    data class MoveTo(val handle: UndoHandle.AddedItem, val targetName: String) : ChoiceAction
 }

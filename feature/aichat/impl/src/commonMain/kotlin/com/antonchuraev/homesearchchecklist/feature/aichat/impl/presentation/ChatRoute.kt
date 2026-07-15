@@ -8,6 +8,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.chat_ambiguous_match
@@ -55,6 +56,11 @@ import aichecklists.core.designsystem.generated.resources.chat_unknown_intent_hi
 import aichecklists.core.designsystem.generated.resources.chat_voice_too_short
 import aichecklists.core.designsystem.generated.resources.chat_preview_cancelled_message
 import aichecklists.core.designsystem.generated.resources.chat_agent_round_limit
+import aichecklists.core.designsystem.generated.resources.chat_move_no_other_lists
+import aichecklists.core.designsystem.generated.resources.chat_result_moved_to
+import aichecklists.core.designsystem.generated.resources.chat_result_undone_add
+import aichecklists.core.designsystem.generated.resources.chat_result_undone_complete
+import aichecklists.core.designsystem.generated.resources.chat_undo_item_gone
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AttachmentSource
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatAttachment
 import com.antonchuraev.homesearchchecklist.core.filepicker.api.picker.FilePickerType
@@ -147,6 +153,14 @@ fun ChatRoute(
     val historyLoadErrorText = stringResource(Res.string.chat_history_load_error)
     val feedbackSubmittedText = stringResource(Res.string.chat_feedback_submitted)
     val feedbackBlankHintText = stringResource(Res.string.chat_feedback_blank_hint)
+    // D1 reversible-action replies (Undo / move-to-list). Must stay in sync with the same map in
+    // App.kt (the dock) — a key present in one and missing in the other ships the raw key on that
+    // surface only.
+    val resultUndoneAddFmt = stringResource(Res.string.chat_result_undone_add)
+    val resultUndoneCompleteFmt = stringResource(Res.string.chat_result_undone_complete)
+    val resultMovedToFmt = stringResource(Res.string.chat_result_moved_to)
+    val undoItemGoneText = stringResource(Res.string.chat_undo_item_gone)
+    val moveNoOtherListsText = stringResource(Res.string.chat_move_no_other_lists)
     // Phase 3 strings
     val micPermissionDeniedText = stringResource(Res.string.chat_mic_permission_denied)
     val voiceTooShortText = stringResource(Res.string.chat_voice_too_short)
@@ -160,22 +174,15 @@ fun ChatRoute(
     // Agentic loop (Phase 2d)
     val agentRoundLimitText = stringResource(Res.string.chat_agent_round_limit)
 
-    val messages = remember(
-        unknownText, genericErrorText, applyErrorText, extractFailText,
-        ambiguousMatchFmt, notFoundFmt, requiresPremiumText,
-        dispatchAddedFmt, dispatchAddedToFmt, dispatchAddedManyToFmt, dispatchAddEmptyText, dispatchRenamedFmt,
-        dispatchDeletedFmt, dispatchItemNotFoundFmt,
-        dispatchCompletedFmt, dispatchAlreadyDoneFmt, dispatchCreatedEmptyFmt,
-        dispatchCreatedWithOneFmt, dispatchCreatedWithManyFmt, dispatchReminderSetFmt,
-        dispatchNoRemindersOnDayFmt, dispatchMovedOneFmt, dispatchMovedManyFmt,
-        dispatchFindBlankText, dispatchFindNoMatchFmt, dispatchFindSuccessFmt,
-        dispatchOperationFailedFmt, dispatchNoChecklistsText, dispatchNoChecklistMatchFmt,
-        dispatchFillLoadFailedFmt, insufficientCreditsText, completionErrorText, historyLoadErrorText,
-        feedbackSubmittedText, feedbackBlankHintText,
-        micPermissionDeniedText, voiceTooShortText, recordingCancelledText, thumbUpThanksText,
-        previewCancelledText, transcribingText, transcribeEmptyText, transcribeErrorText,
-        agentRoundLimitText,
-    ) {
+    // NOT remember()-ed, and the hand-listed key set that used to sit here is gone on purpose.
+    // `stringResource` resolves asynchronously in Compose Multiplatform and returns "" for the
+    // first frames. A remember() keyed on a SUBSET of these strings caches the map while the rest
+    // are still empty, and those entries stay empty forever — the reply renders as an empty
+    // assistant bubble. Keeping the key list complete by hand is exactly the invariant that broke:
+    // every new string had to be added in THREE places (declaration, key list, map), and the D1
+    // keys made it into two of them. (Found 2026-07-15 on :9090.)
+    // Rebuilding a ~50-entry map per recomposition is noise next to the canvas draw.
+    val messages = run {
         mapOf(
             "chat_unknown_intent_hint" to unknownText,
             "chat_generic_error" to genericErrorText,
@@ -222,6 +229,11 @@ fun ChatRoute(
             "chat_transcribe_empty" to transcribeEmptyText,
             "chat_transcribe_error" to transcribeErrorText,
             "chat_agent_round_limit" to agentRoundLimitText,
+            "chat_result_undone_add" to resultUndoneAddFmt,
+            "chat_result_undone_complete" to resultUndoneCompleteFmt,
+            "chat_result_moved_to" to resultMovedToFmt,
+            "chat_undo_item_gone" to undoItemGoneText,
+            "chat_move_no_other_lists" to moveNoOtherListsText,
         )
     }
 
@@ -338,15 +350,21 @@ fun ChatRoute(
         viewModel.sendIntent(ChatScreenIntent.OnAttachmentPickerTriggered)
     }
 
+    // rememberUpdatedState, NOT the map directly: LaunchedEffect captures its lambda ONCE
+    // (key = viewModel), and Compose Resources resolve asynchronously — on the first frame every
+    // stringResource is still "". A directly-captured map freezes those empty values for the
+    // collector's lifetime and every reply renders as a blank bubble. Same stale-closure trap as
+    // the wasmJs FilePicker callbacks (project memory: filepicker-rememberupdatedstate-closure-trap).
+    val currentMessages by rememberUpdatedState(messages)
     LaunchedEffect(viewModel) {
         viewModel.sideEffect.collect { effect ->
             when (effect) {
                 is ChatScreenSideEffect.ShowSnackbar -> {
-                    val text = messages[effect.messageKey] ?: effect.messageKey
+                    val text = currentMessages[effect.messageKey] ?: effect.messageKey
                     snackbarHostState.showSnackbar(text)
                 }
                 is ChatScreenSideEffect.ShowAssistantMessage -> {
-                    val template = messages[effect.messageKey] ?: effect.messageKey
+                    val template = currentMessages[effect.messageKey] ?: effect.messageKey
                     val resolved = applyFormatArgs(template, effect.args)
                     viewModel.sendIntent(
                         ChatScreenIntent.AppendAssistantMessage(

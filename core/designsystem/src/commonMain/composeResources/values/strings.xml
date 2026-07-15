@@ -1227,16 +1227,22 @@
     <string name="chat_preview_item_label">Item</string>
     <string name="chat_preview_new_list_label">List name</string>
     <!-- AI choice response (Claude-style prompt + choice chips) -->
-    <string name="chat_choice_add_to_list">Add to %1$s?</string>
-    <string name="chat_choice_add_default_list">Add to your list?</string>
-    <string name="chat_choice_delete">Delete %1$s?</string>
-    <string name="chat_choice_complete">Mark %1$s as done?</string>
-    <string name="chat_choice_create">Create checklist %1$s?</string>
-    <string name="chat_choice_set_reminder">Set a reminder for %1$s?</string>
+    <!-- Argument-less questions. The OBJECT of the action ("• Milk → Shopping") is rendered as
+         its own line under the question by ToolCallPreviewRenderer — never interpolated into the
+         copy. A one-slot format string could only ever carry one of item/list, which is how
+         "Add to Shopping?" shipped without ever saying WHAT it would add. -->
+    <string name="chat_question_add">Add this?</string>
+    <string name="chat_question_delete">Delete this?</string>
+    <string name="chat_question_complete">Mark as done?</string>
+    <string name="chat_question_create">Create this checklist?</string>
+    <string name="chat_question_set_reminder">Set this reminder?</string>
+    <string name="chat_question_attach">Attach this file?</string>
     <string name="chat_choice_move_reminders">Move all reminders?</string>
-    <string name="chat_choice_attach">Attach to %1$s?</string>
     <string name="chat_choice_create_from_file">Create a checklist from this file?</string>
     <string name="chat_choice_which_list">Which list?</string>
+    <!-- Move picker when the chip cap hides destinations: %1$s shown of %2$s total. Premium has
+         unlimited lists, so a silently truncated picker reads as "my list is gone". -->
+    <string name="chat_choice_which_list_truncated">Which list? Showing %1$s of %2$s.</string>
     <string name="chat_choice_apply_actions">Apply these actions?</string>
     <string name="chat_choice_action_add">Add</string>
     <string name="chat_choice_action_delete">Delete</string>
@@ -1261,6 +1267,37 @@
     <string name="chat_choice_executing_move">Moving…</string>
     <string name="chat_choice_executing_attach">Attaching…</string>
     <string name="chat_choice_executing_default">Working…</string>
+    <!-- Post-action chips (D1): shown AFTER a reversible action was applied without asking. -->
+    <string name="chat_choice_undo">Undo</string>
+    <string name="chat_choice_move_to_list">Move to another list</string>
+    <string name="chat_choice_executing_undo">Undoing…</string>
+    <string name="chat_result_undone_add">Took «%1$s» back off the list.</string>
+    <string name="chat_result_undone_complete">Unchecked «%1$s».</string>
+    <string name="chat_result_moved_to">Moved «%1$s» to %2$s.</string>
+    <string name="chat_undo_item_gone">That item is already gone — nothing to undo.</string>
+    <string name="chat_move_no_other_lists">There's no other list to move it to.</string>
+    <!-- ToolCallPreviewRenderer: the object line of an action. -->
+    <string name="chat_preview_in_list">(in %1$s)</string>
+    <string name="chat_preview_files_count">%1$s files</string>
+    <string name="chat_preview_create_from_file">Create checklist from %1$s</string>
+    <string name="chat_preview_attach_to">Attach %1$s to • %2$s</string>
+    <!-- Date/time composition. Order is locale data: EN "July 20", RU "20 июля" — hence a format
+         string with swapped slots, never Kotlin-side concatenation. -->
+    <string name="chat_preview_day_month">%1$s %2$s</string>
+    <string name="chat_preview_weekday_date">%1$s, %2$s</string>
+    <string name="chat_preview_datetime">%1$s, %2$s at %3$s</string>
+    <string name="month_january">January</string>
+    <string name="month_february">February</string>
+    <string name="month_march">March</string>
+    <string name="month_april">April</string>
+    <string name="month_may">May</string>
+    <string name="month_june">June</string>
+    <string name="month_july">July</string>
+    <string name="month_august">August</string>
+    <string name="month_september">September</string>
+    <string name="month_october">October</string>
+    <string name="month_november">November</string>
+    <string name="month_december">December</string>
     <string name="chat_unknown_intent_hint">I didn't catch that. Try «add milk to shopping» or «remind me on Friday at 6pm».</string>
     <string name="chat_ask_ai_fallback">Ask AI</string>
 
@@ -1306,7 +1343,9 @@
     <string name="chat_dispatch_created_empty">Created checklist «%1$s».</string>
     <string name="chat_dispatch_created_with_one">Created checklist «%1$s» with 1 item.</string>
     <string name="chat_dispatch_created_with_many">Created checklist «%1$s» with %2$s items.</string>
-    <string name="chat_dispatch_reminder_set">Reminder set for «%1$s» at %2$s.</string>
+    <!-- %2$s is a full localized moment ("Monday, July 20 at 09:00") from ChatDateFormatter —
+         the same string the preview showed, so no "at ... at ..." and no drift between them. -->
+    <string name="chat_dispatch_reminder_set">Reminder set for «%1$s»: %2$s.</string>
     <string name="chat_dispatch_no_reminders_on_day">No reminders found on %1$s.</string>
     <string name="chat_dispatch_moved_one">Moved 1 reminder to %1$s.</string>
     <string name="chat_dispatch_moved_many">Moved %1$s reminders to %2$s.</string>

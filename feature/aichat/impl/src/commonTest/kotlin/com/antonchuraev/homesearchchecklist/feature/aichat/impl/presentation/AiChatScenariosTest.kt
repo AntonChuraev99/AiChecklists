@@ -71,13 +71,20 @@ class AiChatScenariosTest {
                 it is ToolCall.AddItem && it.itemTextOrEmpty().contains("молоко")
             }, tapExecute = true))
 
-        // C3 — FLAGSHIP: "add milk to a checklist" → must become a "which list?" choice with chips
-        //      [Shopping, Work] and itemText "milk". RED now (parser reads "a checklist" as the list name).
-        //      GOES GREEN after fix #3 (generic-target detection).
+        // C3 — "add milk to a checklist" / «добавь в чеклист пункт молоко» → escalates.
+        //      These carry a structure meta-marker (checklist/чеклист/пункт) next to a hint-preposition,
+        //      which LocalIntentRouterImpl.hasStructuralMetaMarker() sends to the cloud ON PURPOSE
+        //      (decision 2026-07-10, precision-first): Layer 1 mis-extracts "a checklist" as the list
+        //      NAME, so firing locally is exactly the wrong answer. Recall here is L2/L3's job.
+        //      Asserting escalation is not a lowered bar — it is what guards the rule: if the lexicon
+        //      were ever widened to swallow these locally (explicitly forbidden), no cloud fake would
+        //      be invoked and this goes red.
+        //      The which-list PICKER shape these used to assert is alive and covered by C31 (hintless
+        //      add + 2 lists), which reaches it through the real parser.
         add(ChatScenario("C3", "add milk to a checklist", "add milk to a checklist", ChatLocale.En, listOf("Shopping", "Work"),
-            Expected.PickListChoice(listOf("Shopping", "Work"), itemContains = "milk")))
+            Expected.Escalates))
         add(ChatScenario("C3-ru", "добавь в чеклист пункт молоко", "добавь в чеклист пункт молоко", ChatLocale.Ru, listOf("Покупки", "Работа"),
-            Expected.PickListChoice(listOf("Покупки", "Работа"), itemContains = "молоко")))
+            Expected.Escalates))
 
         // C4 — multi-item "add milk, eggs and bread to shopping" → multi-item add.
         //      RED now: Layer-1 produces a single AddItem with the whole comma-string as one item.
@@ -168,9 +175,14 @@ class AiChatScenariosTest {
                 it is ToolCall.FindItemsQuery && it.query.contains("молоко")
             }))
 
-        // C16 — "where is my passport" → classified FindItems (dispatched inline as FindItemsQuery)
+        // C16 — "where is my passport" → escalates. Broad interrogatives ("where is", "show", "list")
+        //      were DEMOTED out of the findItems lexicon by the same 2026-07-10 decision (see the
+        //      comment on EnIntentLexicon.findItems): they dead-ended at a literal item search
+        //      instead of escalating to the Layer 3 agent, which can actually answer the question.
+        //      So "classified FindItems" is the pre-decision expectation; the cloud hand-off is the
+        //      current contract — same Tier-1/Tier-2 boundary as C17/C24.
         add(ChatScenario("C16", "where is my passport", "where is my passport", ChatLocale.En, listOf("Trip"),
-            Expected.Classified(ChatIntent.FindItems::class)))
+            Expected.Escalates))
 
         // C17 — "what's in my shopping list" → escalates past Layer 1 to a cloud layer.
         //      GREEN: Layer-1 finds no command verb (conf 0) → hands off to Layer 2 (cloud consulted).
@@ -268,6 +280,17 @@ class AiChatScenariosTest {
         //      UX enhancement, not a routing observable — tracked as a product idea, not a red routing gap.
         add(ChatScenario("C30", "add milk (0 lists)", "add milk", ChatLocale.En, emptyList(),
             Expected.ShowsMessage, dispatchOutcome = DispatchOutcome.NotFound("chat_dispatch_not_found", listOf("milk")), tapExecute = true))
+
+        // C31 — hintless add + 2 lists → "which list?" picker (the D1 disambiguation shape).
+        //      This is the boundary of the D1 C-branch: adding is auto-applied only when the TARGET
+        //      is unambiguous. Named no list and 2+ exist → guessing would file the item into a list
+        //      the user never opened, so ask instead. Contrast C2 (same phrasing, ONE list → nothing
+        //      to pick → dispatched straight through). Reaches the picker via the REAL parser, where
+        //      ChatUndoChoiceTest covers the same shape from a scripted classification.
+        add(ChatScenario("C31", "add milk (2 lists → pick)", "add milk", ChatLocale.En, listOf("Shopping", "Work"),
+            Expected.PickListChoice(listOf("Shopping", "Work"), itemContains = "milk")))
+        add(ChatScenario("C31-ru", "добавь молоко (2 списка → выбор)", "добавь молоко", ChatLocale.Ru, listOf("Покупки", "Работа"),
+            Expected.PickListChoice(listOf("Покупки", "Работа"), itemContains = "молоко")))
     }
 
     private fun img(name: String) = ChatAttachment(sourcePath = "/tmp/$name", mimeType = "image/jpeg", fileName = name)

@@ -6,6 +6,7 @@ import com.antonchuraev.homesearchchecklist.core.common.api.State
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AttachmentSource
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatAttachment
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatChoice
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceAction
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
 
 // ---------------------------------------------------------------------------
@@ -98,7 +99,24 @@ data class PendingChoice(
     val executingLabel: String? = null,
     val editText: String? = null,
     val batchItems: List<AgentPlanItem>? = null,
-)
+) {
+    /**
+     * True for the D1 post-action offer (Undo / move-to-list) shown AFTER a reversible action was
+     * applied. It is an offer, not a question: the action already happened and nothing is waiting
+     * on the user.
+     *
+     * Why the UI needs this: a *question* hides the input row on purpose — its chips (including the
+     * escape chip, which dismisses and brings the input back) are the only sane interaction. A
+     * post-action block has NO escape chip, so reusing that rule trapped the chat — the offer stayed
+     * up, the input stayed hidden, and the only way out was Back, which collapsed the whole dock.
+     */
+    val isPostAction: Boolean
+        get() = choice.options.any {
+            it.action is ChoiceAction.Undo ||
+                it.action is ChoiceAction.MoveToList ||
+                it.action is ChoiceAction.MoveTo
+        }
+}
 
 /**
  * One line in the agent-batch choice prompt.

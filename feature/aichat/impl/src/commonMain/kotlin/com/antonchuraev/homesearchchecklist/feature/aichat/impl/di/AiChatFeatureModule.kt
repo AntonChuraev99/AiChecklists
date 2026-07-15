@@ -7,6 +7,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatAg
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatClassifierApiService
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatCompletionApiService
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatHistoryRepository
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.format.ChatDateFormatter
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.TranscribeAudioApiService
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.data.ChatAgentApiServiceImpl
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.data.ChatClassifierApiServiceImpl
@@ -14,6 +15,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.impl.data.ChatComplet
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.data.TranscribeAudioApiServiceImpl
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.parser.LocalIntentRouterImpl
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.ChatViewModel
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.preview.ChatDateFormatterImpl
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.preview.ToolCallPreviewRenderer
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.preview.ToolCallPreviewRendererImpl
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.repository.AiChatRepositoryImpl
@@ -73,8 +75,15 @@ val aiChatFeatureModule = module {
             logger = get(),
         )
     }
+    // One date formatter for the whole chat: also resolved by ToolCallDispatcherImpl (composeApp)
+    // so "reminder set for …" and its preview can never spell the same moment differently.
+    single<ChatDateFormatter> {
+        ChatDateFormatterImpl()
+    }
     single<ToolCallPreviewRenderer> {
-        ToolCallPreviewRendererImpl()
+        ToolCallPreviewRendererImpl(
+            dateFormatter = get(),
+        )
     }
     viewModel {
         ChatViewModel(

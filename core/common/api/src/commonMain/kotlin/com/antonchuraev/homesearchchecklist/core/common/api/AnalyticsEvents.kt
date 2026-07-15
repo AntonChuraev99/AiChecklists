@@ -249,6 +249,15 @@ object AnalyticsEvents {
         const val PREVIEW_CONFIRMED = "ai_chat_preview_confirmed"
         const val PREVIEW_REJECTED = "ai_chat_preview_rejected"
 
+        // ── Reversible actions (D1: apply now, offer Undo after) ──────────────────
+        // Confident add/complete no longer emit PREVIEW_SHOWN — there is no preview to show, the
+        // action already ran. That funnel therefore drops in VOLUME by design; these three events
+        // are where that traffic went. ACTION_AUTO_APPLIED carries action_type + routed_layer, so
+        // "auto-applied → undone" is the new regret rate (the old proxy was preview_rejected).
+        const val ACTION_AUTO_APPLIED = "ai_chat_action_auto_applied"
+        const val ACTION_UNDONE = "ai_chat_action_undone"
+        const val ACTION_MOVED = "ai_chat_action_moved"
+
         // ── Voice input (mic in the chat input row -> Cloud Function transcription) ──
         // One event per mic action so the funnel (tapped -> cancelled / transcribed / failed) is
         // measurable: until these shipped the voice feature was completely un-instrumented, so

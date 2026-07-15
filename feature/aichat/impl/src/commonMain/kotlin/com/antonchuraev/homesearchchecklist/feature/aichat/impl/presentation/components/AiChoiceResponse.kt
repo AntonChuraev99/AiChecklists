@@ -237,12 +237,18 @@ private fun ChoiceChipFor(
     )
 }
 
-/** Numbered list of proposed agent actions inside the prompt bubble (destructive lines tinted). */
+/**
+ * List of proposed / applied actions inside the prompt bubble (destructive lines tinted).
+ *
+ * Numbering appears only from TWO items up: since D1 a single-action choice also renders through
+ * here (it is how the question gets its object), and "1. • Milk" reads like a broken list.
+ */
 @Composable
 private fun BatchActionList(
     items: List<AgentPlanItem>,
     modifier: Modifier = Modifier,
 ) {
+    val numbered = items.size > 1
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
@@ -252,11 +258,13 @@ private fun BatchActionList(
                 verticalAlignment = Alignment.Top,
                 horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
             ) {
-                Text(
-                    text = "${index + 1}.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                if (numbered) {
+                    Text(
+                        text = "${index + 1}.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 if (item.isDestructive) {
                     Icon(
                         imageVector = Icons.Outlined.DeleteForever,

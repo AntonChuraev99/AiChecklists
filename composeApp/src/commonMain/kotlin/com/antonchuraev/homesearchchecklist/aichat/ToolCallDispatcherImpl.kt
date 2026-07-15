@@ -12,7 +12,9 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Chat
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.DispatchOutcome
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ReadChecklistItem
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ToolCall
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.UndoHandle
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.mimeTypeToAttachmentSource
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.format.ChatDateFormatter
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.analyzer.AiAnalyzer
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeInputData
 import com.antonchuraev.homesearchchecklist.feature.analyze.domain.model.AnalyzeResult
@@ -25,9 +27,6 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.UserData
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import kotlinx.coroutines.flow.first
-import kotlinx.datetime.Instant
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 
 /**
  * App-level implementation of [ToolCallDispatcher].
@@ -59,6 +58,7 @@ class ToolCallDispatcherImpl(
     private val logger: AppLogger,
     private val activationCoordinator: ActivationCoordinator,
     private val remoteConfigProvider: RemoteConfigProvider,
+    private val dateFormatter: ChatDateFormatter,
 ) : ToolCallDispatcher {
 
     companion object {
@@ -94,6 +94,115 @@ class ToolCallDispatcherImpl(
         DispatchOutcome.NotFound("chat_dispatch_operation_failed", listOf(e.message ?: "unknown error"))
     }
 
+    // ─── Undo / Move (D1 reversible path) ─────────────────────────────────────
+
+    override suspend fun undo(handle: UndoHandle): DispatchOutcome = runCatching {
+        when (handle) {
+            is UndoHandle.AddedItem -> undoAddedItem(handle)
+            is UndoHandle.CompletedItem -> undoCompletedItem(handle)
+        }
+    }.getOrElse { e ->
+        logger.error(TAG, "undo failed for ${handle::class.simpleName}", e)
+        DispatchOutcome.NotFound("chat_dispatch_operation_failed", listOf(e.message ?: "unknown error"))
+    }
+
+    /**
+     * Removes the fill row AND its template row — the add wrote both, so a half-undo would leave
+     * an orphan template item that reappears on the next fill reset. Rows are located by id only:
+     * a text match would hit a same-named row the user already had.
+     */
+    private suspend fun undoAddedItem(handle: UndoHandle.AddedItem): DispatchOutcome {
+        val fill = checklistRepository.getFillById(handle.fillId)
+            ?: return DispatchOutcome.NotFound("chat_undo_item_gone")
+        if (fill.items.none { it.id == handle.fillItemId }) {
+            // The user deleted the row by hand between the add and the Undo tap. Visible reply,
+            // never a silent skip.
+            return DispatchOutcome.NotFound("chat_undo_item_gone")
+        }
+        // BY ID — never `!it.text.contains(handle.itemText)`. A text filter would also delete the
+        // user's OWN same-named rows that existed before the chat touched the list: an undo that
+        // destroys data it never created. The id guard above does NOT protect against that — it
+        // passes, and the text filter then takes the extra rows with it.
+        checklistRepository.updateFill(
+            fill.copy(items = fill.items.filter { it.id != handle.fillItemId })
+        )
+
+        val checklist = checklistRepository.getChecklistById(handle.checklistId)
+        if (checklist == null) {
+            logger.warning(
+                TAG,
+                "undoAddedItem: checklist id=${handle.checklistId} is gone — fill row removed, template not reconciled",
+            )
+        } else {
+            val remaining = checklist.items.filter { it.id != handle.templateItemId }
+            if (remaining.size != checklist.items.size) {
+                checklistRepository.updateChecklistTemplate(checklist.copy(items = remaining))
+            }
+        }
+
+        return DispatchOutcome.Success(
+            "chat_result_undone_add",
+            listOf(handle.itemText),
+            linkedChecklistId = handle.checklistId,
+        )
+    }
+
+    /** Flips the row back to unchecked. No template write — the template carries no checked state. */
+    private suspend fun undoCompletedItem(handle: UndoHandle.CompletedItem): DispatchOutcome {
+        val fill = checklistRepository.getFillById(handle.fillId)
+            ?: return DispatchOutcome.NotFound("chat_undo_item_gone")
+        if (fill.items.none { it.id == handle.fillItemId }) {
+            return DispatchOutcome.NotFound("chat_undo_item_gone")
+        }
+        checklistRepository.updateFill(
+            fill.copy(
+                items = fill.items.map {
+                    if (it.id == handle.fillItemId) it.withChecked(false) else it
+                },
+            )
+        )
+        return DispatchOutcome.Success(
+            "chat_result_undone_complete",
+            listOf(handle.itemText),
+            linkedChecklistId = handle.checklistId,
+        )
+    }
+
+    override suspend fun moveAddedItem(
+        handle: UndoHandle.AddedItem,
+        targetChecklistName: String,
+    ): DispatchOutcome = runCatching {
+        // ADD FIRST, then remove. If the remove half fails the user sees a duplicate they can
+        // delete; the reverse order would silently drop the item on a failed add.
+        val added = handleAddItem(
+            ToolCall.AddItem(checklistHint = targetChecklistName, itemText = handle.itemText)
+        )
+        // Resolution failure (unknown / ambiguous list) → surface as-is, remove NOTHING.
+        val addedSuccess = added as? DispatchOutcome.Success ?: return@runCatching added
+        val newHandle = addedSuccess.undo as? UndoHandle.AddedItem
+
+        val removed = undo(handle)
+        if (removed !is DispatchOutcome.Success) {
+            // Move already happened — report success, but this duplicate must be traceable.
+            logger.error(
+                TAG,
+                "moveAddedItem: added '${handle.itemText}' to '$targetChecklistName' but could not " +
+                    "remove the original from '${handle.checklistName}' — the item now exists twice",
+            )
+        }
+
+        DispatchOutcome.Success(
+            "chat_result_moved_to",
+            listOf(handle.itemText, newHandle?.checklistName ?: targetChecklistName),
+            linkedChecklistId = addedSuccess.linkedChecklistId,
+            // Fresh handle → the item can be moved onwards (including back) from the new list.
+            undo = newHandle,
+        )
+    }.getOrElse { e ->
+        logger.error(TAG, "moveAddedItem failed", e)
+        DispatchOutcome.NotFound("chat_dispatch_operation_failed", listOf(e.message ?: "unknown error"))
+    }
+
     // ─── AddItem ──────────────────────────────────────────────────────────────
 
     private suspend fun handleAddItem(toolCall: ToolCall.AddItem): DispatchOutcome {
@@ -117,10 +226,30 @@ class ToolCallDispatcherImpl(
         val updatedChecklist = checklist.copy(items = checklist.items + newTemplateItem)
         checklistRepository.updateChecklistTemplate(updatedChecklist)
 
+        // Reversible → hand back the ids so the chat can offer "Undo" instead of asking first.
+        val undo = UndoHandle.AddedItem(
+            checklistId = checklist.id,
+            checklistName = checklist.name,
+            fillId = fill.id,
+            fillItemId = newFillItem.id,
+            templateItemId = newTemplateItem.id,
+            itemText = toolCall.itemText,
+        )
+
         return if (toolCall.checklistHint != null) {
-            DispatchOutcome.Success("chat_dispatch_added_to", listOf(toolCall.itemText, checklist.name), linkedChecklistId = checklist.id)
+            DispatchOutcome.Success(
+                "chat_dispatch_added_to",
+                listOf(toolCall.itemText, checklist.name),
+                linkedChecklistId = checklist.id,
+                undo = undo,
+            )
         } else {
-            DispatchOutcome.Success("chat_dispatch_added", listOf(toolCall.itemText), linkedChecklistId = checklist.id)
+            DispatchOutcome.Success(
+                "chat_dispatch_added",
+                listOf(toolCall.itemText),
+                linkedChecklistId = checklist.id,
+                undo = undo,
+            )
         }
     }
 
@@ -156,6 +285,8 @@ class ToolCallDispatcherImpl(
             ?: return DispatchOutcome.NotFound("chat_dispatch_item_not_found", listOf(toolCall.itemText, checklist.name))
 
         if (matchingItem.checked) {
+            // Nothing changed → nothing to undo (an "Undo" chip here would uncheck an item the
+            // user checked themselves earlier).
             return DispatchOutcome.Success("chat_dispatch_already_done", listOf(matchingItem.text), linkedChecklistId = checklist.id)
         }
 
@@ -164,7 +295,17 @@ class ToolCallDispatcherImpl(
         )
         checklistRepository.updateFill(updatedFill)
 
-        return DispatchOutcome.Success("chat_dispatch_completed", listOf(matchingItem.text, checklist.name), linkedChecklistId = checklist.id)
+        return DispatchOutcome.Success(
+            "chat_dispatch_completed",
+            listOf(matchingItem.text, checklist.name),
+            linkedChecklistId = checklist.id,
+            undo = UndoHandle.CompletedItem(
+                checklistId = checklist.id,
+                fillId = fill.id,
+                fillItemId = matchingItem.id,
+                itemText = matchingItem.text,
+            ),
+        )
     }
 
     // ─── CreateChecklist ──────────────────────────────────────────────────────
@@ -211,7 +352,11 @@ class ToolCallDispatcherImpl(
         )
         checklistRepository.updateFill(updatedFill)
 
-        return DispatchOutcome.Success("chat_dispatch_reminder_set", listOf(matchingItem.text, formatTimestamp(toolCall.at)), linkedChecklistId = checklist.id)
+        return DispatchOutcome.Success(
+            "chat_dispatch_reminder_set",
+            listOf(matchingItem.text, dateFormatter.formatDateTime(toolCall.at)),
+            linkedChecklistId = checklist.id,
+        )
     }
 
     // ─── MoveAllReminders ─────────────────────────────────────────────────────
@@ -223,7 +368,10 @@ class ToolCallDispatcherImpl(
         )
 
         if (reminders.isEmpty()) {
-            return DispatchOutcome.NotFound("chat_dispatch_no_reminders_on_day", listOf(formatDay(toolCall.fromDayStartMs)))
+            return DispatchOutcome.NotFound(
+                "chat_dispatch_no_reminders_on_day",
+                listOf(dateFormatter.formatDay(toolCall.fromDayStartMs)),
+            )
         }
 
         val offsetMs = toolCall.toDayStartMs - toolCall.fromDayStartMs
@@ -241,9 +389,10 @@ class ToolCallDispatcherImpl(
             }
         }
 
+        val targetDay = dateFormatter.formatDay(toolCall.toDayStartMs)
         return when (movedCount) {
-            1 -> DispatchOutcome.Success("chat_dispatch_moved_one", listOf(formatDay(toolCall.toDayStartMs)))
-            else -> DispatchOutcome.Success("chat_dispatch_moved_many", listOf(movedCount.toString(), formatDay(toolCall.toDayStartMs)))
+            1 -> DispatchOutcome.Success("chat_dispatch_moved_one", listOf(targetDay))
+            else -> DispatchOutcome.Success("chat_dispatch_moved_many", listOf(movedCount.toString(), targetDay))
         }
     }
 
@@ -611,21 +760,4 @@ class ToolCallDispatcherImpl(
         }
     }
 
-    // ─── Time formatting ──────────────────────────────────────────────────────
-
-    private fun formatTimestamp(epochMs: Long): String {
-        val tz = TimeZone.currentSystemDefault()
-        val dt = Instant.fromEpochMilliseconds(epochMs).toLocalDateTime(tz)
-        val h = dt.hour.toString().padStart(2, '0')
-        val m = dt.minute.toString().padStart(2, '0')
-        return "$h:$m"
-    }
-
-    private fun formatDay(epochMs: Long): String {
-        val tz = TimeZone.currentSystemDefault()
-        val dt = Instant.fromEpochMilliseconds(epochMs).toLocalDateTime(tz)
-        val dayName = dt.dayOfWeek.name.lowercase().replaceFirstChar { it.uppercaseChar() }
-        val monthName = dt.month.name.lowercase().replaceFirstChar { it.uppercaseChar() }
-        return "$dayName, $monthName ${dt.dayOfMonth}"
-    }
 }

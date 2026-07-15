@@ -10,6 +10,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Chat
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceAction
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.DispatchOutcome
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ToolCall
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.UndoHandle
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.locale.ChatLocaleProvider
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.ChatLocale
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AgentStepResult
@@ -130,14 +131,41 @@ sealed interface Expected {
 
 // ─── Fakes (cloud = zero cost) ───────────────────────────────────────────────
 
-/** Records every dispatched ToolCall; returns a per-scenario [outcome]. */
+/**
+ * Records every dispatched ToolCall; returns a per-scenario [outcome].
+ *
+ * [undoOutcome] / [moveOutcome] back the D1 post-hoc chips (Undo / move-to-list). They default to
+ * a generic Success so scenarios that never touch those chips stay unaffected.
+ */
 class RecordingToolCallDispatcher(
     private val outcome: DispatchOutcome,
+    private val undoOutcome: DispatchOutcome = DispatchOutcome.Success("chat_undo_removed", listOf("item")),
+    private val moveOutcome: DispatchOutcome = DispatchOutcome.Success("chat_dispatch_added_to", listOf("item", "list")),
 ) : ToolCallDispatcher {
     val dispatched = mutableListOf<ToolCall>()
+
+    /** Every [undo] call, in order. */
+    val undone = mutableListOf<UndoHandle>()
+
+    /** Every [moveAddedItem] call as (handle, targetChecklistName), in order. */
+    val moved = mutableListOf<Pair<UndoHandle.AddedItem, String>>()
+
     override suspend fun dispatch(toolCall: ToolCall): DispatchOutcome {
         dispatched.add(toolCall)
         return outcome
+    }
+
+    override suspend fun undo(handle: UndoHandle): DispatchOutcome {
+        undone.add(handle)
+        return undoOutcome
+    }
+
+    override suspend fun moveAddedItem(
+        handle: UndoHandle.AddedItem,
+        targetChecklistName: String,
+    ): DispatchOutcome {
+        moved.add(handle to targetChecklistName)
+        return moveOutcome
     }
 }
 
@@ -339,7 +367,7 @@ class HarnessRig(
  */
 private object HarnessPreviewRenderer :
     com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.preview.ToolCallPreviewRenderer {
-    override fun render(toolCall: ToolCall): String = toolCall.toString()
+    override suspend fun render(toolCall: ToolCall): String = toolCall.toString()
 }
 
 fun buildHarnessRig(scenario: ChatScenario): HarnessRig {

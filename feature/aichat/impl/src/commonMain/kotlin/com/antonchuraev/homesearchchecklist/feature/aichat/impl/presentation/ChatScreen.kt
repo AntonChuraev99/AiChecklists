@@ -318,10 +318,13 @@ fun ChatContent(
             onRemove = { path -> onIntent(ChatScreenIntent.OnRemoveAttachment(path)) },
         )
 
-        // Input row — pinned above the keyboard. Hidden while a choice block is shown:
-        // the chips (incl. "Something else" escape, which dismisses → input returns) are the
-        // only interaction during a pending choice, so a parallel text field is noise.
-        if (state.pendingChoice == null) {
+        // Input row — pinned above the keyboard. Hidden while a QUESTION is pending: its chips
+        // (incl. the "Something else" escape, which dismisses → input returns) are the only
+        // interaction, so a parallel text field is noise.
+        // A post-action offer (Undo / move) is NOT a question — it has no escape chip, so hiding
+        // the input there left no way out but Back (which collapses the dock). Keep typing enabled;
+        // sending a new message clears the offer.
+        if (state.pendingChoice == null || state.pendingChoice.isPostAction) {
             ChatInputRow(
                 text = state.inputText,
                 onTextChange = { onIntent(ChatScreenIntent.OnInputChange(it)) },
