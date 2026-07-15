@@ -8,6 +8,7 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentCloudPaths
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentCloudStoragePort
 import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistDao
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistEntity
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistFillDao
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistFillEntity
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.toDomain
@@ -216,12 +217,42 @@ class SyncRepositoryImpl(
     }
 
     /**
+     * Resolves the cloudId a checklist must be uploaded under, generating and PERSISTING one for
+     * legacy rows created before cloud sync existed.
+     *
+     * MIGRATION_14_15 added `cloudId TEXT DEFAULT NULL` alongside `syncStatus INTEGER NOT NULL
+     * DEFAULT 0`, i.e. every pre-sync checklist is (cloudId = null, syncStatus = SYNCED). Both
+     * upload paths must resolve that null: the push path reaches only PENDING rows
+     * (getPendingSync filters `syncStatus != 0`), so for a legacy SYNCED row initialUpload() is the
+     * ONLY path that ever sees it — before this existed it fabricated `cloudId = ""` and Firestore
+     * rejected the whole batch.
+     *
+     * Persisting is what makes it idempotent: without assignCloudId the next start would mint a
+     * DIFFERENT id for the same checklist and duplicate it in the cloud.
+     */
+    private suspend fun ensureCloudId(entity: ChecklistEntity): String =
+        entity.cloudId ?: generateCloudId().also { newId ->
+            logInfo("backfilling missing cloudId for '${entity.name}' -> $newId")
+            checklistDao.assignCloudId(entity.id, newId)
+        }
+
+    /**
+     * Per-fill analogue of [ensureCloudId]. A blank fill identity is worse than a rejected write:
+     * fills are matched across devices by cloudId, so a `""` fill would make
+     * [mergeRemoteChecklist]'s `fillDao.getByCloudId("")` match an unrelated blank-id fill and
+     * corrupt the merge.
+     */
+    private suspend fun ensureFillCloudId(fill: ChecklistFillEntity): String =
+        fill.cloudId ?: generateCloudId().also { newId ->
+            logInfo("backfilling missing cloudId for fill id=${fill.id} -> $newId")
+            fillDao.assignCloudId(fill.id, newId)
+        }
+
+    /**
      * Uploads one checklist (with its active fills embedded) to Firestore and, on
      * success, marks the checklist and those fills SYNCED.
      *
-     * Backfills a missing cloudId for legacy checklists/fills created before cloud sync
-     * existed (the column is nullable; such rows used to be silently skipped and never
-     * reached the cloud — the web app then showed nothing).
+     * Missing cloudIds are resolved (and persisted) by [ensureCloudId] / [ensureFillCloudId].
      *
      * updatedAt is bumped to push time both in the uploaded document and locally: a fill
      * edited in place does NOT advance its parent's updatedAt, so re-uploading the parent
@@ -232,26 +263,18 @@ class SyncRepositoryImpl(
      */
     private suspend fun uploadChecklistEntity(
         uid: String,
-        entity: com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistEntity,
+        entity: ChecklistEntity,
     ) {
-        val cid = entity.cloudId ?: generateCloudId().also { newId ->
-            logInfo("push: backfilling missing cloudId for '${entity.name}' -> $newId")
-            checklistDao.assignCloudId(entity.id, newId)
-        }
+        val cid = ensureCloudId(entity)
         // Upload not-yet-uploaded attachment bytes BEFORE serializing fills, so the
         // itemsJson embedded in the cloud document carries each attachment's storagePath
         // (the cross-device anchor). Stamping persists to Room too — id is preserved, so
         // the markSynced(it.id) below still targets the same rows.
         val rawFills = fillDao.getActiveFillsByChecklistId(entity.id)
         val fills = rawFills.map { uploadPendingAttachments(uid, it) }
-        val fillSyncData = fills.map { fill ->
-            val fillCid = fill.cloudId ?: generateCloudId().also { newId ->
-                fillDao.assignCloudId(fill.id, newId)
-            }
-            fill.copy(cloudId = fillCid).toFillSyncData()
-        }
+        val fillSyncData = fills.map { fill -> fill.toFillSyncData(cloudId = ensureFillCloudId(fill)) }
         val now = currentTimeMillis()
-        val syncData = entity.copy(cloudId = cid, updatedAt = now).toSyncData(fillSyncData)
+        val syncData = entity.copy(updatedAt = now).toSyncData(cloudId = cid, fills = fillSyncData)
         log("push: uploading '${entity.name}' cloudId=$cid, ${fills.size} fills")
         when (val result = firestoreDataSource.uploadChecklist(uid, syncData)) {
             is AppResult.Success -> {
@@ -276,9 +299,14 @@ class SyncRepositoryImpl(
             val allChecklists = checklistDao.getAllActive()
             log("initialUpload: ${allChecklists.size} active checklists to upload")
             val syncDataList = allChecklists.map { entity ->
+                // getAllActive() is NOT filtered by syncStatus, so unlike the push path this sees
+                // legacy (cloudId = null, SYNCED) rows — they must be backfilled here or they reach
+                // Firestore with a blank document id and sink the whole batch.
+                val cid = ensureCloudId(entity)
                 val fills = fillDao.getActiveFillsByChecklistId(entity.id)
                     .map { uploadPendingAttachments(uid, it) }
-                entity.toSyncData(fills.map { it.toFillSyncData() })
+                val fillSyncData = fills.map { fill -> fill.toFillSyncData(cloudId = ensureFillCloudId(fill)) }
+                entity.toSyncData(cloudId = cid, fills = fillSyncData)
             }
 
             if (syncDataList.isNotEmpty()) {
@@ -527,10 +555,18 @@ class SyncRepositoryImpl(
 
     // ── Mapping helpers ──
 
-    private fun com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistEntity.toSyncData(
-        fills: List<FillSyncData>
+    /**
+     * [cloudId] is a REQUIRED parameter, deliberately shadowing the entity's own nullable
+     * `cloudId`: the cloud identity must arrive already resolved (via [ensureCloudId]) from the
+     * caller. It used to read `cloudId ?: ""` off the receiver, which let initialUpload() ship a
+     * blank Firestore document id and fail every legacy user's entire first sync. Keeping the
+     * fallback out of the mapper makes that class of bug a compile error, not a runtime one.
+     */
+    private fun ChecklistEntity.toSyncData(
+        cloudId: String,
+        fills: List<FillSyncData>,
     ) = ChecklistSyncData(
-        cloudId = cloudId ?: "",
+        cloudId = cloudId,
         name = name,
         itemsJson = json.encodeToString(ListSerializer(ChecklistItem.serializer()), items),
         reminderAt = reminderAt,
@@ -549,9 +585,10 @@ class SyncRepositoryImpl(
         fills = fills,
     )
 
-    private fun com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistFillEntity.toFillSyncData() =
+    /** Fill analogue of [toSyncData] — see there for why [cloudId] is a required parameter. */
+    private fun ChecklistFillEntity.toFillSyncData(cloudId: String) =
         FillSyncData(
-            cloudId = cloudId ?: "",
+            cloudId = cloudId,
             name = name,
             itemsJson = json.encodeToString(ListSerializer(ChecklistFillItem.serializer()), items),
             coverImagePath = coverImagePath,
