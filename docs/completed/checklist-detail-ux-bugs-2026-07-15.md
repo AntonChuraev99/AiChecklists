@@ -40,6 +40,7 @@ Three user-reported UX defects on ChecklistDetail (Android + Web): (1) red delet
 
 **Баги/проблемы:**
 - Bug 4 was dormant: before `1430fac2` the only `OnDeleteFolder` call site deleted a **child** folder, so `viewingDeletedSubtree` was never true through the UI. Fix 3 made the branch live on every use.
+- RU strings for the folder feature: closed as **wont-do** by the owner on 2026-07-15 (`docs/todos/2026-07-15-folder-strings-missing-ru-translation.md`). Fix 3 turned one translated row ("Удалить чек-лист") into an untranslated one ("Delete folder") on RU; accepted, consistent with the English-only policy.
 - Two failed attempts at the test fixtures (`CoroutineScope(testDispatcher)` → leaks past `runTest`; `backgroundScope` → Standard dispatcher, asserts read unwritten state). Stopped after two rather than guessing a third, and handed it to @test-expert, who landed `backgroundScope.coroutineContext + testDispatcher`.
 - A full-module baseline run (33 failed **without** any of these changes, vs 21 and 31 with) prevented misreading a pre-existing flake as a fresh regression.
 
@@ -47,8 +48,8 @@ Three user-reported UX defects on ChecklistDetail (Android + Web): (1) red delet
 
 - `:feature:home:testAndroidHostTest` — **286 tests, 0 failed, 0 skipped**, re-verified with `--rerun-tasks`. Was 285/33 before: `PreferenceDataStoreFactory.createWithPath { }` took a real `Dispatchers.IO` scope that outlived `runTest` and resumed VM coroutines after `resetMain()`. Pinned to `backgroundScope`.
 - Regression test for bug 4 verified to discriminate: reverting to `viewModelScope.launch` fails exactly it.
-- Debug APK installed and exercised on Pixel_9 by the user; bugs 1–3 confirmed fixed.
-- **NOT run:** `androidApp:connectedAndroidTest` (instrumented) and the wasmJs path. Bug 4's race has a wider window on wasmJs (OPFS worker slower than Room) and was not observed there.
+- Debug APK installed and exercised on Pixel_9 by the user; **all four bugs confirmed fixed on device**.
+- **NOT run:** `androidApp:connectedAndroidTest` (instrumented) and the wasmJs path. Bug 4's race has a wider window on wasmJs (OPFS worker slower than Room) and was never observed there — the fix is platform-neutral, but web was not exercised.
 
 ## Выводы
 

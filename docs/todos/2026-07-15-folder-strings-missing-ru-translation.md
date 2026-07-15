@@ -1,16 +1,22 @@
 ---
 date: 2026-07-15
-title: Folder feature has no Russian strings (18 keys)
+title: Folder feature is English-only (18 keys) — accepted, do not re-open
 severity: low
 type: localization
-status: open
+status: closed
+resolution: wont-do
+resolved: 2026-07-15
 ---
 
-# `folder_*` strings are English-only
+# `folder_*` strings stay English — decided
 
-## Problem
+**Decision (2026-07-15, by the project owner): no Russian translation for the folder feature. Accepted as-is.**
 
-All 18 `folder_*` keys exist in `core/designsystem/src/commonMain/composeResources/values/strings.xml` and **none** of them in `values-ru/strings.xml`. On a Russian device the whole folder feature renders in English — `FolderActionsSheet` already behaves this way today.
+This file exists so the gap is not "discovered" again and re-opened as a bug. It is a deliberate choice, not an oversight.
+
+## What the gap is
+
+All 18 `folder_*` keys live in `core/designsystem/src/commonMain/composeResources/values/strings.xml` and **none** in `values-ru/strings.xml`. On a Russian device the whole folder feature renders in English — `FolderActionsSheet` has always behaved this way.
 
 Verified list (`grep -oE 'name="folder_[a-z_]+"'`):
 
@@ -23,25 +29,18 @@ folder_delete_message_empty folder_name_placeholder       folder_reminder_unavai
 folder_delete_message_one   folder_rename                 folder_rename_title
 ```
 
-## Why it is open now
+## Why it surfaced
 
-The 2026-07-15 overflow-sheet change (`1430fac2`) made this visible in a new place: inside a folder the destructive row now reads `folder_delete` ("Delete folder") where it previously read `delete_checklist` — which **is** translated ("Удалить чек-лист"). So on RU one row regressed from Russian to English.
+The overflow-sheet change (`1430fac2`) made it visible in one new place: inside a folder the destructive row now reads `folder_delete` ("Delete folder") where it previously read `delete_checklist` — which **is** translated ("Удалить чек-лист"). So on RU exactly one row went from Russian to English.
 
-Translating just that one key was deliberately rejected: 1 of 18 translated is worse than 0 of 18 (inconsistent within the same sheet), and project policy is English-only unless RU is explicitly requested.
+Translating only that key was rejected during the work (1 of 18 is worse than 0 of 18 — inconsistent within the same sheet), and the owner then confirmed the whole block is not wanted.
 
-## Decision needed
+## Consistent with project policy
 
-Either translate the whole `folder_*` block (18 keys, needs a native check on the plural forms `folder_delete_message_empty/one/other`), or accept the feature as English-only and close this.
+CLAUDE.md: copy is **English only**; RU localization happens only on explicit request or when fixing existing RU strings. This is that policy applied, not an exception to it.
 
-Note `folder_delete_message_other` takes `%1$d` — keep the placeholder.
+## If this is ever revisited
 
-## Files
-
-- `core/designsystem/src/commonMain/composeResources/values/strings.xml` (source)
-- `core/designsystem/src/commonMain/composeResources/values-ru/strings.xml` (target)
-
-Escaping rule for this repo: apostrophes and quotes go in **literally** (`can't`), never `\'` — Compose Resources is not AAPT. See rule `compose-resources-kmp`.
-
-## Verification
-
-Switch device/emulator locale to Russian, open a checklist with folders, exercise: folder card, folder actions sheet, rename, delete-confirm (all three plural branches), overflow sheet inside a folder.
+- 18 keys; `folder_delete_message_empty/one/other` are plural branches and need a native check.
+- `folder_delete_message_other` carries a `%1$d` placeholder — keep it.
+- Escaping in this repo: apostrophes and quotes go in **literally** (`can't`), never `\'` — Compose Resources is parsed by `org.jetbrains.compose.resources`, not AAPT. See rule `compose-resources-kmp`.
