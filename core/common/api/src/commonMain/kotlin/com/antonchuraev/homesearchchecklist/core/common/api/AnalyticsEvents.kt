@@ -463,9 +463,12 @@ object AnalyticsParams {
      * autocapture config in Amplitude 2.x defaults unlisted fields to `true`, and campaign
      * autocapture starts a NEW SESSION on every campaign change — inflating session metrics and
      * breaking Android/Web parity). So we attach utm to the events that need it, explicitly,
-     * instead of letting the SDK re-shape sessions. On Android the install campaign comes from
-     * the Play Install Referrer instead (Play only forwards the URL-encoded `referrer` param —
-     * bare utm_* on a store URL is dropped).
+     * instead of letting the SDK re-shape sessions.
+     *
+     * Scope: these describe the CLICK campaign of an already-installed app. Install attribution is
+     * separate — the store links carry an encoded `referrer` param (Play drops bare utm_* on a
+     * store URL), which Play Console reports read. Nothing in the app reads the Install Referrer
+     * API today, so an install campaign is not available in-app.
      */
     const val UTM_SOURCE = "utm_source"
     const val UTM_MEDIUM = "utm_medium"
@@ -580,9 +583,13 @@ object AnalyticsParams {
  *
  * Why a type and not a literal: the wire values used to be free-text strings duplicated at
  * each call site, so a path could be added with NO source at all (or a typo'd one) and nothing
- * failed — the funnel just silently lost it. Three of eight creation paths were unmeasured this
- * way. A closed set makes "which paths exist" answerable by reading this enum, and `when`
- * blocks over it exhaustive.
+ * failed — the funnel just silently lost it. Most creation paths were unmeasured this way, the
+ * flagship chat dock among them, which is why the web funnel read as zero creates. A closed set
+ * makes "which paths exist" answerable by reading this enum, and `when` blocks over it exhaustive.
+ *
+ * The enum only closes one direction (value -> wire). Nothing makes a NEW call site emit, so the
+ * reverse — every persisting path has a value — is a review question, not a compiler one: the
+ * first version of this enum shipped while three paths were still silent.
  *
  * CONTRACT — [wire] is the analytics wire format (see [AnalyticsEvents] header). "ai" and
  * "manual" predate this enum and MUST keep their exact spelling: renaming either splits the
@@ -606,6 +613,12 @@ enum class ChecklistSource(val wire: String) {
 
     /** AI Chat `create_checklist_from_attachment` — a file dropped into the chat. */
     ATTACHMENT("attachment"),
+
+    /** Bundled template picked in-app (Templates list or its preview). Not the SEO gallery. */
+    TEMPLATE("template"),
+
+    /** Recurring weekly checklist spawned from its parent — a Premium feature. */
+    WEEKLY("weekly"),
 }
 
 /**

@@ -1,7 +1,11 @@
 package com.antonchuraev.homesearchchecklist.feature.create.presentation.preview
 
 import androidx.lifecycle.viewModelScope
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
+import com.antonchuraev.homesearchchecklist.core.common.api.ChecklistSource
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
@@ -20,7 +24,8 @@ class TemplatePreviewViewModel(
     private val templateId: String,
     private val appNavigator: AppNavigator,
     private val templatesRepository: TemplatesRepository,
-    private val checklistRepository: ChecklistRepository
+    private val checklistRepository: ChecklistRepository,
+    private val analyticsTracker: AnalyticsTracker,
 ) : AppViewModel<TemplatePreviewScreenState, TemplatePreviewScreenIntent, Nothing>() {
 
     private val _screenState = MutableStateFlow(TemplatePreviewScreenState())
@@ -112,6 +117,11 @@ class TemplatePreviewViewModel(
                 )
 
                 val checklistId = checklistRepository.addChecklist(checklist)
+
+                analyticsTracker.event(AnalyticsEvents.Checklist.CREATED, mapOf(
+                    AnalyticsParams.SOURCE to ChecklistSource.TEMPLATE.wire,
+                    AnalyticsParams.ITEM_COUNT to checklist.items.size,
+                ))
 
                 _screenState.update { it.copy(isCreating = false) }
 

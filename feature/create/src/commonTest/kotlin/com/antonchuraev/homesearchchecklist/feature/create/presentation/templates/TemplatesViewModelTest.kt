@@ -2,6 +2,10 @@ package com.antonchuraev.homesearchchecklist.feature.create.presentation.templat
 
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import com.antonchuraev.homesearchchecklist.core.common.api.ChecklistSource
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDefaults
@@ -54,6 +58,7 @@ import kotlin.test.assertTrue
 class TemplatesViewModelTest {
 
     private val testDispatcher = UnconfinedTestDispatcher()
+    private val analytics = RecordingAnalyticsTracker()
 
     @BeforeTest
     fun setUp() {
@@ -205,6 +210,15 @@ class TemplatesViewModelTest {
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
 
+    private class RecordingAnalyticsTracker : AnalyticsTracker {
+        val events = mutableListOf<Pair<String, Map<String, Any>>>()
+
+        override fun setUserId(userId: String) {}
+        override fun setUserProperties(properties: Map<String, Any>) {}
+        override fun screenView(name: String) {}
+        override fun event(name: String, params: Map<String, Any>) { events.add(name to params) }
+    }
+
     private fun buildViewModel(
         checklistCount: Int = 0,
         isPremium: Boolean = false
@@ -223,7 +237,8 @@ class TemplatesViewModelTest {
             templatesRepository = FakeTemplatesRepository(),
             checklistRepository = checklistRepo,
             createWeeklyChecklistUseCase = CreateWeeklyChecklistUseCase(checklistRepo, userLimitsUseCase),
-            getUserLimitsUseCase = userLimitsUseCase
+            getUserLimitsUseCase = userLimitsUseCase,
+            analyticsTracker = analytics,
         )
         return viewModel to navigator
     }
@@ -232,7 +247,8 @@ class TemplatesViewModelTest {
 
     @Test
     fun `whenFreeAtChecklistLimit_canCreateChecklistIsFalse`() = runTest {
-        // Free user has 4 checklists, default max is 4 → canCreateChecklist = false
+        // A free user sitting exactly at the default limit → canCreateChecklist = false.
+        // Read from the constant, never a literal: the default has changed before.
         val maxFree = RemoteConfigDefaults.MAX_CHECKLISTS_FREE.toInt()
         val (viewModel, _) = buildViewModel(checklistCount = maxFree, isPremium = false)
         advanceUntilIdle()
