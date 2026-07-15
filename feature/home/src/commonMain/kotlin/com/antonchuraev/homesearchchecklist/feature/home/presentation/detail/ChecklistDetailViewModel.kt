@@ -38,6 +38,7 @@ import aichecklists.core.designsystem.generated.resources.*
 import org.jetbrains.compose.resources.getString
 import kotlin.time.Clock
 import kotlin.time.Instant
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -66,6 +67,10 @@ class ChecklistDetailViewModel(
     private val attachmentStorage: AttachmentStoragePort,
     private val calendarEventLauncher: CalendarEventLauncher,
     private val logger: AppLogger,
+    // App-wide scope, outlives this back-stack entry. Needed only where a write must survive the
+    // ViewModel that started it — see [confirmFolderDelete], which pops its own entry (and so
+    // cancels viewModelScope) before the delete is persisted.
+    private val appScope: CoroutineScope,
 ) : AppViewModel<ChecklistDetailState, ChecklistDetailIntent, Nothing>() {
 
     private val _screenState = MutableStateFlow<ChecklistDetailState>(ChecklistDetailState.Loading)
@@ -1939,15 +1944,35 @@ class ChecklistDetailViewModel(
             }
         }
 
-        viewModelScope.launch {
-            // Cancel alarms for every deleted leaf with an active reminder (same calls as the
-            // single-item sheet delete), keyed by the leaf's FILL id.
-            for (leaf in fillItemsToCancel) {
-                reminderScheduler.cancelItemReminder(checklistId, fill.id, leaf.id)
-                reminderScheduler.cancelItemRepeat(checklistId, fill.id, leaf.id)
+        // Persist on the app scope, NOT viewModelScope: the branch above may have just popped this
+        // entry, and a ChecklistDetail ViewModel is keyed per checklist+folder — the pop clears it
+        // and cancels viewModelScope at the first suspension point below. The delete would then
+        // land partially (fill written, template not → the folder renders back, empty) or not at
+        // all (folder reappears on relaunch), and descendant alarms would outlive their items.
+        appScope.launch {
+            // runCatching, because appScope is shared app-wide: an uncaught throw here would reach
+            // the default handler (no CoroutineExceptionHandler installed) and crash the process,
+            // taking sync and credits convergence down with it. NB the two writes are still not one
+            // transaction — a throw between them leaves the delete half-landed. Tracked separately;
+            // fixing it needs a repository-level transaction, not a reordering.
+            runCatching {
+                // Cancel alarms for every deleted leaf with an active reminder (same calls as the
+                // single-item sheet delete), keyed by the leaf's FILL id.
+                for (leaf in fillItemsToCancel) {
+                    reminderScheduler.cancelItemReminder(checklistId, fill.id, leaf.id)
+                    reminderScheduler.cancelItemRepeat(checklistId, fill.id, leaf.id)
+                }
+                repository.updateFill(updatedFill)
+                repository.updateChecklistTemplate(updatedChecklist)
+            }.onFailure { e ->
+                logger.error(
+                    "ChecklistDetail",
+                    "confirmFolderDelete: persist failed for folder=$folderId " +
+                        "checklist=$checklistId cascade=${removeIds.size}: ${e.message}",
+                    e,
+                )
+                return@launch
             }
-            repository.updateFill(updatedFill)
-            repository.updateChecklistTemplate(updatedChecklist)
             analyticsTracker.event(
                 "folder_deleted",
                 mapOf(
@@ -2818,7 +2843,10 @@ class ChecklistDetailViewModel(
                 levelNodes = snapshot.levelNodes,
                 pendingUndoItem = UndoableDeleteItem(
                     fillItem = item,
-                    checklistItemText = item.text,
+                    // Snapshot the template node itself: it carries parentId (which folder the
+                    // item lives in), type, priority and weekday. getOrNull covers
+                    // checklistIndex == -1 (legacy fill row with no linked node).
+                    checklistItem = state.checklist.items.getOrNull(checklistIndex),
                     originalFillIndex = itemIndex,
                     originalChecklistIndex = checklistIndex,
                 ),
@@ -2853,17 +2881,14 @@ class ChecklistDetailViewModel(
 
         pendingUndoJob?.cancel()
 
-        // The deleted template item is gone, so we recreate it (fresh id). If a template item
-        // is recreated, re-link the restored fill item to that new id so the pair stays
-        // connected — otherwise the fill item would keep pointing at the deleted template id and
-        // become an orphan on the next updateChecklist() reconcile.
-        val recreatedTemplateItem = if (undo.originalChecklistIndex >= 0) {
-            ChecklistItem(text = undo.checklistItemText)
-        } else {
-            null
-        }
-        val restoredFillItem = if (recreatedTemplateItem != null) {
-            undo.fillItem.withTemplateItemId(recreatedTemplateItem.id)
+        // Re-insert the deleted template node exactly as it was, id included. Rebuilding it from
+        // text alone would reset it to the constructor defaults — parentId = null (item jumps out
+        // of its folder to the checklist root), type = ITEM, priority = 0, weekday = null.
+        // Reusing the original id also keeps any descendant's parentId pointing at a live node.
+        val restoredTemplateItem = undo.checklistItem
+        val restoredFillItem = if (restoredTemplateItem != null) {
+            // No-op when the row already links to this node; repairs a legacy unlinked row.
+            undo.fillItem.withTemplateItemId(restoredTemplateItem.id)
         } else {
             undo.fillItem
         }
@@ -2874,8 +2899,8 @@ class ChecklistDetailViewModel(
         val restoredFill = fill.copy(items = restoredFillItems)
 
         val restoredChecklistItems = state.checklist.items.toMutableList().apply {
-            if (recreatedTemplateItem != null) {
-                add(undo.originalChecklistIndex.coerceAtMost(size), recreatedTemplateItem)
+            if (restoredTemplateItem != null) {
+                add(undo.originalChecklistIndex.coerceAtMost(size), restoredTemplateItem)
             }
         }
         val restoredChecklist = state.checklist.copy(items = restoredChecklistItems)

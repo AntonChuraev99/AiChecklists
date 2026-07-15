@@ -17,7 +17,9 @@ val homeFeatureModule = module {
     viewModelOf(::TodayViewModel)
     viewModel { CalendarViewModel(get(), get(), get()) }
     viewModel { (checklistId: Long, currentFolderId: String?) ->
-        ChecklistDetailViewModel(checklistId, currentFolderId, get(), get(), get(), get(), get(), get(), get(), get(), get(), get())
+        // Last get() = the app-wide CoroutineScope (core:common:impl) — confirmFolderDelete needs a
+        // scope that outlives this entry, because it pops itself before the delete is persisted.
+        ChecklistDetailViewModel(checklistId, currentFolderId, get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get())
     }
     viewModel { (fillId: Long) ->
         FillDetailViewModel(fillId, get(), get(), get())

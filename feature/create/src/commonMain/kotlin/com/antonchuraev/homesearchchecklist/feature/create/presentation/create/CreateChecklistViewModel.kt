@@ -2,8 +2,10 @@ package com.antonchuraev.homesearchchecklist.feature.create.presentation.create
 
 import androidx.lifecycle.viewModelScope
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
+import com.antonchuraev.homesearchchecklist.core.common.api.ChecklistSource
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
@@ -185,8 +187,8 @@ class CreateChecklistViewModel(
                     Checklist(name = latestState.name.trim(), items = latestState.items)
                 )
                 analyticsTracker.event(AnalyticsEvents.Checklist.CREATED, mapOf(
-                    "source" to "manual",
-                    "item_count" to latestState.items.size
+                    AnalyticsParams.SOURCE to ChecklistSource.MANUAL.wire,
+                    AnalyticsParams.ITEM_COUNT to latestState.items.size
                 ))
                 appNavigator.navigateToMainScreen(clearBackStack = true)
             }

@@ -70,15 +70,18 @@ gemini_client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 #      arbitrary/expensive model can be forced by a hostile caller).
 # Any check failing → the endpoint's normal default model is used, silently.
 MODEL_OVERRIDE_TEST_SECRET = os.environ.get("MODEL_OVERRIDE_TEST_SECRET", "")
+# Every id here is verified reachable — probed against the live API 2026-07-15.
+# An allow-listed model that 404s is worse than an absent one: the gate waves it through,
+# and an RC arm pointing at it 500s every request for that flow. gemini-2.5-pro,
+# gemini-2.0-flash and gemini-2.0-flash-lite were removed for exactly that reason
+# ("no longer available to new users"). Re-probe before adding an id back.
+# Bounds cost too: only these can be selected by the experiment config or the test-override
+# gate, so a fat-fingered config value can never reach an arbitrary (expensive) model.
+# NOTE: the gemini-2.5-* ids below reach EOL 2026-10-16 — migrate the control arm before then.
 MODEL_OVERRIDE_ALLOWLIST = {
     "gemini-2.5-flash-lite",
     "gemini-2.5-flash",
-    "gemini-2.5-pro",
-    "gemini-2.0-flash",
-    "gemini-2.0-flash-lite",
-    # 3.x tier — allowed as production A/B experiment arms (see assign_model_arm).
-    # Bounds cost: only these ids can be selected by the experiment config or the
-    # test-override gate; a fat-fingered config value can never hit an arbitrary model.
+    # 3.x tier — production A/B experiment arms (see assign_model_arm).
     "gemini-3.1-flash-lite",
     "gemini-3.5-flash",
 }
@@ -3008,12 +3011,38 @@ def _coerce_response_dict(result: Any) -> dict:
     return {"result": result}
 
 
+# Gemini 3.x rejects a replayed function_call part that carries no `thought_signature`
+# (400 INVALID_ARGUMENT). Two kinds of parts legitimately have none:
+#   1. transcripts produced by Gemini 2.5 (control arm) — that model never emits one;
+#   2. transcripts from app builds shipped before the signature round-trip existed.
+# Google documents this exact placeholder for synthetic/legacy calls; it is the ONLY
+# accepted value besides a real signature (an invented string 400s just the same).
+# Keep it: it is what lets a stale client keep working on a 3.x arm without an app release.
+_LEGACY_THOUGHT_SIGNATURE = b"skip_thought_signature_validator"
+
+
+def _decode_thought_signature(raw) -> bytes:
+    """Client-supplied base64 signature -> bytes; the documented placeholder when absent/garbage.
+
+    Never raises: a malformed signature must degrade to the placeholder, not 500 the turn.
+    """
+    if raw:
+        try:
+            return base64.b64decode(raw)
+        except Exception:
+            logger.warning("chat_agent: undecodable thought_signature, using placeholder")
+    return _LEGACY_THOUGHT_SIGNATURE
+
+
 def _reconstruct_agent_contents(transcript: list) -> "list[types.Content]":
     """Rebuild Gemini `contents` from the client's structured transcript.
 
     user            -> Content(role=user,  parts=[text])
     model.tool_calls-> Content(role=model, parts=[function_call ...])
     tool.tool_results-> Content(role=user, parts=[function_response ...])   (role IS user)
+
+    `thought_signature` rides on the PART, not on the FunctionCall, and Gemini 3.x
+    requires it back on every replayed function_call part — see _LEGACY_THOUGHT_SIGNATURE.
     """
     contents: list[types.Content] = []
     for entry in transcript:
@@ -3031,11 +3060,14 @@ def _reconstruct_agent_contents(transcript: list) -> "list[types.Content]":
             for tc in entry.get("tool_calls") or []:
                 if not isinstance(tc, dict) or not tc.get("name"):
                     continue
-                parts.append(types.Part(function_call=types.FunctionCall(
-                    id=tc.get("id"),
-                    name=tc["name"],
-                    args=dict(tc.get("args") or {}),
-                )))
+                parts.append(types.Part(
+                    function_call=types.FunctionCall(
+                        id=tc.get("id"),
+                        name=tc["name"],
+                        args=dict(tc.get("args") or {}),
+                    ),
+                    thought_signature=_decode_thought_signature(tc.get("thought_signature")),
+                ))
             if parts:
                 contents.append(types.Content(role="model", parts=parts))
             else:
@@ -3061,22 +3093,31 @@ def _reconstruct_agent_contents(transcript: list) -> "list[types.Content]":
 
 
 def _serialize_function_calls(parts) -> list:
-    """Extract function_call parts into the client-facing {id, name, args} list.
+    """Extract function_call parts into the client-facing {id, name, args[, thought_signature]} list.
 
     `present_options` is excluded — it is a SERVER-TERMINAL tool intercepted upstream
     (the client renders chips, it is never dispatched via ToolCallDispatcher). Skipping
     it here means a malformed present_options call can't leak as an undispatchable tool.
+
+    `thought_signature` is read off the PART (not the FunctionCall — the SDK hangs it one
+    level up) and base64'd so it survives the JSON transcript the client stores and replays.
+    Emitted only when the model produced one: 2.5 never does, and an absent key is what the
+    reconstruct side reads as "legacy" — see _LEGACY_THOUGHT_SIGNATURE.
     """
     calls = []
     for i, part in enumerate(parts or []):
         fc = getattr(part, "function_call", None)
         if fc is None or not getattr(fc, "name", None) or fc.name == "present_options":
             continue
-        calls.append({
+        call = {
             "id": fc.id or f"call_{i}",
             "name": fc.name,
             "args": dict(fc.args or {}),
-        })
+        }
+        signature = getattr(part, "thought_signature", None)
+        if signature:
+            call["thought_signature"] = base64.b64encode(signature).decode("ascii")
+        calls.append(call)
     return calls
 
 
@@ -3296,8 +3337,12 @@ def chat_agent(request: Request):
         config = types.GenerateContentConfig(
             system_instruction=system_instruction,
             tools=agent_tools,
-            # thinking_budget=0 → no thought_signature blobs to round-trip through
-            # the stateless transcript (see plan §6). Verified on the stable model.
+            # thinking_budget=0 keeps the stable 2.5 arm cheap (no thinking tokens); on 3.x
+            # it is accepted for back-compat but does NOT suppress thought signatures — that
+            # assumption held only for 2.5 and broke the 3.1 arm's tool loop in prod
+            # (400: "Function call is missing a thought_signature"). Signatures are therefore
+            # round-tripped through the transcript, not avoided. Do NOT also pass
+            # thinking_level here: combining it with thinking_budget is a 400.
             thinking_config=types.ThinkingConfig(thinking_budget=0),
             # We do MANUAL function calling (the client executes tools); disable the
             # SDK's automatic loop so it never tries to invoke anything itself.

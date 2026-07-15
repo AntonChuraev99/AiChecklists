@@ -979,12 +979,18 @@ class TestModelExperiment:
         self._patch_template(monkeypatch, main,
                              self._FakeTemplate(self._arm_values("control", "gemini-2.5-flash")))
         monkeypatch.setattr(main, "MODEL_OVERRIDE_TEST_SECRET", "secret123")
+        # Take the id FROM the allowlist rather than naming one: what is under test is
+        # "override beats the RC arm", not any particular model. A literal here rots —
+        # this test asserted on gemini-2.5-pro and stayed green for months after Google
+        # retired it, because the network is faked and a dead id resolves fine.
+        # Whether an id still exists is a live-API question; see ai_model_eval.py.
+        override_model = next(iter(main.MODEL_OVERRIDE_ALLOWLIST - {"gemini-2.5-flash"}))
         model, arm = main.resolve_experiment_model(
             "user-1", "chat_agent", "gemini-2.5-flash",
-            {"model_override": "gemini-2.5-pro", "test_secret": "secret123"},
+            {"model_override": override_model, "test_secret": "secret123"},
         )
         assert arm == "override"
-        assert model == "gemini-2.5-pro"
+        assert model == override_model
 
     def test_no_override_uses_rc_arm(self, _import_main, monkeypatch):
         main = _import_main

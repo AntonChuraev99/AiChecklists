@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.aichat
 
 import com.antonchuraev.homesearchchecklist.core.common.api.ActivationCoordinator
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePort
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
@@ -264,7 +265,20 @@ private fun buildDispatcher(repo: FakeChecklistRepository, premium: Boolean = tr
     activationCoordinator = NoOpActivationCoordinator,
     remoteConfigProvider = DefaultsRemoteConfig,
     dateFormatter = TokenDateFormatter,
+    analyticsTracker = NoOpAnalytics,
 )
+
+/**
+ * These tests assert dispatch behaviour, not reporting. The dispatcher guards its own tracker call
+ * (`onChecklistCreated` wraps it in runCatching), so a no-op here cannot mask a failure that matters
+ * to them — the `checklist_created` emit is covered where it is the subject, not here.
+ */
+private object NoOpAnalytics : AnalyticsTracker {
+    override fun setUserId(userId: String) {}
+    override fun setUserProperties(properties: Map<String, Any>) {}
+    override fun screenView(name: String) {}
+    override fun event(name: String, params: Map<String, Any>) {}
+}
 
 /** A single list "Покупки" (id 1, fill 11) pre-seeded with [items]. */
 private fun shoppingRepo(

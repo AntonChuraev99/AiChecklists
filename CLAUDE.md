@@ -96,7 +96,7 @@ One-liner map; deep rules load when you edit the feature. Full catalog: `docs/pr
 
 - **AI Chat** (`feature/aichat/`) — 3-tier routing, flagship. Hard rules (FEATURE_CATALOG, TDD bad-answer fixes) → rule `ai-chat`; skill `/ai-chat-feedback-fixer`.
 - **Analyze** (`feature/analyze/`) — Gemini via Cloud Functions (Photo/PDF/Text/Link/Voice). `GeminiAiAnalyzer`, `AnalyzeViewModel`.
-- **Templates** (`feature/create/`) — from Remote Config key `templates_json`; Templates → TemplatePreview → Use.
+- **Templates** (`feature/create/`) — bundled Compose Resource read by `TemplatesRepositoryImpl` (the `templates_json` RC key is dead/unread); Templates → TemplatePreview → Use.
 - **Paywall** (`feature/paywall/`) — RevenueCat. Credit-restore flow → rule `credit-restore`.
 - **Sharing** (`feature/sharing/`) — `ShareFormat.Text`/`.Pdf`; `ShareLauncher`/`PdfGenerator` expect/actual.
 - **Updates Feed** (`feature/updatefeed/`) — in-code release feed. Hard rules → rule `updates-feed`; skill `/create-release`.

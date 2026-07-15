@@ -597,6 +597,63 @@ class SyncRepositoryImplTest {
         )
     }
 
+    @Test
+    fun initialUpload_legacyChecklistWithoutCloudId_uploadsWithResolvedCloudId() = runTest {
+        // The legacy-user shape produced by MIGRATION_14_15: it added `cloudId TEXT DEFAULT NULL`
+        // and `syncStatus INTEGER NOT NULL DEFAULT 0` — so every checklist that predates cloud sync
+        // is (cloudId = null, syncStatus = SYNCED). SYNCED rows are excluded by getPendingSync()
+        // (`WHERE syncStatus != 0`), so the backfill inside uploadChecklistEntity NEVER sees them;
+        // initialUpload() is the only path that does — and it read the null cloudId straight through
+        // `cloudId ?: ""`, fabricating a blank identity. Firestore then rejects the whole batch, the
+        // one-time gate stays unmarked, and NOTHING of a legacy user's data ever reaches the cloud
+        // (retried, and failing identically, on every app start).
+        dao.checklists.add(
+            ChecklistEntity(
+                id = 1L,
+                name = "Legacy",
+                items = emptyList(),
+                cloudId = null,
+                userId = null,
+                updatedAt = 100L,
+                syncStatus = SyncStatus.SYNCED.value,
+                isDeleted = false,
+            ),
+        )
+        fillDao.fills.add(fillEntity(id = 10L, checklistId = 1L, cloudId = null))
+
+        val repo = newRepo()
+        auth.currentUserOverride = testUser
+
+        val result = repo.initialUpload()
+
+        assertTrue(result is AppResult.Success, "a legacy checklist must not fail the initial upload")
+
+        val uploadedChecklist = firestore.uploaded.single()
+        assertTrue(
+            uploadedChecklist.cloudId.isNotBlank(),
+            "the uploaded checklist must carry a real cloudId, never a fabricated blank identity",
+        )
+        assertTrue(
+            uploadedChecklist.fills.single().cloudId.isNotBlank(),
+            "the uploaded fill must carry a real cloudId — a blank one collides with every other " +
+                "blank-id fill in mergeRemoteChecklist's getByCloudId lookup",
+        )
+
+        // The resolved identity must be PERSISTED, otherwise the next start backfills a DIFFERENT
+        // cloudId and the same checklist is duplicated in the cloud.
+        val persisted = dao.checklists.single()
+        assertEquals(
+            uploadedChecklist.cloudId,
+            persisted.cloudId,
+            "the backfilled cloudId must be persisted to Room and match what was uploaded",
+        )
+        assertEquals(
+            uploadedChecklist.fills.single().cloudId,
+            fillDao.fills.single().cloudId,
+            "the backfilled fill cloudId must be persisted to Room and match what was uploaded",
+        )
+    }
+
     // ─── Tests: push backfills missing cloudId (Android→Web upload bug) ──
 
     @Test
@@ -1106,12 +1163,35 @@ class SyncRepositoryImplTest {
         var initialUploadCallCount = 0
         val uploaded = mutableListOf<ChecklistSyncData>()
 
+        /**
+         * Mirrors the real Firestore SDK's document-path invariant, which this fake would
+         * otherwise silently swallow: a cloudId is a path SEGMENT, and every backend rejects a
+         * blank one. On Android `checklistRef(uid, "")` collapses to `users/{uid}/checklists`
+         * (3 segments = a collection, not a document) and the SDK throws IllegalArgumentException
+         * — taking the whole batch, and therefore the user's entire initial sync, down with it.
+         *
+         * Without this guard a fake that happily stores `cloudId = ""` would make a test go green
+         * exactly where production is red, "verifying" a bug into existence.
+         */
+        private fun requireUploadableIdentity(data: ChecklistSyncData) {
+            require(data.cloudId.isNotBlank()) {
+                "blank cloudId for checklist '${data.name}' — Firestore rejects an empty path segment"
+            }
+            data.fills.forEach { fill ->
+                require(fill.cloudId.isNotBlank()) {
+                    "blank cloudId for a fill of '${data.name}' — an empty fill identity collides " +
+                        "with every other blank-id fill on merge"
+                }
+            }
+        }
+
         override fun observeChecklistIds(userId: String): Flow<AppResult<List<String>>> = emptyFlow()
         override fun observeChecklist(userId: String, cloudId: String): Flow<AppResult<ChecklistSyncData>> = emptyFlow()
         override fun observeUserDoc(userId: String): Flow<AppResult<UserDocSyncData?>> = emptyFlow()
         override suspend fun findUserIdByGoogleUid(googleUid: String): AppResult<String?> = AppResult.Success(null)
 
         override suspend fun uploadChecklist(userId: String, data: ChecklistSyncData): AppResult<Unit> {
+            requireUploadableIdentity(data)
             uploaded.add(data)
             return AppResult.Success(Unit)
         }
@@ -1123,6 +1203,7 @@ class SyncRepositoryImplTest {
 
         override suspend fun uploadBatch(userId: String, checklists: List<ChecklistSyncData>): AppResult<Unit> {
             initialUploadCallCount++
+            checklists.forEach { requireUploadableIdentity(it) }
             if (uploadBatchResult is AppResult.Success) uploaded.addAll(checklists)
             return uploadBatchResult
         }

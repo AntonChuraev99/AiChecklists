@@ -20,7 +20,10 @@ object RemoteConfigKeys {
     const val MAX_WEEKLY_CHECKLISTS_FREE = "max_weekly_checklists_free"
     const val MAX_ATTACHMENTS_PER_ITEM_FREE = "max_attachments_per_item_free"
 
-    // Templates
+    // DEAD — kept only to document that the Console parameter still exists. Templates are
+    // bundled: TemplatesRepositoryImpl reads them from Compose Resources, never from RC.
+    // Nothing reads this key; deleting the Console parameter is safe.
+    @Deprecated("Templates ship as a bundled resource; this RC key is unread.")
     const val TEMPLATES_JSON = "templates_json"
 
     // Onboarding type: "interactive" | "default" | "none" (none = skip to main)
@@ -76,13 +79,17 @@ object RemoteConfigDefaults {
     const val AI_DAILY_LIMIT_PREMIUM = 300L
 
     // Free user limits
-    const val MAX_CHECKLISTS_FREE = 4L
+    // 5 mirrors the live Remote Config value; this default only applies before the first
+    // successful fetch, so a lower number here silently sold the free tier short on a cold
+    // start. Keep in sync with the Console parameter (see CLAUDE.md limits table).
+    const val MAX_CHECKLISTS_FREE = 5L
     const val MAX_FILLS_FREE = 5L
     const val MAX_RECURRING_REMINDERS_FREE = 10L
     const val MAX_WEEKLY_CHECKLISTS_FREE = 1L
     const val MAX_ATTACHMENTS_PER_ITEM_FREE = 3L
 
-    // Templates - default empty, populated from Remote Config
+    // Unread — see the deprecated key above. Templates come from a bundled resource.
+    @Deprecated("Templates ship as a bundled resource; this RC key is unread.")
     const val TEMPLATES_JSON = ""
 
     // Onboarding type: "interactive" | "default" | "none" (none = skip to main)
@@ -115,9 +122,13 @@ object RemoteConfigDefaults {
     // out of auto-create. Keep this in sync with the Firebase Console parameter default.
     const val FIRST_CHECKLIST_VARIANT = "auto_create"
 
-    // Retention push timing default arm. "behavioral" is the product hypothesis (deliver at the
-    // user's most-active hour). A failed/empty RC fetch keeps the behavioral treatment; the Firebase
-    // RC console assigns the 50/50 split per user. The client value is sticky per install regardless.
+    // Retention push timing arm. "behavioral" = deliver at the user's most-active hour.
+    //
+    // ⚠️ NOT AN EXPERIMENT TODAY (verified 2026-07-15): this key exists in NEITHER RC template,
+    // so every user runs "behavioral" — there is no split to read. Two things must happen before
+    // it is one: (1) add the parameter to the CLIENT template — PushTimingResolver reads the
+    // client namespace, so adding it to the *server* template would silently do nothing; and
+    // (2) attach a condition for the split. Until then, treat any timing comparison as invalid.
     const val PUSH_TIMING_ARM = "behavioral"
 
     // Activation bundle ON by default — this is the desired baseline product behavior (AI

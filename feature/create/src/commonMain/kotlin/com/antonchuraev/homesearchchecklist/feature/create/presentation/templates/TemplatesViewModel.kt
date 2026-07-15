@@ -1,7 +1,11 @@
 package com.antonchuraev.homesearchchecklist.feature.create.presentation.templates
 
 import androidx.lifecycle.viewModelScope
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
+import com.antonchuraev.homesearchchecklist.core.common.api.ChecklistSource
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
@@ -25,6 +29,7 @@ class TemplatesViewModel(
     private val checklistRepository: ChecklistRepository,
     private val createWeeklyChecklistUseCase: CreateWeeklyChecklistUseCase,
     private val getUserLimitsUseCase: GetUserLimitsUseCase,
+    private val analyticsTracker: AnalyticsTracker,
 ) : AppViewModel<TemplatesScreenState, TemplatesScreenIntent, Nothing>() {
 
     private val _screenState = MutableStateFlow(TemplatesScreenState())
@@ -126,6 +131,14 @@ class TemplatesViewModel(
         }
     }
 
+    /**
+     * DEAD as of 2026-07-15: [TemplatesScreenState.selectedTemplate] is never assigned — only
+     * cleared and read — so this always returns at the elvis. Picking a template navigates to
+     * TemplatePreviewViewModel (its own screen) instead; this is the leftover of an in-place
+     * preview dialog. Left in place rather than deleted because [TemplatesScreenState] still
+     * carries the fields; deliberately NOT instrumented — an emit here could never fire, and a
+     * source value with no reachable emit site is exactly the lie ChecklistSource warns about.
+     */
     private fun createFromTemplate() {
         val template = _screenState.value.selectedTemplate ?: return
 
@@ -157,8 +170,13 @@ class TemplatesViewModel(
     private fun handleCreateWeeklyClick() {
         viewModelScope.launch {
             when (val result = createWeeklyChecklistUseCase(getString(Res.string.weekly_checklist_default_name))) {
-                is CreateWeeklyChecklistUseCase.Result.Created ->
+                is CreateWeeklyChecklistUseCase.Result.Created -> {
+                    // Emitted here, not in the use case: the domain layer stays free of analytics.
+                    analyticsTracker.event(AnalyticsEvents.Checklist.CREATED, mapOf(
+                        AnalyticsParams.SOURCE to ChecklistSource.WEEKLY.wire,
+                    ))
                     appNavigator.navigateToChecklistDetail(result.checklistId, clearBackStack = true)
+                }
                 CreateWeeklyChecklistUseCase.Result.RequiresUpgrade ->
                     appNavigator.navigateToPaywall(source = "weekly_mode_limit")
             }

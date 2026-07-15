@@ -7,6 +7,7 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
+import com.antonchuraev.homesearchchecklist.core.common.api.ChecklistSource
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDefaults
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigKeys
@@ -361,8 +362,8 @@ class AnalyzeViewModel(
                 analyticsTracker.event(
                     AnalyticsEvents.Checklist.CREATED,
                     mapOf(
-                        "source" to "ai",
-                        "item_count" to result.suggestedItems.size,
+                        AnalyticsParams.SOURCE to ChecklistSource.AI.wire,
+                        AnalyticsParams.ITEM_COUNT to result.suggestedItems.size,
                         "has_folders" to result.hasFolders
                     )
                 )

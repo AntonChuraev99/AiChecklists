@@ -21,8 +21,21 @@ sealed interface AgentTranscriptEntry {
     data class ToolResults(val results: List<AgentToolResult>) : AgentTranscriptEntry
 }
 
-/** A tool call the model requested. [args] is preserved verbatim (echoed back next round). */
-data class AgentToolCall(val id: String, val name: String, val args: JsonObject)
+/**
+ * A tool call the model requested. [args] is preserved verbatim (echoed back next round).
+ *
+ * [thoughtSignature] is an opaque base64 blob the server round-trips for Gemini 3.x models,
+ * which reject a replayed tool call that arrives without it. The client never reads it —
+ * it only has to hand back exactly what it was given. Null on models that emit none
+ * (the 2.5 control arm) and on entries restored from history saved before this field existed;
+ * the server substitutes a documented placeholder in that case, at some cost to answer quality.
+ */
+data class AgentToolCall(
+    val id: String,
+    val name: String,
+    val args: JsonObject,
+    val thoughtSignature: String? = null,
+)
 
 /** The result of executing a tool call. [result] is the dispatcher's serialized outcome. */
 data class AgentToolResult(val id: String, val name: String, val result: JsonObject)
