@@ -137,7 +137,14 @@ internal class ChatAgentApiServiceImpl(
                             return@runCatching AgentStepResult.ServiceError
                         }
                         AgentStepResult.ToolCalls(
-                            calls = calls.map { AgentToolCall(id = it.id, name = it.name, args = it.args) },
+                            calls = calls.map {
+                                AgentToolCall(
+                                    id = it.id,
+                                    name = it.name,
+                                    args = it.args,
+                                    thoughtSignature = it.thoughtSignature,
+                                )
+                            },
                             creditsRemaining = dto.creditsRemaining,
                             modelVariant = dto.modelVariant,
                             modelId = dto.modelId,
@@ -223,7 +230,14 @@ internal class ChatAgentApiServiceImpl(
         )
         is AgentTranscriptEntry.ModelToolCalls -> TranscriptEntryDto(
             role = "model",
-            toolCalls = calls.map { ToolCallDto(id = it.id, name = it.name, args = it.args) },
+            toolCalls = calls.map {
+                ToolCallDto(
+                    id = it.id,
+                    name = it.name,
+                    args = it.args,
+                    thoughtSignature = it.thoughtSignature,
+                )
+            },
         )
         is AgentTranscriptEntry.ToolResults -> TranscriptEntryDto(
             role = "tool",
@@ -265,6 +279,10 @@ internal class ChatAgentApiServiceImpl(
         val id: String,
         val name: String,
         val args: JsonObject,
+        // Opaque base64 signature Gemini 3.x requires back on every replayed tool call.
+        // Nullable + explicitNulls=false → absent on the 2.5 arm and towards older servers,
+        // so the key only appears on the wire when there is something to echo.
+        @SerialName("thought_signature") val thoughtSignature: String? = null,
     )
 
     @Serializable
