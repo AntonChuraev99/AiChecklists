@@ -21,7 +21,7 @@ MODEL_OVERRIDE_TEST_SECRET set and you must export the SAME value locally:
     python firebase-functions/tests/ai_model_eval.py                 # dry run (safe)
     python firebase-functions/tests/ai_model_eval.py --yes           # tiny subset, 2 models
     python firebase-functions/tests/ai_model_eval.py --yes --full \
-        --models gemini-2.5-flash-lite,gemini-2.5-flash,gemini-2.5-pro
+        --models gemini-2.5-flash-lite,gemini-2.5-flash,gemini-3.1-flash-lite
 
 If MODEL_OVERRIDE_TEST_SECRET is unset (locally or on the CF) the override is
 disabled and every "model" column will actually be the endpoint's prod default —

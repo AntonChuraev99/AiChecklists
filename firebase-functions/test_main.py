@@ -979,12 +979,15 @@ class TestModelExperiment:
         self._patch_template(monkeypatch, main,
                              self._FakeTemplate(self._arm_values("control", "gemini-2.5-flash")))
         monkeypatch.setattr(main, "MODEL_OVERRIDE_TEST_SECRET", "secret123")
+        # Any allow-listed id other than the default works here; the point is that the
+        # override wins over the RC arm. Keep it allow-listed, or resolve_model rejects it
+        # and this asserts the wrong thing.
         model, arm = main.resolve_experiment_model(
             "user-1", "chat_agent", "gemini-2.5-flash",
-            {"model_override": "gemini-2.5-pro", "test_secret": "secret123"},
+            {"model_override": "gemini-3.5-flash", "test_secret": "secret123"},
         )
         assert arm == "override"
-        assert model == "gemini-2.5-pro"
+        assert model == "gemini-3.5-flash"
 
     def test_no_override_uses_rc_arm(self, _import_main, monkeypatch):
         main = _import_main

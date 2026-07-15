@@ -70,15 +70,18 @@ gemini_client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 #      arbitrary/expensive model can be forced by a hostile caller).
 # Any check failing → the endpoint's normal default model is used, silently.
 MODEL_OVERRIDE_TEST_SECRET = os.environ.get("MODEL_OVERRIDE_TEST_SECRET", "")
+# Every id here is verified reachable — probed against the live API 2026-07-15.
+# An allow-listed model that 404s is worse than an absent one: the gate waves it through,
+# and an RC arm pointing at it 500s every request for that flow. gemini-2.5-pro,
+# gemini-2.0-flash and gemini-2.0-flash-lite were removed for exactly that reason
+# ("no longer available to new users"). Re-probe before adding an id back.
+# Bounds cost too: only these can be selected by the experiment config or the test-override
+# gate, so a fat-fingered config value can never reach an arbitrary (expensive) model.
+# NOTE: the gemini-2.5-* ids below reach EOL 2026-10-16 — migrate the control arm before then.
 MODEL_OVERRIDE_ALLOWLIST = {
     "gemini-2.5-flash-lite",
     "gemini-2.5-flash",
-    "gemini-2.5-pro",
-    "gemini-2.0-flash",
-    "gemini-2.0-flash-lite",
-    # 3.x tier — allowed as production A/B experiment arms (see assign_model_arm).
-    # Bounds cost: only these ids can be selected by the experiment config or the
-    # test-override gate; a fat-fingered config value can never hit an arbitrary model.
+    # 3.x tier — production A/B experiment arms (see assign_model_arm).
     "gemini-3.1-flash-lite",
     "gemini-3.5-flash",
 }
