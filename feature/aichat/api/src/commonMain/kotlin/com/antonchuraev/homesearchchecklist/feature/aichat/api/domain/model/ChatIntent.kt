@@ -42,4 +42,24 @@ sealed interface ChatIntent {
 
     /** Raw text preserved for display in snackbar / escalation to Layer 2. */
     data class Unknown(val rawText: String) : ChatIntent
+
+    /**
+     * The classifier REFUSED the turn: the user has no AI credits left (server HTTP 402).
+     *
+     * Not a user intent — a billing state that reached us through the intent channel. It lives
+     * here because the classifier's outcome is the only thing a call-site receives, and the
+     * alternative (flattening it into [Unknown]) is what shipped the bug this variant exists to
+     * kill: the ViewModel rendered "Sorry, I didn't quite catch that" + an "Ask AI" button at the
+     * user, blaming their phrasing for an empty wallet and never offering the paywall
+     * (docs/todos/2026-07-16-aichat-insufficient-credits-shows-unknown-hint.md).
+     *
+     * Invariants for every call-site:
+     *   - Say the wallet is empty ("chat_insufficient_credits"), never the "not understood" hint.
+     *   - Do NOT escalate to Layer 3 — that bills 3 credits to a wallet that just refused 1.
+     *   - Charge the turn 0 credits: 402 means the server billed nothing.
+     *
+     * The server never produces this value (it is minted client-side from the 402), so mapping
+     * paths that translate server payloads treat it as "no tool call".
+     */
+    data object InsufficientCredits : ChatIntent
 }

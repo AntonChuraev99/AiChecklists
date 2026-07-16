@@ -182,6 +182,9 @@ internal class ChatClassifierApiServiceImpl(
      * Pending: docs/todos/2026-05-17-ai-chat-layer-2-cloud-classifier.md (full date-range parsing)
      */
     private fun EntitiesDto.toToolCall(intent: ChatIntent): ToolCall? = when (intent) {
+        // Minted client-side from HTTP 402, never parsed out of a server payload — so a
+        // Success body can never carry it and there is nothing to build.
+        ChatIntent.InsufficientCredits -> null
         ChatIntent.CreateItem -> {
             val text = itemText?.ifBlank { null } ?: return null
             ToolCall.AddItem(checklistHint = checklistHint, itemText = text)

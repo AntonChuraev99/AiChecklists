@@ -455,6 +455,9 @@ fun ChatMessageList(
                 onAskAiFallback = message.askAiForText?.let { text ->
                     { onIntent(ChatScreenIntent.OnAskAiFallback(text)) }
                 },
+                onPaywallCta = message.paywallCtaCredits?.let {
+                    { onIntent(ChatScreenIntent.OnPaywallCtaClick) }
+                },
                 showSenderLabel = message.role == ChatRole.Assistant,
             )
         }

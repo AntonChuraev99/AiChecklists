@@ -3,12 +3,15 @@ package com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AiChatPreferencesRepository
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.dispatcher.ToolCallDispatcher
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AgentTranscriptEntry
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatIntent
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceAction
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.DispatchOutcome
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.IntentClassification
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.RoutingLayer
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ToolCall
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.UndoHandle
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.locale.ChatLocaleProvider
@@ -37,23 +40,38 @@ import kotlinx.coroutines.flow.flowOf
 import kotlin.reflect.KClass
 
 // ════════════════════════════════════════════════════════════════════════════
-// AI Chat scenario test harness — Tier 1 (offline, free, zero-network)
+// Parked Layer-1 scenario harness — Tier 1 (offline, free, zero-network)
+//
+// ⚠️ THIS HARNESS DOES NOT TEST PRODUCTION ROUTING.
+//   Since 2026-07-15 (docs/decisions/2026-07-15-remove-ai-chat-layer1.md) production starts at
+//   Layer 2: AiChatRepositoryImpl no longer takes a router, and Layer 1 is disconnected. Live
+//   prod routing is covered by repository/AiChatRepositoryImplTest.kt — NOT here.
+//
+// WHAT IS REAL vs. MIRRORED
+//   - REAL   Layer-1 parser (LocalIntentRouterImpl) — the thing under measurement.
+//   - REAL   ChatViewModel, driven through the same public Intents the UI uses
+//            (OnInputChange + OnSendClick), so a scenario exercises the full round-trip.
+//   - MIRROR Routing (ParkedLayer1RoutingRepository) — a TEST-ONLY reimplementation of the
+//            ladder Layer 1 *will be re-connected to*. It stands in for the real repository,
+//            which can no longer reach the parser.
+//   - FAKE   Every cloud layer (classifier / completion / agent / transcribe) and the
+//            ToolCallDispatcher, which records dispatched ToolCalls and returns a
+//            per-scenario DispatchOutcome (default Success).
 //
 // PURPOSE
-//   A reusable, data-driven harness for the AI Chat CLIENT routing. It drives the
-//   REAL Layer-1 parser (LocalIntentRouterImpl) + REAL routing (AiChatRepositoryImpl
-//   + ChatViewModel) through the same public Intent the UI uses (OnInputChange +
-//   OnSendClick), while every CLOUD layer is a FAKE (classifier / completion / agent /
-//   transcribe). This means:
-//     - Real parser behavior is exercised (free, deterministic).
-//     - Escalation cases just record "fake cloud invoked" (no network, no Gemini cost).
-//     - The ToolCallDispatcher is a FAKE: it records every dispatched ToolCall and
-//       returns a per-scenario-configurable DispatchOutcome (default Success).
+//   The suite measures the PARKED PARSER — not what a user sees today. It is the capability
+//   dashboard for deciding when Layer 1 is good enough to re-route (owner's condition: «когда
+//   я буду им доволен»; work list: docs/todos/2026-07-13-aichat-layer1-thumbsdown-backlog.md).
+//   Without it the parser keeps its 168 unit tests but loses every end-to-end row and rots
+//   during the parking period — the exact outcome the ADR exists to prevent.
 //
-//   This is a FOUNDATION to GROW: add a row to [ChatScenario] list, get a routing
-//   assertion for free. The runner aggregates pass/fail into one readable map so the
-//   suite is a living dashboard of where the client routing is solid vs. where the AI
-//   still needs work (expectRedNow rows = the improvement roadmap).
+//   A red row here is a gap in the parked parser, NOT a production regression. Do not "fix"
+//   prod because this dashboard is red, and do not re-route Layer 1 to make it green — that is
+//   a product call. GROW IT: add a row to [ChatScenario]; expectRedNow rows = the roadmap.
+//
+// ON REVERT
+//   When Layer 1 is re-routed, delete ParkedLayer1RoutingRepository and hand the real
+//   AiChatRepositoryImpl back to [buildHarnessRig] — the mirror exists only while L1 is parked.
 //
 // COST SAFETY
 //   No real HTTP client, no Gemini, no Firebase. The cloud fakes are pure Kotlin and
@@ -366,12 +384,107 @@ object HarnessNoOpModelExperimentTracker :
         com.antonchuraev.homesearchchecklist.core.common.api.AiModelArm? = null
 }
 
-// ─── Wiring helper: REAL parser + REAL routing + FAKE cloud + FAKE dispatcher ─
+// ─── Wiring: REAL parser + REAL VM + MIRRORED routing + FAKE cloud/dispatcher ─
 
 /**
- * Builds a [ChatViewModel] wired with the REAL Layer-1 parser ([LocalIntentRouterImpl])
- * and REAL routing ([AiChatRepositoryImpl]), with every cloud layer and the dispatcher
- * faked. [dispatcher] is returned so the caller can inspect recorded ToolCalls.
+ * Routing ladder for the **parked** Layer 1 — the harness's reason to exist.
+ *
+ * Layer 1 was disconnected from production routing on 2026-07-15
+ * (`docs/decisions/2026-07-15-remove-ai-chat-layer1.md`), so [AiChatRepositoryImpl] no longer
+ * takes a router and cannot drive this suite any more. The suite is NOT obsolete: it is the
+ * capability dashboard for the parser the owner intends to re-route once he is happy with it
+ * (work list: `docs/todos/2026-07-13-aichat-layer1-thumbsdown-backlog.md`). Without it the
+ * parser keeps 168 unit tests but loses every end-to-end row — exactly the silent rot the ADR
+ * says to prevent.
+ *
+ * So this class reproduces the ladder Layer 1 *will be re-connected to*, around the REAL parser
+ * and the fake cloud APIs:
+ *   confident (>= 0.7) → return the Layer 1 result (0 credits)
+ *   otherwise          → Layer 2 fake; on vague/error degrade back to the Layer 1 result
+ *
+ * ⚠️ This is a TEST-ONLY mirror of routing that production no longer performs. It measures the
+ * parser, NOT what a user gets today — for live routing read
+ * `repository/AiChatRepositoryImplTest.kt`. When Layer 1 is re-routed (a revert of the
+ * disconnect commit), delete this class and hand `AiChatRepositoryImpl` back to [buildHarnessRig].
+ */
+private class ParkedLayer1RoutingRepository(
+    private val router: LocalIntentRouterImpl,
+    private val classifierApi: FakeClassifierApi,
+    private val completionApi: FakeCompletionApi,
+    private val agentApi: FakeAgentApi,
+    private val userDataRepository: UserDataRepository,
+) : com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AiChatRepository {
+
+    override suspend fun classify(input: String, locale: ChatLocale, skipLayer1: Boolean): IntentClassification {
+        val layer1 = router.route(input, locale)
+        if (!skipLayer1 && layer1.confidence >= LAYER_1_CONFIDENCE_THRESHOLD) return layer1
+
+        val userId = userDataRepository.getUserData().userId
+        if (userId.isBlank()) return layer1
+
+        return when (val remote = classifierApi.classify(userId, input, locale)) {
+            is RemoteClassificationResult.Success -> IntentClassification(
+                intent = remote.intent,
+                confidence = remote.confidence,
+                layer = RoutingLayer.Classifier,
+                preBuiltToolCall = remote.toolCall,
+            )
+            // Mirrors AiChatRepositoryImpl: the refusal travels in the type. Mapping it to
+            // Unknown here (as this mirror and prod both did until 2026-07-16) is the bug —
+            // the ViewModel renders Unknown as "I didn't catch that" and never offers the
+            // paywall. No parked scenario feeds a 402 today; this branch is kept honest so
+            // that one written tomorrow measures the fixed behaviour, not the defect.
+            RemoteClassificationResult.InsufficientCredits -> IntentClassification(
+                intent = ChatIntent.InsufficientCredits,
+                confidence = 1f,
+                layer = RoutingLayer.Classifier,
+                preBuiltToolCall = null,
+            )
+            // Cloud unreachable → degrade to whatever Layer 1 made of it (the offline behaviour
+            // the disconnect gave up in prod, still asserted here for the parser's sake).
+            RemoteClassificationResult.NetworkError,
+            RemoteClassificationResult.ServiceError -> layer1
+        }
+    }
+
+    override suspend fun completeFreeForm(
+        messages: List<ChatMessage>,
+        locale: ChatLocale,
+        checklistsSummary: List<ChecklistContext>,
+    ): RemoteCompletionResult =
+        completionApi.complete(userDataRepository.getUserData().userId, messages, locale, checklistsSummary)
+
+    override suspend fun agentStep(
+        transcript: List<AgentTranscriptEntry>,
+        locale: ChatLocale,
+        checklistsSummary: List<ChecklistContext>,
+        contextChecklistName: String?,
+    ): AgentStepResult =
+        agentApi.step(
+            userDataRepository.getUserData().userId,
+            transcript,
+            locale,
+            checklistsSummary,
+            contextChecklistName,
+        )
+
+    override suspend fun transcribeAudio(
+        audioPath: String,
+        mimeType: String,
+        locale: ChatLocale,
+    ): com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.TranscriptionOutcome =
+        com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.TranscriptionOutcome.ServiceError
+
+    private companion object {
+        /** The threshold the disconnected [AiChatRepositoryImpl] used to apply. */
+        const val LAYER_1_CONFIDENCE_THRESHOLD = 0.7f
+    }
+}
+
+/**
+ * Builds a [ChatViewModel] wired with the REAL Layer-1 parser ([LocalIntentRouterImpl]) and the
+ * parked-Layer-1 ladder ([ParkedLayer1RoutingRepository]), with every cloud layer and the
+ * dispatcher faked. [dispatcher] is returned so the caller can inspect recorded ToolCalls.
  *
  * Returns the assembled VM plus the fakes whose state the runner observes.
  */
@@ -382,6 +495,23 @@ class HarnessRig(
     val completionApi: FakeCompletionApi,
     val agentApi: FakeAgentApi,
 )
+
+/**
+ * Remote Config for the offline rigs: answers every key with the caller's own default unless
+ * [longs] overrides it.
+ *
+ * The override matters for the out-of-credits paywall CTA: with a pure echo-the-default fake, a
+ * ViewModel that HARDCODED 300 would look identical to one that reads `ai_daily_limit_premium`
+ * (the compiled default is 300). Tests that assert the RC wiring pass a non-default number.
+ */
+internal class HarnessRemoteConfigProvider(
+    private val longs: Map<String, Long> = emptyMap(),
+) : RemoteConfigProvider {
+    override suspend fun fetchAndActivate(): Boolean = true
+    override fun getBoolean(key: String, defaultValue: Boolean): Boolean = defaultValue
+    override fun getString(key: String, defaultValue: String): String = defaultValue
+    override fun getLong(key: String, defaultValue: Long): Long = longs[key] ?: defaultValue
+}
 
 /**
  * Renders a ToolCall to a short preview string for the agent plan-card. Real renderer is
@@ -401,16 +531,14 @@ fun buildHarnessRig(scenario: ChatScenario): HarnessRig {
     val prefs = FakeAiChatPreferences(initial = false)
     val userRepo = HarnessUserDataRepository("u1")
 
-    // REAL repository — REAL Layer-1 parser, FAKE cloud layers (zero cost).
-    val repository = AiChatRepositoryImpl(
+    // REAL Layer-1 parser + the parked-Layer-1 ladder, FAKE cloud layers (zero cost).
+    // NOT prod routing: prod starts at Layer 2 since 2026-07-15 (see ParkedLayer1RoutingRepository).
+    val repository = ParkedLayer1RoutingRepository(
         router = LocalIntentRouterImpl(HarnessNoOpLogger),
         classifierApi = classifierApi,
         completionApi = completionApi,
-        transcribeApi = FakeTranscribeApi(),
-        chatAgentApi = agentApi,
+        agentApi = agentApi,
         userDataRepository = userRepo,
-        aiChatPreferencesRepository = prefs,
-        logger = HarnessNoOpLogger,
     )
 
     val viewModel = ChatViewModel(
@@ -427,6 +555,7 @@ fun buildHarnessRig(scenario: ChatScenario): HarnessRig {
         aiChatPreferencesRepository = prefs,
         analytics = HarnessAnalytics(),
         aiModelExperimentTracker = HarnessNoOpModelExperimentTracker,
+        remoteConfigProvider = HarnessRemoteConfigProvider(),
         logger = HarnessNoOpLogger,
     )
 

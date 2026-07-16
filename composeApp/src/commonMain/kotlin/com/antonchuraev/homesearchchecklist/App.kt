@@ -891,6 +891,7 @@ fun App() {
                                     text = resolved,
                                     linkedChecklistId = effect.linkedChecklistId,
                                     askAiForText = effect.askAiForText,
+                                    paywallCtaCredits = effect.paywallCtaCredits,
                                 )
                             )
                         }
@@ -902,8 +903,11 @@ fun App() {
                             chatSheetOpen = false
                             navigator.navigateToChecklistDetail(effect.checklistId)
                         }
-                        ChatScreenSideEffect.NavigateToPaywall -> {
-                            navigator.navigateToPaywall(source = "chat_sheet_credits")
+                        is ChatScreenSideEffect.NavigateToPaywall -> {
+                            // Forward the effect's own tag — the old hardcoded "chat_sheet_credits"
+                            // described the credits chip and would mislabel every out-of-credits
+                            // CTA tap as an unprompted chip tap.
+                            navigator.navigateToPaywall(source = effect.source)
                         }
                         ChatScreenSideEffect.RequestRecordAudioPermission -> {
                             // Mic tapped on a bottom bar (MainScreen / ChecklistDetail) opens the
@@ -1215,6 +1219,9 @@ fun App() {
                                             },
                                             onAskAiFallback = lastAssistantMessage.askAiForText?.let { text ->
                                                 { chatViewModel.sendIntent(ChatScreenIntent.OnAskAiFallback(text)) }
+                                            },
+                                            onPaywallCta = lastAssistantMessage.paywallCtaCredits?.let {
+                                                { chatViewModel.sendIntent(ChatScreenIntent.OnPaywallCtaClick) }
                                             },
                                             onOpenChecklist = lastAssistantMessage.linkedChecklistId?.let { id ->
                                                 {
@@ -1632,8 +1639,10 @@ fun App() {
                             onNavigateToChecklist = { checklistId ->
                                 navigator.navigateToChecklistDetail(checklistId)
                             },
-                            onNavigateToPaywall = {
-                                navigator.navigateToPaywall(source = "chat_credits_chip")
+                            // Source comes from ChatRoute (the effect's tag, or the credits-chip
+                            // constant) — never re-labelled here.
+                            onNavigateToPaywall = { source ->
+                                navigator.navigateToPaywall(source = source)
                             },
                         )
                     }

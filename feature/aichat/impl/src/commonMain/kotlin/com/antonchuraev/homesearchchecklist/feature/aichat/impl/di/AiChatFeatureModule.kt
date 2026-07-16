@@ -1,7 +1,6 @@
 package com.antonchuraev.homesearchchecklist.feature.aichat.impl.di
 
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AiChatPreferencesRepository
-import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.LocalIntentRouter
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AiChatRepository
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatAgentApiService
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatClassifierApiService
@@ -13,7 +12,6 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.impl.data.ChatAgentAp
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.data.ChatClassifierApiServiceImpl
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.data.ChatCompletionApiServiceImpl
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.data.TranscribeAudioApiServiceImpl
-import com.antonchuraev.homesearchchecklist.feature.aichat.impl.parser.LocalIntentRouterImpl
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.ChatViewModel
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.preview.ChatDateFormatterImpl
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.preview.ToolCallPreviewRenderer
@@ -39,12 +37,11 @@ import org.koin.dsl.module
  *   modules(checklistFeatureModule, userFeatureModule, aiChatFeatureModule,
  *           /* app-level module with ToolCallDispatcher + ChatLocaleProvider */)
  */
+// Layer 1 (LocalIntentRouterImpl) is intentionally NOT bound — decision 2026-07-15
+// (docs/decisions/2026-07-15-remove-ai-chat-layer1.md). The parser and its 168 tests stay in the
+// repo as a parked asset; re-routing it means reverting the disconnect commit, which restores
+// this binding and the repository's `router` parameter together.
 val aiChatFeatureModule = module {
-    single<LocalIntentRouter> {
-        LocalIntentRouterImpl(
-            logger = get(),
-        )
-    }
     single<ChatAgentApiService> {
         ChatAgentApiServiceImpl(logger = get())
     }
@@ -65,7 +62,6 @@ val aiChatFeatureModule = module {
     }
     single<AiChatRepository> {
         AiChatRepositoryImpl(
-            router = get(),
             classifierApi = get(),
             completionApi = get(),
             transcribeApi = get(),
@@ -98,6 +94,9 @@ val aiChatFeatureModule = module {
             aiChatPreferencesRepository = get<AiChatPreferencesRepository>(),
             analytics = get(),
             aiModelExperimentTracker = get(),
+            // Bound in remoteConfigModule (registered in appModule) — read for the Premium
+            // credit allowance advertised by the out-of-credits paywall CTA.
+            remoteConfigProvider = get(),
             logger = get(),
         )
     }

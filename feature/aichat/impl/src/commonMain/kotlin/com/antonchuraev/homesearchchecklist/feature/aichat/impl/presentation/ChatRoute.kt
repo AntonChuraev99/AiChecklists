@@ -112,7 +112,13 @@ fun ChatRoute(
     snackbarHostState: SnackbarHostState,
     onBack: () -> Unit,
     onNavigateToChecklist: ((Long) -> Unit)? = null,
-    onNavigateToPaywall: (() -> Unit)? = null,
+    /**
+     * Opens the paywall. The `source` argument is the `paywall_shown` attribution tag and comes
+     * from [ChatScreenSideEffect.NavigateToPaywall.source] — forward it verbatim. Do not collapse
+     * it to a constant here: hitting the credit limit and tapping the credits chip are different
+     * events, and the Layer 1 disconnect is measured on telling them apart.
+     */
+    onNavigateToPaywall: ((String) -> Unit)? = null,
     viewModel: ChatViewModel = koinViewModel(),
 ) {
     val state by viewModel.screenState.collectAsState()
@@ -411,12 +417,13 @@ fun ChatRoute(
                             text = resolved,
                             linkedChecklistId = effect.linkedChecklistId,
                             askAiForText = effect.askAiForText,
+                            paywallCtaCredits = effect.paywallCtaCredits,
                         )
                     )
                 }
                 ChatScreenSideEffect.NavigateBack -> onBack()
                 is ChatScreenSideEffect.NavigateToChecklist -> onNavigateToChecklist?.invoke(effect.checklistId)
-                ChatScreenSideEffect.NavigateToPaywall -> onNavigateToPaywall?.invoke()
+                is ChatScreenSideEffect.NavigateToPaywall -> onNavigateToPaywall?.invoke(effect.source)
                 ChatScreenSideEffect.RequestRecordAudioPermission -> {
                     // AudioRecorderLauncher handles permission check internally.
                     // Starting the recorder here requests permission if needed;
@@ -439,7 +446,12 @@ fun ChatRoute(
         state = state,
         onIntent = viewModel::sendIntent,
         drawerState = drawerState,
-        onNavigateToPaywall = onNavigateToPaywall,
+        // ChatScreen's own paywall entry point is the credits chip in the top bar — an unprompted
+        // tap, NOT a user who ran out mid-turn (that one arrives as the NavigateToPaywall effect
+        // above, carrying its own source). Tagging both the same is what merged the two.
+        onNavigateToPaywall = onNavigateToPaywall?.let { navigate ->
+            { navigate(ChatScreenSideEffect.NavigateToPaywall.SOURCE_CREDITS_CHIP) }
+        },
         onAttachmentSourcePicked = { source ->
             // ChatScreen already sent OnPickAttachment via onIntent; this callback
             // lets Route launch the picker directly without waiting for sideEffect.

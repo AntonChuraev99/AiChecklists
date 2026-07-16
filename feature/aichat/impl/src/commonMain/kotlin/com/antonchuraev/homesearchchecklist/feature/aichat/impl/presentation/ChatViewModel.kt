@@ -9,6 +9,9 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AiChatPreferencesRepository
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDefaults
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigKeys
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.dispatcher.ToolCallDispatcher
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AttachmentSource
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatAttachment
@@ -137,6 +140,10 @@ class ChatViewModel(
     private val aiChatPreferencesRepository: AiChatPreferencesRepository,
     private val analytics: AnalyticsTracker,
     private val aiModelExperimentTracker: AiModelExperimentTracker,
+    // Reads ai_daily_limit_premium for the out-of-credits paywall CTA label. The CTA promises a
+    // concrete allowance ("300 credits now and every day"), so the number must track the live RC
+    // value — a literal turns into a false promise the day the limit is retuned.
+    private val remoteConfigProvider: RemoteConfigProvider,
     private val logger: AppLogger,
 ) : AppViewModel<ChatScreenState, ChatScreenIntent, ChatScreenSideEffect>() {
 
@@ -318,11 +325,31 @@ class ChatViewModel(
                 // the final text back so it lands in chat history with correct locale.
                 // linkedChecklistId is preserved for the "Open checklist" button.
                 // askAiForText is preserved for the "Ask AI" fallback button on Unknown responses.
+                // paywallCtaCredits is preserved for the "Become Pro" CTA on out-of-credits replies.
                 addAssistantMessage(
                     intent.text,
                     linkedChecklistId = intent.linkedChecklistId,
                     askAiForText = intent.askAiForText,
+                    paywallCtaCredits = intent.paywallCtaCredits,
                 )
+            }
+
+            ChatScreenIntent.OnPaywallCtaClick -> {
+                // The user acted on the out-of-credits reply. Nothing to undo or clean up —
+                // just hand them to the paywall (both hosts observe NavigateToPaywall).
+                //
+                // The source tag is the point, not decoration: "paywall_shown with source=chat —
+                // expect a rise in users hitting the limit" is the post-release signal the Layer 1
+                // disconnect is judged on (docs/decisions/2026-07-15-remove-ai-chat-layer1.md).
+                // Merged with the credits chip, that number cannot answer the question it was
+                // written for.
+                viewModelScope.launch {
+                    _sideEffect.emit(
+                        ChatScreenSideEffect.NavigateToPaywall(
+                            source = ChatScreenSideEffect.NavigateToPaywall.SOURCE_INSUFFICIENT_CREDITS,
+                        )
+                    )
+                }
             }
 
             ChatScreenIntent.OnHelpClick -> {
@@ -562,10 +589,16 @@ class ChatViewModel(
      * terminal call doesn't emit a second response_received for the same turn.
      *
      * @param routedLayer The layer that produced the response; null → "unknown".
+     * @param creditsUsed Credits the server actually CHARGED for this turn. Defaults to the
+     *   layer's list price ([creditsForLayer]) because a layer that answers always bills it.
+     *   Pass 0 when the layer *refused* the turn (HTTP 402): the request reached Layer 2, so
+     *   routed_layer is honestly "Classifier", but nothing was charged — defaulting there would
+     *   inflate the credits_used sum by one per refusal, which is exactly what shipped.
      */
     private fun trackResponseReceived(
         routedLayer: RoutingLayer?,
         outcome: String,
+        creditsUsed: Int? = creditsForLayer(routedLayer),
         modelVariant: String? = null,
         modelId: String? = null,
         aiFlow: String? = null,
@@ -574,7 +607,7 @@ class ChatViewModel(
             AnalyticsParams.ROUTED_LAYER to (routedLayer?.name ?: "unknown"),
             AnalyticsParams.OUTCOME to outcome,
         )
-        creditsForLayer(routedLayer)?.let { params[AnalyticsParams.CREDITS_USED] = it }
+        creditsUsed?.let { params[AnalyticsParams.CREDITS_USED] = it }
         _turnStartMs?.let { start -> params[AnalyticsParams.LATENCY_MS] = nowMillis() - start }
         _turnStartMs = null
         // Guardrail dimensions for the AI-model A/B test — present only on Layer 3 agent responses
@@ -616,6 +649,54 @@ class ChatViewModel(
         AgentStepResult.NetworkError,
         AgentStepResult.ServiceError,
         -> null
+    }
+
+    /**
+     * The Premium daily AI credit allowance advertised by the out-of-credits CTA.
+     *
+     * Read from Remote Config on every use (cheap local lookup) rather than cached: the CTA
+     * promises a concrete number to a user who is about to pay for it, so a stale/hardcoded
+     * value is a false promise. Falls back to the compiled default before the first fetch.
+     */
+    private fun premiumDailyCredits(): Int =
+        remoteConfigProvider
+            .getLong(RemoteConfigKeys.AI_DAILY_LIMIT_PREMIUM, RemoteConfigDefaults.AI_DAILY_LIMIT_PREMIUM)
+            .toInt()
+
+    /**
+     * The single answer to "the server refused this turn — the wallet is empty" (HTTP 402),
+     * whichever layer hit the wall.
+     *
+     * EVERY 402 on a chat turn routes here, and new ones must too. The bug this exists to prevent
+     * is not one bad branch but a family of them: each 402 site grew its own dialect of "out of
+     * credits" (Layer 2 blamed the user's phrasing via Unknown; Layer 3 showed a CTA-less snackbar
+     * tagged outcome="error" and billed 3 credits for a turn that cost 0), and fixing them one at
+     * a time is how the survivors stayed hidden. One helper = one behaviour:
+     *
+     *   - The reply states the billing reason and carries the paywall CTA; no "Ask AI" button
+     *     (it asks an empty wallet for 3 more credits and 402s again).
+     *   - Analytics report outcome="insufficient_credits" with credits_used=0 — a refused turn is
+     *     neither an "answer" nor an "error" nor a charge.
+     *   - The spinner stops.
+     *
+     * Call sites: the send path and the "I meant something else" reject path (both Layer 2
+     * classify() 402s, see [ChatIntent.InsufficientCredits]) and the Layer 3 agent loop
+     * ([AgentStepResult.InsufficientCredits], reached via Deep Thinking ON / a vague L2 / a
+     * Classifier-source escalation).
+     *
+     * @param layer The layer that refused; reported verbatim as routed_layer, so the funnel can
+     *   still tell a 1-credit refusal from a 3-credit one even though both charged nothing.
+     */
+    private suspend fun emitInsufficientCredits(layer: RoutingLayer?) {
+        logger.info(TAG, "${layer?.name ?: "Unknown layer"} refused the turn (402) — replying out-of-credits + paywall CTA")
+        _sideEffect.emit(
+            ChatScreenSideEffect.ShowAssistantMessage(
+                messageKey = "chat_insufficient_credits",
+                paywallCtaCredits = premiumDailyCredits(),
+            )
+        )
+        trackResponseReceived(layer, outcome = OUTCOME_INSUFFICIENT_CREDITS, creditsUsed = 0)
+        _screenState.value = _screenState.value.copy(isProcessing = false)
     }
 
     /** Maps a routing layer to its credit cost (Layer 1 = 0, Layer 2 = 1, Layer 3 = 3). */
@@ -747,9 +828,15 @@ class ChatViewModel(
                 // Update user message with routing metadata + cost, then persist it.
                 // Cost is known only after classification — appended in a single .copy() to
                 // avoid double recompose.
-                val userCost = when (classification.layer) {
-                    RoutingLayer.Classifier -> 1   // Layer 2: classify_chat_intent costs 1 credit
-                    else -> 0                       // Layer 1 (local) is free; unknown → 0
+                val userCost = when {
+                    // 402: Layer 2 REFUSED the turn, so it charged nothing. Priced off the layer
+                    // alone (until 2026-07-16) this row claimed 1 credit and made the chat's own
+                    // history disagree with the wallet. Must stay ahead of the Classifier branch.
+                    classification.intent is ChatIntent.InsufficientCredits -> 0
+                    // Layer 2: a successful classify_chat_intent costs 1 credit.
+                    classification.layer == RoutingLayer.Classifier -> 1
+                    // Layer 1 (local, parked) is free; unknown → 0.
+                    else -> 0
                 }
                 val taggedUserMsg = userMsg.copy(
                     routedLayer = classification.layer,
@@ -761,6 +848,12 @@ class ChatViewModel(
                 withContext(NonCancellable) { chatHistoryRepository.append(taggedUserMsg) }
 
                 when (val intent = classification.intent) {
+                    // Out of credits — answer with the truth, not the "I didn't catch that" hint,
+                    // and offer the paywall. No askAiForText here on purpose: "Ask AI" asks an
+                    // empty wallet for 3 MORE credits, 402s again, and was how the user had to
+                    // discover the real reason.
+                    ChatIntent.InsufficientCredits -> emitInsufficientCredits(classification.layer)
+
                     is ChatIntent.Unknown -> {
                         // Emit the Unknown hint WITH the original text so ChatRoute can
                         // round-trip it as askAiForText on the AppendAssistantMessage intent.
@@ -1782,6 +1875,12 @@ class ChatViewModel(
                         logger.debug(TAG, "Escalate re-classify → ${classification.intent::class.simpleName} layer=${classification.layer}")
 
                         when (val intent = classification.intent) {
+                            // Same 402 as the send path, and the same rule: say the wallet is
+                            // empty and offer the paywall. Before 2026-07-16 this arrived as
+                            // Unknown and fell into the runAgentTurn branch below — a silent
+                            // 3-credit request to a wallet that had just refused 1.
+                            ChatIntent.InsufficientCredits -> emitInsufficientCredits(classification.layer)
+
                             ChatIntent.FreeForm,
                             is ChatIntent.Unknown -> runAgentTurn(originalText, locale)
 
@@ -1961,7 +2060,7 @@ class ChatViewModel(
                 TranscriptionOutcome.InsufficientCredits -> {
                     analytics.event(
                         name = AnalyticsEvents.Chat.VOICE_TRANSCRIBE_FAILED,
-                        params = mapOf(AnalyticsParams.OUTCOME to "insufficient_credits"),
+                        params = mapOf(AnalyticsParams.OUTCOME to OUTCOME_INSUFFICIENT_CREDITS),
                     )
                     _screenState.value = _screenState.value.copy(isTranscribing = false)
                     _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_insufficient_credits"))
@@ -2304,10 +2403,18 @@ class ChatViewModel(
                 }
 
                 AgentStepResult.InsufficientCredits -> {
-                    logger.info(TAG, "runAgentTurn: InsufficientCredits")
-                    trackResponseReceived(RoutingLayer.FullChat, outcome = "error")
-                    _screenState.value = _screenState.value.copy(isProcessing = false)
-                    _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_insufficient_credits"))
+                    // Same wall as the Layer 2 refusal, so the same answer — one helper, no
+                    // second dialect of "you're out of credits". Until 2026-07-16 this branch
+                    // shipped three separate lies: a snackbar with no way to upgrade (the owner
+                    // asked for the "Become Pro" button HERE too), outcome="error" (a refusal
+                    // buried in the same bucket as "the AI crashed" — undiagnosable in Amplitude),
+                    // and credits_used=3 for a turn the server charged 0 for.
+                    //
+                    // Live paths in: Deep Thinking ON (skips L2 → lands straight here), a vague
+                    // L2 → FreeForm, and escalateChoice from a Classifier-source choice. The
+                    // likeliest repro is a free user with 1-2 credits: L2 classify passes and
+                    // takes 1, Layer 3 wants 3 → 402.
+                    emitInsufficientCredits(RoutingLayer.FullChat)
                     return
                 }
 
@@ -2790,11 +2897,14 @@ class ChatViewModel(
                 )
             }
 
-            // FindItems, FreeForm, AttachToItem and Unknown are handled separately
-            // and should not reach buildToolCall.
+            // FindItems, FreeForm, AttachToItem, Unknown and InsufficientCredits are handled
+            // separately and should not reach buildToolCall. InsufficientCredits especially:
+            // building a tool call for a turn the server refused would execute work the user
+            // never paid for.
             ChatIntent.FindItems,
             ChatIntent.FreeForm,
             is ChatIntent.AttachToItem,  // handled inline before buildToolCall is called
+            ChatIntent.InsufficientCredits,
             is ChatIntent.Unknown -> null
         }
     }
@@ -3031,6 +3141,7 @@ class ChatViewModel(
         content: String,
         linkedChecklistId: Long? = null,
         askAiForText: String? = null,
+        paywallCtaCredits: Int? = null,
     ) {
         val msg = ChatMessage(
             id = generateId(),
@@ -3042,6 +3153,8 @@ class ChatViewModel(
             // askAiForText is transient: NOT persisted to Room (toEntry() ignores it).
             // The "Ask AI" button disappears on app restart — intentional to avoid migration.
             askAiForText = askAiForText,
+            // Same deal for the paywall CTA: transient, so a stale offer can't outlive the turn.
+            paywallCtaCredits = paywallCtaCredits,
         )
         updateMessages { it + msg }
         // Persist every assistant message regardless of routing layer.
@@ -3101,6 +3214,16 @@ class ChatViewModel(
 
     private companion object {
         const val TAG = "ChatViewModel"
+
+        /**
+         * `outcome` for a turn the server REFUSED for lack of credits (HTTP 402).
+         *
+         * Not new vocabulary: the voice path already reports exactly this string on the same
+         * condition ([TranscriptionOutcome.InsufficientCredits]). Reporting "answer" instead —
+         * as the classify path did until 2026-07-16 — hides every paywall-worthy refusal inside
+         * the success bucket.
+         */
+        const val OUTCOME_INSUFFICIENT_CREDITS = "insufficient_credits"
         // Stable chip ids for the AiChoiceResponse block.
         const val CHOICE_EXECUTE = "execute"
         const val CHOICE_EXECUTE_ALL = "execute_all"

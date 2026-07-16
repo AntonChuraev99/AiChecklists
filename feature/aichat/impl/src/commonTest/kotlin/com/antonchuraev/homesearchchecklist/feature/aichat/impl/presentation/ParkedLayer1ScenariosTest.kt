@@ -18,23 +18,35 @@ import kotlin.test.Test
 import kotlin.test.fail
 
 /**
- * Data-driven AI-Chat routing scenario suite (Tier 1 — offline, free).
+ * Data-driven scenario suite for the **parked Layer-1 parser** (Tier 1 — offline, free).
  *
- * Each [ChatScenario] is run through the REAL Layer-1 parser + REAL routing
- * ([buildHarnessRig]) with FAKE cloud layers and a recording dispatcher. The runner
- * aggregates every scenario's PASS/FAIL into one readable map and fails ONLY if a
- * non-[ChatScenario.expectRedNow] scenario failed — so the baseline shows the full
- * pass/fail dashboard at once.
+ * ⚠️ **Not a production-routing suite, and green here does not mean "chat works".** Layer 1 was
+ * disconnected from routing on 2026-07-15 (`docs/decisions/2026-07-15-remove-ai-chat-layer1.md`);
+ * production now starts at Layer 2 and is covered by `repository/AiChatRepositoryImplTest.kt`.
+ * Each [ChatScenario] here runs through the REAL parser and the REAL [ChatViewModel], but its
+ * routing is a TEST-ONLY mirror (`ParkedLayer1RoutingRepository`) of the ladder Layer 1 *will be
+ * re-connected to* — see the header of `ChatScenarioHarness.kt`.
  *
- * expectRedNow rows are the AI-improvement ROADMAP: they are expected to fail today.
- * The runner reports them as RED-OK (known gap) and does NOT fail the build for them.
- * If an expectRedNow scenario unexpectedly PASSES, it is flagged FIXED! so the flag
- * can be flipped.
+ * **What it is for:** the roadmap dashboard for improving Layer 1 to the point where the owner is
+ * willing to re-route it (*«когда я буду им доволен»*; work list:
+ * `docs/todos/2026-07-13-aichat-layer1-thumbsdown-backlog.md`). It keeps the parked parser
+ * exercised end-to-end so it does not rot while unrouted, which is what makes "bring L1 back" a
+ * revert rather than a rewrite.
+ *
+ * **How to read a failure:** a red row is a gap in the parked parser, NOT a user-facing
+ * regression. Do not patch production because this suite is red, and do not re-route Layer 1 to
+ * turn it green — that is a product call, not a code call.
+ *
+ * The runner aggregates every scenario's PASS/FAIL into one readable map and fails ONLY if a
+ * non-[ChatScenario.expectRedNow] scenario failed — so the baseline shows the full pass/fail
+ * dashboard at once. expectRedNow rows are the improvement ROADMAP: they are expected to fail
+ * today; the runner reports them as RED-OK (known gap) and does NOT fail the build for them. If
+ * an expectRedNow scenario unexpectedly PASSES, it is flagged FIXED! so the flag can be flipped.
  *
  * GROW THIS SUITE: add a row to [scenarios]. No new test method needed.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
-class AiChatScenariosTest {
+class ParkedLayer1ScenariosTest {
 
     private val testDispatcher = UnconfinedTestDispatcher()
 

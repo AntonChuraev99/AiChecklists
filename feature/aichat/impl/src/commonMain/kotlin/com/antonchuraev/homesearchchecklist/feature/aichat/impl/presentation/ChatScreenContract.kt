@@ -259,11 +259,14 @@ sealed interface ChatScreenIntent : Intent {
      * can show an "Open checklist" button for successful write-intent outcomes.
      * [askAiForText] is preserved so the bubble can show an "Ask AI" button
      * for Unknown-intent responses that should offer Layer 3 escalation.
+     * [paywallCtaCredits] is preserved so the bubble can show the "Become Pro" CTA
+     * on an out-of-credits reply (the number is the Premium daily allowance).
      */
     data class AppendAssistantMessage(
         val text: String,
         val linkedChecklistId: Long? = null,
         val askAiForText: String? = null,
+        val paywallCtaCredits: Int? = null,
     ) : ChatScreenIntent
 
     /** User tapped the back / navigation icon. */
@@ -304,6 +307,13 @@ sealed interface ChatScreenIntent : Intent {
      * This is an explicit opt-in to spend 3 credits — we never auto-burn on Unknown.
      */
     data class OnAskAiFallback(val text: String) : ChatScreenIntent
+
+    /**
+     * User tapped the "Become Pro" CTA on an out-of-credits assistant bubble.
+     * Emits [ChatScreenSideEffect.NavigateToPaywall] — the conversion moment the Layer 1
+     * disconnect was accepted to buy (docs/decisions/2026-07-15-remove-ai-chat-layer1.md).
+     */
+    data object OnPaywallCtaClick : ChatScreenIntent
 
     // ── Attachment intents (Phase 1: VM domain logic; picker UI lives in Phase 3) ──
 
@@ -395,12 +405,19 @@ sealed interface ChatScreenSideEffect : SideEffect {
      * checklist" deeplink button for successful write-intent dispatch outcomes.
      * [askAiForText] is forwarded when the assistant message is an Unknown-intent response;
      * the bubble shows an "Ask AI" TextButton that escalates to Layer 3 explicitly.
+     * [paywallCtaCredits] is forwarded when the turn was refused for lack of credits: non-null
+     * makes the bubble show the "Become Pro" CTA, and the value is the Premium daily credit
+     * allowance rendered in its label (read from Remote Config — never hardcoded, see
+     * [ChatViewModel.premiumDailyCredits]). Mutually exclusive with [askAiForText] by intent:
+     * offering "Ask AI" to an empty wallet is how the shipped bug hid the truth (it asks for 3
+     * more credits, 402s again).
      */
     data class ShowAssistantMessage(
         val messageKey: String,
         val args: List<String> = emptyList(),
         val linkedChecklistId: Long? = null,
         val askAiForText: String? = null,
+        val paywallCtaCredits: Int? = null,
     ) : ChatScreenSideEffect
 
     /** Navigate back (handled by the host NavController). */
@@ -428,8 +445,31 @@ sealed interface ChatScreenSideEffect : SideEffect {
     data class OpenFilePicker(val source: AttachmentSource) : ChatScreenSideEffect
 
     /**
-     * Navigate to the paywall (triggered by [RequiresPremium] dispatch outcome for
-     * CreateChecklistFromAttachment when the free attachment/checklist quota is exceeded).
+     * Navigate to the paywall, tagging WHY for the `paywall_shown` funnel.
+     *
+     * [source] is carried by the effect rather than hardcoded per host because the two chat
+     * surfaces (the App.kt dock and the full-screen ChatRoute) reach the paywall from two
+     * different places, and a host-side literal silently merged them: a user who *hit the credit
+     * limit* and a user who *tapped the credits chip* both reported "chat_credits_chip". The
+     * Layer 1 disconnect (docs/decisions/2026-07-15-remove-ai-chat-layer1.md) is priced on
+     * exactly that distinction — "paywall_shown with source=chat, expect a rise in users hitting
+     * the limit" is its post-release monitoring signal, so merging the two answers the ADR's
+     * question with the wrong number.
+     *
+     * Emitters: [ChatScreenIntent.OnPaywallCtaClick] ([SOURCE_INSUFFICIENT_CREDITS]) and the
+     * credits chip in the top bar ([SOURCE_CREDITS_CHIP], invoked host-side). A new emitter must
+     * bring its own source constant — do not reuse one of these.
+     *
+     * (The pre-2026-07-16 KDoc credited a `RequiresPremium` dispatch outcome; nothing ever
+     * emitted it from there, so this effect was dead code until the out-of-credits CTA.)
      */
-    data object NavigateToPaywall : ChatScreenSideEffect
+    data class NavigateToPaywall(val source: String) : ChatScreenSideEffect {
+        companion object {
+            /** The user ran out of AI credits and tapped "Become Pro" on the refusal reply. */
+            const val SOURCE_INSUFFICIENT_CREDITS = "chat_insufficient_credits"
+
+            /** The user tapped the credit-balance chip in the chat top bar, unprompted. */
+            const val SOURCE_CREDITS_CHIP = "chat_credits_chip"
+        }
+    }
 }

@@ -2,6 +2,7 @@ package com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation
 
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AiChatPreferencesRepository
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigKeys
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.dispatcher.ToolCallDispatcher
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatIntent
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceAction
@@ -21,8 +22,10 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AiChat
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatHistoryRepository
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChecklistContext
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChecklistItemContext
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.RemoteClassificationResult
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.RemoteCompletionResult
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.TranscriptionOutcome
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.repository.AiChatRepositoryImpl
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.preview.ToolCallPreviewRenderer
@@ -56,6 +59,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -370,6 +374,7 @@ private fun makeVm(
     aiChatPreferencesRepo: AiChatPreferencesRepository = FakeAiChatPreferencesRepository(),
     analytics: com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker = FakeAnalyticsTracker(),
     experimentTracker: FakeAiModelExperimentTracker = FakeAiModelExperimentTracker(),
+    remoteConfig: HarnessRemoteConfigProvider = HarnessRemoteConfigProvider(),
 ): ChatViewModel = ChatViewModel(
     aiChatRepository = repo,
     toolCallDispatcher = dispatcher,
@@ -383,8 +388,80 @@ private fun makeVm(
     aiChatPreferencesRepository = aiChatPreferencesRepo,
     analytics = analytics,
     aiModelExperimentTracker = experimentTracker,
+    remoteConfigProvider = remoteConfig,
     logger = NoOpLogger,
 )
+
+/**
+ * A ViewModel whose Layer 2 is out of credits: the REAL [AiChatRepositoryImpl] wired to a
+ * classifier fake that returns [RemoteClassificationResult.InsufficientCredits] — exactly what
+ * `ChatClassifierApiServiceImpl` produces on HTTP 402 (its line 86).
+ *
+ * **Why the real repository here, when every other test in this file fakes it.** The bug is the
+ * chain, and the load-bearing step is inside the repository: it flattens the refusal into
+ * `ChatIntent.Unknown` before the ViewModel ever sees it. Handing the ViewModel a hand-built
+ * [IntentClassification] would (a) test the ViewModel against the very representation under
+ * debate, and (b) force this test to name the fix's type — pinning it to one of the two candidate
+ * designs (a new ChatIntent variant vs. an outcome wrapper around classify()). Entering through
+ * the classifier API instead keeps these tests blind to the repository's internal representation:
+ * they assert only what the user sees and what Amplitude receives, so either design can satisfy
+ * them unchanged.
+ *
+ * Every other collaborator is a fake and no HTTP client exists here, so this stays free/offline.
+ * Deep Thinking is OFF, so classify() starts at Layer 2 — the path a real free-tier send takes.
+ */
+private fun makeVmOutOfCredits(
+    analytics: FakeAnalyticsTracker = FakeAnalyticsTracker(),
+    remoteConfig: HarnessRemoteConfigProvider = HarnessRemoteConfigProvider(),
+): ChatViewModel {
+    // Non-blank userId: a blank one short-circuits Layer 2 before the 402 can happen.
+    val userRepo = HarnessUserDataRepository("u1")
+    val realRepo = AiChatRepositoryImpl(
+        classifierApi = FakeClassifierApi(RemoteClassificationResult.InsufficientCredits),
+        completionApi = FakeCompletionApi(),
+        transcribeApi = FakeTranscribeApi(),
+        chatAgentApi = FakeAgentApi(),
+        userDataRepository = userRepo,
+        aiChatPreferencesRepository = FakeAiChatPreferences(initial = false),
+        logger = NoOpLogger,
+    )
+    return makeVm(
+        repo = realRepo,
+        userDataRepo = userRepo,
+        analytics = analytics,
+        remoteConfig = remoteConfig,
+    )
+}
+
+/**
+ * A ViewModel whose **Layer 3** is out of credits, reached the way a real user reaches it: Deep
+ * Thinking ON, which skips Layer 2 entirely and routes straight to the agent loop
+ * (`docs/decisions/2026-07-15-remove-ai-chat-layer1.md`).
+ *
+ * Real [AiChatRepositoryImpl] again — the wiring under test spans repository → ViewModel, and the
+ * Layer 2 classifier is left un-stubbed on purpose: if the Deep Thinking bypass ever regressed and
+ * the request went through Layer 2, [FakeClassifierApi]'s default ServiceError would change the
+ * path and this test would stop measuring Layer 3.
+ *
+ * The 402 arrives as [AgentStepResult.InsufficientCredits] — what `ChatAgentApiServiceImpl`
+ * produces on HTTP 402 (its line 121).
+ */
+private fun makeVmDeepThinkingOutOfCredits(
+    analytics: FakeAnalyticsTracker = FakeAnalyticsTracker(),
+): ChatViewModel {
+    val userRepo = HarnessUserDataRepository("u1")
+    val realRepo = AiChatRepositoryImpl(
+        classifierApi = FakeClassifierApi(),
+        completionApi = FakeCompletionApi(),
+        transcribeApi = FakeTranscribeApi(),
+        chatAgentApi = FakeAgentApi(AgentStepResult.InsufficientCredits),
+        userDataRepository = userRepo,
+        // Deep Thinking ON → classify() never calls Layer 2, it returns FreeForm for Layer 3.
+        aiChatPreferencesRepository = FakeAiChatPreferences(initial = true),
+        logger = NoOpLogger,
+    )
+    return makeVm(repo = realRepo, userDataRepo = userRepo, analytics = analytics)
+}
 
 // ─── Choice-block test helpers ──────────────────────────────────────────────
 //
@@ -411,12 +488,17 @@ private fun makeVm(
 
 /**
  * A classification for a write intent that STILL asks (delete), with the ToolCall pre-built so the
- * test does not depend on Layer-1 phrasing. [layer] is what the escalation ladder reads back.
+ * test does not depend on classifier phrasing. [layer] is what the escalation ladder reads back.
+ *
+ * Defaults to [RoutingLayer.Classifier]: since the Layer 1 disconnect (2026-07-15) every
+ * classify() result comes from Layer 2, so Classifier is what a real send now produces. Tests
+ * that specifically exercise the Local branch of the escalation ladder pass `layer` explicitly —
+ * that branch is still reachable in prod via the attachment-only send, which tags Local.
  */
 private fun deleteClassification(
     itemText: String = "milk",
     checklistHint: String? = "shopping",
-    layer: RoutingLayer = RoutingLayer.Local,
+    layer: RoutingLayer = RoutingLayer.Classifier,
 ) = IntentClassification(
     intent = ChatIntent.DeleteItem,
     confidence = 1.0f,
@@ -665,10 +747,20 @@ class ChatViewModelTest {
         assertEquals("chat_choice_dismissed_message", effect.messageKey)
     }
 
-    // ── 8. Layer 1 (Local) → user message costCredits == 0 ───────────────────
+    // ── 8. A Local-layer classification → user message costCredits == 0 ──────
 
+    /**
+     * Locks the `Local → 0 credits` mapping in the ViewModel.
+     *
+     * Since the Layer 1 disconnect (2026-07-15) `classify()` never returns Local, so this exact
+     * route cannot happen in prod — but the mapping itself is still live: the attachment-only
+     * send tags its user message Local (cost 0, the charge lands on execution), and messages
+     * persisted before the disconnect replay from Room carrying Local. Deleting the Local branch
+     * of `creditsForLayer` as "dead" would mis-price both, and would also have to be undone when
+     * Layer 1 is re-routed. Kept deliberately.
+     */
     @Test
-    fun sendClick_layer1Local_userMessageCostCreditsIsZero() = runTest {
+    fun sendClick_localLayerClassification_userMessageCostCreditsIsZero() = runTest {
         val repo = FakeAiChatRepository(
             classifyResult = IntentClassification(
                 intent = ChatIntent.CreateItem,
@@ -682,7 +774,7 @@ class ChatViewModelTest {
 
         val userMsg = vm.screenState.value.messages.first()
         assertEquals(RoutingLayer.Local, userMsg.routedLayer)
-        assertEquals(0, userMsg.costCredits, "Layer 1 (local) is free — costCredits must be 0")
+        assertEquals(0, userMsg.costCredits, "A Local-layer message is free — costCredits must be 0")
     }
 
     // ── 9. Layer 2 (Classifier) → user message costCredits == 1 ─────────────
@@ -2497,8 +2589,8 @@ class ChatViewModelTest {
         val params = analytics.paramsOf("ai_chat_response_received")
         assertNotNull(params, "ai_chat_response_received must be emitted when a preview is shown")
         assertEquals("preview", params["outcome"])
-        assertEquals("Local", params["routed_layer"])
-        assertEquals(0, params["credits_used"], "Layer 1 (Local) costs 0 credits")
+        assertEquals("Classifier", params["routed_layer"])
+        assertEquals(1, params["credits_used"], "Layer 2 (Classifier) costs 1 credit")
         // preview_shown carries the action type
         val previewParams = analytics.paramsOf("ai_chat_preview_shown")
         assertNotNull(previewParams, "ai_chat_preview_shown must be emitted")
@@ -2518,7 +2610,7 @@ class ChatViewModelTest {
             classifyResult = IntentClassification(
                 intent = ChatIntent.CreateItem,
                 confidence = 1.0f,
-                layer = RoutingLayer.Local,
+                layer = RoutingLayer.Classifier,
                 preBuiltToolCall = ToolCall.AddItem(checklistHint = "shopping", itemText = "milk"),
             )
         )
@@ -2539,12 +2631,12 @@ class ChatViewModelTest {
         val params = analytics.paramsOf("ai_chat_response_received")
         assertNotNull(params, "The auto-applied turn must still report a response")
         assertEquals("action", params["outcome"], "An applied action is not a 'preview' outcome")
-        assertEquals("Local", params["routed_layer"])
+        assertEquals("Classifier", params["routed_layer"])
 
         val applied = analytics.paramsOf("ai_chat_action_auto_applied")
         assertNotNull(applied, "Auto-applying must be measurable (it replaces the preview funnel)")
         assertEquals("AddItem", applied["action_type"])
-        assertEquals("Local", applied["routed_layer"])
+        assertEquals("Classifier", applied["routed_layer"])
 
         assertNull(analytics.paramsOf("ai_chat_preview_shown"),
             "No question was asked, so preview_shown must NOT fire")
@@ -2725,6 +2817,9 @@ class ChatViewModelTest {
     fun onFeedbackSubmit_emitsFeedbackWithMigratedParams() = runTest {
         val analytics = FakeAnalyticsTracker()
         val vm = makeVm(analytics = analytics)
+        // routedLayer=Local models a message persisted BEFORE the Layer 1 disconnect (2026-07-15):
+        // the classifier no longer produces Local, but Room history replays it, and feedback on an
+        // old message must still report the layer it was actually answered by.
         val assistantMsg = ChatMessage(
             id = "asst_fb",
             role = ChatRole.Assistant,
@@ -2977,5 +3072,359 @@ class ChatViewModelTest {
         // (5 lists × 6 = 30), even though their name + counts are still present.
         assertTrue(summary[0].recentItems.isNotEmpty(), "Earliest list keeps its items")
         assertTrue(summary.last().recentItems.isEmpty(), "Budget-exhausted list sends no item text")
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // 🔴 RED repro — out of credits is reported as "I didn't catch that" (2026-07-16)
+    // docs/todos/2026-07-16-aichat-insufficient-credits-shows-unknown-hint.md
+    // ══════════════════════════════════════════════════════════════════════════
+    //
+    // Free user, 10/10 daily AI credits spent, types «добавь молоко»:
+    //
+    //   ChatClassifierApiServiceImpl:86   HTTP 402 → RemoteClassificationResult.InsufficientCredits
+    //   AiChatRepositoryImpl:136-143      → ChatIntent.Unknown(rawText)          ← reason erased
+    //   ChatViewModel:764-777             → ShowAssistantMessage("chat_unknown_intent_hint")
+    //                                       + askAiForText → an "Ask AI" button
+    //
+    // So the app tells the user their phrasing was unclear, and the only way to learn the truth is
+    // to tap "Ask AI" — which asks for 3 MORE credits from an empty wallet, 402s again, and only
+    // THERE finally says "out of credits". The paywall never appears on the classify path;
+    // `chat_insufficient_credits` is emitted only from the agent paths (:1967, :2310).
+    //
+    // Pre-existing, but the Layer 1 disconnect (docs/decisions/2026-07-15-remove-ai-chat-layer1.md)
+    // promoted it from edge case to the DEFAULT free-tier experience: L1 used to answer «добавь
+    // молоко» for 0 credits and never reached Layer 2. The ADR priced the disconnect as "free users
+    // hit the paywall on the core action" — this is the code failing to charge that accepted price.
+    //
+    // These tests enter through the classifier API (see [makeVmOutOfCredits]) so they assert the
+    // user-visible + Amplitude-visible contract without naming the repository's internal fix.
+
+    // ── R1. The user is told the wallet is empty, not that they were unclear ──
+
+    @Test
+    fun sendClick_layer2InsufficientCredits_tellsUserCreditsRanOutInsteadOfBlamingTheirPhrasing() = runTest {
+        val vm = makeVmOutOfCredits()
+
+        // sideEffect is a replay=0 SharedFlow — subscribe BEFORE the send or the assert goes vacuous.
+        val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            vm.sideEffect.first()
+        }
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+
+        val effect = effectDeferred.await()
+        val message = assertIs<ChatScreenSideEffect.ShowAssistantMessage>(
+            effect,
+            "A refused turn must answer in the chat, not vanish or snackbar; got $effect",
+        )
+        assertEquals(
+            "chat_insufficient_credits",
+            message.messageKey,
+            "Out of credits must say so. chat_unknown_intent_hint blames the user's phrasing for a " +
+                "billing state — and the string chat_insufficient_credits already exists (EN+RU, " +
+                "wired in App.kt:825 + ChatRoute.kt:247)",
+        )
+        assertNull(
+            message.askAiForText,
+            "The 'Ask AI' button must NOT be offered here: it asks an empty wallet for 3 more " +
+                "credits, 402s again, and is how the user currently has to discover the truth",
+        )
+    }
+
+    // ── R2. The refused turn is reported honestly to Amplitude ───────────────
+    //
+    // ChatViewModel:775 reports outcome="answer" for this turn (there was no answer) and
+    // creditsForLayer(Classifier)=1 (nothing was charged — 402 IS the refusal). So the outcome
+    // distribution is polluted and credits_used over-counts every refusal.
+    // "insufficient_credits" is not a new vocabulary word: the voice path already reports exactly
+    // that on the same condition (ChatViewModel:1964).
+
+    @Test
+    fun sendClick_layer2InsufficientCredits_reportsInsufficientCreditsOutcomeAndZeroCreditsUsed() = runTest {
+        val analytics = FakeAnalyticsTracker()
+        val vm = makeVmOutOfCredits(analytics = analytics)
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        val params = analytics.paramsOf("ai_chat_response_received")
+        assertNotNull(params, "The refused turn must still close the funnel, not go unreported")
+        assertEquals(
+            "insufficient_credits",
+            params["outcome"],
+            "The user got no answer — reporting outcome='answer' hides every paywall-worthy " +
+                "refusal inside the success bucket",
+        )
+        assertEquals(
+            0,
+            params["credits_used"],
+            "402 means the server charged nothing; billing this turn 1 credit inflates the " +
+                "credits_used sum by every refusal",
+        )
+    }
+
+    // ── R3. The refused turn is not persisted as a paid one ──────────────────
+    //
+    // Same lie, second surface: ChatViewModel:750-757 prices the user message off the LAYER alone
+    // (Classifier → 1), so Room keeps a history row claiming this turn cost a credit.
+    // Paired with test #9 (a SUCCESSFUL Classifier turn must stay costCredits=1), this pins the
+    // fix to the refusal itself — re-pricing the whole Classifier layer to 0 turns #9 red.
+
+    @Test
+    fun sendClick_layer2InsufficientCredits_userMessageCostCreditsIsZero() = runTest {
+        val vm = makeVmOutOfCredits()
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        val userMsg = vm.screenState.value.messages.first()
+        assertEquals(
+            0,
+            userMsg.costCredits,
+            "A 402'd turn charged the user nothing — persisting costCredits=1 makes the chat's own " +
+                "history disagree with the wallet",
+        )
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Green coverage — the paywall CTA on the out-of-credits reply (2026-07-16)
+    // ══════════════════════════════════════════════════════════════════════════
+    //
+    // The owner's ask: "пусть ии возвращает текстом ответ что недостаточно кредитов и показывает
+    // кнопку become pro and get 300 credits now and every day". The reply text is asserted by the
+    // RED tests above; these pin the CTA — the conversion moment the Layer 1 disconnect was
+    // accepted to buy (docs/decisions/2026-07-15-remove-ai-chat-layer1.md).
+
+    // ── G1. The refusal carries a paywall CTA, and its number comes from Remote Config ──
+    //
+    // "300" is the Premium daily allowance (RC ai_daily_limit_premium), NOT a constant: the label
+    // promises a specific number to a user about to pay for it, so a hardcoded one turns into a
+    // false promise the day the limit is retuned. The fake therefore serves a NON-default value —
+    // with an echo-the-default fake (300) a hardcoded 300 would look identical and this test would
+    // prove nothing.
+
+    @Test
+    fun sendClick_layer2InsufficientCredits_offersPaywallCtaWithRemoteConfigCreditAllowance() = runTest {
+        val vm = makeVmOutOfCredits(
+            remoteConfig = HarnessRemoteConfigProvider(
+                longs = mapOf(RemoteConfigKeys.AI_DAILY_LIMIT_PREMIUM to 777L),
+            ),
+        )
+
+        val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            vm.sideEffect.first()
+        }
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+
+        val message = assertIs<ChatScreenSideEffect.ShowAssistantMessage>(effectDeferred.await())
+        assertEquals(
+            777,
+            message.paywallCtaCredits,
+            "The CTA advertises the Premium daily allowance, which lives in Remote Config " +
+                "(ai_daily_limit_premium). A hardcoded number silently lies once that key moves",
+        )
+    }
+
+    // ── G2. The CTA survives the ChatRoute round-trip onto the bubble ─────────
+    //
+    // ShowAssistantMessage is resolved to text by the host (ChatRoute / App.kt dock) and sent back
+    // as AppendAssistantMessage. A field dropped in that round-trip renders a bubble with no
+    // button — the message would say "upgrade to Premium" and offer no way to do it.
+
+    @Test
+    fun appendAssistantMessage_withPaywallCta_bubbleCarriesItForRendering() = runTest {
+        val vm = makeVm()
+
+        vm.sendIntent(
+            ChatScreenIntent.AppendAssistantMessage(
+                text = "Not enough credits for AI assist.",
+                paywallCtaCredits = 300,
+            )
+        )
+        testScheduler.advanceUntilIdle()
+
+        val assistantMsg = vm.screenState.value.messages.last()
+        assertEquals(
+            300,
+            assistantMsg.paywallCtaCredits,
+            "ChatMessageBubble shows the CTA off this field; dropping it in the host round-trip " +
+                "leaves the user told to upgrade with nothing to tap",
+        )
+    }
+
+    // ── G3. Tapping the CTA navigates to the paywall, attributed to the limit ──
+    //
+    // The source tag is load-bearing, not decoration. The Layer 1 disconnect
+    // (docs/decisions/2026-07-15-remove-ai-chat-layer1.md) lists "paywall_shown with source=chat —
+    // expect a rise in users hitting the limit" as the signal it is judged on, and the owner
+    // accepted "free users hit the paywall on the core action" as its price. If this tap reports
+    // the same source as the credits chip, the funnel merges a user who RAN OUT mid-turn with one
+    // who tapped the balance out of curiosity — and the ADR's question gets answered with a number
+    // that cannot answer it. Same failure class as checklist_created / folder_deleted: the metric
+    // keeps its name and quietly changes meaning.
+
+    @Test
+    fun onPaywallCtaClick_navigatesToPaywallAttributedToCreditExhaustionNotTheChip() = runTest {
+        val vm = makeVm()
+
+        val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            vm.sideEffect.first()
+        }
+
+        vm.sendIntent(ChatScreenIntent.OnPaywallCtaClick)
+
+        val effect = assertIs<ChatScreenSideEffect.NavigateToPaywall>(
+            effectDeferred.await(),
+            "The CTA must reach the paywall — both hosts (ChatRoute + the App.kt dock) observe " +
+                "this effect. Without it the button is decoration on a conversion moment",
+        )
+        assertEquals(
+            "chat_insufficient_credits",
+            effect.source,
+            "paywall_shown must show WHY the user arrived. Literal, not the constant, on purpose: " +
+                "this string is an Amplitude dimension — renaming the constant is free, renaming " +
+                "the wire value silently breaks every saved chart built on it",
+        )
+        assertNotEquals(
+            ChatScreenSideEffect.NavigateToPaywall.SOURCE_CREDITS_CHIP,
+            effect.source,
+            "Hitting the credit limit is not the same event as tapping the credits chip; the " +
+                "disconnect's whole cost/benefit read depends on separating them",
+        )
+    }
+
+    // ── G4. The reject flow ("I meant something else") answers a 402 the same way ──
+    //
+    // Second classify() call-site (escalateChoice, skipLayer1=true). It can 402 exactly like the
+    // send path, and before 2026-07-16 the refusal arrived as Unknown and fell into the
+    // runAgentTurn branch: a silent 3-credit request to a wallet that had just refused 1. The user
+    // saw a generic error and paid for the privilege.
+    //
+    // Reachable today only via a Local-source choice (which the parked Layer 1 no longer mints),
+    // so this is also the guard that re-routing L1 does not re-open the hole.
+
+    @Test
+    fun onPreviewReject_layer2InsufficientCredits_tellsUserAndDoesNotBillAgentTurn() = runTest {
+        val repo = FakeAiChatRepository(
+            // First classify → a Local-source question, so tapping "escape" re-classifies.
+            classifyResult = deleteClassification(layer = RoutingLayer.Local),
+            // The re-classify (skipLayer1=true) hits the empty wallet.
+            skipLayer1Result = IntentClassification(
+                intent = ChatIntent.InsufficientCredits,
+                confidence = 1.0f,
+                layer = RoutingLayer.Classifier,
+                preBuiltToolCall = null,
+            ),
+        )
+        val vm = makeVm(repo = repo)
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("delete milk from shopping"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        assertNotNull(vm.screenState.value.pendingChoice)
+
+        val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            vm.sideEffect.first()
+        }
+
+        vm.sendIntent(ChatScreenIntent.OnChoiceSelected("escape"))
+        testScheduler.advanceUntilIdle()
+
+        val message = assertIs<ChatScreenSideEffect.ShowAssistantMessage>(
+            effectDeferred.await(),
+            "A 402 on the reject path must answer in the chat, not fail silently",
+        )
+        assertEquals("chat_insufficient_credits", message.messageKey)
+        assertNotNull(message.paywallCtaCredits, "The reject path offers the same paywall CTA")
+        assertEquals(
+            0,
+            repo.agentStepCallCount,
+            "Escalating to the agent here bills 3 credits to a wallet that just refused 1 — the " +
+                "quiet version of the same bug",
+        )
+        assertFalse(vm.screenState.value.isProcessing, "The turn is over — the spinner must stop")
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // G5-G6. The SAME wall on Layer 3 — Deep Thinking ON (2026-07-16)
+    // ══════════════════════════════════════════════════════════════════════════
+    //
+    // Found by @bug-pattern-reviewer AFTER the Layer 2 fix shipped: the classify path was fixed
+    // and its Layer 3 sibling was left with all three defects intact (CTA-less snackbar,
+    // outcome="error", credits_used=3 on a turn charged 0). That is the recurring shape — "fixed
+    // one emit site, the sibling kept the bug" — so these tests exist to hold the LAYER 3 door
+    // shut, not just to cover a branch.
+    //
+    // This is a live path, not a corner: Deep Thinking ON skips Layer 2 by design and lands here
+    // directly. The likeliest repro is a free user with 1-2 credits — Layer 2 passes and takes 1,
+    // Layer 3 wants 3 → 402.
+
+    // ── G5. Layer 3 refusal answers with the CTA, like Layer 2 does ──────────
+
+    @Test
+    fun deepThinkingSend_layer3InsufficientCredits_showsSameCtaReplyAsLayer2() = runTest {
+        val vm = makeVmDeepThinkingOutOfCredits()
+
+        val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            vm.sideEffect.first()
+        }
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("what should I pack for a trip?"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+
+        val message = assertIs<ChatScreenSideEffect.ShowAssistantMessage>(
+            effectDeferred.await(),
+            "A refused Layer 3 turn must answer in the chat. A ShowSnackbar here is the shipped " +
+                "bug: it vanishes, carries no button, and the owner asked for the Become Pro CTA " +
+                "on the out-of-credits reply — on every path that can produce one",
+        )
+        assertEquals("chat_insufficient_credits", message.messageKey)
+        assertNotNull(
+            message.paywallCtaCredits,
+            "Out of credits on Layer 3 is the same conversion moment as on Layer 2 — a snackbar " +
+                "tells the user to upgrade and gives them nothing to tap",
+        )
+        assertNull(message.askAiForText, "Never offer 'Ask AI' to an empty wallet")
+    }
+
+    // ── G6. Layer 3 refusal is reported honestly ─────────────────────────────
+    //
+    // outcome="error" buried every credit refusal in the same bucket as "the agent crashed", and
+    // credits_used defaults to creditsForLayer(FullChat)=3 — inflating the sum by 3 per refusal
+    // on a turn the server charged 0 for. routed_layer must still say FullChat: the funnel needs
+    // to tell a 1-credit refusal from a 3-credit one even though both charged nothing.
+
+    @Test
+    fun deepThinkingSend_layer3InsufficientCredits_reportsRefusalNotErrorAndZeroCreditsUsed() = runTest {
+        val analytics = FakeAnalyticsTracker()
+        val vm = makeVmDeepThinkingOutOfCredits(analytics = analytics)
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("what should I pack for a trip?"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        val params = analytics.paramsOf("ai_chat_response_received")
+        assertNotNull(params, "The refused turn must still close the funnel")
+        assertEquals(
+            "insufficient_credits",
+            params["outcome"],
+            "outcome='error' cannot distinguish 'out of credits' from 'the AI fell over' — one " +
+                "needs a paywall, the other needs an on-call",
+        )
+        assertEquals(
+            0,
+            params["credits_used"],
+            "402 means the server charged nothing; the FullChat list price (3) is what the turn " +
+                "WOULD have cost, not what it did",
+        )
+        assertEquals(
+            "FullChat",
+            params["routed_layer"],
+            "The refusal happened on Layer 3 and the funnel should say so",
+        )
     }
 }

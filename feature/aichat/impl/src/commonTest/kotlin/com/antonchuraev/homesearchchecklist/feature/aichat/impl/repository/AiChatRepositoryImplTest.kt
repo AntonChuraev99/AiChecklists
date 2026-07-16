@@ -5,12 +5,9 @@ import com.antonchuraev.homesearchchecklist.core.datastore.api.AiChatPreferences
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatIntent
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatRole
-import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.IntentClassification
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.RoutingLayer
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ToolCall
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.ChatLocale
-import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.LocalIntentRouter
-import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AgentTranscriptEntry
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AgentStepResult
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatAgentApiService
@@ -26,24 +23,28 @@ import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserD
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 
-// ─── Fakes ────────────────────────────────────────────────────────────────────
+/*
+ * Routing contract after the Layer 1 disconnect (decision 2026-07-15,
+ * docs/decisions/2026-07-15-remove-ai-chat-layer1.md).
+ *
+ * There is no local router left to inject, so these tests lock the two-tier ladder:
+ *   Deep Thinking ON → Layer 3 (skips Layer 2)
+ *   otherwise        → Layer 2 → (vague / unreachable / unregistered) → Layer 3
+ *
+ * The parser itself is NOT covered here — it stays alive and fully tested in
+ * parser/LocalIntentRouterImplTest.kt (168 tests). Those tests are what makes re-routing
+ * Layer 1 a revert rather than a rewrite; do not delete them because this file stopped
+ * referencing the router.
+ */
 
-private class FakeLocalIntentRouter(
-    private val result: IntentClassification,
-) : LocalIntentRouter {
-    var callCount = 0
-    override suspend fun route(input: String, locale: ChatLocale): IntentClassification {
-        callCount++
-        return result
-    }
-}
+// ─── Fakes ────────────────────────────────────────────────────────────────────
 
 private class FakeChatClassifierApiService(
     private val result: RemoteClassificationResult,
@@ -145,7 +146,7 @@ private class FakeAiChatPreferencesRepository(
     override val deepThinkingEnabledFlow: Flow<Boolean> = _flow
     override suspend fun setDeepThinkingEnabled(enabled: Boolean) { _flow.value = enabled }
 
-    // D2's default-list preference is a ViewModel concern; the router never reads it.
+    // D2's default-list preference is a ViewModel concern; the repository never reads it.
     private val _defaultChecklistId = MutableStateFlow<Long?>(null)
     override val defaultChecklistIdFlow: Flow<Long?> = _defaultChecklistId
     override suspend fun setDefaultChecklistId(checklistId: Long?) { _defaultChecklistId.value = checklistId }
@@ -153,105 +154,78 @@ private class FakeAiChatPreferencesRepository(
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-private fun highConfidenceLayer1(intent: ChatIntent = ChatIntent.CreateItem) = IntentClassification(
-    intent = intent,
-    confidence = 0.9f,
-    layer = RoutingLayer.Local,
-)
-
-private fun lowConfidenceLayer1(intent: ChatIntent = ChatIntent.Unknown("?")) = IntentClassification(
-    intent = intent,
-    confidence = 0.5f,
-    layer = RoutingLayer.Local,
+private data class Fixture(
+    val repo: AiChatRepositoryImpl,
+    val classifier: FakeChatClassifierApiService,
+    val completion: FakeChatCompletionApiService,
 )
 
 private fun makeRepo(
-    layer1Result: IntentClassification,
     remoteResult: RemoteClassificationResult = RemoteClassificationResult.ServiceError,
     completionResult: RemoteCompletionResult = RemoteCompletionResult.ServiceError,
     userId: String = "user-123",
     deepThinking: Boolean = false,
-): Triple<AiChatRepositoryImpl, FakeLocalIntentRouter, FakeChatClassifierApiService> {
-    val router = FakeLocalIntentRouter(layer1Result)
+): Fixture {
     val classifier = FakeChatClassifierApiService(remoteResult)
+    val completion = FakeChatCompletionApiService(completionResult)
     val repo = AiChatRepositoryImpl(
-        router = router,
         classifierApi = classifier,
-        completionApi = FakeChatCompletionApiService(completionResult),
+        completionApi = completion,
         transcribeApi = FakeTranscribeAudioApiService(),
         chatAgentApi = FakeChatAgentApiService(),
         userDataRepository = FakeUserDataRepository(userId),
         aiChatPreferencesRepository = FakeAiChatPreferencesRepository(deepThinking),
         logger = NoOpLogger,
     )
-    return Triple(repo, router, classifier)
+    return Fixture(repo, classifier, completion)
 }
 
-/** Variant that exposes the [FakeChatCompletionApiService] for argument-capture assertions. */
-private data class RepoWithCompletion(
-    val repo: AiChatRepositoryImpl,
-    val completion: FakeChatCompletionApiService,
+private fun layer2Success(
+    intent: ChatIntent = ChatIntent.CreateItem,
+    toolCall: ToolCall? = null,
+    confidence: Float = 0.95f,
+) = RemoteClassificationResult.Success(
+    intent = intent,
+    toolCall = toolCall,
+    confidence = confidence,
+    creditsRemaining = 42,
 )
-
-private fun makeRepoWithCompletion(
-    completionResult: RemoteCompletionResult,
-    userId: String = "user-123",
-): RepoWithCompletion {
-    val completion = FakeChatCompletionApiService(completionResult)
-    val repo = AiChatRepositoryImpl(
-        router = FakeLocalIntentRouter(highConfidenceLayer1()),
-        classifierApi = FakeChatClassifierApiService(RemoteClassificationResult.ServiceError),
-        completionApi = completion,
-        transcribeApi = FakeTranscribeAudioApiService(),
-        chatAgentApi = FakeChatAgentApiService(),
-        userDataRepository = FakeUserDataRepository(userId),
-        aiChatPreferencesRepository = FakeAiChatPreferencesRepository(),
-        logger = NoOpLogger,
-    )
-    return RepoWithCompletion(repo, completion)
-}
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 class AiChatRepositoryImplTest {
 
-    // ── 1. Layer 1 high confidence → no Layer 2 call ─────────────────────────
+    // ── 1. Every message starts at Layer 2 — there is no free local shortcut ──
+    //
+    // The single most important assertion in this file: a command-shaped phrase that Layer 1
+    // used to answer for free now goes to the cloud classifier and costs a credit. If this
+    // test starts failing because something short-circuits Layer 2, that "something" is a
+    // second local parser — forbidden by the ADR; re-route the real Layer 1 instead.
 
     @Test
-    fun classify_layer1HighConfidence_doesNotCallLayer2() = runTest {
-        val (repo, router, classifier) = makeRepo(
-            layer1Result = highConfidenceLayer1(ChatIntent.CreateItem),
+    fun classify_commandPhrase_alwaysCallsLayer2() = runTest {
+        val (repo, classifier, _) = makeRepo(
+            remoteResult = layer2Success(ChatIntent.CreateItem),
         )
 
         val result = repo.classify("add milk to shopping", ChatLocale.En)
 
-        assertEquals(1, router.callCount, "Layer 1 must be called exactly once")
-        assertEquals(0, classifier.callCount, "Layer 2 must NOT be called when confidence >= 0.7")
-        assertEquals(RoutingLayer.Local, result.layer)
-        assertIs<ChatIntent.CreateItem>(result.intent)
-        assertEquals(0.9f, result.confidence)
+        assertEquals(1, classifier.callCount, "Layer 2 must be called — Layer 1 is disconnected")
+        assertEquals(RoutingLayer.Classifier, result.layer, "Local routing must never be produced")
     }
 
-    // ── 2. Layer 1 low confidence + Layer 2 Success → returns Classifier result
+    // ── 2. Layer 2 Success → returns Classifier result with the pre-built ToolCall ──
 
     @Test
-    fun classify_layer1LowConf_layer2Success_returnsClassifierResult() = runTest {
+    fun classify_layer2Success_returnsClassifierResult() = runTest {
         val preBuiltToolCall = ToolCall.AddItem(checklistHint = "shopping", itemText = "milk")
-        val remoteSuccess = RemoteClassificationResult.Success(
-            intent = ChatIntent.CreateItem,
-            toolCall = preBuiltToolCall,
-            confidence = 0.95f,
-            creditsRemaining = 42,
-        )
-        val (repo, router, classifier) = makeRepo(
-            layer1Result = lowConfidenceLayer1(),
-            remoteResult = remoteSuccess,
+        val (repo, classifier, _) = makeRepo(
+            remoteResult = layer2Success(ChatIntent.CreateItem, preBuiltToolCall),
         )
 
         val result = repo.classify("add milk to shopping", ChatLocale.En)
 
-        assertEquals(1, router.callCount, "Layer 1 must still run")
-        assertEquals(1, classifier.callCount, "Layer 2 must be called when confidence < 0.7")
+        assertEquals(1, classifier.callCount)
         assertEquals(RoutingLayer.Classifier, result.layer)
         assertIs<ChatIntent.CreateItem>(result.intent)
         assertEquals(0.95f, result.confidence)
@@ -261,91 +235,146 @@ class AiChatRepositoryImplTest {
         assertEquals("shopping", toolCall.checklistHint)
     }
 
-    // ── 3. Layer 1 low confidence + InsufficientCredits → returns Unknown ────
+    // ── 3. Layer 2 vague (FreeForm) → escalates to Layer 3 ───────────────────
 
     @Test
-    fun classify_layer1LowConf_insufficientCredits_returnsUnknown() = runTest {
-        val (repo, _, classifier) = makeRepo(
-            layer1Result = lowConfidenceLayer1(),
+    fun classify_layer2Vague_escalatesToLayer3() = runTest {
+        val (repo, _, _) = makeRepo(
+            remoteResult = layer2Success(ChatIntent.FreeForm, confidence = 0.5f),
+        )
+
+        val result = repo.classify("what should I do this week", ChatLocale.En)
+
+        assertIs<ChatIntent.FreeForm>(result.intent)
+        assertEquals(1.0f, result.confidence)
+        assertEquals(RoutingLayer.FullChat, result.layer)
+        assertNull(result.preBuiltToolCall)
+    }
+
+    // ── 4. Layer 2 Unknown → escalates to Layer 3 ────────────────────────────
+
+    @Test
+    fun classify_layer2Unknown_escalatesToLayer3() = runTest {
+        val (repo, _, _) = makeRepo(
+            remoteResult = layer2Success(ChatIntent.Unknown("?"), confidence = 0.2f),
+        )
+
+        val result = repo.classify("asdfgh", ChatLocale.En)
+
+        assertIs<ChatIntent.FreeForm>(result.intent)
+        assertEquals(RoutingLayer.FullChat, result.layer)
+    }
+
+    // ── 5. InsufficientCredits → the reason must SURVIVE classification ───────
+    //
+    // 🔴 RED repro, 2026-07-16.
+    // docs/todos/2026-07-16-aichat-insufficient-credits-shows-unknown-hint.md
+    //
+    // This test previously asserted `assertIs<ChatIntent.Unknown>(result.intent)` and called it
+    // "caller shows the paywall hint". Both halves were false: no caller shows a paywall hint,
+    // because by then there is nothing left to show one FROM. The test was pinning the bug as
+    // the spec, so it is rewritten rather than kept — the behaviour it locked is the defect.
+    //
+    // What a user gets today: free tier, 10 credits spent, types «добавь молоко» → HTTP 402 →
+    // this branch flattens the refusal into ChatIntent.Unknown → ChatViewModel renders
+    // "Sorry, I didn't quite catch that" + an "Ask AI" button. The app blames the user's phrasing
+    // for a billing state and never offers the paywall — the exact conversion moment the Layer 1
+    // disconnect was accepted to buy (docs/decisions/2026-07-15-remove-ai-chat-layer1.md).
+    //
+    // The reason is erased HERE, so no call-site can recover it: the fix has to carry it in the
+    // type. Two candidate shapes (a ChatIntent variant, or an outcome wrapper around classify())
+    // are both fine — this test therefore fences the two WRONG answers instead of naming the
+    // right one. If the wrapper shape wins, classify()'s signature changes and this test moves to
+    // the new seam: keep the property, drop the type.
+    //
+    // Asserted through the user's wallet, both directions:
+    //   • NOT Unknown  → "I didn't understand you" (the shipped lie).
+    //   • NOT FreeForm → escalation to Layer 3, i.e. billing 3 more credits to a wallet that just
+    //                    refused 1. Quieter than the lie, and worse.
+
+    @Test
+    fun classify_insufficientCredits_neitherClaimsNotUnderstoodNorEscalatesToPaidLayer() = runTest {
+        val (repo, classifier, _) = makeRepo(
             remoteResult = RemoteClassificationResult.InsufficientCredits,
         )
 
-        val result = repo.classify("move things from monday to next week", ChatLocale.En)
+        val result = repo.classify("add milk to shopping", ChatLocale.En)
 
         assertEquals(1, classifier.callCount)
-        assertIs<ChatIntent.Unknown>(result.intent)
-        assertEquals(RoutingLayer.Classifier, result.layer)
-        assertEquals(0f, result.confidence)
-        assertNull(result.preBuiltToolCall)
+        assertFalse(
+            result.intent is ChatIntent.Unknown,
+            "402 must not be reported as 'message not understood': the ViewModel renders that as " +
+                "chat_unknown_intent_hint, blaming the user's phrasing for an empty wallet",
+        )
+        assertFalse(
+            result.intent is ChatIntent.FreeForm,
+            "402 must not escalate to Layer 3 either — that bills 3 credits to a wallet that just " +
+                "refused to pay 1",
+        )
     }
 
-    // ── 4. Layer 1 low confidence + NetworkError → graceful degradation ───────
+    // ── 6. NetworkError → Layer 3, NOT a local fallback ──────────────────────
+    //
+    // Layer 1 used to absorb this (chat worked offline). It cannot any more, so the request
+    // escalates to Layer 3 and the ViewModel surfaces the failure as a visible
+    // `chat_completion_error` reply. What must NOT happen is a Local-layer result: that would
+    // mean a fallback parser crept back in.
 
     @Test
-    fun classify_layer1LowConf_networkError_returnsLayer1Result() = runTest {
-        val layer1 = lowConfidenceLayer1(ChatIntent.Unknown("?"))
-        val (repo, _, classifier) = makeRepo(
-            layer1Result = layer1,
+    fun classify_layer2NetworkError_escalatesToLayer3() = runTest {
+        val (repo, classifier, _) = makeRepo(
             remoteResult = RemoteClassificationResult.NetworkError,
         )
 
-        val result = repo.classify("ambiguous input", ChatLocale.En)
+        val result = repo.classify("add milk to shopping", ChatLocale.En)
 
         assertEquals(1, classifier.callCount)
-        // Must return Layer 1 result unchanged
-        assertEquals(RoutingLayer.Local, result.layer)
-        assertEquals(layer1.confidence, result.confidence)
-        assertNull(result.preBuiltToolCall)
+        assertIs<ChatIntent.FreeForm>(result.intent)
+        assertEquals(RoutingLayer.FullChat, result.layer)
     }
 
-    // ── 5. Layer 1 low confidence + ServiceError → graceful degradation ───────
+    // ── 7. ServiceError → Layer 3 ────────────────────────────────────────────
 
     @Test
-    fun classify_layer1LowConf_serviceError_returnsLayer1Result() = runTest {
-        val layer1 = lowConfidenceLayer1(ChatIntent.Unknown("?"))
-        val (repo, _, classifier) = makeRepo(
-            layer1Result = layer1,
+    fun classify_layer2ServiceError_escalatesToLayer3() = runTest {
+        val (repo, classifier, _) = makeRepo(
             remoteResult = RemoteClassificationResult.ServiceError,
         )
 
         val result = repo.classify("ambiguous input", ChatLocale.En)
 
         assertEquals(1, classifier.callCount)
-        assertEquals(RoutingLayer.Local, result.layer)
-        assertEquals(layer1.confidence, result.confidence)
+        assertIs<ChatIntent.FreeForm>(result.intent)
+        assertEquals(RoutingLayer.FullChat, result.layer)
     }
 
-    // ── 6. Blank userId → Layer 2 skipped entirely ───────────────────────────
+    // ── 8. Blank userId → Layer 2 skipped, escalate to Layer 3 ───────────────
+    //
+    // Unregistered user (web before login). Layer 1 used to answer locally; now the only honest
+    // outcome is Layer 3, where agentStep short-circuits to ServiceError and the user gets a
+    // visible error reply instead of silence.
 
     @Test
-    fun classify_blankUserId_layer2NotCalled() = runTest {
-        val router = FakeLocalIntentRouter(lowConfidenceLayer1())
-        val classifier = FakeChatClassifierApiService(RemoteClassificationResult.InsufficientCredits)
-        val repo = AiChatRepositoryImpl(
-            router = router,
-            classifierApi = classifier,
-            completionApi = FakeChatCompletionApiService(),
-            transcribeApi = FakeTranscribeAudioApiService(),
-            userDataRepository = FakeUserDataRepository(userId = ""),
-            chatAgentApi = FakeChatAgentApiService(),
-                aiChatPreferencesRepository = FakeAiChatPreferencesRepository(),
-            logger = NoOpLogger,
+    fun classify_blankUserId_skipsLayer2AndEscalatesToLayer3() = runTest {
+        val (repo, classifier, _) = makeRepo(
+            remoteResult = layer2Success(ChatIntent.CreateItem),
+            userId = "",
         )
 
         val result = repo.classify("some input", ChatLocale.En)
 
         assertEquals(0, classifier.callCount, "Layer 2 must NOT be called when userId is blank")
-        assertEquals(RoutingLayer.Local, result.layer)
+        assertIs<ChatIntent.FreeForm>(result.intent)
+        assertEquals(RoutingLayer.FullChat, result.layer)
     }
 
-    // ── 7. Layer 2 called with correct userId and text ────────────────────────
+    // ── 9. Layer 2 called with correct userId and text ───────────────────────
 
     @Test
     fun classify_layer2_receivesCorrectUserIdAndText() = runTest {
         val expectedUserId = "firebase-uid-abc123"
         val inputText = "move things from monday to next week"
-        val (repo, _, classifier) = makeRepo(
-            layer1Result = lowConfidenceLayer1(),
+        val (repo, classifier, _) = makeRepo(
             remoteResult = RemoteClassificationResult.NetworkError,
             userId = expectedUserId,
         )
@@ -356,43 +385,144 @@ class AiChatRepositoryImplTest {
         assertEquals(inputText, classifier.lastText)
     }
 
-    // ── 8. Layer 1 exactly at threshold (0.7) → no Layer 2 call ─────────────
+    // ── Deep Thinking toggle ─────────────────────────────────────────────────
+
+    // ── 10. Deep Thinking ON → straight to Layer 3, Layer 2 never charged ────
 
     @Test
-    fun classify_layer1ExactlyAtThreshold_doesNotCallLayer2() = runTest {
-        val atThreshold = IntentClassification(
-            intent = ChatIntent.CreateItem,
-            confidence = 0.7f,
-            layer = RoutingLayer.Local,
-        )
-        val (repo, _, classifier) = makeRepo(
-            layer1Result = atThreshold,
+    fun classify_deepThinkingOn_returnsFreeFormWithoutCallingLayer2() = runTest {
+        val (repo, classifier, _) = makeRepo(
+            remoteResult = layer2Success(ChatIntent.CreateItem),
+            deepThinking = true,
         )
 
-        val result = repo.classify("add milk", ChatLocale.En)
+        val result = repo.classify("плануй мою неделю", ChatLocale.Ru)
 
-        assertEquals(0, classifier.callCount, "Threshold is >=, so 0.7 must not escalate")
-        assertEquals(RoutingLayer.Local, result.layer)
+        assertIs<ChatIntent.FreeForm>(result.intent)
+        assertEquals(1.0f, result.confidence)
+        assertEquals(RoutingLayer.FullChat, result.layer)
+        assertEquals(0, classifier.callCount,
+            "Deep Thinking must skip Layer 2 — an open question costs 3 credits, not 4")
     }
 
-    // ── 9. completeFreeForm: success → returns RemoteCompletionResult.Success ──
+    // ── 11. Deep Thinking ON + command phrase → still Layer 3 (accepted cost) ──
+    //
+    // Documents a deliberate regression. The old guard (2026-05-18) let a confident Layer 1
+    // command win over the toggle so «добавь молоко» stayed free. With Layer 1 disconnected
+    // nothing local can recognise a command, so the toggle wins and the user pays 3 credits.
+    // Accepted knowingly in the ADR — if this test is what pushes someone to "just add a tiny
+    // local check", that check is the forbidden second parser.
+
+    @Test
+    fun classify_deepThinkingOn_commandPhrase_stillRoutesToLayer3() = runTest {
+        val (repo, classifier, _) = makeRepo(
+            remoteResult = layer2Success(ChatIntent.CreateItem),
+            deepThinking = true,
+        )
+
+        val result = repo.classify("добавь молоко в покупки", ChatLocale.Ru)
+
+        assertIs<ChatIntent.FreeForm>(result.intent)
+        assertEquals(RoutingLayer.FullChat, result.layer)
+        assertEquals(0, classifier.callCount)
+    }
+
+    // ── 12. Deep Thinking OFF → Layer 2, toggle stays meaningful ─────────────
+    //
+    // Paired with #10: together they prove ON and OFF are still different routes. If both ever
+    // land on the same layer, the toggle is a lie and the change that caused it is wrong.
+
+    @Test
+    fun classify_deepThinkingOff_routesToLayer2() = runTest {
+        val (repo, classifier, _) = makeRepo(
+            remoteResult = layer2Success(ChatIntent.CreateItem),
+            deepThinking = false,
+        )
+
+        val result = repo.classify("плануй мою неделю", ChatLocale.Ru)
+
+        assertEquals(1, classifier.callCount, "Deep Thinking OFF must start at Layer 2")
+        assertEquals(RoutingLayer.Classifier, result.layer)
+    }
+
+    // ── skipLayer1 (reject flow) ─────────────────────────────────────────────
+
+    // ── 13. skipLayer1=true → Layer 2 is called ──────────────────────────────
+
+    @Test
+    fun classify_skipLayer1_callsClassifierApi() = runTest {
+        val (repo, classifier, _) = makeRepo(
+            remoteResult = RemoteClassificationResult.NetworkError,
+        )
+
+        repo.classify("how do I add an attachment", ChatLocale.En, skipLayer1 = true)
+
+        assertEquals(1, classifier.callCount, "Layer2 classifier must be called when skipLayer1=true")
+    }
+
+    // ── 14. skipLayer1=true ignores the Deep Thinking toggle ─────────────────
+    //
+    // The reject flow ("I meant something else") is an explicit ask to re-interpret a concrete
+    // command, so it must start at Layer 2 even with Deep Thinking ON — otherwise rejecting a
+    // preview would dump the user into free-form chat. This is the only behaviour `skipLayer1`
+    // still controls now that Layer 1 is disconnected.
+
+    @Test
+    fun classify_skipLayer1_deepThinkingOn_stillRoutesToLayer2() = runTest {
+        val (repo, classifier, _) = makeRepo(
+            remoteResult = layer2Success(ChatIntent.DeleteItem),
+            deepThinking = true,
+        )
+
+        val result = repo.classify("delete milk", ChatLocale.En, skipLayer1 = true)
+
+        assertEquals(1, classifier.callCount,
+            "skipLayer1=true must NOT honour Deep Thinking — the reject flow wants Layer 2")
+        assertEquals(RoutingLayer.Classifier, result.layer)
+        assertIs<ChatIntent.DeleteItem>(result.intent)
+    }
+
+    // ── 15. skipLayer1=true + Layer2 vague → FreeForm for Layer 3 ────────────
+
+    @Test
+    fun classify_skipLayer1_layer2Vague_returnsFreeForm() = runTest {
+        val (repo, _, _) = makeRepo(
+            remoteResult = layer2Success(ChatIntent.FreeForm, confidence = 0.5f),
+        )
+
+        val result = repo.classify("how do I add an attachment", ChatLocale.En, skipLayer1 = true)
+
+        assertIs<ChatIntent.FreeForm>(result.intent)
+        assertEquals(1.0f, result.confidence)
+        assertEquals(RoutingLayer.FullChat, result.layer)
+        assertNull(result.preBuiltToolCall)
+    }
+
+    // ── 16. skipLayer1=true + Layer2 NetworkError → FreeForm for Layer 3 ─────
+
+    @Test
+    fun classify_skipLayer1_layer2NetworkError_returnsFreeForm() = runTest {
+        val (repo, classifier, _) = makeRepo(
+            remoteResult = RemoteClassificationResult.NetworkError,
+        )
+
+        val result = repo.classify("how do I add an attachment", ChatLocale.En, skipLayer1 = true)
+
+        assertEquals(1, classifier.callCount)
+        assertIs<ChatIntent.FreeForm>(result.intent)
+        assertEquals(RoutingLayer.FullChat, result.layer)
+    }
+
+    // ── completeFreeForm (Layer 3) ───────────────────────────────────────────
+
+    // ── 17. completeFreeForm: success → returns RemoteCompletionResult.Success ──
 
     @Test
     fun completeFreeForm_success_returnsSuccessResult() = runTest {
         val expectedContent = "Here are some suggestions for your week."
-        val router = FakeLocalIntentRouter(highConfidenceLayer1())
-        val completionApi = FakeChatCompletionApiService(
-            RemoteCompletionResult.Success(content = expectedContent, creditsRemaining = 297)
-        )
-        val repo = AiChatRepositoryImpl(
-            router = router,
-            classifierApi = FakeChatClassifierApiService(RemoteClassificationResult.ServiceError),
-            completionApi = completionApi,
-            transcribeApi = FakeTranscribeAudioApiService(),
-            userDataRepository = FakeUserDataRepository("user-xyz"),
-            chatAgentApi = FakeChatAgentApiService(),
-                aiChatPreferencesRepository = FakeAiChatPreferencesRepository(),
-            logger = NoOpLogger,
+        val (repo, _, completion) = makeRepo(
+            completionResult = RemoteCompletionResult.Success(content = expectedContent, creditsRemaining = 297),
+            userId = "user-xyz",
         )
 
         val result = repo.completeFreeForm(
@@ -401,52 +531,19 @@ class AiChatRepositoryImplTest {
             checklistsSummary = emptyList(),
         )
 
-        assertEquals(1, completionApi.callCount)
+        assertEquals(1, completion.callCount)
         assertIs<RemoteCompletionResult.Success>(result)
         assertEquals(expectedContent, result.content)
         assertEquals(297, result.creditsRemaining)
     }
 
-    // ── 10. completeFreeForm: blank userId → ServiceError, no network call ─────
-
-    @Test
-    fun completeFreeForm_blankUserId_returnsServiceError() = runTest {
-        val completionApi = FakeChatCompletionApiService(RemoteCompletionResult.Success("x", 0))
-        val repo = AiChatRepositoryImpl(
-            router = FakeLocalIntentRouter(highConfidenceLayer1()),
-            classifierApi = FakeChatClassifierApiService(RemoteClassificationResult.ServiceError),
-            completionApi = completionApi,
-            transcribeApi = FakeTranscribeAudioApiService(),
-            userDataRepository = FakeUserDataRepository(userId = ""),
-            chatAgentApi = FakeChatAgentApiService(),
-                aiChatPreferencesRepository = FakeAiChatPreferencesRepository(),
-            logger = NoOpLogger,
-        )
-
-        val result = repo.completeFreeForm(
-            messages = emptyList(),
-            locale = ChatLocale.En,
-            checklistsSummary = emptyList(),
-        )
-
-        assertEquals(0, completionApi.callCount, "No network call when userId is blank")
-        assertIs<RemoteCompletionResult.ServiceError>(result)
-    }
-
-    // ── 11. completeFreeForm: InsufficientCredits propagated ─────────────────
+    // ── 18. completeFreeForm: InsufficientCredits propagated ─────────────────
 
     @Test
     fun completeFreeForm_insufficientCredits_propagatedToCallerUnchanged() = runTest {
-        val completionApi = FakeChatCompletionApiService(RemoteCompletionResult.InsufficientCredits)
-        val repo = AiChatRepositoryImpl(
-            router = FakeLocalIntentRouter(highConfidenceLayer1()),
-            classifierApi = FakeChatClassifierApiService(RemoteClassificationResult.ServiceError),
-            completionApi = completionApi,
-            transcribeApi = FakeTranscribeAudioApiService(),
-            userDataRepository = FakeUserDataRepository("user-abc"),
-            chatAgentApi = FakeChatAgentApiService(),
-                aiChatPreferencesRepository = FakeAiChatPreferencesRepository(),
-            logger = NoOpLogger,
+        val (repo, _, _) = makeRepo(
+            completionResult = RemoteCompletionResult.InsufficientCredits,
+            userId = "user-abc",
         )
 
         val result = repo.completeFreeForm(
@@ -458,104 +555,7 @@ class AiChatRepositoryImplTest {
         assertIs<RemoteCompletionResult.InsufficientCredits>(result)
     }
 
-    // ── 12. Deep Thinking bypass: free-form input routes to Layer 3 ────────
-
-    @Test
-    fun classify_deepThinkingOn_layer1Unknown_returnsFreeForm() = runTest {
-        // Deep Thinking ON + Layer 1 cannot match a command → genuine open-ended question
-        // → must escalate to Layer 3 (FullChat). Layer 1 is still consulted (cheap), but
-        // its Unknown result lets the bypass kick in.
-        val router = FakeLocalIntentRouter(lowConfidenceLayer1())
-        val classifier = FakeChatClassifierApiService(RemoteClassificationResult.ServiceError)
-        val repo = AiChatRepositoryImpl(
-            router = router,
-            classifierApi = classifier,
-            completionApi = FakeChatCompletionApiService(),
-            transcribeApi = FakeTranscribeAudioApiService(),
-            userDataRepository = FakeUserDataRepository("user-deep"),
-            chatAgentApi = FakeChatAgentApiService(),
-                aiChatPreferencesRepository = FakeAiChatPreferencesRepository(initial = true),
-            logger = NoOpLogger,
-        )
-
-        val result = repo.classify("плануй мою неделю", ChatLocale.Ru)
-
-        assertIs<ChatIntent.FreeForm>(result.intent)
-        assertEquals(1.0f, result.confidence)
-        assertEquals(RoutingLayer.FullChat, result.layer)
-        assertEquals(0, classifier.callCount, "Layer 2 must NOT be called when deep thinking is ON")
-    }
-
-    // ── skipLayer1 tests ─────────────────────────────────────────────────────
-
-    // ── 14a. skipLayer1=true → router.route() NOT called ────────────────────
-
-    @Test
-    fun classify_skipLayer1_doesNotCallRouter() = runTest {
-        val (repo, router, _) = makeRepo(
-            layer1Result = highConfidenceLayer1(ChatIntent.CreateItem),
-            remoteResult = RemoteClassificationResult.NetworkError,
-        )
-
-        repo.classify("how do I add an attachment", ChatLocale.En, skipLayer1 = true)
-
-        assertEquals(0, router.callCount, "Layer1 router must NOT be called when skipLayer1=true")
-    }
-
-    // ── 14b. skipLayer1=true → classifierApi.classify() IS called ───────────
-
-    @Test
-    fun classify_skipLayer1_callsClassifierApi() = runTest {
-        val (repo, _, classifier) = makeRepo(
-            layer1Result = highConfidenceLayer1(ChatIntent.CreateItem),
-            remoteResult = RemoteClassificationResult.NetworkError,
-        )
-
-        repo.classify("how do I add an attachment", ChatLocale.En, skipLayer1 = true)
-
-        assertEquals(1, classifier.callCount, "Layer2 classifier must be called when skipLayer1=true")
-    }
-
-    // ── 14c. skipLayer1=true + Layer2 FreeForm → returns FreeForm for Layer3 ─
-
-    @Test
-    fun classify_skipLayer1_layer2Vague_returnsFreeForm() = runTest {
-        val vagueResult = RemoteClassificationResult.Success(
-            intent = ChatIntent.FreeForm,
-            toolCall = null,
-            confidence = 0.5f,
-            creditsRemaining = 10,
-        )
-        val (repo, _, _) = makeRepo(
-            layer1Result = highConfidenceLayer1(ChatIntent.CreateItem),
-            remoteResult = vagueResult,
-        )
-
-        val result = repo.classify("how do I add an attachment", ChatLocale.En, skipLayer1 = true)
-
-        assertIs<ChatIntent.FreeForm>(result.intent)
-        assertEquals(1.0f, result.confidence)
-        assertEquals(RoutingLayer.FullChat, result.layer)
-        assertNull(result.preBuiltToolCall)
-    }
-
-    // ── 14d. skipLayer1=true + Layer2 NetworkError → returns FreeForm for Layer3
-
-    @Test
-    fun classify_skipLayer1_layer2NetworkError_returnsFreeForm() = runTest {
-        val (repo, _, classifier) = makeRepo(
-            layer1Result = highConfidenceLayer1(ChatIntent.CreateItem),
-            remoteResult = RemoteClassificationResult.NetworkError,
-        )
-
-        val result = repo.classify("how do I add an attachment", ChatLocale.En, skipLayer1 = true)
-
-        assertEquals(1, classifier.callCount)
-        assertIs<ChatIntent.FreeForm>(result.intent)
-        assertEquals(RoutingLayer.FullChat, result.layer)
-    }
-
-    // ── 15. completeFreeForm: delegates messages/locale/checklists to completion API ─
+    // ── 19. completeFreeForm: delegates messages/locale/checklists to completion API ──
 
     @Test
     fun completeFreeForm_nonBlankUserId_delegatesAllArgsToCompletionApi() = runTest {
@@ -563,7 +563,7 @@ class AiChatRepositoryImplTest {
             ChatMessage(id = "1", role = ChatRole.User, content = "plan my week", timestamp = 1L),
         )
         val checklists = listOf(ChecklistContext("Shopping", 5, 2))
-        val (repo, completion) = makeRepoWithCompletion(
+        val (repo, _, completion) = makeRepo(
             completionResult = RemoteCompletionResult.Success("Sure!", 280),
             userId = "delegate-user",
         )
@@ -577,11 +577,11 @@ class AiChatRepositoryImplTest {
         assertEquals(checklists, completion.lastChecklistsSummary)
     }
 
-    // ── 16. completeFreeForm: blank userId → ServiceError, zero API calls ──────
+    // ── 20. completeFreeForm: blank userId → ServiceError, zero API calls ─────
 
     @Test
     fun completeFreeForm_blankUserId_returnsServiceErrorWithoutApiCall() = runTest {
-        val (repo, completion) = makeRepoWithCompletion(
+        val (repo, _, completion) = makeRepo(
             completionResult = RemoteCompletionResult.Success("unreachable", 0),
             userId = "",
         )
@@ -596,43 +596,14 @@ class AiChatRepositoryImplTest {
         assertIs<RemoteCompletionResult.ServiceError>(result)
     }
 
-    // ── 17. completeFreeForm: NetworkError propagated unchanged ───────────────
+    // ── 21. completeFreeForm: NetworkError propagated unchanged ──────────────
 
     @Test
     fun completeFreeForm_networkError_propagated() = runTest {
-        val (repo, _) = makeRepoWithCompletion(RemoteCompletionResult.NetworkError)
+        val (repo, _, _) = makeRepo(completionResult = RemoteCompletionResult.NetworkError)
 
         val result = repo.completeFreeForm(emptyList(), ChatLocale.En, emptyList())
 
         assertIs<RemoteCompletionResult.NetworkError>(result)
-    }
-
-    // ── 13. Deep Thinking + Layer 1 command-intent: Layer 1 wins ───────────────
-
-    @Test
-    fun classify_deepThinkingOn_layer1ConfidentCommand_returnsLayer1() = runTest {
-        // Real-world scenario (2026-05-18 ai_chat_feedback events): user leaves Deep
-        // Thinking ON between sessions, then types «добавь в дела купить ведра». Layer 1
-        // detects CreateItem with CONF_FULL — we MUST prefer that over burning 3 credits
-        // on Layer 3 free-form chat. Otherwise every command-shaped query costs 3 credits
-        // and answers «извините, не поняла».
-        val router = FakeLocalIntentRouter(highConfidenceLayer1(ChatIntent.CreateItem))
-        val classifier = FakeChatClassifierApiService(RemoteClassificationResult.ServiceError)
-        val repo = AiChatRepositoryImpl(
-            router = router,
-            classifierApi = classifier,
-            completionApi = FakeChatCompletionApiService(),
-            transcribeApi = FakeTranscribeAudioApiService(),
-            userDataRepository = FakeUserDataRepository("user-deep"),
-            chatAgentApi = FakeChatAgentApiService(),
-                aiChatPreferencesRepository = FakeAiChatPreferencesRepository(initial = true),
-            logger = NoOpLogger,
-        )
-
-        val result = repo.classify("добавь молоко в покупки", ChatLocale.Ru)
-
-        assertIs<ChatIntent.CreateItem>(result.intent)
-        assertEquals(RoutingLayer.Local, result.layer)
-        assertEquals(0, classifier.callCount, "Layer 2 must NOT be called — Layer 1 already won")
     }
 }

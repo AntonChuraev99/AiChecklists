@@ -1309,6 +1309,9 @@
     <string name="month_december">December</string>
     <string name="chat_unknown_intent_hint">I didn't catch that. Try «add milk to shopping» or «remind me on Friday at 6pm».</string>
     <string name="chat_ask_ai_fallback">Ask AI</string>
+    <!-- CTA on the out-of-credits reply. %1$s = Premium daily AI credits (Remote Config
+         ai_daily_limit_premium) — never hardcode the number, the label promises it. -->
+    <string name="chat_paywall_cta_credits">Become Pro and get %1$s credits now and every day</string>
 
     <!-- AI Chat Pricing Help Sheet -->
     <string name="chat_pricing_sheet_title">How AI Chat charges credits</string>

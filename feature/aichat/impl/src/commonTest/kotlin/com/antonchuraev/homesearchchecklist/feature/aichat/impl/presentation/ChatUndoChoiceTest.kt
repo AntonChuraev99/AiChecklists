@@ -172,6 +172,7 @@ internal fun buildVmRig(
         aiChatPreferencesRepository = prefs,
         analytics = HarnessAnalytics(),
         aiModelExperimentTracker = HarnessNoOpModelExperimentTracker,
+        remoteConfigProvider = HarnessRemoteConfigProvider(),
         logger = HarnessNoOpLogger,
     )
     return VmRig(viewModel, dispatcher, mutableListOf(), prefs)
