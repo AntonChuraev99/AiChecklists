@@ -3,7 +3,6 @@ package com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.co
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -44,11 +43,17 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Choi
  *
  * Meta ([meta], D2): a dimmed disambiguating suffix after a [META_SEPARATOR] ("Shopping • 12").
  * In the content-sized layout it trails the label; in the full-width layout ([fillWidth]) it is
- * pinned right by a weight spacer. It is never dropped — the count IS what tells two identically
- * named lists apart — so on a meta-carrying chip the LABEL yields instead: it ellipsises at
- * [maxLines]. That is a deliberate, narrow exception to this component's never-ellipsis rule:
- * a clipped name with a visible count still answers "which one?", a full name without the count
- * does not. Do NOT "fix" this by clipping or dropping the meta.
+ * pinned to the right edge by giving the LABEL the whole remaining width (`weight(1f)`, fill=true)
+ * — the meta is then simply the last, unweighted child, so it lands flush right no matter how
+ * short the label is. Do NOT reintroduce a weighted `Spacer` beside a weighted label: two
+ * weight-1f siblings split the free space 50/50, which parks the meta at "label + half the chip"
+ * and makes its x drift with the label's length (the bug fixed 2026-07-16).
+ *
+ * The meta is never dropped — the count IS what tells two identically named lists apart — so on a
+ * meta-carrying chip the LABEL yields instead: it ellipsises at [maxLines]. That is a deliberate,
+ * narrow exception to this component's never-ellipsis rule: a clipped name with a visible count
+ * still answers "which one?", a full name without the count does not. Do NOT "fix" this by
+ * clipping or dropping the meta.
  *
  * @param leadingIcon Optional 18dp icon drawn before the label (trash for Destructive, etc.).
  * @param meta        Optional dimmed suffix (a bare value — "12", not "12 items"). The full,
@@ -136,10 +141,13 @@ internal fun AiChoiceChip(
                 // See the KDoc: the label — not the meta — is what gives way when a chip carries
                 // both and the name is long.
                 overflow = if (showMeta) TextOverflow.Ellipsis else TextOverflow.Clip,
-                modifier = if (showMeta && fillWidth) Modifier.weight(1f, fill = false) else Modifier,
+                // fill = true (the default): the label claims ALL the space left over after the
+                // meta, so the meta is pushed flush against the right padding and every chip in
+                // the block lines its count up on the same x. See the KDoc — a weighted Spacer
+                // here would halve that space instead and let the meta float.
+                modifier = if (showMeta && fillWidth) Modifier.weight(1f) else Modifier,
             )
             if (showMeta) {
-                if (fillWidth) Spacer(modifier = Modifier.weight(1f))
                 Text(
                     text = "$META_SEPARATOR $meta",
                     style = MaterialTheme.typography.labelLarge,
