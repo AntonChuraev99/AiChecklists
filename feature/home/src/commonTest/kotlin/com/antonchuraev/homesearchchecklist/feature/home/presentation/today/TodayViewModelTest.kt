@@ -1,5 +1,6 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation.today
 
+import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavRoute
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
@@ -21,6 +22,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -96,7 +98,18 @@ private class FakeNavigator : AppNavigator {
     override fun navigateToAddToChecklistPicker(text: String, purpose: com.antonchuraev.homesearchchecklist.core.navigation.api.AddToChecklistPurpose) {}
 }
 
-private class FakeRepository(
+/** Records [AppLogger.error] calls so tests can assert failures are logged, not swallowed. */
+private class FakeAppLogger : AppLogger {
+    val errors = mutableListOf<Pair<String, Throwable?>>()
+    override fun debug(tag: String, message: String) {}
+    override fun info(tag: String, message: String) {}
+    override fun warning(tag: String, message: String) {}
+    override fun error(tag: String, message: String, throwable: Throwable?) {
+        errors.add(message to throwable)
+    }
+}
+
+private open class FakeRepository(
     private val remindersInRange: List<TodayReminderInfo> = emptyList()
 ) : ChecklistRepository {
     override val checklists: Flow<List<Checklist>> = flowOf(emptyList())
@@ -180,10 +193,12 @@ private fun itemLevelReminder(
 class TodayViewModelTest {
 
     private val dispatcher = UnconfinedTestDispatcher()
+    private lateinit var logger: FakeAppLogger
 
     @BeforeTest
     fun setUp() {
         Dispatchers.setMain(dispatcher)
+        logger = FakeAppLogger()
     }
 
     @AfterTest
@@ -206,7 +221,7 @@ class TodayViewModelTest {
     @Test
     fun emptyState_whenNoReminders() = runTest {
         val repo = FakeRepository(remindersInRange = emptyList())
-        val vm = TodayViewModel(repo, FakeNavigator())
+        val vm = TodayViewModel(repo, FakeNavigator(), logger)
 
         val state = vm.awaitState()
         assertIs<TodayScreenState.Empty>(state)
@@ -233,7 +248,7 @@ class TodayViewModelTest {
                 checklistLevelReminder(checklistId = 2L, reminderAt = FUTURE_TODAY_MS),
             )
         )
-        val vm = TodayViewModel(repo, FakeNavigator())
+        val vm = TodayViewModel(repo, FakeNavigator(), logger)
         val state = vm.awaitState()
 
         assertIs<TodayScreenState.Success>(state)
@@ -266,7 +281,7 @@ class TodayViewModelTest {
                 checklistLevelReminder(checklistId = 1L, reminderAt = earlierMs),
             )
         )
-        val vm = TodayViewModel(repo, FakeNavigator())
+        val vm = TodayViewModel(repo, FakeNavigator(), logger)
         val state = vm.awaitState()
 
         assertIs<TodayScreenState.Success>(state)
@@ -280,7 +295,7 @@ class TodayViewModelTest {
     @Test
     fun intentOnReminderClick_itemLevel_navigatesToFillDetail() = runTest {
         val navigator = FakeNavigator()
-        val vm = TodayViewModel(FakeRepository(), navigator)
+        val vm = TodayViewModel(FakeRepository(), navigator, logger)
 
         vm.sendIntent(TodayIntent.OnReminderClick(checklistId = 5L, fillId = 42L))
 
@@ -293,7 +308,7 @@ class TodayViewModelTest {
     @Test
     fun intentOnReminderClick_checklistLevel_navigatesToChecklistDetail() = runTest {
         val navigator = FakeNavigator()
-        val vm = TodayViewModel(FakeRepository(), navigator)
+        val vm = TodayViewModel(FakeRepository(), navigator, logger)
 
         vm.sendIntent(TodayIntent.OnReminderClick(checklistId = 7L, fillId = null))
 
@@ -306,7 +321,7 @@ class TodayViewModelTest {
     @Test
     fun intentOnCreateChecklistClick_navigatesToTemplates() = runTest {
         val navigator = FakeNavigator()
-        val vm = TodayViewModel(FakeRepository(), navigator)
+        val vm = TodayViewModel(FakeRepository(), navigator, logger)
 
         vm.sendIntent(TodayIntent.OnCreateChecklistClick)
 
@@ -322,7 +337,7 @@ class TodayViewModelTest {
                 itemLevelReminder(reminderAt = FUTURE_TODAY_MS, itemText = "Buy milk"),
             )
         )
-        val vm = TodayViewModel(repo, FakeNavigator())
+        val vm = TodayViewModel(repo, FakeNavigator(), logger)
         val state = vm.awaitState()
 
         assertIs<TodayScreenState.Success>(state)
@@ -343,7 +358,7 @@ class TodayViewModelTest {
                 checklistLevelReminder(reminderAt = FUTURE_TODAY_MS, isRecurring = true),
             )
         )
-        val vm = TodayViewModel(repo, FakeNavigator())
+        val vm = TodayViewModel(repo, FakeNavigator(), logger)
         val state = vm.awaitState()
 
         assertIs<TodayScreenState.Success>(state)
@@ -378,14 +393,14 @@ class TodayViewModelTest {
         assertTrue(regex.matches(formatted), "Time label must match HH:mm, got: $formatted")
     }
 
-    // ── 11. OnRefresh intent is a no-op (does not crash) ────────────────────
+    // ── 11. OnRefresh re-fetches data, it must not navigate ─────────────────
 
     @Test
-    fun intentOnRefresh_isNoOp() = runTest {
+    fun intentOnRefresh_doesNotNavigate() = runTest {
         val navigator = FakeNavigator()
-        val vm = TodayViewModel(FakeRepository(), navigator)
+        val vm = TodayViewModel(FakeRepository(), navigator, logger)
 
-        // Should not throw or change navigation state
+        // Refresh is a data concern — it must never move the user off the screen.
         vm.sendIntent(TodayIntent.OnRefresh)
 
         assertTrue(navigator.navigatedFillIds.isEmpty())
@@ -439,7 +454,7 @@ class TodayViewModelTest {
             )
         )
 
-        val vm = TodayViewModel(repo, FakeNavigator())
+        val vm = TodayViewModel(repo, FakeNavigator(), logger)
         val state = vm.awaitState()
 
         assertIs<TodayScreenState.Success>(state)
@@ -475,5 +490,86 @@ class TodayViewModelTest {
                 "Within today-future: starred must precede normal"
             )
         }
+    }
+
+    // ── 13. Repository failure → Error state + logged (never a silent spinner) ─
+
+    /**
+     * Regression guard for the prod incident where Home hung on an infinite spinner:
+     * the reminders flow threw before its first emission, which cancelled the
+     * `defaultStateIn` sharing scope and pinned screenState on Loading forever —
+     * with no log and no user-visible signal.
+     *
+     * The failure must be loud: a rendered Error state AND an AppLogger.error entry.
+     */
+    @Test
+    fun screenState_repositoryThrows_emitsErrorState_andLogsError() = runTest {
+        val cause = RuntimeException("DB failure")
+        val repo = object : FakeRepository() {
+            override fun observeRemindersInRange(
+                fromMs: Long,
+                toMs: Long,
+            ): Flow<List<TodayReminderInfo>> = flow { throw cause }
+        }
+
+        val vm = TodayViewModel(repo, FakeNavigator(), logger)
+        val state = vm.awaitState()
+
+        assertIs<TodayScreenState.Error>(state)
+        assertTrue(logger.errors.isNotEmpty(), "AppLogger.error must be called on repository failure")
+        assertEquals(
+            "today_range_fetch_failed" to cause,
+            logger.errors.first(),
+            "Must log the greppable event tag AND attach the original throwable (Crashlytics)",
+        )
+    }
+
+    /**
+     * A [TodayScreenState.Error] with no null-message payload is intentional: the raw
+     * exception text is untranslated and often null (the prod NPE had message == null).
+     * It belongs in the log only — the UI renders localized strings.
+     */
+    @Test
+    fun screenState_repositoryThrowsNullMessage_stillEmitsErrorState() = runTest {
+        val repo = object : FakeRepository() {
+            override fun observeRemindersInRange(
+                fromMs: Long,
+                toMs: Long,
+            ): Flow<List<TodayReminderInfo>> = flow { throw NullPointerException() }
+        }
+
+        val vm = TodayViewModel(repo, FakeNavigator(), logger)
+
+        assertIs<TodayScreenState.Error>(vm.awaitState())
+        assertTrue(logger.errors.isNotEmpty(), "AppLogger.error must be called on failure")
+    }
+
+    // ── 14. OnRefresh after an error re-subscribes and recovers ─────────────
+
+    @Test
+    fun intentOnRefresh_afterError_resubscribes_andEmitsSuccess() = runTest {
+        val repo = object : FakeRepository() {
+            var shouldThrow = true
+            override fun observeRemindersInRange(
+                fromMs: Long,
+                toMs: Long,
+            ): Flow<List<TodayReminderInfo>> =
+                if (shouldThrow) {
+                    flow { throw RuntimeException("DB failure") }
+                } else {
+                    flowOf(listOf(checklistLevelReminder(reminderAt = FUTURE_TODAY_MS)))
+                }
+        }
+
+        val vm = TodayViewModel(repo, FakeNavigator(), logger)
+        assertIs<TodayScreenState.Error>(vm.awaitState())
+
+        // Heal the repository, then retry: flatMapLatest must re-subscribe.
+        repo.shouldThrow = false
+        vm.sendIntent(TodayIntent.OnRefresh)
+
+        val recovered = vm.screenState.first { it is TodayScreenState.Success }
+        assertIs<TodayScreenState.Success>(recovered)
+        assertEquals(1, recovered.pastDue.size + recovered.today.size)
     }
 }

@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.Icon
@@ -64,6 +65,8 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiP
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiQuickAction
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiDefaultPromptChips
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiDockColor
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
+import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import dev.chrisbanes.haze.hazeSource
@@ -80,6 +83,9 @@ import aichecklists.core.designsystem.generated.resources.sign_in_network
 import aichecklists.core.designsystem.generated.resources.main_ask_gisti_placeholder
 import aichecklists.core.designsystem.generated.resources.main_create_checklist_action
 import aichecklists.core.designsystem.generated.resources.main_create_with_ai_action
+import aichecklists.core.designsystem.generated.resources.main_error_description
+import aichecklists.core.designsystem.generated.resources.main_error_retry
+import aichecklists.core.designsystem.generated.resources.main_error_title
 import aichecklists.core.designsystem.generated.resources.main_menu
 import aichecklists.core.designsystem.generated.resources.main_prompt_new_list
 import aichecklists.core.designsystem.generated.resources.main_prompt_photo
@@ -362,6 +368,20 @@ fun MainScreen(
                 ) {
                     CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
+            }
+            MainScreenState.Error -> {
+                EmptyState(
+                    icon = Icons.Outlined.ErrorOutline,
+                    title = stringResource(Res.string.main_error_title),
+                    description = stringResource(Res.string.main_error_description),
+                    action = {
+                        AppButton(
+                            text = stringResource(Res.string.main_error_retry),
+                            onClick = { viewModel.sendIntent(MainScreenIntent.OnRetry) },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    },
+                )
             }
             is MainScreenState.Success -> {
                 // Floating glassmorphism chat-dock overlay (mirrors ChecklistDetailScreen). The dock

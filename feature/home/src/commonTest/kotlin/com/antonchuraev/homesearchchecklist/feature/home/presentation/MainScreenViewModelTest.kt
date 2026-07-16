@@ -9,6 +9,7 @@ import androidx.navigation3.runtime.NavKey
 import com.antonchuraev.homesearchchecklist.core.auth.api.GoogleAuthRepository
 import com.antonchuraev.homesearchchecklist.core.auth.api.GoogleAuthState
 import com.antonchuraev.homesearchchecklist.core.auth.api.GoogleUser
+import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.AppResult
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.SyncRepository
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.SyncState
@@ -44,6 +45,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -87,15 +89,33 @@ private class FakeGoogleAuthRepository : GoogleAuthRepository {
     override suspend fun restoreSession() {}
 }
 
-private class FakeSyncRepository : SyncRepository {
+private class FakeSyncRepository(
+    /** When set, [pushPendingChanges] reports this failure as an [AppResult.Error] return value. */
+    private val pushError: Exception? = null,
+) : SyncRepository {
+    var pushCount = 0
     override val syncState: StateFlow<SyncState> = MutableStateFlow(SyncState.Disabled)
     override fun observeCloudChecklistIds(): Flow<AppResult<List<String>>> = flowOf()
     override fun observeCloudChecklist(cloudId: String): Flow<AppResult<Checklist>> = flowOf()
-    override suspend fun pushPendingChanges(): AppResult<Unit> = AppResult.Success(Unit)
+    override suspend fun pushPendingChanges(): AppResult<Unit> {
+        pushCount++
+        return pushError?.let { AppResult.Error(it) } ?: AppResult.Success(Unit)
+    }
     override suspend fun initialUpload(): AppResult<Unit> = AppResult.Success(Unit)
     override suspend fun pullAndMerge(): AppResult<Unit> = AppResult.Success(Unit)
     override suspend fun startListening() {}
     override suspend fun stopListening() {}
+}
+
+/** Records [AppLogger.error] calls so tests can assert failures are logged, not swallowed. */
+private class FakeAppLogger : AppLogger {
+    val errors = mutableListOf<Pair<String, Throwable?>>()
+    override fun debug(tag: String, message: String) {}
+    override fun info(tag: String, message: String) {}
+    override fun warning(tag: String, message: String) {}
+    override fun error(tag: String, message: String, throwable: Throwable?) {
+        errors.add(message to throwable)
+    }
 }
 
 private class FakeNavigator : AppNavigator {
@@ -133,7 +153,7 @@ private class FakeNavigator : AppNavigator {
     override fun navigateToAddToChecklistPicker(text: String, purpose: com.antonchuraev.homesearchchecklist.core.navigation.api.AddToChecklistPurpose) {}
 }
 
-private class FakeChecklistRepository(
+private open class FakeChecklistRepository(
     initialChecklists: List<Checklist> = emptyList(),
 ) : ChecklistRepository {
     override val checklists: Flow<List<Checklist>> = flowOf(initialChecklists)
@@ -225,26 +245,29 @@ private class FakeAnalyticsTracker : AnalyticsTracker {
 private fun makeViewModel(
     hintsRepository: HintsRepository,
     checklists: List<Checklist> = emptyList(),
+    checklistRepository: FakeChecklistRepository = FakeChecklistRepository(checklists),
+    syncRepository: SyncRepository = FakeSyncRepository(),
+    logger: AppLogger = FakeAppLogger(),
 ): MainScreenViewModel {
-    val fakeChecklistRepo = FakeChecklistRepository(checklists)
     val fakePaywallRepo = FakePaywallRepository()
     val fakeUserDataRepo = FakeUserDataRepository()
     val fakeRemoteConfig = FakeRemoteConfigProvider()
     return MainScreenViewModel(
-        repository = fakeChecklistRepo,
+        repository = checklistRepository,
         appNavigator = FakeNavigator(),
         getSubscriptionStatusUseCase = GetSubscriptionStatusUseCase(fakePaywallRepo),
         userDataRepository = fakeUserDataRepo,
         getUserLimitsUseCase = GetUserLimitsUseCase(
             remoteConfigProvider = fakeRemoteConfig,
-            checklistRepository = fakeChecklistRepo,
+            checklistRepository = checklistRepository,
             paywallRepository = fakePaywallRepo,
             userDataRepository = fakeUserDataRepo,
         ),
         analyticsTracker = FakeAnalyticsTracker(),
         hintsRepository = hintsRepository,
         googleAuthRepository = FakeGoogleAuthRepository(),
-        syncRepository = FakeSyncRepository(),
+        syncRepository = syncRepository,
+        logger = logger,
     )
 }
 
@@ -377,7 +400,134 @@ class MainScreenViewModelTest {
         assertFalse(after.showSyncBanner, "Dismiss hides the banner for the rest of this session")
         assertEquals(1, hints.dismissCountValue, "Dismiss must bump the persistent lifetime count")
     }
+
+    // ── Failure observability ───────────────────────────────────────────────
+
+    /**
+     * Regression guard for the prod incident where the Lists tab hung on an infinite spinner:
+     * the checklist stream threw before its first emission, which cancelled the `defaultStateIn`
+     * sharing scope and pinned screenState on Loading forever — no crash, no log, no user signal.
+     *
+     * The failure must be loud: a rendered Error state AND an AppLogger.error entry.
+     */
+    @Test
+    fun screenState_repositoryThrows_emitsErrorState_andLogsError() = runTest {
+        val cause = RuntimeException("DB failure")
+        val logger = FakeAppLogger()
+        val vm = makeViewModel(
+            FakeHintsRepository(),
+            checklistRepository = throwingRepository(cause),
+            logger = logger,
+        )
+
+        val state = vm.screenState.first { it !is MainScreenState.Loading }
+
+        assertIs<MainScreenState.Error>(state)
+        // Identity (===) would be wrong here: the throw crosses the channel-based `combine`, and
+        // kotlinx stacktrace recovery hands `catch` a COPY carrying the same type and message.
+        val logged = logger.errors.firstOrNull { it.first == "main_checklists_fetch_failed" }
+        assertTrue(logged != null, "Must log the greppable event tag; got ${logger.errors}")
+        assertEquals(
+            cause.message,
+            logged.second?.message,
+            "The original throwable must be attached (Crashlytics recordException)",
+        )
+    }
+
+    /**
+     * The prod NPE carried `message == null`, which is exactly why [MainScreenState.Error] holds no
+     * payload: a raw exception message is untranslated and often absent. It belongs in the log only.
+     */
+    @Test
+    fun screenState_repositoryThrowsNullMessage_stillEmitsErrorState() = runTest {
+        val logger = FakeAppLogger()
+        val vm = makeViewModel(
+            FakeHintsRepository(),
+            checklistRepository = throwingRepository(NullPointerException()),
+            logger = logger,
+        )
+
+        assertIs<MainScreenState.Error>(vm.screenState.first { it !is MainScreenState.Loading })
+        assertTrue(logger.errors.isNotEmpty(), "AppLogger.error must be called on repository failure")
+    }
+
+    @Test
+    fun onRetry_afterError_resubscribes_andEmitsSuccess() = runTest {
+        // ONE stable flow instance that re-reads `shouldThrow` on every collect — this mirrors a real
+        // Room flow (re-collect = re-query). A getter handing out a fresh flow per call would not:
+        // `checklistsWithProgress` evaluates `repository.checklists` once at VM construction, so the
+        // VM would hold the throwing instance forever and no retry could ever succeed.
+        val repo = object : FakeChecklistRepository() {
+            var shouldThrow = true
+            override val checklists: Flow<List<Checklist>> = flow {
+                if (shouldThrow) throw RuntimeException("DB failure")
+                emit(checklists(2))
+            }
+        }
+        val vm = makeViewModel(FakeHintsRepository(), checklistRepository = repo)
+
+        assertIs<MainScreenState.Error>(vm.screenState.first { it !is MainScreenState.Loading })
+
+        // Heal the repository, then retry: flatMapLatest must re-subscribe from scratch.
+        repo.shouldThrow = false
+        vm.sendIntent(MainScreenIntent.OnRetry)
+
+        val recovered = vm.awaitSuccess()
+        assertEquals(2, recovered.checklists.size, "Retry must re-fetch the healed checklist stream")
+    }
+
+    /**
+     * The init-block sync push observes the same failing Room stream. A throw there used to die
+     * uncaught, silently killing the push job. It must be logged instead — and it must not take the
+     * screen down with it.
+     */
+    @Test
+    fun initPendingSyncPush_repositoryThrows_isLogged_andDoesNotCrash() = runTest {
+        val logger = FakeAppLogger()
+        makeViewModel(
+            FakeHintsRepository(),
+            checklistRepository = throwingRepository(RuntimeException("DB failure")),
+            logger = logger,
+        )
+
+        assertTrue(
+            logger.errors.any { it.first == "main_pending_sync_observe_failed" },
+            "Upstream failure in the init collect must be logged; got ${logger.errors}",
+        )
+    }
+
+    /**
+     * pushPendingChanges reports failure as an AppResult.Error RETURN VALUE (it does not throw), so
+     * the result has to be read or the failure vanishes. It stays non-fatal: the collection survives
+     * so the next emission retries the push.
+     */
+    @Test
+    fun initPendingSyncPush_pushReturnsError_isLogged_andCollectionSurvives() = runTest {
+        val cause = IllegalStateException("network down")
+        val logger = FakeAppLogger()
+        val sync = FakeSyncRepository(pushError = cause)
+        val vm = makeViewModel(
+            FakeHintsRepository(),
+            checklists = checklists(1),
+            syncRepository = sync,
+            logger = logger,
+        )
+
+        // The screen itself is unaffected by a failed background push.
+        assertIs<MainScreenState.Success>(vm.awaitSuccess())
+        assertTrue(sync.pushCount > 0, "Precondition: the push was attempted")
+        assertTrue(
+            logger.errors.any { it.first == "main_pending_sync_push_failed" && it.second === cause },
+            "A push returning AppResult.Error must be logged, not discarded; got ${logger.errors}",
+        )
+    }
 }
+
+/** A repository whose checklist stream fails with [cause] before emitting anything. */
+private fun throwingRepository(cause: Throwable): FakeChecklistRepository =
+    object : FakeChecklistRepository() {
+        override val checklists: Flow<List<Checklist>> = flow { throw cause }
+    }
 
 /** Builds [count] minimal checklists for sync-banner visibility tests. */
 private fun checklists(count: Int): List<Checklist> =

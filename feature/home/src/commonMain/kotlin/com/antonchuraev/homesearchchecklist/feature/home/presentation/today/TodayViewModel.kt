@@ -1,24 +1,42 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation.today
 
+import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.common.api.Intent
 import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import kotlin.time.Instant
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
 
+private const val TAG = "TodayViewModel"
+
 /**
  * ViewModel for the Today screen.
  *
  * Observes all reminders (checklist-level + per-item) scheduled within today's
  * date window [startOfDayMs, endOfDayMs] and maps them to [TodayScreenState].
+ *
+ * Failure contract: [buildRemindersFlow] terminates the upstream on any repository
+ * exception, so [catch] is mandatory — without it the exception cancels the
+ * [defaultStateIn] sharing scope and the StateFlow is stuck on [TodayScreenState.Loading]
+ * forever (infinite spinner, no log, no user-visible signal). The catch turns any
+ * failure into a loud, logged, retryable [TodayScreenState.Error].
+ *
+ * Retry pattern: a [_retryTrigger] MutableStateFlow drives flatMapLatest on the inner
+ * observe flow. Incrementing it cancels the current subscription and re-subscribes,
+ * restarting from scratch without recreating the ViewModel.
  *
  * Sorting contract:
  *   1. Past-due reminders first (reminderAt < nowMs), ascending by reminderAt.
@@ -31,6 +49,7 @@ import kotlinx.datetime.toLocalDateTime
 class TodayViewModel(
     private val repository: ChecklistRepository,
     private val appNavigator: AppNavigator,
+    private val logger: AppLogger,
 ) : AppViewModel<TodayScreenState, TodayIntent, Nothing>() {
 
     /** Stable snapshot of "now" at VM creation (epoch millis). */
@@ -39,9 +58,12 @@ class TodayViewModel(
     /** Start-of-today (midnight) and end-of-today (23:59:59.999) in epoch millis. */
     private val todayRange: Pair<Long, Long> = computeTodayRange(nowMs)
 
-    override val screenState: StateFlow<TodayScreenState> = repository
-        .observeRemindersInRange(todayRange.first, todayRange.second)
-        .map { infos -> mapToState(infos) }
+    /** Incrementing this cancels the current subscription and re-fetches via flatMapLatest. */
+    private val _retryTrigger = MutableStateFlow(0)
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    override val screenState: StateFlow<TodayScreenState> = _retryTrigger
+        .flatMapLatest { buildRemindersFlow() }
         .defaultStateIn(TodayScreenState.Loading)
 
     override fun onIntent(intent: TodayIntent) {
@@ -55,12 +77,25 @@ class TodayViewModel(
                 }
             }
             TodayIntent.OnCreateChecklistClick -> appNavigator.navigateToTemplatesScreen()
-            TodayIntent.OnRefresh -> {
-                // Flow-based state reacts to DB changes automatically.
-                // This intent is a no-op in v1; reserved for pull-to-refresh.
-            }
+            TodayIntent.OnRefresh -> _retryTrigger.update { it + 1 }
         }
     }
+
+    // ─── Flow assembly ────────────────────────────────────────────────────────
+
+    /**
+     * Builds today's reminders flow.
+     *
+     * Called once per [_retryTrigger] emission. [catch] translates repository
+     * exceptions into a logged [TodayScreenState.Error] — never a silent stall.
+     */
+    private fun buildRemindersFlow() = repository
+        .observeRemindersInRange(todayRange.first, todayRange.second)
+        .map { infos -> mapToState(infos) }
+        .catch { e ->
+            logger.error(TAG, "today_range_fetch_failed", e)
+            emit(TodayScreenState.Error)
+        }
 
     // ─── Mapping ──────────────────────────────────────────────────────────────
 
@@ -194,7 +229,10 @@ sealed interface TodayIntent : Intent {
     data class OnReminderClick(val checklistId: Long, val fillId: Long?) : TodayIntent
     /** User tapped "Create Checklist" in the NoChecklists empty state. */
     data object OnCreateChecklistClick : TodayIntent
-    /** Pull-to-refresh or explicit refresh request (no-op in v1, flow reacts automatically). */
+    /**
+     * Explicit refresh/retry request. Re-subscribes the reminders flow from scratch —
+     * the recovery path out of [TodayScreenState.Error].
+     */
     data object OnRefresh : TodayIntent
 }
 
