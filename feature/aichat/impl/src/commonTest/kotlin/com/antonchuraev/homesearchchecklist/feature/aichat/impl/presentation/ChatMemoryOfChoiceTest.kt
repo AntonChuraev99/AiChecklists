@@ -81,6 +81,51 @@ class ChatMemoryOfChoiceTest {
         Dispatchers.resetMain()
     }
 
+    // ── 11pre. The remembered list is the TAPPED one, even when a twin shares its name ──
+
+    /**
+     * id-hints, write side (D2, 2026-07-15). The user taps the SECOND "Покупки" with the toggle on.
+     * The preference stores an id, so the only question is where that id comes from: re-deriving it
+     * from the chip's NAME picks whichever "Покупки" the repository lists first — here the one the
+     * user did not tap — and every later add then silently lands in the wrong list while the
+     * disclosure message names the right one. The tapped call already carries its id; use it.
+     *
+     * The sibling read-side guard is
+     * `ChatObjectRowsTest.whichListChoice_sameNamedLists_eachChipTargetsItsOwnIdNotJustTheName`.
+     */
+    @Test
+    fun memoryToggle_twoListsShareAName_persistsTheTappedListsIdNotTheFirstNameMatch() = runTest {
+        val prefs = FakeAiChatPreferences()
+        val rig = buildVmRig(
+            classification = addClassification(itemText = "молоко"),
+            checklists = listOf(
+                seedList(id = 1L, name = "Покупки", itemCount = 12),
+                seedList(id = 2L, name = "Покупки", itemCount = 3),
+            ),
+            prefs = prefs,
+            dispatchOutcome = DispatchOutcome.Success(
+                messageKey = "chat_dispatch_added_to",
+                args = listOf("молоко", "Покупки"),
+                linkedChecklistId = 2L,
+            ),
+        )
+
+        rig.send("добавь молоко")
+        rig.viewModel.sendIntent(ChatScreenIntent.OnChoiceMemoryToggle(enabled = true))
+
+        // Tap the chip that targets id=2. Both chips read "Покупки", so the LABEL cannot identify
+        // it — pick by the tool call's id, exactly as the user picks by the meta on screen.
+        val chip = rig.viewModel.screenState.value.options()
+            .single { (it.action as? ChoiceAction.Execute)?.toolCall.let { tc -> tc is ToolCall.AddItem && tc.checklistId == 2L } }
+        rig.viewModel.sendIntent(ChatScreenIntent.OnChoiceSelected(chip.id))
+
+        assertEquals(
+            listOf<Long?>(2L),
+            prefs.defaultChecklistIdWrites,
+            "the default must be the list the user TAPPED (id=2), not the first list sharing its name (id=1)",
+        )
+    }
+
     // ── 11. Opt in, pick a list → the choice is remembered and then honoured ──
 
     /**

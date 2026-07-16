@@ -172,6 +172,7 @@ internal class AiChatRepositoryImpl(
         locale: ChatLocale,
         checklistsSummary: List<ChecklistContext>,
         contextChecklistName: String?,
+        requestId: String?,
     ): AgentStepResult {
         val userId = userDataRepository.getUserData().userId
         if (userId.isBlank()) {
@@ -185,6 +186,7 @@ internal class AiChatRepositoryImpl(
             locale = locale,
             checklistsSummary = checklistsSummary,
             contextChecklistName = contextChecklistName,
+            requestId = requestId,
         )
     }
 

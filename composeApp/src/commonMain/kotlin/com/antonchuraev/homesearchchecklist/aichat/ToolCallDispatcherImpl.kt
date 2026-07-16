@@ -39,12 +39,18 @@ import kotlinx.coroutines.flow.first
  * [ChecklistRepository] for all data mutations,
  * [UserDataRepository] for premium gate on [ToolCall.CreateChecklist].
  *
- * Checklist resolution strategy ([resolveChecklist]):
- *   1. hint != null → fuzzy name match (substring, case-insensitive) in all checklists.
+ * Checklist resolution strategy ([resolveChecklistAndFill]):
+ *   1. [ToolCall.checklistId] != null → exact id match. Set only when the client already knows
+ *      which row it means (a tapped which-list chip / the remembered default / the open list),
+ *      so it wins outright and never degrades to (2). A gone id → [DispatchOutcome.NotFound],
+ *      NOT a name retry: a same-named neighbour taking the write is the bug ids exist to prevent.
+ *   2. id == null, hint != null → fuzzy name match (substring, case-insensitive). This is the
+ *      server path: Layer 2/3 name lists, they cannot know local ids.
  *      - 0 matches → [DispatchOutcome.NotFound]
  *      - 1 match → proceed
- *      - >1 matches → [DispatchOutcome.AmbiguousMatch] with up to [MAX_AMBIGUOUS_CANDIDATES] names
- *   2. hint == null → use first checklist in the list (most recently positioned).
+ *      - >1 matches → [DispatchOutcome.AmbiguousMatch] with up to [MAX_AMBIGUOUS_CANDIDATES] names.
+ *        The chat turns these into which-list chips, and each chip comes back carrying an id (1).
+ *   3. id == null, hint == null → use first checklist in the list (most recently positioned).
  *      If no checklists exist → [DispatchOutcome.NotFound].
  *
  * Premium gate:
@@ -211,8 +217,8 @@ class ToolCallDispatcherImpl(
     // ─── AddItem ──────────────────────────────────────────────────────────────
 
     private suspend fun handleAddItem(toolCall: ToolCall.AddItem): DispatchOutcome {
-        val (checklist, fill) = resolveChecklistAndFill(toolCall.checklistHint)
-            ?: return resolveChecklistFailure(toolCall.checklistHint)
+        val (checklist, fill) = resolveChecklistAndFill(toolCall.checklistId, toolCall.checklistHint)
+            ?: return resolveChecklistFailure(toolCall.checklistId, toolCall.checklistHint)
 
         // Create the template item first so the fill row can carry the stable templateItemId link.
         // Every other add path links them; without the link the row renders as an UNLINKED legacy row
@@ -261,8 +267,8 @@ class ToolCallDispatcherImpl(
     // ─── DeleteItem ───────────────────────────────────────────────────────────
 
     private suspend fun handleDeleteItem(toolCall: ToolCall.DeleteItem): DispatchOutcome {
-        val (checklist, fill) = resolveChecklistAndFill(toolCall.checklistHint)
-            ?: return resolveChecklistFailure(toolCall.checklistHint)
+        val (checklist, fill) = resolveChecklistAndFill(toolCall.checklistId, toolCall.checklistHint)
+            ?: return resolveChecklistFailure(toolCall.checklistId, toolCall.checklistHint)
 
         val matchingFillItem = fill.items.firstOrNull { it.text.contains(toolCall.itemText, ignoreCase = true) }
             ?: return DispatchOutcome.NotFound("chat_dispatch_item_not_found", listOf(toolCall.itemText, checklist.name))
@@ -283,8 +289,8 @@ class ToolCallDispatcherImpl(
     // ─── CompleteItem ─────────────────────────────────────────────────────────
 
     private suspend fun handleCompleteItem(toolCall: ToolCall.CompleteItem): DispatchOutcome {
-        val (checklist, fill) = resolveChecklistAndFill(toolCall.checklistHint)
-            ?: return resolveChecklistFailure(toolCall.checklistHint)
+        val (checklist, fill) = resolveChecklistAndFill(toolCall.checklistId, toolCall.checklistHint)
+            ?: return resolveChecklistFailure(toolCall.checklistId, toolCall.checklistHint)
 
         val matchingItem = fill.items.firstOrNull { it.text.contains(toolCall.itemText, ignoreCase = true) }
             ?: return DispatchOutcome.NotFound("chat_dispatch_item_not_found", listOf(toolCall.itemText, checklist.name))
@@ -344,8 +350,8 @@ class ToolCallDispatcherImpl(
     // ─── SetItemReminder ──────────────────────────────────────────────────────
 
     private suspend fun handleSetItemReminder(toolCall: ToolCall.SetItemReminder): DispatchOutcome {
-        val (checklist, fill) = resolveChecklistAndFill(toolCall.checklistHint)
-            ?: return resolveChecklistFailure(toolCall.checklistHint)
+        val (checklist, fill) = resolveChecklistAndFill(toolCall.checklistId, toolCall.checklistHint)
+            ?: return resolveChecklistFailure(toolCall.checklistId, toolCall.checklistHint)
 
         val matchingItem = fill.items.firstOrNull { it.text.contains(toolCall.itemText, ignoreCase = true) }
             ?: return DispatchOutcome.NotFound("chat_dispatch_item_not_found", listOf(toolCall.itemText, checklist.name))
@@ -518,8 +524,8 @@ class ToolCallDispatcherImpl(
             return DispatchOutcome.NotFound("chat_attach_no_files", emptyList())
         }
 
-        val (checklist, fill) = resolveChecklistAndFill(toolCall.checklistHint)
-            ?: return resolveChecklistFailure(toolCall.checklistHint)
+        val (checklist, fill) = resolveChecklistAndFill(toolCall.checklistId, toolCall.checklistHint)
+            ?: return resolveChecklistFailure(toolCall.checklistId, toolCall.checklistHint)
 
         // Item disambiguation — must produce exactly 1 match (AmbiguousMatch if >1)
         val matches = fill.items.filter {
@@ -616,8 +622,8 @@ class ToolCallDispatcherImpl(
             return DispatchOutcome.NotFound("chat_dispatch_add_empty", emptyList())
         }
 
-        val (checklist, fill) = resolveChecklistAndFill(toolCall.checklistHint)
-            ?: return resolveChecklistFailure(toolCall.checklistHint)
+        val (checklist, fill) = resolveChecklistAndFill(toolCall.checklistId, toolCall.checklistHint)
+            ?: return resolveChecklistFailure(toolCall.checklistId, toolCall.checklistHint)
 
         // Pair each template item with its fill row via templateItemId (see handleAddItem note) so the
         // rows are never unlinked legacy rows that folder-mode would dump at the bottom.
@@ -641,8 +647,9 @@ class ToolCallDispatcherImpl(
     // ─── ReadChecklist ────────────────────────────────────────────────────────
 
     private suspend fun handleReadChecklist(toolCall: ToolCall.ReadChecklist): DispatchOutcome {
-        val (checklist, fill) = resolveChecklistAndFill(toolCall.name)
-            ?: return resolveChecklistFailure(toolCall.name)
+        // Agent-only read: the model names a list, it never knows local row ids → name path.
+        val (checklist, fill) = resolveChecklistAndFill(id = null, hint = toolCall.name)
+            ?: return resolveChecklistFailure(id = null, hint = toolCall.name)
 
         val items = fill.items.map { item ->
             ReadChecklistItem(text = item.text, checked = item.checked)
@@ -754,22 +761,36 @@ class ToolCallDispatcherImpl(
     // ─── Resolution helpers ───────────────────────────────────────────────────
 
     /**
-     * Resolves [hint] to a (Checklist, ChecklistFill) pair.
-     * Returns null on failure — call [resolveChecklistFailure] to get the [DispatchOutcome].
+     * Resolves a tool call's target to a (Checklist, ChecklistFill) pair.
+     * Returns null on failure — call [resolveChecklistFailure] with the SAME arguments to
+     * turn that null into the [DispatchOutcome] explaining it.
+     *
+     * Precedence is [id] → [hint] → default, and the first step is not a preference but a
+     * guarantee: when [id] is set the caller has already decided WHICH list it means (the
+     * user tapped its chip, or it is their remembered default, or it is the list open behind
+     * the dock), so no amount of name similarity may override it.
+     *
+     * **A missed [id] never retries by name.** If the row is gone — deleted between building
+     * the chip and tapping it — this returns null and the caller reports it. Retrying by name
+     * would silently hand the write to a same-named neighbour, which is the entire failure ids
+     * exist to prevent (same reasoning as [UndoHandle], which is id-only for the identical
+     * reason on the rollback side).
      */
-    private suspend fun resolveChecklistAndFill(hint: String?): Pair<Checklist, ChecklistFill>? {
+    private suspend fun resolveChecklistAndFill(id: Long?, hint: String?): Pair<Checklist, ChecklistFill>? {
         val allChecklists = checklistRepository.checklists.first()
         if (allChecklists.isEmpty()) return null
 
-        val checklist = if (hint == null) {
-            allChecklists.firstOrNull()
-        } else {
-            val matches = allChecklists.filter { it.name.contains(hint, ignoreCase = true) }
-            when {
-                matches.isEmpty() -> null
-                matches.size == 1 -> matches.first()
-                else -> null // ambiguous — caller must use resolveChecklistFailure
+        val checklist = when {
+            // Exact target — resolve by id or fail; NEVER degrade to the name path below.
+            id != null -> allChecklists.firstOrNull { it.id == id }
+            // Server-built call (Layer 2/3 knows names, not row ids) → fuzzy name match.
+            hint != null -> {
+                val matches = allChecklists.filter { it.name.contains(hint, ignoreCase = true) }
+                // 0 → not found, >1 → ambiguous. resolveChecklistFailure tells them apart.
+                matches.singleOrNull()
             }
+            // No target at all → the active/default list.
+            else -> allChecklists.firstOrNull()
         } ?: return null
 
         val fill = checklistRepository.getDefaultFillOneShot(checklist.id) ?: return null
@@ -778,13 +799,31 @@ class ToolCallDispatcherImpl(
 
     /**
      * Returns the appropriate [DispatchOutcome] when [resolveChecklistAndFill] returns null.
+     * Must be called with the same [id] / [hint] the resolve was attempted with.
      */
-    private suspend fun resolveChecklistFailure(hint: String?): DispatchOutcome {
+    private suspend fun resolveChecklistFailure(id: Long?, hint: String?): DispatchOutcome {
+        val allChecklists = checklistRepository.checklists.first()
+
+        if (id != null) {
+            val byId = allChecklists.firstOrNull { it.id == id }
+            // The id resolved, so the only way to get here is a failed fill load.
+            if (byId != null) {
+                return DispatchOutcome.NotFound("chat_dispatch_fill_load_failed", listOf(byId.name))
+            }
+            // The list is gone. Report it by the name we captured with the id — deliberately NOT
+            // an AmbiguousMatch over same-named survivors: re-asking "which Shopping?" after the
+            // user already answered that question is how the picker loops.
+            return if (hint != null) {
+                DispatchOutcome.NotFound("chat_dispatch_no_checklist_match", listOf(hint))
+            } else {
+                DispatchOutcome.NotFound("chat_dispatch_no_checklists", emptyList())
+            }
+        }
+
         if (hint == null) {
             return DispatchOutcome.NotFound("chat_dispatch_no_checklists", emptyList())
         }
 
-        val allChecklists = checklistRepository.checklists.first()
         val matches = allChecklists.filter { it.name.contains(hint, ignoreCase = true) }
         return when {
             matches.isEmpty() -> DispatchOutcome.NotFound("chat_dispatch_no_checklist_match", listOf(hint))

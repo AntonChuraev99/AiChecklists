@@ -3,8 +3,28 @@ package com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model
 /**
  * Concrete operations extracted from classified intents.
  *
- * [checklistHint] is a fuzzy name (e.g. "покупки", "shopping") used to resolve
- * the target checklist by name-match at dispatch time. Null means "active/default".
+ * ─── Targeting a checklist: [checklistId] first, [checklistHint] as fallback ───
+ *
+ * [checklistHint] is a fuzzy name (e.g. "покупки", "shopping") resolved by name-match at
+ * dispatch time. It is the ONLY target a server-built tool call can carry: Layer 2/3 name
+ * lists, it does not know their local row ids.
+ *
+ * [checklistId] is the exact local checklist id, set ONLY where the client already knows
+ * which row it means — a which-list chip the user tapped, the remembered default list, the
+ * checklist open behind the dock. Null on every server-built call.
+ *
+ * **Why both.** A name is not an identity: two lists may legitimately be called "Shopping".
+ * Resolving those by name makes both which-list chips dispatch the identical tool call, so
+ * the picker asks a question whose answer it then throws away — the "which list… Shopping,
+ * Shopping or Shopping?" failure. This mirrors [UndoHandle], which is id-only for the same
+ * reason: `handleDeleteItem` matches item text with `contains(ignoreCase = true)`, so a
+ * text-addressed rollback would remove a same-named row the user already had.
+ *
+ * **An id is a promise, not a hint.** When [checklistId] is set the dispatcher resolves by
+ * it and does NOT retry by name if the row is gone (deleted between building the chip and
+ * tapping it) — falling back would hand the write to a same-named neighbour, which is the
+ * exact bug ids exist to prevent. Name resolution is for [checklistId] == null, not for
+ * "the id missed".
  *
  * [at] in [SetItemReminder] is epoch millis resolved by [SmartDateParser] reuse.
  *
@@ -14,17 +34,20 @@ package com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model
 sealed interface ToolCall {
     data class AddItem(
         val checklistHint: String?,
-        val itemText: String
+        val itemText: String,
+        val checklistId: Long? = null,
     ) : ToolCall
 
     data class DeleteItem(
         val checklistHint: String?,
-        val itemText: String
+        val itemText: String,
+        val checklistId: Long? = null,
     ) : ToolCall
 
     data class CompleteItem(
         val checklistHint: String?,
-        val itemText: String
+        val itemText: String,
+        val checklistId: Long? = null,
     ) : ToolCall
 
     data class CreateChecklist(
@@ -35,7 +58,8 @@ sealed interface ToolCall {
     data class SetItemReminder(
         val checklistHint: String?,
         val itemText: String,
-        val at: Long
+        val at: Long,
+        val checklistId: Long? = null,
     ) : ToolCall
 
     data class MoveAllReminders(
@@ -72,6 +96,7 @@ sealed interface ToolCall {
         val checklistHint: String?,
         val itemText: String,
         val attachments: List<ChatAttachment>,
+        val checklistId: Long? = null,
     ) : ToolCall
 
     /**
@@ -83,6 +108,7 @@ sealed interface ToolCall {
     data class AddItems(
         val checklistHint: String?,
         val itemTexts: List<String>,
+        val checklistId: Long? = null,
     ) : ToolCall
 
     /**

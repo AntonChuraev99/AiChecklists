@@ -76,6 +76,12 @@ interface AiChatRepository {
      * (the dock was launched from [ChecklistDetailScreen]). When non-null it is forwarded to
      * the agent so list-less commands ("add milk") bias toward this checklist. Null → no focus.
      *
+     * [requestId] makes the turn's 3-credit reservation idempotent. The caller owns turn
+     * boundaries, so the caller must mint it: one id per TURN, reused by every round of that
+     * turn (and by any transport retry of a round), never reused by a later turn. The server
+     * dedups on `{user_id}__{request_id}` — an id that leaks into the next turn makes that turn
+     * free, which is the failure this parameter exists to make impossible to reach by accident.
+     *
      * Returns [AgentStepResult] — caller decides whether to continue the loop
      * ([AgentStepResult.ToolCalls]) or stop ([AgentStepResult.Final] / errors).
      */
@@ -84,6 +90,7 @@ interface AiChatRepository {
         locale: ChatLocale,
         checklistsSummary: List<ChecklistContext>,
         contextChecklistName: String? = null,
+        requestId: String? = null,
     ): AgentStepResult
 
     /**

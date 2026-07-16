@@ -9,6 +9,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Choi
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceObjectRow
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceOption
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceRole
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.DispatchOutcome
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.IntentClassification
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.RoutingLayer
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.RowEmphasis
@@ -144,6 +145,7 @@ private class ScriptedAgentRepository(
         locale: ChatLocale,
         checklistsSummary: List<ChecklistContext>,
         contextChecklistName: String?,
+        requestId: String?,
     ): AgentStepResult = steps.getOrElse(index++) { AgentStepResult.ServiceError }
 
     override suspend fun completeFreeForm(
@@ -573,10 +575,11 @@ class ChatObjectRowsTest {
      * the last-updated day — to EVERY candidate, not just the colliding pair. A block mixing
      * "• 12" with "• 12 • 3 июля" reads as two different kinds of fact instead of one comparison.
      *
-     * NOTE (reported to the coordinator, not asserted here): two lists that share a name stay
-     * indistinguishable regardless of meta, because a candidate chip carries `withHint(name)` —
-     * both chips dispatch the identical ToolCall. Asserting distinct metas would demand a
-     * difference the picker cannot act on.
+     * The meta is now worth asserting: until id-hints (D2, 2026-07-15) a chip carried only
+     * `withHint(name)`, so two lists sharing a name dispatched the IDENTICAL ToolCall and no meta
+     * could make the block actionable — a distinct meta would have described a difference the
+     * picker could not act on. Chips now carry the candidate's id, so meta and dispatch agree;
+     * `whichListChoice_sameNamedLists_eachChipTargetsItsOwnIdNotJustTheName` pins the other half.
      */
     @Test
     fun whichListChoice_nameAndCountCollide_everyCandidateFallsBackToDateMeta() = runTest {
@@ -609,6 +612,88 @@ class ChatObjectRowsTest {
             work.meta,
             "each chip's meta must describe its own list",
         )
+    }
+
+    // ── 10b. id-hints: the chips must be different ANSWERS, not just different labels ──
+
+    /**
+     * THE defect id-hints closes (D2, 2026-07-15). Two lists named "Покупки" produce two chips; if
+     * each only carried `checklistHint = "Покупки"` they dispatched byte-identical ToolCalls, so
+     * whichever the user tapped, the dispatcher re-ran the same ambiguous name-match and asked
+     * again. That is the "which list… Shopping, Shopping or Shopping?" loop Siri answers by telling
+     * users to rename their lists.
+     *
+     * Asserts the ids are (a) present, (b) DISTINCT, and (c) each paired with the row it actually
+     * describes — an id that is merely non-null but copied from a neighbour would pass (a) and (b)
+     * while still routing the add into the wrong list.
+     */
+    @Test
+    fun whichListChoice_sameNamedLists_eachChipTargetsItsOwnIdNotJustTheName() = runTest {
+        val rig = buildVmRig(
+            classification = addClassification(itemText = "молоко", checklistHint = null),
+            checklists = listOf(
+                seedList(id = 1L, name = "Покупки", itemCount = 12, updatedAt = 1_700_000_000_000L),
+                seedList(id = 2L, name = "Покупки", itemCount = 3, updatedAt = 1_800_000_000_000L),
+            ),
+        )
+
+        rig.send("добавь молоко")
+
+        val chips = rig.viewModel.screenState.value.candidateOptions()
+        assertEquals(2, chips.size, "two lists, no hint → one chip each")
+
+        val calls = chips.map { (it.action as ChoiceAction.Execute).toolCall }
+        assertTrue(calls.all { it is ToolCall.AddItem }, "the picker re-runs the original add; got $calls")
+        val ids = calls.map { (it as ToolCall.AddItem).checklistId }
+        assertEquals(
+            listOf(2L, 1L),
+            ids,
+            "each chip must carry ITS list's id (MRU order: id=2 updated later). Same-named chips " +
+                "sharing an id — or carrying none — dispatch the identical call, so the picker asks " +
+                "a question it then throws away; got $calls",
+        )
+        assertTrue(
+            calls.all { (it as ToolCall.AddItem).checklistHint == "Покупки" },
+            "the name rides along for result copy and the id-less fallback; got $calls",
+        )
+
+        // (c) id ↔ meta agreement: the chip that SAYS 3 items must be the one that TARGETS the
+        // 3-item list. Nothing else in the picker can catch an id/label pairing that slipped.
+        val threeItems = chips.single { it.meta == "3" }
+        assertEquals(
+            2L,
+            ((threeItems.action as ChoiceAction.Execute).toolCall as ToolCall.AddItem).checklistId,
+            "the chip reading '3' must target the 3-item list (id=2) — meta and dispatch must " +
+                "describe the same list, or the meta is decoration that lies",
+        )
+    }
+
+    /**
+     * The id is an addition, not a replacement: a candidate name the repository cannot resolve
+     * (renamed/deleted mid-question) still produces a working chip that falls back to the name.
+     * Without this the picker would silently drop the list the user came for.
+     */
+    @Test
+    fun whichListChoice_unknownCandidateName_chipStillDispatchesWithNullIdAndTheName() = runTest {
+        // A hint is required: a hintless add opens the picker up front and never reaches the
+        // dispatcher, so the AmbiguousMatch branch under test would not run.
+        val rig = buildVmRig(
+            classification = addClassification(itemText = "молоко", checklistHint = "покупки"),
+            checklists = listOf(
+                seedList(id = 1L, name = "Покупки", itemCount = 12, updatedAt = 1_700_000_000_000L),
+                seedList(id = 2L, name = "Работа", itemCount = 3, updatedAt = 1_800_000_000_000L),
+            ),
+            dispatchOutcome = DispatchOutcome.AmbiguousMatch(listOf("Покупки", "Призрак")),
+        )
+
+        rig.send("добавь молоко в покупки")
+
+        val calls = rig.viewModel.screenState.value.candidateOptions()
+            .map { (it.action as ChoiceAction.Execute).toolCall as ToolCall.AddItem }
+        val ghost = calls.single { it.checklistHint == "Призрак" }
+        assertNull(ghost.checklistId, "an unresolvable candidate carries no id — it must not borrow one")
+        assertEquals("Призрак", ghost.checklistHint, "…but it keeps the name, so the chip still dispatches")
+        assertEquals(1L, calls.single { it.checklistHint == "Покупки" }.checklistId, "the resolvable one still gets its id")
     }
 
     /** No collision → the count alone; the date is noise the user does not need. */

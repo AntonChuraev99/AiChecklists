@@ -30,6 +30,7 @@ import kotlinx.serialization.json.Json
 import kotlin.reflect.KClass
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -489,6 +490,134 @@ class ToolCallDispatcherImplTest {
         assertEquals(handle.fillItemId, repo.fill(11L).items.single().id, "and must not re-create it under a new id")
         assertEquals(emptyList(), repo.fill(22L).items, "nothing may land in a candidate list")
         assertEquals(emptyList(), repo.fill(33L).items, "nothing may land in a candidate list")
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // Target resolution — id first, name as fallback (id-hints, D2 2026-07-15)
+    // ════════════════════════════════════════════════════════════════════════
+
+    /** Two lists that a human cannot tell apart by name — the case ids exist for. */
+    private fun twoShoppingListsRepo() = FakeChecklistRepository(
+        seedChecklists = listOf(
+            Checklist(id = 1L, name = "Покупки", items = emptyList()),
+            Checklist(id = 2L, name = "Покупки", items = emptyList()),
+        ),
+        seedFills = listOf(
+            ChecklistFill(id = 11L, checklistId = 1L, name = "Покупки", items = emptyList(), isDefault = true),
+            ChecklistFill(id = 22L, checklistId = 2L, name = "Покупки", items = emptyList(), isDefault = true),
+        ),
+    )
+
+    /**
+     * THE point of id-hints. The name matches BOTH lists, so the name path can only shrug
+     * (AmbiguousMatch) — but the user already answered "which list?" by tapping a chip, and the id
+     * carries that answer. Dispatching must honour it instead of re-asking.
+     */
+    @Test
+    fun addItem_withChecklistId_landsInThatList_evenThoughTheNameMatchesBoth() = runTest {
+        val repo = twoShoppingListsRepo()
+        val dispatcher = buildDispatcher(repo)
+
+        val outcome = dispatcher.dispatch(
+            ToolCall.AddItem(checklistId = 2L, checklistHint = "Покупки", itemText = "Молоко"),
+        )
+
+        assertIs<DispatchOutcome.Success>(outcome, "an id-addressed add is never ambiguous, got $outcome")
+        assertEquals(listOf("Молоко"), repo.fill(22L).items.map { it.text }, "the item belongs to the list the id named")
+        assertEquals(emptyList(), repo.fill(11L).items, "and must not appear in its same-named neighbour")
+    }
+
+    /**
+     * Sabotage guard for a resolver written as "try the id, then try the name anyway". The id points
+     * at a list that is gone (deleted between building the chip and tapping it) while a same-named
+     * list survives. A name retry would silently redirect the write into a list the user never
+     * chose — the exact failure ids exist to prevent, and worse than not writing at all because it
+     * is invisible. Same reasoning as [UndoHandle] being id-only.
+     */
+    @Test
+    fun addItem_withStaleChecklistId_reportsNotFound_ratherThanFallingBackToTheSameNamedSurvivor() = runTest {
+        val repo = shoppingRepo() // only id=1 "Покупки" exists
+        val dispatcher = buildDispatcher(repo)
+
+        val outcome = dispatcher.dispatch(
+            ToolCall.AddItem(checklistId = 99L, checklistHint = "Покупки", itemText = "Молоко"),
+        )
+
+        val notFound = assertIs<DispatchOutcome.NotFound>(
+            outcome,
+            "a gone id must fail loudly; falling back to the name would write into the wrong list, got $outcome",
+        )
+        assertEquals("chat_dispatch_no_checklist_match", notFound.messageKey)
+        assertEquals(listOf("Покупки"), notFound.args, "the message names the list the user asked for")
+        assertEquals(emptyList(), repo.fill(11L).items, "nothing may land in the surviving same-named list")
+    }
+
+    /**
+     * The fallback the server path depends on: Layer 2/3 name lists, they cannot know local row ids.
+     * A null id must behave exactly as it did before ids existed — this is an extension, not a
+     * migration, and a dispatcher that started requiring ids would break every remote tool call.
+     */
+    @Test
+    fun addItem_withoutChecklistId_stillResolvesByName() = runTest {
+        val repo = shoppingRepo()
+        val dispatcher = buildDispatcher(repo)
+
+        val outcome = dispatcher.dispatch(
+            ToolCall.AddItem(checklistHint = "покуп", itemText = "Молоко"),
+        )
+
+        assertIs<DispatchOutcome.Success>(outcome, "a fuzzy name still resolves, got $outcome")
+        assertEquals(listOf("Молоко"), repo.fill(11L).items.map { it.text })
+    }
+
+    /** …and an id-less name matching several lists must still ask, not guess. */
+    @Test
+    fun addItem_withoutChecklistId_ambiguousName_stillAsksWhichList() = runTest {
+        val repo = twoShoppingListsRepo()
+        val dispatcher = buildDispatcher(repo)
+
+        val outcome = dispatcher.dispatch(
+            ToolCall.AddItem(checklistHint = "Покупки", itemText = "Молоко"),
+        )
+
+        val ambiguous = assertIs<DispatchOutcome.AmbiguousMatch>(outcome, "got $outcome")
+        assertEquals(listOf("Покупки", "Покупки"), ambiguous.candidates, "both same-named lists are candidates")
+        assertEquals(emptyList(), repo.fill(11L).items, "an unresolved add writes nothing")
+        assertEquals(emptyList(), repo.fill(22L).items, "an unresolved add writes nothing")
+    }
+
+    /**
+     * The id overrides a name that points somewhere else entirely. Not a hypothetical: the chip
+     * builder pairs id+name from one row, so a mismatch means the pair was assembled wrong — and
+     * an id that yields to a stale name would make that bug invisible instead of testable.
+     */
+    @Test
+    fun completeItem_withChecklistId_ignoresAContradictingName() = runTest {
+        val repo = FakeChecklistRepository(
+            seedChecklists = listOf(
+                Checklist(id = 1L, name = "Покупки", items = listOf(templateItem("tpl_1", "Молоко"))),
+                Checklist(id = 2L, name = "Работа", items = listOf(templateItem("tpl_2", "Молоко"))),
+            ),
+            seedFills = listOf(
+                ChecklistFill(
+                    id = 11L, checklistId = 1L, name = "Покупки", isDefault = true,
+                    items = listOf(fillItem("fill_1", "Молоко", templateItemId = "tpl_1")),
+                ),
+                ChecklistFill(
+                    id = 22L, checklistId = 2L, name = "Работа", isDefault = true,
+                    items = listOf(fillItem("fill_2", "Молоко", templateItemId = "tpl_2")),
+                ),
+            ),
+        )
+        val dispatcher = buildDispatcher(repo)
+
+        val outcome = dispatcher.dispatch(
+            ToolCall.CompleteItem(checklistId = 2L, checklistHint = "Покупки", itemText = "Молоко"),
+        )
+
+        assertIs<DispatchOutcome.Success>(outcome, "got $outcome")
+        assertTrue(repo.fill(22L).items.single().checked, "the id decides the target")
+        assertFalse(repo.fill(11L).items.single().checked, "the name must not pull the write back")
     }
 
     // ════════════════════════════════════════════════════════════════════════

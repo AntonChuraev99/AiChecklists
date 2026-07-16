@@ -17,6 +17,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Undo
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.locale.ChatLocaleProvider
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.ChatLocale
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AgentStepResult
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AgentTranscriptRepository
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatAgentApiService
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatClassifierApiService
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatCompletionApiService
@@ -234,6 +235,7 @@ class FakeAgentApi(
         locale: ChatLocale,
         checklistsSummary: List<ChecklistContext>,
         contextChecklistName: String?,
+        requestId: String?,
     ): AgentStepResult {
         callCount++
         return result
@@ -299,6 +301,43 @@ class FakeChatHistory : ChatHistoryRepository {
     override suspend fun append(message: ChatMessage) { stored.add(message) }
     override suspend fun clear() { stored.clear() }
     override suspend fun count(): Int = stored.size
+}
+
+/**
+ * In-memory [AgentTranscriptRepository] for the ViewModel rigs. Records each appended round so a
+ * test can assert the agent's tool memory was persisted, and serves it back keyed by turn so a
+ * seed-splice test can drive the restore path — all without a Room instance.
+ */
+class FakeAgentTranscript : AgentTranscriptRepository {
+    private val rounds = linkedMapOf<String, MutableList<AgentTranscriptEntry>>()
+    val appendedTurnIds = mutableListOf<String>()
+
+    override suspend fun loadForTurns(
+        turnMessageIds: List<String>,
+    ): Map<String, List<AgentTranscriptEntry>> =
+        turnMessageIds
+            .mapNotNull { id -> rounds[id]?.let { id to it.toList() } }
+            .toMap()
+
+    override suspend fun appendRound(
+        turnMessageId: String,
+        calls: AgentTranscriptEntry.ModelToolCalls,
+        results: AgentTranscriptEntry.ToolResults,
+    ) {
+        appendedTurnIds.add(turnMessageId)
+        rounds.getOrPut(turnMessageId) { mutableListOf() }.apply {
+            add(calls)
+            add(results)
+        }
+    }
+
+    override suspend fun deleteTurn(turnMessageId: String) { rounds.remove(turnMessageId) }
+
+    override suspend fun pruneToRecentTurns(keepTurns: Int) {
+        while (rounds.size > keepTurns) rounds.remove(rounds.keys.first())
+    }
+
+    override suspend fun clear() { rounds.clear() }
 }
 
 /**
@@ -459,6 +498,7 @@ private class ParkedLayer1RoutingRepository(
         locale: ChatLocale,
         checklistsSummary: List<ChecklistContext>,
         contextChecklistName: String?,
+        requestId: String?,
     ): AgentStepResult =
         agentApi.step(
             userDataRepository.getUserData().userId,
@@ -466,6 +506,7 @@ private class ParkedLayer1RoutingRepository(
             locale,
             checklistsSummary,
             contextChecklistName,
+            requestId,
         )
 
     override suspend fun transcribeAudio(
@@ -550,6 +591,7 @@ fun buildHarnessRig(scenario: ChatScenario): HarnessRig {
         dateFormatter = TokenDateFormatter(),
         localeProvider = FixedLocaleProvider(scenario.locale),
         chatHistoryRepository = FakeChatHistory(),
+        agentTranscriptRepository = FakeAgentTranscript(),
         checklistRepository = HarnessChecklistRepository(scenario.lists),
         userDataRepository = userRepo,
         aiChatPreferencesRepository = prefs,

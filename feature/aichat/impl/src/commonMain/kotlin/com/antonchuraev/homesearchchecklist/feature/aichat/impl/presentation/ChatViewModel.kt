@@ -36,6 +36,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Agen
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AgentToolResult
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AgentTranscriptEntry
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AgentStepResult
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AgentTranscriptRepository
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AiChatRepository
@@ -45,11 +46,14 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatHi
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.TranscriptionOutcome
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.agent.AgentToolCallMapper
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.agent.AgentToolResultSerializer
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.agent.AgentTranscriptWindow
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.preview.ToolCallPreviewRenderer
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistNodeType
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import kotlin.concurrent.Volatile
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
@@ -135,6 +139,10 @@ class ChatViewModel(
     private val dateFormatter: ChatDateFormatter,
     private val localeProvider: ChatLocaleProvider,
     private val chatHistoryRepository: ChatHistoryRepository,
+    // Stage 3: persists the agent's tool rounds so a past turn's ping-pong survives a restart.
+    // Kept separate from chatHistoryRepository on purpose — history owns the visible prose,
+    // this owns the machine rounds, and neither duplicates the other.
+    private val agentTranscriptRepository: AgentTranscriptRepository,
     private val checklistRepository: ChecklistRepository,
     private val userDataRepository: UserDataRepository,
     private val aiChatPreferencesRepository: AiChatPreferencesRepository,
@@ -390,6 +398,9 @@ class ChatViewModel(
             is ChatScreenIntent.OnClearChat -> {
                 viewModelScope.launch {
                     chatHistoryRepository.clear()
+                    // Clear the agent's tool memory too, else "Clear chat" would wipe the visible
+                    // prose while the model kept privately remembering the rounds behind it.
+                    agentTranscriptRepository.clear()
                     _screenState.value = _screenState.value.copy(
                         messages = emptyList(),
                         showSettingsSheet = false,
@@ -908,18 +919,18 @@ class ChatViewModel(
                         // checklist (hint still null after context-bias) → ask "which list?" up front
                         // when 2+ lists exist (ambiguous). With 0 or 1 list there is nothing to pick,
                         // so fall through — the dispatcher resolves a null hint to the single/none list.
-                        // Covers both single (AddItem) and multi (AddItems) adds; withHint() handles both.
+                        // Covers both single (AddItem) and multi (AddItems) adds; withTarget() handles both.
                         val hintlessAdd = (toolCall is ToolCall.AddItem && toolCall.checklistHint == null) ||
                             (toolCall is ToolCall.AddItems && toolCall.checklistHint == null)
                         if (hintlessAdd) {
                             // D2 memory of choice: the user explicitly asked us to stop asking, so
-                            // route to their default instead of re-opening the picker. Resolved by
-                            // NAME through the same hint path everything else uses; a default that
-                            // no longer exists resolves to null and we fall through to asking —
-                            // the safe direction.
-                            val remembered = rememberedDefaultName()
+                            // route to their default instead of re-opening the picker. Routed by ID
+                            // (the preference stores one) with the name along for copy; a default
+                            // that no longer exists resolves to null and we fall through to asking
+                            // — the safe direction.
+                            val remembered = rememberedDefault()
                             if (remembered != null) {
-                                val routed = toolCall.withHint(remembered) ?: toolCall
+                                val routed = toolCall.withTarget(remembered.id, remembered.name) ?: toolCall
                                 dispatchReversible(routed, sourceLayer = classification.layer)
                                 return@runCatching
                             }
@@ -1218,7 +1229,13 @@ class ChatViewModel(
      *
      * Used both up-front (a generic "add to a checklist" with 2+ lists, no resolvable target)
      * and post-dispatch (an [DispatchOutcome.AmbiguousMatch] where a hint matched several lists).
-     * Candidates whose tool call carries no per-list hint are skipped (see [ToolCall.withHint]).
+     * Candidates whose tool call carries no per-list target are skipped (see [ToolCall.withTarget]).
+     *
+     * Each chip carries its candidate's ID, so two lists sharing a name stay two answers: the meta
+     * tells them apart on screen and the id tells them apart on tap. While chips were name-only the
+     * second half was missing — the block could show "Shopping • 12" beside "Shopping • 3" and then
+     * dispatch the identical call for either, which is the "which list… Shopping, Shopping or
+     * Shopping?" trap this picker exists to avoid.
      */
     private suspend fun showWhichListChoice(
         sourceToolCall: ToolCall,
@@ -1229,11 +1246,12 @@ class ChatViewModel(
         val shown = candidates.take(MAX_CHOICE_OPTIONS)
         val metas = buildCandidateMetas(shown)
         val options = shown.mapIndexedNotNull { index, candidate ->
-            val tc = sourceToolCall.withHint(candidate.name) ?: return@mapIndexedNotNull null
+            val tc = sourceToolCall.withTarget(candidate.id, candidate.name)
+                ?: return@mapIndexedNotNull null
             ChoiceOption(
                 id = "$CHOICE_CANDIDATE_PREFIX$index",
                 label = candidate.name,
-                meta = metas[candidate.name],
+                meta = metas[index],
                 role = ChoiceRole.Default,
                 action = ChoiceAction.Execute(tc),
             )
@@ -1282,43 +1300,71 @@ class ChatViewModel(
     }
 
     /**
-     * The remembered default list's NAME, or null when the chat should keep asking.
+     * The remembered default list as (id, name), or null when the chat should keep asking.
      *
      * Resolves the persisted id against the live checklists on every call rather than caching:
      * the list can be renamed or deleted between turns, and a stale name would route items into
      * nothing. A dangling id resolves to null → the picker comes back, which is the safe failure.
+     *
+     * Returns the id as well as the name so the routed call keeps the identity the preference
+     * actually stores. Resolving id → name → id again would silently re-open the ambiguity the
+     * user closed: "always add to THIS Shopping" would land in whichever Shopping matched first.
      */
-    private suspend fun rememberedDefaultName(): String? {
+    private suspend fun rememberedDefault(): ListTarget? {
         val id = runCatching { aiChatPreferencesRepository.defaultChecklistIdFlow.first() }
             .getOrNull() ?: return null
-        return runCatching { checklistRepository.checklists.first() }
+        val checklist = runCatching { checklistRepository.checklists.first() }
             .getOrNull()
             ?.firstOrNull { it.id == id }
-            ?.name
+            ?: return null
+        return ListTarget(id = checklist.id, name = checklist.name)
     }
+
+    /** A list the client can name AND point at — see [ToolCall.withTarget]. */
+    private data class ListTarget(val id: Long, val name: String)
 
     // ─── Which-list candidates — ranking + disambiguating meta (D2) ───────────
 
-    /** A candidate list for the which-list picker, with the facts needed to tell it apart. */
-    private data class ListCandidate(val name: String, val itemCount: Int, val updatedAt: Long)
+    /**
+     * A candidate list for the which-list picker, with the facts needed to tell it apart.
+     *
+     * [id] is what makes the picker's answer actionable — a chip labelled "Shopping" is only a
+     * question if tapping it dispatches "the list called Shopping". Null only when the name came
+     * from somewhere the repository no longer knows about; such a candidate degrades to the name
+     * path rather than disappearing.
+     */
+    private data class ListCandidate(
+        val id: Long?,
+        val name: String,
+        val itemCount: Int,
+        val updatedAt: Long,
+    )
 
     /**
-     * Orders candidates most-recently-updated first.
+     * Resolves candidate [names] against the repository and orders them most-recently-updated first.
      *
-     * Load-bearing, not cosmetic: the picker shows at most [MAX_CHOICE_OPTIONS], so with 9 lists
-     * the order decides WHICH 6 the user is even allowed to pick. In repository order "Showing 6
-     * of 9" routinely hides the list they were just working in — the one they almost certainly
-     * mean. Names the repository doesn't know keep their original relative order, last.
+     * Ordering is load-bearing, not cosmetic: the picker shows at most [MAX_CHOICE_OPTIONS], so with
+     * 9 lists the order decides WHICH 6 the user is even allowed to pick. In repository order
+     * "Showing 6 of 9" routinely hides the list they were just working in — the one they almost
+     * certainly mean. Names the repository doesn't know keep their original relative order, last.
+     *
+     * Duplicate names are matched up POSITIONALLY (one repository row consumed per occurrence)
+     * rather than by lookup. A `associateBy { it.name }` here would collapse both "Shopping" rows
+     * onto whichever won the map — handing two chips one id, one count and one date, i.e. exactly
+     * the indistinguishable pair this whole path exists to separate. Callers pass one name per
+     * candidate list (both `AmbiguousMatch.candidates` and the hintless-add path do), so the
+     * occurrences line up 1:1.
      */
     private suspend fun rankCandidates(names: List<String>): List<ListCandidate> {
         val known = runCatching { checklistRepository.checklists.first() }
             .onFailure { logger.warning(TAG, "rankCandidates: checklists unavailable — ${it.message}") }
             .getOrDefault(emptyList())
-            .associateBy { it.name }
+        val unclaimed = known.groupBy { it.name }.mapValues { (_, rows) -> ArrayDeque(rows) }
         return names
             .map { name ->
-                val checklist = known[name]
+                val checklist = unclaimed[name]?.removeFirstOrNull()
                 ListCandidate(
+                    id = checklist?.id,
                     name = name,
                     // Folders are containers, not things you tick off — counting them would make
                     // "Shopping • 12" disagree with what the list shows.
@@ -1330,27 +1376,30 @@ class ChatViewModel(
     }
 
     /**
-     * The chip meta per candidate — the bit that answers "which «Shopping»?".
+     * The chip meta per candidate, index-aligned with [candidates] — the bit that answers
+     * "which «Shopping»?".
      *
      * Normally the item count. When two candidates share BOTH name and count the count settles
      * nothing, so the last-updated day is appended to EVERY candidate in the block — mixing
      * formats inside one block ("Shopping • 12" next to "Shopping • 12 • 3 July") would read as
      * two different kinds of fact rather than one comparison.
+     *
+     * Returned as a LIST, not a Map keyed by name: a map cannot describe two lists that share a
+     * name, which is the one case the meta is here to resolve.
      */
-    private suspend fun buildCandidateMetas(candidates: List<ListCandidate>): Map<String, String> {
+    private suspend fun buildCandidateMetas(candidates: List<ListCandidate>): List<String> {
         val collides = candidates
             .groupBy { it.name to it.itemCount }
             .any { (_, group) -> group.size > 1 }
-        return candidates.associate { candidate ->
+        return candidates.map { candidate ->
             // Bare value by design ("• 12", not "• 12 items"): chips are tight, RU inflates copy
             // 15-30%, and the spoken form lives in the chip's contentDescription instead.
             val base = candidate.itemCount.toString()
-            val meta = if (collides && candidate.updatedAt > 0L) {
+            if (collides && candidate.updatedAt > 0L) {
                 "$base $META_SEPARATOR ${dateFormatter.formatDay(candidate.updatedAt)}"
             } else {
                 base
             }
-            candidate.name to meta
         }
     }
 
@@ -1633,7 +1682,7 @@ class ChatViewModel(
                 // Only remember a destination the action actually reached: persisting after a
                 // NotFound would pin the chat to a list the item never landed in.
                 if (remember && outcome is DispatchOutcome.Success) {
-                    rememberDefaultChecklist(extractHint(toolCall))
+                    rememberDefaultChecklist(extractChecklistId(toolCall), extractHint(toolCall))
                 }
             }.onFailure { e ->
                 logger.error(TAG, "executeChoice failed", e)
@@ -1650,12 +1699,17 @@ class ChatViewModel(
      * dark pattern: the next "add milk" would silently skip the question and land somewhere they
      * never re-confirmed. The message names both the list and where to undo it.
      */
-    private suspend fun rememberDefaultChecklist(listName: String?) {
+    private suspend fun rememberDefaultChecklist(checklistId: Long?, listName: String?) {
         if (listName.isNullOrBlank()) {
             logger.warning(TAG, "rememberDefaultChecklist: no list name on the executed tool call")
             return
         }
-        val id = runCatching { checklistRepository.checklists.first() }
+        // The executed call's id when it has one — it IS the list the user picked. Re-deriving the
+        // id from the name would quietly disagree with the add that just happened: with two lists
+        // called "Покупки" the item lands in the tapped one while `firstOrNull { name == }` pins
+        // the preference to the other, so every later add silently changes destination. Falling
+        // back to the name only where there is no id (a server-built call) keeps the old path.
+        val id = checklistId ?: runCatching { checklistRepository.checklists.first() }
             .getOrNull()
             ?.firstOrNull { it.name.equals(listName, ignoreCase = true) }
             ?.id
@@ -2157,18 +2211,54 @@ class ChatViewModel(
         val contextChecklistName = resolveContextChecklistName()
         val historyMessages = _screenState.value.messages
 
-        val seedTranscript: MutableList<AgentTranscriptEntry> = mutableListOf()
+        // The turn these NEW rounds belong to = the most recent user message. Its id keys the
+        // rounds in Room so a later session can splice them back where they happened. In the
+        // "Ask AI" fallback the last message is the assistant's Unknown reply, so we look past
+        // it to the user message that actually opened this turn.
+        val currentTurnMessageId = historyMessages.lastOrNull { it.role == ChatRole.User }?.id
+
+        // Stage 3: pull the persisted tool rounds of PAST turns and splice each between its user
+        // message and that turn's assistant answer, reproducing the [user][calls][results][model]
+        // shape the agent emitted the first time. Degrades to no rounds on a storage miss.
+        val userMessageIds = historyMessages.filter { it.role == ChatRole.User }.map { it.id }
+        val roundsByTurn = agentTranscriptRepository.loadForTurns(userMessageIds)
+
+        val fullSeed: MutableList<AgentTranscriptEntry> = mutableListOf()
         for (msg in historyMessages) {
             when (msg.role) {
-                ChatRole.User -> seedTranscript.add(AgentTranscriptEntry.UserText(msg.content))
-                ChatRole.Assistant -> seedTranscript.add(AgentTranscriptEntry.ModelText(msg.content))
+                ChatRole.User -> {
+                    fullSeed.add(AgentTranscriptEntry.UserText(msg.content))
+                    // Splice past-turn rounds after their user message. Skip the CURRENT turn:
+                    // its rounds are generated live below, so seeding them here would send each
+                    // one twice (stale copy + fresh copy) in the same request.
+                    if (msg.id != currentTurnMessageId) {
+                        roundsByTurn[msg.id]?.let { fullSeed.addAll(it) }
+                    }
+                }
+                ChatRole.Assistant -> fullSeed.add(AgentTranscriptEntry.ModelText(msg.content))
             }
         }
-        // Ensure the latest user message is the final UserText (it was already added above
-        // from persisted history — if the list is up-to-date it is already there, so no
-        // double-add is needed here; the in-memory messages list reflects the just-sent user msg).
 
-        logger.debug(TAG, "runAgentTurn: seeded ${seedTranscript.size} transcript entries")
+        // Window to the newest turns that fit the server's caps, keeping call↔results pairs
+        // intact (see AgentTranscriptWindow). Persist everything, send only a bounded slice —
+        // the server rejects (400), never trims, a transcript over CHAT_AGENT_MAX_TRANSCRIPT_ENTRIES.
+        val seedTranscript = AgentTranscriptWindow.select(fullSeed).toMutableList()
+
+        logger.debug(TAG, "runAgentTurn: seeded ${seedTranscript.size}/${fullSeed.size} transcript entries (windowed)")
+
+        // One idempotency key for the WHOLE turn: reused by every round below so a transport
+        // retry can never double-charge the reservation, fresh per invocation so a genuinely
+        // new turn always bills. A leaked id would make the next turn free — hence per-turn.
+        val requestId = newTurnRequestId()
+
+        // Replace any rounds a prior (aborted / re-done) run left for this turn: a turn owns
+        // exactly one set of rounds, appended fresh as the loop below completes them.
+        if (currentTurnMessageId != null) {
+            agentTranscriptRepository.deleteTurn(currentTurnMessageId)
+        }
+        // Bound the on-disk table. We persist far more turns than we send (the send is windowed
+        // to MAX_TURNS) so the memory is deep, but not unbounded. Prunes whole turns, never rows.
+        agentTranscriptRepository.pruneToRecentTurns(PERSISTED_TURNS_LIMIT)
 
         // ── 2. Agent loop ────────────────────────────────────────────────────
         val transcript = seedTranscript
@@ -2185,6 +2275,7 @@ class ChatViewModel(
                 locale = locale,
                 checklistsSummary = checklistsSummary,
                 contextChecklistName = contextChecklistName,
+                requestId = requestId,
             )
 
             // A/B: mirror the server-assigned model arm into the sticky user-property + persist it via
@@ -2318,8 +2409,23 @@ class ChatViewModel(
                     }
 
                     // Extend transcript and continue.
-                    transcript.add(AgentTranscriptEntry.ModelToolCalls(calls))
-                    transcript.add(AgentTranscriptEntry.ToolResults(allResults))
+                    val modelToolCalls = AgentTranscriptEntry.ModelToolCalls(calls)
+                    val toolResults = AgentTranscriptEntry.ToolResults(allResults)
+                    transcript.add(modelToolCalls)
+                    transcript.add(toolResults)
+
+                    // Stage 3: persist this completed round so it survives a restart. Written as
+                    // a call↔results PAIR (one insert = one transaction) — a half-persisted round
+                    // would replay to Gemini as an unanswered function_call. Non-fatal on failure:
+                    // the live turn already holds the round in [transcript]; only future memory of
+                    // it is at stake. Skip when the turn has no user-message key (degenerate).
+                    if (currentTurnMessageId != null) {
+                        agentTranscriptRepository.appendRound(
+                            turnMessageId = currentTurnMessageId,
+                            calls = modelToolCalls,
+                            results = toolResults,
+                        )
+                    }
                     round++
                 }
 
@@ -2498,73 +2604,100 @@ class ChatViewModel(
     // ─── Context-checklist bias (P5) ─────────────────────────────────────────
 
     /**
-     * Resolves [ChatScreenState.contextChecklistId] to the checklist's display name.
+     * Resolves [ChatScreenState.contextChecklistId] to the open checklist as (id, name).
      *
      * Returns null when there is no active context, or when the context checklist was
      * deleted between opening the dock and sending the command (logged as a warning so
      * the silent fallback to the default-resolution path is traceable).
      *
-     * The resolved name is used to bias list-less commands (e.g. "add milk") toward the
-     * checklist the user currently has open, instead of the dispatcher's "first checklist"
-     * fallback. Name-based (not id-based) so it flows through the existing hint → name-match
-     * resolution in [ToolCallDispatcher] with zero dispatcher changes.
+     * Used to bias list-less commands (e.g. "add milk") toward the checklist the user currently
+     * has open, instead of the dispatcher's "first checklist" fallback. Carries the ID through:
+     * we are looking AT the list, so "add milk" landing in a same-named other list — which is
+     * what the old name-only bias did — is indefensible. The name still rides along for the
+     * result copy and the id-less fallback.
      */
-    private suspend fun resolveContextChecklistName(): String? {
+    private suspend fun resolveContextChecklist(): ListTarget? {
         val contextId = _screenState.value.contextChecklistId ?: return null
         val checklist = runCatching { checklistRepository.getChecklistById(contextId) }
             .getOrElse { e ->
-                logger.error(TAG, "resolveContextChecklistName: lookup failed for id=$contextId — ${e.message}", e)
+                logger.error(TAG, "resolveContextChecklist: lookup failed for id=$contextId — ${e.message}", e)
                 null
             }
         if (checklist == null) {
-            logger.warning(TAG, "resolveContextChecklistName: context checklist id=$contextId not found — falling back to default resolution")
+            logger.warning(TAG, "resolveContextChecklist: context checklist id=$contextId not found — falling back to default resolution")
             return null
         }
-        return checklist.name
+        return ListTarget(id = checklist.id, name = checklist.name)
     }
 
     /**
-     * Applies the active context checklist to a list-less command [toolCall].
+     * The open checklist's display NAME — the agent prompt takes a name, not an id (the model
+     * reasons over list names; ids mean nothing to it).
+     */
+    private suspend fun resolveContextChecklistName(): String? = resolveContextChecklist()?.name
+
+    /**
+     * Applies the active [context] checklist to a list-less command [toolCall].
      *
      * For command variants that target an existing checklist (AddItem, AddItems, CompleteItem,
      * DeleteItem, SetItemReminder, AttachToItem) whose [checklistHint] is null, returns a copy
-     * with the hint set to [contextName]. An explicit hint is NEVER overwritten — the user
-     * naming a list always wins over the open-screen context.
+     * aimed at [context] — id AND name (see [ToolCall.withTarget]). An explicit hint is NEVER
+     * overwritten: the user naming a list always wins over the open-screen context, and a named
+     * list they did not disambiguate must still be allowed to reach the picker.
      *
      * CreateChecklist / RenameChecklist are intentionally excluded: there the "list" is the
      * target/output of the action, not the context to operate within. CreateChecklistFromAttachment,
      * MoveAllReminders, FindItemsQuery and ReadChecklist carry no per-list hint either.
      */
-    private fun applyContextChecklist(toolCall: ToolCall, contextName: String): ToolCall = when (toolCall) {
-        is ToolCall.AddItem ->
-            if (toolCall.checklistHint == null) toolCall.copy(checklistHint = contextName) else toolCall
-        is ToolCall.AddItems ->
-            if (toolCall.checklistHint == null) toolCall.copy(checklistHint = contextName) else toolCall
-        is ToolCall.CompleteItem ->
-            if (toolCall.checklistHint == null) toolCall.copy(checklistHint = contextName) else toolCall
-        is ToolCall.DeleteItem ->
-            if (toolCall.checklistHint == null) toolCall.copy(checklistHint = contextName) else toolCall
-        is ToolCall.SetItemReminder ->
-            if (toolCall.checklistHint == null) toolCall.copy(checklistHint = contextName) else toolCall
-        is ToolCall.AttachToItem ->
-            if (toolCall.checklistHint == null) toolCall.copy(checklistHint = contextName) else toolCall
-        // Excluded by design — list is the target, not the context, or no hint field.
-        is ToolCall.CreateChecklist,
-        is ToolCall.RenameChecklist,
-        is ToolCall.CreateChecklistFromAttachment,
-        is ToolCall.MoveAllReminders,
-        is ToolCall.FindItemsQuery,
-        is ToolCall.ReadChecklist -> toolCall
+    private fun applyContextChecklist(toolCall: ToolCall, context: ListTarget): ToolCall {
+        val hasExplicitHint = when (toolCall) {
+            is ToolCall.AddItem -> toolCall.checklistHint != null
+            is ToolCall.AddItems -> toolCall.checklistHint != null
+            is ToolCall.CompleteItem -> toolCall.checklistHint != null
+            is ToolCall.DeleteItem -> toolCall.checklistHint != null
+            is ToolCall.SetItemReminder -> toolCall.checklistHint != null
+            is ToolCall.AttachToItem -> toolCall.checklistHint != null
+            // Excluded by design — list is the target, not the context, or no hint field.
+            // withTarget() returns null for these, so the elvis below keeps them untouched.
+            is ToolCall.CreateChecklist,
+            is ToolCall.RenameChecklist,
+            is ToolCall.CreateChecklistFromAttachment,
+            is ToolCall.MoveAllReminders,
+            is ToolCall.FindItemsQuery,
+            is ToolCall.ReadChecklist -> true
+        }
+        if (hasExplicitHint) return toolCall
+        return toolCall.withTarget(context.id, context.name) ?: toolCall
     }
 
     /**
-     * Convenience wrapper: resolves the context checklist name (if any) and applies it to
-     * [toolCall] when the hint is null. No-op when there is no context or the command already
-     * carries an explicit hint. Used on the Layer-1/Layer-2 preview-build path.
+     * Convenience wrapper: resolves the context checklist (if any) and applies it to [toolCall]
+     * when the hint is null. No-op when there is no context or the command already carries an
+     * explicit hint. Used on the Layer-1/Layer-2 preview-build path.
      */
     private suspend fun biasToolCallToContext(toolCall: ToolCall): ToolCall {
-        val contextName = resolveContextChecklistName() ?: return toolCall
-        return applyContextChecklist(toolCall, contextName)
+        val context = resolveContextChecklist() ?: return toolCall
+        return applyContextChecklist(toolCall, context)
+    }
+
+    /**
+     * The exact target list id of a write-intent ToolCall, or null when it has none (a server-built
+     * call, or a variant that carries no per-list target). The counterpart of [extractHint]: where
+     * the hint is what we can SHOW, this is what we can trust — see [ToolCall].
+     */
+    private fun extractChecklistId(toolCall: ToolCall): Long? = when (toolCall) {
+        is ToolCall.AddItem -> toolCall.checklistId
+        is ToolCall.DeleteItem -> toolCall.checklistId
+        is ToolCall.CompleteItem -> toolCall.checklistId
+        is ToolCall.SetItemReminder -> toolCall.checklistId
+        is ToolCall.AttachToItem -> toolCall.checklistId
+        is ToolCall.AddItems -> toolCall.checklistId
+        is ToolCall.CreateChecklist,
+        is ToolCall.MoveAllReminders,
+        is ToolCall.FindItemsQuery,
+        is ToolCall.CreateChecklistFromAttachment,
+        is ToolCall.ReadChecklist,
+        is ToolCall.RenameChecklist -> null
     }
 
     /**
@@ -2692,16 +2825,24 @@ class ChatViewModel(
     }
 
     /**
-     * Returns a copy of this tool call with its checklist hint set to [name], for the
-     * AmbiguousMatch "Which list?" choice. Null for tool calls that carry no per-list hint.
+     * Returns a copy of this tool call aimed at ONE specific list — the id resolves it, the name
+     * rides along for display copy, analytics and the id-less fallback. Null for tool calls that
+     * carry no per-list target.
+     *
+     * Both fields, never just one. The id alone would leave `chat_dispatch_added_to` unable to
+     * name where the item went; the name alone is what made two "Shopping" chips dispatch the
+     * identical call, so the picker asked a question it could not act on (see [ToolCall]).
+     *
+     * [id] is nullable so a candidate the repository no longer knows still produces a working
+     * chip — it just resolves by name, exactly as it did before ids existed.
      */
-    private fun ToolCall.withHint(name: String): ToolCall? = when (this) {
-        is ToolCall.AddItem -> copy(checklistHint = name)
-        is ToolCall.DeleteItem -> copy(checklistHint = name)
-        is ToolCall.CompleteItem -> copy(checklistHint = name)
-        is ToolCall.SetItemReminder -> copy(checklistHint = name)
-        is ToolCall.AttachToItem -> copy(checklistHint = name)
-        is ToolCall.AddItems -> copy(checklistHint = name)
+    private fun ToolCall.withTarget(id: Long?, name: String): ToolCall? = when (this) {
+        is ToolCall.AddItem -> copy(checklistId = id, checklistHint = name)
+        is ToolCall.DeleteItem -> copy(checklistId = id, checklistHint = name)
+        is ToolCall.CompleteItem -> copy(checklistId = id, checklistHint = name)
+        is ToolCall.SetItemReminder -> copy(checklistId = id, checklistHint = name)
+        is ToolCall.AttachToItem -> copy(checklistId = id, checklistHint = name)
+        is ToolCall.AddItems -> copy(checklistId = id, checklistHint = name)
         is ToolCall.CreateChecklist,
         is ToolCall.CreateChecklistFromAttachment,
         is ToolCall.MoveAllReminders,
@@ -2765,11 +2906,13 @@ class ChatViewModel(
                 logger.debug(TAG, "ChecklistContent inline (agent): ${outcome.checklistName} — $summary$suffix")
             }
             is DispatchOutcome.AmbiguousMatch -> {
-                val withHint = sourceToolCall?.let { tc ->
-                    outcome.candidates.take(MAX_CHOICE_OPTIONS).mapNotNull { tc.withHint(it) }
+                // Chips only help when the call can actually be aimed at ONE list. A read-only call
+                // (FindItemsQuery) carries no target, so every chip would dispatch the same thing —
+                // those keep the text clarification. The picker itself re-targets per candidate.
+                val targetable = sourceToolCall?.takeIf { tc ->
+                    outcome.candidates.any { tc.withTarget(id = null, name = it) != null }
                 }
-                if (withHint.isNullOrEmpty()) {
-                    // No swappable hint (read path) → keep the old text clarification.
+                if (targetable == null) {
                     val candidates = outcome.candidates.take(MAX_CHOICE_OPTIONS).joinToString(", ")
                     _sideEffect.emit(
                         ChatScreenSideEffect.ShowAssistantMessage(
@@ -2782,7 +2925,7 @@ class ChatViewModel(
                     // command against that specific list, plus a Dismiss escape. sourceLayer = null
                     // keeps the post-dispatch behaviour (no extra response_received, _choiceSourceLayer
                     // cleared) — the original turn already tracked its outcome.
-                    showWhichListChoice(sourceToolCall, outcome.candidates, sourceLayer = null)
+                    showWhichListChoice(targetable, outcome.candidates, sourceLayer = null)
                 }
             }
             is DispatchOutcome.NotFound -> {
@@ -3212,6 +3355,15 @@ class ChatViewModel(
 
     private fun generateId(): String = "${nowMillis()}_${Random.nextInt(0, 100_000)}"
 
+    /**
+     * A fresh idempotency key for one agent turn. Random per invocation → each real turn bills;
+     * captured in a local val and reused across the turn's rounds → a transport retry cannot
+     * double-charge the server's reservation. Uuid.random() matches the id idiom used elsewhere
+     * (analyze's newRequestId, cloudId generation).
+     */
+    @OptIn(ExperimentalUuidApi::class)
+    private fun newTurnRequestId(): String = Uuid.random().toString()
+
     private companion object {
         const val TAG = "ChatViewModel"
 
@@ -3282,5 +3434,13 @@ class ChatViewModel(
          * first round without a tool turn).
          */
         const val AGENT_MAX_ROUNDS = 5
+
+        /**
+         * Turns of agent tool-rounds kept on disk (Stage 3). Far deeper than the send window
+         * ([AgentTranscriptWindow.MAX_TURNS] = 6) — persistence is a cheap local table, so the
+         * memory can be deep even though only the newest few turns ride each request. Bounds
+         * the table so it cannot grow without limit over the life of the install.
+         */
+        const val PERSISTED_TURNS_LIMIT = 40
     }
 }

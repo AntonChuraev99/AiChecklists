@@ -141,9 +141,40 @@ val MIGRATION_16_17 = object : Migration(16, 17) {
     }
 }
 
+// Stage 3 (AI chat remembers the conversation across restarts): a NEW table for the agent's
+// tool rounds. The DDL below is a verbatim copy of what Room generates for
+// [AgentTranscriptEntity] + its turnMessageId index (see schemas/18.json) — the same discipline
+// MIGRATION_11_12 used for ai_chat_history. It has to be, because the database is built with
+// `fallbackToDestructiveMigration(dropAllTables = false)`: a migration that drifts from the
+// generated schema does NOT crash here, it silently drops the user's data.
+val MIGRATION_17_18 = object : Migration(17, 18) {
+    override suspend fun migrate(connection: SQLiteConnection) {
+        connection.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `ai_agent_transcript` (
+                `seq` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `turnMessageId` TEXT NOT NULL,
+                `kind` TEXT NOT NULL,
+                `payloadJson` TEXT NOT NULL,
+                `timestamp` INTEGER NOT NULL
+            )
+            """.trimIndent()
+        )
+        connection.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_ai_agent_transcript_turnMessageId` " +
+                "ON `ai_agent_transcript` (`turnMessageId`)"
+        )
+    }
+}
+
 @Database(
-    entities = [ChecklistEntity::class, ChecklistFillEntity::class, ChatHistoryEntry::class],
-    version = 17,
+    entities = [
+        ChecklistEntity::class,
+        ChecklistFillEntity::class,
+        ChatHistoryEntry::class,
+        AgentTranscriptEntity::class,
+    ],
+    version = 18,
     exportSchema = true
 )
 @TypeConverters(ChecklistItemConverters::class, ReminderConverters::class)
@@ -152,13 +183,14 @@ abstract class ChecklistDatabase : RoomDatabase() {
     abstract fun checklistDao(): ChecklistDao
     abstract fun checklistFillDao(): ChecklistFillDao
     abstract fun chatHistoryDao(): ChatHistoryDao
+    abstract fun agentTranscriptDao(): AgentTranscriptDao
 
     companion object {
         fun getRoomDatabase(
             builder: Builder<ChecklistDatabase>
         ): ChecklistDatabase {
             return builder
-                .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17)
+                .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18)
                 .fallbackToDestructiveMigration(dropAllTables = false)
                 .setQueryCoroutineContext(Dispatchers.Default)
                 .build()

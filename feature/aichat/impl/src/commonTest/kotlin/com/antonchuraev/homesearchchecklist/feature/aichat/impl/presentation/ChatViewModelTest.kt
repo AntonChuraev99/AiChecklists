@@ -18,6 +18,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Chat
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AgentToolCall
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AgentTranscriptEntry
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AgentStepResult
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AgentTranscriptRepository
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AiChatRepository
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatHistoryRepository
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChecklistContext
@@ -90,16 +91,21 @@ private class FakeAiChatRepository(
     /** Captures the checklistsSummary forwarded to each agentStep call (recent-items context). */
     val agentStepChecklists = mutableListOf<List<ChecklistContext>>()
 
+    /** Captures the requestId forwarded to each agentStep call (Stage 3 idempotency key). */
+    val agentStepRequestIds = mutableListOf<String?>()
+
     override suspend fun agentStep(
         transcript: List<AgentTranscriptEntry>,
         locale: ChatLocale,
         checklistsSummary: List<ChecklistContext>,
         contextChecklistName: String?,
+        requestId: String?,
     ): AgentStepResult {
         agentStepCallCount++
         agentStepTranscripts.add(transcript.toList())
         agentStepContextNames.add(contextChecklistName)
         agentStepChecklists.add(checklistsSummary.toList())
+        agentStepRequestIds.add(requestId)
         val index = (agentStepCallCount - 1).coerceAtMost(agentStepResults.lastIndex.coerceAtLeast(0))
         return agentStepResults.getOrElse(index) { AgentStepResult.ServiceError }
     }
@@ -369,6 +375,7 @@ private fun makeVm(
     dispatcher: FakeToolCallDispatcher = FakeToolCallDispatcher(),
     renderer: ToolCallPreviewRenderer = FakePreviewRenderer,
     historyRepo: ChatHistoryRepository = FakeChatHistoryRepository(),
+    agentTranscriptRepo: AgentTranscriptRepository = FakeAgentTranscript(),
     checklistRepo: ChecklistRepository = FakeChecklistRepository(),
     userDataRepo: UserDataRepository = FakeUserDataRepository(),
     aiChatPreferencesRepo: AiChatPreferencesRepository = FakeAiChatPreferencesRepository(),
@@ -383,6 +390,7 @@ private fun makeVm(
     dateFormatter = TokenDateFormatter(),
     localeProvider = FakeLocaleProvider,
     chatHistoryRepository = historyRepo,
+    agentTranscriptRepository = agentTranscriptRepo,
     checklistRepository = checklistRepo,
     userDataRepository = userDataRepo,
     aiChatPreferencesRepository = aiChatPreferencesRepo,
@@ -3426,5 +3434,156 @@ class ChatViewModelTest {
             params["routed_layer"],
             "The refusal happened on Layer 3 and the funnel should say so",
         )
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Stage 3 — the chat remembers its tool rounds across turns (and restarts)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    // ── 60. A completed tool round is persisted, then restored into the NEXT turn's seed ──
+
+    @Test
+    fun agentTurn_persistsToolRound_andRestoresItIntoTheNextTurnTranscript() = runTest {
+        val readCall = AgentToolCall(
+            id = "call-1",
+            name = "read_checklist",
+            args = buildJsonObject { put("name", "Shopping") },
+        )
+        // Turn 1: read-only tool round (dispatched with no plan-card) → Final.
+        // Turn 2: a plain Final. The 3rd agentStep is turn 2's FIRST round — its seed must carry
+        // turn 1's rounds spliced back in.
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.FreeForm,
+                confidence = 1.0f,
+                layer = RoutingLayer.FullChat,
+            ),
+            agentStepResults = listOf(
+                AgentStepResult.ToolCalls(calls = listOf(readCall), creditsRemaining = 297),
+                AgentStepResult.Final(content = "Shopping has 3 items.", creditsRemaining = 297),
+                AgentStepResult.Final(content = "You are welcome.", creditsRemaining = 294),
+            ),
+        )
+        val transcriptRepo = FakeAgentTranscript()
+        val vm = makeVm(
+            repo = repo,
+            dispatcher = FakeToolCallDispatcher(
+                outcome = DispatchOutcome.ChecklistContent(checklistName = "Shopping", items = emptyList()),
+            ),
+            agentTranscriptRepo = transcriptRepo,
+        )
+
+        // Turn 1
+        vm.sendIntent(ChatScreenIntent.OnInputChange("what is in shopping?"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(1, transcriptRepo.appendedTurnIds.size,
+            "the read round of turn 1 must be persisted exactly once")
+
+        // Turn 2
+        vm.sendIntent(ChatScreenIntent.OnInputChange("thanks"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        val turn2Seed = repo.agentStepTranscripts[2]
+        val hasRestoredRound = turn2Seed.any { it is AgentTranscriptEntry.ModelToolCalls } &&
+            turn2Seed.any { it is AgentTranscriptEntry.ToolResults }
+        assertTrue(hasRestoredRound,
+            "turn 2's seed must splice back turn 1's persisted tool round — that is the memory")
+
+        // Pairing invariant survives the restore: a ToolResults is never orphaned.
+        val calls = turn2Seed.count { it is AgentTranscriptEntry.ModelToolCalls }
+        val results = turn2Seed.count { it is AgentTranscriptEntry.ToolResults }
+        assertEquals(calls, results, "restored transcript must keep call↔results pairs balanced")
+    }
+
+    // ── 61. request_id is stable across a turn's rounds, and differs between turns ──
+
+    @Test
+    fun agentTurn_requestId_isStableWithinATurn_andFreshPerTurn() = runTest {
+        val readCall = AgentToolCall(
+            id = "call-1",
+            name = "read_checklist",
+            args = buildJsonObject { put("name", "Shopping") },
+        )
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.FreeForm,
+                confidence = 1.0f,
+                layer = RoutingLayer.FullChat,
+            ),
+            agentStepResults = listOf(
+                // Turn 1 spans two rounds (ToolCalls then Final) → two agentStep calls.
+                AgentStepResult.ToolCalls(calls = listOf(readCall), creditsRemaining = 297),
+                AgentStepResult.Final(content = "Shopping has 3 items.", creditsRemaining = 297),
+                // Turn 2 is a single round.
+                AgentStepResult.Final(content = "You are welcome.", creditsRemaining = 294),
+            ),
+        )
+        val vm = makeVm(
+            repo = repo,
+            dispatcher = FakeToolCallDispatcher(
+                outcome = DispatchOutcome.ChecklistContent(checklistName = "Shopping", items = emptyList()),
+            ),
+        )
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("what is in shopping?"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("thanks"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        val ids = repo.agentStepRequestIds
+        assertEquals(3, ids.size, "three agentStep calls expected (2 for turn 1, 1 for turn 2)")
+        assertTrue(ids.all { it != null && it.isNotBlank() }, "every round must carry a request_id")
+
+        // Same turn → same key (a transport retry of round 2 must not re-charge).
+        assertEquals(ids[0], ids[1], "both rounds of turn 1 must share one request_id")
+        // New turn → new key (else the server reads it as a replay and the turn is free).
+        assertNotEquals(ids[1], ids[2], "turn 2 must mint a fresh request_id")
+    }
+
+    // ── 62. Clear chat wipes the agent's tool memory too, not just the visible prose ──
+
+    @Test
+    fun clearChat_alsoClearsAgentTranscript() = runTest {
+        val readCall = AgentToolCall(
+            id = "call-1",
+            name = "read_checklist",
+            args = buildJsonObject { put("name", "Shopping") },
+        )
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.FreeForm,
+                confidence = 1.0f,
+                layer = RoutingLayer.FullChat,
+            ),
+            agentStepResults = listOf(
+                AgentStepResult.ToolCalls(calls = listOf(readCall), creditsRemaining = 297),
+                AgentStepResult.Final(content = "Shopping has 3 items.", creditsRemaining = 297),
+            ),
+        )
+        val transcriptRepo = FakeAgentTranscript()
+        val vm = makeVm(
+            repo = repo,
+            dispatcher = FakeToolCallDispatcher(
+                outcome = DispatchOutcome.ChecklistContent(checklistName = "Shopping", items = emptyList()),
+            ),
+            agentTranscriptRepo = transcriptRepo,
+        )
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("what is in shopping?"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+        assertTrue(transcriptRepo.appendedTurnIds.isNotEmpty(), "precondition: a round was stored")
+
+        vm.sendIntent(ChatScreenIntent.OnClearChat)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(emptyMap(), transcriptRepo.loadForTurns(transcriptRepo.appendedTurnIds),
+            "Clear chat must leave no tool memory behind the wiped conversation")
     }
 }

@@ -86,6 +86,7 @@ internal class ScriptedAiChatRepository(
         locale: ChatLocale,
         checklistsSummary: List<ChecklistContext>,
         contextChecklistName: String?,
+        requestId: String?,
     ): AgentStepResult {
         agentStepCallCount++
         return AgentStepResult.ServiceError
@@ -167,6 +168,7 @@ internal fun buildVmRig(
         dateFormatter = dateFormatter,
         localeProvider = FixedLocaleProvider(locale),
         chatHistoryRepository = FakeChatHistory(),
+        agentTranscriptRepository = FakeAgentTranscript(),
         checklistRepository = HarnessChecklistRepository(lists, checklists),
         userDataRepository = userRepo,
         aiChatPreferencesRepository = prefs,

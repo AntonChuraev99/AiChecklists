@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.aichat.impl.di
 
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AiChatPreferencesRepository
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AgentTranscriptRepository
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AiChatRepository
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatAgentApiService
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatClassifierApiService
@@ -16,8 +17,10 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.Cha
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.preview.ChatDateFormatterImpl
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.preview.ToolCallPreviewRenderer
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.preview.ToolCallPreviewRendererImpl
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.repository.AgentTranscriptRepositoryImpl
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.repository.AiChatRepositoryImpl
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.repository.ChatHistoryRepositoryImpl
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.AgentTranscriptDao
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChatHistoryDao
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
@@ -60,6 +63,12 @@ val aiChatFeatureModule = module {
             logger = get(),
         )
     }
+    single<AgentTranscriptRepository> {
+        AgentTranscriptRepositoryImpl(
+            dao = get<AgentTranscriptDao>(),
+            logger = get(),
+        )
+    }
     single<AiChatRepository> {
         AiChatRepositoryImpl(
             classifierApi = get(),
@@ -89,6 +98,7 @@ val aiChatFeatureModule = module {
             dateFormatter = get(),
             localeProvider = get(),
             chatHistoryRepository = get(),
+            agentTranscriptRepository = get(),
             checklistRepository = get(),
             userDataRepository = get(),
             aiChatPreferencesRepository = get<AiChatPreferencesRepository>(),
