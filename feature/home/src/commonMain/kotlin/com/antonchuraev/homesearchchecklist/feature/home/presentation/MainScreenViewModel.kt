@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import androidx.lifecycle.viewModelScope
@@ -139,7 +140,15 @@ class MainScreenViewModel(
 
     @OptIn(ExperimentalCoroutinesApi::class)
     override val screenState: StateFlow<MainScreenState> = _retryTrigger
-        .flatMapLatest { buildScreenState() }
+        .flatMapLatest { attempt ->
+            // Emit Loading on retries only. screenState is a StateFlow, which conflates equal
+            // values, and Error is a data object equal to itself: without a distinct value in
+            // between, a retry that fails again re-emits Error == Error, nothing recomposes, and
+            // the user sees a frozen screen after tapping Try Again. Gating on attempt > 0 keeps
+            // the first subscription free of a spurious spinner — WhileSubscribed(5000) re-runs
+            // this flow whenever the screen is re-entered, and that should show the cached state.
+            buildScreenState().onStart { if (attempt > 0) emit(MainScreenState.Loading) }
+        }
         .defaultStateIn(MainScreenState.Loading)
 
     /**

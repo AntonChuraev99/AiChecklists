@@ -47,6 +47,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -474,6 +476,39 @@ class MainScreenViewModelTest {
 
         val recovered = vm.awaitSuccess()
         assertEquals(2, recovered.checklists.size, "Retry must re-fetch the healed checklist stream")
+    }
+
+    /**
+     * A retry that fails again must still change the observed state, or Try Again reads as broken.
+     */
+    @Test
+    fun onRetry_whenRepositoryKeepsFailing_emitsLoadingBeforeErrorAgain() = runTest {
+        val vm = makeViewModel(
+            FakeHintsRepository(),
+            checklistRepository = throwingRepository(RuntimeException("DB failure")),
+        )
+
+        val seen = mutableListOf<MainScreenState>()
+        // backgroundScope inherits runTest's StandardTestDispatcher — Dispatchers.setMain does not
+        // apply to it, so an unpinned collector would not start before the asserts below.
+        val job = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            vm.screenState.toList(seen)
+        }
+        assertIs<MainScreenState.Error>(seen.last())
+        val beforeRetry = seen.size
+
+        vm.sendIntent(MainScreenIntent.OnRetry)
+
+        // screenState is a StateFlow, so it conflates equal values, and Error is a data object
+        // equal to itself. Without a distinct value in between, the second failure emits
+        // Error == Error, nothing recomposes, and the screen freezes with no feedback at all.
+        val afterRetry = seen.drop(beforeRetry)
+        assertTrue(
+            afterRetry.any { it is MainScreenState.Loading },
+            "Retry must emit a distinct state so the UI reacts; observed after retry: $afterRetry",
+        )
+        assertIs<MainScreenState.Error>(seen.last())
+        job.cancel()
     }
 
     /**

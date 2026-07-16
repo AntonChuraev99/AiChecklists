@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.update
 import kotlin.time.Instant
 import kotlinx.datetime.LocalDateTime
@@ -63,7 +64,15 @@ class TodayViewModel(
 
     @OptIn(ExperimentalCoroutinesApi::class)
     override val screenState: StateFlow<TodayScreenState> = _retryTrigger
-        .flatMapLatest { buildRemindersFlow() }
+        .flatMapLatest { attempt ->
+            // Emit Loading on retries only. screenState is a StateFlow, which conflates equal
+            // values, and Error is a data object equal to itself: without a distinct value in
+            // between, a retry that fails again re-emits Error == Error, nothing recomposes, and
+            // the user sees a frozen screen after tapping Try Again. Gating on attempt > 0 keeps
+            // the first subscription free of a spurious spinner — WhileSubscribed(5000) re-runs
+            // this flow whenever the screen is re-entered, and that should show the cached state.
+            buildRemindersFlow().onStart { if (attempt > 0) emit(TodayScreenState.Loading) }
+        }
         .defaultStateIn(TodayScreenState.Loading)
 
     override fun onIntent(intent: TodayIntent) {

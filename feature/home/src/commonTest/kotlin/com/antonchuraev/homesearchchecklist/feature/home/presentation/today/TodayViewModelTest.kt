@@ -24,6 +24,9 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.yield
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -571,5 +574,49 @@ class TodayViewModelTest {
         val recovered = vm.screenState.first { it is TodayScreenState.Success }
         assertIs<TodayScreenState.Success>(recovered)
         assertEquals(1, recovered.pastDue.size + recovered.today.size)
+    }
+
+    // ── 15. Retry that fails again must still produce a visible reaction ─────
+
+    @Test
+    fun intentOnRefresh_whenRepositoryKeepsFailing_emitsLoadingBeforeErrorAgain() = runTest {
+        val repo = object : FakeRepository() {
+            override fun observeRemindersInRange(
+                fromMs: Long,
+                toMs: Long,
+            ): Flow<List<TodayReminderInfo>> = flow {
+                // yield() before throwing: a real Room flow always crosses a suspension point
+                // before failing. Throwing synchronously would collapse onStart's Loading and the
+                // catch's Error into one tick, and StateFlow would conflate them away — an
+                // artefact of the fake, not behaviour any user can hit.
+                yield()
+                throw RuntimeException("DB failure")
+            }
+        }
+        val vm = TodayViewModel(repo, FakeNavigator(), logger)
+
+        val seen = mutableListOf<TodayScreenState>()
+        // Must be unconfined AND share runTest's scheduler: backgroundScope defaults to
+        // StandardTestDispatcher (collector would not start before the asserts), while the
+        // class-level `dispatcher` field owns a separate scheduler (retry emissions would never
+        // reach this collector).
+        val job = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            vm.screenState.toList(seen)
+        }
+        assertIs<TodayScreenState.Error>(seen.last())
+        val beforeRetry = seen.size
+
+        vm.sendIntent(TodayIntent.OnRefresh)
+
+        // screenState is a StateFlow, so it conflates equal values, and Error is a data object
+        // equal to itself. Without a distinct value in between, a retry that fails again emits
+        // Error == Error, nothing recomposes, and Try Again looks dead to the user.
+        val afterRetry = seen.drop(beforeRetry)
+        assertTrue(
+            afterRetry.any { it is TodayScreenState.Loading },
+            "Retry must emit a distinct state so the UI reacts; observed after retry: $afterRetry",
+        )
+        assertIs<TodayScreenState.Error>(seen.last())
+        job.cancel()
     }
 }
