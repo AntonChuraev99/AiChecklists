@@ -38,6 +38,10 @@ playReview = "2.0.2"
 appUpdate = "2.1.0"
 kotlinxDatetime = "0.8.0"
 kotlinxDatetimeWasm = "0.8.0"
+# Core library desugaring — backports java.time.* (API 26+) down to minSdk 24.
+# 2.1.x requires AGP 8.0+ (we run 9.2.0). Do NOT swap for desugar_jdk_libs_minimal:
+# minimal ships only java.util.function + concurrent-collection fixes, NOT java.time.
+desugarJdk = "2.1.5"
 amplitude = "1.22.4"
 reorderable = "3.1.0"
 roborazzi = "1.63.0"
@@ -134,6 +138,13 @@ play-app-update-ktx = { module = "com.google.android.play:app-update-ktx", versi
 
 # Kotlinx Datetime
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinxDatetime" }
+
+# Core library desugaring (D8/L8) — MANDATORY companion to kotlinx-datetime at minSdk 24.
+# kotlinx-datetime on Android is a thin wrapper over java.time.*, which only exists from API 26.
+# Without this, TimeZone.<clinit> throws NoClassDefFoundError: Ljava/time/ZoneOffset; on API 24-25
+# (Crashlytics 52217411). Declared ONLY in :androidApp — dexing happens there, so L8 rewrites
+# java.time -> j$.time for every dependency's bytecode, including the KMP library modules.
+desugar-jdk-libs = { module = "com.android.tools:desugar_jdk_libs", version.ref = "desugarJdk" }
 
 # Glance for App Widgets
 glance = { module = "androidx.glance:glance", version.ref = "glance" }

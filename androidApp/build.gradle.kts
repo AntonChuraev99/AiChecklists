@@ -95,10 +95,24 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+
+        // Backports java.time.* (API 26+) to minSdk 24 via L8. REQUIRED: kotlinx-datetime on
+        // Android delegates to java.time, so TimeZone.<clinit> hard-crashes on API 24-25 without
+        // it (NoClassDefFoundError: Ljava/time/ZoneOffset; — Crashlytics 52217411).
+        // This is the app module, where dexing happens: L8 rewrites java.time -> j$.time across
+        // ALL dependencies, so the 6 KMP library modules using kotlinx-datetime are covered here.
+        // The KMP library plugin (com.android.kotlin.multiplatform.library) exposes no
+        // compileOptions block, so this is also the only place it CAN be declared.
+        isCoreLibraryDesugaringEnabled = true
     }
 }
 
 dependencies {
+    // Core library desugaring runtime (j$.time etc). Pairs with isCoreLibraryDesugaringEnabled
+    // above; the standard variant is required because it carries java.time
+    // (desugar_jdk_libs_minimal does NOT — it is java.util.function only).
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
+
     // composeApp KMP library — provides all shared KMP code + actuals
     implementation(projects.composeApp)
 
