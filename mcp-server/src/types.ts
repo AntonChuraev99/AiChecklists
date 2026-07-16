@@ -27,4 +27,10 @@ export interface Env {
   GOOGLE_OAUTH_CLIENT_SECRET: string;
   /** Service-account JSON key (one JSON string) for Firestore REST. */
   FIREBASE_SERVICE_ACCOUNT: string;
+  /**
+   * Amplitude project 786722 API key (analytics.ts). OPTIONAL on purpose: when it is unset the
+   * server runs exactly as before, minus the `mcp_*` events — analytics must never be a hard
+   * dependency of a tool call. Same value as the Cloud Functions' `AMPLITUDE_SERVER_API_KEY`.
+   */
+  AMPLITUDE_SERVER_API_KEY?: string;
 }

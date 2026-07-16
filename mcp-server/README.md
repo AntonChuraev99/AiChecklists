@@ -80,7 +80,36 @@ breaks its own test.
   AI 30/hour). Best-effort, defense-in-depth over the Cloud Function's transactional credit guard.
 - **Deterministic `request_id`** — `SHA-256(userId|tool|args|minute)` so a retry dedups the
   idempotent CF credit reservation instead of double-charging.
-- **`safe()` wrapper** on every tool — never leaks a raw 500 to the client; errors are logged.
+- **`tracked()` wrapper** on every tool — never leaks a raw 500 to the client; errors are logged
+  and reported to analytics (below).
+
+## Analytics (`analytics.ts`)
+
+Three events to Amplitude project **786722** via the HTTP V2 API (plain `fetch`, no SDK). They
+answer: how many people connected · which of the 16 tools are live vs dead · which fail · and
+whether MCP users retain better — the last one only works because the events land on the **same
+user profile the app writes**.
+
+| Event | Properties |
+|---|---|
+| `mcp_session_started` | `linked` (false = connected but no Gisti account yet). Once per MCP session, on its first tool call |
+| `mcp_tool_called` | `tool_name`. Every invocation |
+| `mcp_tool_failed` | `tool_name`, `reason` — `cf_402` (no credits) / `cf_429` / `cf_503` / `cf_network` / `exception` |
+
+- **`user_id` = the `users/{doc_id}` UUID** (`resolveUserContext().creditUserId`), sent verbatim.
+  That is exactly what the app passes to `setUserId` (`Analytics.kt` ← `SplashViewModel` ←
+  DataStore `USER_ID_KEY` ← `register_user`) and what the CFs use for `push_sent`. **Do not
+  "normalise" it** — a prefix or a swap to `google_uid` silently detaches MCP from every profile
+  and makes the retention question unanswerable. An unlinked email gets no `user_id`, only a
+  pseudonymous `device_id` = `mcp_<sha256(email)[0:16]>` (the email itself never leaves the worker).
+- **Privacy: checklist names, item text, notes, and prompts are never sent.** Enforced by the type
+  system, not by discipline — `McpEvent` is a closed union with no free-text field, so a raw error
+  message (which quotes user data) cannot be attached without a compile error. `analytics.test.ts`
+  pins the payload's key allowlist.
+- **Never on the critical path** — fire-and-forget; a missing key or a failed POST logs and no-ops.
+  No `ctx.waitUntil()`: these run inside the Durable Object, where `waitUntil` [has no
+  effect](https://developers.cloudflare.com/durable-objects/api/state/) — a DO stays alive on its
+  own while the fetch is pending.
 
 ## Files
 
@@ -118,9 +147,16 @@ npx tsx scripts/verify-write.ts <email>     # write (creates + deletes a marked 
 
 Nothing secret is committed. Values live **outside the repo** in `~/.gisti-mcp-secrets/` and, for
 local dev, in gitignored `mcp-server/.dev.vars`. Prod secrets are set via `wrangler secret put`:
-`GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `FIREBASE_SERVICE_ACCOUNT`. The service
-account is least-privilege (`roles/datastore.user` — Firestore only, no Firebase Auth). Bindings
-(`OAUTH_KV`, the `GistiMCP` Durable Object) and the `aichecklists-40230` project id are in
+
+| Secret | Required? | Value |
+|---|---|---|
+| `GOOGLE_OAUTH_CLIENT_ID` | yes | Google OAuth web client |
+| `GOOGLE_OAUTH_CLIENT_SECRET` | yes | ″ |
+| `FIREBASE_SERVICE_ACCOUNT` | yes | SA JSON key, one JSON string |
+| `AMPLITUDE_SERVER_API_KEY` | **optional** | Amplitude project 786722 API key — the same value the Cloud Functions read under this name (Secret Manager `amplitude-server-key`). **Unset → the server behaves exactly as before, minus the `mcp_*` events**: analytics is never a hard dependency of a tool call |
+
+The service account is least-privilege (`roles/datastore.user` — Firestore only, no Firebase Auth).
+Bindings (`OAUTH_KV`, the `GistiMCP` Durable Object) and the `aichecklists-40230` project id are in
 `wrangler.jsonc` (safe to commit).
 
 **Setup gate:** the Google OAuth web client's Authorized redirect URIs must include
