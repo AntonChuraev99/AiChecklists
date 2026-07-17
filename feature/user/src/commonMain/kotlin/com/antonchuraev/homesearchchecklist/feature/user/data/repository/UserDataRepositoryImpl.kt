@@ -18,6 +18,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.delay
@@ -86,11 +87,20 @@ class UserDataRepositoryImpl(
             googleDisplayName = name,
             isGoogleLinked = linked,
         )
-    }.stateIn(
-        appScope,
-        SharingStarted.Eagerly,
-        DEFAULT_USER_DATA
-    )
+    }
+        // Without this, a throwing datastore kills the sharing coroutine and the StateFlow is
+        // pinned to DEFAULT_USER_DATA forever — silently downgrading a signed-in premium user to
+        // anonymous free (isPremium=false, aiCredits=0) with nothing in the log to say why.
+        // The fallback value is unchanged; the point is that it stops being silent.
+        .catch { e ->
+            logger.error(TAG, "user_data_flow_failed", e)
+            emit(DEFAULT_USER_DATA)
+        }
+        .stateIn(
+            appScope,
+            SharingStarted.Eagerly,
+            DEFAULT_USER_DATA
+        )
 
     override fun getUserDataFlow(): StateFlow<UserData> {
         return userDataFlow

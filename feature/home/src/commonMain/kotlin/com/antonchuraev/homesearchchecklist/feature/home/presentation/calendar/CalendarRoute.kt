@@ -41,6 +41,7 @@ fun CalendarRoute(
             todayViewModel.sendIntent(TodayIntent.OnCreateChecklistClick)
             onCreateChecklistClick()
         },
+        onTodayRetry = { todayViewModel.sendIntent(TodayIntent.OnRefresh) },
         onCalendarIntent = { intent ->
             if (intent is CalendarIntent.OnCreateChecklistClick) {
                 onCreateChecklistClick()

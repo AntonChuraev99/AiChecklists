@@ -26,6 +26,19 @@ sealed interface MainScreenState : State {
     data object Loading : MainScreenState {
         override val userLimits: UserLimits? = null
     }
+
+    /**
+     * The checklist stream failed (repository/DB error) — recoverable via [MainScreenIntent.OnRetry].
+     *
+     * Carries no payload by design: the technical detail (exception + message) goes to
+     * [com.antonchuraev.homesearchchecklist.core.common.api.AppLogger] only. The UI renders a
+     * localized message from `strings.xml` — never a raw exception message, which is untranslated,
+     * meaningless to users, and frequently null.
+     */
+    data object Error : MainScreenState {
+        override val userLimits: UserLimits? = null
+    }
+
     data class Success(
         val checklists: List<ChecklistWithProgress>,
         val subscriptionStatus: SubscriptionStatus,
@@ -83,6 +96,12 @@ sealed interface MainScreenIntent : Intent {
     /** Emitted when the user taps the sync-banner close button. Hides it for this session
      *  (in-memory) and increments the persistent lifetime dismiss count. */
     data object OnDismissSyncBanner : MainScreenIntent
+
+    /**
+     * Retry after [MainScreenState.Error]. Re-subscribes the whole state flow from scratch —
+     * the only recovery path out of a failed checklist stream.
+     */
+    data object OnRetry : MainScreenIntent
 }
 
 sealed interface MainScreenSideEffect : SideEffect {

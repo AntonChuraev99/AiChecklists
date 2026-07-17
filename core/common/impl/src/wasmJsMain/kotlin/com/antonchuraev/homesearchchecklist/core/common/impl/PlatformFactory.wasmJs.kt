@@ -7,7 +7,10 @@ private class ConsoleAppLogger : AppLogger {
     override fun info(tag: String, message: String) = consoleLog("[I] $tag: $message")
     override fun warning(tag: String, message: String) = consoleWarn("[W] $tag: $message")
     override fun error(tag: String, message: String, throwable: Throwable?) {
-        consoleError("[E] $tag: $message${throwable?.let { " | ${it.message}" } ?: ""}")
+        // Mirrors Android's Log.e(tag, msg, throwable): type + stack + causal chain.
+        // Printing only throwable.message used to reduce a prod NPE to "| null" — see
+        // describeForLog().
+        consoleError("[E] $tag: $message${throwable?.let { "\n${it.describeForLog()}" } ?: ""}")
     }
 }
 

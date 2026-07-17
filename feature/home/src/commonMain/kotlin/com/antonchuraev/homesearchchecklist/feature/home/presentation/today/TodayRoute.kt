@@ -33,5 +33,6 @@ fun TodayRoute(
             viewModel.sendIntent(TodayIntent.OnCreateChecklistClick)
             onCreateChecklistClick()
         },
+        onRetry = { viewModel.sendIntent(TodayIntent.OnRefresh) },
     )
 }

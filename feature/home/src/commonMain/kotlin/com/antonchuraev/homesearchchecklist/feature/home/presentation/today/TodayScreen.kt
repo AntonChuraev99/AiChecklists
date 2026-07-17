@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.outlined.Alarm
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material3.CircularProgressIndicator
@@ -48,12 +49,16 @@ import aichecklists.core.designsystem.generated.resources.today_all_done_descrip
 import aichecklists.core.designsystem.generated.resources.today_all_done_title
 import aichecklists.core.designsystem.generated.resources.today_empty_state_description
 import aichecklists.core.designsystem.generated.resources.today_empty_state_title
+import aichecklists.core.designsystem.generated.resources.today_error_description
+import aichecklists.core.designsystem.generated.resources.today_error_retry
+import aichecklists.core.designsystem.generated.resources.today_error_title
 import aichecklists.core.designsystem.generated.resources.today_no_checklists_description
 import aichecklists.core.designsystem.generated.resources.today_open_menu
 import aichecklists.core.designsystem.generated.resources.today_section_past_due
 import aichecklists.core.designsystem.generated.resources.today_section_today
 import aichecklists.core.designsystem.generated.resources.today_title
 import com.antonchuraev.homesearchchecklist.core.common.api.State
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
@@ -129,6 +134,16 @@ sealed interface TodayScreenState : State {
     /** No checklists created yet — show onboarding-promo state. */
     data object NoChecklists : TodayScreenState
 
+    /**
+     * Reminders could not be loaded (repository/DB failure).
+     *
+     * Carries no payload by design: the technical detail (exception + message) goes to
+     * [com.antonchuraev.homesearchchecklist.core.common.api.AppLogger] only. The UI shows a
+     * localized, actionable message from `strings.xml` — never a raw exception message,
+     * which is untranslated, meaningless to users, and frequently null.
+     */
+    data object Error : TodayScreenState
+
     data class Success(
         val dateLabel: String,          // e.g. "Tuesday, May 6"
         val pastDue: List<TodayReminderItem>,
@@ -151,6 +166,7 @@ sealed interface TodayScreenState : State {
  *        - If fillId != null → navigate to FillDetail(fillId)
  *        - If fillId == null → navigate to ChecklistDetail(checklistId)
  * @param onCreateChecklistClick Called from NoChecklists empty state CTA.
+ * @param onRetry Called from the [TodayScreenState.Error] retry CTA — re-fetches reminders.
  * @param modifier Optional modifier for the root scaffold.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -160,6 +176,7 @@ fun TodayScreen(
     drawerState: DrawerState?,
     onReminderClick: (checklistId: Long, fillId: Long?) -> Unit,
     onCreateChecklistClick: () -> Unit,
+    onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
@@ -184,6 +201,7 @@ fun TodayScreen(
             state = state,
             onReminderClick = onReminderClick,
             onCreateChecklistClick = onCreateChecklistClick,
+            onRetry = onRetry,
         )
     }
 }
@@ -194,12 +212,15 @@ fun TodayScreen(
  * Used directly inside the Calendar tab host so the tab area gets the Today
  * agenda content without nesting a second top bar. The standalone
  * [TodayScreen] composable wraps this body in [AppScaffold].
+ *
+ * @param onRetry Called from the [TodayScreenState.Error] retry CTA — re-fetches reminders.
  */
 @Composable
 fun TodayBody(
     state: TodayScreenState,
     onReminderClick: (checklistId: Long, fillId: Long?) -> Unit,
     onCreateChecklistClick: () -> Unit,
+    onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
@@ -223,9 +244,22 @@ fun TodayBody(
                 title = stringResource(Res.string.today_empty_state_title),
                 description = stringResource(Res.string.today_no_checklists_description),
                 action = {
-                    com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton(
+                    AppButton(
                         text = stringResource(Res.string.main_create_checklist),
                         onClick = onCreateChecklistClick,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            )
+
+            TodayScreenState.Error -> EmptyState(
+                icon = Icons.Outlined.ErrorOutline,
+                title = stringResource(Res.string.today_error_title),
+                description = stringResource(Res.string.today_error_description),
+                action = {
+                    AppButton(
+                        text = stringResource(Res.string.today_error_retry),
+                        onClick = onRetry,
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }

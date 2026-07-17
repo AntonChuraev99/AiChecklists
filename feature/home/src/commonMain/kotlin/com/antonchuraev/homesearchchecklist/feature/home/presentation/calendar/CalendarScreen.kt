@@ -140,6 +140,7 @@ fun CalendarScreen(
     drawerState: DrawerState?,
     onTodayReminderClick: (checklistId: Long, fillId: Long?) -> Unit,
     onTodayCreateChecklistClick: () -> Unit,
+    onTodayRetry: () -> Unit,
     onCalendarIntent: (CalendarIntent) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -186,6 +187,7 @@ fun CalendarScreen(
                         state = todayState,
                         onReminderClick = onTodayReminderClick,
                         onCreateChecklistClick = onTodayCreateChecklistClick,
+                        onRetry = onTodayRetry,
                     )
                     1 -> CalendarTabBody(
                         state = calendarState,
