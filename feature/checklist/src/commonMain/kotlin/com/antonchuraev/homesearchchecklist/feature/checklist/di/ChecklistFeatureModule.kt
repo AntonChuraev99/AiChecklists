@@ -4,6 +4,7 @@ import com.antonchuraev.homesearchchecklist.core.auth.api.GoogleAuthRepository
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentCloudStoragePort
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePort
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.AgentTranscriptDao
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChatHistoryDao
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistDao
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistFillDao
@@ -31,6 +32,7 @@ val checklistFeatureModule = module {
     single { RecoverRecurringRemindersUseCase(get(), get(), getOrNull()) }
     single<SmartDateParser> { SmartDateParserImpl(get()) }
     single<ChatHistoryDao> { getChecklistDatabase(get<AttachmentStoragePort>()).chatHistoryDao() }
+    single<AgentTranscriptDao> { getChecklistDatabase(get<AttachmentStoragePort>()).agentTranscriptDao() }
     // DAOs exposed as first-class DI definitions so non-repository consumers can
     // resolve them directly. The Android home-screen widget's WidgetRepository
     // requires get<ChecklistDao>() / get<ChecklistFillDao>(); without these the

@@ -26,6 +26,9 @@ import aichecklists.core.designsystem.generated.resources.chat_settings_balance_
 import aichecklists.core.designsystem.generated.resources.chat_settings_deep_thinking_subtitle
 import aichecklists.core.designsystem.generated.resources.chat_settings_deep_thinking_title
 import aichecklists.core.designsystem.generated.resources.chat_settings_clear_chat
+import aichecklists.core.designsystem.generated.resources.chat_settings_default_list_reset
+import aichecklists.core.designsystem.generated.resources.chat_settings_default_list_subtitle
+import aichecklists.core.designsystem.generated.resources.chat_settings_default_list_title
 import aichecklists.core.designsystem.generated.resources.chat_settings_title
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCreditsChip
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppSwitch
@@ -48,6 +51,9 @@ import org.jetbrains.compose.resources.stringResource
  * @param deepThinkingEnabled Current Deep Thinking toggle state.
  * @param onDeepThinkingToggle Callback when the user flips the Deep Thinking switch.
  * @param onGetMoreClick      Callback for the "Get More" credits CTA (navigates to Paywall).
+ * @param defaultChecklistName Name of the list the user asked the chat to remember, or null when
+ *                            the chat still asks every time. Non-null renders the reset row.
+ * @param onResetDefaultChecklist Clears the remembered default ("Ask me every time").
  * @param onDismiss           Called when the sheet should close.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -61,6 +67,8 @@ fun ChatSettingsSheet(
     onClearChat: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    defaultChecklistName: String? = null,
+    onResetDefaultChecklist: () -> Unit = {},
     sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
 ) {
     ModalBottomSheet(
@@ -135,6 +143,50 @@ fun ChatSettingsSheet(
                     onCheckedChange = null,
                     modifier = Modifier.padding(start = AppDimens.SpacingLg),
                 )
+            }
+
+            // Default-list section — rendered ONLY once a default exists.
+            //
+            // This row is the escape hatch for "Remember my choice": without it the chat silently
+            // keeps routing every new item to one list with no visible way back, which is the
+            // trap the memory feature must not become. No default → nothing to reset → no row.
+            if (defaultChecklistName != null) {
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = AppDimens.SpacingLg),
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                )
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onResetDefaultChecklist)
+                        .padding(vertical = AppDimens.SpacingXs),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(Res.string.chat_settings_default_list_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Spacer(modifier = Modifier.height(AppDimens.SpacingXs))
+                        Text(
+                            text = stringResource(
+                                Res.string.chat_settings_default_list_subtitle,
+                                defaultChecklistName,
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Text(
+                        text = stringResource(Res.string.chat_settings_default_list_reset),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(start = AppDimens.SpacingLg),
+                    )
+                }
             }
 
             HorizontalDivider(

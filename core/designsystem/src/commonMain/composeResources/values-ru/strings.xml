@@ -548,6 +548,12 @@
         <item quantity="many">%1$d пунктов</item>
         <item quantity="other">%1$d пунктов</item>
     </plurals>
+    <plurals name="reminders_count">
+        <item quantity="one">%1$d напоминание</item>
+        <item quantity="few">%1$d напоминания</item>
+        <item quantity="many">%1$d напоминаний</item>
+        <item quantity="other">%1$d напоминаний</item>
+    </plurals>
     <string name="reminder_exact_alarm_title">Включить точные напоминания</string>
     <string name="reminder_exact_alarm_step1">Нажмите «Открыть настройки» ниже</string>
     <string name="reminder_exact_alarm_step2">Найдите «Будильники &amp; напоминания»</string>
@@ -1035,33 +1041,42 @@
     <string name="chat_pricing_caption_action">Почему?</string>
 
     <!-- AI-чат: preview card -->
-    <string name="chat_preview_apply">Применить</string>
-    <string name="chat_preview_cancel">Отмена</string>
-    <string name="chat_preview_reject">Я имел в виду другое</string>
     <string name="chat_preview_cancelled_message">Действие отменено.</string>
-    <string name="chat_preview_will_create_one">Будет создан один пункт:</string>
-    <string name="chat_preview_will_create_checklist">Новый чек-лист:</string>
-    <string name="chat_preview_will_delete">Будет удалён пункт:</string>
-    <string name="chat_preview_will_complete">Будет отмечен как выполнен:</string>
-    <string name="chat_preview_will_set_reminder">Поставить напоминание для:</string>
-    <string name="chat_preview_will_move_reminders">Перенести все напоминания:</string>
-    <string name="chat_preview_will_create_from_attachment">Создать чек-лист из файла:</string>
-    <string name="chat_preview_will_attach_to_item">Прикрепить файл к пункту:</string>
+    <!-- D2 переиспользует как contentDescription ряда назначения. -->
     <string name="chat_preview_checklist_label">В чек-лист: %1$s</string>
-    <string name="chat_preview_no_checklist_hint">Чек-лист не указан — добавим в первый.</string>
-    <string name="chat_preview_item_label">Текст пункта</string>
+    <!-- D2 переиспользует как label поля правки при создании чек-листа. -->
     <string name="chat_preview_new_list_label">Название списка</string>
+
+    <!-- D2 ряды объекта — a11y-фразы для типизированного объекта действия. -->
+    <string name="chat_object_item_a11y">Пункт: %1$s</string>
+    <string name="chat_object_time_a11y">Время: %1$s</string>
+    <string name="chat_object_file_a11y">Файл: %1$s</string>
+    <string name="chat_object_name_a11y">Название: %1$s</string>
+    <string name="chat_object_more">…и ещё %1$s</string>
+    <!-- D2: кнопка называет результат, никогда не «Применить». -->
+    <string name="chat_choice_action_create_items">Создать %1$s</string>
+    <string name="chat_choice_action_move_reminders">Перенести %1$s</string>
+    <!-- D2 память выбора — только по опту, никогда не предотмечено; раскрывается после тапа. -->
+    <string name="chat_choice_remember">Запомнить выбор</string>
+    <string name="chat_result_remembered_list">Теперь добавляю в «%1$s» по умолчанию — изменить можно в настройках чата.</string>
+    <string name="chat_settings_default_list_title">Список по умолчанию</string>
+    <string name="chat_settings_default_list_subtitle">Новые пункты из чата попадают в «%1$s».</string>
+    <string name="chat_settings_default_list_reset">Спрашивать каждый раз</string>
     <!-- AI choice response (Claude-style prompt + choice chips) -->
-    <string name="chat_choice_add_to_list">Добавить в %1$s?</string>
-    <string name="chat_choice_add_default_list">Добавить в список?</string>
-    <string name="chat_choice_delete">Удалить %1$s?</string>
-    <string name="chat_choice_complete">Отметить %1$s выполненным?</string>
-    <string name="chat_choice_create">Создать список %1$s?</string>
-    <string name="chat_choice_set_reminder">Поставить напоминание для %1$s?</string>
+    <!-- Вопросы без аргументов: объект действия («• Молоко → Покупки») рендерится отдельной
+         строкой под вопросом (ToolCallPreviewRenderer), а не подставляется в копирайт. -->
+    <string name="chat_question_add">Добавить?</string>
+    <string name="chat_question_delete">Удалить?</string>
+    <string name="chat_question_complete">Отметить выполненным?</string>
+    <string name="chat_question_create">Создать этот список?</string>
+    <string name="chat_question_set_reminder">Поставить это напоминание?</string>
+    <string name="chat_question_attach">Прикрепить этот файл?</string>
     <string name="chat_choice_move_reminders">Перенести все напоминания?</string>
-    <string name="chat_choice_attach">Прикрепить к %1$s?</string>
     <string name="chat_choice_create_from_file">Создать список из этого файла?</string>
     <string name="chat_choice_which_list">В какой список?</string>
+    <!-- Пикер переноса, когда лимит чипов прячет списки: показано %1$s из %2$s. У премиума списков
+         неограниченно, поэтому молча урезанный пикер читается как «список пропал». -->
+    <string name="chat_choice_which_list_truncated">В какой список? Показаны %1$s из %2$s.</string>
     <string name="chat_choice_apply_actions">Выполнить эти действия?</string>
     <string name="chat_choice_action_add">Добавить</string>
     <string name="chat_choice_action_delete">Удалить</string>
@@ -1086,10 +1101,47 @@
     <string name="chat_choice_executing_move">Переношу…</string>
     <string name="chat_choice_executing_attach">Прикрепляю…</string>
     <string name="chat_choice_executing_default">Работаю…</string>
+    <!-- Чипы после действия (D1): показываются ПОСЛЕ применённого обратимого действия. -->
+    <string name="chat_choice_undo">Отменить</string>
+    <string name="chat_choice_move_to_list">В другой список</string>
+    <string name="chat_choice_executing_undo">Отменяю…</string>
+    <string name="chat_result_undone_add">Убрал «%1$s» обратно.</string>
+    <string name="chat_result_undone_complete">Снял отметку с «%1$s».</string>
+    <string name="chat_result_moved_to">Перенёс «%1$s» в %2$s.</string>
+    <string name="chat_undo_item_gone">Этого пункта уже нет — отменять нечего.</string>
+    <string name="chat_move_no_other_lists">Больше нет списков, куда перенести.</string>
+    <!-- ToolCallPreviewRenderer: строка-объект действия. -->
+    <string name="chat_preview_in_list">(в %1$s)</string>
+    <string name="chat_preview_files_count">%1$s файлов</string>
+    <string name="chat_preview_create_from_file">Создать список из %1$s</string>
+    <string name="chat_preview_attach_to">Прикрепить %1$s к • %2$s</string>
+    <!-- Дата/время. Порядок «день-месяц» — часть локали: EN «July 20», RU «20 июля», поэтому
+         слоты в формат-строке переставлены, а не склеены в Kotlin. Месяцы — родительный падеж. -->
+    <string name="chat_preview_day_month">%2$s %1$s</string>
+    <string name="chat_preview_weekday_date">%1$s, %2$s</string>
+    <string name="chat_preview_datetime">%1$s, %2$s в %3$s</string>
+    <string name="month_january">января</string>
+    <string name="month_february">февраля</string>
+    <string name="month_march">марта</string>
+    <string name="month_april">апреля</string>
+    <string name="month_may">мая</string>
+    <string name="month_june">июня</string>
+    <string name="month_july">июля</string>
+    <string name="month_august">августа</string>
+    <string name="month_september">сентября</string>
+    <string name="month_october">октября</string>
+    <string name="month_november">ноября</string>
+    <string name="month_december">декабря</string>
 
     <!-- AI-чат: подсказки и сообщения -->
     <string name="chat_unknown_intent_hint">Не понял запрос. Попробуйте «добавь молоко в покупки» или «напомни в пятницу в 18».</string>
     <string name="chat_ask_ai_fallback">Спросить AI</string>
+    <!-- %1$s = ai_daily_limit_premium (Remote Config, меняется). Число стоит ПОСЛЕ двоеточия
+         намеренно: русский требует согласования существительного с числительным, поэтому
+         «%1$s кредитов» ломается на 1/21/101 («1 кредитов»). После «лимит:» согласование не
+         нужно при любом числе. Не переписывать в «%1$s кредитов» — строка RC-driven именно
+         затем, чтобы число менялось. EN так не ломается: там форма одна. -->
+    <string name="chat_paywall_cta_credits">Оформите Pro — кредиты сразу и каждый день, лимит: %1$s</string>
 
     <!-- AI-чат: pricing bottom sheet -->
     <string name="chat_pricing_sheet_title">Как AI-чат списывает кредиты</string>
@@ -1132,7 +1184,9 @@
     <string name="chat_dispatch_created_empty">Создан чек-лист «%1$s».</string>
     <string name="chat_dispatch_created_with_one">Создан чек-лист «%1$s» с одним пунктом.</string>
     <string name="chat_dispatch_created_with_many">Создан чек-лист «%1$s» с %2$s пунктами.</string>
-    <string name="chat_dispatch_reminder_set">Напоминание для «%1$s» поставлено на %2$s.</string>
+    <!-- %2$s — полный локализованный момент («Понедельник, 20 июля в 09:00») из ChatDateFormatter,
+         та же строка, что показал preview: без расхождения между «предложил» и «сделал». -->
+    <string name="chat_dispatch_reminder_set">Напоминание для «%1$s»: %2$s.</string>
     <string name="chat_dispatch_no_reminders_on_day">Напоминаний не найдено на %1$s.</string>
     <string name="chat_dispatch_moved_one">Перенёс 1 напоминание на %1$s.</string>
     <string name="chat_dispatch_moved_many">Перенёс %1$s напоминаний на %2$s.</string>

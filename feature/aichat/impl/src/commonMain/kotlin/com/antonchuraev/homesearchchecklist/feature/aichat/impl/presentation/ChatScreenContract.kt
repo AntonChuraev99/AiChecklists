@@ -6,7 +6,9 @@ import com.antonchuraev.homesearchchecklist.core.common.api.State
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AttachmentSource
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatAttachment
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatChoice
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceAction
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ToolCall
 
 // ---------------------------------------------------------------------------
 // State
@@ -70,6 +72,13 @@ data class ChatScreenState(
      * Null when the sheet is opened from [MainScreen] with no focus context.
      */
     val contextChecklistId: Long? = null,
+    /**
+     * Name of the checklist the user chose as their chat default ("Remember my choice"), or null
+     * when the chat still asks every time. Resolved from the persisted id against the live
+     * checklists, so a deleted list resolves back to null and the chat resumes asking.
+     * Drives the chat-settings reset row — a remembered default MUST be visible and clearable.
+     */
+    val defaultChecklistName: String? = null,
 ) : State {
     /** True when the Send button should be active (text entered OR attachments pending). */
     val canSend: Boolean get() = inputText.isNotBlank() || pendingAttachments.isNotEmpty()
@@ -91,6 +100,13 @@ data class ChatScreenState(
  * @param batchItems  Non-null for the agent-batch choice: the numbered list of proposed actions
  *                    rendered inside the prompt bubble (destructive lines error-tinted). Null for
  *                    single-action / ambiguous-match choices.
+ * @param showMemoryToggle True only on the which-list picker for an ADD: the one case where the
+ *                    user's pick is a reusable routing default. Never on delete / reminder /
+ *                    attach / create (destructive or one-off), and never on the D1 post-action
+ *                    move — that is a correction of a mistake, not a preference to learn from.
+ * @param rememberChoice Current state of the memory checkbox. Starts false and is NEVER
+ *                    pre-checked: a sticky preference the user did not knowingly opt into is a
+ *                    dark pattern, and the reply after the tap must disclose it.
  */
 data class PendingChoice(
     val choice: ChatChoice,
@@ -98,7 +114,42 @@ data class PendingChoice(
     val executingLabel: String? = null,
     val editText: String? = null,
     val batchItems: List<AgentPlanItem>? = null,
-)
+    val showMemoryToggle: Boolean = false,
+    val rememberChoice: Boolean = false,
+) {
+    /**
+     * True for the D1 post-action offer (Undo / move-to-list) shown AFTER a reversible action was
+     * applied. It is an offer, not a question: the action already happened and nothing is waiting
+     * on the user.
+     *
+     * Why the UI needs this: a *question* hides the input row on purpose — its chips (including the
+     * escape chip, which dismisses and brings the input back) are the only sane interaction. A
+     * post-action block has NO escape chip, so reusing that rule trapped the chat — the offer stayed
+     * up, the input stayed hidden, and the only way out was Back, which collapsed the whole dock.
+     */
+    val isPostAction: Boolean
+        get() = choice.options.any {
+            it.action is ChoiceAction.Undo ||
+                it.action is ChoiceAction.MoveToList ||
+                it.action is ChoiceAction.MoveTo
+        }
+
+    /**
+     * True when this block asks a QUESTION carrying typed object rows (D2). The dock uses it to
+     * pick its scroll anchor and its height cap: a question must show its object, so the frame
+     * anchors to the TOP — auto-scrolling to the bottom would leave bare chips ("cancel WHAT?").
+     */
+    val hasObjectRows: Boolean get() = choice.objectRows.isNotEmpty()
+
+    /**
+     * True when the pending action creates a checklist — the inline edit field is then naming a
+     * list, not fixing an item, and takes the "List name" label.
+     */
+    val isCreatingChecklist: Boolean
+        get() = choice.options.any {
+            (it.action as? ChoiceAction.Execute)?.toolCall is ToolCall.CreateChecklist
+        }
+}
 
 /**
  * One line in the agent-batch choice prompt.
@@ -176,6 +227,19 @@ sealed interface ChatScreenIntent : Intent {
      */
     data object OnChoiceDismissed : ChatScreenIntent
 
+    /**
+     * User flipped "Remember my choice" on the which-list picker. Only bookkeeps the checkbox —
+     * nothing is persisted until a candidate chip is actually tapped, because the preference is
+     * "add to THAT list from now on" and there is no "that list" until one is chosen.
+     */
+    data class OnChoiceMemoryToggle(val enabled: Boolean) : ChatScreenIntent
+
+    /**
+     * User tapped "Ask me every time" in chat settings — clears the remembered default list.
+     * The escape hatch for [OnChoiceMemoryToggle]; without it the preference is a one-way trap.
+     */
+    data object OnResetDefaultChecklist : ChatScreenIntent
+
     /** User edited the text inside the inline edit field of the pending choice. */
     data class OnChoiceEditChange(val text: String) : ChatScreenIntent
 
@@ -195,11 +259,14 @@ sealed interface ChatScreenIntent : Intent {
      * can show an "Open checklist" button for successful write-intent outcomes.
      * [askAiForText] is preserved so the bubble can show an "Ask AI" button
      * for Unknown-intent responses that should offer Layer 3 escalation.
+     * [paywallCtaCredits] is preserved so the bubble can show the "Become Pro" CTA
+     * on an out-of-credits reply (the number is the Premium daily allowance).
      */
     data class AppendAssistantMessage(
         val text: String,
         val linkedChecklistId: Long? = null,
         val askAiForText: String? = null,
+        val paywallCtaCredits: Int? = null,
     ) : ChatScreenIntent
 
     /** User tapped the back / navigation icon. */
@@ -240,6 +307,13 @@ sealed interface ChatScreenIntent : Intent {
      * This is an explicit opt-in to spend 3 credits — we never auto-burn on Unknown.
      */
     data class OnAskAiFallback(val text: String) : ChatScreenIntent
+
+    /**
+     * User tapped the "Become Pro" CTA on an out-of-credits assistant bubble.
+     * Emits [ChatScreenSideEffect.NavigateToPaywall] — the conversion moment the Layer 1
+     * disconnect was accepted to buy (docs/decisions/2026-07-15-remove-ai-chat-layer1.md).
+     */
+    data object OnPaywallCtaClick : ChatScreenIntent
 
     // ── Attachment intents (Phase 1: VM domain logic; picker UI lives in Phase 3) ──
 
@@ -331,12 +405,19 @@ sealed interface ChatScreenSideEffect : SideEffect {
      * checklist" deeplink button for successful write-intent dispatch outcomes.
      * [askAiForText] is forwarded when the assistant message is an Unknown-intent response;
      * the bubble shows an "Ask AI" TextButton that escalates to Layer 3 explicitly.
+     * [paywallCtaCredits] is forwarded when the turn was refused for lack of credits: non-null
+     * makes the bubble show the "Become Pro" CTA, and the value is the Premium daily credit
+     * allowance rendered in its label (read from Remote Config — never hardcoded, see
+     * [ChatViewModel.premiumDailyCredits]). Mutually exclusive with [askAiForText] by intent:
+     * offering "Ask AI" to an empty wallet is how the shipped bug hid the truth (it asks for 3
+     * more credits, 402s again).
      */
     data class ShowAssistantMessage(
         val messageKey: String,
         val args: List<String> = emptyList(),
         val linkedChecklistId: Long? = null,
         val askAiForText: String? = null,
+        val paywallCtaCredits: Int? = null,
     ) : ChatScreenSideEffect
 
     /** Navigate back (handled by the host NavController). */
@@ -364,8 +445,31 @@ sealed interface ChatScreenSideEffect : SideEffect {
     data class OpenFilePicker(val source: AttachmentSource) : ChatScreenSideEffect
 
     /**
-     * Navigate to the paywall (triggered by [RequiresPremium] dispatch outcome for
-     * CreateChecklistFromAttachment when the free attachment/checklist quota is exceeded).
+     * Navigate to the paywall, tagging WHY for the `paywall_shown` funnel.
+     *
+     * [source] is carried by the effect rather than hardcoded per host because the two chat
+     * surfaces (the App.kt dock and the full-screen ChatRoute) reach the paywall from two
+     * different places, and a host-side literal silently merged them: a user who *hit the credit
+     * limit* and a user who *tapped the credits chip* both reported "chat_credits_chip". The
+     * Layer 1 disconnect (docs/decisions/2026-07-15-remove-ai-chat-layer1.md) is priced on
+     * exactly that distinction — "paywall_shown with source=chat, expect a rise in users hitting
+     * the limit" is its post-release monitoring signal, so merging the two answers the ADR's
+     * question with the wrong number.
+     *
+     * Emitters: [ChatScreenIntent.OnPaywallCtaClick] ([SOURCE_INSUFFICIENT_CREDITS]) and the
+     * credits chip in the top bar ([SOURCE_CREDITS_CHIP], invoked host-side). A new emitter must
+     * bring its own source constant — do not reuse one of these.
+     *
+     * (The pre-2026-07-16 KDoc credited a `RequiresPremium` dispatch outcome; nothing ever
+     * emitted it from there, so this effect was dead code until the out-of-credits CTA.)
      */
-    data object NavigateToPaywall : ChatScreenSideEffect
+    data class NavigateToPaywall(val source: String) : ChatScreenSideEffect {
+        companion object {
+            /** The user ran out of AI credits and tapped "Become Pro" on the refusal reply. */
+            const val SOURCE_INSUFFICIENT_CREDITS = "chat_insufficient_credits"
+
+            /** The user tapped the credit-balance chip in the chat top bar, unprompted. */
+            const val SOURCE_CREDITS_CHIP = "chat_credits_chip"
+        }
+    }
 }

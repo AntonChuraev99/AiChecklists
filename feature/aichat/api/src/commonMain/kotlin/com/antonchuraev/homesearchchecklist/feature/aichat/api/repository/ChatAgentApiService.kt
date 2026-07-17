@@ -16,6 +16,11 @@ interface ChatAgentApiService {
      *   to the server as a top-level `context_checklist.name` field so the agent biases
      *   ambiguous, list-less commands toward this checklist instead of guessing the first one.
      *   Null → omit the field entirely (server treats absence as "home screen, no focus").
+     * @param requestId Idempotency key for the turn's credit reservation, sent as top-level
+     *   `request_id`. It MUST be stable across every round AND every transport retry of ONE
+     *   turn, and MUST differ between turns — the server dedups on `{user_id}__{request_id}`,
+     *   so a reused id reads as a replay and the turn is never charged. Null → the server's
+     *   legacy non-deduped reserve (same cost), which is what store clients still use.
      */
     suspend fun step(
         userId: String,
@@ -23,6 +28,7 @@ interface ChatAgentApiService {
         locale: ChatLocale,
         checklistsSummary: List<ChecklistContext>,   // reuse type from ChatCompletionApiService.kt
         contextChecklistName: String? = null,
+        requestId: String? = null,
     ): AgentStepResult
 }
 

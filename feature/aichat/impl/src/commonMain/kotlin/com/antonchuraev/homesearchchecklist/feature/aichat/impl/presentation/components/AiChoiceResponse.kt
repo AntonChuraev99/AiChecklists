@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -14,11 +15,20 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.AttachFile
+import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material.icons.outlined.DeleteForever
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Event
+import androidx.compose.material.icons.outlined.FormatListBulleted
+import androidx.compose.material.icons.outlined.NotificationsNone
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -34,15 +44,25 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.chat_choice_edit_label
 import aichecklists.core.designsystem.generated.resources.chat_choice_executing_default
+import aichecklists.core.designsystem.generated.resources.chat_choice_remember
 import aichecklists.core.designsystem.generated.resources.chat_choice_save
+import aichecklists.core.designsystem.generated.resources.chat_object_more
+import aichecklists.core.designsystem.generated.resources.chat_preview_new_list_label
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatChoice
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceObjectRow
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceOption
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceRole
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.RowEmphasis
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.RowKind
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.AgentPlanItem
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.PendingChoice
 import org.jetbrains.compose.resources.stringResource
@@ -58,17 +78,32 @@ import org.jetbrains.compose.resources.stringResource
  * ```
  * AiSenderLabel          (reused from ChatMessageBubble)
  * ┌──────────────────┐   prompt bubble: surfaceContainerLowest + 1dp outlineVariant
- * │  prompt / batch  │   shape 20-20-20-4 (tail bottom-left), ChatMarkdownText
+ * │  prompt          │   shape 20-20-20-4 (tail bottom-left), ChatMarkdownText
+ * │  object rows     │   D2: the typed object of the action (item / list / time / …)
  * └──────────────────┘
+ * [x] Remember choice    only on the which-list picker for an add
  * [chip] [chip] [chip]   wrapping FlowRow (all-short) or Column-fillMaxWidth (any long label)
  * [escape chip]          separate row
  * ```
+ * The object rows live INSIDE the bubble on purpose. The bubble is already a container and
+ * already means "the AI said this" — a second frame around the rows would turn a dialogue turn
+ * into a form, which is what the chips redesign set out to kill. The root stays a [Column].
+ *
+ * The memory checkbox, by contrast, sits OUTSIDE the bubble: the bubble is what the AI said, the
+ * checkbox is what the user does, and the ordering ("check, then pick") reads top-down.
+ *
  * When [PendingChoice.editText] is non-null, the chip row is replaced by an inline
  * [OutlinedTextField] (auto-focus + IME) and the primary chip relabels to "Save".
  *
+ * @param compact  True for the inline dock (App.kt), false for the full-height chat screen.
+ *                 An explicit parameter, NOT a BoxWithConstraints measurement: both surfaces can
+ *                 be the same width on the same phone, so width cannot tell them apart. Caps how
+ *                 many preview rows render before the overflow line.
  * @param onSelect    Called with a chip's option id when tapped.
  * @param onEditChange Called as the user types in the inline edit field.
  * @param onEditConfirm Called when the user confirms the inline edit (primary chip).
+ * @param onMemoryToggle Called when the user flips "Remember my choice". Only ever reachable when
+ *                 [PendingChoice.showMemoryToggle] is true.
  */
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -78,6 +113,8 @@ fun AiChoiceResponse(
     onEditChange: (String) -> Unit,
     onEditConfirm: () -> Unit,
     modifier: Modifier = Modifier,
+    compact: Boolean = false,
+    onMemoryToggle: (Boolean) -> Unit = {},
 ) {
     val choice = pending.choice
     val isExecuting = pending.executingId != null
@@ -111,13 +148,29 @@ fun AiChoiceResponse(
                     color = MaterialTheme.colorScheme.surfaceContainerLowest,
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 ) {
-                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                    Column(
+                        modifier = Modifier
+                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                            .animateContentSize()
+                            // The bubble speaks as one unit; each object row then overrides with
+                            // its own role-carrying description (see ObjectRow).
+                            .semantics(mergeDescendants = true) {},
+                    ) {
                         ChatMarkdownText(
                             markdown = choice.prompt,
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurface,
                         )
-                        // Agent-batch: numbered list of actions inside the bubble.
+                        // D2: the typed object of the action.
+                        if (choice.objectRows.isNotEmpty()) {
+                            ObjectRows(
+                                rows = choice.objectRows,
+                                compact = compact,
+                                modifier = Modifier.padding(top = AppDimens.SpacingSm),
+                            )
+                        }
+                        // Agent-batch: numbered list of actions inside the bubble. Untouched by D2 —
+                        // object rows assume ONE typed object, a batch is N heterogeneous ones.
                         pending.batchItems?.let { items ->
                             BatchActionList(
                                 items = items,
@@ -128,10 +181,20 @@ fun AiChoiceResponse(
                 }
             }
 
+            // Memory of choice — between the bubble and the chips, never inside either.
+            if (pending.showMemoryToggle && !isEditing) {
+                MemoryRow(
+                    checked = pending.rememberChoice,
+                    enabled = !isExecuting,
+                    onCheckedChange = onMemoryToggle,
+                )
+            }
+
             if (isEditing) {
                 EditField(
                     text = pending.editText.orEmpty(),
                     onTextChange = onEditChange,
+                    isChecklistName = pending.isCreatingChecklist,
                 )
                 // While editing, the primary option relabels to "Save" and confirms the edit.
                 val primary = choice.options.firstOrNull { it.role == ChoiceRole.Primary }
@@ -171,6 +234,160 @@ fun AiChoiceResponse(
 }
 
 /**
+ * The D2 object block: the typed rows describing WHAT the pending action will act on.
+ *
+ * Repeatable rows — the proposed items of a list about to be created ([RowKind.Preview]) and a
+ * multi-item add ([RowKind.Item]) — are capped at [PREVIEW_CAP_COMPACT] in the dock and
+ * [PREVIEW_CAP_FULL] on the full screen, with an "…and N more" tail. The cap lives HERE, not in
+ * the ViewModel, because only the renderer knows which surface it is on; the ViewModel emits the
+ * full truth and this decides how much of it fits.
+ *
+ * Singular rows (destination, time, file, name, count, date range) are never capped: dropping the
+ * time or the list would hide the very thing the question is asking about.
+ */
+@Composable
+private fun ObjectRows(
+    rows: List<ChoiceObjectRow>,
+    compact: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val cap = if (compact) PREVIEW_CAP_COMPACT else PREVIEW_CAP_FULL
+    val cappableCount = rows.count { it.kind.isCappable() }
+    val hiddenCount = (cappableCount - cap).coerceAtLeast(0)
+    var shown = 0
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
+    ) {
+        rows.forEach { row ->
+            if (row.kind.isCappable()) {
+                if (shown >= cap) return@forEach
+                shown++
+            }
+            ObjectRow(row)
+        }
+        if (hiddenCount > 0) {
+            val moreText = stringResource(Res.string.chat_object_more, hiddenCount.toString())
+            ObjectRow(
+                ChoiceObjectRow(
+                    value = moreText,
+                    kind = RowKind.Overflow,
+                    emphasis = RowEmphasis.Detail,
+                    contentDescription = moreText,
+                ),
+            )
+        }
+    }
+}
+
+/** Rows that repeat and may therefore be truncated with an "…and N more" tail. */
+private fun RowKind.isCappable(): Boolean = this == RowKind.Preview || this == RowKind.Item
+
+/**
+ * One object row: a 16dp leading icon + the value.
+ *
+ * The icon carries a 2dp top offset so its optical centre lines up with the first text line
+ * (a 16dp glyph against a 20dp line box sits high otherwise) — same treatment as ChatPricingRow.
+ * The icon is decorative: the row's meaning is spoken by [ChoiceObjectRow.contentDescription],
+ * so the icon takes a null description rather than an empty one.
+ */
+@Composable
+private fun ObjectRow(row: ChoiceObjectRow) {
+    val cs = MaterialTheme.colorScheme
+    val typography = MaterialTheme.typography
+    // Emphasis drives BOTH weight and color — never colour alone (a state told only by hue is
+    // invisible to a colour-blind or greyscale reader).
+    val style = when (row.emphasis) {
+        RowEmphasis.Primary, RowEmphasis.Danger -> typography.titleSmall
+        RowEmphasis.Detail, RowEmphasis.Accent -> typography.bodyMedium
+    }
+    val color = when (row.emphasis) {
+        RowEmphasis.Primary -> cs.onSurface
+        RowEmphasis.Detail -> cs.onSurfaceVariant
+        RowEmphasis.Accent -> cs.onSurface
+        RowEmphasis.Danger -> cs.error
+    }
+    Row(
+        modifier = Modifier.semantics { contentDescription = row.contentDescription },
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
+    ) {
+        val icon = row.kind.icon()
+        if (icon != null) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier
+                    .size(AppDimens.IconSizeSm)
+                    .padding(top = AppDimens.SpacingXxs),
+                tint = color,
+            )
+        } else {
+            // Preview / overflow rows: a literal bullet (or blank) holds the same 16dp gutter so
+            // every row's text starts on one vertical line.
+            Text(
+                text = if (row.kind == RowKind.Preview) PREVIEW_BULLET else "",
+                style = typography.bodyMedium,
+                color = cs.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.width(AppDimens.IconSizeSm),
+            )
+        }
+        Text(text = row.value, style = style, color = color)
+    }
+}
+
+/** Leading icon per row kind; null → the row draws a literal bullet / blank gutter instead. */
+private fun RowKind.icon(): ImageVector? = when (this) {
+    RowKind.Item -> Icons.Outlined.Checklist
+    RowKind.Destination, RowKind.Name -> Icons.Outlined.FormatListBulleted
+    RowKind.Time -> Icons.Outlined.Schedule
+    RowKind.File -> Icons.Outlined.AttachFile
+    RowKind.Count -> Icons.Outlined.NotificationsNone
+    RowKind.DateRange -> Icons.Outlined.Event
+    RowKind.Preview, RowKind.Overflow -> null
+}
+
+/**
+ * "Remember my choice" — a checkbox, deliberately NOT a chip.
+ *
+ * In this block a chip tap EXECUTES. A control that only toggles state must not wear the chip
+ * shape, or the contract users learned in D1 ("tap = it happens") stops holding.
+ *
+ * The whole row is the target ([toggleable] with [Role.Checkbox]); the Checkbox itself takes a
+ * null callback so the tap is not counted twice. Height comes from the Checkbox's own 48dp
+ * minimum touch target.
+ */
+@Composable
+private fun MemoryRow(
+    checked: Boolean,
+    enabled: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .toggleable(
+                value = checked,
+                enabled = enabled,
+                role = Role.Checkbox,
+                onValueChange = onCheckedChange,
+            ),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
+    ) {
+        // No AppCheckbox in the design system yet — raw M3 on theme tokens (the only checkbox in
+        // the chat surface). Worth promoting to core/designsystem if a second one appears.
+        Checkbox(checked = checked, onCheckedChange = null, enabled = enabled)
+        Text(
+            text = stringResource(Res.string.chat_choice_remember),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/**
  * Adaptive chip container. When every label is short (≤ [SHORT_LABEL_MAX] chars) the chips flow
  * in a wrapping [FlowRow] with NO fixed row count — content-sized chips wrap by width, so the
  * layout self-adapts to N options (2, 3, … 6) by spilling onto as many rows as it needs. When ANY
@@ -188,7 +405,9 @@ private fun ChoiceChips(
 ) {
     // FlowRow wraps by width (maxItemsInEachRow unlimited) → rows auto-adapt to the option count.
     // Only drop to a Column when a label is long enough that a content-sized chip would cramp it.
-    val useFlow = options.all { it.label.length <= SHORT_LABEL_MAX }
+    // Measures label + meta (+ the " • " that joins them), not the label alone: "Weekly shopping"
+    // fits, "Weekly shopping • 12" may not, and the meta is not droppable.
+    val useFlow = options.all { it.label.length + (it.meta?.length ?: 0) + META_WIDTH_ALLOWANCE <= SHORT_LABEL_MAX }
     val fallbackLoading = stringResource(Res.string.chat_choice_executing_default)
 
     if (useFlow) {
@@ -234,15 +453,23 @@ private fun ChoiceChipFor(
         isLoading = isThisLoading,
         loadingLabel = if (isThisLoading) (executingLabel ?: fallbackLoading) else null,
         leadingIcon = option.role.leadingIcon(),
+        meta = option.meta,
+        fillWidth = fillWidth,
     )
 }
 
-/** Numbered list of proposed agent actions inside the prompt bubble (destructive lines tinted). */
+/**
+ * List of proposed / applied actions inside the prompt bubble (destructive lines tinted).
+ *
+ * Numbering appears only from TWO items up: since D1 a single-action choice also renders through
+ * here (it is how the question gets its object), and "1. • Milk" reads like a broken list.
+ */
 @Composable
 private fun BatchActionList(
     items: List<AgentPlanItem>,
     modifier: Modifier = Modifier,
 ) {
+    val numbered = items.size > 1
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
@@ -252,11 +479,13 @@ private fun BatchActionList(
                 verticalAlignment = Alignment.Top,
                 horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
             ) {
-                Text(
-                    text = "${index + 1}.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                if (numbered) {
+                    Text(
+                        text = "${index + 1}.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 if (item.isDestructive) {
                     Icon(
                         imageVector = Icons.Outlined.DeleteForever,
@@ -283,12 +512,16 @@ private fun BatchActionList(
  * Inline edit field shown when [PendingChoice.editText] is non-null. Raw M3 [OutlinedTextField]
  * (no project wrapper supports multiline auto-focus) with auto-focus + IME raise, mirroring the
  * old ChatPreviewCard edit field.
+ *
+ * @param isChecklistName When true the field is naming a checklist about to be created, so it
+ *  takes the specific "List name" label instead of the generic edit one.
  */
 @Composable
 private fun EditField(
     text: String,
     onTextChange: (String) -> Unit,
     modifier: Modifier = Modifier,
+    isChecklistName: Boolean = false,
 ) {
     val focusRequester = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
@@ -296,10 +529,11 @@ private fun EditField(
         focusRequester.requestFocus()
         keyboard?.show()
     }
+    val labelRes = if (isChecklistName) Res.string.chat_preview_new_list_label else Res.string.chat_choice_edit_label
     OutlinedTextField(
         value = text,
         onValueChange = onTextChange,
-        label = { Text(stringResource(Res.string.chat_choice_edit_label)) },
+        label = { Text(stringResource(labelRes)) },
         minLines = 1,
         maxLines = 6,
         modifier = modifier
@@ -317,3 +551,17 @@ private fun ChoiceRole.leadingIcon(): ImageVector? = when (this) {
 
 /** Labels at or below this length are considered "short" for the FlowRow layout decision. */
 private const val SHORT_LABEL_MAX = 18
+
+/** Width the " • " joiner adds when a chip carries meta, charged to the layout-switch budget. */
+private const val META_WIDTH_ALLOWANCE = 3
+
+/** Bullet for a preview row (a literal, like the renderer's — punctuation, not language). */
+private const val PREVIEW_BULLET = "•"
+
+/**
+ * How many proposed items a create-checklist preview shows before the "…and N more" row.
+ * The dock has ~440dp to spend and must keep the question, the chips and the escape on screen;
+ * the full screen can afford the whole shape of the list.
+ */
+private const val PREVIEW_CAP_COMPACT = 2
+private const val PREVIEW_CAP_FULL = 6

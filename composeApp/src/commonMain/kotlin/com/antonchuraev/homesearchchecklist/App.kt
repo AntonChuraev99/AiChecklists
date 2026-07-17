@@ -44,7 +44,9 @@ import com.antonchuraev.homesearchchecklist.gestures.ApplyEdgeSwipeExclusion
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -68,6 +70,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.setValue
@@ -124,6 +127,22 @@ import aichecklists.core.designsystem.generated.resources.chat_unknown_intent_hi
 import aichecklists.core.designsystem.generated.resources.chat_voice_too_short
 import aichecklists.core.designsystem.generated.resources.chat_preview_cancelled_message
 import aichecklists.core.designsystem.generated.resources.chat_agent_round_limit
+import aichecklists.core.designsystem.generated.resources.chat_move_no_other_lists
+import aichecklists.core.designsystem.generated.resources.chat_attach_analyze_empty
+import aichecklists.core.designsystem.generated.resources.chat_attach_analyze_failed
+import aichecklists.core.designsystem.generated.resources.chat_attach_limit_reached
+import aichecklists.core.designsystem.generated.resources.chat_attach_no_files
+import aichecklists.core.designsystem.generated.resources.chat_attach_store_failed
+import aichecklists.core.designsystem.generated.resources.chat_attach_unsupported_type
+import aichecklists.core.designsystem.generated.resources.chat_choice_dismissed_message
+import aichecklists.core.designsystem.generated.resources.chat_choice_edit_empty_hint
+import aichecklists.core.designsystem.generated.resources.chat_dispatch_attached_many
+import aichecklists.core.designsystem.generated.resources.chat_dispatch_attached_one
+import aichecklists.core.designsystem.generated.resources.chat_result_moved_to
+import aichecklists.core.designsystem.generated.resources.chat_result_remembered_list
+import aichecklists.core.designsystem.generated.resources.chat_result_undone_add
+import aichecklists.core.designsystem.generated.resources.chat_result_undone_complete
+import aichecklists.core.designsystem.generated.resources.chat_undo_item_gone
 import aichecklists.core.designsystem.generated.resources.chat_panel_greeting
 import aichecklists.core.designsystem.generated.resources.main_create_with_ai_prefill
 import aichecklists.core.designsystem.generated.resources.main_prompt_link_prefill
@@ -737,9 +756,40 @@ fun App() {
             val sm_transcribeEmpty = stringResource(Res.string.chat_transcribe_empty)
             val sm_transcribeError = stringResource(Res.string.chat_transcribe_error)
             val sm_agentRoundLimit = stringResource(Res.string.chat_agent_round_limit)
+            // D1 reversible-action replies (Undo / move-to-list). A key missing from this map
+            // renders as the raw key in the bubble — nothing fails, it just ships "chat_result_undone_add".
+            val sm_resultUndoneAdd = stringResource(Res.string.chat_result_undone_add)
+            val sm_resultUndoneComplete = stringResource(Res.string.chat_result_undone_complete)
+            val sm_resultMovedTo = stringResource(Res.string.chat_result_moved_to)
+            val sm_undoItemGone = stringResource(Res.string.chat_undo_item_gone)
+            val sm_moveNoOtherLists = stringResource(Res.string.chat_move_no_other_lists)
+            // D2 memory-of-choice disclosure. Same sync rule — also lives in ChatRoute.kt's map.
+            val sm_resultRememberedList = stringResource(Res.string.chat_result_remembered_list)
+            // Pre-existing gap found while wiring D2: emitted as a ShowAssistantMessage since D1 but
+            // never added to either map, so every choice cancel printed the raw key into the bubble.
+            val sm_choiceDismissed = stringResource(Res.string.chat_choice_dismissed_message)
+            // The whole attach contour — both success replies and the entire error surface — plus the
+            // blank-edit hint. Same gap: emitted, translated, never resolved, so the user read
+            // "chat_dispatch_attached_one" where the confirmation should be. Guarded now by
+            // ChatMessageKeyResolutionTest; keep both maps in step when adding to either.
+            val sm_attachNoFiles = stringResource(Res.string.chat_attach_no_files)
+            val sm_attachLimitReached = stringResource(Res.string.chat_attach_limit_reached)
+            val sm_attachUnsupportedType = stringResource(Res.string.chat_attach_unsupported_type)
+            val sm_attachAnalyzeEmpty = stringResource(Res.string.chat_attach_analyze_empty)
+            val sm_attachAnalyzeFailed = stringResource(Res.string.chat_attach_analyze_failed)
+            val sm_attachStoreFailed = stringResource(Res.string.chat_attach_store_failed)
+            val sm_dispatchAttachedOne = stringResource(Res.string.chat_dispatch_attached_one)
+            val sm_dispatchAttachedMany = stringResource(Res.string.chat_dispatch_attached_many)
+            val sm_choiceEditEmptyHint = stringResource(Res.string.chat_choice_edit_empty_hint)
             val chatPanelGreeting = stringResource(Res.string.chat_panel_greeting)
 
-            val sheetMessages = remember(sm_unknownIntentHint, sm_genericError) {
+            // NOT remember()-ed. `stringResource` resolves asynchronously in Compose Multiplatform
+            // and returns "" for the first frames; a remember() keyed on a SUBSET of these strings
+            // caches the map while the rest are still empty, and those entries stay empty forever —
+            // the reply then renders as an empty assistant bubble. (Found 2026-07-15 on :9090: the
+            // dock keyed on 2 of ~40 strings and shipped a blank bubble for every dispatch result.)
+            // Rebuilding a 40-entry map per recomposition is noise next to the canvas draw.
+            val sheetMessages = run {
                 mapOf(
                     "chat_unknown_intent_hint" to sm_unknownIntentHint,
                     "chat_generic_error" to sm_genericError,
@@ -786,6 +836,22 @@ fun App() {
                     "chat_transcribe_empty" to sm_transcribeEmpty,
                     "chat_transcribe_error" to sm_transcribeError,
                     "chat_agent_round_limit" to sm_agentRoundLimit,
+                    "chat_result_undone_add" to sm_resultUndoneAdd,
+                    "chat_result_undone_complete" to sm_resultUndoneComplete,
+                    "chat_result_moved_to" to sm_resultMovedTo,
+                    "chat_undo_item_gone" to sm_undoItemGone,
+                    "chat_move_no_other_lists" to sm_moveNoOtherLists,
+                    "chat_result_remembered_list" to sm_resultRememberedList,
+                    "chat_choice_dismissed_message" to sm_choiceDismissed,
+                    "chat_attach_no_files" to sm_attachNoFiles,
+                    "chat_attach_limit_reached" to sm_attachLimitReached,
+                    "chat_attach_unsupported_type" to sm_attachUnsupportedType,
+                    "chat_attach_analyze_empty" to sm_attachAnalyzeEmpty,
+                    "chat_attach_analyze_failed" to sm_attachAnalyzeFailed,
+                    "chat_attach_store_failed" to sm_attachStoreFailed,
+                    "chat_dispatch_attached_one" to sm_dispatchAttachedOne,
+                    "chat_dispatch_attached_many" to sm_dispatchAttachedMany,
+                    "chat_choice_edit_empty_hint" to sm_choiceEditEmptyHint,
                 )
             }
 
@@ -803,21 +869,29 @@ fun App() {
                 onError = { chatViewModel.sendIntent(ChatScreenIntent.OnVoiceRecordingStopped(recordingPath = null)) },
             )
 
+            // rememberUpdatedState, NOT the map directly: LaunchedEffect captures its lambda ONCE
+            // (key = chatViewModel), and Compose Resources resolve asynchronously — on the first
+            // frame every stringResource is still "". A directly-captured map freezes those empty
+            // values for the lifetime of the collector, so every reply rendered as a blank bubble
+            // while the strings were long since loaded. Same stale-closure trap as the wasmJs
+            // FilePicker callbacks (project memory: filepicker-rememberupdatedstate-closure-trap).
+            val currentSheetMessages by rememberUpdatedState(sheetMessages)
             LaunchedEffect(chatViewModel) {
                 chatViewModel.sideEffect.collect { effect ->
                     when (effect) {
                         is ChatScreenSideEffect.ShowSnackbar -> {
-                            val text = sheetMessages[effect.messageKey] ?: effect.messageKey
+                            val text = currentSheetMessages[effect.messageKey] ?: effect.messageKey
                             snackbarHostState.showSnackbar(text)
                         }
                         is ChatScreenSideEffect.ShowAssistantMessage -> {
-                            val template = sheetMessages[effect.messageKey] ?: effect.messageKey
+                            val template = currentSheetMessages[effect.messageKey] ?: effect.messageKey
                             val resolved = applyFormatArgsLocal(template, effect.args)
                             chatViewModel.sendIntent(
                                 ChatScreenIntent.AppendAssistantMessage(
                                     text = resolved,
                                     linkedChecklistId = effect.linkedChecklistId,
                                     askAiForText = effect.askAiForText,
+                                    paywallCtaCredits = effect.paywallCtaCredits,
                                 )
                             )
                         }
@@ -829,8 +903,11 @@ fun App() {
                             chatSheetOpen = false
                             navigator.navigateToChecklistDetail(effect.checklistId)
                         }
-                        ChatScreenSideEffect.NavigateToPaywall -> {
-                            navigator.navigateToPaywall(source = "chat_sheet_credits")
+                        is ChatScreenSideEffect.NavigateToPaywall -> {
+                            // Forward the effect's own tag — the old hardcoded "chat_sheet_credits"
+                            // described the credits chip and would mislabel every out-of-credits
+                            // CTA tap as an unprompted chip tap.
+                            navigator.navigateToPaywall(source = effect.source)
                         }
                         ChatScreenSideEffect.RequestRecordAudioPermission -> {
                             // Mic tapped on a bottom bar (MainScreen / ChecklistDetail) opens the
@@ -1042,7 +1119,14 @@ fun App() {
                         keepExpanded = if (itemCreateOverride != null) true else hasLastAnswer,
                         // A pending choice block (prompt + chips + escape) is taller than a one-line
                         // answer; raise the frame cap so its escape/cancel chip isn't clipped.
-                        answerMaxHeight = if (chatUiState.pendingChoice != null) 360.dp else 210.dp,
+                        // D2 adds typed object rows inside the bubble (item + list + time), so a
+                        // question that carries them needs more room again. Safe: GistiInlineChatPanel
+                        // clamps this against the real dock space, so a keyboard-up dock just scrolls.
+                        answerMaxHeight = when {
+                            chatUiState.pendingChoice?.hasObjectRows == true -> 440.dp
+                            chatUiState.pendingChoice != null -> 360.dp
+                            else -> 210.dp
+                        },
                         // Item-create shows only a short chip row — wrap it (min 0) so there's no empty
                         // gap between the chips and the pinned input; chat keeps the 125dp comfortable
                         // body. INSTANT (not animated): animating this min height sweeps panelFullPx every
@@ -1053,13 +1137,25 @@ fun App() {
                         lastAnswerContent = {
                             // Fixed-height frame: scroll a long answer inside instead of growing the
                             // dock. Priority mirrors ChatContent so the SAME confirm cards render here.
-                            // FIX C: keep the answer pinned to the BOTTOM (latest content + input
-                            // visible), not the top/oldest. Keyed on the scroll's maxValue so it
-                            // re-anchors whenever the content grows (new message / streaming) and on
-                            // first show / expand — when maxValue is laid out we jump to it.
+                            //
+                            // The anchor depends on WHAT the frame holds:
+                            //  - A QUESTION (non-blank prompt) → anchor TOP. Its object rows and the
+                            //    question itself sit above the chips, so bottom-anchoring scrolls the
+                            //    subject out of the cap and leaves bare chips — "cancel WHAT?", which
+                            //    is the exact defect the object rows exist to fix.
+                            //  - Everything else (a plain answer, or the D1 post-action offer whose
+                            //    prompt is blank and whose result bubble renders inside this frame)
+                            //    → anchor BOTTOM: the newest content and the input are what matter.
+                            // Keyed on maxValue so it re-anchors as content grows (new message /
+                            // streaming) and on first show / expand.
                             val answerScroll = rememberScrollState()
-                            LaunchedEffect(answerScroll.maxValue) {
-                                answerScroll.animateScrollTo(answerScroll.maxValue)
+                            val anchorTop = chatUiState.pendingChoice?.choice?.prompt?.isNotBlank() == true
+                            LaunchedEffect(answerScroll.maxValue, anchorTop) {
+                                if (anchorTop) {
+                                    answerScroll.animateScrollTo(0)
+                                } else {
+                                    answerScroll.animateScrollTo(answerScroll.maxValue)
+                                }
                             }
                             Column(
                                 modifier = Modifier
@@ -1072,11 +1168,41 @@ fun App() {
                             ) {
                                 when {
                                     chatUiState.pendingChoice != null -> {
+                                        // A BLANK prompt means the outcome was already said in its own
+                                        // assistant message (D1 post-action chips: Undo / move-to-list).
+                                        // The full-screen chat shows both — message in the list, chips
+                                        // under it — but this peek frame renders ONE branch, so the chips
+                                        // arrived context-free: "Undo" WHAT? Render the message above them.
+                                        val choicePrompt = chatUiState.pendingChoice!!.choice.prompt
+                                        if (choicePrompt.isBlank() && lastAssistantMessage != null) {
+                                            ChatMessageBubble(
+                                                message = lastAssistantMessage,
+                                                onFeedbackClick = { msg ->
+                                                    chatViewModel.sendIntent(ChatScreenIntent.OnFeedbackOpen(msg))
+                                                },
+                                                onThumbUpClick = { msg ->
+                                                    chatViewModel.sendIntent(ChatScreenIntent.OnThumbUpClick(msg))
+                                                },
+                                                onOpenChecklist = lastAssistantMessage.linkedChecklistId?.let { id ->
+                                                    {
+                                                        chatSheetOpen = false
+                                                        navigator.navigateToChecklistDetail(id)
+                                                    }
+                                                },
+                                                showSenderLabel = true,
+                                            )
+                                            Spacer(Modifier.height(AppDimens.SpacingSm))
+                                        }
                                         AiChoiceResponse(
                                             pending = chatUiState.pendingChoice!!,
                                             onSelect = { id -> chatViewModel.sendIntent(ChatScreenIntent.OnChoiceSelected(id)) },
                                             onEditChange = { chatViewModel.sendIntent(ChatScreenIntent.OnChoiceEditChange(it)) },
                                             onEditConfirm = { chatViewModel.sendIntent(ChatScreenIntent.OnChoiceEditConfirmed) },
+                                            // The dock: fewer preview rows fit under the frame cap.
+                                            compact = true,
+                                            onMemoryToggle = { enabled ->
+                                                chatViewModel.sendIntent(ChatScreenIntent.OnChoiceMemoryToggle(enabled))
+                                            },
                                         )
                                     }
                                     chatUiState.isProcessing -> {
@@ -1093,6 +1219,9 @@ fun App() {
                                             },
                                             onAskAiFallback = lastAssistantMessage.askAiForText?.let { text ->
                                                 { chatViewModel.sendIntent(ChatScreenIntent.OnAskAiFallback(text)) }
+                                            },
+                                            onPaywallCta = lastAssistantMessage.paywallCtaCredits?.let {
+                                                { chatViewModel.sendIntent(ChatScreenIntent.OnPaywallCtaClick) }
                                             },
                                             onOpenChecklist = lastAssistantMessage.linkedChecklistId?.let { id ->
                                                 {
@@ -1150,7 +1279,14 @@ fun App() {
                             LaunchedEffect(ic != null) {
                                 if (ic != null) runCatching { chatInputFocusRequester.requestFocus() }
                             }
-                            if (ic != null || chatUiState.pendingChoice == null) {
+                            // A pending QUESTION hides the input (chips are the only interaction).
+                            // A post-action offer (Undo / move) is not a question and has no escape
+                            // chip — hiding the input there trapped the dock: the offer stayed up and
+                            // only Back got out, collapsing the chat. Keep typing enabled for it.
+                            if (ic != null ||
+                                chatUiState.pendingChoice == null ||
+                                chatUiState.pendingChoice!!.isPostAction
+                            ) {
                               Column {
                                 // Item-create only: pending-attachment preview strip ABOVE the input.
                                 // In chat mode (ic == null) the strip lambda is absent → nothing renders,
@@ -1503,8 +1639,10 @@ fun App() {
                             onNavigateToChecklist = { checklistId ->
                                 navigator.navigateToChecklistDetail(checklistId)
                             },
-                            onNavigateToPaywall = {
-                                navigator.navigateToPaywall(source = "chat_credits_chip")
+                            // Source comes from ChatRoute (the effect's tag, or the credits-chip
+                            // constant) — never re-labelled here.
+                            onNavigateToPaywall = { source ->
+                                navigator.navigateToPaywall(source = source)
                             },
                         )
                     }

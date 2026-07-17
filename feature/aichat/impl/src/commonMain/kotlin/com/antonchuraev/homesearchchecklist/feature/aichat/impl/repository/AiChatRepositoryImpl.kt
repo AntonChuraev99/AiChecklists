@@ -8,7 +8,6 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Chat
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.IntentClassification
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.RoutingLayer
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.ChatLocale
-import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.LocalIntentRouter
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AgentStepResult
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AiChatRepository
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatAgentApiService
@@ -27,22 +26,30 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlinx.coroutines.flow.first
 
 /**
- * Phase C implementation: Layer 1 → Layer 2 → Layer 3 routing chain.
+ * Layer 2 → Layer 3 routing chain.
+ *
+ * **Layer 1 (local parser) is disconnected** — decision 2026-07-15
+ * (`docs/decisions/2026-07-15-remove-ai-chat-layer1.md`). Every message now starts at Layer 2,
+ * so trivial mutations («add milk») cost 1 credit instead of 0 and no longer work offline.
+ * This is a *disconnect, not a removal*: `LocalIntentRouterImpl` and its 168 tests stay in the
+ * repo as a parked asset, and re-routing it is a revert of the disconnect commit — do not write
+ * a second local parser.
  *
  * Classification flow ([classify]):
- *   1. [LocalIntentRouter.route] → Layer 1 result
- *   2. If confidence >= [LAYER_1_CONFIDENCE_THRESHOLD] → return immediately (0 credits)
- *   3. Otherwise → [ChatClassifierApiService.classify] (Layer 2, 1 credit)
- *      - Success with intent=FreeForm → ViewModel calls [completeFreeForm] (Layer 3, 3 credits)
- *      - Success with structured intent → return Classifier result
- *      - InsufficientCredits → return Unknown (caller shows inline message)
- *      - NetworkError / ServiceError → graceful degradation to Layer 1 result
+ *   1. Deep Thinking ON → straight to Layer 3 (FreeForm/FullChat), skipping Layer 2 so an
+ *      open-ended question stays 3 credits rather than 4. Not honoured when `skipLayer1=true`.
+ *   2. Otherwise → [ChatClassifierApiService.classify] (Layer 2, 1 credit)
+ *      - Success with a structured intent → return the Classifier result
+ *      - Success but vague (FreeForm / Unknown) → escalate to Layer 3 (FreeForm)
+ *      - InsufficientCredits → return [ChatIntent.InsufficientCredits] (caller shows the
+ *        out-of-credits reply + paywall CTA; the refusal must NOT be flattened into Unknown)
+ *      - NetworkError / ServiceError → escalate to Layer 3, which surfaces the failure as a
+ *        `chat_completion_error` reply (there is no local fallback to degrade to any more)
  *
  * [completeFreeForm] delegates to [ChatCompletionApiService] with full message history.
  * Layer 2 and Layer 3 are skipped when [userId] is blank (unregistered user).
  */
 internal class AiChatRepositoryImpl(
-    private val router: LocalIntentRouter,
     private val classifierApi: ChatClassifierApiService,
     private val completionApi: ChatCompletionApiService,
     private val transcribeApi: TranscribeAudioApiService,
@@ -54,36 +61,20 @@ internal class AiChatRepositoryImpl(
 
     companion object {
         private const val TAG = "AiChatRepository"
-        private const val LAYER_1_CONFIDENCE_THRESHOLD = 0.7f
     }
 
     override suspend fun classify(input: String, locale: ChatLocale, skipLayer1: Boolean): IntentClassification {
-        // skipLayer1=true: user rejected a Layer 1 preview and wants the next-tier interpretation.
-        // We skip the local router entirely and go straight to Layer 2 (cloud classifier).
-        if (skipLayer1) {
-            return classifySkipLayer1(input, locale)
-        }
-
-        // Always run Layer 1 first — it is free, fast, and command-intent recognition
-        // must NOT be bypassed by user-facing toggles. Deep Thinking is for open-ended
-        // questions ("plan my week"), not for "add milk to shopping" type commands.
-        // Real-world signal (2026-05-18): users left Deep Thinking ON between sessions,
-        // every add/delete/find command burned 3 credits on a Layer 3 meta-reply.
-        val layer1 = router.route(input, locale)
-        logger.debug(TAG, "Layer1: ${layer1.intent::class.simpleName} conf=${layer1.confidence}")
-
-        val layer1IsCommand = layer1.intent !is ChatIntent.Unknown &&
-            layer1.intent !is ChatIntent.FreeForm
-        val layer1IsConfident = layer1.confidence >= LAYER_1_CONFIDENCE_THRESHOLD
-
-        // Deep Thinking bypass — user opted into "always full chat" mode.
-        // Honour the toggle ONLY when Layer 1 didn't find a confident command-intent;
-        // otherwise the user almost certainly meant a quick action, not a free-form chat.
-        if (aiChatPreferencesRepository.deepThinkingEnabledFlow.first()) {
-            if (layer1IsCommand && layer1IsConfident) {
-                logger.info(TAG, "Deep thinking ON, but Layer1 matched ${layer1.intent::class.simpleName} confidently — routing as command")
-                return layer1
-            }
+        // Deep Thinking bypass — user opted into "always full chat" mode, so go straight to
+        // Layer 3 without paying Layer 2's credit on the way (open question = 3 credits, not 4).
+        //
+        // The old guard "Deep Thinking ON, but Layer 1 matched a confident command → run it as a
+        // command" (2026-05-18) is gone with Layer 1: nothing local can tell a command from a
+        // question any more. Accepted cost of the disconnect — a user who leaves the toggle on
+        // pays 3 credits for «add milk». This branch is what keeps the toggle meaningful: DT ON
+        // skips Layer 2 entirely, DT OFF starts there.
+        //
+        // skipLayer1=true deliberately does NOT reach this branch (see [classifyViaLayer2]).
+        if (!skipLayer1 && aiChatPreferencesRepository.deepThinkingEnabledFlow.first()) {
             logger.info(TAG, "Deep thinking ON — routing to Layer 3 (FreeForm)")
             return IntentClassification(
                 intent = ChatIntent.FreeForm,
@@ -93,84 +84,26 @@ internal class AiChatRepositoryImpl(
             )
         }
 
-        if (layer1IsConfident) {
-            return layer1
-        }
-
-        logger.debug(TAG, "Layer1 confidence below threshold — escalating to Layer 2")
-
-        val userId = userDataRepository.getUserData().userId
-        if (userId.isBlank()) {
-            logger.warning(TAG, "Layer2 skipped: userId blank (user not registered yet)")
-            return layer1
-        }
-
-        return when (val remote = classifierApi.classify(userId, input, locale)) {
-            is RemoteClassificationResult.Success -> {
-                logger.info(TAG, "Layer2 success: ${remote.intent::class.simpleName} conf=${remote.confidence} credits_remaining=${remote.creditsRemaining}")
-                // Graceful Layer 1 preference: if the cloud classifier gave up (FreeForm or Unknown)
-                // BUT the local router already matched a concrete command-intent, prefer the local
-                // result. This routes the user straight to a preview-card instead of burning 3 more
-                // credits on Layer 3 only to get a "sorry, didn't quite parse..." meta-reply.
-                // Real-world signal: ai_chat_feedback events showed Layer 3 spam on phrases like
-                // «добавь в дела купить 2 мус ведра» where Layer 1 was already confident enough.
-                val classifierIsVague = remote.intent is ChatIntent.FreeForm ||
-                    remote.intent is ChatIntent.Unknown
-                val layer1IsCommand = layer1.intent !is ChatIntent.Unknown &&
-                    layer1.intent !is ChatIntent.FreeForm
-                if (classifierIsVague && layer1IsCommand) {
-                    logger.info(
-                        TAG,
-                        "Layer2 vague (${remote.intent::class.simpleName}) — preferring Layer1 ${layer1.intent::class.simpleName}",
-                    )
-                    // Bump confidence to threshold so downstream handlers treat it as actionable,
-                    // but mark layer=Classifier because the credit was already spent on Layer 2.
-                    return IntentClassification(
-                        intent = layer1.intent,
-                        confidence = maxOf(layer1.confidence, LAYER_1_CONFIDENCE_THRESHOLD),
-                        layer = RoutingLayer.Classifier,
-                        preBuiltToolCall = null,
-                    )
-                }
-                IntentClassification(
-                    intent = remote.intent,
-                    confidence = remote.confidence,
-                    layer = RoutingLayer.Classifier,
-                    preBuiltToolCall = remote.toolCall,
-                )
-            }
-            RemoteClassificationResult.InsufficientCredits -> {
-                logger.info(TAG, "Layer2: InsufficientCredits — returning Unknown")
-                IntentClassification(
-                    intent = ChatIntent.Unknown(rawText = input),
-                    confidence = 0f,
-                    layer = RoutingLayer.Classifier,
-                    preBuiltToolCall = null,
-                )
-            }
-            RemoteClassificationResult.NetworkError -> {
-                logger.warning(TAG, "Layer2 NetworkError — graceful degradation to Layer 1 result")
-                layer1
-            }
-            RemoteClassificationResult.ServiceError -> {
-                logger.warning(TAG, "Layer2 ServiceError — graceful degradation to Layer 1 result")
-                layer1
-            }
-        }
+        return classifyViaLayer2(input, locale)
     }
 
     /**
-     * Reject-flow classification: skips Layer 1 entirely and goes straight to Layer 2.
+     * The only classification path left: Layer 2 (cloud classifier, 1 credit), escalating to
+     * Layer 3 when the classifier is vague, unreachable, or the user is not registered yet.
      *
-     * Does NOT respect the Deep Thinking toggle — when the user taps "I meant something else"
-     * they are explicitly asking for a higher-tier interpretation, not free-form chat.
+     * Entered either from [classify] with Deep Thinking OFF, or from the reject flow
+     * (`skipLayer1=true`), which reaches it *regardless* of the Deep Thinking toggle: tapping
+     * "I meant something else" is an explicit request for a higher-tier interpretation of a
+     * concrete command, not an opt-in to free-form chat.
+     *
+     * There is no local fallback any more — a blank userId or a dead network both escalate to
+     * Layer 3, where the failure surfaces as a visible `chat_completion_error` reply rather than
+     * a misleading "I didn't catch that".
      */
-    private suspend fun classifySkipLayer1(input: String, locale: ChatLocale): IntentClassification {
-        logger.info(TAG, "classifySkipLayer1: skipping Layer1, going straight to Layer2")
-
+    private suspend fun classifyViaLayer2(input: String, locale: ChatLocale): IntentClassification {
         val userId = userDataRepository.getUserData().userId
         if (userId.isBlank()) {
-            logger.warning(TAG, "classifySkipLayer1: userId blank — escalating to Layer3 (FreeForm)")
+            logger.warning(TAG, "Layer2 skipped: userId blank — escalating to Layer3 (FreeForm)")
             return IntentClassification(
                 intent = ChatIntent.FreeForm,
                 confidence = 1.0f,
@@ -181,11 +114,11 @@ internal class AiChatRepositoryImpl(
 
         return when (val remote = classifierApi.classify(userId, input, locale)) {
             is RemoteClassificationResult.Success -> {
-                logger.info(TAG, "classifySkipLayer1 Layer2 success: ${remote.intent::class.simpleName} conf=${remote.confidence}")
+                logger.info(TAG, "Layer2 success: ${remote.intent::class.simpleName} conf=${remote.confidence} credits_remaining=${remote.creditsRemaining}")
                 val isVague = remote.intent is ChatIntent.FreeForm || remote.intent is ChatIntent.Unknown
                 if (isVague) {
-                    // Vague Layer 2 → escalate to Layer 3
-                    logger.info(TAG, "classifySkipLayer1: Layer2 vague (${remote.intent::class.simpleName}) → FreeForm for Layer3")
+                    // Vague Layer 2 → escalate to Layer 3.
+                    logger.info(TAG, "Layer2 vague (${remote.intent::class.simpleName}) → FreeForm for Layer3")
                     IntentClassification(
                         intent = ChatIntent.FreeForm,
                         confidence = 1.0f,
@@ -202,17 +135,28 @@ internal class AiChatRepositoryImpl(
                 }
             }
             RemoteClassificationResult.InsufficientCredits -> {
-                logger.info(TAG, "classifySkipLayer1: InsufficientCredits — returning Unknown")
+                logger.info(TAG, "Layer2: InsufficientCredits — surfacing the refusal to the caller")
+                // The refusal travels in the TYPE. Flattening it into Unknown here (until
+                // 2026-07-16) destroyed the only copy of the reason, so no call-site could tell
+                // "out of credits" from "unparseable" and every 402 rendered as
+                // "Sorry, I didn't quite catch that" — the app blaming the user's phrasing for a
+                // billing state. Escalating to Layer 3 instead would be quieter and worse: it
+                // bills 3 credits to a wallet that just refused to pay 1.
+                //
+                // confidence = 1f: we are CERTAIN the wallet is empty. 0f used to mean "wild
+                // guess", which is what dragged this into the low-confidence/Unknown bucket.
+                // layer stays Classifier — Layer 2 is where the turn died, and analytics should
+                // say so. It charged nothing; the caller prices the turn at 0.
                 IntentClassification(
-                    intent = ChatIntent.Unknown(rawText = input),
-                    confidence = 0f,
+                    intent = ChatIntent.InsufficientCredits,
+                    confidence = 1f,
                     layer = RoutingLayer.Classifier,
                     preBuiltToolCall = null,
                 )
             }
             RemoteClassificationResult.NetworkError,
             RemoteClassificationResult.ServiceError -> {
-                logger.warning(TAG, "classifySkipLayer1: Layer2 ${remote::class.simpleName} — escalating to Layer3 (FreeForm)")
+                logger.warning(TAG, "Layer2 ${remote::class.simpleName} — escalating to Layer3 (FreeForm)")
                 IntentClassification(
                     intent = ChatIntent.FreeForm,
                     confidence = 1.0f,
@@ -228,6 +172,7 @@ internal class AiChatRepositoryImpl(
         locale: ChatLocale,
         checklistsSummary: List<ChecklistContext>,
         contextChecklistName: String?,
+        requestId: String?,
     ): AgentStepResult {
         val userId = userDataRepository.getUserData().userId
         if (userId.isBlank()) {
@@ -241,6 +186,7 @@ internal class AiChatRepositoryImpl(
             locale = locale,
             checklistsSummary = checklistsSummary,
             contextChecklistName = contextChecklistName,
+            requestId = requestId,
         )
     }
 

@@ -39,6 +39,9 @@ val aiChatDispatcherModule = module {
             logger = get(),
             activationCoordinator = get(),
             remoteConfigProvider = get(),
+            // Bound in aiChatFeatureModule — shared with ToolCallPreviewRenderer so the
+            // "reminder set" reply and its preview render the same moment identically.
+            dateFormatter = get(),
             analyticsTracker = get(),
         )
     }

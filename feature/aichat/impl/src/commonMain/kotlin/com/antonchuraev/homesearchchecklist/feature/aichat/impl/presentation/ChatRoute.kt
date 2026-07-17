@@ -8,6 +8,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.chat_ambiguous_match
@@ -55,6 +56,22 @@ import aichecklists.core.designsystem.generated.resources.chat_unknown_intent_hi
 import aichecklists.core.designsystem.generated.resources.chat_voice_too_short
 import aichecklists.core.designsystem.generated.resources.chat_preview_cancelled_message
 import aichecklists.core.designsystem.generated.resources.chat_agent_round_limit
+import aichecklists.core.designsystem.generated.resources.chat_move_no_other_lists
+import aichecklists.core.designsystem.generated.resources.chat_attach_analyze_empty
+import aichecklists.core.designsystem.generated.resources.chat_attach_analyze_failed
+import aichecklists.core.designsystem.generated.resources.chat_attach_limit_reached
+import aichecklists.core.designsystem.generated.resources.chat_attach_no_files
+import aichecklists.core.designsystem.generated.resources.chat_attach_store_failed
+import aichecklists.core.designsystem.generated.resources.chat_attach_unsupported_type
+import aichecklists.core.designsystem.generated.resources.chat_choice_dismissed_message
+import aichecklists.core.designsystem.generated.resources.chat_choice_edit_empty_hint
+import aichecklists.core.designsystem.generated.resources.chat_dispatch_attached_many
+import aichecklists.core.designsystem.generated.resources.chat_dispatch_attached_one
+import aichecklists.core.designsystem.generated.resources.chat_result_moved_to
+import aichecklists.core.designsystem.generated.resources.chat_result_remembered_list
+import aichecklists.core.designsystem.generated.resources.chat_result_undone_add
+import aichecklists.core.designsystem.generated.resources.chat_result_undone_complete
+import aichecklists.core.designsystem.generated.resources.chat_undo_item_gone
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AttachmentSource
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatAttachment
 import com.antonchuraev.homesearchchecklist.core.filepicker.api.picker.FilePickerType
@@ -95,7 +112,13 @@ fun ChatRoute(
     snackbarHostState: SnackbarHostState,
     onBack: () -> Unit,
     onNavigateToChecklist: ((Long) -> Unit)? = null,
-    onNavigateToPaywall: (() -> Unit)? = null,
+    /**
+     * Opens the paywall. The `source` argument is the `paywall_shown` attribution tag and comes
+     * from [ChatScreenSideEffect.NavigateToPaywall.source] — forward it verbatim. Do not collapse
+     * it to a constant here: hitting the credit limit and tapping the credits chip are different
+     * events, and the Layer 1 disconnect is measured on telling them apart.
+     */
+    onNavigateToPaywall: ((String) -> Unit)? = null,
     viewModel: ChatViewModel = koinViewModel(),
 ) {
     val state by viewModel.screenState.collectAsState()
@@ -147,6 +170,32 @@ fun ChatRoute(
     val historyLoadErrorText = stringResource(Res.string.chat_history_load_error)
     val feedbackSubmittedText = stringResource(Res.string.chat_feedback_submitted)
     val feedbackBlankHintText = stringResource(Res.string.chat_feedback_blank_hint)
+    // D1 reversible-action replies (Undo / move-to-list). Must stay in sync with the same map in
+    // App.kt (the dock) — a key present in one and missing in the other ships the raw key on that
+    // surface only.
+    val resultUndoneAddFmt = stringResource(Res.string.chat_result_undone_add)
+    val resultUndoneCompleteFmt = stringResource(Res.string.chat_result_undone_complete)
+    val resultMovedToFmt = stringResource(Res.string.chat_result_moved_to)
+    val undoItemGoneText = stringResource(Res.string.chat_undo_item_gone)
+    val moveNoOtherListsText = stringResource(Res.string.chat_move_no_other_lists)
+    // D2 memory-of-choice disclosure. Same sync rule as above — also lives in App.kt's map.
+    val resultRememberedListFmt = stringResource(Res.string.chat_result_remembered_list)
+    // Pre-existing gap found while wiring D2: emitted as a ShowAssistantMessage since D1 but never
+    // added to either map, so every choice cancel printed the raw key into the bubble.
+    val choiceDismissedText = stringResource(Res.string.chat_choice_dismissed_message)
+    // The whole attach contour — both success replies and the entire error surface — plus the
+    // blank-edit hint. Same gap: emitted, translated, never resolved, so the user read
+    // "chat_dispatch_attached_one" where the confirmation should be. Guarded now by
+    // ChatMessageKeyResolutionTest; keep both maps in step when adding to either.
+    val attachNoFilesText = stringResource(Res.string.chat_attach_no_files)
+    val attachLimitReachedText = stringResource(Res.string.chat_attach_limit_reached)
+    val attachUnsupportedTypeFmt = stringResource(Res.string.chat_attach_unsupported_type)
+    val attachAnalyzeEmptyFmt = stringResource(Res.string.chat_attach_analyze_empty)
+    val attachAnalyzeFailedFmt = stringResource(Res.string.chat_attach_analyze_failed)
+    val attachStoreFailedFmt = stringResource(Res.string.chat_attach_store_failed)
+    val dispatchAttachedOneFmt = stringResource(Res.string.chat_dispatch_attached_one)
+    val dispatchAttachedManyFmt = stringResource(Res.string.chat_dispatch_attached_many)
+    val choiceEditEmptyHintText = stringResource(Res.string.chat_choice_edit_empty_hint)
     // Phase 3 strings
     val micPermissionDeniedText = stringResource(Res.string.chat_mic_permission_denied)
     val voiceTooShortText = stringResource(Res.string.chat_voice_too_short)
@@ -160,22 +209,15 @@ fun ChatRoute(
     // Agentic loop (Phase 2d)
     val agentRoundLimitText = stringResource(Res.string.chat_agent_round_limit)
 
-    val messages = remember(
-        unknownText, genericErrorText, applyErrorText, extractFailText,
-        ambiguousMatchFmt, notFoundFmt, requiresPremiumText,
-        dispatchAddedFmt, dispatchAddedToFmt, dispatchAddedManyToFmt, dispatchAddEmptyText, dispatchRenamedFmt,
-        dispatchDeletedFmt, dispatchItemNotFoundFmt,
-        dispatchCompletedFmt, dispatchAlreadyDoneFmt, dispatchCreatedEmptyFmt,
-        dispatchCreatedWithOneFmt, dispatchCreatedWithManyFmt, dispatchReminderSetFmt,
-        dispatchNoRemindersOnDayFmt, dispatchMovedOneFmt, dispatchMovedManyFmt,
-        dispatchFindBlankText, dispatchFindNoMatchFmt, dispatchFindSuccessFmt,
-        dispatchOperationFailedFmt, dispatchNoChecklistsText, dispatchNoChecklistMatchFmt,
-        dispatchFillLoadFailedFmt, insufficientCreditsText, completionErrorText, historyLoadErrorText,
-        feedbackSubmittedText, feedbackBlankHintText,
-        micPermissionDeniedText, voiceTooShortText, recordingCancelledText, thumbUpThanksText,
-        previewCancelledText, transcribingText, transcribeEmptyText, transcribeErrorText,
-        agentRoundLimitText,
-    ) {
+    // NOT remember()-ed, and the hand-listed key set that used to sit here is gone on purpose.
+    // `stringResource` resolves asynchronously in Compose Multiplatform and returns "" for the
+    // first frames. A remember() keyed on a SUBSET of these strings caches the map while the rest
+    // are still empty, and those entries stay empty forever — the reply renders as an empty
+    // assistant bubble. Keeping the key list complete by hand is exactly the invariant that broke:
+    // every new string had to be added in THREE places (declaration, key list, map), and the D1
+    // keys made it into two of them. (Found 2026-07-15 on :9090.)
+    // Rebuilding a ~50-entry map per recomposition is noise next to the canvas draw.
+    val messages = run {
         mapOf(
             "chat_unknown_intent_hint" to unknownText,
             "chat_generic_error" to genericErrorText,
@@ -222,6 +264,22 @@ fun ChatRoute(
             "chat_transcribe_empty" to transcribeEmptyText,
             "chat_transcribe_error" to transcribeErrorText,
             "chat_agent_round_limit" to agentRoundLimitText,
+            "chat_result_undone_add" to resultUndoneAddFmt,
+            "chat_result_undone_complete" to resultUndoneCompleteFmt,
+            "chat_result_moved_to" to resultMovedToFmt,
+            "chat_undo_item_gone" to undoItemGoneText,
+            "chat_move_no_other_lists" to moveNoOtherListsText,
+            "chat_result_remembered_list" to resultRememberedListFmt,
+            "chat_choice_dismissed_message" to choiceDismissedText,
+            "chat_attach_no_files" to attachNoFilesText,
+            "chat_attach_limit_reached" to attachLimitReachedText,
+            "chat_attach_unsupported_type" to attachUnsupportedTypeFmt,
+            "chat_attach_analyze_empty" to attachAnalyzeEmptyFmt,
+            "chat_attach_analyze_failed" to attachAnalyzeFailedFmt,
+            "chat_attach_store_failed" to attachStoreFailedFmt,
+            "chat_dispatch_attached_one" to dispatchAttachedOneFmt,
+            "chat_dispatch_attached_many" to dispatchAttachedManyFmt,
+            "chat_choice_edit_empty_hint" to choiceEditEmptyHintText,
         )
     }
 
@@ -338,27 +396,34 @@ fun ChatRoute(
         viewModel.sendIntent(ChatScreenIntent.OnAttachmentPickerTriggered)
     }
 
+    // rememberUpdatedState, NOT the map directly: LaunchedEffect captures its lambda ONCE
+    // (key = viewModel), and Compose Resources resolve asynchronously — on the first frame every
+    // stringResource is still "". A directly-captured map freezes those empty values for the
+    // collector's lifetime and every reply renders as a blank bubble. Same stale-closure trap as
+    // the wasmJs FilePicker callbacks (project memory: filepicker-rememberupdatedstate-closure-trap).
+    val currentMessages by rememberUpdatedState(messages)
     LaunchedEffect(viewModel) {
         viewModel.sideEffect.collect { effect ->
             when (effect) {
                 is ChatScreenSideEffect.ShowSnackbar -> {
-                    val text = messages[effect.messageKey] ?: effect.messageKey
+                    val text = currentMessages[effect.messageKey] ?: effect.messageKey
                     snackbarHostState.showSnackbar(text)
                 }
                 is ChatScreenSideEffect.ShowAssistantMessage -> {
-                    val template = messages[effect.messageKey] ?: effect.messageKey
+                    val template = currentMessages[effect.messageKey] ?: effect.messageKey
                     val resolved = applyFormatArgs(template, effect.args)
                     viewModel.sendIntent(
                         ChatScreenIntent.AppendAssistantMessage(
                             text = resolved,
                             linkedChecklistId = effect.linkedChecklistId,
                             askAiForText = effect.askAiForText,
+                            paywallCtaCredits = effect.paywallCtaCredits,
                         )
                     )
                 }
                 ChatScreenSideEffect.NavigateBack -> onBack()
                 is ChatScreenSideEffect.NavigateToChecklist -> onNavigateToChecklist?.invoke(effect.checklistId)
-                ChatScreenSideEffect.NavigateToPaywall -> onNavigateToPaywall?.invoke()
+                is ChatScreenSideEffect.NavigateToPaywall -> onNavigateToPaywall?.invoke(effect.source)
                 ChatScreenSideEffect.RequestRecordAudioPermission -> {
                     // AudioRecorderLauncher handles permission check internally.
                     // Starting the recorder here requests permission if needed;
@@ -381,7 +446,12 @@ fun ChatRoute(
         state = state,
         onIntent = viewModel::sendIntent,
         drawerState = drawerState,
-        onNavigateToPaywall = onNavigateToPaywall,
+        // ChatScreen's own paywall entry point is the credits chip in the top bar — an unprompted
+        // tap, NOT a user who ran out mid-turn (that one arrives as the NavigateToPaywall effect
+        // above, carrying its own source). Tagging both the same is what merged the two.
+        onNavigateToPaywall = onNavigateToPaywall?.let { navigate ->
+            { navigate(ChatScreenSideEffect.NavigateToPaywall.SOURCE_CREDITS_CHIP) }
+        },
         onAttachmentSourcePicked = { source ->
             // ChatScreen already sent OnPickAttachment via onIntent; this callback
             // lets Route launch the picker directly without waiting for sideEffect.

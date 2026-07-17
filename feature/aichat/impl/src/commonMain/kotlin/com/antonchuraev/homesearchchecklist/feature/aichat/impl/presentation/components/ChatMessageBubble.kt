@@ -19,6 +19,7 @@ import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.ThumbDown
 import androidx.compose.material.icons.outlined.ThumbUp
+import androidx.compose.material.icons.outlined.WorkspacePremium
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -39,6 +40,7 @@ import aichecklists.core.designsystem.generated.resources.chat_message_copy
 import aichecklists.core.designsystem.generated.resources.chat_message_thumb_down
 import aichecklists.core.designsystem.generated.resources.chat_message_thumb_up
 import aichecklists.core.designsystem.generated.resources.chat_open_checklist
+import aichecklists.core.designsystem.generated.resources.chat_paywall_cta_credits
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatRole
@@ -65,6 +67,8 @@ import org.jetbrains.compose.resources.stringResource
  * @param showSenderLabel If true and the role is Assistant, render the avatar +
  *                        "AI-ассистент" label above the bubble. Pass `false` for
  *                        the static welcome bubble where the label adds noise.
+ * @param onPaywallCta Invoked by the "Become Pro" CTA shown under an out-of-credits reply.
+ *                     Pass null (or leave the message's `paywallCtaCredits` null) to hide it.
  */
 @Composable
 fun ChatMessageBubble(
@@ -74,6 +78,7 @@ fun ChatMessageBubble(
     onThumbUpClick: ((ChatMessage) -> Unit)? = null,
     onOpenChecklist: (() -> Unit)? = null,
     onAskAiFallback: (() -> Unit)? = null,
+    onPaywallCta: (() -> Unit)? = null,
     showSenderLabel: Boolean = false,
 ) {
     val isUser = message.role == ChatRole.User
@@ -244,6 +249,37 @@ fun ChatMessageBubble(
                             )
                         }
                     }
+                }
+            }
+
+            // "Become Pro" CTA — shown only on an out-of-credits reply (the message carries the
+            // Premium daily allowance to advertise). Deliberately its OWN row rather than another
+            // TextButton inside the action row above: the label is a full sentence and would blow
+            // past the 340dp bubble next to the three action icons. maxLines=2 keeps a long
+            // localisation (RU is ~20% longer) wrapping instead of clipping.
+            val ctaCredits = message.paywallCtaCredits
+            if (!isUser && ctaCredits != null && onPaywallCta != null) {
+                TextButton(
+                    onClick = onPaywallCta,
+                    // Same -6dp optical alignment as the action row, so the CTA lines up with
+                    // the bubble's text edge (padding would throw on a negative value).
+                    modifier = Modifier
+                        .widthIn(max = 340.dp)
+                        .offset(x = (-6).dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.WorkspacePremium,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                    Text(
+                        text = stringResource(Res.string.chat_paywall_cta_credits, ctaCredits.toString()),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 2,
+                        modifier = Modifier.padding(start = AppDimens.SpacingXxs),
+                    )
                 }
             }
         }

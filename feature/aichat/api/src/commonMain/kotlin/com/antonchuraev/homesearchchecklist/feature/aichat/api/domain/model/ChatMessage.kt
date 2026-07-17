@@ -40,4 +40,16 @@ data class ChatMessage(
      * the [ChatHistoryRepositoryImpl.toChatMessage] path (it maps only persisted columns).
      */
     val askAiForText: String? = null,
+    /**
+     * Premium daily credit allowance to render in the "Become Pro" CTA of this message.
+     * Non-null only on the out-of-credits reply ([ChatIntent.InsufficientCredits]); the bubble
+     * then shows the CTA, which navigates to the paywall.
+     *
+     * The number comes from Remote Config (`ai_daily_limit_premium`), NOT a literal — the label
+     * promises a specific allowance and a hardcoded one silently lies the day that key changes.
+     *
+     * TRANSIENT — NOT persisted to Room, same as [askAiForText]: the CTA disappears on app
+     * restart rather than lingering as a stale offer, and no migration is needed.
+     */
+    val paywallCtaCredits: Int? = null,
 )

@@ -80,14 +80,18 @@ internal class ChatAgentApiServiceImpl(
         locale: ChatLocale,
         checklistsSummary: List<ChecklistContext>,
         contextChecklistName: String?,
+        requestId: String?,
     ): AgentStepResult = runCatching {
-        logger.debug(TAG, "step: userId=${userId.take(8)}... transcript=${transcript.size} entries locale=$locale checklists=${checklistsSummary.size} context=${contextChecklistName ?: "none"}")
+        logger.debug(TAG, "step: userId=${userId.take(8)}... transcript=${transcript.size} entries locale=$locale checklists=${checklistsSummary.size} context=${contextChecklistName ?: "none"} requestId=${requestId ?: "none"}")
 
         val response: HttpResponse = httpClient.post(AGENT_URL) {
             contentType(ContentType.Application.Json)
             setBody(
                 AgentRequest(
                     userId = userId,
+                    // Stable per turn → the server's reserve is replay-safe. explicitNulls=false
+                    // drops the key when absent, keeping the legacy path byte-identical.
+                    requestId = requestId,
                     transcript = transcript.map { it.toDto() },
                     locale = locale.toApiString(),
                     timezoneOffsetMinutes = currentTimezoneOffsetMinutes(),
@@ -250,6 +254,10 @@ internal class ChatAgentApiServiceImpl(
     @Serializable
     private data class AgentRequest(
         @SerialName("user_id") val userId: String,
+        // Optional idempotency key for the turn's credit reservation. Absent → the server's
+        // legacy non-deduped reserve; present → dedup doc "{user_id}__{request_id}", so a
+        // retried round-1 returns the recorded balance instead of charging a second time.
+        @SerialName("request_id") val requestId: String? = null,
         val transcript: List<TranscriptEntryDto>,
         val locale: String,
         @SerialName("timezone_offset_minutes") val timezoneOffsetMinutes: Int,

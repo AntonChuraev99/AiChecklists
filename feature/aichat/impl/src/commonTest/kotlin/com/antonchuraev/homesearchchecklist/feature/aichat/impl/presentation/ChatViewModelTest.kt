@@ -2,6 +2,7 @@ package com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation
 
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AiChatPreferencesRepository
+import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigKeys
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.dispatcher.ToolCallDispatcher
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatIntent
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceAction
@@ -10,18 +11,22 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Disp
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.IntentClassification
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.RoutingLayer
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ToolCall
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.UndoHandle
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.locale.ChatLocaleProvider
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.ChatLocale
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AgentToolCall
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AgentTranscriptEntry
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AgentStepResult
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AgentTranscriptRepository
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.AiChatRepository
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChatHistoryRepository
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChecklistContext
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.ChecklistItemContext
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.RemoteClassificationResult
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.RemoteCompletionResult
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.repository.TranscriptionOutcome
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.repository.AiChatRepositoryImpl
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.preview.ToolCallPreviewRenderer
@@ -55,6 +60,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -85,16 +91,21 @@ private class FakeAiChatRepository(
     /** Captures the checklistsSummary forwarded to each agentStep call (recent-items context). */
     val agentStepChecklists = mutableListOf<List<ChecklistContext>>()
 
+    /** Captures the requestId forwarded to each agentStep call (Stage 3 idempotency key). */
+    val agentStepRequestIds = mutableListOf<String?>()
+
     override suspend fun agentStep(
         transcript: List<AgentTranscriptEntry>,
         locale: ChatLocale,
         checklistsSummary: List<ChecklistContext>,
         contextChecklistName: String?,
+        requestId: String?,
     ): AgentStepResult {
         agentStepCallCount++
         agentStepTranscripts.add(transcript.toList())
         agentStepContextNames.add(contextChecklistName)
         agentStepChecklists.add(checklistsSummary.toList())
+        agentStepRequestIds.add(requestId)
         val index = (agentStepCallCount - 1).coerceAtMost(agentStepResults.lastIndex.coerceAtLeast(0))
         return agentStepResults.getOrElse(index) { AgentStepResult.ServiceError }
     }
@@ -206,19 +217,57 @@ private class FakeChecklistRepository(
 
 private class FakeToolCallDispatcher(
     private val outcome: DispatchOutcome = DispatchOutcome.Success("chat_dispatch_added", listOf("item")),
+    private val undoOutcome: DispatchOutcome = DispatchOutcome.Success("chat_undo_removed", listOf("item")),
+    private val moveOutcome: DispatchOutcome = DispatchOutcome.Success("chat_dispatch_added_to", listOf("item", "list")),
 ) : ToolCallDispatcher {
     var lastDispatched: ToolCall? = null
     var dispatchCount = 0
+    var lastUndone: UndoHandle? = null
+    var undoCount = 0
+    var lastMovedTo: String? = null
+    var moveCount = 0
 
     override suspend fun dispatch(toolCall: ToolCall): DispatchOutcome {
         dispatchCount++
         lastDispatched = toolCall
         return outcome
     }
+
+    override suspend fun undo(handle: UndoHandle): DispatchOutcome {
+        undoCount++
+        lastUndone = handle
+        return undoOutcome
+    }
+
+    override suspend fun moveAddedItem(
+        handle: UndoHandle.AddedItem,
+        targetChecklistName: String,
+    ): DispatchOutcome {
+        moveCount++
+        lastMovedTo = targetChecklistName
+        return moveOutcome
+    }
 }
 
+/**
+ * An [UndoHandle] for a just-added row. Only its identity matters here: the C-branch tests assert
+ * the chips carry back the very handle the dispatcher returned, so the field values are arbitrary
+ * but must round-trip unchanged. Rollback semantics live in ChatUndoChoiceTest.
+ */
+private fun addedItemHandle(
+    itemText: String = "milk",
+    checklistName: String = "Shopping",
+) = UndoHandle.AddedItem(
+    checklistId = 1L,
+    checklistName = checklistName,
+    fillId = 11L,
+    fillItemId = "fill_new",
+    templateItemId = "tpl_new",
+    itemText = itemText,
+)
+
 private object FakePreviewRenderer : ToolCallPreviewRenderer {
-    override fun render(toolCall: ToolCall): String = when (toolCall) {
+    override suspend fun render(toolCall: ToolCall): String = when (toolCall) {
         is ToolCall.AddItem -> "• ${toolCall.itemText}"
         else -> toolCall.toString()
     }
@@ -237,6 +286,7 @@ private object NoOpLogger : AppLogger {
 
 private class FakeAiChatPreferencesRepository(
     initial: Boolean = false,
+    initialDefaultChecklistId: Long? = null,
 ) : AiChatPreferencesRepository {
     private val _flow = MutableStateFlow(initial)
     var lastSet: Boolean? = null
@@ -246,6 +296,14 @@ private class FakeAiChatPreferencesRepository(
     override suspend fun setDeepThinkingEnabled(enabled: Boolean) {
         lastSet = enabled
         _flow.value = enabled
+    }
+
+    // ── D2 memory of choice (asserted in ChatMemoryOfChoiceTest) ──
+    private val _defaultChecklistId = MutableStateFlow(initialDefaultChecklistId)
+    override val defaultChecklistIdFlow: kotlinx.coroutines.flow.Flow<Long?> = _defaultChecklistId
+
+    override suspend fun setDefaultChecklistId(checklistId: Long?) {
+        _defaultChecklistId.value = checklistId
     }
 }
 
@@ -317,24 +375,101 @@ private fun makeVm(
     dispatcher: FakeToolCallDispatcher = FakeToolCallDispatcher(),
     renderer: ToolCallPreviewRenderer = FakePreviewRenderer,
     historyRepo: ChatHistoryRepository = FakeChatHistoryRepository(),
+    agentTranscriptRepo: AgentTranscriptRepository = FakeAgentTranscript(),
     checklistRepo: ChecklistRepository = FakeChecklistRepository(),
     userDataRepo: UserDataRepository = FakeUserDataRepository(),
     aiChatPreferencesRepo: AiChatPreferencesRepository = FakeAiChatPreferencesRepository(),
     analytics: com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker = FakeAnalyticsTracker(),
     experimentTracker: FakeAiModelExperimentTracker = FakeAiModelExperimentTracker(),
+    remoteConfig: HarnessRemoteConfigProvider = HarnessRemoteConfigProvider(),
 ): ChatViewModel = ChatViewModel(
     aiChatRepository = repo,
     toolCallDispatcher = dispatcher,
     previewRenderer = renderer,
+    // Injective + timezone-independent — see TokenDateFormatter (ChatUndoChoiceTest).
+    dateFormatter = TokenDateFormatter(),
     localeProvider = FakeLocaleProvider,
     chatHistoryRepository = historyRepo,
+    agentTranscriptRepository = agentTranscriptRepo,
     checklistRepository = checklistRepo,
     userDataRepository = userDataRepo,
     aiChatPreferencesRepository = aiChatPreferencesRepo,
     analytics = analytics,
     aiModelExperimentTracker = experimentTracker,
+    remoteConfigProvider = remoteConfig,
     logger = NoOpLogger,
 )
+
+/**
+ * A ViewModel whose Layer 2 is out of credits: the REAL [AiChatRepositoryImpl] wired to a
+ * classifier fake that returns [RemoteClassificationResult.InsufficientCredits] — exactly what
+ * `ChatClassifierApiServiceImpl` produces on HTTP 402 (its line 86).
+ *
+ * **Why the real repository here, when every other test in this file fakes it.** The bug is the
+ * chain, and the load-bearing step is inside the repository: it flattens the refusal into
+ * `ChatIntent.Unknown` before the ViewModel ever sees it. Handing the ViewModel a hand-built
+ * [IntentClassification] would (a) test the ViewModel against the very representation under
+ * debate, and (b) force this test to name the fix's type — pinning it to one of the two candidate
+ * designs (a new ChatIntent variant vs. an outcome wrapper around classify()). Entering through
+ * the classifier API instead keeps these tests blind to the repository's internal representation:
+ * they assert only what the user sees and what Amplitude receives, so either design can satisfy
+ * them unchanged.
+ *
+ * Every other collaborator is a fake and no HTTP client exists here, so this stays free/offline.
+ * Deep Thinking is OFF, so classify() starts at Layer 2 — the path a real free-tier send takes.
+ */
+private fun makeVmOutOfCredits(
+    analytics: FakeAnalyticsTracker = FakeAnalyticsTracker(),
+    remoteConfig: HarnessRemoteConfigProvider = HarnessRemoteConfigProvider(),
+): ChatViewModel {
+    // Non-blank userId: a blank one short-circuits Layer 2 before the 402 can happen.
+    val userRepo = HarnessUserDataRepository("u1")
+    val realRepo = AiChatRepositoryImpl(
+        classifierApi = FakeClassifierApi(RemoteClassificationResult.InsufficientCredits),
+        completionApi = FakeCompletionApi(),
+        transcribeApi = FakeTranscribeApi(),
+        chatAgentApi = FakeAgentApi(),
+        userDataRepository = userRepo,
+        aiChatPreferencesRepository = FakeAiChatPreferences(initial = false),
+        logger = NoOpLogger,
+    )
+    return makeVm(
+        repo = realRepo,
+        userDataRepo = userRepo,
+        analytics = analytics,
+        remoteConfig = remoteConfig,
+    )
+}
+
+/**
+ * A ViewModel whose **Layer 3** is out of credits, reached the way a real user reaches it: Deep
+ * Thinking ON, which skips Layer 2 entirely and routes straight to the agent loop
+ * (`docs/decisions/2026-07-15-remove-ai-chat-layer1.md`).
+ *
+ * Real [AiChatRepositoryImpl] again — the wiring under test spans repository → ViewModel, and the
+ * Layer 2 classifier is left un-stubbed on purpose: if the Deep Thinking bypass ever regressed and
+ * the request went through Layer 2, [FakeClassifierApi]'s default ServiceError would change the
+ * path and this test would stop measuring Layer 3.
+ *
+ * The 402 arrives as [AgentStepResult.InsufficientCredits] — what `ChatAgentApiServiceImpl`
+ * produces on HTTP 402 (its line 121).
+ */
+private fun makeVmDeepThinkingOutOfCredits(
+    analytics: FakeAnalyticsTracker = FakeAnalyticsTracker(),
+): ChatViewModel {
+    val userRepo = HarnessUserDataRepository("u1")
+    val realRepo = AiChatRepositoryImpl(
+        classifierApi = FakeClassifierApi(),
+        completionApi = FakeCompletionApi(),
+        transcribeApi = FakeTranscribeApi(),
+        chatAgentApi = FakeAgentApi(AgentStepResult.InsufficientCredits),
+        userDataRepository = userRepo,
+        // Deep Thinking ON → classify() never calls Layer 2, it returns FreeForm for Layer 3.
+        aiChatPreferencesRepository = FakeAiChatPreferences(initial = true),
+        logger = NoOpLogger,
+    )
+    return makeVm(repo = realRepo, userDataRepo = userRepo, analytics = analytics)
+}
 
 // ─── Choice-block test helpers ──────────────────────────────────────────────
 //
@@ -342,6 +477,42 @@ private fun makeVm(
 // AiChoiceResponse block (PendingChoice). These helpers read the new structure so the
 // migrated tests stay readable: the Execute tool call is carried by the primary chip's
 // ChoiceAction.Execute; the escape chip id is "escape"; ExecuteAll chip id is "execute_all".
+//
+// ─── Which intent to drive the QUESTION mechanics with (D1, 2026-07-15) ──────
+//
+// D1 ("ceremony proportional to reversibility") split the write intents in two:
+//   • AddItem / CompleteItem  → reversible → applied at once, Undo offered after (NO question).
+//   • DeleteItem / CreateChecklist / SetItemReminder / AttachToItem → still ask first.
+//
+// Every test below that is really about the QUESTION machinery — the Edit chip, Execute/Apply,
+// the FreeForm escape ladder, Dismiss, the preview_shown/confirmed/rejected funnel, the
+// RequiresPremium snackbar, linkedChecklistId plumbing — therefore drives DeleteItem: it is the
+// intent that still asks AND carries both an Execute and an Edit chip. Those tests used AddItem
+// only because, before D1, every write intent asked. Their assertions are unchanged; only the
+// carrier intent moved, so the mechanics stay guarded.
+//
+// The add-specific behaviour (dispatch-without-question, the post-hoc chips, the P5 hint bias)
+// keeps using AddItem and asserts through the dispatcher — see the C-branch tests.
+
+/**
+ * A classification for a write intent that STILL asks (delete), with the ToolCall pre-built so the
+ * test does not depend on classifier phrasing. [layer] is what the escalation ladder reads back.
+ *
+ * Defaults to [RoutingLayer.Classifier]: since the Layer 1 disconnect (2026-07-15) every
+ * classify() result comes from Layer 2, so Classifier is what a real send now produces. Tests
+ * that specifically exercise the Local branch of the escalation ladder pass `layer` explicitly —
+ * that branch is still reachable in prod via the attachment-only send, which tags Local.
+ */
+private fun deleteClassification(
+    itemText: String = "milk",
+    checklistHint: String? = "shopping",
+    layer: RoutingLayer = RoutingLayer.Classifier,
+) = IntentClassification(
+    intent = ChatIntent.DeleteItem,
+    confidence = 1.0f,
+    layer = layer,
+    preBuiltToolCall = ToolCall.DeleteItem(checklistHint = checklistHint, itemText = itemText),
+)
 
 /** The ToolCall behind the (single) Execute option of the pending choice, or null. */
 private fun ChatScreenState.executeToolCall(): ToolCall? =
@@ -437,10 +608,19 @@ class ChatViewModelTest {
         assertEquals("chat_unknown_intent_hint", effect.messageKey)
     }
 
-    // ── 4. CreateItem intent → pendingPreview shown ───────────────────────────
+    // ── 4. CreateItem intent → applied at once, no question (D1 C-branch) ─────
 
+    /**
+     * A confident add is one-tap reversible, so D1 applies it immediately and offers Undo after
+     * instead of asking first.
+     *
+     * Overlaps ChatUndoChoiceTest's C-branch test on purpose but is NOT redundant: that one scripts
+     * a preBuiltToolCall, whereas this classification carries none, so the ViewModel's OWN
+     * text → ToolCall extraction runs. It therefore also pins that "add milk to shopping" reaches
+     * the dispatcher as item "milk" for list "shopping" — the object the user actually named.
+     */
     @Test
-    fun sendClick_createItemIntent_showsPendingPreview() = runTest {
+    fun sendClick_createItemIntent_dispatchesWithoutQuestion() = runTest {
         val repo = FakeAiChatRepository(
             classifyResult = IntentClassification(
                 intent = ChatIntent.CreateItem,
@@ -448,13 +628,35 @@ class ChatViewModelTest {
                 layer = RoutingLayer.Local,
             )
         )
-        val vm = makeVm(repo = repo)
+        val handle = addedItemHandle(itemText = "milk", checklistName = "shopping")
+        val fakeDispatcher = FakeToolCallDispatcher(
+            outcome = DispatchOutcome.Success(
+                messageKey = "chat_dispatch_added_to",
+                args = listOf("milk", "shopping"),
+                undo = handle,
+            ),
+        )
+        val vm = makeVm(repo = repo, dispatcher = fakeDispatcher)
         vm.sendIntent(ChatScreenIntent.OnInputChange("add milk to shopping"))
         vm.sendIntent(ChatScreenIntent.OnSendClick)
 
+        // It happened — with no confirmation round-trip.
+        assertEquals(1, fakeDispatcher.dispatchCount, "A confident add must dispatch immediately")
+        val dispatched = fakeDispatcher.lastDispatched
+        assertIs<ToolCall.AddItem>(dispatched)
+        assertEquals("milk", dispatched.itemText, "The named item must reach the dispatcher")
+        assertEquals("shopping", dispatched.checklistHint, "The named list must reach the dispatcher")
+
+        // What is left on screen is a chip strip, not a question.
         val state = vm.screenState.value
-        assertNotNull(state.pendingChoice, "CreateItem must produce a choice block")
-        assertIs<ToolCall.AddItem>(state.executeToolCall())
+        assertNotNull(state.pendingChoice, "The post-hoc Undo strip must be shown")
+        assertEquals("", state.pendingChoice?.choice?.prompt,
+            "The C-branch asks nothing — the prompt must be empty")
+        assertEquals(
+            listOf<ChoiceAction>(ChoiceAction.Undo(handle), ChoiceAction.MoveToList(handle)),
+            state.actions(),
+            "An added item offers Undo + move-to-list, bound to the handle the dispatcher returned",
+        )
         assertEquals(false, state.isProcessing)
     }
 
@@ -494,22 +696,19 @@ class ChatViewModelTest {
 
     @Test
     fun previewApply_dispatchesAndClearsPendingPreview() = runTest {
-        val repo = FakeAiChatRepository(
-            classifyResult = IntentClassification(
-                intent = ChatIntent.CreateItem,
-                confidence = 1.0f,
-                layer = RoutingLayer.Local,
-            )
-        )
+        val repo = FakeAiChatRepository(classifyResult = deleteClassification())
         val fakeDispatcher = FakeToolCallDispatcher(
-            outcome = DispatchOutcome.Success("chat_dispatch_added_to", listOf("milk", "Shopping"))
+            outcome = DispatchOutcome.Success("chat_dispatch_deleted_from", listOf("milk", "Shopping"))
         )
         val vm = makeVm(repo = repo, dispatcher = fakeDispatcher)
 
         // Build a choice block
-        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk to shopping"))
+        vm.sendIntent(ChatScreenIntent.OnInputChange("delete milk from shopping"))
         vm.sendIntent(ChatScreenIntent.OnSendClick)
         assertNotNull(vm.screenState.value.pendingChoice)
+
+        // Nothing may run before the user confirms — that is what the question is for.
+        assertEquals(0, fakeDispatcher.dispatchCount, "An irreversible action must not run before Apply")
 
         // Collect the SideEffect emitted on execute
         val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
@@ -520,12 +719,12 @@ class ChatViewModelTest {
         vm.sendIntent(ChatScreenIntent.OnChoiceSelected("execute"))
 
         assertNull(vm.screenState.value.pendingChoice)
-        assertIs<ToolCall.AddItem>(fakeDispatcher.lastDispatched)
+        assertIs<ToolCall.DeleteItem>(fakeDispatcher.lastDispatched)
 
         // Success outcome emits ShowAssistantMessage with the dispatch key
         val effect = effectDeferred.await()
         assertIs<ChatScreenSideEffect.ShowAssistantMessage>(effect)
-        assertEquals("chat_dispatch_added_to", effect.messageKey)
+        assertEquals("chat_dispatch_deleted_from", effect.messageKey)
         assertEquals(listOf("milk", "Shopping"), effect.args)
     }
 
@@ -533,15 +732,10 @@ class ChatViewModelTest {
 
     @Test
     fun previewCancel_clearsPendingPreviewAndEmitsCancelledMessage() = runTest {
-        val repo = FakeAiChatRepository(
-            classifyResult = IntentClassification(
-                intent = ChatIntent.CreateItem,
-                confidence = 1.0f,
-                layer = RoutingLayer.Local,
-            )
-        )
-        val vm = makeVm(repo = repo)
-        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk to shopping"))
+        val repo = FakeAiChatRepository(classifyResult = deleteClassification())
+        val fakeDispatcher = FakeToolCallDispatcher()
+        val vm = makeVm(repo = repo, dispatcher = fakeDispatcher)
+        vm.sendIntent(ChatScreenIntent.OnInputChange("delete milk from shopping"))
         vm.sendIntent(ChatScreenIntent.OnSendClick)
         assertNotNull(vm.screenState.value.pendingChoice)
 
@@ -553,16 +747,28 @@ class ChatViewModelTest {
 
         // Choice must be cleared
         assertNull(vm.screenState.value.pendingChoice)
+        // Cancelling a question must cancel the action, not just the bubble.
+        assertEquals(0, fakeDispatcher.dispatchCount, "Dismiss must not dispatch")
         // Assistant cancelled message must be emitted (silent dismiss FORBIDDEN per CLAUDE.md)
         val effect = effectDeferred.await()
         assertIs<ChatScreenSideEffect.ShowAssistantMessage>(effect)
         assertEquals("chat_choice_dismissed_message", effect.messageKey)
     }
 
-    // ── 8. Layer 1 (Local) → user message costCredits == 0 ───────────────────
+    // ── 8. A Local-layer classification → user message costCredits == 0 ──────
 
+    /**
+     * Locks the `Local → 0 credits` mapping in the ViewModel.
+     *
+     * Since the Layer 1 disconnect (2026-07-15) `classify()` never returns Local, so this exact
+     * route cannot happen in prod — but the mapping itself is still live: the attachment-only
+     * send tags its user message Local (cost 0, the charge lands on execution), and messages
+     * persisted before the disconnect replay from Room carrying Local. Deleting the Local branch
+     * of `creditsForLayer` as "dead" would mis-price both, and would also have to be undone when
+     * Layer 1 is re-routed. Kept deliberately.
+     */
     @Test
-    fun sendClick_layer1Local_userMessageCostCreditsIsZero() = runTest {
+    fun sendClick_localLayerClassification_userMessageCostCreditsIsZero() = runTest {
         val repo = FakeAiChatRepository(
             classifyResult = IntentClassification(
                 intent = ChatIntent.CreateItem,
@@ -576,7 +782,7 @@ class ChatViewModelTest {
 
         val userMsg = vm.screenState.value.messages.first()
         assertEquals(RoutingLayer.Local, userMsg.routedLayer)
-        assertEquals(0, userMsg.costCredits, "Layer 1 (local) is free — costCredits must be 0")
+        assertEquals(0, userMsg.costCredits, "A Local-layer message is free — costCredits must be 0")
     }
 
     // ── 9. Layer 2 (Classifier) → user message costCredits == 1 ─────────────
@@ -605,17 +811,11 @@ class ChatViewModelTest {
 
     @Test
     fun previewApply_requiresPremiumOutcome_emitsSnackbar() = runTest {
-        val repo = FakeAiChatRepository(
-            classifyResult = IntentClassification(
-                intent = ChatIntent.CreateItem,
-                confidence = 1.0f,
-                layer = RoutingLayer.Local,
-            )
-        )
+        val repo = FakeAiChatRepository(classifyResult = deleteClassification())
         val fakeDispatcher = FakeToolCallDispatcher(outcome = DispatchOutcome.RequiresPremium)
         val vm = makeVm(repo = repo, dispatcher = fakeDispatcher)
 
-        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk to shopping"))
+        vm.sendIntent(ChatScreenIntent.OnInputChange("delete milk from shopping"))
         vm.sendIntent(ChatScreenIntent.OnSendClick)
 
         val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) { vm.sideEffect.first() }
@@ -747,23 +947,17 @@ class ChatViewModelTest {
 
     @Test
     fun previewApply_successWithLinkedChecklistId_sideEffectCarriesId() = runTest {
-        val repo = FakeAiChatRepository(
-            classifyResult = IntentClassification(
-                intent = ChatIntent.CreateItem,
-                confidence = 1.0f,
-                layer = RoutingLayer.Local,
-            )
-        )
+        val repo = FakeAiChatRepository(classifyResult = deleteClassification())
         val fakeDispatcher = FakeToolCallDispatcher(
             outcome = DispatchOutcome.Success(
-                messageKey = "chat_dispatch_added_to",
+                messageKey = "chat_dispatch_deleted_from",
                 args = listOf("milk", "Shopping"),
                 linkedChecklistId = 42L,
             )
         )
         val vm = makeVm(repo = repo, dispatcher = fakeDispatcher)
 
-        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk to shopping"))
+        vm.sendIntent(ChatScreenIntent.OnInputChange("delete milk from shopping"))
         vm.sendIntent(ChatScreenIntent.OnSendClick)
 
         val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
@@ -892,12 +1086,8 @@ class ChatViewModelTest {
 
     @Test
     fun onPreviewReject_localSource_callsClassifyWithSkipLayer1True() = runTest {
-        // Setup: get a preview from Layer 1
-        val layer1Result = IntentClassification(
-            intent = ChatIntent.CreateItem,
-            confidence = 1.0f,
-            layer = RoutingLayer.Local,
-        )
+        // Setup: get a question from Layer 1 (delete — the reversible intents no longer ask).
+        val layer1Result = deleteClassification(layer = RoutingLayer.Local)
         // Reject will produce FreeForm from Layer 2 → agent loop runs
         val layer2RejectResult = IntentClassification(
             intent = ChatIntent.FreeForm,
@@ -913,7 +1103,7 @@ class ChatViewModelTest {
         val vm = makeVm(repo = repo)
 
         // Send to get a choice block from Layer 1
-        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk to shopping"))
+        vm.sendIntent(ChatScreenIntent.OnInputChange("delete milk from shopping"))
         vm.sendIntent(ChatScreenIntent.OnSendClick)
         assertNotNull(vm.screenState.value.pendingChoice)
 
@@ -944,21 +1134,15 @@ class ChatViewModelTest {
 
     @Test
     fun onPreviewReject_classifierSource_runsAgentLoopDirectly() = runTest {
-        // Setup: produce a Classifier-layer preview
-        val preBuilt = ToolCall.AddItem(checklistHint = "shopping", itemText = "milk")
-        val classifierResult = IntentClassification(
-            intent = ChatIntent.CreateItem,
-            confidence = 0.9f,
-            layer = RoutingLayer.Classifier,
-            preBuiltToolCall = preBuilt,
-        )
+        // Setup: produce a Classifier-layer question (delete — the reversible intents no longer ask).
+        val classifierResult = deleteClassification(layer = RoutingLayer.Classifier)
         // No scripted agentStepResults → agentStep returns ServiceError → chat_completion_error.
         val repo = FakeAiChatRepository(
             classifyResult = classifierResult,
         )
         val vm = makeVm(repo = repo)
 
-        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk to shopping"))
+        vm.sendIntent(ChatScreenIntent.OnInputChange("delete milk from shopping"))
         vm.sendIntent(ChatScreenIntent.OnSendClick)
         assertNotNull(vm.screenState.value.pendingChoice)
 
@@ -1536,26 +1720,34 @@ class ChatViewModelTest {
     // ══════════════════════════════════════════════════════════════════════════
 
     // ── C1. Write-intent choice carries a primary Execute chip with the tool call ──
+    /**
+     * Driven by SetItemReminder: it is a NON-destructive intent that still asks, so it keeps this
+     * test on the Primary role. (Delete would collapse it into C2, which owns the Destructive role.)
+     */
     @Test
     fun writeIntent_choiceHasPrimaryExecuteChip() = runTest {
+        val preBuilt = ToolCall.SetItemReminder(checklistHint = "shopping", itemText = "milk", at = 1_800_000_000_000L)
         val repo = FakeAiChatRepository(
             classifyResult = IntentClassification(
-                intent = ChatIntent.CreateItem,
+                intent = ChatIntent.SetReminder,
                 confidence = 1.0f,
                 layer = RoutingLayer.Local,
+                preBuiltToolCall = preBuilt,
             )
         )
         val vm = makeVm(repo = repo)
-        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk to shopping"))
+        vm.sendIntent(ChatScreenIntent.OnInputChange("remind me about milk in shopping tomorrow at 9"))
         vm.sendIntent(ChatScreenIntent.OnSendClick)
 
         val choice = vm.screenState.value.pendingChoice?.choice
-        assertNotNull(choice, "Write intent must produce a choice block")
+        assertNotNull(choice, "A write intent that still asks must produce a choice block")
         // There is exactly one Execute option and it is the Primary chip.
         val executeOption = choice.options.first { it.id == "execute" }
-        assertEquals(ChoiceRole.Primary, executeOption.role, "Add is a Primary (non-destructive) action")
+        assertEquals(ChoiceRole.Primary, executeOption.role,
+            "Setting a reminder is a Primary (non-destructive) action")
         assertIs<ChoiceAction.Execute>(executeOption.action)
-        assertIs<ToolCall.AddItem>((executeOption.action as ChoiceAction.Execute).toolCall)
+        assertEquals(preBuilt, (executeOption.action as ChoiceAction.Execute).toolCall,
+            "The chip must carry the very tool call the question was asked about")
         // Escape chip re-classifies (FreeForm), carrying the original text.
         assertEquals("escape", choice.escape?.id)
         assertIs<ChoiceAction.FreeForm>(choice.escape?.action)
@@ -1615,15 +1807,9 @@ class ChatViewModelTest {
     // ── C4. OnChoiceDismissed (single choice) → choice cleared + visible reply ──
     @Test
     fun choiceDismissed_singleChoice_clearsAndEmitsMessage() = runTest {
-        val repo = FakeAiChatRepository(
-            classifyResult = IntentClassification(
-                intent = ChatIntent.CreateItem,
-                confidence = 1.0f,
-                layer = RoutingLayer.Local,
-            )
-        )
+        val repo = FakeAiChatRepository(classifyResult = deleteClassification())
         val vm = makeVm(repo = repo)
-        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk to shopping"))
+        vm.sendIntent(ChatScreenIntent.OnInputChange("delete milk from shopping"))
         vm.sendIntent(ChatScreenIntent.OnSendClick)
         assertNotNull(vm.screenState.value.pendingChoice)
 
@@ -1642,21 +1828,13 @@ class ChatViewModelTest {
     // ── C5. Edit then confirm → applyEditedText replaces item text before dispatch ──
     @Test
     fun choiceEdit_confirm_dispatchesEditedText() = runTest {
-        val preBuilt = ToolCall.AddItem(checklistHint = "shopping", itemText = "milk")
-        val repo = FakeAiChatRepository(
-            classifyResult = IntentClassification(
-                intent = ChatIntent.CreateItem,
-                confidence = 1.0f,
-                layer = RoutingLayer.Classifier,
-                preBuiltToolCall = preBuilt,
-            )
-        )
+        val repo = FakeAiChatRepository(classifyResult = deleteClassification(layer = RoutingLayer.Classifier))
         val fakeDispatcher = FakeToolCallDispatcher(
-            outcome = DispatchOutcome.Success("chat_dispatch_added", listOf("oat milk")),
+            outcome = DispatchOutcome.Success("chat_dispatch_deleted", listOf("oat milk")),
         )
         val vm = makeVm(repo = repo, dispatcher = fakeDispatcher)
 
-        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk to shopping"))
+        vm.sendIntent(ChatScreenIntent.OnInputChange("delete milk from shopping"))
         vm.sendIntent(ChatScreenIntent.OnSendClick)
         assertNotNull(vm.screenState.value.pendingChoice)
 
@@ -1669,25 +1847,20 @@ class ChatViewModelTest {
         vm.sendIntent(ChatScreenIntent.OnChoiceEditConfirmed)
 
         val dispatched = fakeDispatcher.lastDispatched
-        assertIs<ToolCall.AddItem>(dispatched)
+        assertIs<ToolCall.DeleteItem>(dispatched)
         assertEquals("oat milk", dispatched.itemText, "Edited text must be applied before dispatch")
+        assertEquals("shopping", dispatched.checklistHint, "Editing the item must not drop the target list")
         assertNull(vm.screenState.value.pendingChoice, "Choice cleared after the edited dispatch")
     }
 
     // ── C6. Edit confirm with blank text → hint snackbar, no dispatch ──
     @Test
     fun choiceEdit_blankConfirm_emitsHintNoDispatch() = runTest {
-        val repo = FakeAiChatRepository(
-            classifyResult = IntentClassification(
-                intent = ChatIntent.CreateItem,
-                confidence = 1.0f,
-                layer = RoutingLayer.Local,
-            )
-        )
+        val repo = FakeAiChatRepository(classifyResult = deleteClassification())
         val fakeDispatcher = FakeToolCallDispatcher()
         val vm = makeVm(repo = repo, dispatcher = fakeDispatcher)
 
-        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk to shopping"))
+        vm.sendIntent(ChatScreenIntent.OnInputChange("delete milk from shopping"))
         vm.sendIntent(ChatScreenIntent.OnSendClick)
         vm.sendIntent(ChatScreenIntent.OnChoiceSelected("edit"))
 
@@ -1935,6 +2108,13 @@ class ChatViewModelTest {
     }
 
     // ── P5: context-checklist bias for list-less commands ─────────────────────
+    //
+    // The bias itself is UNCHANGED by D1 — it still runs before the reversible branch, on the same
+    // rule (explicit hint wins; null hint takes the open checklist's name; unknown context → null).
+    // Only the observation point moved: an add no longer parks in a question, so the biased hint is
+    // read off the ToolCall that reached the dispatcher instead of off the pending choice. Asserting
+    // the hint (not the question copy) is also the more durable contract: the hint is what actually
+    // routes the item to a list.
 
     private fun groceriesChecklist(id: Long = 42L) = Checklist(
         id = id,
@@ -1942,10 +2122,18 @@ class ChatViewModelTest {
         items = emptyList(),
     )
 
+    /** The hint of the single AddItem that reached the dispatcher; fails loudly if none did. */
+    private fun FakeToolCallDispatcher.dispatchedAddHint(): String? {
+        assertEquals(1, dispatchCount, "Exactly one add must have been dispatched")
+        val dispatched = lastDispatched
+        assertIs<ToolCall.AddItem>(dispatched)
+        return dispatched.checklistHint
+    }
+
     @Test
     fun createItem_nullHint_withContextChecklist_biasesHintToContextName() = runTest {
         // AddItem extracted with no explicit list ("add milk") while the dock is focused on
-        // checklist id=42 ("Groceries") → the preview's toolCall hint must become "Groceries".
+        // checklist id=42 ("Groceries") → the dispatched toolCall's hint must become "Groceries".
         val preBuilt = ToolCall.AddItem(checklistHint = null, itemText = "milk")
         val repo = FakeAiChatRepository(
             classifyResult = IntentClassification(
@@ -1956,19 +2144,16 @@ class ChatViewModelTest {
             )
         )
         val checklistRepo = FakeChecklistRepository(seed = listOf(groceriesChecklist(id = 42L)))
-        val vm = makeVm(repo = repo, checklistRepo = checklistRepo)
+        val fakeDispatcher = FakeToolCallDispatcher()
+        val vm = makeVm(repo = repo, dispatcher = fakeDispatcher, checklistRepo = checklistRepo)
 
         // Focus the dock on Groceries, then send a list-less command.
         vm.sendIntent(ChatScreenIntent.OnSetContextChecklist(checklistId = 42L))
         vm.sendIntent(ChatScreenIntent.OnInputChange("add milk"))
         vm.sendIntent(ChatScreenIntent.OnSendClick)
 
-        val state = vm.screenState.value
-        assertNotNull(state.pendingChoice, "Choice block must be shown for CreateItem")
-        val toolCall = state.executeToolCall()
-        assertIs<ToolCall.AddItem>(toolCall)
-        assertEquals("Groceries", toolCall.checklistHint,
-            "Null-hint AddItem must be biased to the open checklist name (the prompt is built from this hint)")
+        assertEquals("Groceries", fakeDispatcher.dispatchedAddHint(),
+            "Null-hint AddItem must be biased to the open checklist name — that hint is what lands it in a list")
     }
 
     @Test
@@ -1984,15 +2169,14 @@ class ChatViewModelTest {
             )
         )
         val checklistRepo = FakeChecklistRepository(seed = listOf(groceriesChecklist(id = 42L)))
-        val vm = makeVm(repo = repo, checklistRepo = checklistRepo)
+        val fakeDispatcher = FakeToolCallDispatcher()
+        val vm = makeVm(repo = repo, dispatcher = fakeDispatcher, checklistRepo = checklistRepo)
 
         vm.sendIntent(ChatScreenIntent.OnSetContextChecklist(checklistId = 42L))
         vm.sendIntent(ChatScreenIntent.OnInputChange("add milk to shopping"))
         vm.sendIntent(ChatScreenIntent.OnSendClick)
 
-        val toolCall = vm.screenState.value.executeToolCall()
-        assertIs<ToolCall.AddItem>(toolCall)
-        assertEquals("shopping", toolCall.checklistHint,
+        assertEquals("shopping", fakeDispatcher.dispatchedAddHint(),
             "Explicit hint must win over the open-screen context")
     }
 
@@ -2009,15 +2193,16 @@ class ChatViewModelTest {
             )
         )
         // Seed present but no OnSetContextChecklist call → contextChecklistId stays null.
+        // One list only, so the hintless add is NOT ambiguous: it falls through to the dispatcher
+        // (which resolves a null hint itself) rather than stopping to ask "which list?".
         val checklistRepo = FakeChecklistRepository(seed = listOf(groceriesChecklist(id = 42L)))
-        val vm = makeVm(repo = repo, checklistRepo = checklistRepo)
+        val fakeDispatcher = FakeToolCallDispatcher()
+        val vm = makeVm(repo = repo, dispatcher = fakeDispatcher, checklistRepo = checklistRepo)
 
         vm.sendIntent(ChatScreenIntent.OnInputChange("add milk"))
         vm.sendIntent(ChatScreenIntent.OnSendClick)
 
-        val toolCall = vm.screenState.value.executeToolCall()
-        assertIs<ToolCall.AddItem>(toolCall)
-        assertNull(toolCall.checklistHint,
+        assertNull(fakeDispatcher.dispatchedAddHint(),
             "Without context, a null hint must remain null (unchanged behaviour)")
     }
 
@@ -2036,16 +2221,15 @@ class ChatViewModelTest {
         )
         // Seed is empty → getChecklistById(99) returns null.
         val checklistRepo = FakeChecklistRepository(seed = emptyList())
-        val vm = makeVm(repo = repo, checklistRepo = checklistRepo)
+        val fakeDispatcher = FakeToolCallDispatcher()
+        val vm = makeVm(repo = repo, dispatcher = fakeDispatcher, checklistRepo = checklistRepo)
 
         vm.sendIntent(ChatScreenIntent.OnSetContextChecklist(checklistId = 99L))
         vm.sendIntent(ChatScreenIntent.OnInputChange("add milk"))
         vm.sendIntent(ChatScreenIntent.OnSendClick)
 
-        val toolCall = vm.screenState.value.executeToolCall()
-        assertIs<ToolCall.AddItem>(toolCall)
-        assertNull(toolCall.checklistHint,
-            "Deleted context checklist must fall back to null hint")
+        assertNull(fakeDispatcher.dispatchedAddHint(),
+            "Deleted context checklist must fall back to null hint, never invent a name")
     }
 
     @Test
@@ -2294,9 +2478,11 @@ class ChatViewModelTest {
     }
 
     @Test
-    fun prefillAndSend_withoutForceAgent_createItem_stillShowsPreview_noRegression() = runTest {
-        // A non-force prefill that classifies to a write-intent must still show the preview card
-        // (proves forceAgent didn't short-circuit the normal classify → preview flow).
+    fun prefillAndSend_withoutForceAgent_createItem_stillDispatchesWriteIntent_noRegression() = runTest {
+        // A non-force prefill that classifies to a write-intent must still run the normal
+        // classify → write-intent flow (proves forceAgent didn't short-circuit it). Since D1 a
+        // confident add lands straight on the dispatcher instead of a preview card, so that is
+        // where the flow is observed.
         val repo = FakeAiChatRepository(
             classifyResult = IntentClassification(
                 intent = ChatIntent.CreateItem,
@@ -2304,15 +2490,17 @@ class ChatViewModelTest {
                 layer = RoutingLayer.Local,
             )
         )
-        val vm = makeVm(repo = repo)
+        val fakeDispatcher = FakeToolCallDispatcher()
+        val vm = makeVm(repo = repo, dispatcher = fakeDispatcher)
 
         vm.sendIntent(ChatScreenIntent.OnPrefillAndSend(text = "add milk to shopping"))
         testScheduler.advanceUntilIdle()
 
         assertEquals(1, repo.classifyCallCount, "Non-force prefill must classify")
         assertEquals(0, repo.agentStepCallCount, "CreateItem must NOT hit the agent loop")
-        assertNotNull(vm.screenState.value.pendingChoice)
-        assertIs<ToolCall.AddItem>(vm.screenState.value.executeToolCall())
+        val dispatched = fakeDispatcher.lastDispatched
+        assertIs<ToolCall.AddItem>(dispatched)
+        assertEquals("milk", dispatched.itemText, "The prefilled text must be parsed, not passed through raw")
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -2398,29 +2586,68 @@ class ChatViewModelTest {
     // ── A5. response_received fires for a write-intent (outcome="preview") with layer + credits ──
     @Test
     fun sendClick_writeIntent_emitsResponseReceivedPreview() = runTest {
-        val repo = FakeAiChatRepository(
-            classifyResult = IntentClassification(
-                intent = ChatIntent.CreateItem,
-                confidence = 1.0f,
-                layer = RoutingLayer.Local,
-            )
-        )
+        val repo = FakeAiChatRepository(classifyResult = deleteClassification())
         val analytics = FakeAnalyticsTracker()
         val vm = makeVm(repo = repo, analytics = analytics)
 
-        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk to shopping"))
+        vm.sendIntent(ChatScreenIntent.OnInputChange("delete milk from shopping"))
         vm.sendIntent(ChatScreenIntent.OnSendClick)
         testScheduler.advanceUntilIdle()
 
         val params = analytics.paramsOf("ai_chat_response_received")
         assertNotNull(params, "ai_chat_response_received must be emitted when a preview is shown")
         assertEquals("preview", params["outcome"])
-        assertEquals("Local", params["routed_layer"])
-        assertEquals(0, params["credits_used"], "Layer 1 (Local) costs 0 credits")
+        assertEquals("Classifier", params["routed_layer"])
+        assertEquals(1, params["credits_used"], "Layer 2 (Classifier) costs 1 credit")
         // preview_shown carries the action type
         val previewParams = analytics.paramsOf("ai_chat_preview_shown")
         assertNotNull(previewParams, "ai_chat_preview_shown must be emitted")
-        assertEquals("AddItem", previewParams["action_type"])
+        assertEquals("DeleteItem", previewParams["action_type"])
+    }
+
+    // ── A5b. The C-branch reports its own turn: outcome="action", no preview_shown ──
+    /**
+     * D1 moved confident add/complete off the preview funnel: there is no preview to show, the
+     * action already ran. Locks the replacement so the turn is never left unreported (which would
+     * silently punch a hole in the response_received funnel) and so preview_shown volume stays a
+     * true count of questions asked rather than quietly counting auto-applied actions too.
+     */
+    @Test
+    fun sendClick_reversibleIntent_emitsResponseReceivedActionAndAutoApplied() = runTest {
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.CreateItem,
+                confidence = 1.0f,
+                layer = RoutingLayer.Classifier,
+                preBuiltToolCall = ToolCall.AddItem(checklistHint = "shopping", itemText = "milk"),
+            )
+        )
+        val analytics = FakeAnalyticsTracker()
+        val fakeDispatcher = FakeToolCallDispatcher(
+            outcome = DispatchOutcome.Success(
+                messageKey = "chat_dispatch_added_to",
+                args = listOf("milk", "shopping"),
+                undo = addedItemHandle(),
+            ),
+        )
+        val vm = makeVm(repo = repo, dispatcher = fakeDispatcher, analytics = analytics)
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk to shopping"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        val params = analytics.paramsOf("ai_chat_response_received")
+        assertNotNull(params, "The auto-applied turn must still report a response")
+        assertEquals("action", params["outcome"], "An applied action is not a 'preview' outcome")
+        assertEquals("Classifier", params["routed_layer"])
+
+        val applied = analytics.paramsOf("ai_chat_action_auto_applied")
+        assertNotNull(applied, "Auto-applying must be measurable (it replaces the preview funnel)")
+        assertEquals("AddItem", applied["action_type"])
+        assertEquals("Classifier", applied["routed_layer"])
+
+        assertNull(analytics.paramsOf("ai_chat_preview_shown"),
+            "No question was asked, so preview_shown must NOT fire")
     }
 
     // ── A6. response_received fires for the agent Final (outcome="answer", layer=FullChat) ──
@@ -2598,6 +2825,9 @@ class ChatViewModelTest {
     fun onFeedbackSubmit_emitsFeedbackWithMigratedParams() = runTest {
         val analytics = FakeAnalyticsTracker()
         val vm = makeVm(analytics = analytics)
+        // routedLayer=Local models a message persisted BEFORE the Layer 1 disconnect (2026-07-15):
+        // the classifier no longer produces Local, but Room history replays it, and feedback on an
+        // old message must still report the layer it was actually answered by.
         val assistantMsg = ChatMessage(
             id = "asst_fb",
             role = ChatRole.Assistant,
@@ -2620,17 +2850,11 @@ class ChatViewModelTest {
     // ── A10. preview confirm/reject funnel ──
     @Test
     fun previewApply_emitsPreviewConfirmed_andReject_emitsRejected() = runTest {
-        val repo = FakeAiChatRepository(
-            classifyResult = IntentClassification(
-                intent = ChatIntent.CreateItem,
-                confidence = 1.0f,
-                layer = RoutingLayer.Local,
-            )
-        )
+        val repo = FakeAiChatRepository(classifyResult = deleteClassification())
         val analytics = FakeAnalyticsTracker()
         val vm = makeVm(repo = repo, analytics = analytics)
 
-        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk to shopping"))
+        vm.sendIntent(ChatScreenIntent.OnInputChange("delete milk from shopping"))
         vm.sendIntent(ChatScreenIntent.OnSendClick)
         testScheduler.advanceUntilIdle()
         assertNotNull(vm.screenState.value.pendingChoice)
@@ -2640,7 +2864,7 @@ class ChatViewModelTest {
 
         val confirmed = analytics.paramsOf("ai_chat_preview_confirmed")
         assertNotNull(confirmed, "Tapping execute must emit ai_chat_preview_confirmed")
-        assertEquals("AddItem", confirmed["action_type"])
+        assertEquals("DeleteItem", confirmed["action_type"])
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -2856,5 +3080,510 @@ class ChatViewModelTest {
         // (5 lists × 6 = 30), even though their name + counts are still present.
         assertTrue(summary[0].recentItems.isNotEmpty(), "Earliest list keeps its items")
         assertTrue(summary.last().recentItems.isEmpty(), "Budget-exhausted list sends no item text")
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // 🔴 RED repro — out of credits is reported as "I didn't catch that" (2026-07-16)
+    // docs/todos/2026-07-16-aichat-insufficient-credits-shows-unknown-hint.md
+    // ══════════════════════════════════════════════════════════════════════════
+    //
+    // Free user, 10/10 daily AI credits spent, types «добавь молоко»:
+    //
+    //   ChatClassifierApiServiceImpl:86   HTTP 402 → RemoteClassificationResult.InsufficientCredits
+    //   AiChatRepositoryImpl:136-143      → ChatIntent.Unknown(rawText)          ← reason erased
+    //   ChatViewModel:764-777             → ShowAssistantMessage("chat_unknown_intent_hint")
+    //                                       + askAiForText → an "Ask AI" button
+    //
+    // So the app tells the user their phrasing was unclear, and the only way to learn the truth is
+    // to tap "Ask AI" — which asks for 3 MORE credits from an empty wallet, 402s again, and only
+    // THERE finally says "out of credits". The paywall never appears on the classify path;
+    // `chat_insufficient_credits` is emitted only from the agent paths (:1967, :2310).
+    //
+    // Pre-existing, but the Layer 1 disconnect (docs/decisions/2026-07-15-remove-ai-chat-layer1.md)
+    // promoted it from edge case to the DEFAULT free-tier experience: L1 used to answer «добавь
+    // молоко» for 0 credits and never reached Layer 2. The ADR priced the disconnect as "free users
+    // hit the paywall on the core action" — this is the code failing to charge that accepted price.
+    //
+    // These tests enter through the classifier API (see [makeVmOutOfCredits]) so they assert the
+    // user-visible + Amplitude-visible contract without naming the repository's internal fix.
+
+    // ── R1. The user is told the wallet is empty, not that they were unclear ──
+
+    @Test
+    fun sendClick_layer2InsufficientCredits_tellsUserCreditsRanOutInsteadOfBlamingTheirPhrasing() = runTest {
+        val vm = makeVmOutOfCredits()
+
+        // sideEffect is a replay=0 SharedFlow — subscribe BEFORE the send or the assert goes vacuous.
+        val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            vm.sideEffect.first()
+        }
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+
+        val effect = effectDeferred.await()
+        val message = assertIs<ChatScreenSideEffect.ShowAssistantMessage>(
+            effect,
+            "A refused turn must answer in the chat, not vanish or snackbar; got $effect",
+        )
+        assertEquals(
+            "chat_insufficient_credits",
+            message.messageKey,
+            "Out of credits must say so. chat_unknown_intent_hint blames the user's phrasing for a " +
+                "billing state — and the string chat_insufficient_credits already exists (EN+RU, " +
+                "wired in App.kt:825 + ChatRoute.kt:247)",
+        )
+        assertNull(
+            message.askAiForText,
+            "The 'Ask AI' button must NOT be offered here: it asks an empty wallet for 3 more " +
+                "credits, 402s again, and is how the user currently has to discover the truth",
+        )
+    }
+
+    // ── R2. The refused turn is reported honestly to Amplitude ───────────────
+    //
+    // ChatViewModel:775 reports outcome="answer" for this turn (there was no answer) and
+    // creditsForLayer(Classifier)=1 (nothing was charged — 402 IS the refusal). So the outcome
+    // distribution is polluted and credits_used over-counts every refusal.
+    // "insufficient_credits" is not a new vocabulary word: the voice path already reports exactly
+    // that on the same condition (ChatViewModel:1964).
+
+    @Test
+    fun sendClick_layer2InsufficientCredits_reportsInsufficientCreditsOutcomeAndZeroCreditsUsed() = runTest {
+        val analytics = FakeAnalyticsTracker()
+        val vm = makeVmOutOfCredits(analytics = analytics)
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        val params = analytics.paramsOf("ai_chat_response_received")
+        assertNotNull(params, "The refused turn must still close the funnel, not go unreported")
+        assertEquals(
+            "insufficient_credits",
+            params["outcome"],
+            "The user got no answer — reporting outcome='answer' hides every paywall-worthy " +
+                "refusal inside the success bucket",
+        )
+        assertEquals(
+            0,
+            params["credits_used"],
+            "402 means the server charged nothing; billing this turn 1 credit inflates the " +
+                "credits_used sum by every refusal",
+        )
+    }
+
+    // ── R3. The refused turn is not persisted as a paid one ──────────────────
+    //
+    // Same lie, second surface: ChatViewModel:750-757 prices the user message off the LAYER alone
+    // (Classifier → 1), so Room keeps a history row claiming this turn cost a credit.
+    // Paired with test #9 (a SUCCESSFUL Classifier turn must stay costCredits=1), this pins the
+    // fix to the refusal itself — re-pricing the whole Classifier layer to 0 turns #9 red.
+
+    @Test
+    fun sendClick_layer2InsufficientCredits_userMessageCostCreditsIsZero() = runTest {
+        val vm = makeVmOutOfCredits()
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        val userMsg = vm.screenState.value.messages.first()
+        assertEquals(
+            0,
+            userMsg.costCredits,
+            "A 402'd turn charged the user nothing — persisting costCredits=1 makes the chat's own " +
+                "history disagree with the wallet",
+        )
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Green coverage — the paywall CTA on the out-of-credits reply (2026-07-16)
+    // ══════════════════════════════════════════════════════════════════════════
+    //
+    // The owner's ask: "пусть ии возвращает текстом ответ что недостаточно кредитов и показывает
+    // кнопку become pro and get 300 credits now and every day". The reply text is asserted by the
+    // RED tests above; these pin the CTA — the conversion moment the Layer 1 disconnect was
+    // accepted to buy (docs/decisions/2026-07-15-remove-ai-chat-layer1.md).
+
+    // ── G1. The refusal carries a paywall CTA, and its number comes from Remote Config ──
+    //
+    // "300" is the Premium daily allowance (RC ai_daily_limit_premium), NOT a constant: the label
+    // promises a specific number to a user about to pay for it, so a hardcoded one turns into a
+    // false promise the day the limit is retuned. The fake therefore serves a NON-default value —
+    // with an echo-the-default fake (300) a hardcoded 300 would look identical and this test would
+    // prove nothing.
+
+    @Test
+    fun sendClick_layer2InsufficientCredits_offersPaywallCtaWithRemoteConfigCreditAllowance() = runTest {
+        val vm = makeVmOutOfCredits(
+            remoteConfig = HarnessRemoteConfigProvider(
+                longs = mapOf(RemoteConfigKeys.AI_DAILY_LIMIT_PREMIUM to 777L),
+            ),
+        )
+
+        val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            vm.sideEffect.first()
+        }
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("add milk"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+
+        val message = assertIs<ChatScreenSideEffect.ShowAssistantMessage>(effectDeferred.await())
+        assertEquals(
+            777,
+            message.paywallCtaCredits,
+            "The CTA advertises the Premium daily allowance, which lives in Remote Config " +
+                "(ai_daily_limit_premium). A hardcoded number silently lies once that key moves",
+        )
+    }
+
+    // ── G2. The CTA survives the ChatRoute round-trip onto the bubble ─────────
+    //
+    // ShowAssistantMessage is resolved to text by the host (ChatRoute / App.kt dock) and sent back
+    // as AppendAssistantMessage. A field dropped in that round-trip renders a bubble with no
+    // button — the message would say "upgrade to Premium" and offer no way to do it.
+
+    @Test
+    fun appendAssistantMessage_withPaywallCta_bubbleCarriesItForRendering() = runTest {
+        val vm = makeVm()
+
+        vm.sendIntent(
+            ChatScreenIntent.AppendAssistantMessage(
+                text = "Not enough credits for AI assist.",
+                paywallCtaCredits = 300,
+            )
+        )
+        testScheduler.advanceUntilIdle()
+
+        val assistantMsg = vm.screenState.value.messages.last()
+        assertEquals(
+            300,
+            assistantMsg.paywallCtaCredits,
+            "ChatMessageBubble shows the CTA off this field; dropping it in the host round-trip " +
+                "leaves the user told to upgrade with nothing to tap",
+        )
+    }
+
+    // ── G3. Tapping the CTA navigates to the paywall, attributed to the limit ──
+    //
+    // The source tag is load-bearing, not decoration. The Layer 1 disconnect
+    // (docs/decisions/2026-07-15-remove-ai-chat-layer1.md) lists "paywall_shown with source=chat —
+    // expect a rise in users hitting the limit" as the signal it is judged on, and the owner
+    // accepted "free users hit the paywall on the core action" as its price. If this tap reports
+    // the same source as the credits chip, the funnel merges a user who RAN OUT mid-turn with one
+    // who tapped the balance out of curiosity — and the ADR's question gets answered with a number
+    // that cannot answer it. Same failure class as checklist_created / folder_deleted: the metric
+    // keeps its name and quietly changes meaning.
+
+    @Test
+    fun onPaywallCtaClick_navigatesToPaywallAttributedToCreditExhaustionNotTheChip() = runTest {
+        val vm = makeVm()
+
+        val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            vm.sideEffect.first()
+        }
+
+        vm.sendIntent(ChatScreenIntent.OnPaywallCtaClick)
+
+        val effect = assertIs<ChatScreenSideEffect.NavigateToPaywall>(
+            effectDeferred.await(),
+            "The CTA must reach the paywall — both hosts (ChatRoute + the App.kt dock) observe " +
+                "this effect. Without it the button is decoration on a conversion moment",
+        )
+        assertEquals(
+            "chat_insufficient_credits",
+            effect.source,
+            "paywall_shown must show WHY the user arrived. Literal, not the constant, on purpose: " +
+                "this string is an Amplitude dimension — renaming the constant is free, renaming " +
+                "the wire value silently breaks every saved chart built on it",
+        )
+        assertNotEquals(
+            ChatScreenSideEffect.NavigateToPaywall.SOURCE_CREDITS_CHIP,
+            effect.source,
+            "Hitting the credit limit is not the same event as tapping the credits chip; the " +
+                "disconnect's whole cost/benefit read depends on separating them",
+        )
+    }
+
+    // ── G4. The reject flow ("I meant something else") answers a 402 the same way ──
+    //
+    // Second classify() call-site (escalateChoice, skipLayer1=true). It can 402 exactly like the
+    // send path, and before 2026-07-16 the refusal arrived as Unknown and fell into the
+    // runAgentTurn branch: a silent 3-credit request to a wallet that had just refused 1. The user
+    // saw a generic error and paid for the privilege.
+    //
+    // Reachable today only via a Local-source choice (which the parked Layer 1 no longer mints),
+    // so this is also the guard that re-routing L1 does not re-open the hole.
+
+    @Test
+    fun onPreviewReject_layer2InsufficientCredits_tellsUserAndDoesNotBillAgentTurn() = runTest {
+        val repo = FakeAiChatRepository(
+            // First classify → a Local-source question, so tapping "escape" re-classifies.
+            classifyResult = deleteClassification(layer = RoutingLayer.Local),
+            // The re-classify (skipLayer1=true) hits the empty wallet.
+            skipLayer1Result = IntentClassification(
+                intent = ChatIntent.InsufficientCredits,
+                confidence = 1.0f,
+                layer = RoutingLayer.Classifier,
+                preBuiltToolCall = null,
+            ),
+        )
+        val vm = makeVm(repo = repo)
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("delete milk from shopping"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        assertNotNull(vm.screenState.value.pendingChoice)
+
+        val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            vm.sideEffect.first()
+        }
+
+        vm.sendIntent(ChatScreenIntent.OnChoiceSelected("escape"))
+        testScheduler.advanceUntilIdle()
+
+        val message = assertIs<ChatScreenSideEffect.ShowAssistantMessage>(
+            effectDeferred.await(),
+            "A 402 on the reject path must answer in the chat, not fail silently",
+        )
+        assertEquals("chat_insufficient_credits", message.messageKey)
+        assertNotNull(message.paywallCtaCredits, "The reject path offers the same paywall CTA")
+        assertEquals(
+            0,
+            repo.agentStepCallCount,
+            "Escalating to the agent here bills 3 credits to a wallet that just refused 1 — the " +
+                "quiet version of the same bug",
+        )
+        assertFalse(vm.screenState.value.isProcessing, "The turn is over — the spinner must stop")
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // G5-G6. The SAME wall on Layer 3 — Deep Thinking ON (2026-07-16)
+    // ══════════════════════════════════════════════════════════════════════════
+    //
+    // Found by @bug-pattern-reviewer AFTER the Layer 2 fix shipped: the classify path was fixed
+    // and its Layer 3 sibling was left with all three defects intact (CTA-less snackbar,
+    // outcome="error", credits_used=3 on a turn charged 0). That is the recurring shape — "fixed
+    // one emit site, the sibling kept the bug" — so these tests exist to hold the LAYER 3 door
+    // shut, not just to cover a branch.
+    //
+    // This is a live path, not a corner: Deep Thinking ON skips Layer 2 by design and lands here
+    // directly. The likeliest repro is a free user with 1-2 credits — Layer 2 passes and takes 1,
+    // Layer 3 wants 3 → 402.
+
+    // ── G5. Layer 3 refusal answers with the CTA, like Layer 2 does ──────────
+
+    @Test
+    fun deepThinkingSend_layer3InsufficientCredits_showsSameCtaReplyAsLayer2() = runTest {
+        val vm = makeVmDeepThinkingOutOfCredits()
+
+        val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            vm.sideEffect.first()
+        }
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("what should I pack for a trip?"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+
+        val message = assertIs<ChatScreenSideEffect.ShowAssistantMessage>(
+            effectDeferred.await(),
+            "A refused Layer 3 turn must answer in the chat. A ShowSnackbar here is the shipped " +
+                "bug: it vanishes, carries no button, and the owner asked for the Become Pro CTA " +
+                "on the out-of-credits reply — on every path that can produce one",
+        )
+        assertEquals("chat_insufficient_credits", message.messageKey)
+        assertNotNull(
+            message.paywallCtaCredits,
+            "Out of credits on Layer 3 is the same conversion moment as on Layer 2 — a snackbar " +
+                "tells the user to upgrade and gives them nothing to tap",
+        )
+        assertNull(message.askAiForText, "Never offer 'Ask AI' to an empty wallet")
+    }
+
+    // ── G6. Layer 3 refusal is reported honestly ─────────────────────────────
+    //
+    // outcome="error" buried every credit refusal in the same bucket as "the agent crashed", and
+    // credits_used defaults to creditsForLayer(FullChat)=3 — inflating the sum by 3 per refusal
+    // on a turn the server charged 0 for. routed_layer must still say FullChat: the funnel needs
+    // to tell a 1-credit refusal from a 3-credit one even though both charged nothing.
+
+    @Test
+    fun deepThinkingSend_layer3InsufficientCredits_reportsRefusalNotErrorAndZeroCreditsUsed() = runTest {
+        val analytics = FakeAnalyticsTracker()
+        val vm = makeVmDeepThinkingOutOfCredits(analytics = analytics)
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("what should I pack for a trip?"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        val params = analytics.paramsOf("ai_chat_response_received")
+        assertNotNull(params, "The refused turn must still close the funnel")
+        assertEquals(
+            "insufficient_credits",
+            params["outcome"],
+            "outcome='error' cannot distinguish 'out of credits' from 'the AI fell over' — one " +
+                "needs a paywall, the other needs an on-call",
+        )
+        assertEquals(
+            0,
+            params["credits_used"],
+            "402 means the server charged nothing; the FullChat list price (3) is what the turn " +
+                "WOULD have cost, not what it did",
+        )
+        assertEquals(
+            "FullChat",
+            params["routed_layer"],
+            "The refusal happened on Layer 3 and the funnel should say so",
+        )
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Stage 3 — the chat remembers its tool rounds across turns (and restarts)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    // ── 60. A completed tool round is persisted, then restored into the NEXT turn's seed ──
+
+    @Test
+    fun agentTurn_persistsToolRound_andRestoresItIntoTheNextTurnTranscript() = runTest {
+        val readCall = AgentToolCall(
+            id = "call-1",
+            name = "read_checklist",
+            args = buildJsonObject { put("name", "Shopping") },
+        )
+        // Turn 1: read-only tool round (dispatched with no plan-card) → Final.
+        // Turn 2: a plain Final. The 3rd agentStep is turn 2's FIRST round — its seed must carry
+        // turn 1's rounds spliced back in.
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.FreeForm,
+                confidence = 1.0f,
+                layer = RoutingLayer.FullChat,
+            ),
+            agentStepResults = listOf(
+                AgentStepResult.ToolCalls(calls = listOf(readCall), creditsRemaining = 297),
+                AgentStepResult.Final(content = "Shopping has 3 items.", creditsRemaining = 297),
+                AgentStepResult.Final(content = "You are welcome.", creditsRemaining = 294),
+            ),
+        )
+        val transcriptRepo = FakeAgentTranscript()
+        val vm = makeVm(
+            repo = repo,
+            dispatcher = FakeToolCallDispatcher(
+                outcome = DispatchOutcome.ChecklistContent(checklistName = "Shopping", items = emptyList()),
+            ),
+            agentTranscriptRepo = transcriptRepo,
+        )
+
+        // Turn 1
+        vm.sendIntent(ChatScreenIntent.OnInputChange("what is in shopping?"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(1, transcriptRepo.appendedTurnIds.size,
+            "the read round of turn 1 must be persisted exactly once")
+
+        // Turn 2
+        vm.sendIntent(ChatScreenIntent.OnInputChange("thanks"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        val turn2Seed = repo.agentStepTranscripts[2]
+        val hasRestoredRound = turn2Seed.any { it is AgentTranscriptEntry.ModelToolCalls } &&
+            turn2Seed.any { it is AgentTranscriptEntry.ToolResults }
+        assertTrue(hasRestoredRound,
+            "turn 2's seed must splice back turn 1's persisted tool round — that is the memory")
+
+        // Pairing invariant survives the restore: a ToolResults is never orphaned.
+        val calls = turn2Seed.count { it is AgentTranscriptEntry.ModelToolCalls }
+        val results = turn2Seed.count { it is AgentTranscriptEntry.ToolResults }
+        assertEquals(calls, results, "restored transcript must keep call↔results pairs balanced")
+    }
+
+    // ── 61. request_id is stable across a turn's rounds, and differs between turns ──
+
+    @Test
+    fun agentTurn_requestId_isStableWithinATurn_andFreshPerTurn() = runTest {
+        val readCall = AgentToolCall(
+            id = "call-1",
+            name = "read_checklist",
+            args = buildJsonObject { put("name", "Shopping") },
+        )
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.FreeForm,
+                confidence = 1.0f,
+                layer = RoutingLayer.FullChat,
+            ),
+            agentStepResults = listOf(
+                // Turn 1 spans two rounds (ToolCalls then Final) → two agentStep calls.
+                AgentStepResult.ToolCalls(calls = listOf(readCall), creditsRemaining = 297),
+                AgentStepResult.Final(content = "Shopping has 3 items.", creditsRemaining = 297),
+                // Turn 2 is a single round.
+                AgentStepResult.Final(content = "You are welcome.", creditsRemaining = 294),
+            ),
+        )
+        val vm = makeVm(
+            repo = repo,
+            dispatcher = FakeToolCallDispatcher(
+                outcome = DispatchOutcome.ChecklistContent(checklistName = "Shopping", items = emptyList()),
+            ),
+        )
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("what is in shopping?"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("thanks"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        val ids = repo.agentStepRequestIds
+        assertEquals(3, ids.size, "three agentStep calls expected (2 for turn 1, 1 for turn 2)")
+        assertTrue(ids.all { it != null && it.isNotBlank() }, "every round must carry a request_id")
+
+        // Same turn → same key (a transport retry of round 2 must not re-charge).
+        assertEquals(ids[0], ids[1], "both rounds of turn 1 must share one request_id")
+        // New turn → new key (else the server reads it as a replay and the turn is free).
+        assertNotEquals(ids[1], ids[2], "turn 2 must mint a fresh request_id")
+    }
+
+    // ── 62. Clear chat wipes the agent's tool memory too, not just the visible prose ──
+
+    @Test
+    fun clearChat_alsoClearsAgentTranscript() = runTest {
+        val readCall = AgentToolCall(
+            id = "call-1",
+            name = "read_checklist",
+            args = buildJsonObject { put("name", "Shopping") },
+        )
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.FreeForm,
+                confidence = 1.0f,
+                layer = RoutingLayer.FullChat,
+            ),
+            agentStepResults = listOf(
+                AgentStepResult.ToolCalls(calls = listOf(readCall), creditsRemaining = 297),
+                AgentStepResult.Final(content = "Shopping has 3 items.", creditsRemaining = 297),
+            ),
+        )
+        val transcriptRepo = FakeAgentTranscript()
+        val vm = makeVm(
+            repo = repo,
+            dispatcher = FakeToolCallDispatcher(
+                outcome = DispatchOutcome.ChecklistContent(checklistName = "Shopping", items = emptyList()),
+            ),
+            agentTranscriptRepo = transcriptRepo,
+        )
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("what is in shopping?"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+        assertTrue(transcriptRepo.appendedTurnIds.isNotEmpty(), "precondition: a round was stored")
+
+        vm.sendIntent(ChatScreenIntent.OnClearChat)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(emptyMap(), transcriptRepo.loadForTurns(transcriptRepo.appendedTurnIds),
+            "Clear chat must leave no tool memory behind the wiped conversation")
     }
 }

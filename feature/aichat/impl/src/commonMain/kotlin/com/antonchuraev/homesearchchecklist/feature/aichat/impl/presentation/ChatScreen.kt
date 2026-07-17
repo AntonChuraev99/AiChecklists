@@ -221,6 +221,8 @@ fun ChatScreen(
             },
             onClearChat = { onIntent(ChatScreenIntent.OnClearChat) },
             onDismiss = { onIntent(ChatScreenIntent.OnSettingsDismiss) },
+            defaultChecklistName = state.defaultChecklistName,
+            onResetDefaultChecklist = { onIntent(ChatScreenIntent.OnResetDefaultChecklist) },
         )
     }
 
@@ -318,10 +320,13 @@ fun ChatContent(
             onRemove = { path -> onIntent(ChatScreenIntent.OnRemoveAttachment(path)) },
         )
 
-        // Input row — pinned above the keyboard. Hidden while a choice block is shown:
-        // the chips (incl. "Something else" escape, which dismisses → input returns) are the
-        // only interaction during a pending choice, so a parallel text field is noise.
-        if (state.pendingChoice == null) {
+        // Input row — pinned above the keyboard. Hidden while a QUESTION is pending: its chips
+        // (incl. the "Something else" escape, which dismisses → input returns) are the only
+        // interaction, so a parallel text field is noise.
+        // A post-action offer (Undo / move) is NOT a question — it has no escape chip, so hiding
+        // the input there left no way out but Back (which collapses the dock). Keep typing enabled;
+        // sending a new message clears the offer.
+        if (state.pendingChoice == null || state.pendingChoice.isPostAction) {
             ChatInputRow(
                 text = state.inputText,
                 onTextChange = { onIntent(ChatScreenIntent.OnInputChange(it)) },
@@ -427,6 +432,11 @@ fun ChatMessageList(
                     onEditChange = { onIntent(ChatScreenIntent.OnChoiceEditChange(it)) },
                     onEditConfirm = { onIntent(ChatScreenIntent.OnChoiceEditConfirmed) },
                     modifier = Modifier.padding(bottom = AppDimens.SpacingSm),
+                    // Full-height screen: the whole preview fits, no dock cap to respect.
+                    compact = false,
+                    onMemoryToggle = { enabled ->
+                        onIntent(ChatScreenIntent.OnChoiceMemoryToggle(enabled))
+                    },
                 )
             }
         }
@@ -444,6 +454,9 @@ fun ChatMessageList(
                 },
                 onAskAiFallback = message.askAiForText?.let { text ->
                     { onIntent(ChatScreenIntent.OnAskAiFallback(text)) }
+                },
+                onPaywallCta = message.paywallCtaCredits?.let {
+                    { onIntent(ChatScreenIntent.OnPaywallCtaClick) }
                 },
                 showSenderLabel = message.role == ChatRole.Assistant,
             )

@@ -39,6 +39,7 @@ from flask import request as flask_request  # global request context for CORS or
 import cors  # local module: CORS origin whitelist (unit-testable without firebase_admin)
 from generated_items import MAX_FOLDER_DEPTH, sanitize_generated_items  # nested AI-item sanitizer (unit-testable)
 from credits_logic import reservation_decision  # local module: reserve-credits branch (unit-testable)
+from chat_agent_logic import scan_current_turn  # local module: chat_agent turn boundary (unit-testable)
 import push_promotions  # local module: promo-push audience filter / copy A/B / payload (unit-testable)
 
 # Module logger — replaces bare print(); logger.exception() in except blocks emits the
@@ -636,10 +637,19 @@ def get_user_premium_status(user_id: str) -> bool:
     return user_data.get("is_premium", False)
 
 
-def reserve_credits(user_id: str, request_id: str | None = None) -> int | None:
-    """
-    Atomically check and deduct credits in a single Firestore transaction.
-    Returns new remaining count, or None if insufficient credits.
+def reserve_credits_with_action(
+    user_id: str, cost: int, request_id: str | None = None
+) -> tuple[str, int | None]:
+    """Atomically check-and-deduct [cost] credits in a single Firestore transaction.
+
+    Returns (action, value) — the raw verdict from reservation_decision:
+        ("reserve", new_balance)  -> THIS call deducted the cost.
+        ("replay", recorded)      -> same (user_id, request_id) already paid; nothing deducted.
+        ("insufficient", None) / ("no_user", None) -> caller returns 402.
+
+    Callers that may refund MUST branch on the action, not just the balance: only a
+    "reserve" may be refunded. Refunding a "replay" would hand back credits deducted by a
+    DIFFERENT invocation — and two racing replays would each refund, minting credits.
 
     When [request_id] is provided (client-generated UUID, stable across HTTP retries of
     the same logical action), the reservation is idempotent: a repeat of the same
@@ -647,9 +657,10 @@ def reserve_credits(user_id: str, request_id: str | None = None) -> int | None:
     This closes the double-charge window where the client retries a transport exception
     AFTER the server already reserved + returned 200 but the client never received it.
     Old clients omit request_id → falls back to the original non-deduped behaviour.
+
+    [cost] is passed in rather than read from Remote Config because the flows differ:
+    analyze/generate charge action_cost (~30), chat charges a flat CHAT_AGENT_COST (3).
     """
-    config = get_credits_config()
-    cost = config["action_cost"]
     user_ref = db.collection("users").document(user_id)
     # Namespace the dedup doc by user so two users' request_ids can never collide. request_id
     # is a UUID from the client (no "/"), safe as a Firestore doc id.
@@ -668,7 +679,7 @@ def reserve_credits(user_id: str, request_id: str | None = None) -> int | None:
 
         action, value = reservation_decision(snapshot.exists, current, cost, prior_remaining)
         if action != "reserve":
-            return value  # no_user/insufficient -> None; replay -> recorded remaining
+            return action, value  # no_user/insufficient -> None; replay -> recorded remaining
 
         now_iso = datetime.now(timezone.utc).isoformat()
         transaction.update(user_ref, {"ai_credits": value, "updated_at": now_iso})
@@ -680,9 +691,20 @@ def reserve_credits(user_id: str, request_id: str | None = None) -> int | None:
                 "remaining_after": value,
                 "reserved_at": now_iso,
             })
-        return value
+        return action, value
 
     return txn(db.transaction())
+
+
+def reserve_credits(user_id: str, request_id: str | None = None) -> int | None:
+    """Reserve the Remote-Config action_cost (analyze / generate flows).
+
+    Thin wrapper over reserve_credits_with_action that keeps the original
+    balance-or-None contract for callers that never need the fresh-vs-replay distinction.
+    """
+    cost = get_credits_config()["action_cost"]
+    _action, value = reserve_credits_with_action(user_id, cost, request_id)
+    return value
 
 
 def refund_credits(user_id: str, amount: int, reason: str, request_id: str | None = None) -> bool:
@@ -2844,6 +2866,28 @@ CHAT_AGENT_MAX_CHECKLISTS = 8           # context summary items from client
 CHAT_AGENT_MAX_OPTIONS = 6              # present_options chip cap (mirrors client MAX_CHOICE_OPTIONS)
 CHAT_AGENT_MIN_OPTIONS = 2             # present_options needs >=2 usable labels to render chips
 
+# ⚠️ CHAT_AGENT_COST MUST stay == CHAT_COMPLETION_COST (both 3). chat_agent's no-request_id path
+# reserves via reserve_chat_completion_credits (CHAT_COMPLETION_COST) — that IS today's production
+# path, deliberately left byte-for-byte alone — while the request_id path reserves CHAT_AGENT_COST.
+# Drifting the two would make a turn's price depend on whether the client sent a request_id.
+# Locked by tests/test_chat_agent_turn_boundary.py::test_both_reserve_paths_charge_the_same_cost
+# (a test, not an import-time assert: main.py hosts every endpoint, so a failed import here would
+# take down all Cloud Functions instead of one flow).
+
+
+def reserve_chat_agent_credits(
+    user_id: str, request_id: str | None = None
+) -> tuple[str, int | None]:
+    """Reserve CHAT_AGENT_COST for one chat turn, idempotently when [request_id] is given.
+
+    Reuses the generic credit_reservations machinery (reservation_decision + the
+    "{user_id}__{request_id}" dedup doc) rather than adding a second, chat-only dedup scheme.
+    Returns (action, balance) — see reserve_credits_with_action; only ("reserve", ...) may be
+    refunded.
+    """
+    return reserve_credits_with_action(user_id, CHAT_AGENT_COST, request_id)
+
+
 # Tool names the agent may emit. The client's ToolCallDispatcher MUST be able to
 # execute every name here (server catalog == client capability). Phase 2 core set
 # — closes findings #1/#2. Phase 3/5 extend this list as the dispatcher grows.
@@ -3169,6 +3213,9 @@ def chat_agent(request: Request):
     Request body:
     {
         "user_id": "string",
+        "request_id": "uuid",                   # optional — stable per TURN across transport
+                                                # retries; makes the reserve idempotent.
+                                                # Omitted -> legacy non-deduped reserve.
         "locale": "ru" | "en",
         "timezone_offset_minutes": -720..840,
         "checklists_summary": [{"name": "...", "totalItems": N, "doneItems": N}, ...],
@@ -3189,8 +3236,12 @@ def chat_agent(request: Request):
         402 -> insufficient credits (first round only)
         500 -> Gemini failure (credits refunded if reserved this round)
 
-    Credits: CHAT_AGENT_COST reserved ONCE per turn, on the first round only
-    (transcript has no `tool` turn yet). Subsequent rounds reserve 0.
+    Credits: CHAT_AGENT_COST reserved ONCE per turn, on the first round only — i.e. when no
+    `tool` turn has come back AFTER the last `user` entry. Subsequent rounds of the same turn
+    reserve 0. The boundary is the CURRENT turn, not the whole transcript: a persisted
+    transcript carries past turns' tool entries, and reading those as "mid-turn" would make
+    every turn of the session free. Refund on Gemini failure only when this call actually
+    deducted (never on an idempotent replay).
     """
     if request.method == "OPTIONS":
         return cors_preflight_ok()
@@ -3215,13 +3266,9 @@ def chat_agent(request: Request):
             f"transcript too long (max {CHAT_AGENT_MAX_TRANSCRIPT_ENTRIES} entries)", 400
         )
 
-    # Size guard — sum of all user/model text (tool results can be large but are
+    # Validation + size guard — sum of all user text (tool results can be large but are
     # machine data, so we only cap human-authored text here).
     total_chars = 0
-    has_tool_turn = False
-    # Counts only AGENTIC rounds (model turns that requested tools), NOT conversational
-    # history seeded as plain model prose — see the per-request cap below for why.
-    agent_round_count = 0
     for entry in transcript:
         if not isinstance(entry, dict):
             return create_error_response("each transcript entry must be an object", 400)
@@ -3230,22 +3277,23 @@ def chat_agent(request: Request):
             return create_error_response("transcript role must be user/model/tool", 400)
         if role == "user":
             total_chars += len(entry.get("text") or "")
-        elif role == "model":
-            # Only model turns that requested tools (have a tool_calls list) are real
-            # agentic rounds. The client also seeds prior assistant prose as role="model"
-            # text (ModelText, no tool_calls) so the agent has conversation context for
-            # referential confirmations ("да, добавь все"). Counting that history would
-            # trip the cap on every new message once a chat has CHAT_AGENT_MAX_ROUNDS+
-            # assistant replies — returning the round-limit message before Gemini is even
-            # called. So count only tool-call rounds here.
-            if entry.get("tool_calls"):
-                agent_round_count += 1
-        elif role == "tool":
-            has_tool_turn = True
     if total_chars > CHAT_AGENT_MAX_TOTAL_CHARS:
         return create_error_response(
             f"transcript text exceeds {CHAT_AGENT_MAX_TOTAL_CHARS} chars cap", 400
         )
+
+    # Both numbers are scoped to the CURRENT turn — everything after the last role="user"
+    # entry. Measuring them over the whole array is only equivalent while the transcript is
+    # rebuilt from message text each turn (today's store clients); with a persisted transcript
+    # past turns arrive WITH their tool entries, and whole-array readings break in two ways:
+    # every turn of a session that ever ran a tool would look mid-turn => never charged, and
+    # 5 tool rounds accumulated over a session's lifetime would trip the per-TURN round cap on
+    # every new message. See chat_agent_logic.scan_current_turn.
+    #
+    # agent_round_count counts only model turns that requested tools. Prior assistant prose
+    # (role="model" text, no tool_calls) is seeded as conversation context so the agent can
+    # resolve referential confirmations ("да, добавь все") — it is not a round.
+    is_first_round, agent_round_count = scan_current_turn(transcript)
 
     locale = (data.get("locale") or "en").strip().lower()
     if locale not in ("ru", "en"):
@@ -3279,14 +3327,24 @@ def chat_agent(request: Request):
             "credits_remaining": get_user_credits(user_id),
         })
 
-    # Credits (D2): charge the flat per-turn cost ONLY on the first round.
-    is_first_round = not has_tool_turn
+    # Credits (D2): charge the flat per-turn cost ONLY on the first round OF THIS TURN.
+    #
+    # request_id is OPTIONAL and additive. Store clients (Android vc67, web) do not send it and
+    # keep the exact legacy path — same function, same cost, same 402. A client that DOES send a
+    # stable id per turn gets a replay-safe reserve: retrying a dropped 200 no longer pays twice.
+    request_id = (data.get("request_id") or "").strip() or None
     reserved_this_round = False
     if is_first_round:
-        new_credits = reserve_chat_completion_credits(user_id)
+        if request_id:
+            action, new_credits = reserve_chat_agent_credits(user_id, request_id)
+        else:
+            new_credits = reserve_chat_completion_credits(user_id)
+            action = "reserve" if new_credits is not None else "insufficient"
         if new_credits is None:
             return create_error_response("insufficient credits", 402)
-        reserved_this_round = True
+        # Refund only what THIS invocation deducted: a replay deducted nothing, so refunding it
+        # would return credits charged by the earlier call AND roll back its dedup doc.
+        reserved_this_round = (action == "reserve")
         credits_remaining = new_credits
     else:
         credits_remaining = get_user_credits(user_id)
@@ -3404,10 +3462,14 @@ def chat_agent(request: Request):
 
     except Exception as e:
         logger.exception("chat_agent: gemini agent step failed for user=%s", user_id[:8])
-        # Refund only if WE reserved on this round (first round). Later rounds
-        # never charged, so there is nothing to refund.
+        # Refund only if WE freshly reserved on this round. Later rounds never charged, and a
+        # replay was charged by an earlier invocation — neither has anything to give back.
         if reserved_this_round:
-            refund_chat_completion_credits(
-                user_id, reason=f"chat_agent_gemini_failure: {type(e).__name__}"
-            )
+            reason = f"chat_agent_gemini_failure: {type(e).__name__}"
+            if request_id:
+                # Also drops the credit_reservations doc, so the client's retry re-reserves
+                # cleanly instead of replaying a reservation we just rolled back (a free turn).
+                refund_credits(user_id, CHAT_AGENT_COST, reason, request_id)
+            else:
+                refund_chat_completion_credits(user_id, reason=reason)
         return create_error_response(f"agent step failed: {str(e)}", 500)

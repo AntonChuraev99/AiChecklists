@@ -21,6 +21,13 @@ sealed interface DispatchOutcome {
          * Surfaced in [ChatMessageBubble] as an "Open checklist" deeplink button.
          */
         val linkedChecklistId: Long? = null,
+        /**
+         * Id-based snapshot of this mutation when it is reversible — non-null ONLY for
+         * AddItem / CompleteItem (and the add half of a move). Its presence is what lets the
+         * chat auto-apply the action and offer an "Undo" chip afterwards instead of asking
+         * for confirmation first. Null for every irreversible / non-undoable operation.
+         */
+        val undo: UndoHandle? = null,
     ) : DispatchOutcome
 
     data class AmbiguousMatch(val candidates: List<String>) : DispatchOutcome
