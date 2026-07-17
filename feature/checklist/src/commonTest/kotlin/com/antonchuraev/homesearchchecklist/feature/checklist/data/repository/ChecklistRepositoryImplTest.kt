@@ -256,6 +256,61 @@ class ChecklistRepositoryImplTest {
         )
     }
 
+    // ─── Tests: deleteCompletedItems removes only checked rows (dual-write) ────
+
+    @Test
+    fun deleteCompletedItems_removesCheckedFromFillAndTemplate_keepsUnchecked_returnsCount() = runTest {
+        val milk = ChecklistItem(text = "Milk")
+        val bread = ChecklistItem(text = "Bread")
+        val eggs = ChecklistItem(text = "Eggs")
+        val checklist = Checklist(id = 1L, name = "Groceries", items = listOf(milk, bread, eggs))
+        checklistDao.checklists.add(checklist.toEntityRow())
+        fillDao.fills.add(
+            defaultFillRow(
+                id = 10L,
+                checklistId = 1L,
+                items = listOf(
+                    ChecklistFillItem(text = "Milk", checked = true, templateItemId = milk.id),
+                    ChecklistFillItem(text = "Bread", checked = true, templateItemId = bread.id),
+                    ChecklistFillItem(text = "Eggs", checked = false, templateItemId = eggs.id),
+                ),
+            ),
+        )
+
+        val removed = newRepo().deleteCompletedItems(1L)
+
+        assertEquals(2, removed, "both checked rows are removed")
+        val savedFill = fillDao.fills.single { it.id == 10L }
+        assertEquals(listOf("Eggs"), savedFill.items.map { it.text }, "fill keeps only the unchecked row")
+        assertEquals(SyncStatus.PENDING_UPLOAD.value, savedFill.syncStatus, "the fill is marked dirty")
+        val savedTemplate = checklistDao.checklists.single { it.id == 1L }
+        assertEquals(
+            listOf("Eggs"),
+            savedTemplate.items.map { it.text },
+            "the template mirrors the removal by the stable link",
+        )
+        assertEquals(SyncStatus.PENDING_UPLOAD.value, savedTemplate.syncStatus, "the template is marked dirty")
+    }
+
+    @Test
+    fun deleteCompletedItems_noCheckedRows_isNoOpReturningZero() = runTest {
+        val milk = ChecklistItem(text = "Milk")
+        checklistDao.checklists.add(Checklist(id = 1L, name = "Groceries", items = listOf(milk)).toEntityRow())
+        fillDao.fills.add(
+            defaultFillRow(
+                id = 10L,
+                checklistId = 1L,
+                items = listOf(ChecklistFillItem(text = "Milk", checked = false, templateItemId = milk.id)),
+            ),
+        )
+
+        val removed = newRepo().deleteCompletedItems(1L)
+
+        assertEquals(0, removed, "nothing checked → nothing removed")
+        val savedFill = fillDao.fills.single { it.id == 10L }
+        assertEquals(SyncStatus.SYNCED.value, savedFill.syncStatus, "no checked rows → no write, the fill stays clean")
+    }
+
     // ─── System under test factory + fakes ───────────────────────────────────
 
     private val checklistDao = FakeChecklistDao()

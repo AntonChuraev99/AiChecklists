@@ -331,6 +331,33 @@ class ChecklistRepositoryImpl(
         }
     }
 
+    override suspend fun deleteCompletedItems(checklistId: Long): Int {
+        val fill = getDefaultFillOneShot(checklistId) ?: return 0
+        val completedItems = fill.items.filter { it.checked }
+        if (completedItems.isEmpty()) return 0
+
+        // Identify the template rows to drop. Prefer the stable link; fall back to text only for
+        // legacy fill rows without a link. Splitting the sets keeps the text fallback from also
+        // deleting a same-text sibling whose fill row was NOT checked.
+        val completedLinkIds = completedItems.mapNotNull { it.templateItemId }.toSet()
+        val completedLegacyTexts = completedItems.filter { it.templateItemId == null }.map { it.text }.toSet()
+
+        // Dual-write, same as the AI-chat dispatcher and ChecklistDetailViewModel:
+        // fill (detail screen) then template (edit screen). updateFill marks the fill dirty and
+        // touches the parent for sync; updateChecklistTemplate marks the template dirty.
+        updateFill(fill.copy(items = fill.items.filter { !it.checked }))
+
+        val checklist = getChecklistById(checklistId)
+        if (checklist != null) {
+            val remainingTemplateItems = checklist.items.filterNot { templateItem ->
+                templateItem.id in completedLinkIds || templateItem.text in completedLegacyTexts
+            }
+            updateChecklistTemplate(checklist.copy(items = remainingTemplateItems))
+        }
+
+        return completedItems.size
+    }
+
     // Attachments
 
     override suspend fun addAttachment(fillId: Long, itemId: String, attachment: Attachment) {

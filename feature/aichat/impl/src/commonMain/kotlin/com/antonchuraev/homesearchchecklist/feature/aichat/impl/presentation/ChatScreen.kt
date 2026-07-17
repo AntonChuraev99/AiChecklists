@@ -285,6 +285,9 @@ fun ChatContent(
     onNavigateToPaywall: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
+    // The mic press-and-hold gesture measures cancel-vs-commit in WINDOW coordinates (see
+    // ChatInputRow), so it stays correct even when this input Column slides down as the keyboard
+    // dismisses on record-start — plain `.imePadding()` is enough, no inset freeze required.
     Column(
         modifier = modifier
             .imePadding(),

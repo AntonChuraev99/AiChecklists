@@ -29,6 +29,22 @@ interface ChecklistRepository {
     fun observeChecklistById(id: Long): Flow<Checklist?>
     suspend fun reorderChecklists(orderedIds: List<Long>)
 
+    /**
+     * Removes every checked item from the checklist's default fill AND the mirrored template rows,
+     * returning the number of items removed (0 when nothing was checked).
+     *
+     * Dual-write (fill + template) so the detail screen and the edit screen stay in sync — the
+     * same pattern [ChecklistRepositoryImpl.togglePriority] and the AI-chat dispatcher use. Template
+     * rows are matched by the stable `templateItemId` link, falling back to text only for legacy
+     * fill rows without a link (so a same-text sibling whose fill row was NOT checked is preserved).
+     *
+     * Backs both the detail-screen "delete completed items" overflow action and the chat
+     * `clear_completed_items` tool. Default no-op returning 0 so the many inline test fakes need not
+     * override it; the real [com.antonchuraev.homesearchchecklist.feature.checklist.data.repository.ChecklistRepositoryImpl]
+     * overrides it.
+     */
+    suspend fun deleteCompletedItems(checklistId: Long): Int = 0
+
     // Display preferences
     suspend fun setSeparateCompleted(checklistId: Long, value: Boolean)
     suspend fun setAutoDeleteCompleted(checklistId: Long, value: Boolean)

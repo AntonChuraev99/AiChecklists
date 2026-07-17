@@ -1542,6 +1542,93 @@ class ChatViewModelTest {
         assertEquals("Done, added milk.", assistantMsgs.first().content)
     }
 
+    // ── 37b. clear_completed_items — ambiguous hint fires the which-list picker ──
+
+    @Test
+    fun agentLoop_clearCompleted_ambiguousHint_firesWhichListPicker() = runTest {
+        val clearCall = AgentToolCall(
+            id = "call-clear",
+            name = "clear_completed_items",
+            args = buildJsonObject { put("checklist_hint", "Покупки") },
+        )
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.FreeForm,
+                confidence = 1.0f,
+                layer = RoutingLayer.FullChat,
+            ),
+            agentStepResults = listOf(
+                AgentStepResult.ToolCalls(calls = listOf(clearCall), creditsRemaining = 297),
+                // Safety-net Final: the ambiguous clear ends the turn AT the picker before a second
+                // agentStep, so this must never be reached (asserted via agentStepCallCount below).
+                AgentStepResult.Final(content = "unreachable", creditsRemaining = 297),
+            ),
+        )
+        val fakeDispatcher = FakeToolCallDispatcher(
+            outcome = DispatchOutcome.AmbiguousMatch(listOf("Покупки дом", "Покупки офис")),
+        )
+        val vm = makeVm(repo = repo, dispatcher = fakeDispatcher)
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("удали выполненные из покупок"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        // Approve the batch → dispatch returns AmbiguousMatch → the which-list picker takes over.
+        vm.sendIntent(ChatScreenIntent.OnChoiceSelected("execute_all"))
+        testScheduler.advanceUntilIdle()
+
+        val picker = assertNotNull(
+            vm.screenState.value.pendingChoice,
+            "an ambiguous bulk clear must ask which list — never a prose question, never a guess",
+        )
+        val executeClears = picker.choice.options
+            .mapNotNull { (it.action as? ChoiceAction.Execute)?.toolCall }
+            .filterIsInstance<ToolCall.ClearCompleted>()
+        assertEquals(
+            listOf("Покупки дом", "Покупки офис"),
+            executeClears.map { it.checklistHint },
+            "each chip re-runs clear_completed against one specific candidate list",
+        )
+        assertEquals(
+            1,
+            repo.agentStepCallCount,
+            "the picker ends the turn; the loop must not continue nor serialize ambiguous back to Gemini",
+        )
+    }
+
+    // ── 37c. clear_completed_items is a bulk delete → flagged destructive ──
+
+    @Test
+    fun agentLoop_clearCompleted_planItemFlaggedDestructive() = runTest {
+        val clearCall = AgentToolCall(
+            id = "call-clear",
+            name = "clear_completed_items",
+            args = buildJsonObject { put("checklist_hint", "Shopping") },
+        )
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.FreeForm,
+                confidence = 1.0f,
+                layer = RoutingLayer.FullChat,
+            ),
+            agentStepResults = listOf(
+                AgentStepResult.ToolCalls(calls = listOf(clearCall), creditsRemaining = 297),
+                AgentStepResult.Final(content = "Cleared.", creditsRemaining = 297),
+            ),
+        )
+        val vm = makeVm(repo = repo, dispatcher = FakeToolCallDispatcher())
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("clear completed"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        val pending = assertNotNull(vm.screenState.value.pendingChoice)
+        assertTrue(
+            pending.batchItems?.first()?.isDestructive == true,
+            "clear_completed_items removes user data — it must be flagged destructive like delete_item",
+        )
+    }
+
     // ── 38. OnAgentPlanCancel → declined results sent, loop continues gracefully ──
 
     @Test

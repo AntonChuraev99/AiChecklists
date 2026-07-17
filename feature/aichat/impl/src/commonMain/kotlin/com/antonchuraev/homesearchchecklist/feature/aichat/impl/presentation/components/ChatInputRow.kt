@@ -55,8 +55,11 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.customActions
@@ -376,66 +379,85 @@ fun ChatInputRow(
         // fired. Recovery: read `isRecording` via `rememberUpdatedState` so the
         // coroutine sees the latest value without recomposition tearing down the modifier.
         val isRecordingLatest by rememberUpdatedState(isRecording)
+        // Live layout coordinates of the mic Box, kept fresh as the node moves. On record-start the
+        // field is disabled → the keyboard closes and, on the home dock, the dock auto-collapses
+        // Expanded→Peek — both slide this node DOWN under a stationary finger. Read ONLY inside the
+        // gesture coroutine (never in composition), so onGloballyPositioned updating it never recomposes.
+        var micLayoutCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
         val micGestureModifier = if (isMic || isRecording) {
-            Modifier.pointerInput(Unit) {
-                awaitEachGesture {
-                    val down = awaitFirstDown()
+            Modifier
+                .onGloballyPositioned { micLayoutCoordinates = it }
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown()
 
-                    // Tap while already recording → finish & save (NOT cancel).
-                    // Previously this path landed in audioRecorder.start() which
-                    // delete()'d the existing file — entire recording lost on second tap.
-                    if (isRecordingLatest) {
-                        down.consume()
-                        // Wait for release so we don't process another down in the same gesture
+                        // Tap while already recording → finish & save (NOT cancel).
+                        // Previously this path landed in audioRecorder.start() which
+                        // delete()'d the existing file — entire recording lost on second tap.
+                        if (isRecordingLatest) {
+                            down.consume()
+                            // Wait for release so we don't process another down in the same gesture
+                            do {
+                                val event = awaitPointerEvent()
+                                val change = event.changes.firstOrNull() ?: break
+                                if (!change.pressed) {
+                                    change.consume()
+                                    break
+                                }
+                                change.consume()
+                            } while (true)
+                            onVoiceRecordingStopped()
+                            return@awaitEachGesture
+                        }
+
+                        // Cancel-vs-commit is measured in WINDOW (root) coordinates, NOT the mic Box's
+                        // LOCAL frame. When the node slides down under a STILL finger (keyboard close /
+                        // dock Expanded→Peek), local coords read that shift as a phantom upward drag, so
+                        // a stationary release wrongly CANCELS — the "release discards the recording" bug.
+                        // localToWindow maps each pointer sample to the finger's absolute screen position,
+                        // which does not move, so node movement contributes 0 to dragY: a still finger
+                        // SAVES; only a genuine ≥80dp upward slide cancels. This makes the fix independent
+                        // of node movement, so it holds on every host (dock peek, full screen, full overlay)
+                        // with no inset-freeze needed.
+                        fun windowY(local: Offset): Float =
+                            micLayoutCoordinates?.localToWindow(local)?.y ?: local.y
+
+                        val downWindowY = windowY(down.position)
+                        onVoiceRecordingStarted()
+                        isDragCancel = false
+                        onDragCancelChanged?.invoke(false)
+
+                        val cancelThresholdPx = cancelThresholdDp.toPx()
+
+                        // Track pointer movement until released
                         do {
                             val event = awaitPointerEvent()
                             val change = event.changes.firstOrNull() ?: break
+                            val dragY = windowY(change.position) - downWindowY
+                            // Negative Y = upward finger movement in window space
+                            val newIsDragCancel = dragY < -cancelThresholdPx
+                            if (newIsDragCancel != isDragCancel) {
+                                isDragCancel = newIsDragCancel
+                                onDragCancelChanged?.invoke(newIsDragCancel)
+                            }
                             if (!change.pressed) {
                                 change.consume()
                                 break
                             }
                             change.consume()
                         } while (true)
-                        onVoiceRecordingStopped()
-                        return@awaitEachGesture
-                    }
 
-                    val downY = down.position.y
-                    onVoiceRecordingStarted()
-                    isDragCancel = false
-                    onDragCancelChanged?.invoke(false)
-
-                    val cancelThresholdPx = cancelThresholdDp.toPx()
-
-                    // Track pointer movement until released
-                    do {
-                        val event = awaitPointerEvent()
-                        val change = event.changes.firstOrNull() ?: break
-                        val dragY = change.position.y - downY
-                        // Negative Y = upward drag
-                        val newIsDragCancel = dragY < -cancelThresholdPx
-                        if (newIsDragCancel != isDragCancel) {
-                            isDragCancel = newIsDragCancel
-                            onDragCancelChanged?.invoke(newIsDragCancel)
+                        // On release: cancel or normal stop
+                        val wasDragCancel = isDragCancel
+                        isDragCancel = false
+                        onDragCancelChanged?.invoke(false)
+                        if (wasDragCancel) {
+                            onVoiceRecordingCancelled()
+                        } else {
+                            onVoiceRecordingStopped()
                         }
-                        if (!change.pressed) {
-                            change.consume()
-                            break
-                        }
-                        change.consume()
-                    } while (true)
-
-                    // On release: cancel or normal stop
-                    val wasDragCancel = isDragCancel
-                    isDragCancel = false
-                    onDragCancelChanged?.invoke(false)
-                    if (wasDragCancel) {
-                        onVoiceRecordingCancelled()
-                    } else {
-                        onVoiceRecordingStopped()
                     }
                 }
-            }
         } else Modifier
 
         // Telegram-style trailing button — plain icon container.

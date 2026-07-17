@@ -2,6 +2,7 @@ package com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.pr
 
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.chat_preview_attach_to
+import aichecklists.core.designsystem.generated.resources.chat_preview_clear_completed
 import aichecklists.core.designsystem.generated.resources.chat_preview_create_from_file
 import aichecklists.core.designsystem.generated.resources.chat_preview_files_count
 import aichecklists.core.designsystem.generated.resources.chat_preview_in_list
@@ -83,6 +84,10 @@ internal class ToolCallPreviewRendererImpl(
         is ToolCall.ReadChecklist -> ""
 
         is ToolCall.RenameChecklist -> "${toolCall.checklistHint} $ARROW ${toolCall.newName}"
+
+        // Agent batch plan line: "Clear completed items (in Shopping)".
+        is ToolCall.ClearCompleted ->
+            previewString(Res.string.chat_preview_clear_completed) + inListSuffix(toolCall.checklistHint)
     }
 
     private fun bullet(text: String): String = "$BULLET $text"

@@ -1178,6 +1178,11 @@ class ChatViewModel(
 
         is ToolCall.CreateChecklistFromAttachment -> listOf(fileRow(toolCall.attachments))
 
+        // ClearCompleted reaches the which-list picker, but its object is "completed items" (a set,
+        // not a named row) and the candidate chips already ARE the destinations — the "Which list?"
+        // prompt carries the question, so no object rows.
+        is ToolCall.ClearCompleted -> emptyList()
+
         // Read-only / agent-only variants never reach a write-intent choice block.
         is ToolCall.FindItemsQuery,
         is ToolCall.ReadChecklist,
@@ -2331,7 +2336,10 @@ class ChatViewModel(
                         val planItems = mutatingCalls.map { call ->
                             val toolCall = AgentToolCallMapper.map(call)
                             val text = if (toolCall != null) previewRenderer.render(toolCall) else call.name
-                            AgentPlanItem(text = text, isDestructive = call.name == "delete_item")
+                            AgentPlanItem(
+                                text = text,
+                                isDestructive = call.name == "delete_item" || call.name == "clear_completed_items",
+                            )
                         }
 
                         // Suspend the loop — show the choice block, wait for user.
@@ -2395,6 +2403,16 @@ class ChatViewModel(
                                     buildJsonObjectError("unknown_tool", call.name)
                                 } else {
                                     val outcome = toolCallDispatcher.dispatch(toolCall)
+                                    // A bulk clear whose target name is ambiguous cannot be resolved
+                                    // by the model either (two same-named lists are indistinguishable
+                                    // to Gemini too). Hand it to the client which-list picker — its
+                                    // id-carrying chips re-dispatch inline via executeChoice — and end
+                                    // the turn. Scoped to ClearCompleted so every other tool keeps
+                                    // serializing its verdict back to the agent unchanged.
+                                    if (toolCall is ToolCall.ClearCompleted && outcome is DispatchOutcome.AmbiguousMatch) {
+                                        showWhichListChoice(toolCall, outcome.candidates, sourceLayer = null)
+                                        return
+                                    }
                                     AgentToolResultSerializer.serialize(outcome)
                                 }
                             }
@@ -2619,6 +2637,8 @@ class ChatViewModel(
             is ToolCall.RenameChecklist -> original
             // Agent-only: ReadChecklist — read-only, no preview card
             is ToolCall.ReadChecklist -> original
+            // Agent-only: ClearCompleted — no user-editable item text
+            is ToolCall.ClearCompleted -> original
         }
     }
 
@@ -2678,6 +2698,7 @@ class ChatViewModel(
             is ToolCall.DeleteItem -> toolCall.checklistHint != null
             is ToolCall.SetItemReminder -> toolCall.checklistHint != null
             is ToolCall.AttachToItem -> toolCall.checklistHint != null
+            is ToolCall.ClearCompleted -> toolCall.checklistHint != null
             // Excluded by design — list is the target, not the context, or no hint field.
             // withTarget() returns null for these, so the elvis below keeps them untouched.
             is ToolCall.CreateChecklist,
@@ -2713,6 +2734,7 @@ class ChatViewModel(
         is ToolCall.SetItemReminder -> toolCall.checklistId
         is ToolCall.AttachToItem -> toolCall.checklistId
         is ToolCall.AddItems -> toolCall.checklistId
+        is ToolCall.ClearCompleted -> toolCall.checklistId
         is ToolCall.CreateChecklist,
         is ToolCall.MoveAllReminders,
         is ToolCall.FindItemsQuery,
@@ -2739,6 +2761,7 @@ class ChatViewModel(
         // Agent-only: hint present on these variants, surface it for potential preview display
         is ToolCall.AddItems -> toolCall.checklistHint
         is ToolCall.RenameChecklist -> toolCall.checklistHint
+        is ToolCall.ClearCompleted -> toolCall.checklistHint
     }
 
     /**
@@ -2790,9 +2813,11 @@ class ChatViewModel(
         is ToolCall.AttachToItem -> Res.string.chat_question_attach
         is ToolCall.CreateChecklistFromAttachment -> Res.string.chat_choice_create_from_file
         // Agent-only / read variants never produce a write-intent choice; safe fallback.
+        // (ClearCompleted asks via the which-list picker's own prompt, not this question.)
         is ToolCall.FindItemsQuery,
         is ToolCall.ReadChecklist,
-        is ToolCall.RenameChecklist -> Res.string.chat_choice_apply_actions
+        is ToolCall.RenameChecklist,
+        is ToolCall.ClearCompleted -> Res.string.chat_choice_apply_actions
     }
 
     /**
@@ -2820,7 +2845,8 @@ class ChatViewModel(
     /** Primary-chip label resource for a write-intent ("Add" / "Delete" / "Create" / …). */
     private fun ToolCall.primaryActionLabel(): StringResource = when (this) {
         is ToolCall.AddItem, is ToolCall.AddItems -> Res.string.chat_choice_action_add
-        is ToolCall.DeleteItem -> Res.string.chat_choice_action_delete
+        // ClearCompleted is a bulk delete — group its verb with delete (agent-only, rarely shown).
+        is ToolCall.DeleteItem, is ToolCall.ClearCompleted -> Res.string.chat_choice_action_delete
         is ToolCall.CompleteItem -> Res.string.chat_choice_action_complete
         is ToolCall.CreateChecklist, is ToolCall.CreateChecklistFromAttachment -> Res.string.chat_choice_action_create
         is ToolCall.SetItemReminder -> Res.string.chat_choice_action_set_reminder
@@ -2834,7 +2860,8 @@ class ChatViewModel(
     /** Loading label resource for a write-intent ("Adding…" / "Deleting…" / …). */
     private fun ToolCall.executingLabel(): StringResource = when (this) {
         is ToolCall.AddItem, is ToolCall.AddItems -> Res.string.chat_choice_executing_add
-        is ToolCall.DeleteItem -> Res.string.chat_choice_executing_delete
+        // A tapped which-list chip for ClearCompleted shows "Deleting…" — it is removing items.
+        is ToolCall.DeleteItem, is ToolCall.ClearCompleted -> Res.string.chat_choice_executing_delete
         is ToolCall.CompleteItem -> Res.string.chat_choice_executing_complete
         is ToolCall.CreateChecklist, is ToolCall.CreateChecklistFromAttachment -> Res.string.chat_choice_executing_create
         is ToolCall.SetItemReminder -> Res.string.chat_choice_executing_set_reminder
@@ -2864,6 +2891,8 @@ class ChatViewModel(
         is ToolCall.SetItemReminder -> copy(checklistId = id, checklistHint = name)
         is ToolCall.AttachToItem -> copy(checklistId = id, checklistHint = name)
         is ToolCall.AddItems -> copy(checklistId = id, checklistHint = name)
+        // Lets a which-list chip retarget a bulk clear at ONE specific list, id-carrying.
+        is ToolCall.ClearCompleted -> copy(checklistId = id, checklistHint = name)
         is ToolCall.CreateChecklist,
         is ToolCall.CreateChecklistFromAttachment,
         is ToolCall.MoveAllReminders,
@@ -2888,6 +2917,7 @@ class ChatViewModel(
         // Agent-only: no single editable item text for these variants
         is ToolCall.AddItems,
         is ToolCall.RenameChecklist,
+        is ToolCall.ClearCompleted,
         is ToolCall.ReadChecklist -> ""
     }
 

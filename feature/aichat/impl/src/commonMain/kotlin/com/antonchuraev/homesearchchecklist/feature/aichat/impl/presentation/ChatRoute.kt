@@ -20,6 +20,7 @@ import aichecklists.core.designsystem.generated.resources.chat_dispatch_add_empt
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_renamed
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_already_done
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_completed
+import aichecklists.core.designsystem.generated.resources.chat_dispatch_completed_items_removed
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_created_empty
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_created_from_attachment
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_created_with_many
@@ -34,6 +35,7 @@ import aichecklists.core.designsystem.generated.resources.chat_dispatch_moved_ma
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_moved_one
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_no_checklist_match
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_no_checklists
+import aichecklists.core.designsystem.generated.resources.chat_dispatch_no_completed_items
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_no_reminders_on_day
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_operation_failed
 import aichecklists.core.designsystem.generated.resources.chat_dispatch_reminder_set
@@ -168,6 +170,8 @@ fun ChatRoute(
     val dispatchNoChecklistsText = stringResource(Res.string.chat_dispatch_no_checklists)
     val dispatchNoChecklistMatchFmt = stringResource(Res.string.chat_dispatch_no_checklist_match)
     val dispatchFillLoadFailedFmt = stringResource(Res.string.chat_dispatch_fill_load_failed)
+    val dispatchCompletedItemsRemovedFmt = stringResource(Res.string.chat_dispatch_completed_items_removed)
+    val dispatchNoCompletedItemsFmt = stringResource(Res.string.chat_dispatch_no_completed_items)
     val insufficientCreditsText = stringResource(Res.string.chat_insufficient_credits)
     val completionErrorText = stringResource(Res.string.chat_completion_error)
     // F1 connectivity-aware error replies (offline / service / timeout). Keep both maps in step.
@@ -257,6 +261,8 @@ fun ChatRoute(
             "chat_dispatch_no_checklists" to dispatchNoChecklistsText,
             "chat_dispatch_no_checklist_match" to dispatchNoChecklistMatchFmt,
             "chat_dispatch_fill_load_failed" to dispatchFillLoadFailedFmt,
+            "chat_dispatch_completed_items_removed" to dispatchCompletedItemsRemovedFmt,
+            "chat_dispatch_no_completed_items" to dispatchNoCompletedItemsFmt,
             "chat_insufficient_credits" to insufficientCreditsText,
             "chat_completion_error" to completionErrorText,
             "chat_error_offline" to errorOfflineText,

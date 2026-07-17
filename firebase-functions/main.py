@@ -2893,8 +2893,8 @@ def reserve_chat_agent_credits(
 # — closes findings #1/#2. Phase 3/5 extend this list as the dispatcher grows.
 CHAT_AGENT_TOOL_NAMES = {
     "add_item", "add_items", "create_checklist", "complete_item",
-    "delete_item", "set_item_reminder", "find_items", "read_checklist",
-    "rename_checklist",
+    "delete_item", "clear_completed_items", "set_item_reminder",
+    "find_items", "read_checklist", "rename_checklist",
 }
 
 
@@ -2971,6 +2971,21 @@ def _build_chat_agent_tools(include_options: bool = False) -> "list[types.Tool]"
                 type=OBJ,
                 properties={"checklist_hint": hint, "item_text": s(STR, "Fuzzy text of the item to delete.")},
                 required=["item_text"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="clear_completed_items",
+            description=(
+                "Remove ALL completed (checked) items from a checklist in one action. Use this for "
+                "requests like 'delete completed', 'удали выполненные', 'clear checked items', "
+                "'очисти сделанное'. This is a bulk operation — do NOT call delete_item with "
+                "'completed'/'выполненные' as the item_text (that is not an item name). Omit "
+                "checklist_hint to target the current/active checklist."
+            ),
+            parameters=types.Schema(
+                type=OBJ,
+                properties={"checklist_hint": hint},
+                required=[],
             ),
         ),
         types.FunctionDeclaration(

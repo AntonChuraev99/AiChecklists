@@ -29,8 +29,8 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
-import aichecklists.core.designsystem.generated.resources.chat_recording_in_progress
 import aichecklists.core.designsystem.generated.resources.chat_voice_drag_cancel_hint
+import aichecklists.core.designsystem.generated.resources.chat_voice_release_cancel_hint
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import org.jetbrains.compose.resources.stringResource
 
@@ -64,11 +64,12 @@ fun ChatRecordingOverlay(
     val seconds = (durationMs / 1000L) % 60L
     val formattedDuration = "$minutes:${seconds.toString().padStart(2, '0')}"
 
-    // Just "Recording…" — timer rendered separately on the right side (single source of truth).
-    // Previously the format string baked in the timer ("Recording… %1$s") which caused
-    // two timers to render side-by-side with the right-aligned Text below.
-    val inProgressLabel = stringResource(Res.string.chat_recording_in_progress)
+    // The label reflects the gesture state: while recording it advertises the slide-up-to-cancel
+    // affordance ("Slide up to cancel"); once the finger has been dragged into the cancel zone it
+    // tells the user what releasing now does ("Release to cancel"). The three dots + red surface +
+    // right-aligned timer already signal that recording is in progress.
     val dragCancelLabel = stringResource(Res.string.chat_voice_drag_cancel_hint)
+    val releaseCancelLabel = stringResource(Res.string.chat_voice_release_cancel_hint)
 
     AnimatedVisibility(
         visible = isRecording,
@@ -107,7 +108,7 @@ fun ChatRecordingOverlay(
                     RecordingDot(delayMs = 400)
 
                     Text(
-                        text = if (isDragCancel) dragCancelLabel else inProgressLabel,
+                        text = if (isDragCancel) releaseCancelLabel else dragCancelLabel,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onErrorContainer,
                         modifier = Modifier.padding(start = AppDimens.SpacingXs),

@@ -1112,6 +1112,7 @@
     <string name="chat_move_no_other_lists">Больше нет списков, куда перенести.</string>
     <!-- ToolCallPreviewRenderer: строка-объект действия. -->
     <string name="chat_preview_in_list">(в %1$s)</string>
+    <string name="chat_preview_clear_completed">Удалить выполненные пункты</string>
     <string name="chat_preview_files_count">%1$s файлов</string>
     <string name="chat_preview_create_from_file">Создать список из %1$s</string>
     <string name="chat_preview_attach_to">Прикрепить %1$s к • %2$s</string>
@@ -1197,6 +1198,9 @@
     <string name="chat_dispatch_no_checklists">Чек-листов пока нет. Создай первый.</string>
     <string name="chat_dispatch_no_checklist_match">Чек-лист «%1$s» не найден.</string>
     <string name="chat_dispatch_fill_load_failed">Не удалось открыть заполнение чек-листа «%1$s».</string>
+    <!-- clear_completed_items tool. %1$s — количество удалённых пунктов, %2$s — название чек-листа. -->
+    <string name="chat_dispatch_completed_items_removed">Удалено выполненных пунктов из %2$s: %1$s.</string>
+    <string name="chat_dispatch_no_completed_items">В %1$s нет выполненных пунктов для удаления.</string>
     <string name="chat_insufficient_credits">Недостаточно кредитов для AI-ответа. Пополните баланс или оформите Premium.</string>
     <string name="chat_completion_error">AI не смог ответить. Попробуйте ещё раз.</string>
     <string name="chat_history_load_error">Не удалось загрузить историю чата.</string>
@@ -1231,6 +1235,7 @@
     <string name="chat_record_voice">Записать голосовое сообщение</string>
     <string name="chat_voice_press_hold_hint">Удерживайте, чтобы записать голос</string>
     <string name="chat_voice_drag_cancel_hint">Сдвиньте вверх для отмены</string>
+    <string name="chat_voice_release_cancel_hint">Отпустите для отмены</string>
     <string name="chat_voice_too_short">Запись слишком короткая. Удерживайте кнопку дольше.</string>
     <string name="chat_recording_in_progress">Запись…</string>
     <string name="chat_transcribing">Расшифровываю…</string>

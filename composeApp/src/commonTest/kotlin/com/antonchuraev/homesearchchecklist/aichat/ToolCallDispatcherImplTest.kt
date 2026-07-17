@@ -95,6 +95,24 @@ private class FakeChecklistRepository(
         checklistState.value = checklistState.value.map { if (it.id == checklist.id) checklist else it }
     }
 
+    // Real in-memory dual-write so the dispatcher test can read the surviving rows AND the count.
+    override suspend fun deleteCompletedItems(checklistId: Long): Int {
+        val fill = fillState.value.firstOrNull { it.checklistId == checklistId && it.isDefault } ?: return 0
+        val completed = fill.items.filter { it.checked }
+        if (completed.isEmpty()) return 0
+        val completedLinkIds = completed.mapNotNull { it.templateItemId }.toSet()
+        val completedLegacyTexts = completed.filter { it.templateItemId == null }.map { it.text }.toSet()
+        updateFill(fill.copy(items = fill.items.filter { !it.checked }))
+        checklistState.value.firstOrNull { it.id == checklistId }?.let { checklist ->
+            updateChecklistTemplate(
+                checklist.copy(
+                    items = checklist.items.filterNot { it.id in completedLinkIds || it.text in completedLegacyTexts },
+                ),
+            )
+        }
+        return completed.size
+    }
+
     override suspend fun addChecklist(checklist: Checklist): Long {
         calls.add(RepoCall.AddChecklist(checklist.name))
         val id = nextChecklistId++
@@ -289,6 +307,42 @@ private fun shoppingRepo(
     seedChecklists = listOf(Checklist(id = 1L, name = "Покупки", items = templateItems)),
     seedFills = listOf(
         ChecklistFill(id = 11L, checklistId = 1L, name = "Покупки", items = fillItems, isDefault = true),
+    ),
+)
+
+/** "Покупки" (id 1, fill 11) with two CHECKED rows (Молоко, Хлеб) and one unchecked (Яйца). */
+private fun mixedRepo() = FakeChecklistRepository(
+    seedChecklists = listOf(
+        Checklist(
+            id = 1L, name = "Покупки",
+            items = listOf(
+                templateItem("tpl_a", "Молоко"),
+                templateItem("tpl_b", "Хлеб"),
+                templateItem("tpl_c", "Яйца"),
+            ),
+        ),
+    ),
+    seedFills = listOf(
+        ChecklistFill(
+            id = 11L, checklistId = 1L, name = "Покупки", isDefault = true,
+            items = listOf(
+                fillItem("f_a", "Молоко", checked = true, templateItemId = "tpl_a"),
+                fillItem("f_b", "Хлеб", checked = true, templateItemId = "tpl_b"),
+                fillItem("f_c", "Яйца", checked = false, templateItemId = "tpl_c"),
+            ),
+        ),
+    ),
+)
+
+/** Two lists whose names both contain [shared] — the ambiguity fixture. */
+private fun twoListRepo(name1: String, name2: String) = FakeChecklistRepository(
+    seedChecklists = listOf(
+        Checklist(id = 1L, name = name1, items = emptyList()),
+        Checklist(id = 2L, name = name2, items = emptyList()),
+    ),
+    seedFills = listOf(
+        ChecklistFill(id = 11L, checklistId = 1L, name = name1, isDefault = true, items = emptyList()),
+        ChecklistFill(id = 22L, checklistId = 2L, name = name2, isDefault = true, items = emptyList()),
     ),
 )
 
@@ -651,5 +705,106 @@ class ToolCallDispatcherImplTest {
         assertEquals("Покупки", handle.checklistName, "the list name labels the move picker")
         assertEquals(11L, handle.fillId)
         assertEquals("Молоко", handle.itemText, "display copy for the chip label")
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // ClearCompleted — bulk clear checked items; picker (never prose) on ambiguity
+    // ════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun clearCompleted_openList_removesCheckedReportsCountKeepsUnchecked() = runTest {
+        val repo = mixedRepo()
+        val dispatcher = buildDispatcher(repo)
+
+        val outcome = dispatcher.dispatch(ToolCall.ClearCompleted(checklistHint = "Покупки", checklistId = 1L))
+
+        val success = assertIs<DispatchOutcome.Success>(outcome, "got $outcome")
+        assertEquals("chat_dispatch_completed_items_removed", success.messageKey)
+        assertEquals(listOf("2", "Покупки"), success.args, "reports the removed count then the list name")
+        assertEquals(1L, success.linkedChecklistId)
+        // Only the unchecked row survives — in BOTH the fill and the template (dual-write).
+        assertEquals(listOf("Яйца"), repo.fill(11L).items.map { it.text }, "fill keeps only the unchecked row")
+        assertEquals(listOf("Яйца"), repo.checklist(1L).items.map { it.text }, "template mirrors the removal")
+    }
+
+    @Test
+    fun clearCompleted_unambiguousHint_removesChecked() = runTest {
+        val repo = mixedRepo()
+        val dispatcher = buildDispatcher(repo)
+
+        val outcome = dispatcher.dispatch(ToolCall.ClearCompleted(checklistHint = "Покуп"))
+
+        assertIs<DispatchOutcome.Success>(outcome, "a hint matching exactly one list proceeds; got $outcome")
+        assertEquals(1, repo.fill(11L).items.size, "the two checked rows are gone")
+    }
+
+    @Test
+    fun clearCompleted_ambiguousHint_returnsAmbiguousMatch() = runTest {
+        val repo = twoListRepo("Покупки дом", "Покупки офис")
+        val dispatcher = buildDispatcher(repo)
+
+        val outcome = dispatcher.dispatch(ToolCall.ClearCompleted(checklistHint = "Покупки"))
+
+        val ambiguous = assertIs<DispatchOutcome.AmbiguousMatch>(outcome, "got $outcome")
+        assertEquals(
+            listOf("Покупки дом", "Покупки офис"),
+            ambiguous.candidates,
+            "the picker gets the candidate names — never a prose question",
+        )
+    }
+
+    @Test
+    fun clearCompleted_noTargetMultipleLists_returnsAmbiguousMatch() = runTest {
+        val repo = twoListRepo("Покупки", "Работа")
+        val dispatcher = buildDispatcher(repo)
+
+        val outcome = dispatcher.dispatch(ToolCall.ClearCompleted(checklistHint = null))
+
+        val ambiguous = assertIs<DispatchOutcome.AmbiguousMatch>(
+            outcome,
+            "a bulk clear never guesses across >1 list (unlike add/delete); got $outcome",
+        )
+        assertEquals(listOf("Покупки", "Работа"), ambiguous.candidates)
+    }
+
+    @Test
+    fun clearCompleted_noTargetSingleList_clearsItWithoutAsking() = runTest {
+        val repo = mixedRepo()
+        val dispatcher = buildDispatcher(repo)
+
+        val outcome = dispatcher.dispatch(ToolCall.ClearCompleted(checklistHint = null))
+
+        assertIs<DispatchOutcome.Success>(outcome, "the sole list is cleared without asking; got $outcome")
+        assertEquals(1, repo.fill(11L).items.size)
+    }
+
+    @Test
+    fun clearCompleted_noCompletedItems_friendlySuccessNotError() = runTest {
+        val repo = shoppingRepo(
+            templateItems = listOf(templateItem("tpl_1", "Молоко")),
+            fillItems = listOf(fillItem("f_1", "Молоко", checked = false, templateItemId = "tpl_1")),
+        )
+        val dispatcher = buildDispatcher(repo)
+
+        val outcome = dispatcher.dispatch(ToolCall.ClearCompleted(checklistHint = "Покупки"))
+
+        val success = assertIs<DispatchOutcome.Success>(
+            outcome,
+            "zero completed is a friendly success, not an error; got $outcome",
+        )
+        assertEquals("chat_dispatch_no_completed_items", success.messageKey)
+        assertEquals(listOf("Покупки"), success.args)
+        assertEquals(1, repo.fill(11L).items.size, "nothing was removed")
+    }
+
+    @Test
+    fun clearCompleted_noChecklists_notFound() = runTest {
+        val repo = FakeChecklistRepository()
+        val dispatcher = buildDispatcher(repo)
+
+        val outcome = dispatcher.dispatch(ToolCall.ClearCompleted(checklistHint = "Покупки"))
+
+        val notFound = assertIs<DispatchOutcome.NotFound>(outcome, "got $outcome")
+        assertEquals("chat_dispatch_no_checklists", notFound.messageKey)
     }
 }

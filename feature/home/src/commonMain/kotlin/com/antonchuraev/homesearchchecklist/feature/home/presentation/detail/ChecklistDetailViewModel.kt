@@ -1204,14 +1204,13 @@ class ChecklistDetailViewModel(
         val completedItems = fill.items.filter { it.checked }
         if (completedItems.isEmpty()) return
 
-        // Identify the template items to drop. Prefer the stable link; for legacy fill rows
-        // without a link, fall back to text. Splitting the sets keeps the text fallback from
-        // also deleting a same-text sibling whose fill item was NOT checked.
+        // Optimistic UI: drop the checked template rows so the list updates before the write lands.
+        // Prefer the stable link; for legacy fill rows without a link, fall back to text. Splitting
+        // the sets keeps the text fallback from also deleting a same-text sibling whose fill item
+        // was NOT checked. The persistence itself (the identical dual-write) now lives in the repo.
         val completedLinkIds = completedItems.mapNotNull { it.templateItemId }.toSet()
         val completedLegacyTexts = completedItems.filter { it.templateItemId == null }.map { it.text }.toSet()
-
-        val updatedFillItems = fill.items.filter { !it.checked }
-        val updatedFill = fill.copy(items = updatedFillItems)
+        val remainingFillCount = fill.items.count { !it.checked }
 
         val updatedChecklistItems = state.checklist.items.filterNot { templateItem ->
             templateItem.id in completedLinkIds || templateItem.text in completedLegacyTexts
@@ -1223,12 +1222,11 @@ class ChecklistDetailViewModel(
         }
 
         viewModelScope.launch {
-            repository.updateFill(updatedFill)
-            repository.updateChecklistTemplate(updatedChecklist)
+            repository.deleteCompletedItems(checklistId)
             analyticsTracker.event(AnalyticsEvents.Item.COMPLETED_ITEMS_DELETED, mapOf(
                 AnalyticsParams.CHECKLIST_ID to checklistId.toString(),
                 "deleted_count" to completedItems.size.toString(),
-                "remaining_count" to updatedFillItems.size.toString()
+                "remaining_count" to remainingFillCount.toString()
             ))
         }
     }

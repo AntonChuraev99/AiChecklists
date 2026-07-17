@@ -328,6 +328,40 @@ class AgentToolCallMapperTest {
         assertNull(AgentToolCallMapper.map(call))
     }
 
+    // ─── clear_completed_items ─────────────────────────────────────────────────
+
+    @Test
+    fun clearCompleted_withHint_mapsCorrectly() {
+        val call = agentCall(
+            "clear_completed_items",
+            buildJsonObject { put("checklist_hint", "shopping") },
+        )
+        val result = AgentToolCallMapper.map(call)
+        assertIs<ToolCall.ClearCompleted>(result)
+        assertEquals("shopping", result.checklistHint)
+        assertNull(result.checklistId)
+    }
+
+    @Test
+    fun clearCompleted_withoutHint_mapsWithNullHint() {
+        // No required arg: an unnamed clear still maps (the dispatcher resolves the target).
+        val call = agentCall("clear_completed_items", buildJsonObject { })
+        val result = AgentToolCallMapper.map(call)
+        assertIs<ToolCall.ClearCompleted>(result)
+        assertNull(result.checklistHint)
+    }
+
+    @Test
+    fun clearCompleted_blankHint_mapsWithNullHint() {
+        val call = agentCall(
+            "clear_completed_items",
+            buildJsonObject { put("checklist_hint", "  ") },
+        )
+        val result = AgentToolCallMapper.map(call)
+        assertIs<ToolCall.ClearCompleted>(result)
+        assertNull(result.checklistHint)
+    }
+
     // ─── unknown name ─────────────────────────────────────────────────────────
 
     @Test

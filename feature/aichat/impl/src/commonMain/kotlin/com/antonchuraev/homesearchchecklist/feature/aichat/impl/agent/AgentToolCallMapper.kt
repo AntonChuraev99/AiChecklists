@@ -35,6 +35,7 @@ internal object AgentToolCallMapper {
      * - `rename_checklist`  → [ToolCall.RenameChecklist]  (null if either arg blank)
      * - `find_items`        → [ToolCall.FindItemsQuery] (null if query blank)
      * - `read_checklist`    → [ToolCall.ReadChecklist]  (null if name blank)
+     * - `clear_completed_items` → [ToolCall.ClearCompleted] (checklist_hint optional → null)
      * - anything else       → null
      */
     fun map(agentToolCall: AgentToolCall): ToolCall? {
@@ -117,6 +118,11 @@ internal object AgentToolCallMapper {
                 if (name.isBlank()) return null
                 ToolCall.ReadChecklist(name = name)
             }
+
+            "clear_completed_items" ->
+                // checklist_hint is optional: absent → the dispatcher targets the sole list or asks
+                // the which-list picker. No required arg, so this call never maps to null.
+                ToolCall.ClearCompleted(checklistHint = args.stringOrNull("checklist_hint"))
 
             else -> null
         }

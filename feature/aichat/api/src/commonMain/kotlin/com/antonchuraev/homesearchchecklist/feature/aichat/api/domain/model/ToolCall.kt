@@ -126,4 +126,19 @@ sealed interface ToolCall {
         val checklistHint: String,
         val newName: String,
     ) : ToolCall
+
+    /**
+     * Bulk-remove every checked item from one checklist (agent path — "удали выполненные пункты").
+     * Resolves like the item-targeting variants: [checklistId] first, [checklistHint] as fallback.
+     *
+     * [checklistHint] is the fuzzy list name the server sends (= `context_checklist` when a list is
+     * open). Null when the agent named no list — the dispatcher then asks the which-list picker if
+     * more than one checklist exists. [checklistId] is set only after a which-list chip is tapped,
+     * so the retargeted call clears exactly the list the user picked (see [checklistId] rationale
+     * on [AddItem]).
+     */
+    data class ClearCompleted(
+        val checklistHint: String?,
+        val checklistId: Long? = null,
+    ) : ToolCall
 }

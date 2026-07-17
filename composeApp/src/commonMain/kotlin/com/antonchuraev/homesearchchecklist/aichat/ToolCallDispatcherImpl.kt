@@ -99,6 +99,7 @@ class ToolCallDispatcherImpl(
             is ToolCall.AddItems -> handleAddItems(toolCall)
             is ToolCall.ReadChecklist -> handleReadChecklist(toolCall)
             is ToolCall.RenameChecklist -> handleRenameChecklist(toolCall)
+            is ToolCall.ClearCompleted -> handleClearCompleted(toolCall)
         }
     }.getOrElse { e ->
         logger.error(TAG, "dispatch failed for ${toolCall::class.simpleName}", e)
@@ -683,6 +684,68 @@ class ToolCallDispatcherImpl(
             listOf(oldName, toolCall.newName),
             linkedChecklistId = checklist.id,
         )
+    }
+
+    // ─── ClearCompleted ───────────────────────────────────────────────────────
+
+    /**
+     * Bulk-clears the checked items of one checklist. Resolves the target with the same id-first,
+     * name-fallback strategy the item tools use (see [resolveChecklistAndFill]); only the target is
+     * resolved here — the repository re-loads and does the fill+template dual-write authoritatively.
+     *
+     * Ambiguity routes to the which-list picker, never a prose question:
+     * - hint matches >1 list → [DispatchOutcome.AmbiguousMatch].
+     * - no target and ≥2 lists exist → also [DispatchOutcome.AmbiguousMatch]. Unlike add/delete
+     *   (which default to the sole/active list), a bulk clear is destructive enough that it never
+     *   guesses across several lists.
+     *
+     * Zero checked items is a friendly Success ("nothing to remove"), not an error — the user asked
+     * for a valid operation that happened to have no effect.
+     */
+    private suspend fun handleClearCompleted(toolCall: ToolCall.ClearCompleted): DispatchOutcome {
+        val allChecklists = checklistRepository.checklists.first()
+        if (allChecklists.isEmpty()) {
+            return DispatchOutcome.NotFound("chat_dispatch_no_checklists", emptyList())
+        }
+
+        val hint = toolCall.checklistHint
+        val checklist = when {
+            // Exact target (a tapped which-list chip) — resolve by id or fail; never degrade to name.
+            toolCall.checklistId != null ->
+                allChecklists.firstOrNull { it.id == toolCall.checklistId }
+                    ?: return resolveChecklistFailure(toolCall.checklistId, hint)
+
+            // Server-built call → fuzzy name match; 0 → not found, 1 → proceed, >1 → picker.
+            hint != null -> {
+                val matches = allChecklists.filter { it.name.contains(hint, ignoreCase = true) }
+                when {
+                    matches.isEmpty() ->
+                        return DispatchOutcome.NotFound("chat_dispatch_no_checklist_match", listOf(hint))
+                    matches.size > 1 ->
+                        return DispatchOutcome.AmbiguousMatch(matches.take(MAX_AMBIGUOUS_CANDIDATES).map { it.name })
+                    else -> matches.first()
+                }
+            }
+
+            // No target: 1 list → clear it; ≥2 → ask which, never guess for a bulk delete.
+            else -> allChecklists.singleOrNull()
+                ?: return DispatchOutcome.AmbiguousMatch(allChecklists.take(MAX_AMBIGUOUS_CANDIDATES).map { it.name })
+        }
+
+        val removed = checklistRepository.deleteCompletedItems(checklist.id)
+        return if (removed == 0) {
+            DispatchOutcome.Success(
+                "chat_dispatch_no_completed_items",
+                listOf(checklist.name),
+                linkedChecklistId = checklist.id,
+            )
+        } else {
+            DispatchOutcome.Success(
+                "chat_dispatch_completed_items_removed",
+                listOf(removed.toString(), checklist.name),
+                linkedChecklistId = checklist.id,
+            )
+        }
     }
 
     // ─── Attachment helpers ───────────────────────────────────────────────────
