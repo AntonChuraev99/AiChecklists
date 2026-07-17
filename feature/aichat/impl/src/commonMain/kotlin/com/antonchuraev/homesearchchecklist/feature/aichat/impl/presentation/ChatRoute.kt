@@ -44,6 +44,9 @@ import aichecklists.core.designsystem.generated.resources.chat_generic_error
 import aichecklists.core.designsystem.generated.resources.chat_history_load_error
 import aichecklists.core.designsystem.generated.resources.chat_insufficient_credits
 import aichecklists.core.designsystem.generated.resources.chat_completion_error
+import aichecklists.core.designsystem.generated.resources.chat_error_offline
+import aichecklists.core.designsystem.generated.resources.chat_error_service
+import aichecklists.core.designsystem.generated.resources.chat_error_timeout
 import aichecklists.core.designsystem.generated.resources.chat_mic_permission_denied
 import aichecklists.core.designsystem.generated.resources.chat_not_found
 import aichecklists.core.designsystem.generated.resources.chat_recording_cancelled
@@ -167,6 +170,10 @@ fun ChatRoute(
     val dispatchFillLoadFailedFmt = stringResource(Res.string.chat_dispatch_fill_load_failed)
     val insufficientCreditsText = stringResource(Res.string.chat_insufficient_credits)
     val completionErrorText = stringResource(Res.string.chat_completion_error)
+    // F1 connectivity-aware error replies (offline / service / timeout). Keep both maps in step.
+    val errorOfflineText = stringResource(Res.string.chat_error_offline)
+    val errorServiceText = stringResource(Res.string.chat_error_service)
+    val errorTimeoutText = stringResource(Res.string.chat_error_timeout)
     val historyLoadErrorText = stringResource(Res.string.chat_history_load_error)
     val feedbackSubmittedText = stringResource(Res.string.chat_feedback_submitted)
     val feedbackBlankHintText = stringResource(Res.string.chat_feedback_blank_hint)
@@ -252,6 +259,9 @@ fun ChatRoute(
             "chat_dispatch_fill_load_failed" to dispatchFillLoadFailedFmt,
             "chat_insufficient_credits" to insufficientCreditsText,
             "chat_completion_error" to completionErrorText,
+            "chat_error_offline" to errorOfflineText,
+            "chat_error_service" to errorServiceText,
+            "chat_error_timeout" to errorTimeoutText,
             "chat_history_load_error" to historyLoadErrorText,
             "chat_feedback_submitted" to feedbackSubmittedText,
             "chat_feedback_blank_hint" to feedbackBlankHintText,
@@ -418,6 +428,7 @@ fun ChatRoute(
                             linkedChecklistId = effect.linkedChecklistId,
                             askAiForText = effect.askAiForText,
                             paywallCtaCredits = effect.paywallCtaCredits,
+                            retryText = effect.retryText,
                         )
                     )
                 }

@@ -218,7 +218,10 @@ fun AiChoiceResponse(
                 )
 
                 choice.escape?.let { escape ->
-                    Row(modifier = Modifier.padding(top = AppDimens.SpacingXs)) {
+                    // No extra top padding: the parent column's SpacingSm already separates the
+                    // escape chip from the options above. The old +SpacingXs pushed the gap to 12dp,
+                    // which read as a loose break between two button rows (audit fix — tighten).
+                    Row {
                         AiChoiceChip(
                             label = escape.label,
                             role = escape.role,
@@ -388,11 +391,15 @@ private fun MemoryRow(
 }
 
 /**
- * Adaptive chip container. When every label is short (≤ [SHORT_LABEL_MAX] chars) the chips flow
- * in a wrapping [FlowRow] with NO fixed row count — content-sized chips wrap by width, so the
- * layout self-adapts to N options (2, 3, … 6) by spilling onto as many rows as it needs. When ANY
- * label is long, fall back to a vertical [Column] of full-width chips so the long text isn't cramped.
- * Width is dictated by the parent (one composable, no separate dock variant).
+ * Chip container. Every chat chip hugs its content width — never stretched, never full-width (the
+ * global rule from the audit). The chips flow in a wrapping [FlowRow] with NO fixed row count, so
+ * the layout self-adapts to N options (2, 3, … 6) by spilling onto as many rows as it needs. A long
+ * label simply takes more of its row (and, at the extreme, wraps to two lines inside its own pill)
+ * rather than forcing the whole block to a column of stretched buttons.
+ *
+ * Meta ("Shopping • 12 • 3 Jul") rides INSIDE the pill after the label (see [AiChoiceChip], called
+ * with `fillWidth = false`) — a single hugging pill, NOT two `weight(1f)` children that would split
+ * the space 50/50 and clip (the project's known "two weights split space" bug).
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -403,32 +410,15 @@ private fun ChoiceChips(
     blockInteractive: Boolean,
     onSelect: (String) -> Unit,
 ) {
-    // FlowRow wraps by width (maxItemsInEachRow unlimited) → rows auto-adapt to the option count.
-    // Only drop to a Column when a label is long enough that a content-sized chip would cramp it.
-    // Measures label + meta (+ the " • " that joins them), not the label alone: "Weekly shopping"
-    // fits, "Weekly shopping • 12" may not, and the meta is not droppable.
-    val useFlow = options.all { it.label.length + (it.meta?.length ?: 0) + META_WIDTH_ALLOWANCE <= SHORT_LABEL_MAX }
     val fallbackLoading = stringResource(Res.string.chat_choice_executing_default)
-
-    if (useFlow) {
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
-            // Tighter vertical rhythm between wrapped chip rows (4dp) than the horizontal gap (8dp).
-            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
-        ) {
-            options.forEach { option ->
-                ChoiceChipFor(option, executingId, executingLabel, fallbackLoading, blockInteractive, onSelect, fillWidth = false)
-            }
-        }
-    } else {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
-        ) {
-            options.forEach { option ->
-                ChoiceChipFor(option, executingId, executingLabel, fallbackLoading, blockInteractive, onSelect, fillWidth = true)
-            }
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
+        // Tighter vertical rhythm between wrapped chip rows (4dp) than the horizontal gap (8dp).
+        verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
+    ) {
+        options.forEach { option ->
+            ChoiceChipFor(option, executingId, executingLabel, fallbackLoading, blockInteractive, onSelect, fillWidth = false)
         }
     }
 }
@@ -463,6 +453,11 @@ private fun ChoiceChipFor(
  *
  * Numbering appears only from TWO items up: since D1 a single-action choice also renders through
  * here (it is how the question gets its object), and "1. • Milk" reads like a broken list.
+ *
+ * NEVER truncated — takes no `compact` flag on purpose. Unlike the create-checklist preview rows
+ * ([ObjectRows], capped at [PREVIEW_CAP_COMPACT] in the dock), the agent batch is the full plan the
+ * user is being asked to approve: hiding step 3 of 4 in the dock would have them approve actions
+ * they cannot see. Every step renders on every surface.
  */
 @Composable
 private fun BatchActionList(
@@ -548,12 +543,6 @@ private fun ChoiceRole.leadingIcon(): ImageVector? = when (this) {
     ChoiceRole.Add -> Icons.Outlined.Add
     ChoiceRole.Primary, ChoiceRole.Default, ChoiceRole.Escape -> null
 }
-
-/** Labels at or below this length are considered "short" for the FlowRow layout decision. */
-private const val SHORT_LABEL_MAX = 18
-
-/** Width the " • " joiner adds when a chip carries meta, charged to the layout-switch budget. */
-private const val META_WIDTH_ALLOWANCE = 3
 
 /** Bullet for a preview row (a literal, like the renderer's — punctuation, not language). */
 private const val PREVIEW_BULLET = "•"

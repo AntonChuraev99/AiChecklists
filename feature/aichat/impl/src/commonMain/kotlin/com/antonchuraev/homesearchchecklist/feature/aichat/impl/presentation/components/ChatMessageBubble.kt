@@ -4,6 +4,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
@@ -17,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.ThumbDown
 import androidx.compose.material.icons.outlined.ThumbUp
 import androidx.compose.material.icons.outlined.WorkspacePremium
@@ -25,7 +28,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,9 +43,11 @@ import aichecklists.core.designsystem.generated.resources.chat_message_thumb_dow
 import aichecklists.core.designsystem.generated.resources.chat_message_thumb_up
 import aichecklists.core.designsystem.generated.resources.chat_open_checklist
 import aichecklists.core.designsystem.generated.resources.chat_paywall_cta_credits
+import aichecklists.core.designsystem.generated.resources.chat_retry
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatRole
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceRole
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -56,9 +60,11 @@ import org.jetbrains.compose.resources.stringResource
  *   20-20-20-4 corners (tail on bottom-left). Optional [AiSenderLabel] above the
  *   bubble (24dp avatar + "AI-ассистент"). Max width 340dp (~82%).
  *
- * Below assistant bubbles: 4-action row [Copy] [Refresh] [ThumbUp] [ThumbDown]
- * plus optional [Open checklist] TextButton when the message carries a
- * `linkedChecklistId`.
+ * Below assistant bubbles: an icon action row [Copy] [ThumbUp] [ThumbDown], then a
+ * wrap-content chip row of the actionable buttons — [Open checklist] (when the message
+ * carries a `linkedChecklistId`), [Ask AI] (Unknown-intent dead-end), [Retry]
+ * (recoverable error) — and finally the [Become Pro] CTA. All of these are real
+ * [AiChoiceChip] buttons (not bare clickable text) and hug their content width.
  *
  * Typography: bodyLarge (16sp, lineHeight 24, letterSpacing 0.5) — M3 chat spec.
  * Text inside every bubble is wrapped in [SelectionContainer] for native long-press
@@ -69,7 +75,10 @@ import org.jetbrains.compose.resources.stringResource
  *                        the static welcome bubble where the label adds noise.
  * @param onPaywallCta Invoked by the "Become Pro" CTA shown under an out-of-credits reply.
  *                     Pass null (or leave the message's `paywallCtaCredits` null) to hide it.
+ * @param onRetry Invoked by the "Retry" chip on a recoverable-error reply. Pass null (or leave
+ *               the message's `retryText` null) to hide it — it re-sends `message.retryText`.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ChatMessageBubble(
     message: ChatMessage,
@@ -79,6 +88,7 @@ fun ChatMessageBubble(
     onOpenChecklist: (() -> Unit)? = null,
     onAskAiFallback: (() -> Unit)? = null,
     onPaywallCta: (() -> Unit)? = null,
+    onRetry: (() -> Unit)? = null,
     showSenderLabel: Boolean = false,
 ) {
     val isUser = message.role == ChatRole.User
@@ -177,10 +187,9 @@ fun ChatMessageBubble(
                 InlineCostBadge(cost = message.costCredits)
             }
 
-            // Action row for assistant messages (M3 chat actions): Copy · ThumbUp · ThumbDown.
+            // Icon action row for assistant messages (M3 chat actions): Copy · ThumbUp · ThumbDown.
             // ThumbUp = analytics-only fire-and-forget (no sheet). ThumbDown = opens feedback sheet.
-            // Optional "Open checklist" TextButton when the message has a linkedChecklistId.
-            if (!isUser && (onFeedbackClick != null || onThumbUpClick != null || onOpenChecklist != null || onAskAiFallback != null)) {
+            if (!isUser && (onFeedbackClick != null || onThumbUpClick != null)) {
                 // offset(x = -6.dp) — Compose equivalent of CSS `marginLeft: -6` (from design).
                 // Visually aligns the first action button with the bubble's text left edge,
                 // compensating for the 32dp IconButton hit-area. NOTE: must use offset, not
@@ -213,74 +222,69 @@ fun ChatMessageBubble(
                             onClick = { onFeedbackClick(message) },
                         )
                     }
+                }
+            }
+
+            // Action chips — real, obviously-tappable buttons (NOT bare clickable text, the audit
+            // fix): Open checklist · Ask AI · Retry. Each is an [AiChoiceChip] that hugs its content,
+            // laid out in a wrap-content FlowRow so several fit one row and spill only when needed.
+            // These moved out of the 32dp icon row above (a 40dp chip cannot align with 32dp icons)
+            // into their own row, tightly spaced.
+            val showRetry = message.retryText != null && onRetry != null
+            if (!isUser && (onOpenChecklist != null || onAskAiFallback != null || showRetry)) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
+                    verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
+                ) {
                     if (onOpenChecklist != null) {
-                        TextButton(onClick = onOpenChecklist) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.OpenInNew,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
-                            Text(
-                                text = stringResource(Res.string.chat_open_checklist),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(start = AppDimens.SpacingXxs),
-                            )
-                        }
+                        AiChoiceChip(
+                            label = stringResource(Res.string.chat_open_checklist),
+                            role = ChoiceRole.Default,
+                            onClick = onOpenChecklist,
+                            leadingIcon = Icons.AutoMirrored.Filled.OpenInNew,
+                            maxLines = 1,
+                        )
                     }
-                    // "Ask AI" fallback button — shown only when the assistant message
-                    // carries askAiForText (i.e. it is an Unknown-intent dead-end).
-                    // Tapping it escalates the original text to Layer 3 (3 credits),
-                    // which is an explicit user opt-in — credits are never auto-burned.
+                    // "Ask AI" — shown only when the message carries askAiForText (Unknown-intent
+                    // dead-end). Tapping escalates the original text to Layer 3 (3 credits), an
+                    // explicit user opt-in — credits are never auto-burned.
                     if (onAskAiFallback != null) {
-                        TextButton(onClick = onAskAiFallback) {
-                            Icon(
-                                imageVector = Icons.Outlined.AutoAwesome,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
-                            Text(
-                                text = stringResource(Res.string.chat_ask_ai_fallback),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(start = AppDimens.SpacingXxs),
-                            )
-                        }
+                        AiChoiceChip(
+                            label = stringResource(Res.string.chat_ask_ai_fallback),
+                            role = ChoiceRole.Default,
+                            onClick = onAskAiFallback,
+                            leadingIcon = Icons.Outlined.AutoAwesome,
+                            maxLines = 1,
+                        )
+                    }
+                    // "Retry" — shown on a recoverable-error reply (offline / service / timeout, F1).
+                    // Re-sends message.retryText through the normal send pipeline.
+                    if (showRetry) {
+                        AiChoiceChip(
+                            label = stringResource(Res.string.chat_retry),
+                            role = ChoiceRole.Default,
+                            onClick = onRetry,
+                            leadingIcon = Icons.Outlined.Refresh,
+                            maxLines = 1,
+                        )
                     }
                 }
             }
 
             // "Become Pro" CTA — shown only on an out-of-credits reply (the message carries the
-            // Premium daily allowance to advertise). Deliberately its OWN row rather than another
-            // TextButton inside the action row above: the label is a full sentence and would blow
-            // past the 340dp bubble next to the three action icons. maxLines=2 keeps a long
-            // localisation (RU is ~20% longer) wrapping instead of clipping.
+            // Premium daily allowance to advertise). A real filled (Primary) chip now, its own row:
+            // the label is a full sentence, so maxLines=2 keeps a long localisation (RU ~20% longer)
+            // wrapping instead of clipping, and widthIn caps it on wide screens.
             val ctaCredits = message.paywallCtaCredits
             if (!isUser && ctaCredits != null && onPaywallCta != null) {
-                TextButton(
+                AiChoiceChip(
+                    label = stringResource(Res.string.chat_paywall_cta_credits, ctaCredits.toString()),
+                    role = ChoiceRole.Primary,
                     onClick = onPaywallCta,
-                    // Same -6dp optical alignment as the action row, so the CTA lines up with
-                    // the bubble's text edge (padding would throw on a negative value).
-                    modifier = Modifier
-                        .widthIn(max = 340.dp)
-                        .offset(x = (-6).dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.WorkspacePremium,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                    Text(
-                        text = stringResource(Res.string.chat_paywall_cta_credits, ctaCredits.toString()),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                        maxLines = 2,
-                        modifier = Modifier.padding(start = AppDimens.SpacingXxs),
-                    )
-                }
+                    leadingIcon = Icons.Outlined.WorkspacePremium,
+                    maxLines = 2,
+                    modifier = Modifier.widthIn(max = 340.dp),
+                )
             }
         }
     }

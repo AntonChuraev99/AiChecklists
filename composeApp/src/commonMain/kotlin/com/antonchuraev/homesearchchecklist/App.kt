@@ -115,6 +115,9 @@ import aichecklists.core.designsystem.generated.resources.chat_generic_error
 import aichecklists.core.designsystem.generated.resources.chat_history_load_error
 import aichecklists.core.designsystem.generated.resources.chat_insufficient_credits
 import aichecklists.core.designsystem.generated.resources.chat_completion_error
+import aichecklists.core.designsystem.generated.resources.chat_error_offline
+import aichecklists.core.designsystem.generated.resources.chat_error_service
+import aichecklists.core.designsystem.generated.resources.chat_error_timeout
 import aichecklists.core.designsystem.generated.resources.chat_mic_permission_denied
 import aichecklists.core.designsystem.generated.resources.chat_not_found
 import aichecklists.core.designsystem.generated.resources.chat_recording_cancelled
@@ -744,6 +747,10 @@ fun App() {
             val sm_dispatchFillLoadFailed = stringResource(Res.string.chat_dispatch_fill_load_failed)
             val sm_insufficientCredits = stringResource(Res.string.chat_insufficient_credits)
             val sm_completionError = stringResource(Res.string.chat_completion_error)
+            // F1 connectivity-aware error replies. Keep in step with ChatRoute.kt's map.
+            val sm_errorOffline = stringResource(Res.string.chat_error_offline)
+            val sm_errorService = stringResource(Res.string.chat_error_service)
+            val sm_errorTimeout = stringResource(Res.string.chat_error_timeout)
             val sm_historyLoadError = stringResource(Res.string.chat_history_load_error)
             val sm_feedbackSubmitted = stringResource(Res.string.chat_feedback_submitted)
             val sm_feedbackBlankHint = stringResource(Res.string.chat_feedback_blank_hint)
@@ -824,6 +831,9 @@ fun App() {
                     "chat_dispatch_fill_load_failed" to sm_dispatchFillLoadFailed,
                     "chat_insufficient_credits" to sm_insufficientCredits,
                     "chat_completion_error" to sm_completionError,
+                    "chat_error_offline" to sm_errorOffline,
+                    "chat_error_service" to sm_errorService,
+                    "chat_error_timeout" to sm_errorTimeout,
                     "chat_history_load_error" to sm_historyLoadError,
                     "chat_feedback_submitted" to sm_feedbackSubmitted,
                     "chat_feedback_blank_hint" to sm_feedbackBlankHint,
@@ -892,6 +902,7 @@ fun App() {
                                     linkedChecklistId = effect.linkedChecklistId,
                                     askAiForText = effect.askAiForText,
                                     paywallCtaCredits = effect.paywallCtaCredits,
+                                    retryText = effect.retryText,
                                 )
                             )
                         }
@@ -1189,6 +1200,9 @@ fun App() {
                                                         navigator.navigateToChecklistDetail(id)
                                                     }
                                                 },
+                                                onRetry = lastAssistantMessage.retryText?.let { text ->
+                                                    { chatViewModel.sendIntent(ChatScreenIntent.OnRetryClick(text)) }
+                                                },
                                                 showSenderLabel = true,
                                             )
                                             Spacer(Modifier.height(AppDimens.SpacingSm))
@@ -1228,6 +1242,9 @@ fun App() {
                                                     chatSheetOpen = false
                                                     navigator.navigateToChecklistDetail(id)
                                                 }
+                                            },
+                                            onRetry = lastAssistantMessage.retryText?.let { text ->
+                                                { chatViewModel.sendIntent(ChatScreenIntent.OnRetryClick(text)) }
                                             },
                                             showSenderLabel = true,
                                         )

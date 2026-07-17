@@ -267,6 +267,7 @@ sealed interface ChatScreenIntent : Intent {
         val linkedChecklistId: Long? = null,
         val askAiForText: String? = null,
         val paywallCtaCredits: Int? = null,
+        val retryText: String? = null,
     ) : ChatScreenIntent
 
     /** User tapped the back / navigation icon. */
@@ -314,6 +315,14 @@ sealed interface ChatScreenIntent : Intent {
      * disconnect was accepted to buy (docs/decisions/2026-07-15-remove-ai-chat-layer1.md).
      */
     data object OnPaywallCtaClick : ChatScreenIntent
+
+    /**
+     * User tapped "Retry" on a recoverable error reply (offline / service / timeout — F1).
+     * Re-sends [text] (the original user message that failed) through the normal send pipeline,
+     * so it is classified / dispatched exactly like a fresh send. A new user bubble is appended —
+     * an honest "I sent it again", not a silent in-place retry.
+     */
+    data class OnRetryClick(val text: String) : ChatScreenIntent
 
     // ── Attachment intents (Phase 1: VM domain logic; picker UI lives in Phase 3) ──
 
@@ -418,6 +427,12 @@ sealed interface ChatScreenSideEffect : SideEffect {
         val linkedChecklistId: Long? = null,
         val askAiForText: String? = null,
         val paywallCtaCredits: Int? = null,
+        /**
+         * The user text to re-send when the user taps "Retry" on this reply (F1 recoverable errors:
+         * offline / service / timeout). Non-null makes the bubble show a "Retry" chip that dispatches
+         * [OnRetryClick]. Only set on the connectivity-error emit sites in [ChatViewModel].
+         */
+        val retryText: String? = null,
     ) : ChatScreenSideEffect
 
     /** Navigate back (handled by the host NavController). */

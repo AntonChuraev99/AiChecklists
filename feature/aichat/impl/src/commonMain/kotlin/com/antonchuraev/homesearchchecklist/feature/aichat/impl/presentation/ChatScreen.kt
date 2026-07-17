@@ -458,6 +458,9 @@ fun ChatMessageList(
                 onPaywallCta = message.paywallCtaCredits?.let {
                     { onIntent(ChatScreenIntent.OnPaywallCtaClick) }
                 },
+                onRetry = message.retryText?.let { text ->
+                    { onIntent(ChatScreenIntent.OnRetryClick(text)) }
+                },
                 showSenderLabel = message.role == ChatRole.Assistant,
             )
         }

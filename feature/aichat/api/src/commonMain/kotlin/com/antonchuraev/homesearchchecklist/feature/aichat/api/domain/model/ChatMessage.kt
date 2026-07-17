@@ -52,4 +52,14 @@ data class ChatMessage(
      * restart rather than lingering as a stale offer, and no migration is needed.
      */
     val paywallCtaCredits: Int? = null,
+    /**
+     * The original user text to re-send when the user taps "Retry" on a recoverable error reply
+     * (offline / service / timeout — F1). When non-null on an assistant message, [ChatMessageBubble]
+     * renders a "Retry" chip that dispatches [OnRetryClick] → re-runs the send pipeline with [retryText].
+     *
+     * TRANSIENT — NOT persisted to Room, same as [askAiForText] / [paywallCtaCredits]: after a restart
+     * the failed turn is gone, so the button would retry nothing. Text only (attachments are not
+     * re-carried); connectivity errors are overwhelmingly on the text/classify/agent path.
+     */
+    val retryText: String? = null,
 )

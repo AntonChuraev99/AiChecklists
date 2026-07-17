@@ -56,6 +56,7 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -339,7 +340,16 @@ class ChatViewModel(
                     linkedChecklistId = intent.linkedChecklistId,
                     askAiForText = intent.askAiForText,
                     paywallCtaCredits = intent.paywallCtaCredits,
+                    retryText = intent.retryText,
                 )
+            }
+
+            is ChatScreenIntent.OnRetryClick -> {
+                // Re-send the failed message through the normal pipeline. State updates are
+                // synchronous, so handleSend() reads the freshly-seeded inputText (it also
+                // clears the field afterwards). A fresh user bubble is appended — honest.
+                _screenState.value = _screenState.value.copy(inputText = intent.text)
+                handleSend()
             }
 
             ChatScreenIntent.OnPaywallCtaClick -> {
@@ -822,7 +832,7 @@ class ChatViewModel(
                     runAgentTurn(text, locale)
                 }.onFailure { e ->
                     logger.error(TAG, "handleSend(forceAgent) failed", e)
-                    _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_generic_error"))
+                    emitTransportError(e, retryText = text)
                     trackResponseReceived(RoutingLayer.FullChat, outcome = "error")
                     _screenState.value = _screenState.value.copy(isProcessing = false)
                 }
@@ -986,7 +996,7 @@ class ChatViewModel(
                 }
             }.onFailure { e ->
                 logger.error(TAG, "handleSend failed", e)
-                _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_generic_error"))
+                emitTransportError(e, retryText = text)
                 trackResponseReceived(routedLayer = null, outcome = "error")
                 _screenState.value = _screenState.value.copy(isProcessing = false)
             }
@@ -2524,12 +2534,23 @@ class ChatViewModel(
                     return
                 }
 
-                AgentStepResult.NetworkError,
-                AgentStepResult.ServiceError -> {
-                    logger.warning(TAG, "runAgentTurn: ${stepResult::class.simpleName}")
+                // F1: split the connectivity failures. NetworkError (offline / timeout / parse)
+                // must NOT read "AI couldn't respond" — blaming the model when the phone has no
+                // signal is the exact copy this fix removes. Both kinds now carry a Retry button
+                // that re-sends the failed message.
+                AgentStepResult.NetworkError -> {
+                    logger.warning(TAG, "runAgentTurn: NetworkError")
                     trackResponseReceived(RoutingLayer.FullChat, outcome = "error")
                     _screenState.value = _screenState.value.copy(isProcessing = false)
-                    _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_completion_error"))
+                    _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_error_offline", retryText = userInput))
+                    return
+                }
+
+                AgentStepResult.ServiceError -> {
+                    logger.warning(TAG, "runAgentTurn: ServiceError")
+                    trackResponseReceived(RoutingLayer.FullChat, outcome = "error")
+                    _screenState.value = _screenState.value.copy(isProcessing = false)
+                    _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_error_service", retryText = userInput))
                     return
                 }
             }
@@ -3285,6 +3306,7 @@ class ChatViewModel(
         linkedChecklistId: Long? = null,
         askAiForText: String? = null,
         paywallCtaCredits: Int? = null,
+        retryText: String? = null,
     ) {
         val msg = ChatMessage(
             id = generateId(),
@@ -3298,6 +3320,9 @@ class ChatViewModel(
             askAiForText = askAiForText,
             // Same deal for the paywall CTA: transient, so a stale offer can't outlive the turn.
             paywallCtaCredits = paywallCtaCredits,
+            // And the Retry handle: transient, so a restart (which loses the failed turn) doesn't
+            // leave a button that would retry nothing.
+            retryText = retryText,
         )
         updateMessages { it + msg }
         // Persist every assistant message regardless of routing layer.
@@ -3308,6 +3333,24 @@ class ChatViewModel(
                 runCatching { chatHistoryRepository.append(msg) }
                     .onFailure { e -> logger.error(TAG, "addAssistantMessage: persist failed — ${e.message}", e) }
             }
+        }
+    }
+
+    /**
+     * Emits a recoverable-error assistant reply for an *unexpected* failure caught in a runCatching
+     * onFailure (F1). The typed connectivity kinds (offline / service) come from the agent loop's
+     * own [AgentStepResult]; here all we have is a [Throwable], so we can only tell a coroutine
+     * timeout apart from the rest — and even the fallback no longer blames the AI (the neutral
+     * "Something went wrong" of chat_generic_error). Both carry a Retry button re-sending [retryText].
+     *
+     * Keys are emitted as literals inside the [ChatScreenSideEffect.ShowAssistantMessage] calls so
+     * ChatMessageKeyResolutionTest can still see them and enforce both surface maps carry them.
+     */
+    private suspend fun emitTransportError(e: Throwable, retryText: String?) {
+        if (e is TimeoutCancellationException) {
+            _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_error_timeout", retryText = retryText))
+        } else {
+            _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_generic_error", retryText = retryText))
         }
     }
 
@@ -3331,7 +3374,7 @@ class ChatViewModel(
                 runAgentTurn(text, locale)
             }.onFailure { e ->
                 logger.error(TAG, "handleAskAiFallback failed", e)
-                _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_generic_error"))
+                emitTransportError(e, retryText = text)
                 _screenState.value = _screenState.value.copy(isProcessing = false)
             }
         }

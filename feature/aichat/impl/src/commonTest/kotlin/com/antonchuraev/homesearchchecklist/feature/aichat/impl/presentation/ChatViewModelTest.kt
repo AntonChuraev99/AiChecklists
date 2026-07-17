@@ -1095,7 +1095,7 @@ class ChatViewModelTest {
             layer = RoutingLayer.FullChat,
             preBuiltToolCall = null,
         )
-        // No scripted agentStepResults → agentStep returns ServiceError → chat_completion_error.
+        // No scripted agentStepResults → agentStep returns ServiceError → chat_error_service (F1).
         val repo = FakeAiChatRepository(
             classifyResult = layer1Result,
             skipLayer1Result = layer2RejectResult,
@@ -1136,7 +1136,7 @@ class ChatViewModelTest {
     fun onPreviewReject_classifierSource_runsAgentLoopDirectly() = runTest {
         // Setup: produce a Classifier-layer question (delete — the reversible intents no longer ask).
         val classifierResult = deleteClassification(layer = RoutingLayer.Classifier)
-        // No scripted agentStepResults → agentStep returns ServiceError → chat_completion_error.
+        // No scripted agentStepResults → agentStep returns ServiceError → chat_error_service (F1).
         val repo = FakeAiChatRepository(
             classifyResult = classifierResult,
         )
@@ -1335,7 +1335,7 @@ class ChatViewModelTest {
     @Test
     fun onAskAiFallback_runsAgentLoopWithOriginalText() = runTest {
         // No scripted agentStepResults → agentStep emits a ShowAssistantMessage sideEffect
-        // (ServiceError → chat_completion_error). The Final path calls addAndPersistAssistantMessage
+        // (ServiceError → chat_error_service, F1). The Final path calls addAndPersistAssistantMessage
         // directly without a sideeffect, so there would be nothing to drain.
         val repo = FakeAiChatRepository(
             classifyResult = IntentClassification(
@@ -1372,11 +1372,13 @@ class ChatViewModelTest {
         assertFalse(vm.screenState.value.isProcessing,
             "isProcessing must be false after the agent loop completes")
 
-        // Drain the chat_completion_error ShowAssistantMessage from ServiceError path
+        // Drain the connectivity-error ShowAssistantMessage from the ServiceError path (F1).
         val fallbackEffect = fallbackEffectDeferred.await()
         assertIs<ChatScreenSideEffect.ShowAssistantMessage>(fallbackEffect)
-        assertEquals("chat_completion_error", fallbackEffect.messageKey,
-            "ServiceError from the agent loop must emit chat_completion_error")
+        assertEquals("chat_error_service", fallbackEffect.messageKey,
+            "ServiceError from the agent loop must emit chat_error_service (not the AI-blaming chat_completion_error)")
+        assertEquals("это штука что ты", fallbackEffect.retryText,
+            "the error reply must carry the original text so the Retry chip can re-send it")
     }
 
     // ══════════════════════════════════════════════════════════════════════════
