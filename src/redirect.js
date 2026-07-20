@@ -95,6 +95,19 @@ export default {
     if (isComposeResource || isHtml) {
       const headers = new Headers(assetResponse.headers);
       headers.set("Cache-Control", "no-cache");
+      // COOP on the HTML DOCUMENT (not scripts) — COOP governs the browsing
+      // context, so only the top-level index.html that calls signInWithPopup
+      // needs it. The `_headers` /* rule does NOT reach the SPA not_found
+      // fallback that synthesises index.html for `/` and deep-links, so the
+      // opener document shipped WITHOUT COOP and the Firebase popup's
+      // window.close() stayed blocked (login silently failed). Setting it here,
+      // in the run_worker_first path, guarantees every HTML response carries it.
+      // `same-origin-allow-popups` keeps cross-origin isolation OFF, so the
+      // SAH-pool OPFS driver (no SharedArrayBuffer needed) is unaffected. See
+      // _headers strategy comment + firebase-js-sdk#8541.
+      if (isHtml) {
+        headers.set("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
+      }
       return new Response(assetResponse.body, {
         status: assetResponse.status,
         statusText: assetResponse.statusText,

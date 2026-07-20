@@ -2,9 +2,16 @@
 # Docs: https://developers.cloudflare.com/workers/static-assets/headers/
 #
 # Strategy:
-#   - NO COOP/COEP — Room 3.0 OPFS uses OpfsSAHPoolDb (SAH Pool VFS) which
-#     does not require SharedArrayBuffer. Firebase Auth signInWithPopup and
-#     third-party scripts (Stripe, analytics) work without restrictions.
+#   - COOP = same-origin-allow-popups, NO COEP. Room 3.0 OPFS uses OpfsSAHPoolDb
+#     (SAH Pool VFS) which does not require SharedArrayBuffer, so COEP stays off
+#     (adding it would gate SAB and break third-party scripts). COOP is NOT left
+#     unset: Chromium tightened the opener↔popup relationship, and with an unset
+#     (unsafe-none) opener the Firebase Auth popup's window.close() is blocked
+#     ("Cross-Origin-Opener-Policy policy would block the window.close call"),
+#     so signInWithPopup never delivers the credential and login silently fails.
+#     `same-origin-allow-popups` restores the opener relationship for popups this
+#     page opens (Firebase Auth, Stripe) while keeping cross-origin isolation off.
+#     Official Firebase remedy (firebase-js-sdk#8541). Do NOT add COEP here.
 #   - Hashed assets (wasm, chunk JS) → 1 year, immutable.
 #   - Entry points (index.html, composeApp.js, init.js) → always revalidate.
 #   - Compose resources (fixed names) → 1 day with revalidation.
@@ -12,6 +19,7 @@
 /*
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
+  Cross-Origin-Opener-Policy: same-origin-allow-popups
 
 /*.wasm
   Cache-Control: public, max-age=31536000, immutable
