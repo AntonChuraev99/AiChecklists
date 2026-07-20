@@ -15,6 +15,17 @@ interface ChecklistDao {
     @Query("SELECT * FROM checklists WHERE isDeleted = 0 ORDER BY position ASC")
     fun observeChecklists(): Flow<List<ChecklistEntity>>
 
+    /**
+     * Crash-tolerant variant of [observeChecklists] used by the public `checklists` stream.
+     *
+     * Returns raw, nullable [ChecklistRow]s so a single corrupt row (NULL `name`/`items`, or invalid
+     * `items` JSON) can never throw during cursor mapping and take down every collector — the prod
+     * web-origin infinite-spinner incident. The safe raw→domain recovery lives in
+     * [ChecklistRow.toChecklistSafe]. Keep the WHERE/ORDER identical to [observeChecklists].
+     */
+    @Query("SELECT * FROM checklists WHERE isDeleted = 0 ORDER BY position ASC")
+    fun observeChecklistRows(): Flow<List<ChecklistRow>>
+
     @Query("SELECT * FROM checklists WHERE id = :id AND isDeleted = 0")
     suspend fun getById(id: Long): ChecklistEntity?
 

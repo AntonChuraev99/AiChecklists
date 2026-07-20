@@ -8,6 +8,7 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AppResult
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentCloudStoragePort
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistDao
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistEntity
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistRow
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistFillDao
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistFillEntity
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Attachment
@@ -1013,6 +1014,7 @@ class SyncRepositoryImplTest {
 
         // ── Unused stubs ──
         override fun observeChecklists(): Flow<List<ChecklistEntity>> = flowOf(emptyList())
+        override fun observeChecklistRows(): Flow<List<ChecklistRow>> = flowOf(emptyList())
         override suspend fun getById(id: Long): ChecklistEntity? = checklists.firstOrNull { it.id == id }
         override fun observeChecklistById(id: Long): Flow<ChecklistEntity?> = flowOf(null)
         override suspend fun updateSyncStatus(id: Long, status: Int) {}

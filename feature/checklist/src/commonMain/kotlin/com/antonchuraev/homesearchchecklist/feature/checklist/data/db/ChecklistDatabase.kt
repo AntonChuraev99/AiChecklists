@@ -4,7 +4,7 @@ import androidx.room3.ConstructedBy
 import androidx.room3.Database
 import androidx.room3.RoomDatabase
 import androidx.room3.RoomDatabaseConstructor
-import androidx.room3.TypeConverters
+import androidx.room3.ColumnTypeConverters
 import androidx.room3.migration.Migration
 import androidx.sqlite.SQLiteConnection
 import androidx.sqlite.execSQL
@@ -177,7 +177,7 @@ val MIGRATION_17_18 = object : Migration(17, 18) {
     version = 18,
     exportSchema = true
 )
-@TypeConverters(ChecklistItemConverters::class, ReminderConverters::class)
+@ColumnTypeConverters(ChecklistItemConverters::class, ReminderConverters::class)
 @ConstructedBy(ChecklistDatabaseConstructor::class)
 abstract class ChecklistDatabase : RoomDatabase() {
     abstract fun checklistDao(): ChecklistDao

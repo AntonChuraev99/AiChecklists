@@ -56,6 +56,12 @@ kotlin {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
         }
+        getByName("androidHostTest").dependencies {
+            // Desktop-JVM SQLite natives so BundledSQLiteDriver loads in host tests.
+            // The android sqlite-bundled artifact ships only Android-ELF .so (UnsatisfiedLinkError
+            // on a desktop JVM). The -jvm variant carries Windows/Linux/macOS natives.
+            implementation("androidx.sqlite:sqlite-bundled-jvm:${libs.versions.sqlite3.get()}")
+        }
 
         androidMain.dependencies {
             implementation(libs.sqlite3.bundled)

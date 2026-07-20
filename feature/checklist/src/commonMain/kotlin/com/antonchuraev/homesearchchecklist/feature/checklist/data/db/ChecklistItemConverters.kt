@@ -1,6 +1,6 @@
 package com.antonchuraev.homesearchchecklist.feature.checklist.data.db
 
-import androidx.room3.TypeConverter
+import androidx.room3.ColumnTypeConverter
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistViewMode
@@ -56,31 +56,31 @@ class ChecklistItemConverters {
             throw ChecklistJsonDecodeException(column, value.length, e)
         }
 
-    @TypeConverter
+    @ColumnTypeConverter
     fun fromString(value: String): List<ChecklistItem> {
         if (value.isEmpty()) return emptyList()
         return decodeList(value, "checklists.items", ChecklistItem.serializer())
     }
 
-    @TypeConverter
+    @ColumnTypeConverter
     fun toString(items: List<ChecklistItem>): String {
         if (items.isEmpty()) return ""
         return json.encodeToString(ListSerializer(ChecklistItem.serializer()), items)
     }
 
-    @TypeConverter
+    @ColumnTypeConverter
     fun fillItemsFromString(value: String): List<ChecklistFillItem> {
         if (value.isEmpty()) return emptyList()
         return decodeList(value, "checklist_fills.items", ChecklistFillItem.serializer())
     }
 
-    @TypeConverter
+    @ColumnTypeConverter
     fun fillItemsToString(items: List<ChecklistFillItem>): String {
         if (items.isEmpty()) return ""
         return json.encodeToString(ListSerializer(ChecklistFillItem.serializer()), items)
     }
 
-    @TypeConverter
+    @ColumnTypeConverter
     fun viewModeFromString(value: String?): ChecklistViewMode {
         return when (value) {
             ChecklistViewMode.Weekly.name -> ChecklistViewMode.Weekly
@@ -88,7 +88,7 @@ class ChecklistItemConverters {
         }
     }
 
-    @TypeConverter
+    @ColumnTypeConverter
     fun viewModeToString(mode: ChecklistViewMode): String {
         return mode.name
     }

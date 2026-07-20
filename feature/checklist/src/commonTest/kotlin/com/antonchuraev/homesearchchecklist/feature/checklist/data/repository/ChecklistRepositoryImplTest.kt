@@ -8,6 +8,7 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistD
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistEntity
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistFillDao
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistFillEntity
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistRow
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistTransactionRunner
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Attachment
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
@@ -404,6 +405,7 @@ class ChecklistRepositoryImplTest {
 
         // ── Unused stubs ──
         override fun observeChecklists(): Flow<List<ChecklistEntity>> = flowOf(emptyList())
+        override fun observeChecklistRows(): Flow<List<ChecklistRow>> = flowOf(emptyList())
         override fun observeChecklistById(id: Long): Flow<ChecklistEntity?> = flowOf(null)
         override suspend fun insert(checklist: ChecklistEntity): Long = checklist.id
         override suspend fun updateSyncStatus(id: Long, status: Int) {}

@@ -1,6 +1,6 @@
 package com.antonchuraev.homesearchchecklist.feature.checklist.data.db
 
-import androidx.room3.TypeConverter
+import androidx.room3.ColumnTypeConverter
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
@@ -8,7 +8,7 @@ import kotlinx.serialization.json.Json
 class ReminderConverters {
     private val json = Json { ignoreUnknownKeys = true }
 
-    @TypeConverter
+    @ColumnTypeConverter
     fun repeatRuleFromString(value: String?): ReminderRepeatRule? {
         if (value.isNullOrEmpty()) return null
         return try {
@@ -19,7 +19,7 @@ class ReminderConverters {
         }
     }
 
-    @TypeConverter
+    @ColumnTypeConverter
     fun repeatRuleToString(rule: ReminderRepeatRule?): String? {
         if (rule == null) return null
         return json.encodeToString(ReminderRepeatRule.serializer(), rule)

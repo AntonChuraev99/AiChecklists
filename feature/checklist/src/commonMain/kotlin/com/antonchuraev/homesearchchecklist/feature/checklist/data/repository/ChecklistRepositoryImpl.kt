@@ -10,8 +10,10 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistD
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistEntity
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistFillDao
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistFillEntity
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistItemConverters
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistTransactionRunner
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ReminderConverters
+import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.toChecklistSafe
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.toDomain
 import com.antonchuraev.homesearchchecklist.feature.checklist.data.db.toEntity
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Attachment
@@ -42,9 +44,16 @@ class ChecklistRepositoryImpl(
     private val logger: AppLogger,
 ) : ChecklistRepository {
 
+    // Converters instantiated once; reused by the crash-tolerant checklists mapping below.
+    private val itemConverters = ChecklistItemConverters()
+
     // Checklists (templates)
-    override val checklists: Flow<List<Checklist>> = checklistDao.observeChecklists().map { list ->
-        list.map { it.toDomain() }
+    // Reads raw, nullable ChecklistRows and recovers each corrupt row (NULL name/items, or invalid
+    // items JSON) to safe defaults instead of throwing. A single bad row in the accumulated OPFS DB
+    // used to kill this flow and every collector (all four Home boot flows) → infinite spinner on
+    // the prod web origin. See ChecklistRow.toChecklistSafe.
+    override val checklists: Flow<List<Checklist>> = checklistDao.observeChecklistRows().map { rows ->
+        rows.map { it.toChecklistSafe(itemConverters, reminderConverters, logger) }
     }
 
     override suspend fun addChecklist(checklist: Checklist): Long {
