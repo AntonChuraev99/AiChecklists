@@ -82,6 +82,9 @@ interface AiChatRepository {
      * dedups on `{user_id}__{request_id}` — an id that leaks into the next turn makes that turn
      * free, which is the failure this parameter exists to make impossible to reach by accident.
      *
+     * [responseLanguage] is the BCP-47 primary subtag the user explicitly pinned for AI replies, or
+     * null for Auto (server decides from the message). Forwarded as `response_language`; additive.
+     *
      * Returns [AgentStepResult] — caller decides whether to continue the loop
      * ([AgentStepResult.ToolCalls]) or stop ([AgentStepResult.Final] / errors).
      */
@@ -91,6 +94,7 @@ interface AiChatRepository {
         checklistsSummary: List<ChecklistContext>,
         contextChecklistName: String? = null,
         requestId: String? = null,
+        responseLanguage: String? = null,
     ): AgentStepResult
 
     /**

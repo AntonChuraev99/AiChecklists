@@ -87,6 +87,7 @@ internal class ScriptedAiChatRepository(
         checklistsSummary: List<ChecklistContext>,
         contextChecklistName: String?,
         requestId: String?,
+        responseLanguage: String?,
     ): AgentStepResult {
         agentStepCallCount++
         return AgentStepResult.ServiceError

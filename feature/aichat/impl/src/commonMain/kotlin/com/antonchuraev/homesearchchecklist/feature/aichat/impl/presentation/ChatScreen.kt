@@ -30,8 +30,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.Modifier
-import aichecklists.core.designsystem.generated.resources.Res
-import aichecklists.core.designsystem.generated.resources.chat_assistant_welcome
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.AttachmentSource
@@ -49,8 +47,8 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.com
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatAttachmentSourceSheet
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatFeedbackSheet
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatRecordingOverlay
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatResponseLanguageSheet
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatSettingsSheet
-import org.jetbrains.compose.resources.stringResource
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatHeader
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatInputRow
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatMessageBubble
@@ -221,8 +219,20 @@ fun ChatScreen(
             },
             onClearChat = { onIntent(ChatScreenIntent.OnClearChat) },
             onDismiss = { onIntent(ChatScreenIntent.OnSettingsDismiss) },
+            responseLanguageCode = state.responseLanguage,
+            onResponseLanguageClick = { onIntent(ChatScreenIntent.OnResponseLanguageClick) },
             defaultChecklistName = state.defaultChecklistName,
             onResetDefaultChecklist = { onIntent(ChatScreenIntent.OnResetDefaultChecklist) },
+        )
+    }
+
+    // Response-language picker — a sibling above the settings sheet (drill-in). Selecting a
+    // language persists it and closes only this sheet; the settings row updates reactively.
+    if (state.showResponseLanguageSheet) {
+        ChatResponseLanguageSheet(
+            currentCode = state.responseLanguage,
+            onSelect = { code -> onIntent(ChatScreenIntent.OnResponseLanguageSelected(code)) },
+            onDismiss = { onIntent(ChatScreenIntent.OnResponseLanguagePickerDismiss) },
         )
     }
 
@@ -298,10 +308,11 @@ fun ChatContent(
             onWhyClick = { onIntent(ChatScreenIntent.OnHelpClick) },
         )
 
-        // Message list — occupies all remaining vertical space. Extracted to [ChatMessageList] so the
-        // App-level FULL chat overlay renders the SAME scrollable history (reverseLayout + IME
-        // scroll-anchor fix + welcome bubble) without duplicating it.
-        ChatMessageList(
+        // Body — occupies all remaining vertical space. [ChatBody] shows the localized empty-state
+        // (greeting + suggestion cards that PREFILL the composer) while the conversation is empty and
+        // the [ChatMessageList] once it has content. Shared with the App-level FULL chat overlay so
+        // both surfaces behave identically (reverseLayout + IME scroll-anchor fix live in the list).
+        ChatBody(
             state = state,
             onIntent = onIntent,
             listState = listState,
@@ -367,7 +378,10 @@ fun ChatContent(
 
 /**
  * Reverse-layout scrollable chat history: typing indicator (top), optional pending-choice block,
- * the messages (newest at the bottom), an optional "Today" divider and the welcome bubble.
+ * the messages (newest at the bottom) and an optional "Today" divider.
+ *
+ * The empty-conversation greeting is NOT rendered here — [ChatBody] owns the empty↔list switch and
+ * shows [ChatEmptyState] instead, so this list has no welcome bubble to collide with reverseLayout.
  *
  * @param showTodayDivider Whether the most recent message is from today (caller computes it).
  * @param totalItemCount   Message + choice + typing count — the IME scroll-anchor key.
@@ -381,17 +395,6 @@ fun ChatMessageList(
     totalItemCount: Int,
     modifier: Modifier = Modifier,
 ) {
-    // Welcome bubble is a UI affordance, not data
-    val welcomeText = stringResource(Res.string.chat_assistant_welcome)
-    val welcomeBubble = remember(welcomeText) {
-        ChatMessage(
-            id = "__welcome",
-            role = ChatRole.Assistant,
-            content = welcomeText,
-            timestamp = 0L,
-        )
-    }
-
     // IME scroll-anchor fix: re-run scrollToItem(0) when keyboard opens/closes so the
     // reverseLayout list stays pinned to the bottom after viewport resize.
     // MUST use imeBottom as a LaunchedEffect key — totalItemCount alone is insufficient.
@@ -472,13 +475,6 @@ fun ChatMessageList(
             item(key = "__day_divider") {
                 com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatDayDivider()
             }
-        }
-
-        item(key = "__welcome") {
-            ChatMessageBubble(
-                message = welcomeBubble,
-                showSenderLabel = false,
-            )
         }
     }
 }

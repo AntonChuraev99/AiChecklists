@@ -1162,6 +1162,10 @@
     <string name="chat_settings_get_more">Получить больше</string>
     <string name="chat_settings_deep_thinking_title">Глубокое мышление</string>
     <string name="chat_settings_deep_thinking_subtitle">Все запросы идут сразу к продвинутой модели (3 кредита за ответ). Без локального роутинга. Чтобы отвечать на вопросы о ваших списках, она также отправляет названия чек-листов и текст нескольких недавно добавленных пунктов.</string>
+    <string name="chat_settings_response_language_title">Язык ответа</string>
+    <string name="chat_settings_response_language_auto">Авто</string>
+    <string name="chat_settings_response_language_subtitle_auto">Подстраивается под язык сообщения</string>
+    <string name="chat_settings_response_language_subtitle_fixed">Gisti всегда отвечает на языке: %1$s</string>
     <string name="chat_settings_clear_chat">Очистить историю чата</string>
 
     <!-- AI-чат: навигация и snackbar-сообщения -->
@@ -1272,6 +1276,8 @@
     <string name="chat_features_example_find">Найди, где у меня молоко</string>
     <string name="chat_features_example_from_attachment">Создай чеклист из этого фото, PDF или текста</string>
     <string name="chat_features_example_ask">Что собрать в поездку в первую очередь?</string>
+    <string name="chat_empty_title">Что поможем отметить?</string>
+    <string name="chat_empty_subtitle">Спросите своими словами или начните с примера.</string>
     <string name="chat_features_got_it">Понятно</string>
     <string name="chat_assistant_label">AI-ассистент</string>
     <string name="chat_message_copy">Скопировать сообщение</string>

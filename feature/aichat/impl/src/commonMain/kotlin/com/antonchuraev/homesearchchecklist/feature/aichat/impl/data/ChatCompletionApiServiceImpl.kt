@@ -55,6 +55,9 @@ internal class ChatCompletionApiServiceImpl(
             ignoreUnknownKeys = true
             isLenient = true
             encodeDefaults = true
+            // Drop null-valued keys so a null `response_language` (Auto) leaves the request
+            // byte-identical to the legacy payload — the additive field never appears when unused.
+            explicitNulls = false
         }
 
         fun defaultHttpClient(): HttpClient = HttpClient {
@@ -76,8 +79,9 @@ internal class ChatCompletionApiServiceImpl(
         messages: List<ChatMessage>,
         locale: ChatLocale,
         checklistsSummary: List<ChecklistContext>,
+        responseLanguage: String?,
     ): RemoteCompletionResult = runCatching {
-        logger.debug(TAG, "complete: userId=${userId.take(8)}... messages=${messages.size} locale=$locale checklists=${checklistsSummary.size}")
+        logger.debug(TAG, "complete: userId=${userId.take(8)}... messages=${messages.size} locale=$locale checklists=${checklistsSummary.size} responseLanguage=${responseLanguage ?: "auto"}")
 
         val response: HttpResponse = httpClient.post(COMPLETION_URL) {
             contentType(ContentType.Application.Json)
@@ -86,6 +90,9 @@ internal class ChatCompletionApiServiceImpl(
                     userId = userId,
                     messages = messages.map { MessageDto(role = it.role.toApiString(), content = it.content) },
                     locale = locale.toApiString(),
+                    // Explicit override only; null (Auto) is dropped by explicitNulls=false so the
+                    // server sees no `response_language` key and matches the message language itself.
+                    responseLanguage = responseLanguage,
                     timezoneOffsetMinutes = currentTimezoneOffsetMinutes(),
                     checklistsSummary = checklistsSummary.map { ctx ->
                         ChecklistSummaryDto(
@@ -139,6 +146,7 @@ internal class ChatCompletionApiServiceImpl(
         @SerialName("user_id") val userId: String,
         val messages: List<MessageDto>,
         val locale: String,
+        @SerialName("response_language") val responseLanguage: String? = null,
         @SerialName("timezone_offset_minutes") val timezoneOffsetMinutes: Int,
         @SerialName("checklists_summary") val checklistsSummary: List<ChecklistSummaryDto>,
     )

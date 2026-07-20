@@ -1338,6 +1338,10 @@
     <string name="chat_settings_get_more">Get more</string>
     <string name="chat_settings_deep_thinking_title">Deep Thinking</string>
     <string name="chat_settings_deep_thinking_subtitle">All queries skip the local router and go straight to the advanced model (3 credits per reply). To answer questions about your lists, it also sends your checklist names and the text of a few recently added items.</string>
+    <string name="chat_settings_response_language_title">Response language</string>
+    <string name="chat_settings_response_language_auto">Auto</string>
+    <string name="chat_settings_response_language_subtitle_auto">Automatically matches your message</string>
+    <string name="chat_settings_response_language_subtitle_fixed">Gisti always replies in %1$s</string>
     <string name="chat_settings_clear_chat">Clear Chat History</string>
 
     <!-- AI Chat navigation / snackbar messages -->
@@ -1456,6 +1460,8 @@
     <string name="chat_features_example_from_attachment">Create a checklist from this photo, PDF or text</string>
     <string name="chat_features_example_ask">What should I pack for the trip first?</string>
     <string name="chat_features_got_it">Got it</string>
+    <string name="chat_empty_title">What can I help you check off?</string>
+    <string name="chat_empty_subtitle">Ask in your own words, or start with an example.</string>
     <string name="chat_assistant_label">AI Assistant</string>
     <string name="chat_message_copy">Copy message</string>
     <string name="chat_message_refresh">Regenerate response</string>

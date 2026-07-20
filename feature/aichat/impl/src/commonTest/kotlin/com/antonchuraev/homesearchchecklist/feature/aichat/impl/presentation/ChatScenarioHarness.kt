@@ -214,6 +214,7 @@ class FakeCompletionApi(
         messages: List<ChatMessage>,
         locale: ChatLocale,
         checklistsSummary: List<ChecklistContext>,
+        responseLanguage: String?,
     ): RemoteCompletionResult {
         callCount++
         return result
@@ -236,6 +237,7 @@ class FakeAgentApi(
         checklistsSummary: List<ChecklistContext>,
         contextChecklistName: String?,
         requestId: String?,
+        responseLanguage: String?,
     ): AgentStepResult {
         callCount++
         return result
@@ -292,6 +294,15 @@ class FakeAiChatPreferences(
     override suspend fun setDefaultChecklistId(checklistId: Long?) {
         defaultChecklistIdWrites.add(checklistId)
         defaultIdFlow.value = checklistId
+    }
+
+    // ── Response-language override ──
+    private val responseLanguageState = MutableStateFlow<String?>(null)
+    override val responseLanguageFlow: Flow<String?> = responseLanguageState
+    val responseLanguageWrites = mutableListOf<String?>()
+    override suspend fun setResponseLanguage(code: String?) {
+        responseLanguageWrites.add(code)
+        responseLanguageState.value = code
     }
 }
 
@@ -499,6 +510,7 @@ private class ParkedLayer1RoutingRepository(
         checklistsSummary: List<ChecklistContext>,
         contextChecklistName: String?,
         requestId: String?,
+        responseLanguage: String?,
     ): AgentStepResult =
         agentApi.step(
             userDataRepository.getUserData().userId,
@@ -507,6 +519,7 @@ private class ParkedLayer1RoutingRepository(
             checklistsSummary,
             contextChecklistName,
             requestId,
+            responseLanguage,
         )
 
     override suspend fun transcribeAudio(
