@@ -21,6 +21,10 @@ interface ChatAgentApiService {
      *   turn, and MUST differ between turns — the server dedups on `{user_id}__{request_id}`,
      *   so a reused id reads as a replay and the turn is never charged. Null → the server's
      *   legacy non-deduped reserve (same cost), which is what store clients still use.
+     * @param responseLanguage BCP-47 primary subtag ("en", "es", …) the user explicitly pinned for
+     *   AI replies, forwarded as top-level `response_language`. `null` (the default) is Auto — the
+     *   server matches the message language. Additive: null is omitted from the payload
+     *   (explicitNulls=false), so the legacy request stays byte-identical.
      */
     suspend fun step(
         userId: String,
@@ -29,6 +33,7 @@ interface ChatAgentApiService {
         checklistsSummary: List<ChecklistContext>,   // reuse type from ChatCompletionApiService.kt
         contextChecklistName: String? = null,
         requestId: String? = null,
+        responseLanguage: String? = null,
     ): AgentStepResult
 }
 

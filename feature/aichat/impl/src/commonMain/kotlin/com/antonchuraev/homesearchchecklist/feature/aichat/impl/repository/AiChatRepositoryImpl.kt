@@ -173,13 +173,14 @@ internal class AiChatRepositoryImpl(
         checklistsSummary: List<ChecklistContext>,
         contextChecklistName: String?,
         requestId: String?,
+        responseLanguage: String?,
     ): AgentStepResult {
         val userId = userDataRepository.getUserData().userId
         if (userId.isBlank()) {
             logger.warning(TAG, "agentStep skipped: userId blank (user not registered yet)")
             return AgentStepResult.ServiceError
         }
-        logger.debug(TAG, "agentStep: transcript=${transcript.size} entries locale=$locale checklists=${checklistsSummary.size} context=${contextChecklistName ?: "none"}")
+        logger.debug(TAG, "agentStep: transcript=${transcript.size} entries locale=$locale checklists=${checklistsSummary.size} context=${contextChecklistName ?: "none"} responseLanguage=${responseLanguage ?: "auto"}")
         return chatAgentApi.step(
             userId = userId,
             transcript = transcript,
@@ -187,6 +188,7 @@ internal class AiChatRepositoryImpl(
             checklistsSummary = checklistsSummary,
             contextChecklistName = contextChecklistName,
             requestId = requestId,
+            responseLanguage = responseLanguage,
         )
     }
 

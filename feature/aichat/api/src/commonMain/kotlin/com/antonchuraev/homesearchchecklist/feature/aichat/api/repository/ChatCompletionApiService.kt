@@ -16,11 +16,18 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.parser.ChatLocale
  * leaves the device when the user invokes Layer 3 (Deep Thinking / free-form question).
  */
 interface ChatCompletionApiService {
+    /**
+     * @param responseLanguage BCP-47 primary subtag ("en", "es", …) the user explicitly pinned for
+     *   AI replies, forwarded to the server as `response_language`. `null` (the default) means Auto —
+     *   the server picks the reply language from the message. Additive/backward-compatible: an older
+     *   server ignores the extra field, and `null` is omitted from the payload.
+     */
     suspend fun complete(
         userId: String,
         messages: List<ChatMessage>,
         locale: ChatLocale,
         checklistsSummary: List<ChecklistContext>,
+        responseLanguage: String? = null,
     ): RemoteCompletionResult
 }
 

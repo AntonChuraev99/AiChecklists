@@ -1001,3 +1001,48 @@ class TestModelExperiment:
         )
         assert arm == "variant_b"
         assert model == "gemini-3.1-flash-lite"
+
+
+# ===========================================================================
+# All-languages support: response-language directive (chat_completion / chat_agent)
+# ===========================================================================
+
+class TestResponseLanguageDirective:
+    """Additive, backward-compatible response-language helpers.
+
+    Absent field → Auto (reply in the user's message language); an explicit BCP-47
+    tag → force that language. Old clients never send `response_language`, so the
+    legacy path is exercised by the "absent → None → Auto directive" cases.
+    """
+
+    def test_normalise_absent_or_blank_is_none(self, _import_main):
+        main = _import_main
+        assert main._normalise_response_language(None) is None
+        assert main._normalise_response_language("") is None
+        assert main._normalise_response_language("   ") is None
+        assert main._normalise_response_language(123) is None
+
+    def test_normalise_strips_region_and_script(self, _import_main):
+        main = _import_main
+        assert main._normalise_response_language("es") == "es"
+        assert main._normalise_response_language("ES") == "es"
+        assert main._normalise_response_language("es-419") == "es"
+        assert main._normalise_response_language("zh_Hant") == "zh"
+        assert main._normalise_response_language(" en-US ") == "en"
+
+    def test_auto_directive_matches_message_language(self, _import_main):
+        main = _import_main
+        directive = main._language_directive(None)
+        assert "SAME language" in directive
+        assert "most recent" in directive
+
+    def test_explicit_directive_names_known_language(self, _import_main):
+        main = _import_main
+        directive = main._language_directive("es")
+        assert "Spanish" in directive
+        assert "overrides any language note above" in directive
+
+    def test_explicit_directive_unknown_tag_falls_back_to_code(self, _import_main):
+        main = _import_main
+        directive = main._language_directive("xx")
+        assert "xx" in directive  # BCP-47 code fallback still forces a language

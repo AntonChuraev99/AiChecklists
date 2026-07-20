@@ -94,18 +94,23 @@ private class FakeAiChatRepository(
     /** Captures the requestId forwarded to each agentStep call (Stage 3 idempotency key). */
     val agentStepRequestIds = mutableListOf<String?>()
 
+    /** Captures the responseLanguage forwarded to each agentStep call (explicit reply-language override). */
+    val agentStepResponseLanguages = mutableListOf<String?>()
+
     override suspend fun agentStep(
         transcript: List<AgentTranscriptEntry>,
         locale: ChatLocale,
         checklistsSummary: List<ChecklistContext>,
         contextChecklistName: String?,
         requestId: String?,
+        responseLanguage: String?,
     ): AgentStepResult {
         agentStepCallCount++
         agentStepTranscripts.add(transcript.toList())
         agentStepContextNames.add(contextChecklistName)
         agentStepChecklists.add(checklistsSummary.toList())
         agentStepRequestIds.add(requestId)
+        agentStepResponseLanguages.add(responseLanguage)
         val index = (agentStepCallCount - 1).coerceAtMost(agentStepResults.lastIndex.coerceAtLeast(0))
         return agentStepResults.getOrElse(index) { AgentStepResult.ServiceError }
     }
@@ -304,6 +309,16 @@ private class FakeAiChatPreferencesRepository(
 
     override suspend fun setDefaultChecklistId(checklistId: Long?) {
         _defaultChecklistId.value = checklistId
+    }
+
+    // ── Response-language override ──
+    private val _responseLanguage = MutableStateFlow<String?>(null)
+    var lastResponseLanguageSet: String? = null
+    override val responseLanguageFlow: kotlinx.coroutines.flow.Flow<String?> = _responseLanguage
+
+    override suspend fun setResponseLanguage(code: String?) {
+        lastResponseLanguageSet = code
+        _responseLanguage.value = code
     }
 }
 
@@ -3674,5 +3689,164 @@ class ChatViewModelTest {
 
         assertEquals(emptyMap(), transcriptRepo.loadForTurns(transcriptRepo.appendedTurnIds),
             "Clear chat must leave no tool memory behind the wiped conversation")
+    }
+
+    // ── 63. Response-language override — WIRE: selection reaches agentStep ─────
+
+    /**
+     * Builds a ViewModel whose every send routes straight to the agent loop (FreeForm/FullChat) so
+     * the reply-language override on `agentStep(...)` is exercised. One Final result per round; the
+     * fake repeats the last result when its list is exhausted, so multiple sends are fine.
+     */
+    private fun freeFormAgentRepo() = FakeAiChatRepository(
+        classifyResult = IntentClassification(
+            intent = ChatIntent.FreeForm,
+            confidence = 1.0f,
+            layer = RoutingLayer.FullChat,
+        ),
+        agentStepResults = listOf(
+            AgentStepResult.Final(content = "ok", creditsRemaining = 100),
+        ),
+    )
+
+    @Test
+    fun onResponseLanguageSelected_code_forwardsThatLanguageToAgentStep() = runTest {
+        val repo = freeFormAgentRepo()
+        val vm = makeVm(repo = repo)
+
+        // Pin Spanish, then send a free-form turn.
+        vm.sendIntent(ChatScreenIntent.OnResponseLanguageSelected("es"))
+        vm.sendIntent(ChatScreenIntent.OnInputChange("plan my week"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(1, repo.agentStepCallCount, "the free-form send must reach agentStep")
+        assertEquals(
+            "es",
+            repo.agentStepResponseLanguages.last(),
+            "the pinned reply-language must be forwarded to agentStep as responseLanguage",
+        )
+    }
+
+    @Test
+    fun onResponseLanguageSelected_auto_forwardsNullAfterHavingSelectedCode() = runTest {
+        val repo = freeFormAgentRepo()
+        val vm = makeVm(repo = repo)
+
+        // First pin Spanish and send — proves a non-null override is actually carried…
+        vm.sendIntent(ChatScreenIntent.OnResponseLanguageSelected("es"))
+        vm.sendIntent(ChatScreenIntent.OnInputChange("plan my week"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+        assertEquals("es", repo.agentStepResponseLanguages[0], "precondition: Spanish carried on turn 1")
+
+        // …then switch back to Auto (null) and send again — the next turn must drop the override.
+        vm.sendIntent(ChatScreenIntent.OnResponseLanguageSelected(null))
+        vm.sendIntent(ChatScreenIntent.OnInputChange("and the week after"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(2, repo.agentStepCallCount, "the second send must also reach agentStep")
+        assertNull(
+            repo.agentStepResponseLanguages[1],
+            "selecting Auto must forward null responseLanguage (server decides the reply language)",
+        )
+    }
+
+    @Test
+    fun agentStep_noLanguageSelected_forwardsNullResponseLanguage() = runTest {
+        val repo = freeFormAgentRepo()
+        val vm = makeVm(repo = repo)
+
+        // No OnResponseLanguageSelected at all — the default must be Auto (null).
+        vm.sendIntent(ChatScreenIntent.OnInputChange("plan my week"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(1, repo.agentStepCallCount, "the free-form send must reach agentStep")
+        assertNull(
+            repo.agentStepResponseLanguages.last(),
+            "with no language pinned, agentStep must receive null responseLanguage",
+        )
+    }
+
+    // ── 64. Response-language override — PERSIST + sheet + state mirror ────────
+
+    @Test
+    fun onResponseLanguageSelected_code_persistsClosesSheetAndReflectsInState() = runTest {
+        val prefs = FakeAiChatPreferencesRepository()
+        val vm = makeVm(aiChatPreferencesRepo = prefs)
+
+        // Open the sheet first so "closes on select" is a real transition, not the default.
+        vm.sendIntent(ChatScreenIntent.OnResponseLanguageClick)
+        assertTrue(vm.screenState.value.showResponseLanguageSheet, "precondition: sheet is open")
+
+        vm.sendIntent(ChatScreenIntent.OnResponseLanguageSelected("es"))
+        testScheduler.advanceUntilIdle()
+
+        assertEquals("es", prefs.lastResponseLanguageSet, "the code must be persisted to DataStore")
+        assertEquals(
+            "es",
+            vm.screenState.value.responseLanguage,
+            "state.responseLanguage must mirror the persisted selection (single source of truth)",
+        )
+        assertFalse(
+            vm.screenState.value.showResponseLanguageSheet,
+            "picking a language must close the picker sheet",
+        )
+    }
+
+    @Test
+    fun onResponseLanguageSelected_auto_persistsNullAndReflectsAutoInState() = runTest {
+        val prefs = FakeAiChatPreferencesRepository()
+        val vm = makeVm(aiChatPreferencesRepo = prefs)
+
+        // Pin a code first so switching to Auto is an observable change, not the initial null.
+        vm.sendIntent(ChatScreenIntent.OnResponseLanguageSelected("es"))
+        testScheduler.advanceUntilIdle()
+        assertEquals("es", vm.screenState.value.responseLanguage, "precondition: Spanish pinned")
+
+        vm.sendIntent(ChatScreenIntent.OnResponseLanguageSelected(null))
+        testScheduler.advanceUntilIdle()
+
+        assertNull(prefs.lastResponseLanguageSet, "Auto must persist null")
+        assertNull(
+            vm.screenState.value.responseLanguage,
+            "state.responseLanguage must mirror Auto (null) after switching back",
+        )
+    }
+
+    @Test
+    fun onResponseLanguageClick_opensResponseLanguageSheet() {
+        val vm = makeVm()
+        assertFalse(vm.screenState.value.showResponseLanguageSheet, "sheet is closed by default")
+
+        vm.sendIntent(ChatScreenIntent.OnResponseLanguageClick)
+
+        assertTrue(
+            vm.screenState.value.showResponseLanguageSheet,
+            "tapping the response-language row must open the picker sheet",
+        )
+    }
+
+    // ── 65. OnPrefillInput — sets the composer text without sending ───────────
+
+    @Test
+    fun onPrefillInput_setsInputTextAndDoesNotSend() = runTest {
+        val repo = freeFormAgentRepo()
+        val vm = makeVm(repo = repo)
+
+        vm.sendIntent(ChatScreenIntent.OnPrefillInput("buy milk and eggs"))
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(
+            "buy milk and eggs",
+            vm.screenState.value.inputText,
+            "OnPrefillInput must load the text into the composer",
+        )
+        // Prefill only fills the composer — nothing is classified or sent until the user taps send.
+        assertEquals(0, repo.classifyCallCount, "prefill must NOT classify")
+        assertEquals(0, repo.agentStepCallCount, "prefill must NOT reach the agent loop")
+        assertEquals(0, vm.screenState.value.messages.size, "prefill must NOT append a message")
     }
 }

@@ -19,6 +19,15 @@ private const val DEFAULT_DEEP_THINKING = false
 private const val KEY_DEFAULT_CHECKLIST_ID = "ai_chat_default_checklist_id"
 private const val NO_DEFAULT_CHECKLIST = ""
 
+/**
+ * The explicit AI response language, stored as its BCP-47 primary subtag ("en", "es", …).
+ *
+ * The empty string is the "Auto" sentinel (no override) — same string-storage convention as
+ * [KEY_DEFAULT_CHECKLIST_ID], so "reset to Auto" is a plain write rather than a per-key remove.
+ */
+private const val KEY_RESPONSE_LANGUAGE = "ai_chat_response_language"
+private const val NO_RESPONSE_LANGUAGE = ""
+
 class AiChatPreferencesRepositoryImpl(
     private val dataStore: AppDatastore,
 ) : AiChatPreferencesRepository {
@@ -36,5 +45,13 @@ class AiChatPreferencesRepositoryImpl(
 
     override suspend fun setDefaultChecklistId(checklistId: Long?) {
         dataStore.saveString(KEY_DEFAULT_CHECKLIST_ID, checklistId?.toString() ?: NO_DEFAULT_CHECKLIST)
+    }
+
+    override val responseLanguageFlow: Flow<String?> =
+        dataStore.observeString(KEY_RESPONSE_LANGUAGE, NO_RESPONSE_LANGUAGE)
+            .map { it.ifEmpty { null } }
+
+    override suspend fun setResponseLanguage(code: String?) {
+        dataStore.saveString(KEY_RESPONSE_LANGUAGE, code ?: NO_RESPONSE_LANGUAGE)
     }
 }

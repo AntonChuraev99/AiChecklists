@@ -178,7 +178,8 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.com
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.AiChoiceResponse
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatFeedbackSheet
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatInputRow
-import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.ChatMessageList
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.ChatBody
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.ChatEmptyState
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatMessageBubble
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatTypingIndicator
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatRecordingOverlay
@@ -792,7 +793,6 @@ fun App() {
             val sm_dispatchAttachedOne = stringResource(Res.string.chat_dispatch_attached_one)
             val sm_dispatchAttachedMany = stringResource(Res.string.chat_dispatch_attached_many)
             val sm_choiceEditEmptyHint = stringResource(Res.string.chat_choice_edit_empty_hint)
-            val chatPanelGreeting = stringResource(Res.string.chat_panel_greeting)
 
             // NOT remember()-ed. `stringResource` resolves asynchronously in Compose Multiplatform
             // and returns "" for the first frames; a remember() keyed on a SUBSET of these strings
@@ -1265,22 +1265,14 @@ fun App() {
                             // shrink/grow. The answer frame just stays empty (height 0 via answerMinHeight=0)
                             // in item-create.
                             if (itemCreateOverride == null) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(
-                                            horizontal = AppDimens.ScreenPaddingHorizontal,
-                                            vertical = AppDimens.SpacingMd,
-                                        ),
-                                    verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
-                                ) {
-                                    Text(
-                                        text = chatPanelGreeting,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.fillMaxWidth(),
-                                    )
-                                }
+                                // Localized greeting + a prompt-chip row whose taps PREFILL the dock
+                                // composer (OnPrefillInput) — never send. The peek chips fade on
+                                // expand, so there is no double row.
+                                ChatEmptyState(
+                                    compact = true,
+                                    onPrefill = { chatViewModel.sendIntent(ChatScreenIntent.OnPrefillInput(it)) },
+                                    modifier = Modifier.padding(vertical = AppDimens.SpacingMd),
+                                )
                             }
                         },
                         inputContent = { onInputFocusChanged ->
@@ -1391,7 +1383,10 @@ fun App() {
                     dockStartHeightPx = dockHeightPx,
                     onCollapse = { scope.launch { fullState.close() } },
                     historyContent = {
-                        ChatMessageList(
+                        // ChatBody (not ChatMessageList directly) so the FULL overlay shows the SAME
+                        // localized empty-state (greeting + suggestion cards that prefill the composer)
+                        // as the full-screen chat while the conversation is empty.
+                        ChatBody(
                             state = chatUiState,
                             onIntent = { chatViewModel.sendIntent(it) },
                             listState = fullListState,

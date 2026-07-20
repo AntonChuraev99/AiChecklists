@@ -274,6 +274,14 @@ class ChatViewModel(
                     _screenState.value = _screenState.value.copy(defaultChecklistName = name)
                 }
         }
+
+        // Mirror the persisted response-language override so the settings sheet reflects it on
+        // entry and every agent turn forwards the pinned code (null = Auto).
+        viewModelScope.launch {
+            aiChatPreferencesRepository.responseLanguageFlow.collect { code ->
+                _screenState.value = _screenState.value.copy(responseLanguage = code)
+            }
+        }
     }
 
     override fun onIntent(intent: ChatScreenIntent) {
@@ -403,6 +411,27 @@ class ChatViewModel(
                 viewModelScope.launch {
                     aiChatPreferencesRepository.setDeepThinkingEnabled(intent.enabled)
                 }
+            }
+
+            ChatScreenIntent.OnResponseLanguageClick -> {
+                _screenState.value = _screenState.value.copy(showResponseLanguageSheet = true)
+            }
+
+            is ChatScreenIntent.OnResponseLanguageSelected -> {
+                // Close the picker immediately; persist to DataStore, and the init {} collector
+                // mirrors the new value back into state (single source of truth).
+                _screenState.value = _screenState.value.copy(showResponseLanguageSheet = false)
+                viewModelScope.launch {
+                    runCatching { aiChatPreferencesRepository.setResponseLanguage(intent.code) }
+                        .onFailure { e ->
+                            logger.error(TAG, "Failed to persist response language", e)
+                            _sideEffect.emit(ChatScreenSideEffect.ShowSnackbar("chat_generic_error"))
+                        }
+                }
+            }
+
+            ChatScreenIntent.OnResponseLanguagePickerDismiss -> {
+                _screenState.value = _screenState.value.copy(showResponseLanguageSheet = false)
             }
 
             is ChatScreenIntent.OnClearChat -> {
@@ -2291,6 +2320,9 @@ class ChatViewModel(
                 checklistsSummary = checklistsSummary,
                 contextChecklistName = contextChecklistName,
                 requestId = requestId,
+                // Explicit reply-language override (null = Auto → server decides). Read from state,
+                // which mirrors the persisted preference loaded in init {}.
+                responseLanguage = _screenState.value.responseLanguage,
             )
 
             // A/B: mirror the server-assigned model arm into the sticky user-property + persist it via

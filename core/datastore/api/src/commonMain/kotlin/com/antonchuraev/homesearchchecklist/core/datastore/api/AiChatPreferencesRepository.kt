@@ -33,4 +33,18 @@ interface AiChatPreferencesRepository {
 
     /** Persist (or clear, with `null`) the user's default chat target list. */
     suspend fun setDefaultChecklistId(checklistId: Long?)
+
+    /**
+     * Emits the BCP-47 primary subtag (e.g. "en", "es", "hi") of the language the user explicitly
+     * pinned for AI replies, or `null` when the reply language should be decided automatically by
+     * the server ("Auto" — the default).
+     *
+     * This is an explicit override only: `null` means "no override, let the server match the user's
+     * message language". A non-null code is forwarded to the Layer-3 endpoints as `response_language`
+     * so the model always answers in that language regardless of the input language.
+     */
+    val responseLanguageFlow: Flow<String?>
+
+    /** Persist (or clear, with `null` = Auto) the user's explicit AI response language. */
+    suspend fun setResponseLanguage(code: String?)
 }

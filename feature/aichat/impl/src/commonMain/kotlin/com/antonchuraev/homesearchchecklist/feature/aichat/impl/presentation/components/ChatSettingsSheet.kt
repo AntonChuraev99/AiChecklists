@@ -10,8 +10,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetState
@@ -29,10 +32,15 @@ import aichecklists.core.designsystem.generated.resources.chat_settings_clear_ch
 import aichecklists.core.designsystem.generated.resources.chat_settings_default_list_reset
 import aichecklists.core.designsystem.generated.resources.chat_settings_default_list_subtitle
 import aichecklists.core.designsystem.generated.resources.chat_settings_default_list_title
+import aichecklists.core.designsystem.generated.resources.chat_settings_response_language_auto
+import aichecklists.core.designsystem.generated.resources.chat_settings_response_language_subtitle_auto
+import aichecklists.core.designsystem.generated.resources.chat_settings_response_language_subtitle_fixed
+import aichecklists.core.designsystem.generated.resources.chat_settings_response_language_title
 import aichecklists.core.designsystem.generated.resources.chat_settings_title
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCreditsChip
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppSwitch
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
+import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.ChatLanguageOption
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -67,6 +75,8 @@ fun ChatSettingsSheet(
     onClearChat: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    responseLanguageCode: String? = null,
+    onResponseLanguageClick: () -> Unit = {},
     defaultChecklistName: String? = null,
     onResetDefaultChecklist: () -> Unit = {},
     sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -143,6 +153,61 @@ fun ChatSettingsSheet(
                     onCheckedChange = null,
                     modifier = Modifier.padding(start = AppDimens.SpacingLg),
                 )
+            }
+
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = AppDimens.SpacingLg),
+                color = MaterialTheme.colorScheme.outlineVariant,
+            )
+
+            // Response-language row (Perplexity-style drill-in). null → "Auto"; a pinned code shows
+            // its endonym. Tapping opens the language picker sheet; the localized empty-state is the
+            // signal we speak the user's language, so there is no in-chat language badge.
+            val responseLanguageEndonym = ChatLanguageOption.endonymFor(responseLanguageCode)
+            val responseLanguageValueLabel = responseLanguageEndonym
+                ?: stringResource(Res.string.chat_settings_response_language_auto)
+            val responseLanguageSubtitle = if (responseLanguageEndonym == null) {
+                stringResource(Res.string.chat_settings_response_language_subtitle_auto)
+            } else {
+                stringResource(Res.string.chat_settings_response_language_subtitle_fixed, responseLanguageEndonym)
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(role = Role.Button, onClick = onResponseLanguageClick)
+                    .padding(vertical = AppDimens.SpacingXs),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(Res.string.chat_settings_response_language_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Spacer(modifier = Modifier.height(AppDimens.SpacingXs))
+                    Text(
+                        text = responseLanguageSubtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingXxs),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(start = AppDimens.SpacingLg),
+                ) {
+                    Text(
+                        text = responseLanguageValueLabel,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
 
             // Default-list section — rendered ONLY once a default exists.

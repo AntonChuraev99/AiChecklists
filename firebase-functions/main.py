@@ -2711,6 +2711,66 @@ def _format_checklists_summary(items) -> str:
     return "\n".join(lines) if lines else "(no recent checklists provided)"
 
 
+# ── Response-language support (all-languages, additive / backward-compatible) ──────────
+# The chat responds in the user's language. Two modes, both template-agnostic (the
+# directive is appended to the already-formatted prompt, so it does not depend on the
+# proprietary prompts_private.py template internals):
+#   • Auto (default): `response_language` absent/blank → reply in the user's own message
+#     language (Gemini auto-detects from the text). Works for EVERY language and for old
+#     clients that never send the field — no client change required.
+#   • Explicit override: `response_language` = a BCP-47 tag → always reply in that language.
+# The directive is worded as highest-priority so it overrides any language note the private
+# template may already inject via {locale}.
+_RESPONSE_LANGUAGE_NAMES = {
+    "en": "English", "hi": "Hindi", "es": "Spanish", "pt": "Portuguese",
+    "de": "German", "fr": "French", "it": "Italian", "nl": "Dutch",
+    "pl": "Polish", "tr": "Turkish", "ru": "Russian", "uk": "Ukrainian",
+    "ar": "Arabic", "zh": "Chinese", "ja": "Japanese", "ko": "Korean",
+    # tolerated beyond the client picker list — server stays permissive to any tag
+    "id": "Indonesian", "vi": "Vietnamese", "th": "Thai", "fa": "Persian",
+    "cs": "Czech", "sv": "Swedish", "ro": "Romanian", "el": "Greek",
+    "he": "Hebrew", "hu": "Hungarian", "da": "Danish", "fi": "Finnish",
+    "nb": "Norwegian", "no": "Norwegian", "sk": "Slovak", "bg": "Bulgarian",
+}
+
+
+def _normalise_response_language(raw):
+    """Extract a clean BCP-47 primary subtag from the optional `response_language` field.
+
+    Returns None (→ Auto) when absent, blank, or not a string. "es-419"/"zh_Hant" → "es"/"zh".
+    """
+    if not isinstance(raw, str):
+        return None
+    tag = raw.strip().lower()
+    if not tag:
+        return None
+    return tag.split("-")[0].split("_")[0] or None
+
+
+def _language_directive(response_language):
+    """Final, authoritative language block appended to a chat prompt.
+
+    `response_language` is a normalised primary subtag, or None for Auto.
+    """
+    if response_language:
+        name = _RESPONSE_LANGUAGE_NAMES.get(response_language)
+        target = name or f"the language with BCP-47 code '{response_language}'"
+        return (
+            "\n\n---\n"
+            "LANGUAGE (highest priority — overrides any language note above): "
+            f"Write your ENTIRE response in {target}, regardless of the language the "
+            "user writes in. Only user-provided proper nouns and quoted text may stay "
+            "in their original language."
+        )
+    return (
+        "\n\n---\n"
+        "LANGUAGE (highest priority — overrides any language note above): "
+        "Write your ENTIRE response in the SAME language as the user's most recent "
+        "message. Detect the language from the message text itself, not from any locale "
+        "code. If the message is too short to tell, keep the prior conversation's language."
+    )
+
+
 @functions_framework.http
 def chat_completion(request: Request):
     """
@@ -2776,6 +2836,10 @@ def chat_completion(request: Request):
     if locale not in ("ru", "en"):
         locale = "en"
 
+    # Optional + additive: explicit response-language override. Absent → Auto (reply in the
+    # user's message language). Old clients never send it, so the legacy path is unchanged.
+    response_language = _normalise_response_language(data.get("response_language"))
+
     try:
         tz_offset_minutes = int(data.get("timezone_offset_minutes") or 0)
     except (TypeError, ValueError):
@@ -2805,6 +2869,7 @@ def chat_completion(request: Request):
         checklists_summary=checklists_summary_text,
         history=history_text,
     )
+    prompt += _language_directive(response_language)
 
     try:
         content = _call_gemini_flash(prompt, model_id=model_id)
@@ -3314,6 +3379,9 @@ def chat_agent(request: Request):
     if locale not in ("ru", "en"):
         locale = "en"
 
+    # Optional + additive: explicit response-language override (see chat_completion).
+    response_language = _normalise_response_language(data.get("response_language"))
+
     try:
         tz_offset_minutes = int(data.get("timezone_offset_minutes") or 0)
     except (TypeError, ValueError):
@@ -3396,6 +3464,7 @@ def chat_agent(request: Request):
         context_block=context_block,
         features=features_block,
     )
+    system_instruction += _language_directive(response_language)
 
     # Capability gate: only clients that advertise `supports_options` can render type:"options",
     # so only they get the present_options tool. Absent/false → base tools (old-client safe).

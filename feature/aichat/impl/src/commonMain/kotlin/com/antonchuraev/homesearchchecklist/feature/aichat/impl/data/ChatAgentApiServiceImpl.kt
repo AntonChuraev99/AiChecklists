@@ -81,8 +81,9 @@ internal class ChatAgentApiServiceImpl(
         checklistsSummary: List<ChecklistContext>,
         contextChecklistName: String?,
         requestId: String?,
+        responseLanguage: String?,
     ): AgentStepResult = runCatching {
-        logger.debug(TAG, "step: userId=${userId.take(8)}... transcript=${transcript.size} entries locale=$locale checklists=${checklistsSummary.size} context=${contextChecklistName ?: "none"} requestId=${requestId ?: "none"}")
+        logger.debug(TAG, "step: userId=${userId.take(8)}... transcript=${transcript.size} entries locale=$locale checklists=${checklistsSummary.size} context=${contextChecklistName ?: "none"} requestId=${requestId ?: "none"} responseLanguage=${responseLanguage ?: "auto"}")
 
         val response: HttpResponse = httpClient.post(AGENT_URL) {
             contentType(ContentType.Application.Json)
@@ -113,6 +114,9 @@ internal class ChatAgentApiServiceImpl(
                     // tool) when the client advertises support. Older clients omit this flag and
                     // never receive an "options" response they couldn't render.
                     supportsOptions = true,
+                    // Explicit reply-language override only; null (Auto) is dropped by
+                    // explicitNulls=false so the server keeps deciding the language itself.
+                    responseLanguage = responseLanguage,
                 )
             )
         }
@@ -267,6 +271,9 @@ internal class ChatAgentApiServiceImpl(
         @SerialName("context_checklist") val contextChecklist: ContextChecklistDto? = null,
         // Backward-compat gate: when true the server may return type:"options" (present_options).
         @SerialName("supports_options") val supportsOptions: Boolean = false,
+        // Optional: present only when the user pinned an explicit AI reply language (not Auto).
+        // Server contract: top-level `response_language: "<bcp47>"`. Dropped when null.
+        @SerialName("response_language") val responseLanguage: String? = null,
     )
 
     @Serializable

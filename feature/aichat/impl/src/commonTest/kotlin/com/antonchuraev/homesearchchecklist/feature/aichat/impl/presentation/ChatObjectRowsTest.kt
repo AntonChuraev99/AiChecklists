@@ -146,6 +146,7 @@ private class ScriptedAgentRepository(
         checklistsSummary: List<ChecklistContext>,
         contextChecklistName: String?,
         requestId: String?,
+        responseLanguage: String?,
     ): AgentStepResult = steps.getOrElse(index++) { AgentStepResult.ServiceError }
 
     override suspend fun completeFreeForm(

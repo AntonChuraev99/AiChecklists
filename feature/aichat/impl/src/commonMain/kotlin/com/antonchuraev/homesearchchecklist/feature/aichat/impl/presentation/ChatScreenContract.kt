@@ -79,6 +79,15 @@ data class ChatScreenState(
      * Drives the chat-settings reset row — a remembered default MUST be visible and clearable.
      */
     val defaultChecklistName: String? = null,
+    /**
+     * The BCP-47 primary subtag ("en", "es", "hi", …) of the language the user EXPLICITLY pinned
+     * for AI replies, or null for "Auto" (the default — the server matches the message language).
+     * Loaded from DataStore on VM init and forwarded to Layer-3 as `response_language` only when
+     * non-null. The endonym shown in settings is resolved from [ChatLanguageOption.ALL] by code.
+     */
+    val responseLanguage: String? = null,
+    /** Whether the response-language picker bottom sheet is visible (opened from chat settings). */
+    val showResponseLanguageSheet: Boolean = false,
 ) : State {
     /** True when the Send button should be active (text entered OR attachments pending). */
     val canSend: Boolean get() = inputText.isNotBlank() || pendingAttachments.isNotEmpty()
@@ -281,6 +290,19 @@ sealed interface ChatScreenIntent : Intent {
 
     /** User toggled the "Deep Thinking" switch in the settings sheet. */
     data class OnDeepThinkingToggle(val enabled: Boolean) : ChatScreenIntent
+
+    /** User tapped the "Response language" row in chat settings — opens the language picker sheet. */
+    data object OnResponseLanguageClick : ChatScreenIntent
+
+    /**
+     * User picked a reply language in the picker. [code] is a BCP-47 primary subtag, or null to
+     * reset to "Auto" (server decides). Persisted to DataStore; the init {} collector mirrors it
+     * back into state, and it is forwarded to Layer-3 as `response_language` only when non-null.
+     */
+    data class OnResponseLanguageSelected(val code: String?) : ChatScreenIntent
+
+    /** User dismissed the response-language picker sheet without changing the selection. */
+    data object OnResponseLanguagePickerDismiss : ChatScreenIntent
 
     data object OnClearChat : ChatScreenIntent
 

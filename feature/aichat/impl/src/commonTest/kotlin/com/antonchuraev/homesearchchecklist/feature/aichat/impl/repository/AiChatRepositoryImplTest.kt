@@ -79,6 +79,7 @@ private class FakeChatCompletionApiService(
         messages: List<ChatMessage>,
         locale: ChatLocale,
         checklistsSummary: List<ChecklistContext>,
+        responseLanguage: String?,
     ): RemoteCompletionResult {
         callCount++
         lastUserId = userId
@@ -130,6 +131,7 @@ private class FakeChatAgentApiService : ChatAgentApiService {
         checklistsSummary: List<ChecklistContext>,
         contextChecklistName: String?,
         requestId: String?,
+        responseLanguage: String?,
     ): AgentStepResult = AgentStepResult.ServiceError
 }
 
@@ -151,6 +153,10 @@ private class FakeAiChatPreferencesRepository(
     private val _defaultChecklistId = MutableStateFlow<Long?>(null)
     override val defaultChecklistIdFlow: Flow<Long?> = _defaultChecklistId
     override suspend fun setDefaultChecklistId(checklistId: Long?) { _defaultChecklistId.value = checklistId }
+
+    private val _responseLanguage = MutableStateFlow<String?>(null)
+    override val responseLanguageFlow: Flow<String?> = _responseLanguage
+    override suspend fun setResponseLanguage(code: String?) { _responseLanguage.value = code }
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
