@@ -127,7 +127,7 @@ Strategy + phased plan: **`docs/plans/2026-07-14-seo-organic-growth-strategy.md`
 
 - **Indexable pages are static files under `landing/`, served by worker `gisti-landing` (`wrangler.landing.jsonc`, apex + www). NEVER an app route** — `app.gisti-ai.com` is wasmJs Compose (Skiko `<canvas>`) = empty DOM for crawlers = SEO-zero. Replicate the `landing/mcp/index.html` pattern for new pages.
 - **Public gallery = curated/opt-in content ONLY** — never expose Firestore user checklists (private data under `users/{google_uid}`).
-- Gaps to close first: no `robots.txt`, no `sitemap.xml`, no IndexNow, GSC apex re-index deferred (Phase 0 in the plan).
+- Phase 0 foundation LIVE: `robots.txt` + `sitemap.xml` (124 URLs, 61 hi + 63 en) + IndexNow, all serving; GSC domain property verified. Pages **are** indexed — the gap is **ranking / domain authority** (backlinks + internal links + Pinterest), not infra or indexing. Current GSC state + owner actions live in the SEO plan's verification block (gitignored).
 - Landing infra + deploy account trap (gmail acct, `wrangler whoami` first): `docs/plans/2026-07-01-landing-root-swap-migration-plan.md`; SEO-landing history: `docs/completed/seo-landing-page-2026-07-01.md`.
 
 ## Dependencies & Economics
