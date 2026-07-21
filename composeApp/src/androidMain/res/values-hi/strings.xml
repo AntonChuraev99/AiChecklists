@@ -1,0 +1,62 @@
+<resources>
+    <string name="app_name">Gisti - AI चेकलिस्ट</string>
+
+    <!-- Widget -->
+    <string name="widget_name">चेकलिस्ट</string>
+    <string name="widget_description">अपनी चेकलिस्ट के आइटम देखें और पूरे करें</string>
+    <string name="widget_loading">लोड हो रहा है…</string>
+
+    <!-- Widget UI States -->
+    <string name="widget_not_found">चेकलिस्ट नहीं मिली</string>
+    <string name="widget_select_another">दूसरी चुनें</string>
+    <string name="widget_tap_to_configure">सेट करने के लिए टैप करें</string>
+    <string name="widget_select_checklist_display">दिखाने के लिए चेकलिस्ट चुनें</string>
+    <string name="widget_no_items">कोई आइटम नहीं</string>
+    <string name="widget_checked">पूरा हुआ</string>
+    <string name="widget_unchecked">बाकी</string>
+
+    <!-- Reminder Notifications -->
+    <string name="reminder_all_completed">सभी आइटम पूरे हुए!</string>
+    <string name="reminder_notification_channel">चेकलिस्ट रिमाइंडर</string>
+    <string name="reminder_notification_channel_desc">चेकलिस्ट रिमाइंडर और डेडलाइन के लिए सूचनाएं</string>
+    <string name="reminder_notification_tap">खोलने के लिए टैप करें</string>
+    <plurals name="reminder_items_remaining">
+        <item quantity="one">%1$d आइटम बाकी</item>
+        <item quantity="other">%1$d आइटम बाकी</item>
+    </plurals>
+
+    <!-- Push / Promotions Notifications (FCM re-engagement) -->
+    <string name="promotions_notification_channel">टिप्स और ऑफ़र</string>
+    <string name="promotions_notification_channel_desc">प्रोडक्ट टिप्स, साप्ताहिक सारांश और ऑफ़र। आपके सेट किए रिमाइंडर एक अलग चैनल हैं और चालू रहते हैं।</string>
+
+    <!-- Local retention pushes (AlarmManager, on-device data) -->
+    <string name="retention_streak_title">जारी रखें</string>
+    <plurals name="retention_streak_body">
+        <item quantity="one">आज %2$s में %1$d आइटम बाकी</item>
+        <item quantity="other">आज %2$s में %1$d आइटम बाकी</item>
+    </plurals>
+    <string name="retention_overdue_title">अब भी आपकी सूची में</string>
+    <plurals name="retention_overdue_body">
+        <item quantity="one">%2$s में %1$d आइटम अब भी बाकी</item>
+        <item quantity="other">%2$s में %1$d आइटम अब भी बाकी</item>
+    </plurals>
+    <string name="retention_digest_title">आपका साप्ताहिक चेक-इन</string>
+    <plurals name="retention_digest_body_open">
+        <item quantity="one">आपकी %2$d चेकलिस्ट में %1$d आइटम इंतज़ार में है।</item>
+        <item quantity="other">आपकी %2$d चेकलिस्ट में %1$d आइटम इंतज़ार में हैं।</item>
+    </plurals>
+    <string name="retention_digest_body_caught_up">आपकी %1$d चेकलिस्ट पूरी हो गईं। बढ़िया काम!</string>
+    <!-- Come-back nudge -->
+    <string name="retention_comeback_title">वहीं से जारी रखें जहां छोड़ा था</string>
+    <plurals name="retention_comeback_body">
+        <item quantity="one">%2$s में %1$d आइटम अब भी इंतज़ार में</item>
+        <item quantity="other">%2$s में %1$d आइटम अब भी इंतज़ार में</item>
+    </plurals>
+
+    <!-- ACTION_PROCESS_TEXT selection-toolbar menu labels (must stay short) -->
+    <string name="process_text_create_ai">टेक्स्ट से चेकलिस्ट</string>
+    <string name="process_text_add_to_existing">चेकलिस्ट में जोड़ें</string>
+    <string name="process_text_new_checklist">नई चेकलिस्ट</string>
+    <string name="process_text_fill_ai">फ़िल (AI)</string>
+    <string name="process_text_empty">कोई टेक्स्ट नहीं चुना</string>
+</resources>

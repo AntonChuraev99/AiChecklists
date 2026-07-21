@@ -8,6 +8,7 @@ package com.antonchuraev.homesearchchecklist.core.datastore.api
  *   System  → null  → restore device default
  *   English → "en"  → override
  *   Russian → "ru"  → override
+ *   Hindi   → "hi"  → override
  *
  * Lives in core:datastore:api because the root App composable (locale plumbing)
  * and feature:settings both consume this type.
@@ -16,4 +17,5 @@ enum class AppLanguage(val tag: String?) {
     System(null),
     English("en"),
     Russian("ru"),
+    Hindi("hi"),
 }

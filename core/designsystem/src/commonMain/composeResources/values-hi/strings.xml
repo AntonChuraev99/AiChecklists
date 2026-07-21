@@ -1,0 +1,1546 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App -->
+    <string name="app_name">Gisti - AI Checklists</string>
+
+    <!-- Common -->
+    <string name="save">सहेजें</string>
+    <string name="cancel">रद्द करें</string>
+    <string name="ok">ठीक है</string>
+    <string name="error">एरर</string>
+    <string name="selected">चुना गया:</string>
+    <string name="select">चुनें</string>
+    <string name="delete">हटाएं</string>
+    <string name="add_item">आइटम जोड़ें</string>
+    <string name="add_item_placeholder">नया आइटम जोड़ें...</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_skip">छोड़ें</string>
+    <string name="onboarding_continue">जारी रखें</string>
+    <!-- Onboarding Page 1 - AI Chat -->
+    <string name="onboarding_page1_title">बस Gisti को बताएं आपको क्या चाहिए</string>
+    <string name="onboarding_page1_description">आइटम जोड़ें, रिमाइंडर सेट करें, अपने हफ़्ते की योजना बनाएं — सब कुछ AI चैट से।</string>
+
+    <!-- Onboarding Page 2 - Create from Anything -->
+    <string name="onboarding_page2_title">कोई भी कंटेंट → चेकलिस्ट</string>
+    <string name="onboarding_page2_description">फ़ोटो, PDF, वॉइस, टेक्स्ट या लिंक — AI इसे एक साफ़ चेकलिस्ट में बदल देता है।</string>
+
+    <!-- Onboarding Page 3 - Reminders & Calendar -->
+    <string name="onboarding_page3_title">कुछ भी न भूलें</string>
+    <string name="onboarding_page3_description">हर आइटम के लिए रिमाइंडर, दोहराने वाले शेड्यूल, और कैलेंडर व्यू।</string>
+
+    <!-- Onboarding Page 4 - Works Everywhere -->
+    <string name="onboarding_page4_title">आपकी सूचियां आपके साथ चलती हैं</string>
+    <string name="onboarding_page4_description">फ़ोन, टैबलेट या ब्राउज़र — वही चेकलिस्ट, वही AI।</string>
+
+    <!-- Onboarding Get Started (last feature page CTA) -->
+    <string name="onboarding_get_started">शुरू करें</string>
+
+    <!-- Interactive Onboarding -->
+    <string name="onboarding_interactive_category_title">आप क्या व्यवस्थित करना चाहते हैं?</string>
+    <string name="onboarding_interactive_category_subtitle">शुरू करने के लिए एक चुनें</string>
+    <string name="onboarding_interactive_category_travel">यात्रा</string>
+    <string name="onboarding_interactive_category_home">घर और शिफ़्टिंग</string>
+    <string name="onboarding_interactive_category_shopping">शॉपिंग</string>
+    <string name="onboarding_interactive_category_work">काम और प्रोजेक्ट</string>
+    <string name="onboarding_interactive_category_health">स्वास्थ्य</string>
+    <string name="onboarding_interactive_category_education">शिक्षा</string>
+    <string name="onboarding_interactive_category_fitness">फ़िटनेस</string>
+    <string name="onboarding_interactive_category_cooking">खाना बनाना</string>
+    <string name="onboarding_interactive_category_finance">फ़ाइनेंस</string>
+    <string name="onboarding_interactive_category_events">इवेंट्स</string>
+    <string name="onboarding_interactive_style_title">आप अपनी सूचियां कैसी पसंद करते हैं?</string>
+    <string name="onboarding_interactive_style_subtitle">इससे आपकी पहली चेकलिस्ट तय होती है</string>
+    <string name="onboarding_interactive_style_minimalist">मिनिमल</string>
+    <string name="onboarding_interactive_style_minimalist_desc">बस ज़रूरी चीज़ें</string>
+    <string name="onboarding_interactive_style_detailed">विस्तृत</string>
+    <string name="onboarding_interactive_style_detailed_desc">हर कदम शामिल</string>
+    <string name="onboarding_interactive_style_chaotic">सब कुछ और ज़्यादा</string>
+    <string name="onboarding_interactive_style_chaotic_desc">एक्स्ट्रा टिप्स जो आप भूल सकते हैं</string>
+    <string name="onboarding_interactive_template_title">एक चेकलिस्ट चुनें</string>
+    <string name="onboarding_interactive_template_subtitle">अपना शुरुआती बिंदु चुनें</string>
+    <string name="onboarding_interactive_template_items_count">%1$d आइटम</string>
+    <string name="onboarding_interactive_customize_title">इसे अपना बनाएं</string>
+    <string name="onboarding_interactive_customize_subtitle">जो नहीं चाहिए उसे बंद कर दें</string>
+    <string name="onboarding_interactive_customize_continue">जारी रखें</string>
+    <string name="onboarding_interactive_creating_title">आपकी चेकलिस्ट बन रही है…</string>
+    <string name="onboarding_interactive_creating_social">Gisti से 12,000+ चेकलिस्ट बनाई गईं</string>
+    <string name="onboarding_interactive_preview_title">आपकी चेकलिस्ट तैयार है!</string>
+    <string name="onboarding_interactive_preview_subtitle">आइटम पर टैप करके उन्हें चेक करें</string>
+    <string name="onboarding_interactive_preview_button">सहेजें और जारी रखें</string>
+    <string name="onboarding_preview_all_checked">सब चेक हो गया!</string>
+
+    <!-- Discover More Step -->
+    <string name="onboarding_discover_title">आपकी चेकलिस्ट तैयार है!</string>
+    <string name="onboarding_discover_subtitle">इसे अपने काम का बनाएं</string>
+
+    <string name="onboarding_discover_reminder_title">रिमाइंडर सेट करें</string>
+    <string name="onboarding_discover_reminder_subtitle">सही समय पर याद दिलाया जाए</string>
+    <string name="onboarding_discover_widget_title">विजेट जोड़ें</string>
+    <string name="onboarding_discover_widget_subtitle">होम स्क्रीन से तुरंत एक्सेस</string>
+    <string name="onboarding_discover_share_title">चेकलिस्ट शेयर करें</string>
+    <string name="onboarding_discover_share_subtitle">तुरंत एक्सपोर्ट या शेयर करें</string>
+
+    <string name="onboarding_discover_reminder_sheet_title">क्विक रिमाइंडर</string>
+    <string name="onboarding_discover_reminder_tonight">आज रात, 9 PM</string>
+    <string name="onboarding_discover_reminder_daily">रोज़ाना, 9 AM</string>
+    <string name="onboarding_discover_reminder_weekly">साप्ताहिक, सोमवार</string>
+    <string name="onboarding_discover_reminder_custom">कस्टम…</string>
+    <string name="onboarding_discover_reminder_done">रिमाइंडर सेट हो गया!</string>
+
+    <string name="onboarding_discover_widget_sheet_title">होम स्क्रीन पर विजेट जोड़ें</string>
+    <string name="onboarding_discover_widget_step1">अपनी होम स्क्रीन पर देर तक दबाएं</string>
+    <string name="onboarding_discover_widget_step2">"Widgets" पर टैप करें और Gisti ढूंढें</string>
+    <string name="onboarding_discover_widget_step3">विजेट को अपनी होम स्क्रीन पर खींचें</string>
+    <string name="onboarding_discover_widget_done">समझ गया</string>
+
+    <string name="onboarding_discover_maybe_later">शायद बाद में</string>
+
+    <!-- Retention: recurring-list nudge (checklist detail) -->
+    <string name="recurring_nudge_title">इस सूची को हर हफ़्ते दोहराएं?</string>
+    <string name="recurring_nudge_subtitle">इसे रूटीन बनाएं और हम इसे हर हफ़्ते वापस ले आएंगे।</string>
+    <string name="recurring_nudge_accept">हर हफ़्ते दोहराएं</string>
+    <string name="recurring_nudge_dismiss">खारिज करें</string>
+    <string name="recurring_nudge_set_confirmation">साप्ताहिक दोहराव सेट हो गया</string>
+
+    <!-- Retention: home-screen widget promo sheet (after the user's 2nd checklist) -->
+    <string name="widget_promo_title">Gisti विजेट जोड़ें</string>
+    <string name="widget_promo_description">एक चेकलिस्ट को बस एक टैप की दूरी पर रखें, सीधे अपनी होम स्क्रीन पर।</string>
+    <string name="widget_promo_feature1">ऐप खोले बिना अपनी सूची देखें</string>
+    <string name="widget_promo_feature2">होम स्क्रीन से ही आइटम चेक करें</string>
+    <string name="widget_promo_feature3">स्ट्रीक जारी रखने के लिए रोज़ाना एक रिमाइंडर</string>
+    <string name="widget_promo_add">विजेट जोड़ें</string>
+    <string name="widget_promo_skip">अभी नहीं</string>
+    <string name="onboarding_discover_completed">%2$d में से %1$d पूरे हुए</string>
+
+    <!-- AI Welcome onboarding (Toki style) — Android-only variant -->
+    <string name="onboarding_welcome_continue">जारी रखें</string>
+    <string name="onboarding_welcome_create_cta">मेरी पहली सूची बनाएं</string>
+    <string name="onboarding_welcome_create_error">आपकी सूची नहीं बन पाई। फिर से आज़माएं।</string>
+    <string name="onboarding_welcome_default_checklist_name">मेरी चेकलिस्ट</string>
+    <string name="onboarding_welcome_generating">आपकी चेकलिस्ट बन रही है…</string>
+    <!-- Step 1: Welcome -->
+    <string name="onboarding_welcome_title_lead">मिलिए अपने AI</string>
+    <string name="onboarding_welcome_title_accent">चेकलिस्ट असिस्टेंट से</string>
+    <string name="onboarding_welcome_testimonial_quote">"यह एक ही मैसेज में मेरे पूरे हफ़्ते की योजना बना देता है। मैं बस बोलता हूं, यह सब व्यवस्थित कर देता है।"</string>
+    <string name="onboarding_welcome_testimonial_author">माया, शुरुआती यूज़र</string>
+    <!-- Step 2: Capture -->
+    <string name="onboarding_welcome_capture_title_lead">बस चैट करें।</string>
+    <string name="onboarding_welcome_capture_title_accent">हो गया।</string>
+    <string name="onboarding_welcome_capture_lead">Gisti को आसान शब्दों में बताएं आपको क्या चाहिए। यह सूची बनाता है, रिमाइंडर सेट करता है, और सब कुछ व्यवस्थित रखता है।</string>
+    <string name="onboarding_welcome_chat_bubble_user">समुद्र तट पर मेरी वीकेंड ट्रिप प्लान करो</string>
+    <string name="onboarding_welcome_chat_bubble_done">ट्रिप चेकलिस्ट तैयार</string>
+    <!-- Step 3: Value -->
+    <string name="onboarding_welcome_value_title_lead">फ़ोटो लें।</string>
+    <string name="onboarding_welcome_value_title_accent">सूची बनाएं।</string>
+    <string name="onboarding_welcome_value_lead">किसी फ़ोटो, PDF या छोटे नोट को कुछ ही सेकंड में तैयार चेकलिस्ट में बदलें।</string>
+    <!-- Step 4: First checklist -->
+    <string name="onboarding_welcome_first_title_lead">मैं क्या</string>
+    <string name="onboarding_welcome_first_title_accent">पहले व्यवस्थित करूं?</string>
+    <string name="onboarding_welcome_first_lead">नीचे टाइप करें, या कोई स्टार्टर चुनें।</string>
+    <string name="onboarding_welcome_first_input_placeholder">कोई काम या लक्ष्य बताएं…</string>
+    <string name="onboarding_welcome_more_ways_title">शुरू करने के और तरीके</string>
+    <string name="onboarding_welcome_more_ways_sub">फ़ोटो, PDF, वॉइस या लिंक</string>
+    <string name="onboarding_welcome_chip_groceries">किराना</string>
+    <string name="onboarding_welcome_chip_trip">ट्रिप पैकिंग</string>
+    <string name="onboarding_welcome_chip_workout">वर्कआउट प्लान</string>
+    <string name="onboarding_welcome_chip_todo">टू-डू लिस्ट</string>
+    <string name="onboarding_welcome_checklist_groceries">किराना</string>
+    <string name="onboarding_welcome_checklist_trip">ट्रिप पैकिंग</string>
+    <string name="onboarding_welcome_checklist_workout">वर्कआउट प्लान</string>
+    <string name="onboarding_welcome_checklist_todo">टू-डू लिस्ट</string>
+    <!-- Step 4 starter items: pre-filled checklist contents per chip (no AI). -->
+    <string name="onboarding_welcome_items_trip_1">पासपोर्ट और टिकट</string>
+    <string name="onboarding_welcome_items_trip_2">फ़ोन और चार्जर</string>
+    <string name="onboarding_welcome_items_trip_3">टॉयलेटरीज़</string>
+    <string name="onboarding_welcome_items_trip_4">दवाइयां</string>
+    <string name="onboarding_welcome_items_trip_5">कपड़े</string>
+    <string name="onboarding_welcome_items_trip_6">पावर बैंक और अडैप्टर</string>
+    <string name="onboarding_welcome_items_groceries_1">दूध</string>
+    <string name="onboarding_welcome_items_groceries_2">ब्रेड</string>
+    <string name="onboarding_welcome_items_groceries_3">अंडे</string>
+    <string name="onboarding_welcome_items_groceries_4">फल</string>
+    <string name="onboarding_welcome_items_groceries_5">सब्ज़ियां</string>
+    <string name="onboarding_welcome_items_groceries_6">कॉफ़ी</string>
+    <string name="onboarding_welcome_items_workout_1">वॉर्म-अप</string>
+    <string name="onboarding_welcome_items_workout_2">कार्डियो</string>
+    <string name="onboarding_welcome_items_workout_3">स्ट्रेंथ ट्रेनिंग</string>
+    <string name="onboarding_welcome_items_workout_4">स्ट्रेचिंग</string>
+    <string name="onboarding_welcome_items_workout_5">कूल-डाउन</string>
+    <string name="onboarding_welcome_items_todo_1">सबसे ज़रूरी काम</string>
+    <string name="onboarding_welcome_items_todo_2">ईमेल का जवाब दें</string>
+    <string name="onboarding_welcome_items_todo_3">दिन की योजना बनाएं</string>
+    <string name="onboarding_welcome_items_todo_4">थोड़ा ब्रेक</string>
+    <string name="onboarding_welcome_items_todo_5">कल की समीक्षा करें</string>
+    <!-- Default starter items (empty input, no chip): getting-started tips. -->
+    <string name="onboarding_welcome_default_item_1">अपना आइटम जोड़ने के लिए + पर टैप करें</string>
+    <string name="onboarding_welcome_default_item_2">चीज़ों को चेक करने के लिए स्वाइप करें</string>
+    <string name="onboarding_welcome_default_item_3">रिमाइंडर सेट करें ताकि आप न भूलें</string>
+    <string name="onboarding_welcome_default_item_4">किसी सूची को भरवाने के लिए AI आज़माएं</string>
+
+    <!-- Navigation Drawer -->
+    <string name="drawer_section_navigate">नेविगेट करें</string>
+    <string name="drawer_section_help">मदद और फ़ीडबैक</string>
+    <string name="drawer_section_about">जानकारी</string>
+    <string name="drawer_tagline">AI चेकलिस्ट</string>
+    <string name="drawer_version_label">वर्शन %1$s</string>
+    <string name="drawer_logo_content_description">Gisti लोगो</string>
+    <string name="drawer_item_home">होम</string>
+    <string name="drawer_item_mcp">Gisti MCP</string>
+    <!-- Drawer cross-promo store badge -->
+    <string name="drawer_promo_web_top">वेब पर भी उपलब्ध</string>
+    <string name="drawer_promo_web_bottom">gisti-ai.com खोलें</string>
+    <string name="drawer_promo_android_top">यहां से पाएं</string>
+    <string name="drawer_promo_android_bottom">Google Play</string>
+    <string name="drawer_promo_web_cd">gisti-ai.com पर Gisti का वेब वर्शन खोलें</string>
+    <string name="drawer_promo_android_cd">Google Play पर Gisti ऐप पाएं</string>
+
+    <!-- Main Screen -->
+    <string name="main_title">मेरी चेकलिस्ट</string>
+    <string name="main_empty_title">व्यवस्थित होने के लिए तैयार हैं?</string>
+    <string name="main_empty_description">अपनी पहली चेकलिस्ट बनाएं या AI से किसी भी टेक्स्ट, फ़ोटो या डॉक्यूमेंट से बनवाएं।</string>
+    <string name="main_empty_cta">चेकलिस्ट बनाएं</string>
+    <string name="main_error_title">आपकी चेकलिस्ट लोड नहीं हो पाईं</string>
+    <string name="main_error_description">कुछ गड़बड़ हो गई। आपकी चेकलिस्ट सुरक्षित हैं — फिर से आज़माएं।</string>
+    <string name="main_error_retry">फिर से आज़माएं</string>
+    <string name="main_create_checklist">चेकलिस्ट बनाएं</string>
+    <string name="main_create_checklist_locked">और अनलॉक करने के लिए प्रीमियम बनें</string>
+    <string name="main_create_checklist_action">नई चेकलिस्ट</string>
+    <string name="main_ai_analysis">AI विश्लेषण</string>
+    <string name="main_no_items">खाली</string>
+    <string name="main_my_lists">मेरी सूचियां</string>
+    <string name="main_ask_gisti_placeholder">Gisti को मैसेज करें</string>
+    <string name="main_ask_gisti_mic">वॉइस इनपुट</string>
+    <string name="main_prompt_photo">फ़ोटो ➡️ सूची</string>
+    <string name="main_prompt_add">काम जोड़ें</string>
+    <string name="main_prompt_remind">मुझे याद दिलाएं…</string>
+    <string name="main_prompt_link">लिंक ➡️ सूची</string>
+    <string name="main_prompt_plan_day">दिन प्लान करें</string>
+    <string name="main_prompt_pdf">PDF → सूची</string>
+    <string name="main_prompt_new_list">नई सूची</string>
+    <string name="main_prompt_link_prefill">इससे सूची बनाएं: </string>
+    <string name="main_prompt_remind_prefill">मुझे याद दिलाएं </string>
+    <string name="main_create_with_ai_action">AI से बनाएं</string>
+    <string name="main_create_with_ai_prefill">इसके लिए चेकलिस्ट बनाएं: </string>
+    <string name="main_prompt_plan_day_query">आज मुझे क्या करना चाहिए?</string>
+    <!-- Activation hero (new-user first run, RC flag activation_bundle_v1) -->
+    <string name="activation_hero_title">मैं आपको क्या व्यवस्थित करने में मदद करूं?</string>
+    <string name="activation_hero_subtitle">कुछ भी बताएं और मैं आपके लिए चेकलिस्ट बना दूंगा। या इनमें से किसी एक से शुरू करें:</string>
+    <string name="activation_hero_input_placeholder">कुछ भी बताएं — मैं चेकलिस्ट बना दूंगा</string>
+    <string name="activation_hero_send">मेरी चेकलिस्ट बनाएं</string>
+    <string name="activation_chip_trip">ट्रिप पैकिंग</string>
+    <string name="activation_chip_groceries">किराना</string>
+    <string name="activation_chip_morning">सुबह का रूटीन</string>
+    <string name="activation_chip_work">काम के टास्क</string>
+    <string name="activation_chip_workout">वर्कआउट प्लान</string>
+    <string name="activation_chip_party">पार्टी प्लानिंग</string>
+    <string name="checklist_prompt_whats_missing">क्या छूट रहा है?</string>
+    <string name="checklist_prompt_generate_ideas">आइडिया दें</string>
+    <string name="checklist_prompt_add_items">आइटम जोड़ें</string>
+    <string name="checklist_prompt_summary">सारांश</string>
+    <string name="checklist_prompt_remind">मुझे याद दिलाएं</string>
+    <string name="checklist_prompt_whats_missing_query">इस चेकलिस्ट में क्या छूट रहा है?</string>
+    <string name="checklist_prompt_generate_ideas_query">इस चेकलिस्ट में जोड़ने के लिए कुछ नए आइटम के आइडिया दें।</string>
+    <string name="checklist_prompt_summary_query">इस चेकलिस्ट पर मेरी प्रगति का सारांश दें।</string>
+    <string name="checklist_prompt_add_items_query">इस चेकलिस्ट के लिए और आइटम सुझाएं।</string>
+    <string name="checklist_prompt_remind_prefill">मुझे याद दिलाएं </string>
+    <!-- Item-create dock (checklist detail "+" reuses the chat dock input to add items) -->
+    <string name="item_create_input_placeholder">मुझे करना है…</string>
+    <string name="item_create_chip_in_1_hour">1 घंटे में</string>
+    <string name="item_create_chip_tomorrow_morning">कल सुबह</string>
+    <string name="item_create_chip_tonight">आज रात</string>
+    <string name="item_create_chip_pick_time">समय चुनें…</string>
+    <string name="item_create_chip_important">ज़रूरी</string>
+    <string name="item_create_chip_repeat">दोहराएं</string>
+    <string name="item_create_remove_attachment">अटैचमेंट हटाएं</string>
+    <string name="main_free_lists_used">%2$d में से %1$d फ्री सूचियाँ इस्तेमाल</string>
+    <string name="main_menu">मेन्यू</string>
+    <string name="main_menu_support">सहायता</string>
+    <string name="main_menu_rate_app">ऐप रेट करें</string>
+    <string name="main_menu_leave_feedback">फ़ीडबैक दें</string>
+
+    <!-- Update Feed Screen -->
+    <string name="update_feed_title">अपडेट</string>
+    <string name="update_feed_menu_item">अपडेट</string>
+    <string name="update_feed_empty_title">अभी कोई अपडेट नहीं</string>
+    <string name="update_feed_empty_description">खबरें और टिप्स के लिए बाद में देखें</string>
+    <string name="update_feed_unlock_with_premium">और अनलॉक करने के लिए Pro बनें</string>
+    <string name="unlock_more_with_premium">और अनलॉक करने के लिए Pro बनें</string>
+    <string name="update_feed_version_header">वर्शन %1$s</string>
+
+    <!-- Create Screen -->
+    <string name="create_title">नई चेकलिस्ट</string>
+    <string name="create_name_section">चेकलिस्ट का नाम</string>
+    <string name="create_name_placeholder">जैसे, प्रोजेक्ट टास्क</string>
+    <string name="create_items_section">आइटम</string>
+    <string name="create_add_item">आइटम जोड़ें</string>
+    <string name="create_add_item_dialog_title">आइटम जोड़ें</string>
+    <string name="create_item_name_label">आइटम टेक्स्ट</string>
+    <string name="create_edit_item">आइटम संपादित करें</string>
+    <string name="create_confirm_item_edit">आइटम बदलाव सहेजें</string>
+    <string name="create_choose_template">टेम्पलेट से चुनें</string>
+
+    <!-- Templates Screen -->
+    <string name="templates_title">टेम्पलेट</string>
+    <string name="templates_search_placeholder">टेम्पलेट खोजें...</string>
+    <string name="templates_no_results">कोई टेम्पलेट नहीं मिला</string>
+    <string name="templates_no_results_description">कोई दूसरा शब्द आज़माएं</string>
+    <string name="templates_empty_title">कोई टेम्पलेट उपलब्ध नहीं</string>
+    <string name="templates_empty_description">पहले से बनी चेकलिस्ट के लिए बाद में देखें।</string>
+    <string name="templates_item_count">%1$d आइटम</string>
+    <string name="templates_preview_items">इस टेम्पलेट में %1$d आइटम हैं:</string>
+    <string name="templates_and_more">... और %1$d आइटम</string>
+    <string name="templates_use_template">टेम्पलेट इस्तेमाल करें</string>
+    <string name="templates_section_title">टेम्पलेट चुनें</string>
+    <string name="templates_tap_to_use">इस्तेमाल के लिए टैप करें</string>
+    <string name="templates_create_manually">खुद बनाएं</string>
+    <string name="templates_create_with_ai">AI से बनाएं</string>
+
+    <!-- Template Preview Screen -->
+    <string name="template_preview_title">प्रीव्यू</string>
+    <string name="template_preview_items_count">%1$d आइटम</string>
+    <string name="template_preview_create_button">चेकलिस्ट बनाएं (%1$d आइटम)</string>
+    <string name="template_preview_creating">बन रही है...</string>
+    <string name="template_preview_remove_item">आइटम हटाएं</string>
+    <string name="template_preview_add_item">आइटम जोड़ें</string>
+    <string name="template_preview_add_item_hint">नया आइटम जोड़ें...</string>
+
+    <!-- Analyze Result Preview Screen -->
+    <string name="analyze_preview_title">AI नतीजा</string>
+    <string name="analyze_preview_fill_title">AI फ़िल नतीजा</string>
+    <string name="analyze_preview_for_checklist">चेकलिस्ट के लिए: %1$s</string>
+    <string name="analyze_preview_name_label">चेकलिस्ट का नाम</string>
+    <string name="analyze_preview_fill_name_label">फ़िल का नाम</string>
+    <string name="analyze_preview_items_count">%1$d आइटम</string>
+    <string name="analyze_preview_create_button">चेकलिस्ट बनाएं (%1$d आइटम)</string>
+    <string name="analyze_preview_create_fill_button">फ़िल बनाएं (%1$d आइटम)</string>
+    <string name="analyze_preview_creating">बन रही है...</string>
+    <string name="analyze_preview_remove_item">आइटम हटाएं</string>
+    <string name="analyze_preview_add_item">आइटम जोड़ें</string>
+    <string name="analyze_preview_add_item_hint">नया आइटम जोड़ें...</string>
+    <string name="analyze_preview_folder_hint">AI ने इसे फ़ोल्डर में व्यवस्थित किया है। बनाने के बाद आप नाम बदल और फिर से क्रम में लगा सकते हैं।</string>
+    <string name="analyze_preview_use_folders_label">फ़ोल्डर इस्तेमाल करें</string>
+    <string name="analyze_preview_use_folders_helper">AI के सुझाए फ़ोल्डर में आइटम को समूहबद्ध करें। बंद रखने पर एक सादी सूची रहेगी।</string>
+    <string name="analyze_preview_soft_cap_hint">छोटी सूचियाँ ज़्यादा बार पूरी होती हैं — हमने टॉप 10 रखे हैं। ज़रूरत हो तो नीचे और जोड़ें।</string>
+    <string name="analyze_preview_show_more">%1$d और दिखाएं</string>
+    <string name="analyze_preview_show_less">कम दिखाएं</string>
+    <string name="analyze_preview_add_all">सभी जोड़ें</string>
+    <string name="analyze_preview_add_overflow_item">आइटम जोड़ें</string>
+
+    <!-- Analyze Screen -->
+    <string name="analyze_title">AI विश्लेषण</string>
+    <string name="analyze_button">विश्लेषण करें</string>
+    <string name="analyze_loading">आपका कंटेंट विश्लेषण हो रहा है</string>
+    <string name="analyze_loading_description">AI चेकलिस्ट आइटम निकाल रहा है...</string>
+    <string name="analyze_select_source">आप क्या विश्लेषण करना चाहते हैं?</string>
+    <string name="analyze_enter_data">अपना कंटेंट जोड़ें</string>
+    <string name="analyze_source_photo">फ़ोटो</string>
+    <string name="analyze_source_pdf">PDF</string>
+    <string name="analyze_source_text_file">टेक्स्ट फ़ाइल</string>
+    <string name="analyze_source_link">वेब लिंक</string>
+    <string name="analyze_source_text">टेक्स्ट पेस्ट करें</string>
+    <string name="analyze_source_voice">वॉइस</string>
+    <string name="analyze_url_label">URL</string>
+    <string name="analyze_url_placeholder">https://example.com/article</string>
+    <string name="analyze_text_placeholder">मीटिंग नोट्स, आर्टिकल, निर्देश पेस्ट करें — जो कुछ भी आप चेकलिस्ट में बदलना चाहते हैं...</string>
+    <string name="analyze_text_label">आपका टेक्स्ट</string>
+    <string name="analyze_select_photo">फ़ोटो चुनें</string>
+    <string name="analyze_select_pdf">PDF चुनें</string>
+    <string name="analyze_select_file">फ़ाइल चुनें</string>
+    <string name="analyze_result_title">ये रही आपकी चेकलिस्ट!</string>
+    <string name="analyze_items_found">निकाले गए आइटम:</string>
+    <string name="analyze_and_more">... और %1$d और</string>
+    <string name="analyze_checklist_name_label">चेकलिस्ट का नाम</string>
+    <string name="analyze_checklist_name_placeholder">मेरी चेकलिस्ट</string>
+    <string name="analyze_create_checklist">चेकलिस्ट बनाएं</string>
+    <string name="analyze_error_no_input">विश्लेषण के लिए एक स्रोत चुनें</string>
+    <string name="analyze_error_empty_url">विश्लेषण के लिए एक URL डालें</string>
+    <string name="analyze_error_invalid_url">एक मान्य URL डालें</string>
+    <string name="analyze_error_empty_text">विश्लेषण के लिए कुछ टेक्स्ट डालें</string>
+    <string name="analyze_error_no_file">विश्लेषण के लिए एक फ़ाइल चुनें</string>
+    <string name="analyze_error_empty_name">अपनी चेकलिस्ट को एक नाम दें</string>
+    <string name="analyze_cost_info">इस काम में %1$d क्रेडिट लगेंगे</string>
+    <string name="analyze_not_enough_credits">पर्याप्त क्रेडिट नहीं। जारी रखने के लिए और लें।</string>
+
+    <!-- Voice recording -->
+    <string name="analyze_voice_tap_to_record">रिकॉर्ड करने के लिए टैप करें</string>
+    <string name="analyze_voice_recording">रिकॉर्ड हो रहा है...</string>
+    <string name="analyze_voice_stop">रोकें</string>
+    <string name="analyze_voice_recorded">रिकॉर्ड हुआ</string>
+    <string name="analyze_voice_play">रिकॉर्डिंग चलाएं</string>
+    <string name="analyze_voice_delete">रिकॉर्डिंग हटाएं</string>
+    <string name="analyze_voice_permission_required">माइक्रोफ़ोन की अनुमति ज़रूरी है</string>
+    <string name="analyze_voice_permission_denied">माइक्रोफ़ोन एक्सेस अस्वीकार हो गया। वॉइस रिकॉर्ड करने के लिए अनुमति दें।</string>
+    <string name="analyze_voice_permission_denied_settings">माइक्रोफ़ोन एक्सेस बंद है। वॉइस रिकॉर्ड करने के लिए इसे सेटिंग्स में चालू करें।</string>
+    <string name="analyze_voice_open_settings">सेटिंग्स खोलें</string>
+    <string name="analyze_error_no_recording">विश्लेषण के लिए एक वॉइस मैसेज रिकॉर्ड करें</string>
+
+    <!-- Fill target selector -->
+    <string name="fill_target_title">कहाँ फ़िल करें?</string>
+    <string name="fill_target_main">मुख्य चेकलिस्ट फ़िल करें</string>
+    <string name="fill_target_main_description">मौजूदा आइटम को AI नतीजों से अपडेट करें</string>
+    <string name="fill_target_new">नई फ़िल बनाएं</string>
+    <string name="fill_target_new_description">इस विश्लेषण के लिए एक अलग फ़िल बनाएं</string>
+
+    <!-- Fill apply (fill-default mode) -->
+    <string name="fill_apply">चेकलिस्ट पर लागू करें</string>
+
+    <!-- Fill mode (Fill via AI) -->
+    <string name="analyze_fill_title">AI से फ़िल करें</string>
+    <string name="analyze_fill_result_title">AI फ़िल तैयार!</string>
+    <string name="analyze_fill_for_checklist">चेकलिस्ट फ़िल हो रही है: %1$s</string>
+    <string name="analyze_fill_stats">%2$d में से %1$d आइटम चेक हुए</string>
+    <string name="analyze_fill_name_label">फ़िल का नाम</string>
+    <string name="analyze_fill_name_placeholder">जैसे, मेन रोड का अपार्टमेंट</string>
+    <string name="analyze_create_fill">फ़िल बनाएं</string>
+    <string name="analyze_saving">सहेजा जा रहा है...</string>
+
+    <!-- Checklist Detail Screen -->
+    <string name="checklist_not_found">चेकलिस्ट नहीं मिली</string>
+    <string name="checklist_not_found_description">यह चेकलिस्ट नहीं खुल सकी — शायद यह अधूरी या खराब है। आप इसे अपनी सूची से हटाने के लिए डिलीट कर सकते हैं।</string>
+    <string name="checklist_not_found_delete_message">इस चेकलिस्ट को डिलीट करें? इसे पूर्ववत नहीं किया जा सकता।</string>
+    <string name="checklist_edit_title">चेकलिस्ट संपादित करें</string>
+    <string name="checklist_edit">संपादित करें</string>
+    <string name="checklist_progress">प्रगति</string>
+    <string name="checklist_no_items">इस चेकलिस्ट में कोई आइटम नहीं।\nआइटम जोड़ने के लिए + पर टैप करें।</string>
+    <string name="checklist_delete_title">चेकलिस्ट डिलीट करें?</string>
+    <string name="checklist_delete_message">क्या आप वाकई "%1$s" को डिलीट करना चाहते हैं? यह क्रिया पूर्ववत नहीं की जा सकती।</string>
+    <string name="checklist_template_items">टेम्पलेट आइटम: %1$d</string>
+    <string name="checklist_fills_section">फ़िल</string>
+    <string name="checklist_no_fills">अभी कोई फ़िल नहीं।\nआइटम चेक करना शुरू करने के लिए नई फ़िल बनाएं।</string>
+    <string name="checklist_no_fills_title">अभी कोई फ़िल नहीं</string>
+    <string name="checklist_no_fills_description">अपनी सूची के आइटम चेक करना शुरू करने के लिए एक फ़िल बनाएं। हर फ़िल आपकी प्रगति अलग से ट्रैक करती है।</string>
+    <string name="checklist_add_fill">नई फ़िल</string>
+    <string name="checklist_add_fill_ai">AI से फ़िल करें</string>
+    <string name="checklist_new_fill">नई फ़िल बनाएं</string>
+    <string name="fill_options_open">चेकलिस्ट फ़िल करें</string>
+    <string name="fill_options_title">इस चेकलिस्ट को फ़िल करें</string>
+    <string name="fill_manually_title">खुद फ़िल करें</string>
+    <string name="fill_manually_desc">एक खाली फ़िल बनाएं</string>
+    <string name="fill_via_ai_title">AI से फ़िल करें</string>
+    <string name="fill_via_ai_desc">फ़ोटो, PDF, लिंक या टेक्स्ट → AI इसे फ़िल करेगा</string>
+    <string name="checklist_view_all_fills">सभी फ़िल देखें</string>
+    <string name="checklist_fills_count">%1$d और फ़िल</string>
+    <string name="fills_list_title">सभी फ़िल</string>
+    <string name="fills_default_name">मुख्य</string>
+    <string name="checklist_add_fill_dialog_title">नई फ़िल</string>
+    <string name="checklist_fill_name_label">फ़िल का नाम</string>
+    <string name="checklist_fill_name_placeholder">जैसे, मेन रोड का अपार्टमेंट</string>
+    <string name="reorder">क्रम बदलें</string>
+    <string name="done">हो गया</string>
+    <string name="delete_item">आइटम हटाएं</string>
+    <string name="undo">पूर्ववत करें</string>
+    <string name="more_options">और विकल्प</string>
+    <string name="separate_completed">पूरे हुए अलग करें</string>
+    <string name="auto_delete_completed">पूरा होने के बाद आइटम हटाएं</string>
+    <string name="delete_completed_items">पूरे हुए आइटम हटाएं</string>
+    <string name="completed_count">पूरे हुए (%1$d)</string>
+    <string name="delete_checklist">चेकलिस्ट हटाएं</string>
+    <string name="collapse">समेटें</string>
+    <string name="expand">फैलाएं</string>
+
+    <!-- Folders (nested checklists) -->
+    <string name="folder_default_name">नया फ़ोल्डर</string>
+    <string name="folder_create">नया फ़ोल्डर</string>
+    <string name="folder_open">फ़ोल्डर खोलें</string>
+    <string name="folder_progress">%1$d/%2$d</string>
+    <!-- Folder actions (Phase 4) -->
+    <string name="folder_actions_title">फ़ोल्डर क्रियाएं</string>
+    <!-- Folder reminder (Phase 5) -->
+    <string name="folder_reminder">रिमाइंडर</string>
+    <string name="folder_reminder_active">रिमाइंडर सेट है</string>
+    <string name="folder_reminder_unavailable">यह फ़ोल्डर अब उपलब्ध नहीं है।</string>
+    <string name="folder_rename">नाम बदलें</string>
+    <string name="folder_rename_title">फ़ोल्डर का नाम बदलें</string>
+    <string name="folder_name_label">फ़ोल्डर का नाम</string>
+    <string name="folder_name_placeholder">नाम दर्ज करें</string>
+    <string name="folder_move">यहां ले जाएं…</string>
+    <string name="folder_delete">फ़ोल्डर हटाएं</string>
+    <string name="folder_delete_title">फ़ोल्डर हटाएं?</string>
+    <string name="folder_delete_message_empty">यह फ़ोल्डर हटाएं?</string>
+    <string name="folder_delete_message_one">इससे फ़ोल्डर और उसके अंदर का 1 आइटम हट जाएगा। इसे पूर्ववत नहीं किया जा सकता।</string>
+    <string name="folder_delete_message_other">इससे फ़ोल्डर और उसके अंदर के %1$d आइटम हट जाएंगे। इसे पूर्ववत नहीं किया जा सकता।</string>
+    <string name="move_to_folder_title">यहां ले जाएं…</string>
+    <string name="move_to_root">होम (शीर्ष स्तर)</string>
+    <string name="move_here_current">मौजूदा स्थान</string>
+    <!-- Folders on/off toggle + flatten confirm (Phase 7) -->
+    <string name="folders_toggle">फ़ोल्डर</string>
+    <string name="folders_toggle_weekly_hint">वीकली व्यू में उपलब्ध नहीं</string>
+    <string name="folders_disable_title">फ़ोल्डर बंद करें?</string>
+    <string name="folders_disable_message">इससे फ़ोल्डर हट जाएंगे और सभी आइटम शीर्ष स्तर पर आ जाएंगे। आपके आइटम बने रहेंगे।</string>
+    <string name="folders_disable_confirm">बंद करें</string>
+    <string name="folders_disable_cancel">रद्द करें</string>
+
+    <string name="checklist_fill_delete_title">फ़िल हटाएं?</string>
+    <string name="checklist_fill_delete_message">क्या आप वाकई “%1$s” को हटाना चाहते हैं? इस क्रिया को पूर्ववत नहीं किया जा सकता।</string>
+
+    <!-- Fill Detail Screen -->
+    <string name="fill_not_found">फ़िल नहीं मिली</string>
+    <string name="fill_complete_title">सब हो गया!</string>
+    <string name="fill_complete_description">इस चेकलिस्ट को पूरा करने के लिए बढ़िया!</string>
+    <string name="fill_edit_title">फ़िल संपादित करें</string>
+    <string name="fill_add_note">नोट जोड़ें</string>
+    <string name="fill_note_dialog_title">नोट</string>
+
+    <!-- Per-item action row (ChecklistItemCard bottom row — kept for formatItemReminderLabel fallback) -->
+    <string name="detail_item_action_note">नोट</string>
+    <string name="detail_item_action_edit_note">नोट संपादित करें</string>
+    <string name="detail_item_action_remind">याद दिलाएं</string>
+    <string name="detail_item_reminder_missed">छूट गया (%1$s)</string>
+    <string name="detail_item_reminder_at">%1$s</string>
+
+    <!-- Item Details Sheet (Things-style) -->
+    <string name="detail_item_sheet_action_reminder">रिमाइंडर</string>
+    <string name="detail_item_sheet_action_note">नोट</string>
+    <string name="detail_item_sheet_action_edit_note">नोट संपादित करें</string>
+    <string name="detail_item_sheet_action_delete">आइटम हटाएं</string>
+    <string name="detail_item_sheet_action_open_link">लिंक खोलें</string>
+    <string name="detail_item_sheet_subtitle_no_reminder">सेट करने के लिए टैप करें</string>
+    <string name="detail_item_sheet_subtitle_no_note">जोड़ने के लिए टैप करें</string>
+    <string name="detail_item_sheet_edit_text_hint">आइटम टेक्स्ट</string>
+
+    <!-- Item priority (star) -->
+    <string name="item_priority_mark">महत्वपूर्ण चिह्नित करें</string>
+    <string name="item_priority_unmark">महत्व हटाएं</string>
+    <string name="item_priority_action">महत्वपूर्ण</string>
+    <string name="fill_note_placeholder">इस आइटम के बारे में नोट जोड़ें...</string>
+    <string name="fill_cover_change">कवर बदलें</string>
+    <string name="fill_cover_remove">कवर हटाएं</string>
+
+    <!-- Item Details Sheet — Attachments section -->
+    <string name="detail_item_sheet_action_attachments">अटैचमेंट</string>
+    <string name="detail_item_sheet_subtitle_no_attachments">जोड़ने के लिए टैप करें</string>
+    <string name="detail_item_sheet_subtitle_attachment_count_one">%1$d अटैचमेंट</string>
+    <string name="detail_item_sheet_subtitle_attachment_count_other">%1$d अटैचमेंट</string>
+    <string name="attachment_add_image_button">इमेज जोड़ें</string>
+    <string name="attachment_add_file_button">फ़ाइल जोड़ें</string>
+    <string name="attachment_remove_button">हटाएं</string>
+    <string name="attachment_open_external_button">खोलें</string>
+    <string name="attachment_fullscreen_close_cd">बंद करें</string>
+    <string name="attachment_fullscreen_delete_cd">अटैचमेंट हटाएं</string>
+    <string name="attachment_fullscreen_counter">%2$d में से %1$d</string>
+    <string name="attachment_premium_limit_reached_snackbar">फ्री प्लान: प्रति आइटम 3 अटैचमेंट। अनलिमिटेड के लिए प्रीमियम में अपग्रेड करें।</string>
+    <string name="attachment_load_error">अटैचमेंट लोड नहीं हो सका</string>
+    <string name="attachment_size_too_large_snackbar">अटैचमेंट बहुत बड़ा है (अधिकतम 10 MB)</string>
+    <string name="attachment_deleted_snackbar">अटैचमेंट हटा दिया गया</string>
+
+    <!-- Premium Banner -->
+    <string name="premium_banner_title">प्रीमियम लें</string>
+    <string name="premium_banner_description">रोज़ाना AI क्रेडिट रिफिल</string>
+    <string name="premium_banner_upgrade">अपग्रेड करें</string>
+    <string name="premium_banner_active_title">प्रीमियम सदस्य</string>
+    <string name="premium_banner_valid_until">%1$s तक सक्रिय</string>
+
+    <!-- Limits -->
+    <string name="limit_reached_title">चेकलिस्ट की सीमा पूरी हुई</string>
+    <string name="limit_reached_message">आप फ्री प्लान पर अधिकतम %1$d चेकलिस्ट तक पहुंच चुके हैं। अनलिमिटेड चेकलिस्ट के लिए प्रीमियम में अपग्रेड करें।</string>
+    <string name="limit_upgrade">प्रीमियम में अपग्रेड करें</string>
+    <string name="limit_fill_reached_title">फ़िल की सीमा पूरी हुई</string>
+    <string name="limit_fill_reached_message">आप इस चेकलिस्ट के लिए अधिकतम %1$d फ़िल तक पहुंच चुके हैं। अनलिमिटेड फ़िल के लिए प्रीमियम में अपग्रेड करें।</string>
+    <string name="limit_checklist_count">%1$d/%2$d चेकलिस्ट</string>
+    <string name="limit_fill_count">%1$d/%2$d फ़िल</string>
+
+    <!-- AI Credits -->
+    <string name="credits_display">%1$d क्रेडिट</string>
+    <string name="credits_get_more">और क्रेडिट पाएं</string>
+    <string name="credits_pro_badge">PRO</string>
+    <string name="credits_your_credits">आपके AI क्रेडिट</string>
+    <string name="credits_refill_info">रोज़ 12:00 CET पर रिफिल होता है</string>
+    <string name="credits_refill_to">%1$d तक</string>
+    <string name="credits_premium_benefit">प्रीमियम: रोज़ %1$d क्रेडिट तक रिफिल</string>
+
+    <!-- Subscription Status Screen -->
+    <string name="subscription_status_title">आपकी सदस्यता</string>
+    <string name="subscription_status_active">प्रीमियम सदस्य</string>
+    <string name="subscription_status_valid_until">आपकी प्रीमियम एक्सेस इस तारीख तक मान्य है</string>
+    <string name="subscription_status_back">होम पर वापस</string>
+    <string name="subscription_status_credits_section">AI क्रेडिट</string>
+    <string name="subscription_status_credits_info">आपके क्रेडिट रोज़ 12:00 CET पर रिफिल होते हैं</string>
+    <string name="subscription_status_daily_cap">रोज़ाना रिफिल: %1$d क्रेडिट तक</string>
+    <string name="subscription_purchase_success">🎉 प्रीमियम में आपका स्वागत है! अनलिमिटेड एक्सेस का आनंद लें।</string>
+
+    <!-- Paywall Screen -->
+    <string name="paywall_title">अपनी पूरी क्षमता अनलॉक करें</string>
+    <string name="paywall_subtitle">सभी फ़ीचर्स का अनलिमिटेड एक्सेस पाएं</string>
+    <string name="paywall_feature_checklists">अनलिमिटेड चेकलिस्ट और फ़िल</string>
+    <string name="paywall_feature_ai">रोज़ाना AI क्रेडिट रिफिल (300 तक)</string>
+    <string name="paywall_feature_sync">प्राथमिकता सपोर्ट</string>
+    <string name="paywall_continue">अभी सब्सक्राइब करें</string>
+    <string name="paywall_restore">खरीदारी रिस्टोर करें</string>
+    <string name="paywall_best_value">बेस्ट वैल्यू</string>
+    <string name="paywall_free_trial_badge">%1$d दिन फ्री</string>
+    <string name="paywall_start_trial">फ्री ट्रायल शुरू करें</string>
+    <string name="paywall_per_month">प्रति माह</string>
+    <!-- DEPRECATED: replaced by paywall_trial_terms_yearly / paywall_trial_terms_monthly -->
+    <string name="paywall_trial_terms">%1$d-दिन का फ्री ट्रायल, फिर %2$s/माह। ऑटो-रिन्यू होता है। कभी भी रद्द करें।</string>
+    <string name="paywall_trial_terms_yearly">%1$d-दिन का फ्री ट्रायल, फिर %2$s/वर्ष। ऑटो-रिन्यू होता है। कभी भी रद्द करें।</string>
+    <string name="paywall_trial_terms_monthly">%1$d-दिन का फ्री ट्रायल, फिर %2$s/माह। ऑटो-रिन्यू होता है। कभी भी रद्द करें।</string>
+    <string name="paywall_no_subscription_found">कोई सक्रिय सदस्यता नहीं मिली</string>
+    <string name="paywall_restore_failed">खरीदारी रिस्टोर नहीं हो सकी। कृपया अपना कनेक्शन जांचें और फिर से आज़माएं।</string>
+    <string name="paywall_purchase_failed">खरीदारी पूरी नहीं हो सकी। कृपया फिर से आज़माएं।</string>
+    <string name="paywall_days_free">%1$d-दिन का फ्री ट्रायल</string>
+    <string name="paywall_go_premium">प्रीमियम लें</string>
+    <string name="paywall_then_price">फिर %1$s / माह</string>
+    <string name="paywall_price_per_month">%1$s / माह</string>
+    <string name="paywall_start_free_trial">फ्री ट्रायल शुरू करें</string>
+    <string name="paywall_subscribe_now">अभी सब्सक्राइब करें</string>
+    <string name="paywall_retry">फिर से आज़माएं</string>
+    <string name="paywall_load_error">सदस्यता विकल्प लोड नहीं हो सके।\nकृपया अपना कनेक्शन जांचें और फिर से आज़माएं।</string>
+    <string name="paywall_no_payment_now">अभी कोई भुगतान नहीं</string>
+    <string name="paywall_cancel_anytime">कभी भी रद्द करें</string>
+    <string name="paywall_auto_renew_notice">ऑटो-रिन्यू होता है। कभी भी रद्द करें।</string>
+    <string name="paywall_timeline_today">आज</string>
+    <string name="paywall_timeline_due">%1$s को देय</string>
+    <string name="paywall_timeline_free">फ्री ट्रायल</string>
+    <string name="paywall_terms">उपयोग की शर्तें</string>
+    <string name="paywall_privacy">गोपनीयता नीति</string>
+    <string name="paywall_support">सपोर्ट</string>
+    <string name="paywall_preview_item1">AI से अनलिमिटेड बनाएं</string>
+    <string name="paywall_preview_item2">AI से अनलिमिटेड फ़िल</string>
+    <string name="paywall_preview_item3">PDF &amp; टेक्स्ट एक्सपोर्ट</string>
+    <string name="paywall_preview_item4">रोज़ 300 AI क्रेडिट</string>
+    <string name="paywall_preview_tagline">किसी भी चीज़ का\nसार पाएं</string>
+
+    <!-- Paywall — post-cancel reason picker (measures why the native purchase sheet was dismissed) -->
+    <string name="cancel_reason_title">मन बदल गया?</string>
+    <string name="cancel_reason_subtitle">आपका जवाब हमें बेहतर बनाने में मदद करता है। एक टैप — कुछ लिखना नहीं।</string>
+    <string name="cancel_reason_expensive">बहुत महंगा</string>
+    <string name="cancel_reason_just_looking">बस देख रहे हैं</string>
+    <string name="cancel_reason_need_info">और जानकारी चाहिए</string>
+    <string name="cancel_reason_subscriptions">सब्सक्रिप्शन को लेकर पक्का नहीं</string>
+    <string name="cancel_reason_missing_feature">कोई फ़ीचर नहीं है</string>
+    <string name="cancel_reason_payment_issue">भुगतान में समस्या</string>
+    <string name="cancel_reason_other">अन्य</string>
+    <string name="cancel_reason_dismiss">अभी नहीं</string>
+    <string name="cancel_reason_thanks">धन्यवाद — इससे मदद मिलती है।</string>
+
+    <!-- Splash Screen -->
+    <string name="splash_loading">तैयारी हो रही है...</string>
+
+    <!-- Errors (used in ViewModels via getString) -->
+    <string name="error_add_at_least_one_item">कम से कम एक आइटम जोड़ें</string>
+    <string name="error_create_checklist_failed">चेकलिस्ट बनाने में विफल</string>
+    <string name="error_generate_pdf_failed">PDF बनाने में विफल</string>
+    <string name="error_no_data_available">कोई डेटा उपलब्ध नहीं</string>
+    <string name="error_template_not_found">टेम्पलेट नहीं मिला</string>
+    <string name="error_template_load_failed">टेम्पलेट लोड करने में विफल</string>
+    <string name="error_fill_not_found">डिफ़ॉल्ट फ़िल नहीं मिली</string>
+    <string name="error_save_failed">सहेजने में विफल</string>
+    <string name="error_create_fill_failed">फ़िल बनाने में विफल</string>
+    <!-- Validation errors (used in ViewModels via getString) -->
+    <string name="create_error_name_required">चेकलिस्ट का नाम दर्ज करें</string>
+    <string name="fill_error_name_required">नाम दर्ज करें</string>
+    <string name="analyze_error_select_checklist">एक चेकलिस्ट चुनें</string>
+    <string name="analyze_error_analysis_failed">विश्लेषण में विफल</string>
+    <string name="analyze_error_user_not_ready">आपको साइन इन किया जा रहा है… कृपया थोड़ी देर में फिर से आज़माएं</string>
+    <string name="analyze_error_network">कनेक्शन में समस्या। अपना इंटरनेट जांचें और फिर से आज़माएं</string>
+    <!-- Default names (used in ViewModels via getString) -->
+    <string name="default_checklist_name">नई चेकलिस्ट</string>
+    <string name="default_fill_name">AI फ़िल</string>
+    <string name="weekly_checklist_default_name">मेरा सप्ताह</string>
+
+    <!-- Gallery deep-link (app.gisti-ai.com/?g=create&template=…) -->
+    <string name="gallery_deeplink_not_found">वह चेकलिस्ट टेम्पलेट अब उपलब्ध नहीं है</string>
+    <string name="gallery_deeplink_error">वह चेकलिस्ट नहीं खुल सकी। अपना कनेक्शन जांचें और फिर से आज़माएं</string>
+
+    <!-- Share Screen -->
+    <string name="share">शेयर करें</string>
+    <string name="share_screen_title">चेकलिस्ट शेयर करें</string>
+    <string name="share_select_format">फ़ॉर्मेट चुनें</string>
+    <string name="share_as_text">सादा टेक्स्ट</string>
+    <string name="share_as_text_description">मैसेज के लिए कॉपी-फ्रेंडली फ़ॉर्मेट</string>
+    <string name="share_as_pdf">PDF दस्तावेज़</string>
+    <string name="share_as_pdf_description">चेकबॉक्स के साथ फ़ॉर्मेटेड दस्तावेज़</string>
+    <string name="share_button">शेयर करें</string>
+    <string name="share_generating_pdf">PDF बन रहा है...</string>
+    <string name="share_error">शेयर करने में विफल</string>
+
+    <!-- Feedback-only sheet -->
+    <string name="feedback_only_title">फ़ीडबैक दें</string>
+    <string name="feedback_only_description">हमें बताएं आपके मन में क्या है</string>
+    <string name="feedback_thanks_message">फ़ीडबैक के लिए धन्यवाद!</string>
+
+    <!-- CSAT Survey -->
+    <string name="csat_title">Gisti आपको कैसा लगा?</string>
+    <string name="csat_not_good">अच्छा नहीं</string>
+    <string name="csat_okay">ठीक-ठाक</string>
+    <string name="csat_love_it">बहुत पसंद आया!</string>
+    <string name="csat_whats_the_problem">सबसे बड़ी समस्या क्या है?</string>
+    <string name="csat_what_could_be_better">क्या बेहतर हो सकता है?</string>
+    <!-- Not Good chips -->
+    <string name="csat_chip_buggy">बग्स</string>
+    <string name="csat_chip_slow">धीमा</string>
+    <string name="csat_chip_hard_to_use">इस्तेमाल कठिन</string>
+    <string name="csat_chip_inaccurate_ai">AI सटीक नहीं</string>
+    <string name="csat_chip_too_expensive">बहुत महंगा</string>
+    <!-- Okay chips -->
+    <string name="csat_chip_more_features">और फ़ीचर्स</string>
+    <string name="csat_chip_better_design">बेहतर डिज़ाइन</string>
+    <string name="csat_chip_faster">तेज़</string>
+    <string name="csat_chip_more_templates">और टेम्पलेट</string>
+    <string name="csat_chip_better_ai">बेहतर AI</string>
+    <string name="csat_feedback_placeholder">अपने विचार बताएं…</string>
+    <string name="csat_submit">भेजें</string>
+
+    <!-- Reminders -->
+    <string name="reminder_set_reminder">रिमाइंडर सेट करें</string>
+    <string name="reminder_in_one_hour">1 घंटे में</string>
+    <string name="reminder_tomorrow_morning">कल सुबह</string>
+    <string name="reminder_tomorrow_evening">कल शाम</string>
+    <string name="reminder_pick_date_time">तारीख और समय चुनें</string>
+    <string name="reminder_remove">रिमाइंडर हटाएं</string>
+    <!-- Add to Google Calendar (one-way export, no OAuth) -->
+    <string name="add_to_google_calendar">Google Calendar में जोड़ें</string>
+    <string name="calendar_app_not_found">कैलेंडर नहीं खुल सका</string>
+    <string name="reminder_select_time">समय चुनें</string>
+    <string name="reminder_next">आगे</string>
+    <string name="reminder_all_completed">सभी आइटम पूरे हो गए!</string>
+    <string name="reminder_notification_channel">चेकलिस्ट रिमाइंडर</string>
+    <string name="reminder_notification_channel_desc">चेकलिस्ट रिमाइंडर और डेडलाइन के लिए सूचनाएं</string>
+    <string name="reminder_notification_tap">खोलने के लिए टैप करें</string>
+    <plurals name="reminder_items_remaining">
+        <item quantity="one">%1$d आइटम बाकी</item>
+        <item quantity="other">%1$d आइटम बाकी</item>
+    </plurals>
+    <plurals name="items_count">
+        <item quantity="one">%1$d आइटम</item>
+        <item quantity="other">%1$d आइटम</item>
+    </plurals>
+    <plurals name="reminders_count">
+        <item quantity="one">%1$d रिमाइंडर</item>
+        <item quantity="other">%1$d रिमाइंडर</item>
+    </plurals>
+    <string name="reminder_exact_alarm_title">सटीक रिमाइंडर चालू करें</string>
+    <string name="reminder_exact_alarm_step1">नीचे "सेटिंग्स खोलें" पर टैप करें</string>
+    <string name="reminder_exact_alarm_step2">"अलार्म और रिमाइंडर" ढूंढें</string>
+    <string name="reminder_exact_alarm_step3">Gisti के लिए इसे ON करें</string>
+    <string name="reminder_exact_alarm_description">इसके बिना, रिमाइंडर कुछ मिनट देरी से आ सकते हैं।</string>
+    <string name="reminder_exact_alarm_dont_show">फिर न दिखाएं</string>
+    <string name="reminder_exact_alarm_open_settings">सेटिंग्स खोलें</string>
+    <string name="reminder_exact_alarm_skip">छोड़ें</string>
+    <string name="reminder_exact_alarm_granted">सटीक रिमाइंडर चालू हो गए!</string>
+    <string name="reminder_exact_alarm_denied">रिमाइंडर कुछ मिनट देरी से आ सकते हैं</string>
+
+    <!-- Full-screen (alarm-style) reminder -->
+    <string name="reminder_fullscreen_toggle">फ़ुल-स्क्रीन रिमाइंडर</string>
+    <string name="reminder_fullscreen_toggle_desc">अलार्म की तरह लॉक स्क्रीन पर दिखता है</string>
+    <string name="reminder_fsi_title">रिमाइंडर फ़ुल-स्क्रीन दिखाएं</string>
+    <string name="reminder_fsi_step1">नीचे "सेटिंग्स खोलें" पर टैप करें</string>
+    <string name="reminder_fsi_step2">"फ़ुल-स्क्रीन सूचनाएं" ढूंढें (या ऐप सूची में Gisti)</string>
+    <string name="reminder_fsi_step3">Gisti के लिए इसे चालू करें</string>
+    <string name="reminder_fsi_description">फ़ुल-स्क्रीन रिमाइंडर अलार्म की तरह लॉक स्क्रीन पर दिखते हैं, ताकि आप ज़रूरी रिमाइंडर कभी न चूकें।</string>
+    <string name="reminder_fsi_dont_show">फिर न दिखाएं</string>
+    <string name="reminder_fsi_open_settings">सेटिंग्स खोलें</string>
+    <string name="reminder_fsi_skip">छोड़ें</string>
+    <!-- Full-screen reminder alarm activity (over the lock screen) -->
+    <string name="reminder_full_screen_label">रिमाइंडर</string>
+    <string name="reminder_full_screen_open">खोलें</string>
+    <string name="reminder_full_screen_dismiss">खारिज करें</string>
+
+    <!-- Notification Permission -->
+    <string name="reminder_notification_permission_title">सूचनाएं चालू करें</string>
+    <string name="reminder_notification_permission_description">Gisti को अनुमति दें कि रिमाइंडर का समय होने पर वह आपको सूचित करे, ताकि आप कोई ज़रूरी चेकलिस्ट न चूकें।</string>
+    <string name="reminder_notification_permission_feature1">आपके सेट किए गए सटीक समय पर सूचना पाएं</string>
+    <string name="reminder_notification_permission_feature2">अपनी चेकलिस्ट का नाम और बचे हुए आइटम देखें</string>
+    <string name="reminder_notification_permission_feature3">सीधे खोलने के लिए सूचना पर टैप करें</string>
+    <string name="reminder_notification_permission_enable">सूचनाएं चालू करें</string>
+    <string name="reminder_notification_permission_skip">अभी नहीं</string>
+
+    <!-- Repeat types -->
+    <string name="reminder_repeat_none">न दोहराएं</string>
+    <string name="reminder_repeat_daily">हर दिन</string>
+    <string name="reminder_repeat_weekly">हर हफ्ते</string>
+    <string name="reminder_repeat_monthly">हर महीने</string>
+    <string name="reminder_repeat_weekdays">सप्ताह के दिन</string>
+    <string name="reminder_repeat_biweekly">हर 2 हफ्ते</string>
+    <string name="reminder_repeat_quarterly">हर 3 महीने</string>
+    <string name="reminder_repeat_yearly">हर साल</string>
+    <string name="reminder_repeat_custom">कस्टम…</string>
+
+    <!-- Repeat interval -->
+    <string name="reminder_repeat_every">हर</string>
+    <string name="reminder_repeat_days">दिन</string>
+    <string name="reminder_repeat_weeks">हफ्ते</string>
+    <string name="reminder_repeat_months">महीने</string>
+    <string name="reminder_repeat_years">साल</string>
+
+    <string name="reminder_repeat_on">इन दिनों दोहराएं</string>
+    <!-- Weekdays (short) -->
+    <string name="reminder_weekday_mon">सो</string>
+    <string name="reminder_weekday_tue">मं</string>
+    <string name="reminder_weekday_wed">बु</string>
+    <string name="reminder_weekday_thu">गु</string>
+    <string name="reminder_weekday_fri">शु</string>
+    <string name="reminder_weekday_sat">श</string>
+    <string name="reminder_weekday_sun">र</string>
+
+    <!-- End condition -->
+    <string name="reminder_ends">समाप्ति</string>
+    <string name="reminder_ends_never">कभी नहीं</string>
+    <string name="reminder_ends_on_date">तारीख पर</string>
+    <string name="reminder_ends_after_count">इसके बाद</string>
+    <string name="reminder_ends_occurrences">बार</string>
+
+    <!-- Reset checks -->
+    <string name="reminder_reset_checks">हर बार चेकबॉक्स रीसेट करें</string>
+    <string name="reminder_reset_checks_desc">रिमाइंडर दोहराए जाने पर सभी आइटम अनचेक करें</string>
+
+    <!-- Summary labels -->
+    <string name="reminder_repeat_label">दोहराएं</string>
+    <string name="reminder_repeat_summary_daily">हर दिन</string>
+    <string name="reminder_repeat_summary_weekly">हर हफ्ते</string>
+    <string name="reminder_repeat_summary_monthly">हर महीने</string>
+    <string name="reminder_repeat_summary_weekdays">सोम–शुक्र</string>
+    <string name="reminder_repeat_summary_biweekly">हर 2 हफ्ते</string>
+    <string name="reminder_repeat_summary_quarterly">हर 3 महीने</string>
+    <string name="reminder_repeat_summary_yearly">हर साल</string>
+
+    <!-- Reminder sheet tabs -->
+    <string name="reminder_tab_once">एक बार</string>
+    <string name="reminder_tab_repeat">दोहराएं</string>
+    <string name="reminder_repeat_time_label">दिन का समय</string>
+    <string name="reminder_remove_repeat">दोहराव शेड्यूल हटाएं</string>
+    <string name="reminder_repeat_active">दोहराव: %1$s %2$s पर</string>
+
+    <!-- Repeat rule sheet -->
+    <string name="reminder_repeat_title">दोहराएं</string>
+    <string name="reminder_repeat_save">सहेजें</string>
+    <string name="reminder_ends_done">हो गया</string>
+
+    <!-- Common Accessibility -->
+    <string name="back">वापस</string>
+    <string name="feedback">फ़ीडबैक</string>
+    <string name="completed_label">पूर्ण</string>
+
+    <!-- Checklist Detail - Undo -->
+    <string name="checklist_item_deleted">"%1$s" हटाया गया</string>
+
+    <!-- Share Screen - Preview -->
+    <string name="share_items_progress">%1$d/%2$d आइटम</string>
+
+    <!-- Onboarding - Interactive - Customize Step -->
+    <string name="onboarding_interactive_settings">सेटिंग्स</string>
+
+    <!-- Consent Dialog -->
+    <string name="consent_title">गोपनीयता और डेटा उपयोग</string>
+    <string name="consent_body">हम ऐप को बेहतर बनाने और विज्ञापन की प्रभावशीलता मापने के लिए एनालिटिक्स का उपयोग करते हैं। आपका डेटा हमें यह समझने में मदद करता है कि फ़ीचर कैसे इस्तेमाल होते हैं और आपके अनुभव को बेहतर बनाता है।\n\nक्या आप एनालिटिक्स और विज्ञापन के उद्देश्यों के लिए डेटा संग्रह की सहमति देते हैं?</string>
+    <string name="consent_accept">स्वीकार करें</string>
+    <string name="consent_decline">अस्वीकार करें</string>
+
+    <!-- Widget Config -->
+    <string name="widget_config_title">चेकलिस्ट चुनें</string>
+    <string name="widget_config_items_count">%1$d आइटम</string>
+    <string name="widget_config_empty_title">अभी कोई चेकलिस्ट नहीं</string>
+    <string name="widget_config_empty_description">पहले ऐप में एक चेकलिस्ट बनाएं, फिर विजेट कॉन्फ़िगर करने के लिए वापस आएं।</string>
+
+    <!-- Feature Illustrations -->
+    <string name="illustration_photo">फ़ोटो</string>
+    <string name="illustration_pdf">PDF</string>
+    <string name="illustration_text">टेक्स्ट</string>
+    <string name="illustration_link">लिंक</string>
+    <string name="illustration_voice">वॉइस</string>
+    <string name="illustration_task_extracted">कॉन्टेंट से निकाला गया टास्क</string>
+    <string name="illustration_another_item">आपके इनपुट से एक और आइटम</string>
+    <string name="illustration_ai_generated">AI-जनित चेकलिस्ट आइटम</string>
+    <string name="illustration_apartment_check">🏠 अपार्टमेंट जांच</string>
+    <string name="illustration_kitchen">रसोई की स्थिति</string>
+    <string name="illustration_windows">खिड़कियां और दरवाज़े</string>
+    <string name="illustration_plumbing">प्लंबिंग का काम</string>
+    <string name="illustration_main_street">✅ मेन स्ट्रीट अपार्टमेंट</string>
+    <string name="illustration_project_review">प्रोजेक्ट समीक्षा</string>
+    <string name="illustration_progress">3/3 ✓</string>
+    <string name="illustration_review_document">दस्तावेज़ की समीक्षा करें</string>
+    <string name="illustration_send_email">ईमेल भेजें</string>
+    <string name="illustration_final_approval">अंतिम मंज़ूरी</string>
+    <string name="illustration_share">शेयर करें</string>
+    <string name="illustration_ai_badge">✨ AI</string>
+    <string name="illustration_unlimited_create">AI से असीमित बनाएं</string>
+    <string name="illustration_unlimited_fill">AI से असीमित फ़िल</string>
+    <string name="illustration_pdf_text_export">PDF और टेक्स्ट एक्सपोर्ट</string>
+    <string name="illustration_credits_daily">रोज़ 300 AI क्रेडिट</string>
+
+    <!-- Premium benefits card (onboarding slide 5) — summarizes slides 1-4 -->
+    <string name="ob_benefit_unlimited_ai">AI चैट और क्रिएशन — कोई सीमा नहीं</string>
+    <string name="ob_benefit_calendar">कैलेंडर और साप्ताहिक प्लानर</string>
+    <string name="ob_benefit_reminders">बिना सीमा के रिमाइंडर</string>
+    <string name="ob_benefit_credits">हर दिन 300 AI क्रेडिट</string>
+
+    <!-- Settings Screen -->
+    <string name="settings_title">सेटिंग्स</string>
+    <string name="settings_theme">थीम</string>
+    <string name="settings_theme_light">लाइट</string>
+    <string name="settings_theme_dark">डार्क</string>
+    <string name="settings_theme_system">सिस्टम डिफ़ॉल्ट</string>
+
+    <!-- Language section (Settings) -->
+    <string name="settings_language">भाषा</string>
+    <string name="settings_language_system">सिस्टम डिफ़ॉल्ट</string>
+    <string name="settings_language_english">English</string>
+    <string name="settings_language_russian">Русский</string>
+    <string name="settings_language_hindi">हिन्दी</string>
+
+    <string name="settings_dynamic_color">डायनामिक रंग</string>
+    <string name="settings_dynamic_color_description">अपने वॉलपेपर के रंग इस्तेमाल करें (Android 12+)</string>
+    <string name="settings_back">वापस</string>
+
+    <!-- Smart Add chip labels (TokenChipPreview) -->
+    <!-- Day keys -->
+    <string name="smart_add_chip_today">आज</string>
+    <string name="smart_add_chip_tomorrow">कल</string>
+    <string name="smart_add_chip_day_after_tomorrow">परसों</string>
+    <!-- Time suffix: "at HH:MM" — %1$s is the formatted time string -->
+    <string name="smart_add_chip_at_time">%1$s पर</string>
+    <!-- Absolute time only: "at HH:MM" -->
+    <string name="smart_add_chip_time_only">%1$s पर</string>
+    <!-- Relative offsets (plurals defined in plurals.xml) -->
+    <!-- Weekday names -->
+    <string name="smart_add_chip_weekday_monday">सोमवार</string>
+    <string name="smart_add_chip_weekday_tuesday">मंगलवार</string>
+    <string name="smart_add_chip_weekday_wednesday">बुधवार</string>
+    <string name="smart_add_chip_weekday_thursday">गुरुवार</string>
+    <string name="smart_add_chip_weekday_friday">शुक्रवार</string>
+    <string name="smart_add_chip_weekday_saturday">शनिवार</string>
+    <string name="smart_add_chip_weekday_sunday">रविवार</string>
+    <!-- Repeat keys -->
+    <string name="smart_add_chip_repeat_daily">रोज़</string>
+    <string name="smart_add_chip_repeat_weekly">साप्ताहिक</string>
+    <string name="smart_add_chip_repeat_monthly">मासिक</string>
+    <string name="smart_add_chip_repeat_yearly">वार्षिक</string>
+    <string name="smart_add_chip_repeat_weekdays">सप्ताह के दिन</string>
+    <!-- Combined: "Every %1$s at %2$s" — %1$s = weekday, %2$s = HH:MM -->
+    <string name="smart_add_chip_combined_weekday_repeat">हर %1$s %2$s पर</string>
+    <!-- Smart Add hints shown when user submits an incomplete trigger phrase -->
+    <string name="smart_add_hint_add_item_text">टास्क टेक्स्ट जोड़ें — जैसे "हर रविवार 12 बजे मॉम को कॉल करें"</string>
+    <string name="smart_add_hint_add_time">समय पूरा करें — जैसे "12 बजे" या "सुबह 7 बजे"</string>
+
+    <!-- Debug Screen -->
+    <!-- PDF Export -->
+    <string name="pdf_note_label">नोट:</string>
+    <string name="pdf_page_number">%2$d में से पेज %1$d</string>
+
+    <string name="debug_title">Debug Menu</string>
+    <string name="debug_developer_tools">Developer Tools</string>
+    <string name="debug_app_info">App Info</string>
+    <string name="debug_app_info_description">Version, build, and other details</string>
+    <string name="debug_reset_onboarding">Reset Onboarding</string>
+    <string name="debug_reset_onboarding_description">Show welcome screen again</string>
+    <string name="debug_clear_data">Clear Data</string>
+    <string name="debug_clear_data_description">Delete all local data</string>
+    <string name="debug_create_test">Create Test Checklists</string>
+    <string name="debug_create_test_description">Add demo data for testing</string>
+    <string name="debug_app_info_dialog_title">App Info</string>
+    <string name="debug_label_name">Name</string>
+    <string name="debug_label_version">Version</string>
+    <string name="debug_label_build">Build</string>
+    <string name="debug_test_restore_credits">Test Restore Credits</string>
+    <string name="debug_test_restore_credits_description">Simulate credit restore after purchase</string>
+    <string name="debug_restore_credits_success">Credits restored: %1$d</string>
+    <string name="debug_restore_credits_error">Failed to restore credits</string>
+    <string name="debug_store_screenshots">Store Screenshots</string>
+    <string name="debug_store_screenshots_description">Preview screens for App Store/Play Store</string>
+    <string name="debug_repeat_rule_presets">Repeat Rule Presets</string>
+    <string name="debug_repeat_rule_presets_description">Preview the 8 smart repeat presets sheet</string>
+    <string name="debug_show_csat">Show CSAT Survey</string>
+    <string name="debug_show_csat_description">Force show CSAT bottom sheet for testing</string>
+    <string name="debug_interactive_onboarding">Interactive Onboarding</string>
+    <string name="debug_interactive_onboarding_description">Open the new interactive onboarding flow</string>
+    <string name="debug_dock_legacy_title">Legacy chat dock</string>
+    <string name="debug_dock_legacy_description">Revert to the old flat-grey dock (no hairline) for comparison</string>
+
+    <!-- Onboardings debug screen -->
+    <string name="debug_onboardings_title">Onboardings</string>
+    <string name="debug_onboardings_description">Launch any onboarding variant</string>
+    <string name="debug_onboardings_section_variants">Variants</string>
+    <string name="debug_onboardings_interactive_title">Interactive Onboarding</string>
+    <string name="debug_onboardings_interactive_desc">Multi-step: category → style → template</string>
+    <string name="debug_onboardings_slides_title">Slides Onboarding</string>
+    <string name="debug_onboardings_slides_desc">3 pager slides + paywall</string>
+    <string name="debug_onboardings_ai_welcome_title">AI Welcome (Toki)</string>
+    <string name="debug_onboardings_ai_welcome_desc">4 steps: AI-agent hook → create first list</string>
+
+    <!-- Debug — post-cancel reason sheet preview -->
+    <string name="debug_cancel_reason_title">Test: Cancel reason sheet</string>
+    <string name="debug_cancel_reason_description">Preview the post-cancel reason picker (bypasses the session cap)</string>
+
+    <!-- Screen Catalog -->
+    <string name="debug_catalog_title">Screen Catalog</string>
+    <string name="debug_catalog_entry_description">Browse all app screens (for screenshot tests)</string>
+    <string name="debug_catalog_section_state">Setup State</string>
+    <string name="debug_catalog_section_lifecycle">Lifecycle</string>
+    <string name="debug_catalog_section_create">Create</string>
+    <string name="debug_catalog_section_detail">Detail</string>
+    <string name="debug_catalog_section_ai">AI</string>
+    <string name="debug_catalog_section_monetisation">Monetisation</string>
+    <string name="debug_catalog_section_other">Other</string>
+    <string name="debug_catalog_state_empty">Empty (no data)</string>
+    <string name="debug_catalog_state_empty_desc">Clear all, free user, 10 credits</string>
+    <string name="debug_catalog_state_with_data">With Data (3 checklists)</string>
+    <string name="debug_catalog_state_with_data_desc">3 checklists, free user, 10 credits</string>
+    <string name="debug_catalog_state_free_limit">Free Limit Hit (4 checklists)</string>
+    <string name="debug_catalog_state_free_limit_desc">4 checklists, free user — shows upsell button</string>
+    <string name="debug_catalog_state_premium">Premium User</string>
+    <string name="debug_catalog_state_premium_desc">3 checklists, premium, 300 credits</string>
+    <string name="debug_catalog_onboarding">Onboarding</string>
+    <string name="debug_catalog_onboarding_desc">Static onboarding pager</string>
+    <string name="debug_catalog_interactive_onboarding">Interactive Onboarding</string>
+    <string name="debug_catalog_interactive_onboarding_desc">Animated interactive onboarding flow</string>
+    <string name="debug_catalog_main">Main</string>
+    <string name="debug_catalog_main_desc">Home screen with checklist list</string>
+    <string name="debug_catalog_templates">Templates</string>
+    <string name="debug_catalog_templates_desc">Checklist template gallery</string>
+    <string name="debug_catalog_template_preview">Template Preview</string>
+    <string name="debug_catalog_template_preview_desc">Preview a single template (daily_tasks)</string>
+    <string name="debug_catalog_create_new">Create New</string>
+    <string name="debug_catalog_create_new_desc">Blank create checklist screen</string>
+    <string name="debug_catalog_create_edit">Create (Edit mode)</string>
+    <string name="debug_catalog_create_edit_desc">Edit first seeded checklist — requires seed</string>
+    <string name="debug_catalog_checklist_detail">Checklist Detail</string>
+    <string name="debug_catalog_checklist_detail_desc">Detail view — requires seed</string>
+    <string name="debug_catalog_fill_detail">Fill Detail</string>
+    <string name="debug_catalog_fill_detail_desc">Fill detail view — requires seed</string>
+    <string name="debug_catalog_fills_list">Fills List</string>
+    <string name="debug_catalog_fills_list_desc">All fills for a checklist — requires seed</string>
+    <string name="debug_catalog_share_checklist">Share Checklist</string>
+    <string name="debug_catalog_share_checklist_desc">Export screen — requires seed</string>
+    <string name="debug_catalog_analyze_empty">Analyze (empty)</string>
+    <string name="debug_catalog_analyze_empty_desc">Analyze screen, no checklist selected</string>
+    <string name="debug_catalog_analyze_for_checklist">Analyze (with checklist)</string>
+    <string name="debug_catalog_analyze_for_checklist_desc">Analyze linked to first seeded checklist</string>
+    <string name="debug_catalog_analyze_result_preview">Analyze Result Preview</string>
+    <string name="debug_catalog_analyze_result_preview_desc">Shows empty result preview state</string>
+    <string name="debug_catalog_paywall">Paywall (RC variant)</string>
+    <string name="debug_catalog_paywall_desc">Subscription / trial screen (variant from Remote Config)</string>
+    <string name="debug_catalog_paywall_timeline">Paywall · Timeline</string>
+    <string name="debug_catalog_paywall_timeline_desc">Force A/B variant: Timeline (3-step trial)</string>
+    <string name="debug_catalog_paywall_features">Paywall · Features</string>
+    <string name="debug_catalog_paywall_features_desc">Force A/B variant: Features grid</string>
+    <string name="debug_catalog_paywall_compare">Paywall · Compare</string>
+    <string name="debug_catalog_paywall_compare_desc">Force A/B variant: Comparison table</string>
+    <string name="debug_catalog_subscription_success">Subscription Status (success)</string>
+    <string name="debug_catalog_subscription_success_desc">Success confirmation screen</string>
+    <string name="debug_catalog_subscription_pending">Subscription Status (pending)</string>
+    <string name="debug_catalog_subscription_pending_desc">Pending / no-message status screen</string>
+    <string name="debug_catalog_settings">Settings</string>
+    <string name="debug_catalog_settings_desc">App settings screen</string>
+    <string name="debug_catalog_update_feed">Update Feed</string>
+    <string name="debug_catalog_update_feed_desc">Version changelog / update feed</string>
+    <string name="debug_catalog_store_screenshot">Store Screenshot</string>
+    <string name="debug_catalog_store_screenshot_desc">Marketing screenshot preview pages</string>
+
+    <!-- Paywall V1 — A/B redesign strings (paywall_v1_*) -->
+    <!-- Top bar actions -->
+    <string name="paywall_v1_close_cd">बंद करें</string>
+    <string name="paywall_v1_restore_action">रिस्टोर करें</string>
+
+    <!-- Web target: replaces paywall with an "install the mobile app" CTA -->
+    <string name="paywall_web_install_title">पूरा Gisti अनुभव पाएं</string>
+    <string name="paywall_web_install_description">सब्सक्रिप्शन और सभी फ़ीचर मोबाइल ऐप में हैं। असीमित चेकलिस्ट, AI फ़िल, एक्सपोर्ट और रिमाइंडर के लिए अपने फ़ोन पर Gisti इंस्टॉल करें।</string>
+    <string name="paywall_web_install_android_label">Android</string>
+    <string name="paywall_web_install_android_status">अभी Google Play पर उपलब्ध</string>
+    <string name="paywall_web_install_android_cta">Google Play पर पाएं</string>
+    <string name="paywall_web_install_ios_label">iOS</string>
+    <string name="paywall_web_install_ios_status">जल्द आ रहा है</string>
+    <string name="paywall_web_install_ios_hint">हम इस पर काम कर रहे हैं। बने रहें।</string>
+
+    <!-- Trial pill (Variant A) -->
+    <string name="paywall_v1_timeline_days_free">%1$d दिन मुफ़्त</string>
+
+    <!-- Variant A: Timeline headline/body -->
+    <string name="paywall_v1_timeline_headline">Gisti Pro आज़माएं,\nबिल्कुल मुफ़्त।</string>
+    <string name="paywall_v1_timeline_body">किसी भी फ़ोटो, वॉइस मेमो या PDF को तुरंत स्मार्ट चेकलिस्ट में बदलें।</string>
+
+    <!-- Timeline section label -->
+    <string name="paywall_v1_how_trial_works">आपका ट्रायल कैसे काम करता है</string>
+
+    <!-- Timeline steps (2-step: Today → trial end. Day 2 step removed — promised a push
+         notification we don't actually send, which is a Google Play "Deceptive behavior"
+         policy risk. If we add real pre-trial-end push notifications, restore Day 2.) -->
+    <string name="paywall_v1_timeline_step1_title">आज</string>
+    <string name="paywall_v1_timeline_step1_body">Gisti Pro अनलॉक करें — हर दिन 300 AI रिक्वेस्ट, असीमित चेकलिस्ट और दोहराने वाले रिमाइंडर।</string>
+    <string name="paywall_v1_timeline_step3_title">दिन 3</string>
+    <string name="paywall_v1_timeline_step3_body">आपका मुफ़्त ट्रायल खत्म होता है और आपकी Pro सब्सक्रिप्शन शुरू होती है।</string>
+
+    <!-- Variant B: Features headline/body -->
+    <string name="paywall_v1_features_headline">सब कुछ Pro,\n%1$d दिन मुफ़्त</string>
+    <string name="paywall_v1_features_body">फ़ोटो, वॉइस और PDF से बनाएं। अपने हफ़्ते की योजना बनाएं। रोज़ की सीमा के बिना AI। कभी भी रद्द करें।</string>
+
+    <!-- Variant B: Feature rows — truthful Pro benefits (NOT exclusive features). -->
+    <!-- DEPRECATED (kept for translation continuity, no longer rendered):
+         paywall_v1_feature_photo_*, paywall_v1_feature_voice_*, paywall_v1_feature_pdf_*,
+         paywall_v1_feature_link_*. All four input types are available on Free too;
+         claiming them as Pro-only was misleading. Remove safely after string sync. -->
+    <string name="paywall_v1_feature_photo_title">फ़ोटो से चेकलिस्ट</string>
+    <string name="paywall_v1_feature_photo_body">फ्रिज, रेसिपी या व्हाइटबोर्ड की फ़ोटो लें।</string>
+    <string name="paywall_v1_feature_voice_title">वॉइस मेमो</string>
+    <string name="paywall_v1_feature_voice_body">बस बोलें। Gisti उसे व्यवस्थित कर देगा।</string>
+    <string name="paywall_v1_feature_pdf_title">PDF और दस्तावेज़</string>
+    <string name="paywall_v1_feature_pdf_body">सिलेबस, मैनुअल, रेसिपी डालें।</string>
+    <string name="paywall_v1_feature_link_title">कोई भी लिंक</string>
+    <string name="paywall_v1_feature_link_body">लेख और पोस्ट, स्टेप्स में बदल जाते हैं।</string>
+    <!-- Active feature rows -->
+    <string name="paywall_v1_feature_ai_runs_title">हर दिन 300 AI रिक्वेस्ट</string>
+    <string name="paywall_v1_feature_ai_runs_body">रोज़ भरते हैं। एक हफ़्ते की ट्रिप, रेसिपी और प्रोजेक्ट प्लान करें।</string>
+    <string name="paywall_v1_feature_unlimited_lists_title">असीमित चेकलिस्ट</string>
+    <string name="paywall_v1_feature_unlimited_lists_body">4-चेकलिस्ट की सीमा नहीं। जितनी चाहें उतनी बनाएं।</string>
+    <string name="paywall_v1_feature_unlimited_fills_title">हर चेकलिस्ट में असीमित फ़िल</string>
+    <string name="paywall_v1_feature_unlimited_fills_body">एक ही चेकलिस्ट को कई ट्रिप, सेशन और प्रोजेक्ट में दोबारा इस्तेमाल करें।</string>
+    <string name="paywall_v1_feature_unlimited_reminders_title">असीमित बार-बार आने वाले रिमाइंडर</string>
+    <string name="paywall_v1_feature_unlimited_reminders_body">रोज़, साप्ताहिक, कस्टम — जितने चाहें उतने सेट करें।</string>
+    <!-- REMOVED: paywall_v1_feature_sync_title / _body — product is mobile-only, no cross-device sync exists -->
+
+    <!-- Variant C: Compare headline/body -->
+    <string name="paywall_v1_compare_headline">तुलना करें और चुनें।</string>
+    <string name="paywall_v1_compare_body">वही AI टूल — Pro सीमाएं हटा देता है। %1$d दिन Pro मुफ़्त आज़माएं।</string>
+
+    <!-- Variant C: Compare table headers -->
+    <string name="paywall_v1_compare_feature">फ़ीचर</string>
+    <string name="paywall_v1_compare_free">फ्री</string>
+    <string name="paywall_v1_compare_pro">Pro</string>
+
+    <!-- Variant C: Compare rows — only real differences between Free and Pro. -->
+    <!-- DEPRECATED (kept for translation continuity, no longer rendered):
+         paywall_v1_compare_row_photo, _voice, _pdf_link — all input types
+         are accessible on Free (server gates by credits, not type).
+         paywall_v1_compare_row_priority_ai — same Gemini model for everyone
+         (firebase-functions/main.py uses gemini-2.5-flash-lite for all users).
+         paywall_v1_compare_row_ai_checklists — replaced by _ai_requests with
+         truthful values ("100 once" instead of "10/day refilled"). -->
+    <string name="paywall_v1_compare_row_ai_checklists">AI चेकलिस्ट / दिन</string>
+    <string name="paywall_v1_compare_row_photo">फ़ोटो इनपुट</string>
+    <string name="paywall_v1_compare_row_voice">वॉइस मेमो इनपुट</string>
+    <string name="paywall_v1_compare_row_pdf_link">PDF और लिंक इम्पोर्ट</string>
+    <string name="paywall_v1_compare_row_reminders">स्मार्ट रिमाइंडर</string>
+    <string name="paywall_v1_compare_row_priority_ai">बेस्ट AI मॉडल (Gemini 2.5 Flash)</string>
+    <!-- Active compare rows + values -->
+    <string name="paywall_v1_compare_row_ai_requests">AI रिक्वेस्ट</string>
+    <string name="paywall_v1_compare_row_checklists">चेकलिस्ट</string>
+    <string name="paywall_v1_compare_row_fills">फ़िल / सूची</string>
+    <string name="paywall_v1_compare_row_recurring_reminders">बार-बार आने वाले रिमाइंडर</string>
+    <string name="paywall_v1_compare_value_free_credits">100 एक बार</string>
+    <string name="paywall_v1_compare_value_pro_credits">300/दिन</string>
+    <string name="paywall_v1_compare_value_unlimited">असीमित</string>
+
+    <!-- Plan rows -->
+    <string name="paywall_v1_yearly_label">सालाना</string>
+    <string name="paywall_v1_monthly_label">मासिक</string>
+    <string name="paywall_v1_best_value_badge">बेस्ट वैल्यू</string>
+    <string name="paywall_v1_billed_monthly">मासिक बिलिंग</string>
+    <!-- %1$s = monthly equivalent of yearly price (e.g. "$2.50" or "915,83 ₸") -->
+    <string name="paywall_v1_billed_annually_subtitle">%1$s/माह · सालाना बिलिंग</string>
+    <!-- DEPRECATED: savings % is now computed dynamically in PaywallRoute from real prices -->
+    <string name="paywall_v1_save_72">72% बचाएं</string>
+    <!-- %1$d = dynamically computed percentage -->
+    <string name="paywall_save_percent">%1$d%% बचाएं</string>
+
+    <!-- Sticky CTA -->
+    <string name="paywall_v1_cta_start_trial">%1$d-दिन का मुफ़्त ट्रायल शुरू करें</string>
+    <!-- DEPRECATED: replaced by paywall_v1_cta_sub_yearly / paywall_v1_cta_sub_monthly -->
+    <string name="paywall_v1_cta_sub">फिर $20/साल। अपने आप रिन्यू होता है। कभी भी रद्द करें।</string>
+    <!-- 1-line CTA disclosure. NOTE: Google Play subscription policy 4.5 requires
+         "auto-renewing" disclosure visible before purchase. We previously had a
+         rejection on this exact topic (docs/solutions/ui-improvements/
+         paywall-subscription-policy-compliance.md). The auto-renew language is
+         omitted here per product request — if Play review flags this again,
+         restore "Auto-renews. " between %1$s/year. and Cancel. -->
+    <string name="paywall_v1_cta_sub_yearly">फिर %1$s/साल। कभी भी रद्द करें।</string>
+    <string name="paywall_v1_cta_sub_monthly">फिर %1$s/माह। कभी भी रद्द करें।</string>
+
+    <!-- No-trial variants (used when the selected offering has no free trial) -->
+    <string name="paywall_v1_timeline_headline_no_trial">Gisti Pro अनलॉक करें।</string>
+    <string name="paywall_v1_pro_benefits">आपको क्या मिलता है</string>
+    <string name="paywall_v1_features_headline_no_trial">सब कुछ Pro,\nअनलॉक।</string>
+    <string name="paywall_v1_compare_body_no_trial">वही AI टूल — Pro सीमाएं हटा देता है।</string>
+    <string name="paywall_v1_cta_sub_yearly_no_trial">%1$s/साल। कभी भी रद्द करें।</string>
+    <string name="paywall_v1_cta_sub_monthly_no_trial">%1$s/माह। कभी भी रद्द करें।</string>
+
+    <!-- Weekly mode ("My Week" checklist view) -->
+    <string name="templates_create_weekly">मेरा हफ़्ता</string>
+    <string name="weekly_mode_title">मेरा हफ़्ता</string>
+    <string name="weekday_monday">सोमवार</string>
+    <string name="weekday_tuesday">मंगलवार</string>
+    <string name="weekday_wednesday">बुधवार</string>
+    <string name="weekday_thursday">गुरुवार</string>
+    <string name="weekday_friday">शुक्रवार</string>
+    <string name="weekday_saturday">शनिवार</string>
+    <string name="weekday_sunday">रविवार</string>
+    <!-- %1$s = localized weekday name, e.g. "Add for Monday" -->
+    <string name="weekly_add_for_day">%1$s के लिए जोड़ें</string>
+    <string name="weekly_move_to_day_title">दिन में ले जाएं</string>
+    <string name="weekly_move_to_day_action">यहां ले जाएं…</string>
+    <string name="weekly_paywall_locked_title">प्रीमियम फ़ीचर</string>
+    <string name="weekly_paywall_locked_message">फ्री यूज़र 1 साप्ताहिक चेकलिस्ट रख सकते हैं। असीमित साप्ताहिक चेकलिस्ट के लिए प्रीमियम में अपग्रेड करें।</string>
+    <string name="weekly_overdue_section_title">बकाया</string>
+    <string name="reminder_paywall_locked_title">प्रीमियम फ़ीचर</string>
+    <string name="reminder_paywall_locked_message">फ्री यूज़र 10 एक्टिव रिमाइंडर रख सकते हैं। चेकलिस्ट और आइटम पर असीमित रिमाइंडर के लिए प्रीमियम में अपग्रेड करें।</string>
+    <string name="reminder_paywall_locked_cta">Pro बनें</string>
+
+    <!-- Today Screen -->
+    <string name="today_title">आज</string>
+    <string name="today_empty_state_title">आज के लिए कुछ नहीं</string>
+    <string name="today_empty_state_description">अपना दिन एंजॉय करें या नया टास्क बनाएं</string>
+    <string name="today_all_done_title">आज का सब हो गया</string>
+    <string name="today_all_done_description">बढ़िया! आज के लिए तय सब कुछ आपने पूरा कर लिया।</string>
+    <string name="today_no_checklists_description">शुरू करने के लिए अपनी पहली चेकलिस्ट बनाएं।</string>
+    <string name="today_section_past_due">समय बीत चुका</string>
+    <string name="today_section_today">आज</string>
+    <string name="today_open_menu">मेन्यू खोलें</string>
+    <string name="today_error_title">आज के रिमाइंडर लोड नहीं हो सके</string>
+    <string name="today_error_description">कुछ गड़बड़ हो गई। आपके रिमाइंडर सुरक्षित हैं — फिर से आज़माएं।</string>
+    <string name="today_error_retry">फिर से आज़माएं</string>
+
+    <!-- Navigation Bar tabs -->
+    <string name="today_tab_today">आज</string>
+    <string name="today_tab_lists">सूचियां</string>
+
+    <!-- Calendar Screen -->
+    <string name="calendar_nav_label">कैलेंडर</string>
+    <string name="calendar_title">कैलेंडर</string>
+    <string name="calendar_empty_title">कोई आने वाला रिमाइंडर नहीं</string>
+    <string name="calendar_empty_description">अपना हफ़्ता यहां देखने के लिए रिमाइंडर वाली चेकलिस्ट बनाएं।</string>
+    <string name="calendar_empty_cta">चेकलिस्ट बनाएं</string>
+    <string name="calendar_error_title">आपका कैलेंडर लोड नहीं हो सका</string>
+    <string name="calendar_error_retry">फिर से आज़माएं</string>
+    <string name="calendar_section_past_due">समय बीत चुका</string>
+    <string name="calendar_grid_week_label">इस हफ़्ते</string>
+    <string name="calendar_prev_week">पिछला हफ़्ता</string>
+    <string name="calendar_next_week">अगला हफ़्ता</string>
+
+    <!-- Item meta chips (read-only indicators below item text in ChecklistItemCard) -->
+    <string name="item_chip_priority">ज़रूरी</string>
+
+    <!-- AI Chat Screen -->
+    <string name="chat_title">AI चैट</string>
+    <string name="chat_input_placeholder">Gisti को मैसेज करें</string>
+    <string name="chat_send_action">भेजें</string>
+    <string name="chat_typing_indicator_a11y">AI सोच रहा है…</string>
+    <string name="chat_help_action">प्राइसिंग जानकारी</string>
+    <!-- %1$d = credit balance, shown as "3 credits left · ≈ 0–3" -->
+    <string name="chat_credits_label">%1$d क्रेडिट बचे · ≈ 0–3</string>
+    <!-- Compact balance: just the number, icon explains what it is. -->
+    <string name="chat_credits_balance">%1$d</string>
+    <!-- Pricing caption shown above input row; tap "?" opens the full pricing sheet. -->
+    <string name="chat_pricing_caption">≈ 0–3 क्रेडिट प्रति क्वेरी</string>
+    <string name="chat_pricing_caption_action">क्यों?</string>
+    <string name="chat_preview_cancelled_message">कार्रवाई रद्द कर दी गई।</string>
+    <!-- Reused by D2 as the destination object-row contentDescription. -->
+    <string name="chat_preview_checklist_label">चेकलिस्ट में: %1$s</string>
+    <!-- Reused by D2 as the inline-edit field label when creating a checklist. -->
+    <string name="chat_preview_new_list_label">सूची का नाम</string>
+
+    <!-- D2 object rows — a11y phrases for the typed object of a pending action. -->
+    <string name="chat_object_item_a11y">आइटम: %1$s</string>
+    <string name="chat_object_time_a11y">समय: %1$s</string>
+    <string name="chat_object_file_a11y">फ़ाइल: %1$s</string>
+    <string name="chat_object_name_a11y">नाम: %1$s</string>
+    <string name="chat_object_more">…और %1$s अधिक</string>
+    <!-- D2 outcome-naming chip labels: the button names the result, never "Apply". -->
+    <string name="chat_choice_action_create_items">%1$s बनाएं</string>
+    <string name="chat_choice_action_move_reminders">%1$s ले जाएं</string>
+    <!-- D2 memory of choice — opt-in, never pre-checked; disclosed after the tap. -->
+    <string name="chat_choice_remember">मेरी पसंद याद रखें</string>
+    <string name="chat_result_remembered_list">अब से मैं डिफ़ॉल्ट रूप से %1$s में जोड़ूंगा — आप इसे चैट सेटिंग्स में बदल सकते हैं।</string>
+    <string name="chat_settings_default_list_title">चैट के लिए डिफ़ॉल्ट सूची</string>
+    <string name="chat_settings_default_list_subtitle">चैट से नए आइटम %1$s में जाते हैं।</string>
+    <string name="chat_settings_default_list_reset">हर बार मुझसे पूछें</string>
+    <!-- AI choice response (Claude-style prompt + choice chips) -->
+    <!-- Argument-less questions. The OBJECT of the action ("• Milk → Shopping") is rendered as
+         its own line under the question by ToolCallPreviewRenderer — never interpolated into the
+         copy. A one-slot format string could only ever carry one of item/list, which is how
+         "Add to Shopping?" shipped without ever saying WHAT it would add. -->
+    <string name="chat_question_add">इसे जोड़ें?</string>
+    <string name="chat_question_delete">इसे हटाएं?</string>
+    <string name="chat_question_complete">पूरा हुआ मार्क करें?</string>
+    <string name="chat_question_create">यह चेकलिस्ट बनाएं?</string>
+    <string name="chat_question_set_reminder">यह रिमाइंडर सेट करें?</string>
+    <string name="chat_question_attach">यह फ़ाइल अटैच करें?</string>
+    <string name="chat_choice_move_reminders">सभी रिमाइंडर ले जाएं?</string>
+    <string name="chat_choice_create_from_file">इस फ़ाइल से चेकलिस्ट बनाएं?</string>
+    <string name="chat_choice_which_list">कौन सी सूची?</string>
+    <!-- Move picker when the chip cap hides destinations: %1$s shown of %2$s total. Premium has
+         unlimited lists, so a silently truncated picker reads as "my list is gone". -->
+    <string name="chat_choice_which_list_truncated">कौन सी सूची? %2$s में से %1$s दिखा रहे हैं।</string>
+    <string name="chat_choice_apply_actions">ये कार्रवाइयां लागू करें?</string>
+    <string name="chat_choice_action_add">जोड़ें</string>
+    <string name="chat_choice_action_delete">हटाएं</string>
+    <string name="chat_choice_action_complete">पूरा करें</string>
+    <string name="chat_choice_action_create">बनाएं</string>
+    <string name="chat_choice_action_set_reminder">रिमाइंडर सेट करें</string>
+    <string name="chat_choice_action_move">ले जाएं</string>
+    <string name="chat_choice_action_attach">अटैच करें</string>
+    <string name="chat_choice_execute_all">सब करें</string>
+    <string name="chat_choice_edit">संपादित करें</string>
+    <string name="chat_choice_save">सहेजें</string>
+    <string name="chat_choice_other">कुछ और</string>
+    <string name="chat_choice_cancel">रद्द करें</string>
+    <string name="chat_choice_dismissed_message">ठीक है, रद्द कर दिया।</string>
+    <string name="chat_choice_edit_empty_hint">पहले कुछ टाइप करें।</string>
+    <string name="chat_choice_edit_label">संपादित करें</string>
+    <string name="chat_choice_executing_add">जोड़ रहे हैं…</string>
+    <string name="chat_choice_executing_delete">हटा रहे हैं…</string>
+    <string name="chat_choice_executing_complete">अपडेट कर रहे हैं…</string>
+    <string name="chat_choice_executing_create">बना रहे हैं…</string>
+    <string name="chat_choice_executing_set_reminder">रिमाइंडर सेट कर रहे हैं…</string>
+    <string name="chat_choice_executing_move">ले जा रहे हैं…</string>
+    <string name="chat_choice_executing_attach">अटैच कर रहे हैं…</string>
+    <string name="chat_choice_executing_default">काम हो रहा है…</string>
+    <!-- Post-action chips (D1): shown AFTER a reversible action was applied without asking. -->
+    <string name="chat_choice_undo">पूर्ववत करें</string>
+    <string name="chat_choice_move_to_list">दूसरी सूची में ले जाएं</string>
+    <string name="chat_choice_executing_undo">पूर्ववत कर रहे हैं…</string>
+    <string name="chat_result_undone_add">«%1$s» को सूची से वापस हटा दिया।</string>
+    <string name="chat_result_undone_complete">«%1$s» अनचेक कर दिया।</string>
+    <string name="chat_result_moved_to">«%1$s» को %2$s में ले गए।</string>
+    <string name="chat_undo_item_gone">वह आइटम पहले ही हट चुका है — पूर्ववत करने के लिए कुछ नहीं।</string>
+    <string name="chat_move_no_other_lists">इसे ले जाने के लिए कोई दूसरी सूची नहीं है।</string>
+    <!-- ToolCallPreviewRenderer: the object line of an action. -->
+    <string name="chat_preview_in_list">(%1$s में)</string>
+    <string name="chat_preview_clear_completed">पूरे हुए आइटम हटाएं</string>
+    <string name="chat_preview_files_count">%1$s फ़ाइलें</string>
+    <string name="chat_preview_create_from_file">%1$s से चेकलिस्ट बनाएं</string>
+    <string name="chat_preview_attach_to">%1$s को अटैच करें • %2$s</string>
+    <!-- Date/time composition. Order is locale data: EN "July 20", RU "20 июля" — hence a format
+         string with swapped slots, never Kotlin-side concatenation. -->
+    <string name="chat_preview_day_month">%1$s %2$s</string>
+    <string name="chat_preview_weekday_date">%1$s, %2$s</string>
+    <string name="chat_preview_datetime">%1$s, %2$s को %3$s बजे</string>
+    <string name="month_january">जनवरी</string>
+    <string name="month_february">फ़रवरी</string>
+    <string name="month_march">मार्च</string>
+    <string name="month_april">अप्रैल</string>
+    <string name="month_may">मई</string>
+    <string name="month_june">जून</string>
+    <string name="month_july">जुलाई</string>
+    <string name="month_august">अगस्त</string>
+    <string name="month_september">सितंबर</string>
+    <string name="month_october">अक्टूबर</string>
+    <string name="month_november">नवंबर</string>
+    <string name="month_december">दिसंबर</string>
+    <string name="chat_unknown_intent_hint">मैं समझ नहीं पाया। «शॉपिंग में दूध जोड़ें» या «शुक्रवार शाम 6 बजे याद दिलाएं» आज़माएं।</string>
+    <string name="chat_ask_ai_fallback">AI से पूछें</string>
+    <!-- CTA on the out-of-credits reply. %1$s = Premium daily AI credits (Remote Config
+         ai_daily_limit_premium) — never hardcode the number, the label promises it. -->
+    <string name="chat_paywall_cta_credits">Pro बनें और अभी व हर दिन %1$s क्रेडिट पाएं</string>
+
+    <!-- AI Chat Pricing Help Sheet -->
+    <string name="chat_pricing_sheet_title">AI चैट क्रेडिट कैसे चार्ज करता है</string>
+    <string name="chat_pricing_layer1_title">स्टैंडर्ड कमांड — फ्री</string>
+    <string name="chat_pricing_layer1_detail">जोड़ें, खोजें, हटाएं, पूरा मार्क करें, सरल रिमाइंडर। आपके डिवाइस पर ही प्रोसेस, कोई क्रेडिट नहीं।</string>
+    <string name="chat_pricing_layer2_title">स्मार्ट कमांड — 1 क्रेडिट</string>
+    <string name="chat_pricing_layer2_detail">बल्क ऑपरेशन या अस्पष्ट शब्द। AI हमें ठीक-ठीक समझने में मदद करता है कि आपका मतलब क्या है।</string>
+    <string name="chat_pricing_layer3_title">खुले सवाल — 3 क्रेडिट</string>
+    <string name="chat_pricing_layer3_detail">«इस हफ़्ते मुझे क्या करना चाहिए?», प्लानिंग, सारांश। पूरी AI सोच-समझ।</string>
+    <string name="chat_pricing_apply_note">राइट एक्शन (जोड़ना / हटाना / सेट करना) हमेशा एक प्रीव्यू दिखाते हैं। क्रेडिट तब कटते हैं जब हम समझ लेते हैं कि आपका मतलब क्या था, तब नहीं जब आप Apply दबाते हैं।</string>
+    <string name="chat_pricing_got_it">समझ गया</string>
+
+    <!-- AI Chat Settings sheet -->
+    <string name="chat_settings_open">चैट सेटिंग्स</string>
+    <string name="chat_settings_title">चैट सेटिंग्स</string>
+    <string name="chat_settings_balance_label">क्रेडिट बैलेंस</string>
+    <string name="chat_settings_get_more">और पाएं</string>
+    <string name="chat_settings_deep_thinking_title">डीप थिंकिंग</string>
+    <string name="chat_settings_deep_thinking_subtitle">सभी सवाल लोकल राउटर को छोड़कर सीधे एडवांस्ड मॉडल पर जाते हैं (हर जवाब के 3 क्रेडिट)। आपकी सूचियों के बारे में सवालों के जवाब देने के लिए, यह आपके चेकलिस्ट के नाम और हाल ही में जोड़े गए कुछ आइटम का टेक्स्ट भी भेजता है।</string>
+    <string name="chat_settings_response_language_title">जवाब की भाषा</string>
+    <string name="chat_settings_response_language_auto">ऑटो</string>
+    <string name="chat_settings_response_language_subtitle_auto">अपने आप आपके मैसेज से मेल खाती है</string>
+    <string name="chat_settings_response_language_subtitle_fixed">Gisti हमेशा %1$s में जवाब देता है</string>
+    <string name="chat_settings_clear_chat">चैट हिस्ट्री मिटाएं</string>
+
+    <!-- AI Chat navigation / snackbar messages -->
+    <string name="nav_ai_chat">AI चैट</string>
+    <string name="main_open_ai_chat">AI असिस्टेंट खोलें</string>
+    <string name="main_action_ai_chat">AI चैट</string>
+    <string name="chat_requires_premium">इस एक्शन के लिए प्रीमियम सब्सक्रिप्शन ज़रूरी है।</string>
+    <string name="chat_ambiguous_match">क्या आपका मतलब था: %1$s? कृपया साफ़ करें।</string>
+    <string name="chat_not_found">कुछ नहीं मिला: %1$s</string>
+    <string name="chat_assistant_welcome">नमस्ते! मैं आपकी चेकलिस्ट मैनेज करने में मदद कर सकता हूँ। आज़माएं «शॉपिंग में दूध जोड़ो» या «शुक्रवार शाम 6 बजे याद दिलाना»।</string>
+    <!-- Inline assistant error messages — surfaced when ViewModel hits a recoverable failure -->
+    <string name="chat_generic_error">कुछ गड़बड़ हो गई। कृपया फिर से आज़माएं।</string>
+    <string name="chat_apply_error">बदलाव लागू करते समय कुछ गड़बड़ हो गई। कृपया फिर से आज़माएं।</string>
+    <string name="chat_extract_fail">मैं आपका मतलब समझ गया लेकिन ब्यौरा नहीं निकाल पाया। कृपया और साफ़ जानकारी के साथ फिर से आज़माएं।</string>
+    <!-- AI Chat dispatch outcomes (C.1 i18n) -->
+    <string name="chat_dispatch_added">«%1$s» जोड़ा गया।</string>
+    <string name="chat_dispatch_added_to">«%1$s» को %2$s में जोड़ा गया।</string>
+    <string name="chat_dispatch_deleted">«%1$s» को %2$s से हटाया गया।</string>
+    <string name="chat_dispatch_item_not_found">%2$s में «%1$s» से मेल खाता कोई आइटम नहीं मिला।</string>
+    <string name="chat_dispatch_completed">%2$s में «%1$s» को हो गया के रूप में चिह्नित किया गया।</string>
+    <string name="chat_dispatch_already_done">«%1$s» पहले से ही हो गया के रूप में चिह्नित है।</string>
+    <string name="chat_dispatch_created_empty">चेकलिस्ट «%1$s» बनाई गई।</string>
+    <string name="chat_dispatch_created_with_one">चेकलिस्ट «%1$s» 1 आइटम के साथ बनाई गई।</string>
+    <string name="chat_dispatch_created_with_many">चेकलिस्ट «%1$s» %2$s आइटम के साथ बनाई गई।</string>
+    <!-- %2$s is a full localized moment ("Monday, July 20 at 09:00") from ChatDateFormatter —
+         the same string the preview showed, so no "at ... at ..." and no drift between them. -->
+    <string name="chat_dispatch_reminder_set">«%1$s» के लिए रिमाइंडर सेट किया गया: %2$s।</string>
+    <string name="chat_dispatch_no_reminders_on_day">%1$s को कोई रिमाइंडर नहीं मिला।</string>
+    <string name="chat_dispatch_moved_one">1 रिमाइंडर %1$s पर ले जाया गया।</string>
+    <string name="chat_dispatch_moved_many">%1$s रिमाइंडर %2$s पर ले जाए गए।</string>
+    <string name="chat_dispatch_find_blank">कृपया कोई खोज शब्द दें।</string>
+    <string name="chat_dispatch_find_no_match">«%1$s» से कुछ भी मेल नहीं खाता।</string>
+    <string name="chat_dispatch_find_success">%1$s आइटम मिले: %2$s</string>
+    <string name="chat_dispatch_operation_failed">ऑपरेशन विफल हुआ: %1$s</string>
+    <string name="chat_dispatch_no_checklists">कोई चेकलिस्ट नहीं मिली। पहले एक बनाएं।</string>
+    <string name="chat_dispatch_no_checklist_match">«%1$s» से मेल खाती कोई चेकलिस्ट नहीं मिली।</string>
+    <string name="chat_dispatch_fill_load_failed">चेकलिस्ट «%1$s» के लिए फ़िल लोड नहीं हो सका।</string>
+    <!-- clear_completed_items tool. %1$s is the count of removed items, %2$s the checklist name. -->
+    <string name="chat_dispatch_completed_items_removed">%2$s से %1$s पूरे हुए आइटम हटाए गए।</string>
+    <string name="chat_dispatch_no_completed_items">%1$s में हटाने के लिए कोई पूरा हुआ आइटम नहीं है।</string>
+    <string name="chat_insufficient_credits">AI असिस्ट के लिए पर्याप्त क्रेडिट नहीं हैं। रीफ़िल करें या प्रीमियम में अपग्रेड करें।</string>
+    <string name="chat_completion_error">AI जवाब नहीं दे सका। कृपया फिर से आज़माएं।</string>
+    <!-- Connectivity-aware chat error messages (F1). Split by failure kind so an offline user
+         is not told "the AI couldn't respond". All three offer a Retry button (chat_retry). -->
+    <string name="chat_error_offline">लगता है आप ऑफ़लाइन हैं। अपना कनेक्शन जांचें और फिर से आज़माएं।</string>
+    <string name="chat_error_service">AI सेवा अभी जवाब नहीं दे रही है। कृपया थोड़ी देर में फिर से आज़माएं।</string>
+    <string name="chat_error_timeout">अनुरोध का समय समाप्त हो गया। कृपया फिर से आज़माएं।</string>
+    <string name="chat_retry">फिर से आज़माएं</string>
+    <string name="chat_history_load_error">चैट हिस्ट्री लोड नहीं हो सकी।</string>
+    <string name="chat_feedback_open">फ़ीडबैक दें</string>
+    <string name="chat_feedback_title">फ़ीडबैक दें</string>
+    <string name="chat_feedback_subtitle">आगे के जवाब बेहतर बनाने में मदद करता है। हम यह सवाल + जवाब आपके फ़ीडबैक के साथ भेजेंगे।</string>
+    <string name="chat_feedback_question_label">सवाल</string>
+    <string name="chat_feedback_answer_label">AI जवाब</string>
+    <string name="chat_feedback_placeholder">क्या गड़बड़ हुई? क्या कमी रही?</string>
+    <string name="chat_feedback_submit">भेजें</string>
+    <string name="chat_feedback_cancel">रद्द करें</string>
+    <string name="chat_feedback_submitted">आपके फ़ीडबैक के लिए धन्यवाद!</string>
+    <string name="chat_feedback_blank_hint">कृपया फ़ीडबैक टेक्स्ट डालें</string>
+    <string name="chat_open_checklist">चेकलिस्ट खोलें</string>
+
+    <!-- AI Chat — attachment flow strings (Phase 1) -->
+    <string name="chat_attach_no_files">कोई फ़ाइल अटैच नहीं है। कृपया पहले एक फ़ाइल चुनें।</string>
+    <string name="chat_attach_limit_reached">अटैचमेंट की सीमा पूरी हो गई। असीमित अटैचमेंट के लिए प्रीमियम में अपग्रेड करें।</string>
+    <string name="chat_attach_unsupported_type">असमर्थित फ़ाइल प्रकार: %1$s।</string>
+    <string name="chat_attach_analyze_empty">«%1$s» से कोई चेकलिस्ट आइटम नहीं निकाले जा सके।</string>
+    <string name="chat_attach_analyze_failed">«%1$s» का विश्लेषण नहीं हो सका। कृपया फिर से आज़माएं।</string>
+    <string name="chat_attach_store_failed">«%1$s» सहेजा नहीं जा सका। स्टोरेज अनुमतियां जांचें।</string>
+    <string name="chat_recording_cancelled">रिकॉर्डिंग रद्द हुई।</string>
+    <string name="chat_dispatch_created_from_attachment">«%1$s» %2$s आइटम के साथ बनाई गई।</string>
+    <string name="chat_dispatch_attached_one">«%1$s» को %3$s में «%2$s» से अटैच किया गया।</string>
+    <string name="chat_dispatch_attached_many">%1$s फ़ाइलें %3$s में «%2$s» से अटैच की गईं।</string>
+    <string name="chat_dispatch_added_many_to">%2$s में %1$s आइटम जोड़े गए।</string>
+    <string name="chat_dispatch_renamed">«%1$s» का नाम बदलकर «%2$s» किया गया।</string>
+    <string name="chat_dispatch_add_empty">जोड़ने के लिए कोई आइटम नहीं है।</string>
+    <!-- Phase 3 UI strings: attachment + voice input -->
+    <string name="chat_attach_file_action">फ़ाइल अटैच करें</string>
+    <string name="chat_record_voice">वॉइस मैसेज रिकॉर्ड करें</string>
+    <string name="chat_voice_press_hold_hint">रिकॉर्ड करने के लिए दबाए रखें</string>
+    <string name="chat_voice_drag_cancel_hint">रद्द करने के लिए ऊपर स्लाइड करें</string>
+    <string name="chat_voice_release_cancel_hint">रद्द करने के लिए छोड़ें</string>
+    <string name="chat_voice_too_short">रिकॉर्डिंग बहुत छोटी है। माइक बटन को ज़्यादा देर दबाए रखें।</string>
+    <string name="chat_recording_in_progress">रिकॉर्ड हो रहा है…</string>
+    <string name="chat_transcribing">ट्रांसक्राइब हो रहा है…</string>
+    <string name="chat_transcribe_empty">रिकॉर्डिंग में कुछ सुनाई नहीं दिया। फिर से आज़माएं।</string>
+    <string name="chat_transcribe_error">रिकॉर्डिंग ट्रांसक्राइब नहीं हो सकी। कनेक्शन जांचें और फिर से आज़माएं।</string>
+    <string name="chat_attachment_remove">अटैचमेंट हटाएं</string>
+    <string name="chat_attachment_source_chooser_title">अटैच करें</string>
+    <string name="chat_attachment_source_image">इमेज</string>
+    <string name="chat_attachment_source_pdf">PDF दस्तावेज़</string>
+    <string name="chat_attachment_source_text">टेक्स्ट फ़ाइल</string>
+    <string name="chat_attachment_source_audio">ऑडियो फ़ाइल</string>
+    <string name="chat_mic_permission_denied">सेटिंग्स में माइक्रोफ़ोन एक्सेस की अनुमति दें</string>
+    <string name="chat_input_placeholder_with_attachment">बताएं अटैचमेंट के साथ क्या करना है…</string>
+    <string name="chat_features_help_action">AI चैट कैसे इस्तेमाल करें</string>
+    <string name="chat_features_sheet_title">AI चैट क्या कर सकती है</string>
+    <string name="chat_features_intro">अपनी चेकलिस्ट से आसान भाषा में बात करें — असिस्टेंट समझ जाता है कि आपका मतलब क्या है। सटीक शब्दों की ज़रूरत नहीं।</string>
+    <string name="chat_features_section_items">आइटम मैनेज करें</string>
+    <string name="chat_features_section_create">चेकलिस्ट बनाएं</string>
+    <string name="chat_features_section_reminders">रिमाइंडर</string>
+    <string name="chat_features_section_ask">पूछें &amp; खोजें</string>
+    <string name="chat_features_case_add">आइटम जोड़ें</string>
+    <string name="chat_features_case_complete">हो गया के रूप में चिह्नित करें</string>
+    <string name="chat_features_case_delete">आइटम हटाएं</string>
+    <string name="chat_features_case_create">चेकलिस्ट बनाएं</string>
+    <string name="chat_features_case_from_attachment">फ़ोटो या PDF से बनाएं</string>
+    <string name="chat_features_case_reminder">रिमाइंडर सेट करें</string>
+    <string name="chat_features_case_find">आइटम खोजें</string>
+    <string name="chat_features_case_ask">कुछ भी पूछें</string>
+    <string name="chat_features_example_create">«शॉपिंग» चेकलिस्ट दूध, ब्रेड, मक्खन के साथ बनाओ</string>
+    <string name="chat_features_example_add">शॉपिंग में मक्खन जोड़ो</string>
+    <string name="chat_features_example_complete">दूध को हो गया के रूप में चिह्नित करो</string>
+    <string name="chat_features_example_delete">शॉपिंग से ब्रेड हटाओ</string>
+    <string name="chat_features_example_reminder">शाम 6 बजे दूध के बारे में याद दिलाना</string>
+    <string name="chat_features_example_find">खोजो कि दूध मेरे कहां है</string>
+    <string name="chat_features_example_from_attachment">इस फ़ोटो, PDF या टेक्स्ट से एक चेकलिस्ट बनाओ</string>
+    <string name="chat_features_example_ask">यात्रा के लिए मुझे सबसे पहले क्या पैक करना चाहिए?</string>
+    <string name="chat_features_got_it">समझ गया</string>
+    <string name="chat_empty_title">मैं आपको क्या चेक ऑफ़ करने में मदद करूं?</string>
+    <string name="chat_empty_subtitle">अपने शब्दों में पूछें, या किसी उदाहरण से शुरू करें।</string>
+    <string name="chat_assistant_label">AI असिस्टेंट</string>
+    <string name="chat_message_copy">मैसेज कॉपी करें</string>
+    <string name="chat_message_refresh">जवाब फिर से बनाएं</string>
+    <string name="chat_message_thumb_up">अच्छा जवाब</string>
+    <string name="chat_message_thumb_down">खराब जवाब</string>
+    <string name="chat_day_divider_today">आज</string>
+    <string name="chat_thumb_up_thanks">फ़ीडबैक के लिए धन्यवाद</string>
+    <string name="detail_pane_placeholder">ब्यौरा देखने के लिए एक चेकलिस्ट चुनें</string>
+
+    <!-- Google Auth / Sync -->
+    <string name="sync_banner_title">अपनी चेकलिस्ट सिंक करें</string>
+    <string name="sync_banner_description">किसी भी डिवाइस से अपनी सूचियां एक्सेस करने के लिए Google से साइन इन करें</string>
+    <string name="sync_banner_dismiss">सिंक बैनर हटाएं</string>
+    <string name="web_credits_banner_title">100 फ़्री AI क्रेडिट पाएं</string>
+    <string name="web_credits_banner_description">AI फ़ीचर अनलॉक करने के लिए Google से साइन इन करें</string>
+    <string name="drawer_sign_in">साइन इन करें</string>
+    <string name="drawer_account">अकाउंट</string>
+    <string name="drawer_sign_out">साइन आउट करें</string>
+    <string name="google_sign_in_success">सफलतापूर्वक साइन इन हुए</string>
+    <string name="google_sign_in_failed">साइन इन विफल हुआ। कृपया फिर से आज़माएं।</string>
+    <string name="google_sign_in_required">AI फ़ीचर इस्तेमाल करने के लिए Google से साइन इन करें</string>
+    <string name="sign_in_no_account">इस डिवाइस पर कोई Google अकाउंट नहीं मिला। अपनी डिवाइस सेटिंग्स में एक जोड़ें, फिर आज़माएं।</string>
+    <string name="sign_in_cancelled">साइन इन रद्द हुआ।</string>
+    <string name="sign_in_unavailable">Google साइन इन कुछ समय के लिए उपलब्ध नहीं है। कृपया बाद में फिर से आज़माएं।</string>
+    <string name="sign_in_network">इंटरनेट कनेक्शन नहीं है। अपना नेटवर्क जांचें और फिर से आज़माएं।</string>
+
+    <!-- Agent plan-card (Phase 2d: agentic loop) -->
+    <string name="chat_agent_plan_header">ये एक्शन लागू करें?</string>
+    <string name="chat_agent_plan_apply">सभी लागू करें</string>
+    <string name="chat_agent_round_limit">मैंने कई कदम पूरे कर लिए लेकिन प्रति-अनुरोध सीमा तक पहुंच गया। बताएं आपको और क्या चाहिए।</string>
+
+    <!-- Chat dock / expandable sheet (App-level sheet host) -->
+    <string name="chat_dock_ask_about">&#8220;%1$s&#8221; के बारे में पूछें…</string>
+    <string name="chat_sheet_open_full">पूरी चैट स्क्रीन खोलें</string>
+    <string name="chat_sheet_close">चैट बंद करें</string>
+    <string name="chat_dock_placeholder">Gisti से पूछें…</string>
+    <string name="chat_dock_mic_description">वॉइस इनपुट</string>
+
+    <!-- Inline chat panel (replaces modal sheet) -->
+    <string name="chat_panel_open_full">पूरी स्क्रीन खोलें</string>
+    <string name="chat_panel_help_description">चैट मदद</string>
+    <string name="chat_panel_collapse">चैट समेटें</string>
+    <string name="chat_panel_greeting">नमस्ते! मैं Gisti हूँ। अपनी सूचियों के बारे में मुझसे कुछ भी पूछें।</string>
+    <string name="chat_panel_scrim_description">चैट बंद करने के लिए टैप करें</string>
+
+    <!-- First checklist (A/B auto-create) -->
+    <string name="first_checklist_title">आपकी पहली चेकलिस्ट</string>
+    <string name="first_checklist_item_1">किसी आइटम को चेक ऑफ़ करने के लिए गोले पर टैप करें</string>
+    <string name="first_checklist_item_2">किसी भी आइटम को संपादित करने के लिए उस पर टैप करें</string>
+    <string name="first_checklist_item_3">अपना खुद का जोड़ने के लिए + बटन इस्तेमाल करें</string>
+    <string name="first_checklist_item_4">अपने AI असिस्टेंट से मिलें — स्क्रीन के नीचे मौजूद चैट बार। आइटम जोड़ने, रिमाइंडर सेट करने, या पूरी चेकलिस्ट बनाने के लिए आसान शब्दों में पूछें (आज़माएं «दूध जोड़ो» या «शुक्रवार शाम 6 बजे याद दिलाना»), या बोलने के लिए माइक पर टैप करें।</string>
+
+    <!-- Add to existing checklist picker (ACTION_PROCESS_TEXT "Add to checklist" action) -->
+    <string name="add_to_checklist_title">चेकलिस्ट में जोड़ें</string>
+    <string name="add_to_checklist_subtitle">चुने गए टेक्स्ट को जोड़ने के लिए एक चेकलिस्ट चुनें</string>
+    <string name="add_to_checklist_empty_title">अभी कोई चेकलिस्ट नहीं</string>
+    <string name="add_to_checklist_empty_description">चुने गए टेक्स्ट को जोड़ने के लिए अपनी पहली चेकलिस्ट बनाएं।</string>
+    <string name="add_to_checklist_create_new">नई चेकलिस्ट बनाएं</string>
+    <string name="add_to_checklist_item_count">%1$d आइटम</string>
+    <string name="fill_checklist_picker_title">भरने के लिए चेकलिस्ट चुनें</string>
+    <string name="fill_checklist_picker_subtitle">एक चेकलिस्ट चुनें और AI उसे चुने गए टेक्स्ट से भर देगा</string>
+    <string name="fill_checklist_picker_empty_description">पहले एक चेकलिस्ट बनाएं, फिर AI उसे आपके टेक्स्ट से भर सकता है।</string>
+
+    <!-- In-app update (Google Play flexible update — restart snackbar) -->
+    <string name="app_update_downloaded_message">अपडेट डाउनलोड हो गया</string>
+    <string name="app_update_downloaded_restart">रीस्टार्ट करें</string>
+
+    <!-- MCP Screen (Gisti MCP — connect checklists to Claude via the remote MCP server) -->
+    <string name="mcp_title">Gisti MCP</string>
+    <string name="mcp_hero_title">अपनी चेकलिस्ट सीधे Claude से मैनेज करें।</string>
+    <string name="mcp_hero_body">चैट करके उन्हें पढ़ें, बनाएं और संपादित करें — तब भी जब Gisti बंद हो।</string>
+    <string name="mcp_value_read">अपनी चेकलिस्ट Claude में पढ़ें</string>
+    <string name="mcp_value_create">AI से नई चेकलिस्ट बनाएं</string>
+    <string name="mcp_value_edit">हैंड्स-फ़्री चेक ऑफ़ &amp; संपादित करें</string>
+    <string name="mcp_value_sync">आपके सभी डिवाइस पर क्लाउड-सिंक्ड</string>
+    <string name="mcp_cta_guide">कनेक्शन गाइड</string>
+    <string name="mcp_endpoint_label">MCP सर्वर URL</string>
+    <string name="mcp_endpoint_copied">कॉपी हो गया</string>
+    <string name="mcp_endpoint_copy_cd">MCP सर्वर URL कॉपी करें</string>
+    <string name="mcp_requires_google">Google से साइन इन करना ज़रूरी है</string>
+</resources>
