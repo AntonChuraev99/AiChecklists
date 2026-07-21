@@ -1,0 +1,26 @@
+# .gcloudignore — explicit upload filter for `gcloud functions deploy`.
+#
+# WHY THIS FILE MUST EXIST: without it gcloud falls back to .gitignore, which lists
+# prompts_private.py (the private AI prompts, gitignored). That would EXCLUDE it from
+# the upload → stub prompts ship → the AI breaks. An explicit .gcloudignore makes gcloud
+# ignore .gitignore entirely, so every runtime .py — including prompts_private.py — is
+# uploaded, while venv/tests/junk are kept out.
+
+# Python venv / build caches (venv is huge — must not upload)
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Tests (not needed at runtime)
+tests/
+test_main.py
+test_push_promotions.py
+requirements-dev.txt
+
+# Local junk / OS / editor artifacts
+bash.exe.stackdump
+tmpclaude-*
+.env
+.git/
+.gitignore
