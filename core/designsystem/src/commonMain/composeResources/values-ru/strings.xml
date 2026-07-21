@@ -721,6 +721,7 @@
     <string name="settings_language_system">Системный</string>
     <string name="settings_language_english">English</string>
     <string name="settings_language_russian">Русский</string>
+    <string name="settings_language_hindi">हिन्दी</string>
 
     <string name="settings_dynamic_color">Динамические цвета</string>
     <string name="settings_dynamic_color_description">Использовать цвета из обоев (Android 12+)</string>

@@ -28,6 +28,7 @@ import aichecklists.core.designsystem.generated.resources.settings_dynamic_color
 import aichecklists.core.designsystem.generated.resources.settings_dynamic_color_description
 import aichecklists.core.designsystem.generated.resources.settings_language
 import aichecklists.core.designsystem.generated.resources.settings_language_english
+import aichecklists.core.designsystem.generated.resources.settings_language_hindi
 import aichecklists.core.designsystem.generated.resources.settings_language_russian
 import aichecklists.core.designsystem.generated.resources.settings_language_system
 import aichecklists.core.designsystem.generated.resources.settings_theme
@@ -156,6 +157,14 @@ fun SettingsScreenContent(
                     label = stringResource(Res.string.settings_language_russian),
                     selected = selectedLanguage == AppLanguage.Russian,
                     onClick = { onLanguageChange(AppLanguage.Russian) },
+                )
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                )
+                LanguageOption(
+                    label = stringResource(Res.string.settings_language_hindi),
+                    selected = selectedLanguage == AppLanguage.Hindi,
+                    onClick = { onLanguageChange(AppLanguage.Hindi) },
                 )
             }
 
