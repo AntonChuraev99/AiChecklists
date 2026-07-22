@@ -48,7 +48,7 @@ test.describe("Gisti web — Phase 3: Firebase JS SDK bridges", () => {
 
     const value = await page.evaluate(() => {
       try {
-        return (globalThis as any).__rcGetString("templates_json");
+        return (globalThis as any).__rcGetString("paywall_variant");
       } catch (e) {
         return `error: ${e}`;
       }
@@ -56,7 +56,7 @@ test.describe("Gisti web — Phase 3: Firebase JS SDK bridges", () => {
 
     // Even without real API key, defaultConfig should return a string (never throw)
     expect(typeof value).toBe("string");
-    console.log("templates_json default config value:", value.slice(0, 200));
+    console.log("paywall_variant default config value:", value.slice(0, 200));
   });
 
   // NOTE: We don't assert canvas-level render in Playwright because the bundled

@@ -15,17 +15,8 @@ import requests
 # Configuration
 PROJECT_ID = "aichecklists-40230"
 SERVICE_ACCOUNT_FILE = Path(__file__).parent.parent / "aichecklists-40230-firebase-adminsdk-fbsvc-acc76859ba.json"
-TEMPLATES_FILE = Path(__file__).parent.parent / "firebase-config" / "templates.json"
 REMOTE_CONFIG_URL = f"https://firebaseremoteconfig.googleapis.com/v1/projects/{PROJECT_ID}/remoteConfig"
 SCOPES = ["https://www.googleapis.com/auth/firebase.remoteconfig"]
-
-
-def load_templates_json():
-    """Load templates JSON from file."""
-    if TEMPLATES_FILE.exists():
-        with open(TEMPLATES_FILE, "r", encoding="utf-8") as f:
-            return f.read().strip()
-    return ""
 
 # Default Remote Config parameters for the app
 DEFAULT_PARAMETERS = {
@@ -83,14 +74,11 @@ DEFAULT_PARAMETERS = {
         "defaultValue": {"value": "5"},
         "description": "Maximum fills per checklist for free users",
         "valueType": "NUMBER"
-    },
-    "templates_json": {
-        "defaultValue": {"value": ""},
-        "description": "JSON with checklist templates (see firebase-config/templates.json)",
-        "valueType": "JSON"
     }
-    # Note: update_feed_json was removed in 2026-05-06 — Update Feed content is now bundled
-    # with the APK (UpdateFeedContent.JSON). Do not re-add it here.
+    # Note: templates_json was removed in 2026-07-22 — checklist templates are bundled with the
+    # app (feature/create Compose Resource, generated from data/checklists/*.json) and never read
+    # from RC. update_feed_json was removed earlier (2026-05-06, bundled as UpdateFeedContent.JSON).
+    # Do not re-add either here.
 }
 
 
@@ -139,14 +127,6 @@ def publish_config(config, etag):
 
 def setup_default_config():
     """Set up default Remote Config parameters."""
-    # Load templates JSON from file
-    templates_json = load_templates_json()
-    if templates_json:
-        print(f"Loaded templates from {TEMPLATES_FILE}")
-        DEFAULT_PARAMETERS["templates_json"]["defaultValue"]["value"] = templates_json
-    else:
-        print("Warning: templates.json not found, templates_json will be empty")
-
     print("Fetching current Remote Config...")
     current_config, etag = get_current_config()
 

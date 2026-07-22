@@ -20,12 +20,6 @@ object RemoteConfigKeys {
     const val MAX_WEEKLY_CHECKLISTS_FREE = "max_weekly_checklists_free"
     const val MAX_ATTACHMENTS_PER_ITEM_FREE = "max_attachments_per_item_free"
 
-    // DEAD — kept only to document that the Console parameter still exists. Templates are
-    // bundled: TemplatesRepositoryImpl reads them from Compose Resources, never from RC.
-    // Nothing reads this key; deleting the Console parameter is safe.
-    @Deprecated("Templates ship as a bundled resource; this RC key is unread.")
-    const val TEMPLATES_JSON = "templates_json"
-
     // Onboarding type: "interactive" | "default" | "none" (none = skip to main)
     const val ONBOARDING = "onboarding"
 
@@ -87,10 +81,6 @@ object RemoteConfigDefaults {
     const val MAX_RECURRING_REMINDERS_FREE = 10L
     const val MAX_WEEKLY_CHECKLISTS_FREE = 1L
     const val MAX_ATTACHMENTS_PER_ITEM_FREE = 3L
-
-    // Unread — see the deprecated key above. Templates come from a bundled resource.
-    @Deprecated("Templates ship as a bundled resource; this RC key is unread.")
-    const val TEMPLATES_JSON = ""
 
     // Onboarding type: "interactive" | "default" | "none" (none = skip to main)
     //
