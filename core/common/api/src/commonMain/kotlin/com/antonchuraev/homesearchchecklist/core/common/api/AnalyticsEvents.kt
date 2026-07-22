@@ -376,6 +376,11 @@ object AnalyticsEvents {
     object Csat {
         const val SHOWN = "csat_shown"
         const val OPENED = "csat_opened"
+        // Sheet closed without a terminal action. Carries [AnalyticsParams.HAD_RATING]
+        // (a rating was picked before closing) + [AnalyticsParams.SOURCE] = auto | manual |
+        // feedback (which entry opened the sheet), so an auto-show dismissal is separable
+        // from a manual-drawer one — a naive dismissed/shown double-counts both entries.
+        // Auto shows also carry [AnalyticsParams.TRIGGER_EVENT] + [AnalyticsParams.SCORE].
         const val DISMISSED = "csat_dismissed"
         const val RATING_SELECTED = "csat_rating_selected"
         const val REVIEW_TAPPED = "csat_review_tapped"

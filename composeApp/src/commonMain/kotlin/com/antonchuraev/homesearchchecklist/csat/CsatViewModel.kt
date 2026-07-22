@@ -64,12 +64,22 @@ class CsatViewModel(
     companion object {
         private const val SHOW_DELAY_MS = 5000L
         private const val MAX_FEEDBACK_LENGTH = 500
+        private const val SOURCE_AUTO = "auto"
+        private const val SOURCE_MANUAL = "manual"
+        private const val SOURCE_FEEDBACK = "feedback"
     }
 
     private val _screenState = MutableStateFlow(CsatState())
     override val screenState: StateFlow<CsatState> = _screenState.asStateFlow()
 
     private var csatShownThisSession = false
+
+    // Which entry opened the current sheet — stamped on csat_dismissed so an auto-show
+    // dismissal is distinguishable from a manual-drawer one (a naive dismissed/shown
+    // double-counts both). Auto shows also remember their trigger + score for tuning.
+    private var entrySource: String = SOURCE_AUTO
+    private var currentTriggerEvent: String? = null
+    private var currentScore: Int? = null
 
     init {
         csatManager.startObserving(
@@ -84,6 +94,9 @@ class CsatViewModel(
         delay(SHOW_DELAY_MS)
         if (csatShownThisSession) return
         csatShownThisSession = true
+        entrySource = SOURCE_AUTO
+        currentTriggerEvent = triggerEvent
+        currentScore = score
         csatManager.recordShown()
         // Log WHICH scored moment (and the score) triggered the show — without this the scored
         // model is a black box in analytics (can't see which trigger converts to a survey).
@@ -112,11 +125,17 @@ class CsatViewModel(
     }
 
     private fun handleForceShow() {
-        analyticsTracker.event(AnalyticsEvents.Csat.OPENED, mapOf(AnalyticsParams.SOURCE to "manual"))
+        entrySource = SOURCE_MANUAL
+        currentTriggerEvent = null
+        currentScore = null
+        analyticsTracker.event(AnalyticsEvents.Csat.OPENED, mapOf(AnalyticsParams.SOURCE to SOURCE_MANUAL))
         _screenState.update { it.copy(showBottomSheet = true) }
     }
 
     private fun handleForceShowFeedback() {
+        entrySource = SOURCE_FEEDBACK
+        currentTriggerEvent = null
+        currentScore = null
         analyticsTracker.event(AnalyticsEvents.Csat.FEEDBACK_OPENED)
         _screenState.update {
             it.copy(
@@ -237,7 +256,15 @@ class CsatViewModel(
 
     private fun handleDismiss() {
         val hadRating = _screenState.value.selectedRating != null
-        analyticsTracker.event(AnalyticsEvents.Csat.DISMISSED, mapOf(AnalyticsParams.HAD_RATING to hadRating))
+        analyticsTracker.event(
+            AnalyticsEvents.Csat.DISMISSED,
+            buildMap<String, Any> {
+                put(AnalyticsParams.HAD_RATING, hadRating)
+                put(AnalyticsParams.SOURCE, entrySource)
+                currentTriggerEvent?.let { put(AnalyticsParams.TRIGGER_EVENT, it) }
+                currentScore?.let { put(AnalyticsParams.SCORE, it) }
+            },
+        )
         viewModelScope.launch {
             csatManager.recordOutcome(CsatManager.OUTCOME_DISMISSED)
         }
