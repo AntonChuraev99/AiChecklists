@@ -443,11 +443,13 @@ object AnalyticsEvents {
     // ─── Settings ────────────────────────────────────────────────────────────
     object Settings {
         /**
-         * User picked a UI language in Settings. Carries [AnalyticsParams.LANGUAGE] =
-         * BCP-47 tag ("en" / "ru" / "hi") or "system", and [AnalyticsParams.SOURCE] = the
-         * surface ("settings"). Fires on the explicit user selection only (not the reactive
-         * load), so in-app language adoption — invisible before this — is measurable (the
-         * flagship Hindi launch shipped with zero language events).
+         * User picked a language. Carries [AnalyticsParams.LANGUAGE] = BCP-47 tag
+         * ("en" / "ru" / "hi") or "system", and [AnalyticsParams.SOURCE] = the surface that
+         * originated it, one of {"settings", "chat_picker"} — "settings" is the app UI-language
+         * picker (SettingsViewModel), "chat_picker" is the AI-chat reply-language picker
+         * (ChatViewModel.OnResponseLanguageSelected). Fires on the explicit user selection only
+         * (not the reactive load), so in-app language adoption — invisible before this — is
+         * measurable (the flagship Hindi launch shipped with zero language events).
          */
         const val LANGUAGE_SELECTED = "language_selected"
     }

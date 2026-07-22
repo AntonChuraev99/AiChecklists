@@ -2924,6 +2924,104 @@ class ChatViewModelTest {
         assertEquals("false", params["deep_thinking_enabled"])
     }
 
+    // ── A8b. routed_layer end-to-end — a Classifier-path reply carries its tier, not "unknown" ──
+
+    /**
+     * Locks the whole GOAL-1 chain: a Layer-2 (Classifier) inline reply must reach the user's
+     * thumb-down carrying routed_layer=Classifier, not the "unknown" that masked 86% of feedback.
+     *
+     * The bug lived in the round-trip: `addAssistantMessage` (the sibling of the correctly-tagged
+     * `addAndPersistAssistantMessage`) created every non-agent reply with routedLayer=null, so the
+     * ShowAssistantMessage → AppendAssistantMessage hop dropped the tier. This drives the real path:
+     * the ViewModel emits the inline FindItems reply, the test replays ChatRoute's round-trip
+     * (forwarding effect.routedLayer), and then a thumb-down on the resulting bubble is measured.
+     */
+    @Test
+    fun findItemsReply_classifierLayer_thumbDownReportsClassifierNotUnknown() = runTest {
+        val analytics = FakeAnalyticsTracker()
+        val repo = FakeAiChatRepository(
+            classifyResult = IntentClassification(
+                intent = ChatIntent.FindItems,
+                confidence = 0.9f,
+                layer = RoutingLayer.Classifier,
+            )
+        )
+        val fakeDispatcher = FakeToolCallDispatcher(
+            outcome = DispatchOutcome.Success("chat_dispatch_find_success", listOf("1", "«milk» in Shopping"))
+        )
+        val vm = makeVm(repo = repo, dispatcher = fakeDispatcher, analytics = analytics)
+
+        val effectDeferred = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            vm.sideEffect.first()
+        }
+
+        vm.sendIntent(ChatScreenIntent.OnInputChange("find milk"))
+        vm.sendIntent(ChatScreenIntent.OnSendClick)
+
+        // The inline reply effect must carry the classifying tier — the field that was always null.
+        val effect = assertIs<ChatScreenSideEffect.ShowAssistantMessage>(effectDeferred.await())
+        assertEquals(RoutingLayer.Classifier, effect.routedLayer,
+            "The FindItems inline reply must carry classification.layer, not null")
+
+        // Replay the ChatRoute round-trip (resolve key → AppendAssistantMessage, forwarding the tier).
+        vm.sendIntent(
+            ChatScreenIntent.AppendAssistantMessage(
+                text = "Found «milk» in Shopping",
+                routedLayer = effect.routedLayer,
+            )
+        )
+        testScheduler.advanceUntilIdle()
+
+        // The appended assistant bubble carries the tier onto ChatMessage.routedLayer.
+        val assistantMsg = vm.screenState.value.messages.last { it.role == ChatRole.Assistant }
+        assertEquals(RoutingLayer.Classifier, assistantMsg.routedLayer,
+            "AppendAssistantMessage must set routedLayer on the created ChatMessage")
+
+        // Thumb-down on that bubble now reports the real tier instead of "unknown".
+        vm.sendIntent(ChatScreenIntent.OnFeedbackOpen(assistantMsg))
+        val params = analytics.paramsOf("ai_chat_thumb_down")
+        assertNotNull(params, "ai_chat_thumb_down must fire on feedback open")
+        assertEquals("Classifier", params["routed_layer"],
+            "The thumb-down must report Classifier, not the pre-fix 'unknown'")
+    }
+
+    // ── A8c. chat response-language picker emits language_selected{source=chat_picker} ──
+
+    /**
+     * The chat reply-language picker is the SECOND surface of `language_selected` (the first is the
+     * Settings UI picker, SettingsViewModelTest). Mirrors that test: an explicit pick emits the
+     * shared event with source="chat_picker" so the two surfaces stay distinguishable in Amplitude.
+     */
+    @Test
+    fun onResponseLanguageSelected_emitsLanguageSelectedWithChatPickerSource() = runTest {
+        val analytics = FakeAnalyticsTracker()
+        val vm = makeVm(analytics = analytics)
+
+        vm.sendIntent(ChatScreenIntent.OnResponseLanguageSelected("hi"))
+        testScheduler.advanceUntilIdle()
+
+        val params = analytics.paramsOf("language_selected")
+        assertNotNull(params, "language_selected must fire on an explicit chat-picker selection")
+        assertEquals("hi", params["language"])
+        assertEquals("chat_picker", params["source"])
+    }
+
+    // ── A8d. chat language picker: Auto (null) maps to "system", consistent with Settings ──
+
+    @Test
+    fun onResponseLanguageSelected_autoNull_mapsLanguageToSystem() = runTest {
+        val analytics = FakeAnalyticsTracker()
+        val vm = makeVm(analytics = analytics)
+
+        vm.sendIntent(ChatScreenIntent.OnResponseLanguageSelected(null))
+        testScheduler.advanceUntilIdle()
+
+        val params = analytics.paramsOf("language_selected")
+        assertNotNull(params)
+        assertEquals("system", params["language"], "null code (Auto) must map to \"system\"")
+        assertEquals("chat_picker", params["source"])
+    }
+
     // ── A9. feedback — migrated to catalog name, submit emits ai_chat_feedback ──
     @Test
     fun onFeedbackSubmit_emitsFeedbackWithMigratedParams() = runTest {

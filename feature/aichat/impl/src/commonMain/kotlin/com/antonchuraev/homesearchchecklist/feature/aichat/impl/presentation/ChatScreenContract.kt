@@ -8,6 +8,7 @@ import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.Chat
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatChoice
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChoiceAction
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ChatMessage
+import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.RoutingLayer
 import com.antonchuraev.homesearchchecklist.feature.aichat.api.domain.model.ToolCall
 
 // ---------------------------------------------------------------------------
@@ -270,6 +271,9 @@ sealed interface ChatScreenIntent : Intent {
      * for Unknown-intent responses that should offer Layer 3 escalation.
      * [paywallCtaCredits] is preserved so the bubble can show the "Become Pro" CTA
      * on an out-of-credits reply (the number is the Premium daily allowance).
+     * [routedLayer] is preserved so the appended assistant message carries the tier that
+     * produced it — thumb_up / thumb_down analytics read `ChatMessage.routedLayer`, and a null
+     * here is exactly the "unknown" that masked 86% of chat feedback before this round-trip.
      */
     data class AppendAssistantMessage(
         val text: String,
@@ -277,6 +281,7 @@ sealed interface ChatScreenIntent : Intent {
         val askAiForText: String? = null,
         val paywallCtaCredits: Int? = null,
         val retryText: String? = null,
+        val routedLayer: RoutingLayer? = null,
     ) : ChatScreenIntent
 
     /** User tapped the back / navigation icon. */
@@ -455,6 +460,13 @@ sealed interface ChatScreenSideEffect : SideEffect {
          * [OnRetryClick]. Only set on the connectivity-error emit sites in [ChatViewModel].
          */
         val retryText: String? = null,
+        /**
+         * The routing tier that produced this reply, forwarded through the ChatRoute round-trip onto
+         * [ChatMessage.routedLayer] so thumb_up / thumb_down analytics can report `routed_layer`
+         * instead of "unknown". Null only where the layer is genuinely indeterminate (an unexpected
+         * transport failure that never reached a tier). See [AppendAssistantMessage.routedLayer].
+         */
+        val routedLayer: RoutingLayer? = null,
     ) : ChatScreenSideEffect
 
     /** Navigate back (handled by the host NavController). */

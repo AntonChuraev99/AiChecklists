@@ -909,6 +909,7 @@ fun App() {
                                     askAiForText = effect.askAiForText,
                                     paywallCtaCredits = effect.paywallCtaCredits,
                                     retryText = effect.retryText,
+                                    routedLayer = effect.routedLayer,
                                 )
                             )
                         }

@@ -343,12 +343,14 @@ class ChatViewModel(
                 // linkedChecklistId is preserved for the "Open checklist" button.
                 // askAiForText is preserved for the "Ask AI" fallback button on Unknown responses.
                 // paywallCtaCredits is preserved for the "Become Pro" CTA on out-of-credits replies.
+                // routedLayer is preserved so thumb feedback reports the tier, not "unknown".
                 addAssistantMessage(
                     intent.text,
                     linkedChecklistId = intent.linkedChecklistId,
                     askAiForText = intent.askAiForText,
                     paywallCtaCredits = intent.paywallCtaCredits,
                     retryText = intent.retryText,
+                    routedLayer = intent.routedLayer,
                 )
             }
 
@@ -418,6 +420,18 @@ class ChatViewModel(
             }
 
             is ChatScreenIntent.OnResponseLanguageSelected -> {
+                // Explicit user selection only (this handler IS the explicit pick — the reactive
+                // init {} collector never dispatches this intent), mirroring the Settings picker
+                // (SettingsViewModel.persistLanguage). Second surface for language_selected so the
+                // chat reply-language picker is measurable too; source distinguishes it from Settings.
+                // null code = "Auto" → "system", consistent with Settings ("system" for null tag).
+                analytics.event(
+                    name = AnalyticsEvents.Settings.LANGUAGE_SELECTED,
+                    params = mapOf(
+                        AnalyticsParams.LANGUAGE to (intent.code ?: "system"),
+                        AnalyticsParams.SOURCE to "chat_picker",
+                    ),
+                )
                 // Close the picker immediately; persist to DataStore, and the init {} collector
                 // mirrors the new value back into state (single source of truth).
                 _screenState.value = _screenState.value.copy(showResponseLanguageSheet = false)
@@ -743,6 +757,7 @@ class ChatViewModel(
             ChatScreenSideEffect.ShowAssistantMessage(
                 messageKey = "chat_insufficient_credits",
                 paywallCtaCredits = premiumDailyCredits(),
+                routedLayer = layer,
             )
         )
         trackResponseReceived(layer, outcome = OUTCOME_INSUFFICIENT_CREDITS, creditsUsed = 0)
@@ -861,7 +876,7 @@ class ChatViewModel(
                     runAgentTurn(text, locale)
                 }.onFailure { e ->
                     logger.error(TAG, "handleSend(forceAgent) failed", e)
-                    emitTransportError(e, retryText = text)
+                    emitTransportError(e, retryText = text, routedLayer = RoutingLayer.FullChat)
                     trackResponseReceived(RoutingLayer.FullChat, outcome = "error")
                     _screenState.value = _screenState.value.copy(isProcessing = false)
                 }
@@ -913,6 +928,7 @@ class ChatViewModel(
                             ChatScreenSideEffect.ShowAssistantMessage(
                                 messageKey = "chat_unknown_intent_hint",
                                 askAiForText = text,
+                                routedLayer = classification.layer,
                             )
                         )
                         trackResponseReceived(classification.layer, outcome = "answer")
@@ -929,7 +945,7 @@ class ChatViewModel(
                     ChatIntent.FindItems -> {
                         val query = extractQuery(text)
                         val outcome = toolCallDispatcher.dispatch(ToolCall.FindItemsQuery(query))
-                        handleOutcomeInline(outcome)
+                        handleOutcomeInline(outcome, routedLayer = classification.layer)
                         trackResponseReceived(classification.layer, outcome = "answer")
                         _screenState.value = _screenState.value.copy(isProcessing = false)
                     }
@@ -1025,7 +1041,9 @@ class ChatViewModel(
                 }
             }.onFailure { e ->
                 logger.error(TAG, "handleSend failed", e)
-                emitTransportError(e, retryText = text)
+                // routedLayer = null (same as trackResponseReceived below): a catch-all failure here
+                // could have died in classify, dispatch or the agent — no single tier is honest.
+                emitTransportError(e, retryText = text, routedLayer = null)
                 trackResponseReceived(routedLayer = null, outcome = "error")
                 _screenState.value = _screenState.value.copy(isProcessing = false)
             }
@@ -1469,7 +1487,7 @@ class ChatViewModel(
             return
         }
 
-        handleOutcomeInline(outcome, sourceToolCall = toolCall)
+        handleOutcomeInline(outcome, sourceToolCall = toolCall, routedLayer = sourceLayer)
 
         val undo = (outcome as? DispatchOutcome.Success)?.undo
         if (undo == null) {
@@ -1484,6 +1502,9 @@ class ChatViewModel(
                     AnalyticsParams.ROUTED_LAYER to sourceLayer.name,
                 ),
             )
+            // Carry the layer onto the post-action chips so an Undo / Move reply (and any
+            // apply-error on them) reports the tier that added the item, not "unknown".
+            _choiceSourceLayer = sourceLayer
             showReversibleChips(undo)
         }
         trackResponseReceived(sourceLayer, outcome = "action")
@@ -1532,6 +1553,8 @@ class ChatViewModel(
 
     /** Rolls the mutation back by id and reports the result (or `chat_undo_item_gone`). */
     private fun executeUndo(option: ChoiceOption, handle: UndoHandle) {
+        // Captured before clearChoice() nulls it — the reply reports the tier that added the item.
+        val srcLayer = _choiceSourceLayer
         viewModelScope.launch {
             markChipExecuting(option.id, choiceString(Res.string.chat_choice_executing_undo))
             runCatching {
@@ -1546,11 +1569,11 @@ class ChatViewModel(
                     )
                 }
                 clearChoice()
-                handleOutcomeInline(outcome)
+                handleOutcomeInline(outcome, routedLayer = srcLayer)
             }.onFailure { e ->
                 logger.error(TAG, "executeUndo failed", e)
                 clearChoice()
-                _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_apply_error"))
+                _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_apply_error", routedLayer = srcLayer))
             }
         }
     }
@@ -1611,6 +1634,8 @@ class ChatViewModel(
 
     /** Moves the just-added item to the tapped list (add-then-remove inside the dispatcher). */
     private fun executeMove(option: ChoiceOption, handle: UndoHandle.AddedItem, targetName: String) {
+        // Captured before clearChoice() nulls it — the reply reports the tier that added the item.
+        val srcLayer = _choiceSourceLayer
         viewModelScope.launch {
             markChipExecuting(option.id, choiceString(Res.string.chat_choice_executing_move))
             runCatching {
@@ -1624,14 +1649,18 @@ class ChatViewModel(
                     )
                 }
                 clearChoice()
-                handleOutcomeInline(outcome)
+                handleOutcomeInline(outcome, routedLayer = srcLayer)
                 // A fresh handle → the item can be moved onwards (or back) from its new home.
                 val newHandle = (outcome as? DispatchOutcome.Success)?.undo as? UndoHandle.AddedItem
-                if (newHandle != null) showReversibleChips(newHandle, includeUndo = false)
+                if (newHandle != null) {
+                    // Keep the layer on the follow-up chips (clearChoice above nulled it).
+                    _choiceSourceLayer = srcLayer
+                    showReversibleChips(newHandle, includeUndo = false)
+                }
             }.onFailure { e ->
                 logger.error(TAG, "executeMove failed", e)
                 clearChoice()
-                _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_apply_error"))
+                _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_apply_error", routedLayer = srcLayer))
             }
         }
     }
@@ -1707,9 +1736,11 @@ class ChatViewModel(
             name = AnalyticsEvents.Chat.PREVIEW_CONFIRMED,
             params = mapOf(AnalyticsParams.ACTION_TYPE to (toolCall::class.simpleName ?: "unknown")),
         )
-        // Captured BEFORE the dispatch clears the choice — the checkbox state dies with the block.
+        // Captured BEFORE the dispatch clears the choice — the checkbox state dies with the block,
+        // and clearChoice() below nulls _choiceSourceLayer, so grab the tier for the reply now.
         val pending = _screenState.value.pendingChoice
         val remember = pending?.showMemoryToggle == true && pending.rememberChoice
+        val srcLayer = _choiceSourceLayer
         viewModelScope.launch {
             // Mark the chip loading (whole block goes non-interactive in the UI).
             val loadingLabel = choiceString(toolCall.executingLabel())
@@ -1722,16 +1753,16 @@ class ChatViewModel(
                 val outcome = toolCallDispatcher.dispatch(toolCall)
                 // Clear first; handleOutcomeInline may set a NEW choice (AmbiguousMatch → "Which list?").
                 clearChoice()
-                handleOutcomeInline(outcome, sourceToolCall = toolCall)
+                handleOutcomeInline(outcome, sourceToolCall = toolCall, routedLayer = srcLayer)
                 // Only remember a destination the action actually reached: persisting after a
                 // NotFound would pin the chat to a list the item never landed in.
                 if (remember && outcome is DispatchOutcome.Success) {
-                    rememberDefaultChecklist(extractChecklistId(toolCall), extractHint(toolCall))
+                    rememberDefaultChecklist(extractChecklistId(toolCall), extractHint(toolCall), srcLayer)
                 }
             }.onFailure { e ->
                 logger.error(TAG, "executeChoice failed", e)
                 clearChoice()
-                _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_apply_error"))
+                _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_apply_error", routedLayer = srcLayer))
             }
         }
     }
@@ -1743,7 +1774,11 @@ class ChatViewModel(
      * dark pattern: the next "add milk" would silently skip the question and land somewhere they
      * never re-confirmed. The message names both the list and where to undo it.
      */
-    private suspend fun rememberDefaultChecklist(checklistId: Long?, listName: String?) {
+    private suspend fun rememberDefaultChecklist(
+        checklistId: Long?,
+        listName: String?,
+        routedLayer: RoutingLayer?,
+    ) {
         if (listName.isNullOrBlank()) {
             logger.warning(TAG, "rememberDefaultChecklist: no list name on the executed tool call")
             return
@@ -1767,6 +1802,7 @@ class ChatViewModel(
                     ChatScreenSideEffect.ShowAssistantMessage(
                         messageKey = "chat_result_remembered_list",
                         args = listOf(listName),
+                        routedLayer = routedLayer,
                     ),
                 )
             }
@@ -1820,7 +1856,7 @@ class ChatViewModel(
                 runAgentTurn(text, locale)
             }.onFailure { e ->
                 logger.error(TAG, "sendOptionAsTurn failed", e)
-                _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_generic_error"))
+                _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_generic_error", routedLayer = RoutingLayer.FullChat))
                 trackResponseReceived(RoutingLayer.FullChat, outcome = "error")
                 _screenState.value = _screenState.value.copy(isProcessing = false)
             }
@@ -1921,10 +1957,13 @@ class ChatViewModel(
             return
         }
 
+        // Captured before clearChoice() nulls it — the cancelled-reply reports the tier that
+        // produced the write preview (Classifier for a normal send), not "unknown".
+        val srcLayer = _choiceSourceLayer
         clearChoice()
         // Write-intent dismiss must reply (silent dismiss FORBIDDEN — CLAUDE.md).
         viewModelScope.launch {
-            _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_choice_dismissed_message"))
+            _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_choice_dismissed_message", routedLayer = srcLayer))
         }
     }
 
@@ -1985,7 +2024,7 @@ class ChatViewModel(
                             ChatIntent.FindItems -> {
                                 val query = extractQuery(originalText)
                                 val outcome = toolCallDispatcher.dispatch(ToolCall.FindItemsQuery(query))
-                                handleOutcomeInline(outcome)
+                                handleOutcomeInline(outcome, routedLayer = classification.layer)
                                 _screenState.value = _screenState.value.copy(isProcessing = false)
                             }
 
@@ -1998,7 +2037,7 @@ class ChatViewModel(
                                 val builtToolCall = classification.preBuiltToolCall
                                     ?: buildToolCall(intent, originalText, locale)
                                 if (builtToolCall == null) {
-                                    _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_extract_fail"))
+                                    _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_extract_fail", routedLayer = classification.layer))
                                     _screenState.value = _screenState.value.copy(isProcessing = false)
                                     return@runCatching
                                 }
@@ -2026,7 +2065,7 @@ class ChatViewModel(
                 }
             }.onFailure { e ->
                 logger.error(TAG, "escalateChoice failed", e)
-                _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_generic_error"))
+                _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_generic_error", routedLayer = sourceLayer))
                 _screenState.value = _screenState.value.copy(isProcessing = false)
             }
         }
@@ -2078,7 +2117,7 @@ class ChatViewModel(
             }.onFailure { e ->
                 logger.error(TAG, "handleSendAttachmentsOnly failed", e)
                 trackResponseReceived(RoutingLayer.Local, outcome = "error")
-                _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_generic_error"))
+                _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_generic_error", routedLayer = RoutingLayer.Local))
                 _screenState.value = _screenState.value.copy(isProcessing = false)
             }
         }
@@ -2592,7 +2631,7 @@ class ChatViewModel(
                     logger.warning(TAG, "runAgentTurn: NetworkError")
                     trackResponseReceived(RoutingLayer.FullChat, outcome = "error")
                     _screenState.value = _screenState.value.copy(isProcessing = false)
-                    _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_error_offline", retryText = userInput))
+                    _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_error_offline", retryText = userInput, routedLayer = RoutingLayer.FullChat))
                     return
                 }
 
@@ -2600,7 +2639,7 @@ class ChatViewModel(
                     logger.warning(TAG, "runAgentTurn: ServiceError")
                     trackResponseReceived(RoutingLayer.FullChat, outcome = "error")
                     _screenState.value = _screenState.value.copy(isProcessing = false)
-                    _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_error_service", retryText = userInput))
+                    _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_error_service", retryText = userInput, routedLayer = RoutingLayer.FullChat))
                     return
                 }
             }
@@ -2610,7 +2649,7 @@ class ChatViewModel(
         logger.warning(TAG, "runAgentTurn: hit round cap ($AGENT_MAX_ROUNDS rounds) without Final")
         trackResponseReceived(RoutingLayer.FullChat, outcome = "error")
         _screenState.value = _screenState.value.copy(isProcessing = false)
-        _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_agent_round_limit"))
+        _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_agent_round_limit", routedLayer = RoutingLayer.FullChat))
     }
 
     /** Builds a minimal error JsonObject for tool results that couldn't be executed. */
@@ -2962,8 +3001,15 @@ class ChatViewModel(
      *   an [DispatchOutcome.AmbiguousMatch] into a "Which list?" choice block whose chips re-run
      *   the same command against a specific candidate (hint swapped). Null on read-only paths
      *   (FindItemsQuery) where there is no per-list hint to swap → falls back to a text hint.
+     * @param routedLayer The tier that produced [outcome] — forwarded onto every assistant reply
+     *   this emits so thumb feedback reports it. Callers pass the turn's `classification.layer`
+     *   (send / escalate) or the choice's `_choiceSourceLayer` (execute / undo / move).
      */
-    private suspend fun handleOutcomeInline(outcome: DispatchOutcome, sourceToolCall: ToolCall? = null) {
+    private suspend fun handleOutcomeInline(
+        outcome: DispatchOutcome,
+        sourceToolCall: ToolCall? = null,
+        routedLayer: RoutingLayer? = null,
+    ) {
         when (outcome) {
             is DispatchOutcome.Success -> {
                 _sideEffect.emit(
@@ -2971,6 +3017,7 @@ class ChatViewModel(
                         messageKey = outcome.messageKey,
                         args = outcome.args,
                         linkedChecklistId = outcome.linkedChecklistId,
+                        routedLayer = routedLayer,
                     )
                 )
             }
@@ -2984,6 +3031,7 @@ class ChatViewModel(
                     ChatScreenSideEffect.ShowAssistantMessage(
                         messageKey = "chat_generic_error",
                         args = emptyList(),
+                        routedLayer = routedLayer,
                     )
                 )
                 logger.debug(TAG, "ChecklistContent inline (agent): ${outcome.checklistName} — $summary$suffix")
@@ -3001,6 +3049,7 @@ class ChatViewModel(
                         ChatScreenSideEffect.ShowAssistantMessage(
                             messageKey = "chat_ambiguous_match",
                             args = listOf(candidates),
+                            routedLayer = routedLayer,
                         )
                     )
                 } else {
@@ -3016,6 +3065,7 @@ class ChatViewModel(
                     ChatScreenSideEffect.ShowAssistantMessage(
                         messageKey = outcome.messageKey,
                         args = outcome.args,
+                        routedLayer = routedLayer,
                     )
                 )
             }
@@ -3369,6 +3419,7 @@ class ChatViewModel(
         askAiForText: String? = null,
         paywallCtaCredits: Int? = null,
         retryText: String? = null,
+        routedLayer: RoutingLayer? = null,
     ) {
         val msg = ChatMessage(
             id = generateId(),
@@ -3376,6 +3427,10 @@ class ChatViewModel(
             content = content,
             timestamp = nowMillis(),
             costCredits = 0,
+            // routedLayer is the tier that produced this reply. Persisted to Room like any other
+            // column, so thumb_up / thumb_down keep reporting the right layer after a restart.
+            // Null only where the layer is genuinely indeterminate (see emitTransportError).
+            routedLayer = routedLayer,
             linkedChecklistId = linkedChecklistId,
             // askAiForText is transient: NOT persisted to Room (toEntry() ignores it).
             // The "Ask AI" button disappears on app restart — intentional to avoid migration.
@@ -3407,12 +3462,16 @@ class ChatViewModel(
      *
      * Keys are emitted as literals inside the [ChatScreenSideEffect.ShowAssistantMessage] calls so
      * ChatMessageKeyResolutionTest can still see them and enforce both surface maps carry them.
+     *
+     * @param routedLayer The tier that was running when the throwable escaped. The agent call-sites
+     *   pass [RoutingLayer.FullChat]; the send-pipeline catch-all passes null — a truly unexpected
+     *   exception there could have died in classify, dispatch or the agent, so no single tier is honest.
      */
-    private suspend fun emitTransportError(e: Throwable, retryText: String?) {
+    private suspend fun emitTransportError(e: Throwable, retryText: String?, routedLayer: RoutingLayer?) {
         if (e is TimeoutCancellationException) {
-            _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_error_timeout", retryText = retryText))
+            _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_error_timeout", retryText = retryText, routedLayer = routedLayer))
         } else {
-            _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_generic_error", retryText = retryText))
+            _sideEffect.emit(ChatScreenSideEffect.ShowAssistantMessage("chat_generic_error", retryText = retryText, routedLayer = routedLayer))
         }
     }
 
@@ -3436,7 +3495,7 @@ class ChatViewModel(
                 runAgentTurn(text, locale)
             }.onFailure { e ->
                 logger.error(TAG, "handleAskAiFallback failed", e)
-                emitTransportError(e, retryText = text)
+                emitTransportError(e, retryText = text, routedLayer = RoutingLayer.FullChat)
                 _screenState.value = _screenState.value.copy(isProcessing = false)
             }
         }
