@@ -439,6 +439,18 @@ object AnalyticsEvents {
         /** The one-time reminder opt-in was resolved. Param: [AnalyticsParams.OUTCOME] = "granted" | "skipped". */
         const val REMINDER_OPTIN = "activation_reminder_optin"
     }
+
+    // ─── Settings ────────────────────────────────────────────────────────────
+    object Settings {
+        /**
+         * User picked a UI language in Settings. Carries [AnalyticsParams.LANGUAGE] =
+         * BCP-47 tag ("en" / "ru" / "hi") or "system", and [AnalyticsParams.SOURCE] = the
+         * surface ("settings"). Fires on the explicit user selection only (not the reactive
+         * load), so in-app language adoption — invisible before this — is measurable (the
+         * flagship Hindi launch shipped with zero language events).
+         */
+        const val LANGUAGE_SELECTED = "language_selected"
+    }
 }
 
 /**
@@ -448,6 +460,7 @@ object AnalyticsEvents {
  */
 object AnalyticsParams {
     const val SOURCE = "source"
+    const val LANGUAGE = "language"
     const val TRIGGER_EVENT = "trigger_event"
     const val SCORE = "score"
     const val VARIANT = "variant"

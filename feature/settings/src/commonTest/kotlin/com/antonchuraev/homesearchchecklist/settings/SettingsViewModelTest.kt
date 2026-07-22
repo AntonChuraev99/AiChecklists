@@ -1,5 +1,8 @@
 package com.antonchuraev.homesearchchecklist.settings
 
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppLanguage
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppThemeMode
 import com.antonchuraev.homesearchchecklist.core.datastore.api.LanguageRepository
@@ -32,6 +35,7 @@ class SettingsViewModelTest {
 
     private lateinit var fakeRepository: FakeThemeRepository
     private lateinit var fakeLanguageRepository: FakeLanguageRepository
+    private lateinit var fakeAnalytics: FakeAnalyticsTracker
     private lateinit var viewModel: SettingsViewModel
 
     @BeforeTest
@@ -39,12 +43,24 @@ class SettingsViewModelTest {
         Dispatchers.setMain(testDispatcher)
         fakeRepository = FakeThemeRepository()
         fakeLanguageRepository = FakeLanguageRepository()
-        viewModel = SettingsViewModel(fakeRepository, fakeLanguageRepository)
+        fakeAnalytics = FakeAnalyticsTracker()
+        viewModel = SettingsViewModel(fakeRepository, fakeLanguageRepository, fakeAnalytics)
     }
 
     @AfterTest
     fun teardown() {
         Dispatchers.resetMain()
+    }
+
+    @Test
+    fun selectLanguage_emitsLanguageSelectedEvent() = runTest {
+        viewModel.sendIntent(SettingsIntent.SelectLanguage(AppLanguage.Hindi))
+        advanceUntilIdle()
+
+        val event = fakeAnalytics.events.last()
+        assertEquals(AnalyticsEvents.Settings.LANGUAGE_SELECTED, event.first)
+        assertEquals("hi", event.second[AnalyticsParams.LANGUAGE])
+        assertEquals("settings", event.second[AnalyticsParams.SOURCE])
     }
 
     @Test
@@ -201,5 +217,15 @@ private class FakeLanguageRepository : LanguageRepository {
 
     fun emitLanguage(language: AppLanguage) {
         _languageFlow.value = language
+    }
+}
+
+private class FakeAnalyticsTracker : AnalyticsTracker {
+    val events = mutableListOf<Pair<String, Map<String, Any>>>()
+    override fun setUserId(userId: String) {}
+    override fun setUserProperties(properties: Map<String, Any>) {}
+    override fun screenView(name: String) {}
+    override fun event(name: String, params: Map<String, Any>) {
+        events += name to params
     }
 }

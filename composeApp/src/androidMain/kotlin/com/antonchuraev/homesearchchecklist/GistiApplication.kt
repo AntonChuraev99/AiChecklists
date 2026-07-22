@@ -2,6 +2,7 @@ package com.antonchuraev.homesearchchecklist
 
 import android.app.Application
 import android.app.NotificationManager
+import android.content.Context
 import android.os.Build
 import androidx.core.app.NotificationManagerCompat
 import com.antonchuraev.homesearchchecklist.consent.ConsentManager
@@ -156,10 +157,15 @@ open class GistiApplication : Application() {
     }
 
     /**
-     * Emit [AnalyticsEvents.Push.PERMISSION_STATE] once per start with the app-level notification
-     * toggle and the promotions-channel importance (0 = the user muted "Tips & Offers" alone). Runs
-     * after channel creation so [NotificationManager.getNotificationChannel] resolves. Null-safe
-     * against the widget process where the tracker may not be bound.
+     * Mirror the current notification-permission state (app-level toggle + promotions-channel
+     * importance, 0 = the user muted "Tips & Offers" alone) into user-properties on EVERY start —
+     * segmentable ("how many users have push off") without spending an event — and emit
+     * [AnalyticsEvents.Push.PERMISSION_STATE] ONLY when that state changed vs the last-seen
+     * snapshot (or on first observation). The event measures opt-out DRIFT (Android has no
+     * channel-disable callback, so state is polled on start); one row per change carries the full
+     * signal, whereas a per-session emit was pure event-volume noise. Runs after channel creation
+     * so [NotificationManager.getNotificationChannel] resolves. Null-safe against the widget
+     * process where the tracker may not be bound.
      */
     private fun emitPushPermissionState() {
         val tracker: AnalyticsTracker = GlobalContext.getOrNull()?.getOrNull() ?: return
@@ -171,6 +177,30 @@ open class GistiApplication : Application() {
         } else {
             0
         }
+
+        // Current state as user-properties — cheap, segmentable, no per-session event.
+        runCatching {
+            tracker.setUserProperties(
+                mapOf(
+                    AnalyticsParams.NOTIFICATIONS_ENABLED to notificationsEnabled,
+                    AnalyticsParams.CHANNEL_IMPORTANCE to promoImportance,
+                ),
+            )
+        }
+
+        // Emit the event only on a real change (or first observation) — drift, not volume.
+        val prefs = getSharedPreferences("push_perm_state", Context.MODE_PRIVATE)
+        val keyEnabled = "last_notifications_enabled"
+        val keyImportance = "last_promo_importance"
+        val changed = !prefs.contains(keyEnabled) ||
+            prefs.getBoolean(keyEnabled, false) != notificationsEnabled ||
+            prefs.getInt(keyImportance, -1) != promoImportance
+        if (!changed) return
+        prefs.edit()
+            .putBoolean(keyEnabled, notificationsEnabled)
+            .putInt(keyImportance, promoImportance)
+            .apply()
+
         runCatching {
             tracker.event(
                 AnalyticsEvents.Push.PERMISSION_STATE,

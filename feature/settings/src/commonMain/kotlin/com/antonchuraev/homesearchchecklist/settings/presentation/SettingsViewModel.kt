@@ -1,6 +1,9 @@
 package com.antonchuraev.homesearchchecklist.settings.presentation
 
 import androidx.lifecycle.viewModelScope
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppLanguage
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppThemeMode
@@ -17,6 +20,7 @@ import kotlinx.coroutines.launch
 class SettingsViewModel(
     private val themeRepository: ThemeRepository,
     private val languageRepository: LanguageRepository,
+    private val analyticsTracker: AnalyticsTracker,
 ) : AppViewModel<SettingsState, SettingsIntent, SettingsSideEffect>() {
 
     private val _screenState = MutableStateFlow(
@@ -78,6 +82,15 @@ class SettingsViewModel(
     }
 
     private fun persistLanguage(language: AppLanguage) {
+        // Explicit user selection only (not the reactive collector) — this is the sole
+        // signal of in-app language adoption; the Hindi UI launch shipped with none.
+        analyticsTracker.event(
+            AnalyticsEvents.Settings.LANGUAGE_SELECTED,
+            mapOf(
+                AnalyticsParams.LANGUAGE to (language.tag ?: "system"),
+                AnalyticsParams.SOURCE to "settings",
+            ),
+        )
         viewModelScope.launch {
             languageRepository.setLanguage(language)
             // State update comes reactively from the Flow collector above.
