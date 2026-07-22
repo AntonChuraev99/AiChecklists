@@ -105,7 +105,15 @@ class SyncRepositoryImpl(
     }
 
     override suspend fun pushPendingChanges(): AppResult<Unit> {
-        val uid = currentUserId ?: return AppResult.Error(Exception("Not authenticated"))
+        val uid = currentUserId ?: run {
+            // Not signed in yet — nothing to push (sync requires auth). This is a
+            // documented no-op, NOT a failure: dirty rows stay marked and push on the
+            // next emission once auth is ready. Returning an Error here surfaced a
+            // Crashlytics non-fatal on every pre-auth cold-start race (issue 2018d810),
+            // a benign self-healing condition — a Success no-op is the correct result.
+            log("push: skipped — not authenticated yet (no-op)")
+            return AppResult.Success(Unit)
+        }
         _syncState.value = SyncState.Syncing
         return try {
             val pendingChecklists = checklistDao.getPendingSync()

@@ -155,6 +155,15 @@ class UserApiServiceImpl(
         }
         logger.debug(TAG, "registerUser: response status=${response.status}")
 
+        // Guard non-2xx BEFORE deserializing: an error response often carries a
+        // non-JSON body (HTML/plain-text error page), and response.body<Dto>() then
+        // throws a cryptic NoTransformationFoundException (crashes 8695b359) instead of
+        // a meaningful failure. Surface the HTTP status as a clean, self-healing error.
+        if (!response.status.isSuccess()) {
+            val raw = runCatching { response.bodyAsText() }.getOrNull()?.take(200)
+            logger.warning(TAG, "registerUser: HTTP ${response.status.value}, body=$raw")
+            throw Exception("register_user failed: HTTP ${response.status.value}")
+        }
         val responseBody = response.body<RegisterUserResponseDto>()
         logger.debug(TAG, "registerUser: response body - success=${responseBody.success}, userId=${responseBody.userId?.take(8)}..., aiCredits=${responseBody.aiCredits}, isPremium=${responseBody.isPremium}, error=${responseBody.error}")
 
@@ -253,6 +262,13 @@ class UserApiServiceImpl(
             )
         }
 
+        // Same non-2xx guard as registerUser: avoid NoTransformationFoundException
+        // (crashes ddc8be1f) when the error body isn't JSON.
+        if (!response.status.isSuccess()) {
+            val raw = runCatching { response.bodyAsText() }.getOrNull()?.take(200)
+            logger.warning(TAG, "registerPushToken: HTTP ${response.status.value}, body=$raw")
+            throw Exception("register_push_token failed: HTTP ${response.status.value}")
+        }
         val responseBody = response.body<RegisterPushTokenResponseDto>()
         if (responseBody.success) {
             logger.debug(TAG, "registerPushToken: SUCCESS")
