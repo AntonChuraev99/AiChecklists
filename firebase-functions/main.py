@@ -3554,12 +3554,19 @@ def chat_agent(request: Request):
                 "chat_agent: still empty after retry (finish_reason=%s) user=%s — graceful degrade",
                 payload, user_id[:8],
             )
+            degraded_balance = credits_remaining
             if reserved_this_round:
                 reason = "chat_agent_empty_gemini_after_retry"
                 if request_id:
                     refund_credits(user_id, CHAT_AGENT_COST, reason, request_id)
                 else:
                     refund_chat_completion_credits(user_id, reason=reason)
+                # Post-refund balance computed LOCALLY (reserve == refund == CHAT_AGENT_COST,
+                # enforced == CHAT_COMPLETION_COST) — NOT a Firestore read: a get_user_credits()
+                # here sits inside the try whose except refunds again on reserved_this_round,
+                # so a throw after the refund would double-refund. Disarm that except too.
+                degraded_balance = credits_remaining + CHAT_AGENT_COST
+                reserved_this_round = False
             degrade_msg = (
                 "Извините, у меня не получилось сформировать ответ. Попробуйте переформулировать запрос."
                 if locale == "ru" else
@@ -3569,8 +3576,7 @@ def chat_agent(request: Request):
                 **exp_meta,
                 "type": "final",
                 "content": degrade_msg,
-                # Refunded above -> report the true post-refund balance (mirrors the round-cap path).
-                "credits_remaining": get_user_credits(user_id),
+                "credits_remaining": degraded_balance,
             })
 
         # A real answer (options / tool_calls / final) — bill the turn once. All three served

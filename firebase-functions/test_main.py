@@ -1169,7 +1169,7 @@ class TestChatAgentEmptyCandidate:
         assert data["success"] is True
         assert data["type"] == "final"
         assert "не получилось" in data["content"]  # ru degrade message
-        # Post-refund balance is reported, not the stale reserved one.
+        # Post-refund balance computed locally: reserved (5) + refunded CHAT_AGENT_COST (3).
         assert data["credits_remaining"] == 8
         # The turn was refunded (non-answer) and NOT billed.
         mock_refund.assert_called_once()
@@ -1177,6 +1177,30 @@ class TestChatAgentEmptyCandidate:
         mock_incr.assert_not_called()
         # Retried exactly once (2 Gemini calls total).
         assert mock_client.models.generate_content.call_count == 2
+
+    def test_empty_degrade_throw_after_refund_does_not_double_refund(self, _import_main):
+        """Regression: if building the degrade response throws AFTER the refund, the outer
+        except must NOT refund a second time (reserved_this_round is disarmed post-refund).
+        Without the disarm this returned +2x cost AND still 500'd the client."""
+        main = _import_main
+        empty = _response(parts=[], text="", finish_reason="SAFETY")
+        mock_client = MagicMock()
+        mock_client.models.generate_content.side_effect = [empty, empty]
+
+        with patch.object(main, "resolve_experiment_model", return_value=("gemini-x", "control")):
+            with patch.object(main, "_reconstruct_agent_contents", return_value=[object()]):
+                with patch.object(main, "reserve_chat_completion_credits", return_value=5):
+                    with patch.object(main, "refund_chat_completion_credits") as mock_refund:
+                        with patch.object(main, "gemini_client", mock_client):
+                            # Throw only on the degrade success-response build; the except path
+                            # uses create_error_response, which stays real.
+                            with patch.object(main, "create_success_response", side_effect=RuntimeError("boom")):
+                                with app.test_request_context():
+                                    resp = main.chat_agent(make_request(self._REQ))
+        status = resp[1] if isinstance(resp, tuple) else resp.status_code
+        # The build threw -> client gets a 500, but the refund happened EXACTLY ONCE.
+        assert status == 500
+        mock_refund.assert_called_once()
 
     def test_empty_then_recovers_on_retry(self, _import_main):
         main = _import_main
