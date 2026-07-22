@@ -70,6 +70,9 @@ open class GistiApplication : Application() {
 
         // Sample the notification opt-out state once per start (Android has no channel-disable
         // callback) so we can measure opt-out drift on the promotions channel over time.
+        // Offloaded to applicationScope (Dispatchers.IO) — pure telemetry with no first-frame
+        // dependency, so it must not run on the cold-start main thread. Channels are created
+        // synchronously above, so getNotificationChannel() still resolves inside the coroutine.
         emitPushPermissionState()
 
         // Record this cold start as an activity sample (behavioral timing) and (re)schedule the
@@ -163,56 +166,63 @@ open class GistiApplication : Application() {
      * [AnalyticsEvents.Push.PERMISSION_STATE] ONLY when that state changed vs the last-seen
      * snapshot (or on first observation). The event measures opt-out DRIFT (Android has no
      * channel-disable callback, so state is polled on start); one row per change carries the full
-     * signal, whereas a per-session emit was pure event-volume noise. Runs after channel creation
-     * so [NotificationManager.getNotificationChannel] resolves. Null-safe against the widget
-     * process where the tracker may not be bound.
+     * signal, whereas a per-session emit was pure event-volume noise.
+     *
+     * Dispatched to [applicationScope] (Dispatchers.IO) so this pure-telemetry sampling never runs
+     * on the cold-start main thread. It is called from onCreate() only AFTER the notification
+     * channels are created synchronously, so [NotificationManager.getNotificationChannel] still
+     * resolves inside the coroutine (the channel writes happen-before the launch). Null-safe
+     * against the widget process where the tracker may not be bound.
      */
     private fun emitPushPermissionState() {
-        val tracker: AnalyticsTracker = GlobalContext.getOrNull()?.getOrNull() ?: return
-        val notificationsEnabled = NotificationManagerCompat.from(this).areNotificationsEnabled()
-        val promoImportance = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            getSystemService(NotificationManager::class.java)
-                ?.getNotificationChannel(PushNotificationChannels.PROMOTIONS_CHANNEL_ID)
-                ?.importance ?: 0
-        } else {
-            0
-        }
+        applicationScope.launch {
+            val tracker: AnalyticsTracker = GlobalContext.getOrNull()?.getOrNull() ?: return@launch
+            val notificationsEnabled =
+                NotificationManagerCompat.from(this@GistiApplication).areNotificationsEnabled()
+            val promoImportance = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                getSystemService(NotificationManager::class.java)
+                    ?.getNotificationChannel(PushNotificationChannels.PROMOTIONS_CHANNEL_ID)
+                    ?.importance ?: 0
+            } else {
+                0
+            }
 
-        // Current state as user-properties — cheap, segmentable, no per-session event.
-        runCatching {
-            tracker.setUserProperties(
-                mapOf(
-                    AnalyticsParams.NOTIFICATIONS_ENABLED to notificationsEnabled,
-                    AnalyticsParams.CHANNEL_IMPORTANCE to promoImportance,
-                ),
-            )
-        }
+            // Current state as user-properties — cheap, segmentable, no per-session event.
+            runCatching {
+                tracker.setUserProperties(
+                    mapOf(
+                        AnalyticsParams.NOTIFICATIONS_ENABLED to notificationsEnabled,
+                        AnalyticsParams.CHANNEL_IMPORTANCE to promoImportance,
+                    ),
+                )
+            }
 
-        // Emit the event only on a real change (or first observation) — drift, not volume.
-        val prefs = getSharedPreferences("push_perm_state", Context.MODE_PRIVATE)
-        val keyEnabled = "last_notifications_enabled"
-        val keyImportance = "last_promo_importance"
-        val changed = !prefs.contains(keyEnabled) ||
-            prefs.getBoolean(keyEnabled, false) != notificationsEnabled ||
-            prefs.getInt(keyImportance, -1) != promoImportance
-        if (!changed) return
-        prefs.edit()
-            .putBoolean(keyEnabled, notificationsEnabled)
-            .putInt(keyImportance, promoImportance)
-            .apply()
+            // Emit the event only on a real change (or first observation) — drift, not volume.
+            val prefs = getSharedPreferences("push_perm_state", Context.MODE_PRIVATE)
+            val keyEnabled = "last_notifications_enabled"
+            val keyImportance = "last_promo_importance"
+            val changed = !prefs.contains(keyEnabled) ||
+                prefs.getBoolean(keyEnabled, false) != notificationsEnabled ||
+                prefs.getInt(keyImportance, -1) != promoImportance
+            if (!changed) return@launch
+            prefs.edit()
+                .putBoolean(keyEnabled, notificationsEnabled)
+                .putInt(keyImportance, promoImportance)
+                .apply()
 
-        runCatching {
-            tracker.event(
-                AnalyticsEvents.Push.PERMISSION_STATE,
-                mapOf(
-                    AnalyticsParams.NOTIFICATIONS_ENABLED to notificationsEnabled,
-                    AnalyticsParams.CHANNEL to PushNotificationChannels.DATA_CHANNEL_PROMO,
-                    AnalyticsParams.CHANNEL_IMPORTANCE to promoImportance,
-                ),
-            )
-        }.onFailure { e ->
-            GlobalContext.getOrNull()?.getOrNull<AppLogger>()
-                ?.warning("PushFcm", "permission_state emit failed: ${e.message}")
+            runCatching {
+                tracker.event(
+                    AnalyticsEvents.Push.PERMISSION_STATE,
+                    mapOf(
+                        AnalyticsParams.NOTIFICATIONS_ENABLED to notificationsEnabled,
+                        AnalyticsParams.CHANNEL to PushNotificationChannels.DATA_CHANNEL_PROMO,
+                        AnalyticsParams.CHANNEL_IMPORTANCE to promoImportance,
+                    ),
+                )
+            }.onFailure { e ->
+                GlobalContext.getOrNull()?.getOrNull<AppLogger>()
+                    ?.warning("PushFcm", "permission_state emit failed: ${e.message}")
+            }
         }
     }
 
