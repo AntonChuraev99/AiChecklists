@@ -10,6 +10,7 @@ Covers:
 
 import json
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -1046,3 +1047,164 @@ class TestResponseLanguageDirective:
         main = _import_main
         directive = main._language_directive("xx")
         assert "xx" in directive  # BCP-47 code fallback still forces a language
+
+
+# ===========================================================================
+# chat_agent: empty-candidate handling (retry-once + graceful degrade)
+# Followup #2, docs/todos/2026-07-22-release-1.18.2-remaining-followups.md
+# ===========================================================================
+
+def _text_part(text):
+    return SimpleNamespace(text=text, function_call=None, thought_signature=None)
+
+
+def _fc_part(name, args=None, call_id="c1"):
+    fc = SimpleNamespace(name=name, id=call_id, args=args or {})
+    return SimpleNamespace(text=None, function_call=fc, thought_signature=None)
+
+
+def _response(parts, text="", finish_reason="STOP"):
+    candidate = SimpleNamespace(
+        content=SimpleNamespace(parts=parts),
+        finish_reason=finish_reason,
+    )
+    return SimpleNamespace(candidates=[candidate], text=text)
+
+
+class TestInterpretAgentResponse:
+    """The pure _interpret_agent_response classifier — the single source of truth for
+    which terminal outcome a chat_agent Gemini response carries."""
+
+    def test_empty_candidate_returns_empty_with_finish_reason(self, _import_main):
+        main = _import_main
+        resp = _response(parts=[], text="", finish_reason="SAFETY")
+        kind, payload = main._interpret_agent_response(resp)
+        assert kind == "empty"
+        assert payload == "SAFETY"
+
+    def test_no_candidates_returns_empty(self, _import_main):
+        main = _import_main
+        resp = SimpleNamespace(candidates=[], text="")
+        kind, payload = main._interpret_agent_response(resp)
+        assert kind == "empty"
+
+    def test_final_text_returns_final(self, _import_main):
+        main = _import_main
+        resp = _response(parts=[_text_part("Hello there")], text="Hello there")
+        kind, payload = main._interpret_agent_response(resp)
+        assert kind == "final"
+        assert payload == "Hello there"
+
+    def test_tool_calls_returns_tool_calls(self, _import_main):
+        main = _import_main
+        resp = _response(parts=[_fc_part("add_item", {"text": "milk"})])
+        kind, payload = main._interpret_agent_response(resp)
+        assert kind == "tool_calls"
+        assert payload[0]["name"] == "add_item"
+        assert payload[0]["args"] == {"text": "milk"}
+
+    def test_present_options_returns_options(self, _import_main):
+        main = _import_main
+        resp = _response(parts=[_fc_part(
+            "present_options",
+            {"prompt": "Which list?", "options": ["Groceries", "Work"]},
+        )])
+        kind, payload = main._interpret_agent_response(resp)
+        assert kind == "options"
+        assert payload["prompt"] == "Which list?"
+        assert payload["options"] == ["Groceries", "Work"]
+
+    def test_options_precede_tool_calls(self, _import_main):
+        """present_options is server-terminal — it wins even if generic tool calls coexist."""
+        main = _import_main
+        resp = _response(parts=[
+            _fc_part("present_options", {"prompt": "Pick", "options": ["A", "B"]}),
+            _fc_part("add_item", {"text": "milk"}, call_id="c2"),
+        ])
+        kind, _ = main._interpret_agent_response(resp)
+        assert kind == "options"
+
+
+class TestChatAgentEmptyCandidate:
+    """chat_agent must retry once on an empty Gemini candidate, then degrade gracefully
+    (localized final + refund) instead of the old hard 500."""
+
+    # Minimal first-round request (no request_id -> legacy reserve path).
+    _REQ = {
+        "user_id": "user-abc",
+        "locale": "ru",
+        "transcript": [{"role": "user", "text": "привет"}],
+    }
+
+    def _run(self, main, generate_content, get_credits_return=8):
+        """Invoke chat_agent with all IO deps mocked, Gemini driven by generate_content."""
+        mock_client = MagicMock()
+        mock_client.models.generate_content.side_effect = None
+        if isinstance(generate_content, list):
+            mock_client.models.generate_content.side_effect = generate_content
+        else:
+            mock_client.models.generate_content.return_value = generate_content
+
+        with patch.object(main, "resolve_experiment_model", return_value=("gemini-x", "control")):
+            with patch.object(main, "_reconstruct_agent_contents", return_value=[object()]):
+                with patch.object(main, "reserve_chat_completion_credits", return_value=5):
+                    with patch.object(main, "increment_usage") as mock_incr:
+                        with patch.object(main, "refund_chat_completion_credits") as mock_refund:
+                            with patch.object(main, "get_user_credits", return_value=get_credits_return):
+                                with patch.object(main, "gemini_client", mock_client):
+                                    with app.test_request_context():
+                                        resp = main.chat_agent(make_request(self._REQ))
+        data = resp[0].get_json() if isinstance(resp, tuple) else resp.get_json()
+        status = resp[1] if isinstance(resp, tuple) else resp.status_code
+        return status, data, mock_incr, mock_refund, mock_client
+
+    def test_empty_twice_degrades_gracefully_and_refunds(self, _import_main):
+        main = _import_main
+        empty = _response(parts=[], text="", finish_reason="SAFETY")
+        status, data, mock_incr, mock_refund, mock_client = self._run(
+            main, generate_content=[empty, empty], get_credits_return=8,
+        )
+        # 200 (not 500), typed final with the localized degrade copy.
+        assert status == 200
+        assert data["success"] is True
+        assert data["type"] == "final"
+        assert "не получилось" in data["content"]  # ru degrade message
+        # Post-refund balance is reported, not the stale reserved one.
+        assert data["credits_remaining"] == 8
+        # The turn was refunded (non-answer) and NOT billed.
+        mock_refund.assert_called_once()
+        assert mock_refund.call_args.kwargs.get("reason") == "chat_agent_empty_gemini_after_retry"
+        mock_incr.assert_not_called()
+        # Retried exactly once (2 Gemini calls total).
+        assert mock_client.models.generate_content.call_count == 2
+
+    def test_empty_then_recovers_on_retry(self, _import_main):
+        main = _import_main
+        empty = _response(parts=[], text="", finish_reason="SAFETY")
+        recovered = _response(parts=[_text_part("Привет!")], text="Привет!")
+        status, data, mock_incr, mock_refund, mock_client = self._run(
+            main, generate_content=[empty, recovered],
+        )
+        assert status == 200
+        assert data["type"] == "final"
+        assert data["content"] == "Привет!"
+        # Recovered turn: reserved balance kept, billed once, NOT refunded.
+        assert data["credits_remaining"] == 5
+        mock_refund.assert_not_called()
+        mock_incr.assert_called_once()
+        assert mock_client.models.generate_content.call_count == 2
+
+    def test_first_call_success_no_retry(self, _import_main):
+        main = _import_main
+        ok = _response(parts=[_text_part("Готово")], text="Готово")
+        status, data, mock_incr, mock_refund, mock_client = self._run(
+            main, generate_content=ok,
+        )
+        assert status == 200
+        assert data["type"] == "final"
+        assert data["content"] == "Готово"
+        assert data["credits_remaining"] == 5
+        mock_refund.assert_not_called()
+        mock_incr.assert_called_once()
+        # Happy path: exactly one Gemini call, no retry.
+        assert mock_client.models.generate_content.call_count == 1

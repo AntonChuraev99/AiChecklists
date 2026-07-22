@@ -3285,6 +3285,37 @@ def _extract_final_text(response, parts) -> str:
     return (getattr(response, "text", None) or "").strip()
 
 
+def _interpret_agent_response(response):
+    """Classify a chat_agent Gemini response into its single terminal outcome.
+
+    Returns a (kind, payload) tuple, kind being one of:
+      "options"    -> payload = {"prompt": str, "options": [...]}  (model called present_options)
+      "tool_calls" -> payload = [ {id, name, args}, ... ]          (client-dispatched tool calls)
+      "final"      -> payload = str                                (final assistant text)
+      "empty"      -> payload = finish_reason | None               (no options, no tools, no text)
+
+    "empty" is the transient safety-filter / empty-completion blip the caller retries once and
+    then degrades gracefully on — see chat_agent. Extraction order mirrors the model's own
+    precedence (present_options is server-terminal, then tool calls, then text).
+    """
+    candidate = (response.candidates or [None])[0]
+    parts = candidate.content.parts if (candidate and candidate.content) else []
+
+    present = _extract_present_options(parts)
+    if present is not None:
+        return ("options", present)
+
+    tool_calls = _serialize_function_calls(parts)
+    if tool_calls:
+        return ("tool_calls", tool_calls)
+
+    content = _extract_final_text(response, parts)
+    if content:
+        return ("final", content)
+
+    return ("empty", getattr(candidate, "finish_reason", None))
+
+
 @functions_framework.http
 def chat_agent(request: Request):
     """
@@ -3492,55 +3523,85 @@ def chat_agent(request: Request):
             temperature=0.4,
         )
 
-        response = gemini_client.models.generate_content(
-            model=model_id,
-            contents=contents,
-            config=config,
-        )
+        def _run_gemini():
+            return gemini_client.models.generate_content(
+                model=model_id,
+                contents=contents,
+                config=config,
+            )
 
-        candidate = (response.candidates or [None])[0]
-        parts = candidate.content.parts if (candidate and candidate.content) else []
+        response = _run_gemini()
+        # present_options is server-terminal (choice chips), then client-dispatched tool calls,
+        # then a final text reply — _interpret_agent_response applies that same precedence.
+        kind, payload = _interpret_agent_response(response)
 
-        # present_options is server-terminal: if the model offered the user a choice, return
-        # it as type:"options" (the client renders chips) BEFORE serializing client-dispatched
-        # tool calls. Mirrors the tool_calls / final usage bump.
-        present = _extract_present_options(parts)
-        if present is not None:
-            try:
-                increment_usage(user_id, "chat_agent", "text")
-            except Exception:
-                pass
+        # Empty candidate (no options, no tool calls, no text) is almost always a transient
+        # safety-filter / empty-completion blip at temperature 0.4 — retry ONCE before giving up
+        # rather than failing the whole turn. (docs/todos/2026-07-22-release-1.18.2-remaining-followups.md #2)
+        if kind == "empty":
+            logger.warning(
+                "chat_agent: empty candidate (finish_reason=%s) user=%s — retrying once",
+                payload, user_id[:8],
+            )
+            response = _run_gemini()
+            kind, payload = _interpret_agent_response(response)
+
+        # Still empty after the retry -> graceful degradation. Refund the turn (never bill a
+        # non-answer) and return a friendly localized final instead of the old hard 500 the client
+        # surfaced as "something went wrong". payload here is the retry's finish_reason.
+        if kind == "empty":
+            logger.warning(
+                "chat_agent: still empty after retry (finish_reason=%s) user=%s — graceful degrade",
+                payload, user_id[:8],
+            )
+            if reserved_this_round:
+                reason = "chat_agent_empty_gemini_after_retry"
+                if request_id:
+                    refund_credits(user_id, CHAT_AGENT_COST, reason, request_id)
+                else:
+                    refund_chat_completion_credits(user_id, reason=reason)
+            degrade_msg = (
+                "Извините, у меня не получилось сформировать ответ. Попробуйте переформулировать запрос."
+                if locale == "ru" else
+                "Sorry, I couldn't generate a response. Please try rephrasing your request."
+            )
             return create_success_response({
                 **exp_meta,
-                "type": "options",
-                "prompt": present["prompt"],
-                "options": present["options"],
-                "credits_remaining": credits_remaining,
+                "type": "final",
+                "content": degrade_msg,
+                # Refunded above -> report the true post-refund balance (mirrors the round-cap path).
+                "credits_remaining": get_user_credits(user_id),
             })
 
-        tool_calls = _serialize_function_calls(parts)
-
+        # A real answer (options / tool_calls / final) — bill the turn once. All three served
+        # outcomes count as one turn; only the empty-degrade path above skips the usage bump.
         try:
             increment_usage(user_id, "chat_agent", "text")
         except Exception:
             pass
 
-        if tool_calls:
+        if kind == "options":
             return create_success_response({
                 **exp_meta,
-                "type": "tool_calls",
-                "tool_calls": tool_calls,
+                "type": "options",
+                "prompt": payload["prompt"],
+                "options": payload["options"],
                 "credits_remaining": credits_remaining,
             })
 
-        content = _extract_final_text(response, parts)
-        if not content:
-            raise ValueError("Gemini returned neither tool calls nor text")
+        if kind == "tool_calls":
+            return create_success_response({
+                **exp_meta,
+                "type": "tool_calls",
+                "tool_calls": payload,
+                "credits_remaining": credits_remaining,
+            })
 
+        # kind == "final"
         return create_success_response({
             **exp_meta,
             "type": "final",
-            "content": content,
+            "content": payload,
             "credits_remaining": credits_remaining,
         })
 
