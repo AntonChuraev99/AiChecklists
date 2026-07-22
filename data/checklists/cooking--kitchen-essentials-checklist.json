@@ -1,0 +1,62 @@
+{
+  "category": "cooking",
+  "slug": "kitchen-essentials-checklist",
+  "order": 3,
+  "icon": "countertops",
+  "title": "Kitchen Essentials Checklist",
+  "metaTitle": "Kitchen Essentials Checklist (Stock Your Kitchen) | Gisti",
+  "metaDescription": "A kitchen essentials checklist for a well-stocked kitchen: pantry staples, oils, spices, fresh basics, tools, and restocking. Free, or tailor with AI in Gisti.",
+  "cardDesc": "Pantry staples, oils and spices, fresh basics, and the tools worth keeping in a working kitchen.",
+  "ordered": false,
+  "intro": "A well-stocked kitchen is what lets you cook without a shop run every night — the oils, spices, and staples that turn whatever's fresh into a meal. This checklist covers the pantry basics worth always having, the perishables to keep topped up, and the tools worth replacing when they wear out. Use it as a restock routine or as a starting list for a new kitchen. Browse more <a href=\"/checklists/cooking/\" class=\"text-primary hover:underline\">cooking and meal checklists</a>.",
+  "items": [
+    { "text": "Stock cooking fats — a neutral oil, olive oil, and butter", "note": "A neutral oil for high heat and olive oil for finishing covers most cooking." },
+    { "text": "Keep vinegars and acids on hand, like white, balsamic, and a lemon or two", "note": "A splash of acid brightens almost any dish that tastes flat." },
+    { "text": "Restock everyday spices and dried herbs, and toss any that have lost their smell", "note": "Ground spices fade after about a year — if it barely smells, it won't season." },
+    { "text": "Keep baking basics — flour, sugar, baking soda, baking powder, and salt" },
+    { "text": "Stock pantry carbs like rice, pasta, and a few tins of beans or lentils" },
+    { "text": "Keep flavor builders — garlic, onions, stock cubes, soy sauce, and tomato paste" },
+    { "text": "Restock dairy and eggs, plus a long-life milk or alternative as backup" },
+    { "text": "Buy fresh fruits and vegetables you'll actually use this week", "note": "Buying only what you'll cook cuts the produce that rots in the drawer." },
+    { "text": "Check expiration and best-before dates and rotate older items to the front", "note": "Front-to-back rotation is how shops keep stock from expiring unnoticed." },
+    { "text": "Restock kitchen paper, foil, parchment, cling film, and storage bags" },
+    { "text": "Check dish soap, sponges, and surface cleaner" },
+    { "text": "Replace worn-out tools — a dull knife, a scratched pan, or a cracked spatula", "note": "A sharp knife is safer than a dull one, which slips instead of cutting." },
+    { "text": "Make sure you have the basics — a chef's knife, cutting board, and a few good pans" },
+    { "text": "Organize shelves and containers so you can see what you have", "note": "Clear jars and a quick inventory stop you rebuying what's already there." }
+  ],
+  "faq": [
+    { "q": "What are kitchen essentials I should always have?", "a": "A working kitchen keeps a few fats (a neutral oil, olive oil, butter), everyday spices and salt, baking basics like flour and sugar, and shelf-stable carbs like rice and pasta. Add flavor builders — garlic, onions, stock, soy sauce, tomato paste — and you can turn almost anything fresh into a meal." },
+    { "q": "How often should I restock my pantry?", "a": "Top up perishables like dairy, eggs, and produce weekly, and check pantry staples every few weeks so you notice what's running low before you're out. A quick shelf scan before you shop stops you from rebuying things you already have or letting older items expire." },
+    { "q": "What kitchen tools do I actually need?", "a": "Start with the few that do the most work: a sharp chef's knife, a cutting board, a couple of good pans, a saucepan, mixing bowls, and a set of measuring tools. Replace anything worn — a dull knife or a scratched non-stick pan is worth swapping — and add specialty gear only when a recipe truly needs it." }
+  ],
+  "related": ["dinner-party-menu-checklist", "baking-day-checklist", "groceries/pantry-staples-checklist"],
+  "hi": {
+    "title": "किचन एसेंशियल्स चेकलिस्ट",
+    "metaTitle": "किचन एसेंशियल्स चेकलिस्ट (किचन स्टॉक करें) | Gisti",
+    "metaDescription": "अच्छी तरह भरे किचन के लिए किचन एसेंशियल्स चेकलिस्ट: पैंट्री स्टेपल, तेल और मसाले, ताज़ा ज़रूरी सामान, औज़ार, और रीस्टॉक रिमाइंडर। मुफ़्त, या Gisti में AI से ढालें।",
+    "cardDesc": "पैंट्री स्टेपल, तेल और मसाले, ताज़ा ज़रूरी सामान, और एक चलते किचन के लायक औज़ार।",
+    "intro": "अच्छी तरह भरा किचन वही है जो आपको हर रात दुकान भागे बिना पकाने देता है — वे तेल, मसाले, और स्टेपल जो जो भी ताज़ा हो उसे खाने में बदल देते हैं। यह चेकलिस्ट बताती है कि कौन-सी पैंट्री बुनियादी चीज़ें हमेशा रखनी हैं, किन ख़राब होने वाली चीज़ों को भरा रखना है, और घिसने पर कौन-से औज़ार बदलने लायक हैं। इसे रीस्टॉक दिनचर्या या नए किचन की शुरुआती सूची की तरह इस्तेमाल करें। और देखें <a href=\"/hi/checklists/cooking/\" class=\"text-primary hover:underline\">कुकिंग और मील चेकलिस्ट</a>।",
+    "items": [
+      { "text": "पकाने के फ़ैट रखें — एक न्यूट्रल तेल, ऑलिव ऑयल, और मक्खन", "note": "तेज़ आँच के लिए न्यूट्रल तेल और फ़िनिशिंग के लिए ऑलिव ऑयल ज़्यादातर पकाई कवर कर देते हैं।" },
+      { "text": "सिरके और खट्टी चीज़ें पास रखें, जैसे सफ़ेद, बाल्सामिक, और एक-दो नींबू", "note": "थोड़ी-सी खटास लगभग हर फीके लगने वाले पकवान को उभार देती है।" },
+      { "text": "रोज़मर्रा के मसाले और सूखी जड़ी-बूटियाँ भरें, और जिनकी महक चली गई हो उन्हें हटा दें", "note": "पिसे मसाले करीब एक साल में फीके पड़ जाते हैं — अगर मुश्किल से महकें, तो स्वाद नहीं देंगे।" },
+      { "text": "बेकिंग की बुनियादी चीज़ें रखें — आटा, चीनी, बेकिंग सोडा, बेकिंग पाउडर, और नमक" },
+      { "text": "पैंट्री कार्ब्स रखें जैसे चावल, पास्ता, और बीन्स या दाल के कुछ डिब्बे" },
+      { "text": "स्वाद बढ़ाने वाली चीज़ें रखें — लहसुन, प्याज़, स्टॉक क्यूब, सोया सॉस, और टमाटर पेस्ट" },
+      { "text": "डेयरी और अंडे भरें, साथ में बैकअप के लिए एक लंबी-अवधि वाला दूध या विकल्प" },
+      { "text": "इस हफ़्ते सचमुच इस्तेमाल होने लायक ताज़ा फल और सब्ज़ियाँ ख़रीदें", "note": "सिर्फ़ वही ख़रीदना जो आप पकाएँगे, दराज़ में सड़ने वाली सब्ज़ियाँ घटा देता है।" },
+      { "text": "एक्सपायरी और बेस्ट-बिफ़ोर तारीख़ें जाँचें और पुराने सामान को आगे रखें", "note": "आगे-से-पीछे घुमाव से दुकानें स्टॉक को बिना ध्यान गए एक्सपायर होने से बचाती हैं।" },
+      { "text": "किचन पेपर, फ़ॉयल, पार्चमेंट, क्लिंग फ़िल्म, और स्टोरेज बैग भरें" },
+      { "text": "बर्तन धोने का साबुन, स्पंज, और सतह साफ़ करने वाला जाँचें" },
+      { "text": "घिसे हुए औज़ार बदलें — कुंद चाकू, खरोंच वाला पैन, या टूटा स्पैचुला", "note": "तेज़ चाकू कुंद से ज़्यादा सुरक्षित है, क्योंकि कुंद काटने के बजाय फिसलता है।" },
+      { "text": "पक्का करें कि बुनियादी चीज़ें हैं — एक शेफ़ चाकू, चॉपिंग बोर्ड, और कुछ अच्छे पैन" },
+      { "text": "शेल्फ़ और डिब्बे व्यवस्थित करें ताकि आप देख सकें कि आपके पास क्या है", "note": "पारदर्शी जार और एक झटपट इन्वेंट्री आपको वही दोबारा ख़रीदने से रोकती है जो पहले से है।" }
+    ],
+    "faq": [
+      { "q": "किचन में हमेशा कौन-सी ज़रूरी चीज़ें होनी चाहिए?", "a": "एक चलता किचन कुछ फ़ैट (एक न्यूट्रल तेल, ऑलिव ऑयल, मक्खन), रोज़मर्रा के मसाले और नमक, आटा-चीनी जैसी बेकिंग बुनियादी चीज़ें, और चावल-पास्ता जैसे टिकाऊ कार्ब्स रखता है। साथ में स्वाद बढ़ाने वाली चीज़ें — लहसुन, प्याज़, स्टॉक, सोया सॉस, टमाटर पेस्ट — जोड़ें, और आप लगभग किसी भी ताज़ी चीज़ को खाने में बदल सकते हैं।" },
+      { "q": "मुझे अपनी पैंट्री कितनी बार भरनी चाहिए?", "a": "डेयरी, अंडे, और सब्ज़ियों जैसी ख़राब होने वाली चीज़ें हर हफ़्ते भरें, और पैंट्री स्टेपल हर कुछ हफ़्ते जाँचें ताकि ख़त्म होने से पहले पता चल जाए कि क्या कम है। ख़रीदारी से पहले एक झटपट शेल्फ़ नज़र आपको वही दोबारा ख़रीदने या पुराने सामान को एक्सपायर होने देने से रोकती है।" },
+      { "q": "मुझे सचमुच कौन-से किचन औज़ार चाहिए?", "a": "उन कुछ से शुरू करें जो सबसे ज़्यादा काम आते हैं: एक तेज़ शेफ़ चाकू, एक चॉपिंग बोर्ड, कुछ अच्छे पैन, एक सॉसपैन, मिक्सिंग बाउल, और मापने के औज़ारों का एक सेट। घिसा हुआ कुछ भी बदलें — कुंद चाकू या खरोंच वाला नॉन-स्टिक पैन बदलने लायक है — और ख़ास उपकरण तभी जोड़ें जब कोई रेसिपी सचमुच माँगे।" }
+    ]
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "category": "fitness",
+  "slug": "home-workout-checklist",
+  "order": 54,
+  "icon": "exercise",
+  "title": "Home Workout Checklist",
+  "metaTitle": "Home Workout Checklist (No Gym Needed) | Gisti",
+  "metaDescription": "A no-equipment home workout checklist — warm up, do bodyweight strength and cardio, hit your core, then cool down. Free, or tailor it with AI in Gisti.",
+  "cardDesc": "Stay fit without a gym — warm up, bodyweight strength, cardio intervals, core, and a proper cool-down.",
+  "ordered": true,
+  "intro": "You don't need a gym or any equipment to get a real workout — your own bodyweight, a bit of floor space, and 20 to 40 minutes are enough. This checklist runs through a balanced session: a warm-up, strength and cardio, focused core work, and a cool-down, all doable in a living room. Scale each move up or down to match your fitness, and see the rest of our <a href=\"/checklists/fitness/\" class=\"text-primary hover:underline\">health and fitness checklists</a>.",
+  "items": [
+    { "text": "Clear a space about the size of your mat, with room to reach out", "note": "Push furniture back so you can lunge and swing your arms freely." },
+    { "text": "Keep water and a towel nearby, and a mat or soft surface for floor work" },
+    { "text": "Warm up for 5 minutes with marching, arm circles, and hip openers", "note": "A proper warm-up cuts injury risk and makes the first sets feel easier." },
+    { "text": "Do a bodyweight strength circuit: squats, push-ups, lunges, and glute bridges", "note": "Drop to your knees for push-ups or hold a chair for balance to scale any move down." },
+    { "text": "Rest 30 to 60 seconds between rounds, and repeat the circuit 2 to 4 times" },
+    { "text": "Add cardio intervals: jumping jacks, high knees, or burpees", "note": "Work hard for 30 to 45 seconds, then recover — that interval style builds fitness fast." },
+    { "text": "Add load with resistance bands or filled water bottles if you have them" },
+    { "text": "Do focused core work: planks, dead bugs, and bicycle crunches", "note": "Slow, controlled holds beat rushed reps — keep your lower back flat on the floor." },
+    { "text": "Keep good form over speed, and stop any move that causes sharp pain" },
+    { "text": "Stay hydrated with small sips throughout" },
+    { "text": "Cool down with 3 to 5 minutes of easy movement to lower your heart rate" },
+    { "text": "Stretch the major muscle groups you worked while they're still warm" },
+    { "text": "Track your exercises, rounds, and reps", "note": "Progress by adding a round or reps over time — that's how bodyweight training keeps working." },
+    { "text": "Note how it felt so you can adjust the next session" }
+  ],
+  "faq": [
+    { "q": "Can you get fit with just home workouts?", "a": "Yes. Bodyweight training builds real strength, endurance, and mobility, and it's how many people stay fit without ever touching a machine. The key is progression — as moves get easier, add rounds, reps, or harder variations like single-leg squats or decline push-ups. A few resistance bands or dumbbells extend how far you can go." },
+    { "q": "How long should a home workout be?", "a": "A focused 20 to 40 minutes is plenty for a full-body session, including warm-up and cool-down. Short, consistent workouts several times a week beat occasional long ones. If you're short on time, a 15-minute circuit done with real effort still delivers — intensity and consistency matter more than duration." },
+    { "q": "What home workout can I do with no equipment?", "a": "A simple full-body circuit works: squats, push-ups, lunges, glute bridges, and a plank, repeated for a few rounds with short rests. Add cardio bursts like jumping jacks or high knees between rounds. Scale each move to your level — knee push-ups, shallower squats — and progress by adding rounds or reps as you get stronger." }
+  ],
+  "related": ["gym-workout-checklist", "yoga-session-checklist", "running-prep-checklist", "meal-prep-checklist"],
+  "hi": {
+    "title": "होम वर्कआउट चेकलिस्ट",
+    "metaTitle": "होम वर्कआउट चेकलिस्ट (जिम की ज़रूरत नहीं) | Gisti",
+    "metaDescription": "बिना उपकरण वाला होम वर्कआउट चेकलिस्ट — वार्म-अप करें, बॉडीवेट स्ट्रेंथ और कार्डियो करें, कोर पर काम करें, फिर कूल डाउन करें। मुफ़्त, या Gisti में AI से अपने मुताबिक ढालें।",
+    "cardDesc": "बिना जिम के फ़िट रहें — वार्म-अप, बॉडीवेट स्ट्रेंथ, कार्डियो इंटरवल, कोर, और एक अच्छा कूल-डाउन।",
+    "intro": "एक असली वर्कआउट के लिए आपको जिम या किसी उपकरण की ज़रूरत नहीं — आपका अपना बॉडीवेट, थोड़ी फ़र्श जगह, और 20 से 40 मिनट काफ़ी हैं। यह चेकलिस्ट एक संतुलित सेशन से गुज़ारती है: वार्म-अप, स्ट्रेंथ और कार्डियो, केंद्रित कोर वर्क, और कूल-डाउन, सब कुछ एक बैठक-कमरे में करने लायक। हर मूव को अपनी फ़िटनेस के हिसाब से बढ़ाएँ या घटाएँ, और देखें हमारी बाक़ी <a href=\"/hi/checklists/fitness/\" class=\"text-primary hover:underline\">सेहत और फ़िटनेस चेकलिस्ट</a>।",
+    "items": [
+      { "text": "अपनी मैट के आकार जितनी जगह ख़ाली करें, जहाँ हाथ फैलाने की भी गुंजाइश हो", "note": "फ़र्नीचर पीछे खिसकाएँ ताकि आप खुलकर लंज कर सकें और हाथ घुमा सकें।" },
+      { "text": "पानी और एक तौलिया पास रखें, और फ़र्श के काम के लिए एक मैट या नरम सतह" },
+      { "text": "मार्चिंग, आर्म सर्कल, और हिप ओपनर से 5 मिनट वार्म-अप करें", "note": "सही वार्म-अप चोट का जोखिम घटाता है और पहले सेट आसान लगते हैं।" },
+      { "text": "एक बॉडीवेट स्ट्रेंथ सर्किट करें: स्क्वैट, पुश-अप, लंज, और ग्लूट ब्रिज", "note": "किसी भी मूव को आसान करने के लिए पुश-अप में घुटनों पर आएँ या संतुलन के लिए कुर्सी पकड़ें।" },
+      { "text": "राउंड के बीच 30 से 60 सेकंड आराम करें, और सर्किट 2 से 4 बार दोहराएँ" },
+      { "text": "कार्डियो इंटरवल जोड़ें: जंपिंग जैक, हाई नीज़, या बर्पी", "note": "30 से 45 सेकंड ज़ोर लगाएँ, फिर रिकवर करें — यह इंटरवल शैली फ़िटनेस जल्दी बनाती है।" },
+      { "text": "अगर हों तो रेज़िस्टेंस बैंड या भरी पानी की बोतलों से लोड जोड़ें" },
+      { "text": "केंद्रित कोर वर्क करें: प्लैंक, डेड बग, और बाइसिकल क्रंच", "note": "जल्दबाज़ी वाले रेप्स से धीमे, नियंत्रित होल्ड बेहतर हैं — अपनी कमर फ़र्श से सटाए रखें।" },
+      { "text": "गति से ज़्यादा अच्छी फ़ॉर्म रखें, और तेज़ दर्द देने वाला कोई मूव रोक दें" },
+      { "text": "पूरे समय छोटे-छोटे घूँट पानी पीकर हाइड्रेटेड रहें" },
+      { "text": "हार्ट रेट कम करने के लिए 3 से 5 मिनट की आसान मूवमेंट से कूल डाउन करें" },
+      { "text": "जिन बड़े मसल ग्रुप पर काम किया उन्हें गर्म रहते हुए स्ट्रेच करें" },
+      { "text": "अपनी एक्सरसाइज़, राउंड, और रेप्स ट्रैक करें", "note": "समय के साथ एक राउंड या रेप्स जोड़कर आगे बढ़ें — बॉडीवेट ट्रेनिंग इसी तरह काम करती रहती है।" },
+      { "text": "नोट करें कि कैसा लगा ताकि अगला सेशन आप उसी हिसाब से ढाल सकें" }
+    ],
+    "faq": [
+      { "q": "क्या सिर्फ़ होम वर्कआउट से फ़िट हुआ जा सकता है?", "a": "हाँ। बॉडीवेट ट्रेनिंग असली स्ट्रेंथ, एंड्योरेंस, और मोबिलिटी बनाती है, और कई लोग बिना किसी मशीन को छुए इसी से फ़िट रहते हैं। कुंजी है प्रगति — जैसे-जैसे मूव आसान हों, राउंड, रेप्स, या सिंगल-लेग स्क्वैट और डिक्लाइन पुश-अप जैसे कठिन रूप जोड़ें। कुछ रेज़िस्टेंस बैंड या डंबल आपकी सीमा और आगे बढ़ा देते हैं।" },
+      { "q": "होम वर्कआउट कितनी देर का होना चाहिए?", "a": "वार्म-अप और कूल-डाउन समेत एक केंद्रित 20 से 40 मिनट का फ़ुल-बॉडी सेशन काफ़ी है। हफ़्ते में कई बार के छोटे, नियमित वर्कआउट कभी-कभार के लंबे वर्कआउट से बेहतर हैं। अगर समय कम है, तो असली मेहनत से किया 15 मिनट का सर्किट भी नतीजे देता है — तीव्रता और निरंतरता अवधि से ज़्यादा मायने रखती हैं।" },
+      { "q": "बिना उपकरण के मैं कौन-सा होम वर्कआउट कर सकता हूँ?", "a": "एक सरल फ़ुल-बॉडी सर्किट काम करता है: स्क्वैट, पुश-अप, लंज, ग्लूट ब्रिज, और एक प्लैंक, छोटे आराम के साथ कुछ राउंड दोहराएँ। राउंड के बीच जंपिंग जैक या हाई नीज़ जैसे कार्डियो बर्स्ट जोड़ें। हर मूव को अपने स्तर के हिसाब से ढालें — घुटनों पर पुश-अप, कम गहरे स्क्वैट — और मज़बूत होते जाने पर राउंड या रेप्स जोड़कर आगे बढ़ें।" }
+    ]
+  }
+}

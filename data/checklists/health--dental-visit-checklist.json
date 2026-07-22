@@ -1,0 +1,62 @@
+{
+  "category": "health",
+  "slug": "dental-visit-checklist",
+  "order": 3,
+  "icon": "dentistry",
+  "title": "Dental Visit Checklist",
+  "metaTitle": "Dental Visit Checklist (Before Your Appointment) | Gisti",
+  "metaDescription": "A dental visit checklist to prepare before your visit: what to bring, concerns to raise, and questions to ask your dentist. Free, or tailor with AI in Gisti.",
+  "cardDesc": "What to bring, concerns to raise, and questions to ask so your dental appointment goes smoothly.",
+  "ordered": false,
+  "intro": "A dental appointment is quick, but a little prep makes it more useful — the right paperwork, the concerns you've been meaning to mention, and questions about anything that's been bothering you. This checklist covers what to sort out before you go and what to confirm before you leave. It's an organizational aid, not dental or medical advice. See more <a href=\"/checklists/health/\" class=\"text-primary hover:underline\">health and wellness checklists</a>.",
+  "items": [
+    { "text": "Confirm the date, time, and location, and add it to your calendar" },
+    { "text": "Bring your insurance or dental plan card and a photo ID", "note": "Check what your plan covers so there are no surprises at checkout." },
+    { "text": "Brush and floss before you go" },
+    { "text": "Write down any concerns — a sensitive tooth, bleeding gums, jaw pain, or a chip", "note": "Note when it started and what triggers it, like cold or chewing." },
+    { "text": "List your current medications and any recent changes", "note": "Some medications affect bleeding or cause dry mouth, which the dentist should know." },
+    { "text": "Update your medical history form, including allergies" },
+    { "text": "Prepare questions about brushing, flossing, whitening, or a treatment you're weighing" },
+    { "text": "Arrange a ride ahead of time if you're having sedation or a procedure" },
+    { "text": "Bring any prior X-rays or records if you're seeing a new dentist" },
+    { "text": "Arrive about 15 minutes early to fill out forms" },
+    { "text": "Ask about anything flagged during the exam and what your options are" },
+    { "text": "Confirm the cost and what your insurance covers before agreeing to treatment" },
+    { "text": "Book your next cleaning before you leave", "note": "Most people are due for a check-up every six months." },
+    { "text": "Schedule any follow-up treatment and note the aftercare instructions", "note": "Write down aftercare while it's fresh — what to eat, when to resume brushing the area." }
+  ],
+  "faq": [
+    { "q": "How do I prepare for a dentist appointment?", "a": "Brush and floss beforehand, bring your insurance card and ID, and write down any concerns like a sensitive tooth or bleeding gums. Update your medical history and medication list too, since some medications affect dental care." },
+    { "q": "How often should I go to the dentist?", "a": "For most people a check-up and cleaning every six months keeps problems small and catchable early, though your dentist may suggest more or less often based on your teeth and gums. Booking the next visit before you leave is the easiest way to stay on schedule." },
+    { "q": "What should I tell my dentist?", "a": "Mention any pain or sensitivity, bleeding gums, changes to your medications, and any health conditions — plus habits like grinding or clenching. This is an organizational checklist, not medical or dental advice; your dentist is the right person to diagnose and recommend treatment." }
+  ],
+  "related": ["doctor-visit-checklist", "medication-tracker-checklist", "fitness/self-care-checklist"],
+  "hi": {
+    "title": "डेंटल विज़िट चेकलिस्ट",
+    "metaTitle": "डेंटल विज़िट चेकलिस्ट (अपॉइंटमेंट से पहले) | Gisti",
+    "metaDescription": "अपनी अपॉइंटमेंट से पहले तैयारी के लिए डेंटल विज़िट चेकलिस्ट: क्या ले जाएँ, कौन-सी दिक्कतें बताएँ, और दंत-चिकित्सक से क्या पूछें। मुफ़्त, या Gisti में AI से ढालें।",
+    "cardDesc": "क्या ले जाएँ, कौन-सी दिक्कतें बताएँ, और क्या पूछें — ताकि आपकी डेंटल अपॉइंटमेंट अच्छी तरह चले।",
+    "intro": "डेंटल अपॉइंटमेंट जल्दी निपट जाती है, पर थोड़ी तैयारी उसे और उपयोगी बना देती है — सही काग़ज़ात, वे दिक्कतें जो आप बताना चाहते थे, और किसी परेशानी के बारे में सवाल। यह चेकलिस्ट बताती है कि जाने से पहले क्या तैयार करना है और निकलने से पहले क्या पक्का करना है। यह एक व्यवस्था-सहायक है, दंत या चिकित्सा सलाह नहीं। और देखें <a href=\"/hi/checklists/health/\" class=\"text-primary hover:underline\">स्वास्थ्य और वेलनेस चेकलिस्ट</a>।",
+    "items": [
+      { "text": "तारीख़, समय, और जगह पक्की करें, और उसे अपने कैलेंडर में जोड़ें" },
+      { "text": "अपना बीमा या डेंटल प्लान कार्ड और एक फ़ोटो पहचान-पत्र लाएँ", "note": "देख लें कि आपका प्लान क्या कवर करता है ताकि चेकआउट पर कोई हैरानी न हो।" },
+      { "text": "जाने से पहले ब्रश और फ़्लॉस करें" },
+      { "text": "कोई भी दिक्कत लिख लें — संवेदनशील दाँत, मसूड़ों से खून, जबड़े में दर्द, या टूटा किनारा", "note": "नोट करें कि यह कब शुरू हुआ और किससे बढ़ता है, जैसे ठंड या चबाना।" },
+      { "text": "अपनी मौजूदा दवाइयाँ और हाल के कोई बदलाव सूचीबद्ध करें", "note": "कुछ दवाएँ खून बहने पर असर डालती हैं या मुँह सुखाती हैं, जो दंत-चिकित्सक को पता होना चाहिए।" },
+      { "text": "अपना चिकित्सा-इतिहास फ़ॉर्म अपडेट करें, एलर्जी सहित" },
+      { "text": "ब्रशिंग, फ़्लॉसिंग, व्हाइटनिंग, या किसी इलाज के बारे में सवाल तैयार करें" },
+      { "text": "अगर सिडेशन या कोई प्रक्रिया है तो पहले से आने-जाने का इंतज़ाम करें" },
+      { "text": "अगर आप नए दंत-चिकित्सक के पास जा रहे हैं तो पुराने एक्स-रे या रिकॉर्ड लाएँ" },
+      { "text": "फ़ॉर्म भरने के लिए लगभग 15 मिनट पहले पहुँचें" },
+      { "text": "जाँच में जो कुछ सामने आए उसके बारे में पूछें और अपने विकल्प जानें" },
+      { "text": "इलाज के लिए हाँ कहने से पहले खर्च और बीमा कवरेज पक्का करें" },
+      { "text": "निकलने से पहले अपनी अगली सफ़ाई बुक करें", "note": "ज़्यादातर लोगों को हर छह महीने में जाँच करानी चाहिए।" },
+      { "text": "कोई फ़ॉलो-अप इलाज शेड्यूल करें और देखभाल के निर्देश नोट कर लें", "note": "देखभाल के निर्देश तुरंत लिख लें — क्या खाना है, उस जगह ब्रश करना कब शुरू करना है।" }
+    ],
+    "faq": [
+      { "q": "मैं दंत-चिकित्सक की अपॉइंटमेंट के लिए कैसे तैयारी करूँ?", "a": "पहले ब्रश और फ़्लॉस करें, अपना बीमा कार्ड और पहचान-पत्र लाएँ, और संवेदनशील दाँत या मसूड़ों से खून जैसी कोई दिक्कत लिख लें। अपना चिकित्सा-इतिहास और दवाओं की सूची भी अपडेट करें, क्योंकि कुछ दवाएँ दंत-चिकित्सा पर असर डालती हैं।" },
+      { "q": "मुझे कितनी बार दंत-चिकित्सक के पास जाना चाहिए?", "a": "ज़्यादातर लोगों के लिए हर छह महीने में जाँच और सफ़ाई से समस्याएँ छोटी और जल्दी पकड़ में आने लायक रहती हैं, हालाँकि आपके दाँतों और मसूड़ों के आधार पर दंत-चिकित्सक ज़्यादा या कम बार सुझा सकते हैं। निकलने से पहले अगली विज़िट बुक कर लेना समय पर रहने का सबसे आसान तरीका है।" },
+      { "q": "मुझे अपने दंत-चिकित्सक को क्या बताना चाहिए?", "a": "कोई दर्द या संवेदनशीलता, मसूड़ों से खून, अपनी दवाओं में बदलाव, और कोई स्वास्थ्य स्थिति बताएँ — साथ ही दाँत पीसने या भींचने जैसी आदतें। यह एक व्यवस्था-चेकलिस्ट है, चिकित्सा या दंत सलाह नहीं; निदान और इलाज की सलाह देने के लिए आपके दंत-चिकित्सक सही व्यक्ति हैं।" }
+    ]
+  }
+}

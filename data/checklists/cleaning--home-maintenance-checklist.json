@@ -1,0 +1,68 @@
+{
+  "category": "cleaning",
+  "slug": "home-maintenance-checklist",
+  "order": 51,
+  "icon": "handyman",
+  "title": "Home Maintenance Checklist",
+  "metaTitle": "Home Maintenance Checklist (Seasonal) | Gisti",
+  "metaDescription": "A seasonal home maintenance checklist — roof and gutters, HVAC filters, smoke detectors, plumbing, and dryer vents. Free, or tailor it with AI in Gisti.",
+  "cardDesc": "Seasonal upkeep that prevents costly repairs — roof, gutters, HVAC, detectors, plumbing, and safety checks.",
+  "ordered": false,
+  "intro": "Home maintenance is the quiet work that stops small problems becoming expensive ones — a cleared gutter that prevents a leak, a fresh smoke-alarm battery, a serviced boiler that doesn't quit in the first cold snap. This checklist groups the seasonal jobs that keep a house safe, efficient, and sound, inside and out. Work through it each season, or tackle a few tasks a weekend. See more in our <a href=\"/checklists/cleaning/\" class=\"text-primary hover:underline\">cleaning and home-care checklists</a>.",
+  "items": [
+    { "text": "Inspect the roof for damaged, loose, or missing shingles or tiles" },
+    { "text": "Clear leaves and debris from gutters and downspouts, and check they drain", "note": "Blocked gutters cause damp, leaks, and rotted fascia faster than almost anything." },
+    { "text": "Test every smoke and carbon-monoxide detector, and replace the batteries", "note": "Replace the alarms themselves every 7 to 10 years, not just the batteries." },
+    { "text": "Change or clean HVAC and furnace filters", "note": "A clogged filter makes the system work harder, raising bills and shortening its life." },
+    { "text": "Service the heating system before winter and the AC before summer" },
+    { "text": "Check under sinks, around the water heater, and at visible pipes for leaks" },
+    { "text": "Flush the water heater to clear sediment, and test its pressure-relief valve", "note": "Sediment buildup wastes energy and shortens the tank's life." },
+    { "text": "Clean the dryer's lint trap and exhaust ducting", "note": "Lint buildup is a common house-fire cause and slows drying." },
+    { "text": "Test and reset GFCI outlets, and check the breaker panel for issues" },
+    { "text": "Inspect and reseal weather stripping and caulking around doors and windows", "note": "Good seals cut drafts and can noticeably lower heating and cooling bills." },
+    { "text": "Check exterior caulking and grout, and touch up peeling paint or siding" },
+    { "text": "Clean the refrigerator coils so it runs efficiently" },
+    { "text": "Test the garage door's auto-reverse safety feature" },
+    { "text": "Service seasonal equipment: the lawn mower in spring, the snow blower before winter" },
+    { "text": "Trim trees and shrubs back from the roof, siding, and power lines" },
+    { "text": "Check the attic and basement for moisture, pests, or failing insulation" },
+    { "text": "Test the sump pump before the wet season, and clear the pit", "note": "Pour a bucket of water in to confirm it kicks on before you actually need it." }
+  ],
+  "faq": [
+    { "q": "What home maintenance should I do every season?", "a": "Each season, test smoke and CO detectors, change HVAC filters, and check for leaks under sinks and around the water heater. Clear gutters in autumn, service heating before winter and cooling before summer, and inspect the roof and exterior seals for weather damage. Spreading these jobs across the year keeps any one weekend from being overwhelming." },
+    { "q": "How often should I clean my gutters?", "a": "At least twice a year — once in late spring and again in autumn after the leaves fall. If you have overhanging trees, you may need to clear them more often. Blocked gutters overflow and push water against the roofline and foundation, causing damp, leaks, and rot, so it's one of the highest-value maintenance jobs." },
+    { "q": "Is home maintenance really worth the effort?", "a": "Yes — preventive maintenance is far cheaper than emergency repairs. A cleared gutter, a serviced boiler, or a clean dryer vent costs little in time but heads off water damage, breakdowns, and even fires. Staying on top of small tasks also protects your home's value and keeps it running efficiently, which lowers energy bills." }
+  ],
+  "related": ["spring-cleaning-checklist", "deep-cleaning-checklist", "house-chores-checklist", "move-out-cleaning-checklist"],
+  "hi": {
+    "title": "होम मेंटेनेंस चेकलिस्ट",
+    "metaTitle": "होम मेंटेनेंस चेकलिस्ट (मौसमी) | Gisti",
+    "metaDescription": "एक मौसमी होम मेंटेनेंस चेकलिस्ट — छत और गटर, HVAC फ़िल्टर, स्मोक डिटेक्टर, प्लंबिंग, और ड्रायर वेंट। मुफ़्त, या Gisti में AI से अपने मुताबिक ढालें।",
+    "cardDesc": "महँगी मरम्मत रोकने वाली मौसमी देखभाल — छत, गटर, HVAC, डिटेक्टर, प्लंबिंग, और सुरक्षा जाँच।",
+    "intro": "होम मेंटेनेंस वह चुपचाप किया जाने वाला काम है जो छोटी समस्याओं को महँगी बनने से रोकता है — एक साफ़ किया गटर जो रिसाव टाल देता है, एक नई स्मोक-अलार्म बैटरी, एक सर्विस किया बॉयलर जो पहली ठंड में दग़ा नहीं देता। यह चेकलिस्ट उन मौसमी कामों को समेटती है जो घर को अंदर और बाहर से सुरक्षित, कुशल, और मज़बूत रखते हैं। इसे हर मौसम में निपटाएँ, या एक वीकेंड में कुछ काम कर लें। और देखें हमारी <a href=\"/hi/checklists/cleaning/\" class=\"text-primary hover:underline\">क्लीनिंग और घर-देखभाल चेकलिस्ट</a>।",
+    "items": [
+      { "text": "छत की जाँच करें कि कोई शिंगल या टाइल टूटी, ढीली, या ग़ायब तो नहीं" },
+      { "text": "गटर और डाउनस्पाउट से पत्तियाँ और कचरा साफ़ करें, और देखें कि पानी बहता है", "note": "बंद गटर सीलन, रिसाव, और फ़ासिया के सड़ने का कारण बाक़ी लगभग हर चीज़ से तेज़ बनते हैं।" },
+      { "text": "हर स्मोक और कार्बन-मोनोऑक्साइड डिटेक्टर टेस्ट करें, और बैटरियाँ बदलें", "note": "सिर्फ़ बैटरियाँ ही नहीं, बल्कि अलार्म भी हर 7 से 10 साल में बदल दें।" },
+      { "text": "HVAC और फ़र्नेस फ़िल्टर बदलें या साफ़ करें", "note": "जाम फ़िल्टर सिस्टम को ज़्यादा मेहनत कराता है, जिससे बिल बढ़ते हैं और उसकी उम्र घटती है।" },
+      { "text": "सर्दी से पहले हीटिंग सिस्टम और गर्मी से पहले AC की सर्विस कराएँ" },
+      { "text": "सिंक के नीचे, वॉटर हीटर के इर्द-गिर्द, और दिखते पाइपों पर रिसाव जाँचें" },
+      { "text": "तलछट हटाने के लिए वॉटर हीटर फ़्लश करें, और उसका प्रेशर-रिलीफ़ वाल्व टेस्ट करें", "note": "तलछट जमना ऊर्जा बर्बाद करता है और टैंक की उम्र घटाता है।" },
+      { "text": "ड्रायर का लिंट ट्रैप और एग्ज़ॉस्ट डक्ट साफ़ करें", "note": "लिंट जमना घर में आग का एक आम कारण है और कपड़े सूखना धीमा करता है।" },
+      { "text": "GFCI आउटलेट टेस्ट और रीसेट करें, और ब्रेकर पैनल की जाँच करें" },
+      { "text": "दरवाज़ों और खिड़कियों के इर्द-गिर्द वेदर स्ट्रिपिंग और कॉल्क जाँचें और दोबारा सील करें", "note": "अच्छी सील ड्राफ़्ट रोकती हैं और हीटिंग व कूलिंग के बिल ठीक-ठाक घटा सकती हैं।" },
+      { "text": "बाहरी कॉल्क और ग्राउट जाँचें, और उखड़ते पेंट या साइडिंग को ठीक करें" },
+      { "text": "रेफ़्रिजरेटर के कॉइल साफ़ करें ताकि वह कुशलता से चले" },
+      { "text": "गैराज दरवाज़े का ऑटो-रिवर्स सुरक्षा फ़ीचर टेस्ट करें" },
+      { "text": "मौसमी उपकरण की सर्विस कराएँ: वसंत में लॉन मोवर, सर्दी से पहले स्नो ब्लोअर" },
+      { "text": "पेड़ और झाड़ियाँ छत, साइडिंग, और बिजली की तारों से दूर छाँटें" },
+      { "text": "अटारी और बेसमेंट में नमी, कीट, या ख़राब होते इन्सुलेशन की जाँच करें" },
+      { "text": "बरसात के मौसम से पहले सम्प पंप टेस्ट करें, और गड्ढा साफ़ करें", "note": "ज़रूरत पड़ने से पहले पुष्टि के लिए एक बाल्टी पानी डालकर देखें कि वह चालू होता है।" }
+    ],
+    "faq": [
+      { "q": "मुझे हर मौसम में कौन-सा होम मेंटेनेंस करना चाहिए?", "a": "हर मौसम में स्मोक और CO डिटेक्टर टेस्ट करें, HVAC फ़िल्टर बदलें, और सिंक के नीचे व वॉटर हीटर के इर्द-गिर्द रिसाव जाँचें। पतझड़ में गटर साफ़ करें, सर्दी से पहले हीटिंग और गर्मी से पहले कूलिंग की सर्विस कराएँ, और छत व बाहरी सील में मौसम से हुई क्षति जाँचें। इन कामों को पूरे साल में फैलाना किसी एक वीकेंड को भारी होने से बचाता है।" },
+      { "q": "मुझे अपने गटर कितनी बार साफ़ करने चाहिए?", "a": "साल में कम-से-कम दो बार — एक बार वसंत के आख़िर में और फिर पतझड़ में पत्तियाँ गिरने के बाद। अगर ऊपर झुके पेड़ हों, तो शायद ज़्यादा बार साफ़ करने पड़ें। बंद गटर बहकर छत की रेखा और नींव पर पानी धकेलते हैं, जिससे सीलन, रिसाव, और सड़न होती है, इसलिए यह सबसे ज़्यादा फ़ायदे वाले मेंटेनेंस कामों में से एक है।" },
+      { "q": "क्या होम मेंटेनेंस वाक़ई मेहनत के लायक है?", "a": "हाँ — निवारक रखरखाव आपातकालीन मरम्मत से कहीं सस्ता है। एक साफ़ गटर, एक सर्विस किया बॉयलर, या एक साफ़ ड्रायर वेंट समय में कम ख़र्च होता है पर पानी की क्षति, ख़राबी, और यहाँ तक कि आग को टाल देता है। छोटे कामों पर टिके रहना आपके घर की क़ीमत भी बचाता है और उसे कुशलता से चलाए रखता है, जिससे ऊर्जा बिल घटते हैं।" }
+    ]
+  }
+}

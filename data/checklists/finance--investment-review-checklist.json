@@ -1,0 +1,62 @@
+{
+  "category": "finance",
+  "slug": "investment-review-checklist",
+  "order": 3,
+  "icon": "trending_up",
+  "title": "Investment Review Checklist",
+  "metaTitle": "Investment Review Checklist (What to Check) | Gisti",
+  "metaDescription": "An investment review checklist: check performance, asset allocation, fees, and contributions against your plan. Free, or tailor it with AI in Gisti.",
+  "cardDesc": "Review performance, asset mix, fees, and contributions against your plan — organized, not advice.",
+  "ordered": false,
+  "intro": "A periodic investment review keeps your portfolio pointed at your actual goals instead of drifting on autopilot. This checklist covers what to look at each time — performance over a meaningful stretch, how your asset mix has drifted, the fees you're paying, and whether your contributions are on track. It's a framework for reviewing and recording your own decisions, not investment advice. See more <a href=\"/checklists/finance/\" class=\"text-primary hover:underline\">finance and money checklists</a>.",
+  "items": [
+    { "text": "Note the date and pull current statements for every investment account", "note": "Reviewing on a set schedule beats reacting to every headline." },
+    { "text": "Review performance since your last check, not just the last few days" },
+    { "text": "Compare your current asset mix against your target allocation", "note": "Allocation drift is the quiet way a portfolio gets riskier than you intended." },
+    { "text": "Note any holding that has grown well above or fallen well below its target weight" },
+    { "text": "Review the fees and expense ratios you're paying on each holding", "note": "Small percentage fees compound into large sums over years — know what you pay." },
+    { "text": "Check that dividends and interest are handled the way you want — reinvested or paid out" },
+    { "text": "Review your retirement contributions and whether you're on track for the year" },
+    { "text": "Confirm you've used any tax-advantaged accounts or annual allowances available to you" },
+    { "text": "Revisit your risk tolerance and time horizon — has anything in your life changed?", "note": "A new job, a home, or a child can change how much risk fits." },
+    { "text": "Check that beneficiary and account details are current" },
+    { "text": "Note whether rebalancing is needed to return to your target mix" },
+    { "text": "Confirm your investments still match your original plan and goals" },
+    { "text": "Write down the reasoning behind any change you decide to make", "note": "A short note now explains your past self's thinking at the next review." },
+    { "text": "Set a date for your next review" }
+  ],
+  "faq": [
+    { "q": "How often should I review my investments?", "a": "For a long-term portfolio, a review every three to six months is usually enough — often enough to catch real drift, rarely enough to avoid tinkering on every market swing. Checking daily tends to prompt emotional decisions that hurt returns. Set a recurring date and treat it as a maintenance check, not a reason to trade." },
+    { "q": "What should I look at when reviewing a portfolio?", "a": "Look at performance over a meaningful period, how your asset mix compares to your target, the fees you're paying, and whether your contributions and goals are still on track. Note whether anything has drifted enough to rebalance, and confirm account and beneficiary details are current. The aim is to check that the portfolio still matches your plan — not to chase whatever went up recently." },
+    { "q": "Is this investment checklist financial advice?", "a": "No — it's a framework for reviewing and recording your own decisions, not investment advice. It doesn't recommend specific investments, allocations, or moves for your situation. All investing carries risk, and for advice tailored to your finances a licensed financial adviser is the right person to consult." }
+  ],
+  "related": ["monthly-budget-checklist", "tax-preparation-checklist", "financial-goals-checklist"],
+  "hi": {
+    "title": "निवेश समीक्षा चेकलिस्ट",
+    "metaTitle": "निवेश समीक्षा चेकलिस्ट (क्या जाँचें) | Gisti",
+    "metaDescription": "एक निवेश समीक्षा चेकलिस्ट: प्रदर्शन, asset allocation, fees, और योगदान को अपनी योजना से मिलाकर जाँचें। मुफ़्त, या Gisti में AI से अपने हिसाब से ढालें।",
+    "cardDesc": "प्रदर्शन, asset mix, fees, और योगदान को अपनी योजना से मिलाकर जाँचें — व्यवस्थित, सलाह नहीं।",
+    "intro": "एक समय-समय पर की जाने वाली निवेश समीक्षा आपके portfolio को autopilot पर बहकने के बजाय आपके असली लक्ष्यों की ओर टिकाए रखती है। यह चेकलिस्ट बताती है हर बार क्या देखना है — एक सार्थक अवधि में प्रदर्शन, आपका asset mix कितना खिसका है, आप जो fees चुका रहे हैं, और क्या आपके योगदान सही राह पर हैं। यह आपके अपने फ़ैसलों की समीक्षा और रिकॉर्ड के लिए एक ढाँचा है, निवेश सलाह नहीं। और देखें <a href=\"/hi/checklists/finance/\" class=\"text-primary hover:underline\">फ़ाइनेंस और पैसे की चेकलिस्ट</a>।",
+    "items": [
+      { "text": "तारीख़ नोट करें और हर निवेश खाते के मौजूदा विवरण निकालें", "note": "एक तय समय पर समीक्षा करना हर ख़बर पर प्रतिक्रिया देने से बेहतर है।" },
+      { "text": "अपनी पिछली जाँच के बाद से प्रदर्शन की समीक्षा करें, सिर्फ़ पिछले कुछ दिनों की नहीं" },
+      { "text": "अपने मौजूदा asset mix की तुलना अपने target allocation से करें", "note": "Allocation का खिसकना वह चुपचाप तरीक़ा है जिससे portfolio आपके इरादे से ज़्यादा जोखिम भरा हो जाता है।" },
+      { "text": "किसी भी ऐसे holding को नोट करें जो अपने target weight से काफ़ी ऊपर बढ़ गया या काफ़ी नीचे गिर गया" },
+      { "text": "हर holding पर आप जो fees और expense ratio चुका रहे हैं उसकी समीक्षा करें", "note": "छोटे प्रतिशत की fees सालों में बड़ी रकम में बदल जाती हैं — जानें कि आप क्या चुका रहे हैं।" },
+      { "text": "जाँचें कि लाभांश और ब्याज उसी तरह संभाले जा रहे हैं जैसे आप चाहते हैं — reinvest या भुगतान" },
+      { "text": "अपने retirement योगदान की समीक्षा करें और क्या आप साल के लिए सही राह पर हैं" },
+      { "text": "पक्का करें कि आपने अपने लिए उपलब्ध किसी भी tax-advantaged खाते या सालाना छूट का इस्तेमाल किया है" },
+      { "text": "अपनी जोखिम-सहनशीलता और समय-सीमा पर दोबारा सोचें — क्या आपकी ज़िंदगी में कुछ बदला है?", "note": "एक नई नौकरी, एक घर, या एक बच्चा बदल सकता है कि कितना जोखिम फ़िट बैठता है।" },
+      { "text": "जाँचें कि beneficiary और खाते के विवरण मौजूदा हैं" },
+      { "text": "नोट करें कि अपने target mix पर लौटने के लिए rebalancing की ज़रूरत है या नहीं" },
+      { "text": "पक्का करें कि आपके निवेश अब भी आपकी मूल योजना और लक्ष्यों से मेल खाते हैं" },
+      { "text": "जो भी बदलाव करने का फ़ैसला करें उसके पीछे की वजह लिख लें", "note": "अभी की एक छोटी नोट अगली समीक्षा पर आपके बीते ख़ुद की सोच समझाती है।" },
+      { "text": "अपनी अगली समीक्षा के लिए एक तारीख़ तय करें" }
+    ],
+    "faq": [
+      { "q": "मुझे अपने निवेश की समीक्षा कितनी बार करनी चाहिए?", "a": "एक लंबे समय के portfolio के लिए, हर तीन से छह महीने में एक समीक्षा आमतौर पर काफ़ी है — असली drift पकड़ने के लिए पर्याप्त, हर बाज़ार-उतार-चढ़ाव पर छेड़छाड़ से बचने के लिए विरल। रोज़ जाँचना अक्सर भावनात्मक फ़ैसलों को बढ़ावा देता है जो रिटर्न को नुक़सान पहुँचाते हैं। एक दोहराने वाली तारीख़ तय करें और इसे एक रखरखाव जाँच मानें, ट्रेड करने की वजह नहीं।" },
+      { "q": "portfolio की समीक्षा करते समय मुझे क्या देखना चाहिए?", "a": "एक सार्थक अवधि में प्रदर्शन देखें, आपका asset mix आपके target से कैसे तुलना करता है, आप जो fees चुका रहे हैं, और क्या आपके योगदान और लक्ष्य अब भी सही राह पर हैं। नोट करें कि क्या कुछ इतना खिसक गया है कि rebalance करना पड़े, और पक्का करें कि खाते व beneficiary के विवरण मौजूदा हैं। मक़सद यह जाँचना है कि portfolio अब भी आपकी योजना से मेल खाता है — जो हाल में बढ़ा उसके पीछे भागना नहीं।" },
+      { "q": "क्या यह निवेश चेकलिस्ट वित्तीय सलाह है?", "a": "नहीं — यह आपके अपने फ़ैसलों की समीक्षा और रिकॉर्ड के लिए एक ढाँचा है, निवेश सलाह नहीं। यह आपकी स्थिति के लिए ख़ास निवेश, allocation, या क़दम की सिफ़ारिश नहीं करती। हर निवेश में जोखिम होता है, और आपके वित्त के हिसाब से सलाह के लिए एक लाइसेंसी वित्तीय सलाहकार सही व्यक्ति हैं जिनसे परामर्श लें।" }
+    ]
+  }
+}

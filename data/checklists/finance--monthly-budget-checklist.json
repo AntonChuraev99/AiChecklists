@@ -1,0 +1,64 @@
+{
+  "category": "finance",
+  "slug": "monthly-budget-checklist",
+  "order": 1,
+  "icon": "account_balance_wallet",
+  "title": "Monthly Budget Checklist",
+  "metaTitle": "Monthly Budget Checklist (Review Your Spending) | Gisti",
+  "metaDescription": "A monthly budget checklist: review spending, compare it to your plan, cut unused subscriptions, and set a savings goal. Free, or tailor it with AI in Gisti.",
+  "cardDesc": "Review spending, compare it to your plan, cut unused subscriptions, and set a savings goal each month.",
+  "ordered": false,
+  "intro": "A monthly budget review is the habit that keeps a budget honest — it's where you see what you actually spent versus what you planned. This checklist walks you through the review most people skip: pulling your statements, categorizing expenses, catching subscriptions you forgot, and setting next month's savings goal. It's about organizing and tracking your own money, not telling you how to spend it. See more <a href=\"/checklists/finance/\" class=\"text-primary hover:underline\">finance and money checklists</a>.",
+  "items": [
+    { "text": "Gather your bank, card, and cash records for the month" },
+    { "text": "Note your total income for the month" },
+    { "text": "List and categorize every expense — housing, food, transport, and the rest", "note": "Grouping spending is what turns a pile of transactions into a picture." },
+    { "text": "Compare what you spent against what you planned, category by category" },
+    { "text": "Flag the categories that went over and note why", "note": "The 'why' tells you whether it was a one-off or a habit forming." },
+    { "text": "Review recurring subscriptions and memberships, and cancel what you no longer use", "note": "Small monthly charges are the easiest spending to forget and the easiest to cut." },
+    { "text": "Scan for any fees, unfamiliar charges, or double bills" },
+    { "text": "Check upcoming large or irregular expenses and set money aside now", "note": "Insurance, tuition, and annual renewals hurt less when you save for them monthly." },
+    { "text": "Note how much you saved this month and compare it to your goal" },
+    { "text": "Set a savings target for the coming month" },
+    { "text": "Review your debt balances and the payments due" },
+    { "text": "Update your budget or tracking spreadsheet with this month's numbers" },
+    { "text": "Confirm or set up an automatic transfer to savings on payday", "note": "Automating savings means it happens before you can spend it." },
+    { "text": "Review your progress toward longer-term financial goals" },
+    { "text": "Pick one thing to change next month and write it down", "note": "One deliberate tweak a month adds up faster than a total overhaul you abandon." }
+  ],
+  "faq": [
+    { "q": "How do I do a monthly budget review?", "a": "Pull together the month's income and spending, then sort every expense into categories and compare the totals against what you planned. Look for categories that went over, subscriptions you no longer use, and any odd charges, then set a savings goal for next month and note one thing to change. Done monthly, it takes 20-30 minutes and keeps small leaks from becoming big ones." },
+    { "q": "What categories should a budget have?", "a": "Start with the big ones almost everyone has: housing, utilities, groceries, transport, debt payments, insurance, and savings. Add a few that fit your life — subscriptions, dining out, childcare, health — and one catch-all for the rest. The goal is enough detail to see where money goes without so many categories that tracking becomes a chore." },
+    { "q": "Is this budget checklist financial advice?", "a": "No — this is an organizing tool to help you review and track your own money, not financial advice. It doesn't recommend how much to spend, save, or invest for your situation. For decisions about debt, investments, or taxes, a qualified financial professional who knows your full picture is the right person to ask." }
+  ],
+  "related": ["tax-preparation-checklist", "investment-review-checklist", "financial-goals-checklist"],
+  "hi": {
+    "title": "मासिक बजट चेकलिस्ट",
+    "metaTitle": "मासिक बजट चेकलिस्ट (अपना ख़र्च देखें) | Gisti",
+    "metaDescription": "एक मासिक बजट चेकलिस्ट: ख़र्च की समीक्षा करें, उसे अपनी योजना से मिलाएँ, बिना इस्तेमाल के subscriptions काटें, और एक बचत लक्ष्य तय करें। मुफ़्त, या Gisti में AI से ढालें।",
+    "cardDesc": "हर महीने ख़र्च देखें, योजना से मिलाएँ, बेकार subscriptions काटें, और एक बचत लक्ष्य तय करें।",
+    "intro": "मासिक बजट समीक्षा वह आदत है जो बजट को ईमानदार रखती है — यहीं आप देखते हैं कि आपने असल में क्या ख़र्च किया बनाम क्या योजना बनाई थी। यह चेकलिस्ट आपको उस समीक्षा से गुज़ारती है जिसे ज़्यादातर लोग छोड़ देते हैं: अपने विवरण निकालना, ख़र्चों को श्रेणीबद्ध करना, भूली हुई subscriptions पकड़ना, और अगले महीने का बचत लक्ष्य तय करना। यह आपके अपने पैसे को व्यवस्थित और ट्रैक करने के बारे में है, यह नहीं कि पैसा कैसे ख़र्च करें। और देखें <a href=\"/hi/checklists/finance/\" class=\"text-primary hover:underline\">फ़ाइनेंस और पैसे की चेकलिस्ट</a>।",
+    "items": [
+      { "text": "महीने भर के अपने बैंक, कार्ड, और नकद रिकॉर्ड इकट्ठा करें" },
+      { "text": "महीने की अपनी कुल आमदनी नोट करें" },
+      { "text": "हर ख़र्च को सूचीबद्ध और श्रेणीबद्ध करें — घर, खाना, आवाजाही, और बाक़ी सब", "note": "ख़र्च को समूहों में बाँटना ही लेन-देन के ढेर को एक तस्वीर में बदलता है।" },
+      { "text": "जो आपने ख़र्च किया उसकी तुलना जो योजना बनाई थी उससे करें, श्रेणी-दर-श्रेणी" },
+      { "text": "जो श्रेणियाँ बजट से ज़्यादा हो गईं उन्हें चिह्नित करें और वजह नोट करें", "note": "'वजह' बताती है कि यह एक बार की बात थी या एक आदत बन रही है।" },
+      { "text": "चालू subscriptions और memberships की समीक्षा करें, और जो अब इस्तेमाल नहीं करते उन्हें रद्द करें", "note": "छोटे मासिक शुल्क भूलना सबसे आसान ख़र्च हैं और काटना भी सबसे आसान।" },
+      { "text": "किसी भी शुल्क, अनजानी चार्ज, या दोहरे बिल के लिए जाँचें" },
+      { "text": "आने वाले बड़े या अनियमित ख़र्च देखें और अभी से पैसे अलग रखें", "note": "Insurance, फ़ीस, और सालाना नवीनीकरण कम चुभते हैं जब आप हर महीने उनके लिए बचाते हैं।" },
+      { "text": "इस महीने आपने कितना बचाया नोट करें और अपने लक्ष्य से तुलना करें" },
+      { "text": "आने वाले महीने के लिए एक बचत लक्ष्य तय करें" },
+      { "text": "अपने कर्ज़ की बकाया रकम और देय भुगतान की समीक्षा करें" },
+      { "text": "इस महीने के आँकड़ों से अपना budget या ट्रैकिंग स्प्रेडशीट अपडेट करें" },
+      { "text": "वेतन-दिन पर बचत में एक अपने-आप होने वाला ट्रांसफ़र पक्का करें या सेट करें", "note": "बचत को ऑटोमैटिक करने का मतलब है वह आपके ख़र्च करने से पहले हो जाती है।" },
+      { "text": "लंबे समय के वित्तीय लक्ष्यों की ओर अपनी प्रगति की समीक्षा करें" },
+      { "text": "अगले महीने बदलने के लिए एक चीज़ चुनें और उसे लिख लें", "note": "महीने में एक सोचा-समझा बदलाव उस पूरे बदलाव से तेज़ी से जुड़ता है जिसे आप छोड़ देते हैं।" }
+    ],
+    "faq": [
+      { "q": "मैं मासिक बजट समीक्षा कैसे करूँ?", "a": "महीने की आमदनी और ख़र्च एक साथ लाएँ, फिर हर ख़र्च को श्रेणियों में बाँटें और कुल की तुलना अपनी योजना से करें। उन श्रेणियों को देखें जो ज़्यादा हो गईं, वे subscriptions जो अब इस्तेमाल नहीं करते, और कोई अजीब चार्ज, फिर अगले महीने के लिए एक बचत लक्ष्य तय करें और बदलने के लिए एक चीज़ नोट करें। हर महीने करने पर इसमें 20-30 मिनट लगते हैं और छोटी लीक बड़ी बनने से रुक जाती है।" },
+      { "q": "एक बजट में कौन-सी श्रेणियाँ होनी चाहिए?", "a": "उन बड़ी श्रेणियों से शुरू करें जो लगभग सबके पास होती हैं: घर, बिजली-पानी, राशन, आवाजाही, कर्ज़ के भुगतान, insurance, और बचत। कुछ ऐसी जोड़ें जो आपकी ज़िंदगी में फ़िट हों — subscriptions, बाहर खाना, बच्चों की देखभाल, स्वास्थ्य — और एक बाक़ी सबके लिए। मक़सद इतना ब्यौरा है कि पैसा कहाँ जाता है दिखे, पर इतनी श्रेणियाँ नहीं कि ट्रैक करना बोझ बन जाए।" },
+      { "q": "क्या यह बजट चेकलिस्ट वित्तीय सलाह है?", "a": "नहीं — यह आपके अपने पैसे की समीक्षा और ट्रैकिंग में मदद के लिए एक व्यवस्थित करने वाला औज़ार है, वित्तीय सलाह नहीं। यह नहीं बताती कि आपकी स्थिति के लिए कितना ख़र्च, बचत, या निवेश करें। कर्ज़, निवेश, या टैक्स के फ़ैसलों के लिए, एक योग्य वित्तीय पेशेवर जो आपकी पूरी तस्वीर जानता हो, पूछने के लिए सही व्यक्ति है।" }
+    ]
+  }
+}

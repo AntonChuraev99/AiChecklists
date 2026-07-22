@@ -28,6 +28,13 @@ const TEMPLATES = join(__dirname, "templates");
 const DATA_DIR = join(REPO, "data", "checklists");
 const OUT_DIR = join(REPO, "landing", "checklists");
 const SITEMAP = join(REPO, "landing", "sitemap.xml");
+// Single-source derived artifacts (see writeAppTemplates / writeSeed at the bottom):
+//   APP_TEMPLATES → the in-app Templates screen (feature/create, Android + Web) reads this
+//                   bundled Compose Resource.
+//   SEED_OUT      → seed-firestore-templates.mjs pushes this to Firestore gallery_templates
+//                   (the deep-link "Use this checklist" create-from-template source).
+const APP_TEMPLATES = join(REPO, "feature", "create", "src", "commonMain", "composeResources", "files", "templates.json");
+const SEED_OUT = join(__dirname, "gallery-templates.seed.json");
 
 const BASE = "https://gisti-ai.com";
 const BUILD_VERSION = "20260714";      // CSS cache-bust ?v= (bump on asset change — NOT a content date)
@@ -200,6 +207,51 @@ const CATEGORIES = {
       metaTitle: "बिज़नेस और लॉन्च चेकलिस्ट (मुफ़्त) | Gisti",
       metaDescription: "मुफ़्त बिज़नेस और लॉन्च चेकलिस्ट — प्रोडक्ट लॉन्च, वेबसाइट गो-लाइव, स्टार्टअप, और छोटे-बिज़नेस सेटअप। जैसे हैं वैसे इस्तेमाल करें या Gisti में AI से ढालें।",
       hubIntro: 'हर लॉन्च और बिज़नेस पड़ाव छोटी चीज़ों को न भूलने पर टिका होता है। ये मुफ़्त बिज़नेस चेकलिस्ट उन बड़े पलों को कवर करती हैं जिनकी संस्थापक और टीमें चिंता करती हैं — एक प्रोडक्ट लॉन्च करना, एक वेबसाइट लाइव करना, एक आइडिया से स्टार्टअप शुरू करना, एक छोटा बिज़नेस सेट करना, और सोशल मीडिया कंटेंट को पटरी पर रखना। किसी भी सूची को जैसे है वैसे इस्तेमाल करें, या Gisti में खोलकर कदमों पर काम करें, उन्हें अपनी टीम में बाँटें, और AI से हर एक को अपनी स्थिति के मुताबिक ढालें। और देखें पूरी <a href="/hi/checklists/" class="text-primary hover:underline">चेकलिस्ट गैलरी</a>।',
+    } },
+  real_estate: { name: "Real Estate & Home", h1: "AI Real Estate & Home-Buying Checklists", icon: "real_estate_agent", bg: "#E3F2FD", color: "#1976D2", tileDesc: "Apartment viewing, house inspection, rental, and home-buying checklists.", metaTitle: "Real Estate & Home-Buying Checklists (Free) | Gisti", metaDescription: "Free real estate checklists — apartment viewing, house inspection, rental agreement review, and home buying. Use as-is or tailor with AI in Gisti.", hubIntro: 'Renting or buying a home is one of the biggest decisions you make — and the easiest to rush. These free real estate checklists cover what to check before you sign or buy: what to look for at an apartment viewing, how to inspect a house, what to read in a rental agreement, and the full home-buying journey step by step. Use any list as-is, or open it in Gisti to tick items off and let AI tailor it to your property and budget. See the full <a href="/checklists/" class="text-primary hover:underline">checklist gallery</a> for more.',
+    hi: {
+      name: "रियल एस्टेट और घर",
+      h1: "रियल एस्टेट और घर खरीदने के लिए AI चेकलिस्ट",
+      tileDesc: "अपार्टमेंट देखना, घर की जाँच, किराया, और घर खरीदने की चेकलिस्ट।",
+      metaTitle: "रियल एस्टेट और घर खरीदने की चेकलिस्ट (मुफ़्त) | Gisti",
+      metaDescription: "मुफ़्त रियल एस्टेट चेकलिस्ट — अपार्टमेंट देखना, घर की जाँच, किराया अनुबंध समीक्षा, और घर खरीदना। जैसे हैं वैसे इस्तेमाल करें या Gisti में AI से ढालें।",
+      hubIntro: 'घर किराए पर लेना या खरीदना आपके सबसे बड़े फ़ैसलों में से एक है — और सबसे आसानी से जल्दबाज़ी में हो जाने वाला। ये मुफ़्त रियल एस्टेट चेकलिस्ट कवर करती हैं कि साइन या ख़रीद से पहले क्या जाँचना है: अपार्टमेंट देखते समय क्या देखें, घर की जाँच कैसे करें, किराया अनुबंध में क्या पढ़ें, और घर खरीदने का पूरा सफ़र कदम-दर-कदम। किसी भी सूची को जैसे है वैसे इस्तेमाल करें, या Gisti में खोलकर आइटम टिक करें और AI से इसे अपनी प्रॉपर्टी और बजट के मुताबिक ढालें। और देखें पूरी <a href="/hi/checklists/" class="text-primary hover:underline">चेकलिस्ट गैलरी</a>।',
+    } },
+  shopping: { name: "Shopping & Gifts", h1: "AI Shopping & Gift Checklists", icon: "shopping_bag", bg: "#E8F5E9", color: "#2E7D32", tileDesc: "Wardrobe, electronics, and gift shopping checklists.", metaTitle: "Shopping & Gift Checklists (Free) | Gisti", metaDescription: "Free shopping checklists — seasonal wardrobe updates, electronics buying guides, and gift shopping. Use as-is or tailor with AI in Gisti.", hubIntro: 'The best purchases are the planned ones. These free shopping and gift checklists help you buy smart — refreshing a seasonal wardrobe without overbuying, comparing the specs that actually matter before a big electronics purchase, and tracking a gift list so no one gets forgotten. Use any list as-is, or open it in Gisti to add your own picks and let AI tailor it to your budget and taste. See the full <a href="/checklists/" class="text-primary hover:underline">checklist gallery</a> for more.',
+    hi: {
+      name: "खरीदारी और उपहार",
+      h1: "खरीदारी और उपहार के लिए AI चेकलिस्ट",
+      tileDesc: "वॉर्डरोब, इलेक्ट्रॉनिक्स, और उपहार खरीदारी की चेकलिस्ट।",
+      metaTitle: "खरीदारी और उपहार चेकलिस्ट (मुफ़्त) | Gisti",
+      metaDescription: "मुफ़्त खरीदारी चेकलिस्ट — मौसमी वॉर्डरोब अपडेट, इलेक्ट्रॉनिक्स खरीदने की गाइड, और उपहार खरीदारी। जैसे हैं वैसे इस्तेमाल करें या Gisti में AI से ढालें।",
+      hubIntro: 'सबसे अच्छी खरीदारी वही होती है जो पहले से योजना बनाकर की जाए। ये मुफ़्त खरीदारी और उपहार चेकलिस्ट समझदारी से खरीदने में मदद करती हैं — बिना ज़रूरत से ज़्यादा ख़रीदे मौसमी वॉर्डरोब ताज़ा करना, किसी बड़ी इलेक्ट्रॉनिक्स ख़रीद से पहले वे स्पेक्स तुलना करना जो सचमुच मायने रखते हैं, और एक उपहार सूची ट्रैक करना ताकि कोई छूट न जाए। किसी भी सूची को जैसे है वैसे इस्तेमाल करें, या Gisti में खोलकर अपने चुनाव जोड़ें और AI से इसे अपने बजट और पसंद के मुताबिक ढालें। और देखें पूरी <a href="/hi/checklists/" class="text-primary hover:underline">चेकलिस्ट गैलरी</a>।',
+    } },
+  health: { name: "Health & Wellness", h1: "AI Health & Wellness Checklists", icon: "health_and_safety", bg: "#E0F7FA", color: "#00838F", tileDesc: "Doctor visit, medication, and dental-care checklists.", metaTitle: "Health & Wellness Checklists (Free) | Gisti", metaDescription: "Free health checklists — doctor visit prep, medication tracking, and dental visits. Organize your care, or tailor a list with AI in Gisti.", hubIntro: 'Good health care is mostly about not missing the details — the question you meant to ask, the medication you meant to refill. These free health and wellness checklists help you stay organized: what to bring and ask at a doctor\'s visit, how to keep track of your medications, and how to prepare for a dental appointment. Use any list as-is, or open it in Gisti and let AI tailor it to you. (These are organizational checklists, not medical advice.) See the full <a href="/checklists/" class="text-primary hover:underline">checklist gallery</a> for more.',
+    hi: {
+      name: "सेहत और तंदुरुस्ती",
+      h1: "सेहत और तंदुरुस्ती के लिए AI चेकलिस्ट",
+      tileDesc: "डॉक्टर विज़िट, दवा, और दंत-चिकित्सा की चेकलिस्ट।",
+      metaTitle: "सेहत और तंदुरुस्ती चेकलिस्ट (मुफ़्त) | Gisti",
+      metaDescription: "मुफ़्त सेहत चेकलिस्ट — डॉक्टर विज़िट की तैयारी, दवा ट्रैकिंग, और दंत विज़िट। अपनी देखभाल व्यवस्थित करें, या Gisti में AI से ढालें।",
+      hubIntro: 'अच्छी स्वास्थ्य देखभाल ज़्यादातर छोटी बातें न चूकने के बारे में है — वह सवाल जो आप पूछना चाहते थे, वह दवा जो आप दोबारा लेना चाहते थे। ये मुफ़्त सेहत और तंदुरुस्ती चेकलिस्ट व्यवस्थित रहने में मदद करती हैं: डॉक्टर के पास क्या ले जाएँ और क्या पूछें, अपनी दवाओं का हिसाब कैसे रखें, और दंत अपॉइंटमेंट के लिए कैसे तैयार हों। किसी भी सूची को जैसे है वैसे इस्तेमाल करें, या Gisti में खोलकर AI से इसे अपने मुताबिक ढालें। (ये व्यवस्थित करने वाली चेकलिस्ट हैं, चिकित्सा सलाह नहीं।) और देखें पूरी <a href="/hi/checklists/" class="text-primary hover:underline">चेकलिस्ट गैलरी</a>।',
+    } },
+  cooking: { name: "Cooking & Meals", h1: "AI Cooking & Meal Checklists", icon: "restaurant", bg: "#FBE9E7", color: "#D84315", tileDesc: "Dinner party, baking, and kitchen-essentials checklists.", metaTitle: "Cooking & Meal Checklists (Free) | Gisti", metaDescription: "Free cooking checklists — dinner party menus, baking day prep, and kitchen essentials. Use as-is or tailor with AI in Gisti.", hubIntro: 'A good meal runs on preparation as much as cooking. These free cooking and meal checklists cover the moments worth planning ahead — a dinner party menu that comes together on time, a baking day with every ingredient measured out first, and the kitchen essentials worth keeping stocked. Use any list as-is, or open it in Gisti to adjust portions and let AI tailor it to your menu and guests. See the full <a href="/checklists/" class="text-primary hover:underline">checklist gallery</a> for more.',
+    hi: {
+      name: "खाना और भोजन",
+      h1: "खाना और भोजन के लिए AI चेकलिस्ट",
+      tileDesc: "डिनर पार्टी, बेकिंग, और रसोई की ज़रूरी चीज़ों की चेकलिस्ट।",
+      metaTitle: "खाना और भोजन चेकलिस्ट (मुफ़्त) | Gisti",
+      metaDescription: "मुफ़्त खाना बनाने की चेकलिस्ट — डिनर पार्टी मेन्यू, बेकिंग डे की तैयारी, और रसोई की ज़रूरी चीज़ें। जैसे हैं वैसे इस्तेमाल करें या Gisti में AI से ढालें।",
+      hubIntro: 'एक अच्छा भोजन जितना पकाने पर चलता है उतना ही तैयारी पर। ये मुफ़्त खाना और भोजन चेकलिस्ट उन पलों को कवर करती हैं जिन्हें पहले से योजना बनाना फ़ायदेमंद है — एक डिनर पार्टी मेन्यू जो समय पर तैयार हो जाए, एक बेकिंग डे जिसमें हर सामग्री पहले से नापी हुई हो, और वे रसोई की ज़रूरी चीज़ें जिन्हें स्टॉक में रखना अच्छा है। किसी भी सूची को जैसे है वैसे इस्तेमाल करें, या Gisti में खोलकर मात्रा समायोजित करें और AI से इसे अपने मेन्यू और मेहमानों के मुताबिक ढालें। और देखें पूरी <a href="/hi/checklists/" class="text-primary hover:underline">चेकलिस्ट गैलरी</a>।',
+    } },
+  finance: { name: "Finance & Money", h1: "AI Finance & Money Checklists", icon: "savings", bg: "#E0F2F1", color: "#00695C", tileDesc: "Budgeting, tax prep, investment, and financial-goals checklists.", metaTitle: "Finance & Money Checklists (Free) | Gisti", metaDescription: "Free personal finance checklists — monthly budget review, tax preparation, investment review, and financial goals. Use as-is or tailor with AI in Gisti.", hubIntro: 'Staying on top of money is less about big moves and more about regular small reviews. These free finance checklists cover the routines that keep your finances healthy — a monthly budget review, getting organized for tax season, a periodic investment check-in, and tracking progress toward your financial goals. Use any list as-is, or open it in Gisti and let AI tailor it to your situation. (These are organizational checklists, not financial advice.) See the full <a href="/checklists/" class="text-primary hover:underline">checklist gallery</a> for more.',
+    hi: {
+      name: "वित्त और पैसा",
+      h1: "वित्त और पैसे के लिए AI चेकलिस्ट",
+      tileDesc: "बजट, टैक्स तैयारी, निवेश, और वित्तीय-लक्ष्यों की चेकलिस्ट।",
+      metaTitle: "वित्त और पैसा चेकलिस्ट (मुफ़्त) | Gisti",
+      metaDescription: "मुफ़्त व्यक्तिगत वित्त चेकलिस्ट — मासिक बजट समीक्षा, टैक्स तैयारी, निवेश समीक्षा, और वित्तीय लक्ष्य। जैसे हैं वैसे इस्तेमाल करें या Gisti में AI से ढालें।",
+      hubIntro: 'पैसे पर नियंत्रण रखना बड़े क़दमों से कम और नियमित छोटी समीक्षाओं से ज़्यादा जुड़ा है। ये मुफ़्त वित्त चेकलिस्ट उन दिनचर्याओं को कवर करती हैं जो आपके वित्त को स्वस्थ रखती हैं — एक मासिक बजट समीक्षा, टैक्स सीज़न के लिए व्यवस्थित होना, एक समय-समय पर निवेश जाँच, और अपने वित्तीय लक्ष्यों की ओर प्रगति ट्रैक करना। किसी भी सूची को जैसे है वैसे इस्तेमाल करें, या Gisti में खोलकर AI से इसे अपनी स्थिति के मुताबिक ढालें। (ये व्यवस्थित करने वाली चेकलिस्ट हैं, वित्तीय सलाह नहीं।) और देखें पूरी <a href="/hi/checklists/" class="text-primary hover:underline">चेकलिस्ट गैलरी</a>।',
     } },
 };
 
@@ -799,6 +851,59 @@ function writeSitemap(pages) {
   return rows.length;
 }
 
+// ── Derived app + Firestore artifacts (SAME data → they can never drift) ──────
+// data/checklists/*.json is the ONE source of truth. Besides the landing pages
+// above, it emits: (a) the bundled Compose Resource the in-app Templates screen
+// reads, and (b) the Firestore seed the deep-link gallery reads. English base
+// content is used (the in-app library + seed are EN today; hi twins drive landing
+// only). App items are flat text — the Templates screen has no per-item notes; the
+// note survives on the landing page and in the Firestore seed (used by the
+// deep-link create-from-template flow).
+
+// Per-template app icon: the checklist's own `icon` when set, else the category icon.
+// (The 47 migrated app templates carry their original Material icon name; the SEO-first
+//  gallery checklists have none and fall back to the category's icon.)
+const appIconOf = (cl) => cl.icon || CATEGORIES[cl.category].icon;
+// EN app-facing description = the short card copy (falls back to the SEO description).
+const appDescOf = (cl) => cl.cardDesc || cl.metaDescription || "";
+
+// (a) Bundled templates.json for the in-app Templates screen (id = slug; flat items).
+function writeAppTemplates(cats, catKeys) {
+  const templates = [];
+  for (const k of catKeys) {
+    for (const cl of cats[k]) {
+      templates.push({
+        id: cl.slug,
+        name: cl.title,
+        description: appDescOf(cl),
+        icon: appIconOf(cl),
+        category: cl.category,
+        items: cl.items.map((it) => it.text),
+      });
+    }
+  }
+  writeFileSync(APP_TEMPLATES, JSON.stringify({ templates }, null, 2) + "\n", "utf8");
+  return templates.length;
+}
+
+// (b) Firestore gallery_templates seed (deep-link create-from-template; keeps notes).
+function writeSeed(cats, catKeys) {
+  const docs = [];
+  for (const k of catKeys) {
+    for (const cl of cats[k]) {
+      docs.push({
+        slug: cl.slug,
+        category: cl.category,
+        title: cl.title,
+        ordered: !!cl.ordered,
+        items: cl.items.map((it) => (it.note ? { text: it.text, note: it.note } : { text: it.text })),
+      });
+    }
+  }
+  writeFileSync(SEED_OUT, JSON.stringify(docs, null, 2) + "\n", "utf8");
+  return docs.length;
+}
+
 // ── Main ─────────────────────────────────────────────────────────────────────
 function main() {
   const files = readdirSync(DATA_DIR).filter((f) => f.endsWith(".json") && !f.startsWith("_"));
@@ -879,11 +984,17 @@ function main() {
 
   const urlCount = writeSitemap(sitemapPages);
 
+  // Derived artifacts from the SAME data (all categories that have ≥1 checklist).
+  const appCount = writeAppTemplates(cats, catKeys);
+  const seedCount = writeSeed(cats, catKeys);
+
   console.log(`Generated:`);
   console.log(`  ${details.length} en detail pages${hiDetailCount ? ` + ${hiDetailCount} hi` : ""}`);
   console.log(`  ${catKeys.length} en hub pages${hiHubCount ? ` + ${hiHubCount} hi` : ""} (${catKeys.join(", ")})`);
   console.log(`  1 en gallery index${hiIndexExists ? " + 1 hi" : ""}`);
   console.log(`  sitemap.xml with ${urlCount} URLs`);
+  console.log(`  bundled app templates.json: ${appCount} templates`);
+  console.log(`  gallery-templates.seed.json: ${seedCount} docs`);
   const total = details.length + hiDetailCount + catKeys.length + hiHubCount + 1 + (hiIndexExists ? 1 : 0);
   console.log(`Total: ${total} pages under landing/`);
 }

@@ -1,0 +1,64 @@
+{
+  "category": "study",
+  "slug": "online-course-checklist",
+  "order": 51,
+  "icon": "computer",
+  "title": "Online Course Checklist",
+  "metaTitle": "Online Course Checklist (Finish On Time) | Gisti",
+  "metaDescription": "An online course checklist to finish on time: set up your space, map deadlines, keep up with lectures, and track progress. Free, or tailor it with AI in Gisti.",
+  "cardDesc": "Set up your space, map deadlines, keep up with lectures, and track progress to the finish.",
+  "ordered": false,
+  "intro": "Online courses are easy to start and easy to drift away from — no fixed classroom means the schedule is entirely on you. This checklist covers the habits that get people to the finish: setting up a real study space, mapping every deadline up front, keeping up with lectures and readings, and tracking progress so a busy week doesn't quietly become a missed month. See more <a href=\"/checklists/study/\" class=\"text-primary hover:underline\">study and exam checklists</a>.",
+  "items": [
+    { "text": "Set up a dedicated, distraction-free space and confirm your internet, sound, and logins work", "note": "A consistent spot signals your brain that it's time to focus." },
+    { "text": "Read the full syllabus and note the grading breakdown and what's due when" },
+    { "text": "Add every deadline — assignments, quizzes, exams — to your calendar at the start", "note": "Front-loading all the dates is how you avoid a nasty surprise in week six." },
+    { "text": "Block a regular weekly slot for the course so it doesn't quietly slip" },
+    { "text": "Watch each lecture actively, pausing to take notes in your own words", "note": "Passive watching feels productive but fades fast — summarizing is what sticks." },
+    { "text": "Keep up with assigned readings before the related lecture, not after" },
+    { "text": "Summarize the key ideas after each module while they're fresh" },
+    { "text": "Take part in discussion forums or live sessions", "note": "Explaining an idea to someone else is one of the strongest ways to learn it." },
+    { "text": "Start assignments early enough to ask questions before they're due" },
+    { "text": "Review your notes regularly instead of cramming before quizzes" },
+    { "text": "Reach out to the instructor or classmates when you're stuck, rather than stalling" },
+    { "text": "Track which modules you've finished against the total" },
+    { "text": "Back up your notes and submitted work somewhere safe" },
+    { "text": "Apply what you learn in a small project or practice problem", "note": "Using new knowledge once, right away, cements it far better than re-reading." },
+    { "text": "Save your certificate and course materials when you finish" }
+  ],
+  "faq": [
+    { "q": "How do I stay motivated in an online course?", "a": "The biggest help is structure: a fixed weekly time, a real study space, and every deadline in your calendar from day one. Small, visible progress — checking off modules and applying what you learn right away — keeps momentum going better than willpower alone. Joining discussions and studying with others adds accountability that a self-paced course otherwise lacks." },
+    { "q": "How do I finish an online course I keep putting off?", "a": "Break it into the smallest next step — one lecture, one reading — and block a specific time for it rather than waiting to feel like it. Put every deadline where you'll see it, and track how many modules remain so the finish feels reachable. Telling someone your target date, or studying alongside a peer, makes it much harder to quietly drift away." },
+    { "q": "How many hours a week does an online course take?", "a": "It varies widely — a short skills course might need two to three hours a week, while a university-level course can ask for eight to twelve. The syllabus usually states an estimate, but lectures, readings, and assignments all add up, so plan a realistic weekly block and adjust after the first couple of weeks." }
+  ],
+  "related": ["research-paper-checklist", "study-plan-checklist", "exam-prep-checklist", "back-to-school-supplies-checklist"],
+  "hi": {
+    "title": "ऑनलाइन कोर्स चेकलिस्ट",
+    "metaTitle": "ऑनलाइन कोर्स चेकलिस्ट (समय पर पूरा करें) | Gisti",
+    "metaDescription": "एक ऑनलाइन कोर्स चेकलिस्ट समय पर पूरा करने के लिए: अपनी जगह सेट करें, डेडलाइन का नक्शा बनाएँ, lectures के साथ चलें, और प्रगति ट्रैक करें। मुफ़्त, या Gisti में AI से ढालें।",
+    "cardDesc": "अपनी जगह सेट करें, डेडलाइन का नक्शा बनाएँ, lectures के साथ चलें, और अंत तक प्रगति ट्रैक करें।",
+    "intro": "ऑनलाइन कोर्स शुरू करना आसान है और बहक जाना भी — कोई तय क्लासरूम न होने का मतलब है शेड्यूल पूरी तरह आप पर है। यह चेकलिस्ट उन आदतों को बताती है जो लोगों को अंत तक पहुँचाती हैं: एक असली स्टडी जगह सेट करना, हर डेडलाइन पहले से नक्शे में डालना, lectures और readings के साथ चलना, और प्रगति ट्रैक करना ताकि एक व्यस्त हफ़्ता चुपचाप एक छूटा हुआ महीना न बन जाए। और देखें <a href=\"/hi/checklists/study/\" class=\"text-primary hover:underline\">स्टडी और परीक्षा चेकलिस्ट</a>।",
+    "items": [
+      { "text": "एक समर्पित, बिना-ध्यानभंग वाली जगह सेट करें और पक्का करें कि आपका इंटरनेट, आवाज़, और logins काम करते हैं", "note": "एक जैसी जगह आपके दिमाग़ को संकेत देती है कि ध्यान लगाने का समय है।" },
+      { "text": "पूरा syllabus पढ़ें और ग्रेडिंग का ब्यौरा व क्या कब देना है नोट करें" },
+      { "text": "हर डेडलाइन — assignments, quizzes, परीक्षाएँ — शुरू में ही अपने calendar में डालें", "note": "सारी तारीख़ें पहले से डाल देना ही छठे हफ़्ते के बुरे झटके से बचाता है।" },
+      { "text": "कोर्स के लिए एक नियमित साप्ताहिक समय ब्लॉक करें ताकि यह चुपचाप छूट न जाए" },
+      { "text": "हर lecture को active होकर देखें, अपने शब्दों में नोट लेने के लिए रुकते हुए", "note": "बिना सोचे देखना उपयोगी लगता है पर जल्दी फीका पड़ता है — सारांश बनाना ही टिकता है।" },
+      { "text": "सौंपे गए readings को संबंधित lecture से पहले पूरा करें, बाद में नहीं" },
+      { "text": "हर module के बाद मुख्य विचारों का सारांश बनाएँ जब वे ताज़ा हों" },
+      { "text": "discussion फ़ोरम या live सत्रों में हिस्सा लें", "note": "किसी और को एक विचार समझाना उसे सीखने के सबसे मज़बूत तरीक़ों में से एक है।" },
+      { "text": "assignments इतनी जल्दी शुरू करें कि समय से पहले सवाल पूछ सकें" },
+      { "text": "quizzes से पहले रटने के बजाय अपने नोट्स की नियमित समीक्षा करें" },
+      { "text": "अटक जाएँ तो रुकने के बजाय instructor या सहपाठियों से संपर्क करें" },
+      { "text": "आपने कितने module पूरे किए, कुल के मुक़ाबले, ट्रैक करें" },
+      { "text": "अपने नोट्स और जमा किए काम का कहीं सुरक्षित बैकअप रखें" },
+      { "text": "जो सीखें उसे एक छोटे प्रोजेक्ट या अभ्यास-सवाल में लागू करें", "note": "नए ज्ञान को एक बार, तुरंत इस्तेमाल करना उसे दोबारा पढ़ने से कहीं बेहतर पक्का करता है।" },
+      { "text": "ख़त्म करने पर अपना certificate और कोर्स सामग्री सहेजें" }
+    ],
+    "faq": [
+      { "q": "एक ऑनलाइन कोर्स में मैं प्रेरित कैसे रहूँ?", "a": "सबसे बड़ी मदद है ढाँचा: एक तय साप्ताहिक समय, एक असली स्टडी जगह, और पहले दिन से हर डेडलाइन आपके calendar में। छोटी, दिखती हुई प्रगति — module चेक करना और जो सीखें उसे तुरंत लागू करना — अकेले इच्छाशक्ति से बेहतर गति बनाए रखती है। discussions में शामिल होना और दूसरों के साथ पढ़ना वह जवाबदेही जोड़ता है जो एक ख़ुद-की-गति वाले कोर्स में वरना नहीं होती।" },
+      { "q": "एक ऑनलाइन कोर्स जिसे मैं टालता रहता हूँ, उसे कैसे पूरा करूँ?", "a": "इसे सबसे छोटे अगले क़दम में बाँटें — एक lecture, एक reading — और मन करने का इंतज़ार करने के बजाय उसके लिए एक ख़ास समय ब्लॉक करें। हर डेडलाइन वहाँ रखें जहाँ आप देखेंगे, और कितने module बचे हैं ट्रैक करें ताकि अंत पहुँच में लगे। किसी को अपनी लक्ष्य-तारीख़ बताना, या किसी साथी के साथ पढ़ना, चुपचाप बहक जाना कहीं मुश्किल बना देता है।" },
+      { "q": "एक ऑनलाइन कोर्स हफ़्ते में कितने घंटे लेता है?", "a": "यह बहुत बदलता है — एक छोटा स्किल कोर्स हफ़्ते में दो-तीन घंटे माँग सकता है, जबकि एक विश्वविद्यालय-स्तर का कोर्स आठ से बारह माँग सकता है। syllabus आमतौर पर एक अनुमान बताता है, पर lectures, readings, और assignments सब जुड़ते हैं, इसलिए एक हक़ीक़ी साप्ताहिक ब्लॉक की योजना बनाएँ और पहले कुछ हफ़्तों बाद समायोजित करें।" }
+    ]
+  }
+}

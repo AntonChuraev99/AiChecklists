@@ -1,0 +1,62 @@
+{
+  "category": "cooking",
+  "slug": "baking-day-checklist",
+  "order": 2,
+  "icon": "bakery_dining",
+  "title": "Baking Day Checklist",
+  "metaTitle": "Baking Day Checklist (Prep, Bake, Store) | Gisti",
+  "metaDescription": "A baking day checklist to bake with confidence: gather tools, measure by weight, mind the oven, cool and store properly. Free, or tailor with AI in Gisti.",
+  "cardDesc": "Gather tools, measure accurately, mind the oven, and cool and store right for bakes that work.",
+  "ordered": false,
+  "intro": "Baking rewards preparation more than almost any cooking — measure carefully, read the recipe all the way through, and get everything ready before you start. This checklist takes you from picking recipes to storing the results, with the small details that separate a good bake from a flat one. It's built for a relaxed baking day, whether you're making one cake or a whole batch. See more <a href=\"/checklists/cooking/\" class=\"text-primary hover:underline\">cooking and meal checklists</a>.",
+  "items": [
+    { "text": "Pick your recipes and read each one all the way through before starting", "note": "Reading ahead catches a two-hour chill or a step you'd otherwise discover too late." },
+    { "text": "Check you have every ingredient in the right amount, and note any substitutions", "note": "Baking is less forgiving than cooking — swapping baking soda for powder won't work." },
+    { "text": "Take butter, eggs, and dairy out early if the recipe wants them at room temperature", "note": "Room-temp ingredients cream and emulsify far better than cold ones." },
+    { "text": "Gather all tools — bowls, whisk, mixer, pans, parchment, and a scale" },
+    { "text": "Grease and line your pans before you start mixing" },
+    { "text": "Measure ingredients precisely, ideally by weight with a kitchen scale", "note": "Weighing flour avoids the packed-cup error that makes bakes dry and dense." },
+    { "text": "Preheat the oven and check it with an oven thermometer", "note": "Many home ovens run 10-15°C off, which is enough to ruin a delicate bake." },
+    { "text": "Follow the mixing method exactly — creaming, folding, and order all matter" },
+    { "text": "Set a timer for each batch and check a few minutes before it's due" },
+    { "text": "Test for doneness with a skewer, a gentle press, or the internal temperature" },
+    { "text": "Cool bakes on a wire rack so the bottoms don't turn soggy", "note": "Frost or glaze only once fully cool, or it will melt and slide off." },
+    { "text": "Decorate, glaze, or dust once everything has cooled" },
+    { "text": "Store each item the right way once cool", "note": "Airtight at room temperature for most; the fridge or freezer for cream-based bakes." },
+    { "text": "Clean as you go and wash tools between mixing wet and dry ingredients" }
+  ],
+  "faq": [
+    { "q": "How do I prepare for a day of baking?", "a": "Read your recipes all the way through, check you have every ingredient in the right amount, and gather your tools and pans before you start. Bring butter, eggs, and dairy to room temperature if the recipe calls for it, and get your oven preheating early." },
+    { "q": "Why should I weigh ingredients when baking?", "a": "A cup of flour can vary a lot depending on how it's scooped, and that difference is enough to make a cake dry or dense. Weighing with a kitchen scale is more accurate and repeatable, which is why most serious baking recipes list grams — it's the single easiest way to get consistent results." },
+    { "q": "How should I store baked goods?", "a": "Let everything cool completely first, then store most cakes, cookies, and breads airtight at room temperature. Anything with cream, custard, or cream cheese frosting belongs in the fridge, and many bakes freeze well if you wrap them tightly." }
+  ],
+  "related": ["dinner-party-menu-checklist", "kitchen-essentials-checklist", "groceries/pantry-staples-checklist"],
+  "hi": {
+    "title": "बेकिंग डे चेकलिस्ट",
+    "metaTitle": "बेकिंग डे चेकलिस्ट (तैयारी, बेक, भंडारण) | Gisti",
+    "metaDescription": "आत्मविश्वास से बेक करने के लिए बेकिंग डे चेकलिस्ट: औज़ार जुटाएँ, वज़न से मापें, ओवन तापमान का ध्यान रखें, ठीक से ठंडा करें और सही भंडारण करें। मुफ़्त, या Gisti में AI से ढालें।",
+    "cardDesc": "औज़ार जुटाएँ, सटीक मापें, ओवन का ध्यान रखें, और सही ठंडा व भंडारण करें ताकि बेक अच्छे बनें।",
+    "intro": "बेकिंग लगभग हर पकाई से ज़्यादा तैयारी का इनाम देती है — ध्यान से मापें, रेसिपी पूरी पढ़ें, और शुरू करने से पहले सब कुछ तैयार कर लें। यह चेकलिस्ट रेसिपी चुनने से लेकर नतीजे भंडारण करने तक ले जाती है, उन छोटी बातों के साथ जो अच्छे बेक को बेकार बेक से अलग करती हैं। यह एक आराम भरे बेकिंग डे के लिए है, चाहे आप एक केक बनाएँ या पूरा बैच। और देखें <a href=\"/hi/checklists/cooking/\" class=\"text-primary hover:underline\">कुकिंग और मील चेकलिस्ट</a>।",
+    "items": [
+      { "text": "अपनी रेसिपी चुनें और शुरू करने से पहले हर एक पूरी पढ़ें", "note": "पहले पढ़ने से दो घंटे की ठंडक या कोई ऐसा स्टेप पकड़ में आता है जो बाद में बहुत देर से पता चलता।" },
+      { "text": "जाँचें कि हर सामग्री सही मात्रा में है, और कोई विकल्प नोट करें", "note": "बेकिंग पकाई से कम माफ़ करती है — बेकिंग सोडा की जगह पाउडर काम नहीं करेगा।" },
+      { "text": "अगर रेसिपी को कमरे के तापमान पर चाहिए तो मक्खन, अंडे, और डेयरी पहले निकाल लें", "note": "कमरे के तापमान वाली सामग्री ठंडी से कहीं बेहतर फेंटती और मिलती है।" },
+      { "text": "सारे औज़ार जुटाएँ — कटोरे, व्हिस्क, मिक्सर, पैन, पार्चमेंट, और एक तराज़ू" },
+      { "text": "मिलाना शुरू करने से पहले अपने पैन ग्रीस और लाइन कर लें" },
+      { "text": "सामग्री सटीक मापें, बेहतर हो कि किचन तराज़ू से वज़न के हिसाब से", "note": "आटा तौलने से वह ठुँसे-कप वाली ग़लती टलती है जो बेक को सूखा और भारी बनाती है।" },
+      { "text": "ओवन प्रीहीट करें और उसे ओवन थर्मामीटर से जाँचें", "note": "कई घरेलू ओवन 10-15°C तक ग़लत चलते हैं, जो नाज़ुक बेक बिगाड़ने के लिए काफ़ी है।" },
+      { "text": "मिलाने की विधि ठीक-ठीक अपनाएँ — क्रीमिंग, फ़ोल्डिंग, और क्रम, सब मायने रखते हैं" },
+      { "text": "हर बैच के लिए टाइमर लगाएँ और तय समय से कुछ मिनट पहले जाँचें" },
+      { "text": "पकने की जाँच सींक, हल्के दबाव, या अंदरूनी तापमान से करें" },
+      { "text": "बेक को तार की रैक पर ठंडा करें ताकि तली गीली न हो", "note": "फ़्रॉस्ट या ग्लेज़ तभी करें जब पूरी तरह ठंडा हो, वरना वह पिघलकर फिसल जाएगा।" },
+      { "text": "सब ठंडा होने पर सजाएँ, ग्लेज़ करें, या पाउडर छिड़कें" },
+      { "text": "ठंडा होने के बाद हर चीज़ सही तरीके से भंडारण करें", "note": "ज़्यादातर के लिए कमरे के तापमान पर एयरटाइट; क्रीम वाले बेक के लिए फ़्रिज या फ़्रीज़र।" },
+      { "text": "साथ-साथ सफ़ाई करें और गीली व सूखी सामग्री मिलाने के बीच औज़ार धो लें" }
+    ],
+    "faq": [
+      { "q": "मैं बेकिंग के दिन के लिए कैसे तैयारी करूँ?", "a": "अपनी रेसिपी पूरी पढ़ें, जाँचें कि हर सामग्री सही मात्रा में है, और शुरू करने से पहले अपने औज़ार और पैन जुटा लें। अगर रेसिपी कहे तो मक्खन, अंडे, और डेयरी कमरे के तापमान पर लाएँ, और ओवन जल्दी प्रीहीट पर लगा दें।" },
+      { "q": "बेकिंग में सामग्री को वज़न से क्यों मापना चाहिए?", "a": "एक कप आटा इस बात पर काफ़ी बदल सकता है कि उसे कैसे भरा गया, और यह फ़र्क़ केक को सूखा या भारी बनाने के लिए काफ़ी है। किचन तराज़ू से तौलना ज़्यादा सटीक और दोहराने लायक है, इसीलिए ज़्यादातर गंभीर बेकिंग रेसिपी ग्राम में देती हैं — एक जैसे नतीजे पाने का यह सबसे आसान तरीका है।" },
+      { "q": "बेक किए सामान का भंडारण कैसे करूँ?", "a": "पहले सब कुछ पूरी तरह ठंडा होने दें, फिर ज़्यादातर केक, कुकीज़, और ब्रेड कमरे के तापमान पर एयरटाइट रखें। क्रीम, कस्टर्ड, या क्रीम-चीज़ फ़्रॉस्टिंग वाली कोई भी चीज़ फ़्रिज में रखें, और कई बेक कसकर लपेटने पर अच्छे से फ़्रीज़ हो जाते हैं।" }
+    ]
+  }
+}

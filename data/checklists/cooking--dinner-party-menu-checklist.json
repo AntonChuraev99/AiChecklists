@@ -1,0 +1,62 @@
+{
+  "category": "cooking",
+  "slug": "dinner-party-menu-checklist",
+  "order": 1,
+  "icon": "restaurant",
+  "title": "Dinner Party Menu Checklist",
+  "metaTitle": "Dinner Party Menu Checklist (Plan & Prep) | Gisti",
+  "metaDescription": "A dinner party menu checklist to plan a meal that comes together on time: courses, drinks, shopping, prep, and a timeline. Free, or tailor with AI in Gisti.",
+  "cardDesc": "Plan the courses, drinks, shopping, and timeline so dinner comes together calmly and on time.",
+  "ordered": false,
+  "intro": "A dinner party feels effortless when the planning is done days ahead — the menu set, the shopping done, and as much prepped as possible before guests arrive. This checklist walks through building a menu you can actually cook on the night, from courses and drinks to a realistic timeline. Adjust it to your guests, your kitchen, and how much you want to cook. Find more <a href=\"/checklists/cooking/\" class=\"text-primary hover:underline\">cooking and meal checklists</a>.",
+  "items": [
+    { "text": "Confirm your guest count and check for allergies or dietary needs", "note": "Vegetarian, gluten-free, or nut allergies shape the whole menu — ask when you invite." },
+    { "text": "Pick a loose theme or cuisine to tie the courses together" },
+    { "text": "Plan an appetizer or two that can be served cold or at room temperature", "note": "Something you make ahead frees you up while guests arrive." },
+    { "text": "Choose a main course you're comfortable cooking, plus two sides" },
+    { "text": "Balance the menu so not everything needs the oven or stove at once", "note": "One oven dish, one stovetop, and one cold dish is easy to manage solo." },
+    { "text": "Select a dessert you can make the day before" },
+    { "text": "Plan drinks — wine or a signature cocktail, plus a non-alcoholic option" },
+    { "text": "Write a full shopping list grouped by store section, and note what you already have" },
+    { "text": "Shop for non-perishables and drinks a few days ahead; buy fresh items the day before" },
+    { "text": "Prep what you can in advance — chop, marinate, make sauces, and set out serving dishes", "note": "Label make-ahead components in the fridge so nothing gets forgotten." },
+    { "text": "Write a cooking timeline that counts backward from serving time", "note": "Note what goes in the oven when, and what can rest while you plate." },
+    { "text": "Set the table and arrange serving spoons and platters earlier in the day" },
+    { "text": "Have a simple backup ready in case a dish doesn't work out", "note": "A good cheese board or a pasta you can throw together saves the night." },
+    { "text": "Plan seating, music, and a tidy space for coats and bags" }
+  ],
+  "faq": [
+    { "q": "How do I plan a dinner party menu?", "a": "Start with your guest count and any dietary needs, then pick a main course you're confident cooking and build sides, a starter, and a dessert around it. Choose dishes that don't all need the oven at the same time, and lean on things you can make ahead so you're not stuck in the kitchen all night." },
+    { "q": "How far in advance should I prep for a dinner party?", "a": "Shop for non-perishables and drinks a few days ahead and buy fresh ingredients the day before. Desserts, sauces, marinades, and most prep can be done the day before too — leaving only the cooking and plating for the night itself." },
+    { "q": "How many dishes should I serve at a dinner party?", "a": "For most gatherings, one or two appetizers, a main with two sides, and a single dessert is plenty. It's better to cook a few dishes well than to stretch yourself thin — keep the menu manageable for your kitchen and the time you have." }
+  ],
+  "related": ["baking-day-checklist", "kitchen-essentials-checklist", "groceries/party-grocery-list"],
+  "hi": {
+    "title": "डिनर पार्टी मेन्यू चेकलिस्ट",
+    "metaTitle": "डिनर पार्टी मेन्यू चेकलिस्ट (योजना और तैयारी) | Gisti",
+    "metaDescription": "समय पर तैयार होने वाले खाने की योजना के लिए डिनर पार्टी मेन्यू चेकलिस्ट: कोर्स, ड्रिंक्स, ख़रीदारी, पहले से तैयारी, और टाइमलाइन। मुफ़्त, या Gisti में AI से ढालें।",
+    "cardDesc": "कोर्स, ड्रिंक्स, ख़रीदारी, और टाइमलाइन की योजना बनाएँ ताकि डिनर शांति से और समय पर तैयार हो।",
+    "intro": "डिनर पार्टी तब आसान लगती है जब योजना कुछ दिन पहले बन जाए — मेन्यू तय, ख़रीदारी पूरी, और जितना हो सके मेहमानों के आने से पहले तैयार। यह चेकलिस्ट ऐसा मेन्यू बनाने में मदद करती है जिसे आप उस रात सचमुच पका सकें, कोर्स और ड्रिंक्स से लेकर एक व्यावहारिक टाइमलाइन तक। इसे अपने मेहमानों, अपने किचन, और आप कितना पकाना चाहते हैं, उसके हिसाब से ढालें। और देखें <a href=\"/hi/checklists/cooking/\" class=\"text-primary hover:underline\">कुकिंग और मील चेकलिस्ट</a>।",
+    "items": [
+      { "text": "अपने मेहमानों की संख्या पक्की करें और एलर्जी या खान-पान की ज़रूरतें जाँचें", "note": "शाकाहारी, ग्लूटेन-फ़्री, या नट एलर्जी पूरे मेन्यू को तय करती हैं — न्योता देते समय ही पूछ लें।" },
+      { "text": "कोर्स को जोड़ने के लिए एक हल्की थीम या व्यंजन-शैली चुनें" },
+      { "text": "एक-दो ऐसे स्टार्टर बनाएँ जो ठंडे या सामान्य तापमान पर परोसे जा सकें", "note": "पहले से बना कुछ मेहमानों के आते समय आपको खाली रखता है।" },
+      { "text": "एक ऐसा मुख्य व्यंजन चुनें जिसे पकाने में आप सहज हों, साथ में दो साइड" },
+      { "text": "मेन्यू ऐसा संतुलित करें कि सब कुछ एक ही समय ओवन या चूल्हे पर न हो", "note": "एक ओवन डिश, एक चूल्हे की, और एक ठंडी डिश अकेले संभालना आसान है।" },
+      { "text": "एक ऐसा डेज़र्ट चुनें जिसे आप एक दिन पहले बना सकें" },
+      { "text": "ड्रिंक्स की योजना बनाएँ — वाइन या एक ख़ास कॉकटेल, साथ में एक बिना-अल्कोहल विकल्प" },
+      { "text": "स्टोर के हिस्सों के अनुसार पूरी ख़रीदारी सूची बनाएँ, और जो पहले से है उसे नोट करें" },
+      { "text": "बिना ख़राब होने वाली चीज़ें और ड्रिंक्स कुछ दिन पहले ख़रीदें; ताज़ा सामान एक दिन पहले" },
+      { "text": "जो हो सके पहले से तैयार करें — काटना, मैरिनेट करना, सॉस बनाना, और परोसने के बर्तन निकालना", "note": "फ़्रिज में पहले से बने हिस्सों पर लेबल लगाएँ ताकि कुछ न भूले।" },
+      { "text": "परोसने के समय से उल्टी गिनती करते हुए एक कुकिंग टाइमलाइन लिखें", "note": "नोट करें कि क्या कब ओवन में जाता है, और प्लेट लगाते समय क्या रुक सकता है।" },
+      { "text": "दिन में पहले ही टेबल लगाएँ और परोसने के चम्मच व प्लैटर तैयार रखें" },
+      { "text": "किसी डिश के न बनने की सूरत में एक आसान बैकअप तैयार रखें", "note": "एक अच्छा चीज़ बोर्ड या झटपट बनने वाला पास्ता रात बचा लेता है।" },
+      { "text": "बैठक, संगीत, और कोट व बैग के लिए एक साफ़ जगह की योजना बनाएँ" }
+    ],
+    "faq": [
+      { "q": "मैं डिनर पार्टी का मेन्यू कैसे बनाऊँ?", "a": "अपने मेहमानों की संख्या और खान-पान की ज़रूरतों से शुरू करें, फिर एक ऐसा मुख्य व्यंजन चुनें जिसे पकाने में आप आश्वस्त हों और उसके इर्द-गिर्द साइड, स्टार्टर, और डेज़र्ट बनाएँ। ऐसी डिश चुनें जिन्हें एक ही समय ओवन की ज़रूरत न हो, और पहले से बनने वाली चीज़ों पर भरोसा करें ताकि आप पूरी रात किचन में न फँसे रहें।" },
+      { "q": "डिनर पार्टी के लिए कितनी पहले तैयारी करनी चाहिए?", "a": "बिना ख़राब होने वाली चीज़ें और ड्रिंक्स कुछ दिन पहले ख़रीदें और ताज़ा सामान एक दिन पहले। डेज़र्ट, सॉस, मैरिनेड, और ज़्यादातर तैयारी भी एक दिन पहले हो सकती है — जिससे उस रात सिर्फ़ पकाना और परोसना बचता है।" },
+      { "q": "डिनर पार्टी में कितनी डिश परोसनी चाहिए?", "a": "ज़्यादातर मौकों के लिए एक-दो स्टार्टर, दो साइड के साथ एक मुख्य व्यंजन, और एक डेज़र्ट काफ़ी है। कुछ डिश अच्छे से बनाना, बहुत सारी डिश में खुद को थका लेने से बेहतर है — मेन्यू अपने किचन और समय के हिसाब से संभालने लायक रखें।" }
+    ]
+  }
+}

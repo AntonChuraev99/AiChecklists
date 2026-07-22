@@ -1,0 +1,64 @@
+{
+  "category": "fitness",
+  "slug": "yoga-session-checklist",
+  "order": 53,
+  "icon": "self_improvement",
+  "title": "Yoga Session Checklist",
+  "metaTitle": "Yoga Session Checklist (Home Practice) | Gisti",
+  "metaDescription": "A yoga session checklist — set up your space, breathe, warm up, flow through poses, and rest in savasana. Free, or tailor it to your practice with AI in Gisti.",
+  "cardDesc": "A calming home flow — set up, breathe, warm up, move through poses, and rest in savasana.",
+  "ordered": true,
+  "intro": "A good yoga session builds gently — you settle the breath, warm the body, work through standing and balancing poses, then wind back down to stillness. This checklist lays out a well-rounded home practice you can do in 20 to 60 minutes, at whatever level suits you. Move at your own pace, never force a pose, and rest whenever you need to. Find more in our <a href=\"/checklists/fitness/\" class=\"text-primary hover:underline\">health and fitness checklists</a>.",
+  "items": [
+    { "text": "Set up a quiet space and lay out a non-slip mat", "note": "A grippy mat prevents slips in standing and balancing poses." },
+    { "text": "Keep props within reach: a block, a strap, and a cushion or folded blanket", "note": "Props make poses accessible — they're a smart tool, not a shortcut." },
+    { "text": "Wear comfortable, stretchy clothing and practice barefoot" },
+    { "text": "Practice on a fairly empty stomach", "note": "Leave about 2 hours after a full meal to avoid discomfort in twists and folds." },
+    { "text": "Silence your phone or set a gentle timer for savasana" },
+    { "text": "Begin seated with a few minutes of slow, deep breathing to center yourself" },
+    { "text": "Warm up with gentle movement: cat-cow, neck rolls, and a few sun salutations" },
+    { "text": "Move through standing poses like warrior and triangle to build strength" },
+    { "text": "Add balancing poses such as tree or eagle", "note": "Fix your gaze on one still point to steady your balance." },
+    { "text": "Come to the floor for seated stretches and forward folds" },
+    { "text": "Include a gentle backbend like cobra or bridge to open the chest" },
+    { "text": "Add hip openers such as pigeon or a seated twist" },
+    { "text": "Breathe into tension and ease off slowly, never bouncing or forcing", "note": "Sharp pain means back off; a mild, steady stretch is fine." },
+    { "text": "Rest in savasana for at least 5 minutes to absorb the practice", "note": "Don't skip it — this final rest is where the nervous system settles." },
+    { "text": "Close with a moment of stillness and a slow return to your day" }
+  ],
+  "faq": [
+    { "q": "What do I need to start a yoga practice at home?", "a": "Very little — a non-slip mat, comfortable clothing you can stretch in, and enough clear floor space to lie down with your arms out. A block and a strap help you ease into poses, but a stack of books and a belt work just as well to start. The most useful thing is a quiet 20 minutes and a follow-along video or sequence." },
+    { "q": "How long should a yoga session be?", "a": "Anywhere from 15 to 60 minutes works, depending on your time and goal. A short 15 to 20 minute flow is plenty for a daily habit, while 45 to 60 minutes lets you warm up fully, hold poses longer, and enjoy a proper savasana. Consistency matters more than length — a short daily practice beats an occasional long one." },
+    { "q": "Should I do yoga on an empty stomach?", "a": "It's best to practice on a fairly empty stomach — leave about two hours after a large meal, or one hour after a light snack. Twists, folds, and inversions feel uncomfortable on a full stomach. A small bite like a banana beforehand is fine if you'd otherwise feel low on energy." }
+  ],
+  "related": ["home-workout-checklist", "self-care-checklist", "morning-routine-checklist", "gym-workout-checklist"],
+  "hi": {
+    "title": "योग सेशन चेकलिस्ट",
+    "metaTitle": "योग सेशन चेकलिस्ट (घर पर अभ्यास) | Gisti",
+    "metaDescription": "एक योग सेशन चेकलिस्ट — अपनी जगह तैयार करें, साँस लें, वार्म-अप करें, आसनों में बहें, और शवासन में विश्राम करें। मुफ़्त, या Gisti में AI से अपने अभ्यास के मुताबिक ढालें।",
+    "cardDesc": "एक शांत घरेलू फ़्लो — तैयारी करें, साँस लें, वार्म-अप करें, आसनों से गुज़रें, और शवासन में विश्राम करें।",
+    "intro": "एक अच्छा योग सेशन धीरे-धीरे बनता है — आप साँस को थिर करते हैं, शरीर को गर्म करते हैं, खड़े होकर और संतुलन के आसनों से गुज़रते हैं, फिर वापस ठहराव में उतरते हैं। यह चेकलिस्ट एक संतुलित घरेलू अभ्यास रखती है जिसे आप 20 से 60 मिनट में, अपने स्तर के हिसाब से कर सकते हैं। अपनी गति से चलें, किसी आसन को ज़बरदस्ती न करें, और जब भी ज़रूरत हो विश्राम करें। और देखें हमारी <a href=\"/hi/checklists/fitness/\" class=\"text-primary hover:underline\">सेहत और फ़िटनेस चेकलिस्ट</a>।",
+    "items": [
+      { "text": "एक शांत जगह तैयार करें और एक नॉन-स्लिप मैट बिछाएँ", "note": "पकड़ वाली मैट खड़े होने और संतुलन के आसनों में फिसलन रोकती है।" },
+      { "text": "प्रॉप्स पहुँच में रखें: एक ब्लॉक, एक स्ट्रैप, और एक तकिया या मुड़ा हुआ कंबल", "note": "प्रॉप्स आसनों को सुलभ बनाते हैं — ये एक समझदार साधन हैं, कोई शॉर्टकट नहीं।" },
+      { "text": "आरामदायक, खिंचने वाले कपड़े पहनें और नंगे पाँव अभ्यास करें" },
+      { "text": "काफ़ी हद तक खाली पेट अभ्यास करें", "note": "मरोड़ और झुकाव में तकलीफ़ से बचने के लिए भरपेट खाने के करीब 2 घंटे बाद करें।" },
+      { "text": "अपना फ़ोन साइलेंट करें या शवासन के लिए एक हल्का टाइमर लगाएँ" },
+      { "text": "बैठकर कुछ मिनट धीमी, गहरी साँस लेते हुए ख़ुद को केंद्रित करें" },
+      { "text": "हल्की मूवमेंट से वार्म-अप करें: कैट-काउ, गर्दन घुमाना, और कुछ सूर्य नमस्कार" },
+      { "text": "ताक़त बढ़ाने के लिए वॉरियर और ट्रायंगल जैसे खड़े आसनों से गुज़रें" },
+      { "text": "ट्री या ईगल जैसे संतुलन आसन जोड़ें", "note": "संतुलन थिर रखने के लिए अपनी नज़र किसी एक स्थिर बिंदु पर टिकाएँ।" },
+      { "text": "बैठकर की जाने वाली स्ट्रेच और फ़ॉरवर्ड फ़ोल्ड के लिए फ़र्श पर आएँ" },
+      { "text": "छाती खोलने के लिए कोबरा या ब्रिज जैसा एक हल्का बैकबेंड शामिल करें" },
+      { "text": "पिजन या बैठकर किया मरोड़ जैसे हिप ओपनर जोड़ें" },
+      { "text": "तनाव में साँस भरें और धीरे-धीरे ढीला छोड़ें, कभी झटका या ज़ोर न लगाएँ", "note": "तेज़ दर्द का मतलब है रुक जाएँ; हल्का, स्थिर खिंचाव ठीक है।" },
+      { "text": "अभ्यास को सोखने के लिए कम-से-कम 5 मिनट शवासन में विश्राम करें", "note": "इसे न छोड़ें — यह आख़िरी विश्राम ही है जहाँ तंत्रिका तंत्र थिर होता है।" },
+      { "text": "एक पल की स्थिरता और अपने दिन में धीमी वापसी के साथ समाप्त करें" }
+    ],
+    "faq": [
+      { "q": "घर पर योग अभ्यास शुरू करने के लिए मुझे क्या चाहिए?", "a": "बहुत कम — एक नॉन-स्लिप मैट, आरामदायक कपड़े जिनमें आप खिंच सकें, और इतनी खाली फ़र्श जगह कि आप हाथ फैलाकर लेट सकें। एक ब्लॉक और एक स्ट्रैप आसनों में ढलने में मदद करते हैं, पर शुरुआत के लिए किताबों का ढेर और एक बेल्ट भी उतना ही काम करते हैं। सबसे उपयोगी चीज़ है शांत 20 मिनट और एक फ़ॉलो-अलॉन्ग वीडियो या क्रम।" },
+      { "q": "योग सेशन कितनी देर का होना चाहिए?", "a": "आपके समय और लक्ष्य के हिसाब से 15 से 60 मिनट तक कुछ भी चलता है। एक छोटा 15 से 20 मिनट का फ़्लो रोज़ की आदत के लिए काफ़ी है, जबकि 45 से 60 मिनट में आप पूरी तरह वार्म-अप कर पाते हैं, आसन ज़्यादा देर रोक पाते हैं, और एक अच्छे शवासन का मज़ा ले पाते हैं। लंबाई से ज़्यादा निरंतरता मायने रखती है — एक छोटा रोज़ का अभ्यास कभी-कभार के लंबे अभ्यास से बेहतर है।" },
+      { "q": "क्या मुझे खाली पेट योग करना चाहिए?", "a": "काफ़ी हद तक खाली पेट अभ्यास करना सबसे अच्छा है — भारी भोजन के करीब दो घंटे बाद, या हल्के नाश्ते के एक घंटे बाद करें। भरे पेट पर मरोड़, झुकाव, और उलटे आसन असहज लगते हैं। अगर वरना आपको ऊर्जा कम लगे, तो पहले केले जैसा एक छोटा निवाला ठीक है।" }
+    ]
+  }
+}

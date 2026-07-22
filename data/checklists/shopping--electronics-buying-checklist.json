@@ -1,0 +1,64 @@
+{
+  "category": "shopping",
+  "slug": "electronics-buying-checklist",
+  "order": 2,
+  "icon": "devices",
+  "title": "Electronics Buying Checklist",
+  "metaTitle": "Electronics Buying Checklist (What to Check) | Gisti",
+  "metaDescription": "An electronics buying checklist: match the device to your needs, compare models and prices, and check reviews and warranty. Free, or tailor it with AI in Gisti.",
+  "cardDesc": "Make smart tech buys — match your needs, compare models and prices, check reviews and warranty.",
+  "ordered": false,
+  "intro": "It's easy to overpay for electronics by buying the newest, shiniest model instead of the one that fits how you'll actually use it. This checklist keeps you grounded — define your real needs, compare models and prices, read the critical reviews, and check the warranty and compatibility before you commit. A little patience around sales and previous-generation models often saves the most. Find more <a href=\"/checklists/shopping/\" class=\"text-primary hover:underline\">shopping checklists</a>.",
+  "items": [
+    { "text": "Write down what you actually need the device to do before you shop", "note": "Buying for your real use, not the spec sheet, saves you from paying for power you'll never touch." },
+    { "text": "Set a budget range, and decide whether last year's model at a discount does the job", "note": "The newest model is often a small upgrade for a big price jump — compare it against the previous generation." },
+    { "text": "Shortlist a few models and compare the specs that actually matter for your use" },
+    { "text": "Read recent user reviews, not just the star rating, for real-world problems", "note": "Sort reviews by most recent and most critical — that's where deal-breakers and reliability issues show up." },
+    { "text": "Search the model name plus 'problems' or 'recall' to check for common faults" },
+    { "text": "Confirm it's compatible with what you already own — cables, ports, ecosystem, software", "note": "Check ports, wireless standards, and whether it plays nicely with your phone, OS, or smart-home setup." },
+    { "text": "Compare prices across several retailers, including refurbished and open-box", "note": "Manufacturer-refurbished gear is often much cheaper with the same warranty." },
+    { "text": "Check whether a sale is coming up before you buy at full price", "note": "Big shopping events and new-model launches routinely drop prices — a short wait can save a lot." },
+    { "text": "Read the return policy and return window before buying, especially online", "note": "Know how long you have and who pays return shipping if it isn't right." },
+    { "text": "Check the warranty length and what it actually covers" },
+    { "text": "See which accessories are included and which you'll need to buy separately", "note": "A cheap deal can cost more once you add the case, cable, or storage it doesn't come with." },
+    { "text": "Factor in running costs — subscriptions, batteries, ink, storage, or energy use" },
+    { "text": "Buy from a reputable seller to avoid counterfeits and warranty problems", "note": "On marketplaces, check the seller is the brand or an authorised dealer — grey-market gear can void the warranty." },
+    { "text": "Keep the receipt, warranty, and box until you're sure it works and you're keeping it", "note": "You'll need the receipt for warranty claims and returns — save a photo of it too." },
+    { "text": "Register the product and install any updates or security before daily use" }
+  ],
+  "faq": [
+    { "q": "How do I choose the right electronics to buy?", "a": "Start from what you'll actually use it for, then set a budget and shortlist a few models that fit — not the flashiest specs. Read recent, critical reviews for real problems, check compatibility with what you own, and compare prices including refurbished. A short wait for a sale or last year's model often saves a lot for little loss." },
+    { "q": "Is it better to buy the newest model?", "a": "Not always. The latest release is often a modest upgrade over the previous generation at a noticeably higher price, and early versions sometimes have bugs. Unless a new feature genuinely matters to you, last year's model or a manufacturer-refurbished unit is frequently the better value. Compare them side by side before deciding." },
+    { "q": "When is the best time to buy electronics?", "a": "Prices tend to drop around major shopping events and when a new model is about to launch, which pushes the current one down. If your purchase isn't urgent, checking the release cycle and upcoming sales can save real money. Just don't wait forever for a slightly better deal on something you need now." }
+  ],
+  "related": ["seasonal-wardrobe-checklist", "gift-shopping-checklist"],
+  "hi": {
+    "title": "इलेक्ट्रॉनिक्स खरीदने की चेकलिस्ट",
+    "metaTitle": "इलेक्ट्रॉनिक्स खरीदने की चेकलिस्ट (क्या जाँचें) | Gisti",
+    "metaDescription": "इलेक्ट्रॉनिक्स खरीदने की चेकलिस्ट: डिवाइस को अपनी ज़रूरत से मिलाएँ, मॉडल व कीमतों की तुलना करें, और रिव्यू व वारंटी जाँचें। मुफ़्त, या Gisti में AI से ढालें।",
+    "cardDesc": "समझदारी से टेक खरीदें — अपनी ज़रूरत से मिलाएँ, मॉडल व कीमतों की तुलना करें, रिव्यू व वारंटी जाँचें।",
+    "intro": "इलेक्ट्रॉनिक्स पर ज़्यादा पैसे देना आसान है — उस मॉडल के बजाय सबसे नया, चमकदार मॉडल खरीदकर जो आपके असल इस्तेमाल में फ़िट बैठता है। यह चेकलिस्ट आपको ज़मीन पर रखती है — अपनी असली ज़रूरत तय करें, मॉडल व कीमतों की तुलना करें, आलोचनात्मक रिव्यू पढ़ें, और तय करने से पहले वारंटी व अनुकूलता जाँचें। सेल और पिछली-पीढ़ी के मॉडलों के आसपास थोड़ा धीरज अक्सर सबसे ज़्यादा बचाता है। और देखें <a href=\"/hi/checklists/shopping/\" class=\"text-primary hover:underline\">शॉपिंग चेकलिस्ट</a>।",
+    "items": [
+      { "text": "खरीदने से पहले लिख लें कि आपको डिवाइस से असल में क्या करवाना है", "note": "स्पेक शीट के बजाय अपने असल इस्तेमाल के लिए खरीदना आपको उस ताकत के पैसे देने से बचाता है जिसे आप कभी नहीं छुएँगे।" },
+      { "text": "एक बजट सीमा तय करें, और तय करें कि छूट पर पिछले साल का मॉडल काम चला देता है या नहीं", "note": "सबसे नया मॉडल अक्सर बड़ी कीमत उछाल पर छोटा अपग्रेड होता है — उसकी तुलना पिछली पीढ़ी से करें।" },
+      { "text": "कुछ मॉडल छाँटें और उन स्पेक्स की तुलना करें जो आपके इस्तेमाल के लिए सचमुच मायने रखते हैं" },
+      { "text": "सिर्फ़ स्टार रेटिंग नहीं, असल दुनिया की समस्याओं के लिए हाल के यूज़र रिव्यू पढ़ें", "note": "रिव्यू को सबसे हाल के और सबसे आलोचनात्मक से छाँटें — वहीं डील-ब्रेकर और भरोसे की समस्याएँ सामने आती हैं।" },
+      { "text": "आम खराबियाँ जाँचने के लिए मॉडल का नाम और 'problems' या 'recall' सर्च करें" },
+      { "text": "पक्का करें कि यह आपके मौजूदा सामान से अनुकूल है — केबल, पोर्ट, इकोसिस्टम, सॉफ़्टवेयर", "note": "पोर्ट, वायरलेस मानक, और यह जाँचें कि यह आपके फ़ोन, OS, या स्मार्ट-होम सेटअप के साथ अच्छे से चलता है या नहीं।" },
+      { "text": "कई रिटेलरों में कीमतों की तुलना करें, रीफ़र्बिश्ड और ओपन-बॉक्स समेत", "note": "निर्माता-रीफ़र्बिश्ड सामान अक्सर उसी वारंटी के साथ काफ़ी सस्ता होता है।" },
+      { "text": "पूरी कीमत पर खरीदने से पहले जाँचें कि कोई सेल आने वाली है या नहीं", "note": "बड़े शॉपिंग इवेंट और नए-मॉडल लॉन्च अक्सर कीमतें गिराते हैं — थोड़ा इंतज़ार बहुत बचा सकता है।" },
+      { "text": "खरीदने से पहले वापसी नीति और वापसी की समय-सीमा पढ़ें, ख़ासकर ऑनलाइन", "note": "जानें कि आपके पास कितना समय है और अगर सामान ठीक न हो तो वापसी की शिपिंग कौन चुकाता है।" },
+      { "text": "वारंटी की अवधि और वह असल में किसे कवर करती है जाँचें" },
+      { "text": "देखें कौन-सी एक्सेसरीज़ शामिल हैं और कौन-सी अलग से खरीदनी होंगी", "note": "एक सस्ता सौदा तब महँगा पड़ सकता है जब आप उसमें न आने वाला केस, केबल, या स्टोरेज जोड़ते हैं।" },
+      { "text": "चलने के खर्च गिनें — सब्सक्रिप्शन, बैटरी, इंक, स्टोरेज, या बिजली की खपत" },
+      { "text": "नकली सामान और वारंटी की समस्याओं से बचने के लिए भरोसेमंद विक्रेता से खरीदें", "note": "मार्केटप्लेस पर जाँचें कि विक्रेता ब्रांड है या अधिकृत डीलर — ग्रे-मार्केट सामान वारंटी रद्द कर सकता है।" },
+      { "text": "जब तक पक्का न हो कि यह चलता है और आप इसे रख रहे हैं, रसीद, वारंटी, और बॉक्स रखें", "note": "वारंटी दावों और वापसी के लिए आपको रसीद चाहिए होगी — उसकी एक फ़ोटो भी सहेज लें।" },
+      { "text": "रोज़ इस्तेमाल से पहले प्रोडक्ट रजिस्टर करें और कोई भी अपडेट या सुरक्षा इंस्टॉल करें" }
+    ],
+    "faq": [
+      { "q": "मैं सही इलेक्ट्रॉनिक्स कैसे चुनूँ?", "a": "इससे शुरू करें कि आप इसे असल में किसलिए इस्तेमाल करेंगे, फिर बजट तय करें और उसमें फ़िट होने वाले कुछ मॉडल छाँटें — सबसे चमकदार स्पेक्स नहीं। असल समस्याओं के लिए हाल के, आलोचनात्मक रिव्यू पढ़ें, अपने सामान से अनुकूलता जाँचें, और रीफ़र्बिश्ड समेत कीमतों की तुलना करें। सेल या पिछले साल के मॉडल के लिए थोड़ा इंतज़ार अक्सर कम नुकसान में बहुत बचाता है।" },
+      { "q": "क्या सबसे नया मॉडल खरीदना बेहतर है?", "a": "हमेशा नहीं। नवीनतम रिलीज़ अक्सर पिछली पीढ़ी पर काफ़ी ज़्यादा कीमत पर एक मामूली अपग्रेड होता है, और शुरुआती संस्करणों में कभी-कभी बग होते हैं। जब तक कोई नई सुविधा आपके लिए सचमुच मायने न रखे, पिछले साल का मॉडल या निर्माता-रीफ़र्बिश्ड यूनिट अक्सर बेहतर मूल्य होता है। तय करने से पहले उन्हें आमने-सामने रखकर तुलना करें।" },
+      { "q": "इलेक्ट्रॉनिक्स खरीदने का सबसे अच्छा समय कब है?", "a": "कीमतें बड़े शॉपिंग इवेंट के आसपास और जब कोई नया मॉडल लॉन्च होने वाला होता है तब गिरती हैं, जो मौजूदा को नीचे धकेलता है। अगर आपकी खरीद ज़रूरी नहीं है, तो रिलीज़ चक्र और आने वाली सेल जाँचना असली पैसा बचा सकता है। बस जो चीज़ आपको अभी चाहिए उस पर थोड़े बेहतर सौदे के लिए हमेशा इंतज़ार न करें।" }
+    ]
+  }
+}

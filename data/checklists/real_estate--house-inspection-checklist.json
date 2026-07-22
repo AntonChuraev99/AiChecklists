@@ -1,0 +1,66 @@
+{
+  "category": "real_estate",
+  "slug": "house-inspection-checklist",
+  "order": 2,
+  "icon": "home",
+  "title": "House Inspection Checklist",
+  "metaTitle": "House Inspection Checklist for Buyers | Gisti",
+  "metaDescription": "A home inspection checklist covering roof, foundation, plumbing, wiring, HVAC, damp, and pests before you buy. Free, or tailor it with AI in Gisti.",
+  "cardDesc": "Check roof, foundation, plumbing, wiring, HVAC, damp, and pests before you buy or renew.",
+  "ordered": false,
+  "intro": "A house can look perfect and still hide an aging roof, a damp basement, or wiring that needs replacing. This checklist walks the whole property — structure, systems, and the usual trouble spots — so you know what you're dealing with and what to ask a professional about. It's a sharper walk-through, not a replacement for a licensed inspector. See more <a href=\"/checklists/real_estate/\" class=\"text-primary hover:underline\">real estate checklists</a>.",
+  "items": [
+    { "text": "Check the roof for missing, curling, or patched shingles and note its rough age", "note": "A roof near the end of its life is one of the biggest single costs you can inherit — ask when it was last replaced." },
+    { "text": "Check the gutters and downspouts for sagging, leaks, and where they drain", "note": "Water pooling against the house is behind many foundation and basement problems." },
+    { "text": "Walk the foundation and exterior walls, looking for cracks, bulging, or crumbling", "note": "Hairline cracks are normal; wide, horizontal, or stair-step cracks deserve a specialist's look." },
+    { "text": "Run the taps, showers, and flush the toilets in every bathroom, watching pressure and drainage", "note": "Slow drains, running toilets, and stains under sinks all hint at plumbing you'll pay for." },
+    { "text": "Open the electrical panel and check for labelled breakers, scorch marks, and enough capacity", "note": "Old fuse boxes, aluminium wiring, and no ground can be expensive and a safety issue." },
+    { "text": "Test the heating and cooling, and ask when the HVAC was last serviced and the filter changed" },
+    { "text": "Look for pest signs — droppings, gnaw marks, mud tubes, sawdust — in the attic, basement, and corners", "note": "Mud tubes on a foundation wall are a classic sign of termites." },
+    { "text": "Check the attic insulation depth and look for daylight, stains, or mould under the roof" },
+    { "text": "Inspect the basement or crawl space for damp, efflorescence, and a musty smell", "note": "A dehumidifier running hard or fresh paint on the lower walls can be hiding a moisture problem." },
+    { "text": "Open and close the garage door and test its auto-reverse safety" },
+    { "text": "Check that windows and doors open, close, and lock, and look for fogging between double-glazed panes" },
+    { "text": "Look under sinks and around the water heater for leaks, corrosion, and its age", "note": "Most water heaters last 8-12 years; note the manufacture date on the label." },
+    { "text": "Test a sample of outlets and switches, plus the GFCI outlets in kitchens and bathrooms" },
+    { "text": "Walk the boundaries and compare fences and structures against the property lines", "note": "Fences and sheds don't always sit on the legal boundary — the survey is what counts." },
+    { "text": "Check for even floors and doors that latch; a door that won't close can signal settling" },
+    { "text": "Hire a licensed inspector for anything structural, electrical, or you can't safely reach", "note": "This checklist helps you spot issues and ask better questions — it doesn't replace a professional inspection." }
+  ],
+  "faq": [
+    { "q": "What does a home inspection cover?", "a": "A full inspection looks at the roof, foundation, structure, plumbing, electrical, heating and cooling, insulation, drainage, and signs of pests or water damage. The inspector reports on condition and safety but usually won't open walls or guarantee anything. It's a snapshot of what's visible on the day." },
+    { "q": "Can I inspect a house myself before hiring an inspector?", "a": "Yes, and it's smart — a walk-through with this checklist helps you rule out obvious problems and decide whether a place is worth a paid inspection. But for anything structural, electrical, or hidden, hire a licensed inspector. This list makes you a sharper client, not a substitute for one." },
+    { "q": "What are the biggest red flags in a house inspection?", "a": "The costly ones are foundation movement, a roof at the end of its life, outdated or unsafe electrical, major plumbing problems, and persistent water in the basement or crawl space. Pests like termites and hidden mould also rank high. Any of these should shape your offer or your decision to walk away." }
+  ],
+  "related": ["home-buying-checklist", "apartment-viewing-checklist", "rental-agreement-checklist"],
+  "hi": {
+    "title": "हाउस इंस्पेक्शन चेकलिस्ट",
+    "metaTitle": "खरीदारों के लिए हाउस इंस्पेक्शन चेकलिस्ट | Gisti",
+    "metaDescription": "घर निरीक्षण की चेकलिस्ट: खरीदने से पहले छत, नींव, प्लंबिंग, वायरिंग, HVAC, नमी, और कीट जाँचें। मुफ़्त, या Gisti में AI से ढालें।",
+    "cardDesc": "खरीदने या नवीनीकरण से पहले छत, नींव, प्लंबिंग, वायरिंग, HVAC, नमी, और कीट जाँचें।",
+    "intro": "एक घर बिल्कुल सही दिख सकता है और फिर भी पुरानी छत, नम बेसमेंट, या बदलने लायक वायरिंग छिपाए हो सकता है। यह चेकलिस्ट पूरी प्रॉपर्टी से गुज़रती है — ढाँचा, सिस्टम, और आम मुसीबत वाली जगहें — ताकि आपको पता हो कि आप किससे निपट रहे हैं और किसी विशेषज्ञ से क्या पूछना है। यह एक बेहतर वॉक-थ्रू है, लाइसेंस्ड इंस्पेक्टर का विकल्प नहीं। और देखें <a href=\"/hi/checklists/real_estate/\" class=\"text-primary hover:underline\">रियल एस्टेट चेकलिस्ट</a>।",
+    "items": [
+      { "text": "छत पर गायब, मुड़े, या पैबंद लगे शिंगल देखें और उसकी अनुमानित उम्र नोट करें", "note": "अपने जीवन के अंत के पास पहुँची छत सबसे बड़े इकलौते खर्चों में से एक है जो आप विरासत में ले सकते हैं — पूछें कि आख़िरी बार कब बदली गई।" },
+      { "text": "गटर और डाउनस्पाउट में झुकाव, रिसाव, और वे कहाँ पानी गिराते हैं जाँचें", "note": "घर के साथ जमा होता पानी कई नींव और बेसमेंट की समस्याओं की जड़ है।" },
+      { "text": "नींव और बाहरी दीवारों पर चलें, दरारें, उभार, या टूट-फूट ढूँढें", "note": "बाल जैसी बारीक दरारें सामान्य हैं; चौड़ी, आड़ी, या सीढ़ीनुमा दरारों को विशेषज्ञ की नज़र चाहिए।" },
+      { "text": "हर बाथरूम में नल, शावर चलाएँ और टॉयलेट फ्लश करें, प्रेशर और निकासी देखते हुए", "note": "धीमी निकासी, बहते टॉयलेट, और सिंक के नीचे दाग सब उस प्लंबिंग का इशारा हैं जिसकी आप कीमत चुकाएँगे।" },
+      { "text": "इलेक्ट्रिकल पैनल खोलें और लेबल किए ब्रेकर, जलने के निशान, और पर्याप्त क्षमता जाँचें", "note": "पुराने फ़्यूज़ बॉक्स, एल्युमीनियम वायरिंग, और अर्थिंग न होना महँगा और सुरक्षा का मुद्दा हो सकता है।" },
+      { "text": "हीटिंग और कूलिंग चलाकर देखें, और पूछें कि HVAC आख़िरी बार कब सर्विस हुआ और फ़िल्टर बदला गया" },
+      { "text": "कीटों के निशान ढूँढें — बीट, कुतरने के निशान, मिट्टी की नलियाँ, बुरादा — अटारी, बेसमेंट, और कोनों में", "note": "नींव की दीवार पर मिट्टी की नलियाँ दीमक का एक जाना-पहचाना संकेत हैं।" },
+      { "text": "अटारी के इंसुलेशन की गहराई जाँचें और छत के नीचे दिन की रोशनी, दाग, या फफूँदी देखें" },
+      { "text": "बेसमेंट या क्रॉल स्पेस में नमी, दीवार पर सफ़ेद पपड़ी, और सीलन की गंध जाँचें", "note": "ज़ोर से चलता डीह्यूमिडिफ़ायर या निचली दीवारों पर ताज़ा पेंट किसी नमी की समस्या को छिपा सकता है।" },
+      { "text": "गैराज का दरवाज़ा खोलें-बंद करें और उसकी ऑटो-रिवर्स सुरक्षा जाँचें" },
+      { "text": "जाँचें कि खिड़कियाँ और दरवाज़े खुलते, बंद होते, और लॉक होते हैं, और डबल-ग्लेज़्ड शीशों के बीच धुंध देखें" },
+      { "text": "सिंक के नीचे और वॉटर हीटर के आसपास रिसाव, जंग, और उसकी उम्र देखें", "note": "ज़्यादातर वॉटर हीटर 8-12 साल चलते हैं; लेबल पर निर्माण की तारीख नोट करें।" },
+      { "text": "कुछ आउटलेट और स्विच जाँचें, साथ ही किचन और बाथरूम के GFCI आउटलेट" },
+      { "text": "सीमाओं पर चलें और बाड़ व ढाँचों की तुलना प्रॉपर्टी की रेखाओं से करें", "note": "बाड़ और शेड हमेशा कानूनी सीमा पर नहीं होते — जो मायने रखता है वह सर्वे है।" },
+      { "text": "समतल फ़र्श और ठीक से बंद होते दरवाज़े जाँचें; जो दरवाज़ा बंद न हो वह घर के बैठने का संकेत हो सकता है" },
+      { "text": "किसी भी संरचनात्मक, बिजली से जुड़ी, या जहाँ आप सुरक्षित नहीं पहुँच सकते, चीज़ के लिए लाइसेंस्ड इंस्पेक्टर बुलाएँ", "note": "यह चेकलिस्ट आपको समस्याएँ पकड़ने और बेहतर सवाल पूछने में मदद करती है — यह पेशेवर निरीक्षण की जगह नहीं लेती।" }
+    ],
+    "faq": [
+      { "q": "घर निरीक्षण में क्या-क्या शामिल होता है?", "a": "एक पूरा निरीक्षण छत, नींव, ढाँचा, प्लंबिंग, बिजली, हीटिंग और कूलिंग, इंसुलेशन, पानी की निकासी, और कीट या पानी के नुकसान के संकेत देखता है। इंस्पेक्टर हालत और सुरक्षा पर रिपोर्ट देता है पर आम तौर पर दीवारें नहीं खोलता और किसी चीज़ की गारंटी नहीं देता। यह उस दिन जो दिख रहा है उसका एक स्नैपशॉट है।" },
+      { "q": "क्या इंस्पेक्टर बुलाने से पहले मैं खुद घर जाँच सकता हूँ?", "a": "हाँ, और यह समझदारी है — इस चेकलिस्ट के साथ वॉक-थ्रू आपको ज़ाहिर समस्याएँ छाँटने और तय करने में मदद करता है कि जगह किसी पेड निरीक्षण के लायक है या नहीं। पर किसी भी संरचनात्मक, बिजली, या छिपी चीज़ के लिए लाइसेंस्ड इंस्पेक्टर बुलाएँ। यह सूची आपको बेहतर ग्राहक बनाती है, इंस्पेक्टर का विकल्प नहीं।" },
+      { "q": "घर निरीक्षण में सबसे बड़े ख़तरे के संकेत क्या हैं?", "a": "महँगे संकेत हैं नींव का खिसकना, जीवन के अंत पर पहुँची छत, पुरानी या असुरक्षित बिजली, बड़ी प्लंबिंग समस्याएँ, और बेसमेंट या क्रॉल स्पेस में लगातार पानी। दीमक जैसे कीट और छिपी फफूँदी भी ऊँचे दर्जे पर हैं। इनमें से कोई भी आपके ऑफ़र या पीछे हटने के फ़ैसले को आकार देना चाहिए।" }
+    ]
+  }
+}

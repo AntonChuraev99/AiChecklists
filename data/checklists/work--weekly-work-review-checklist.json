@@ -1,0 +1,64 @@
+{
+  "category": "work",
+  "slug": "weekly-work-review-checklist",
+  "order": 53,
+  "icon": "event_note",
+  "title": "Weekly Work Review Checklist",
+  "metaTitle": "Weekly Work Review Checklist (Reflect & Plan) | Gisti",
+  "metaDescription": "A weekly work review checklist to wrap up the week and plan ahead: review progress, clear your inbox, set priorities, and reflect. Free, or tailor it in Gisti.",
+  "cardDesc": "Close out the week and plan the next — review, inbox, priorities, and reflection.",
+  "ordered": false,
+  "intro": "A weekly review is a small habit with an outsized payoff: an hour to close out the week, catch what's slipping, and start Monday with a plan instead of a scramble. This checklist walks through reviewing your progress, clearing the decks, and setting next week's priorities. See more <a href=\"/checklists/work/\" class=\"text-primary hover:underline\">work checklists</a>.",
+  "items": [
+    { "text": "Review what you finished this week against what you planned", "note": "The gap between intent and reality is where the useful lessons are." },
+    { "text": "Check progress on each ongoing project and flag anything at risk" },
+    { "text": "Capture loose ends: unread messages, half-done tasks, open loops" },
+    { "text": "Clear and organize your inbox to a manageable state", "note": "Reply, archive, or turn each one into a task — don't leave it as a to-do in disguise." },
+    { "text": "Follow up on anything you're waiting on from other people" },
+    { "text": "Review next week's calendar, deadlines, and meetings", "note": "Decline or reschedule anything that doesn't need you." },
+    { "text": "Update your task list and set the top three priorities for next week", "note": "Keep it short so the important work actually gets done." },
+    { "text": "Note key decisions and update project docs while they're fresh" },
+    { "text": "Reflect on what went well and what you'd do again" },
+    { "text": "Pick one thing to improve or handle differently next week" },
+    { "text": "Log your wins and progress for later reviews", "note": "You'll have forgotten most of them by appraisal season." },
+    { "text": "Check in on your longer-term goals, not just this week's tasks" },
+    { "text": "Tidy your files, desktop, and notes so Monday starts clean" },
+    { "text": "Block focus time for your most important work next week", "note": "Protect it before meetings fill the calendar." },
+    { "text": "Note anything to raise with your manager or team" }
+  ],
+  "faq": [
+    { "q": "What is a weekly review and why do it?", "a": "A weekly review is a short, regular check-in where you look back at the week's work and plan the week ahead. It catches slipping projects, clears mental clutter, and lets you start Monday with clear priorities instead of reacting to whatever lands first. Half an hour to an hour is usually enough." },
+    { "q": "What should a weekly work review include?", "a": "Review what you completed and what's still open, check progress on your projects, clear your inbox and follow-ups, and look at next week's calendar and deadlines. Then set your top few priorities, reflect on what went well and what to improve, and note anything to raise with your team. Keep the list of next-week priorities short so it's realistic." },
+    { "q": "When is the best time to do a weekly review?", "a": "Friday afternoon works well because the week is fresh and you can leave with a clear plan, but Monday morning is a fine alternative if you'd rather start the week by setting it up. Pick a consistent slot and protect it — the habit matters more than the exact day. The key is doing it every week, not perfecting the timing." }
+  ],
+  "related": ["daily-standup-checklist", "meeting-prep-checklist", "first-day-at-work-checklist", "project-kickoff-checklist"],
+  "hi": {
+    "title": "साप्ताहिक कार्य समीक्षा चेकलिस्ट",
+    "metaTitle": "साप्ताहिक कार्य समीक्षा चेकलिस्ट (सोचें और प्लान करें) | Gisti",
+    "metaDescription": "हफ़्ता समेटने और अगला प्लान करने के लिए एक साप्ताहिक कार्य समीक्षा चेकलिस्ट: प्रगति देखें, इनबॉक्स साफ़ करें, प्राथमिकताएँ तय करें, और सोचें। मुफ़्त, या Gisti में ढालें।",
+    "cardDesc": "हफ़्ता समेटें और अगला प्लान करें — समीक्षा, इनबॉक्स, प्राथमिकताएँ, और चिंतन।",
+    "intro": "साप्ताहिक समीक्षा एक छोटी आदत है जिसका फ़ायदा बड़ा होता है: हफ़्ता समेटने, फिसलती चीज़ों को पकड़ने, और सोमवार को भागदौड़ के बजाय एक योजना के साथ शुरू करने के लिए एक घंटा। यह चेकलिस्ट आपकी प्रगति देखने, चीज़ें समेटने, और अगले हफ़्ते की प्राथमिकताएँ तय करने से गुज़ारती है। और देखें <a href=\"/hi/checklists/work/\" class=\"text-primary hover:underline\">काम की चेकलिस्ट</a>।",
+    "items": [
+      { "text": "इस हफ़्ते आपने जो पूरा किया उसे जो प्लान किया था उससे मिलाकर देखें", "note": "इरादे और हक़ीक़त के बीच का फ़र्क ही काम के सबक़ देता है।" },
+      { "text": "हर चालू प्रोजेक्ट की प्रगति जाँचें और जोखिम वाली किसी भी चीज़ पर निशान लगाएँ" },
+      { "text": "अधूरी चीज़ें समेटें: बिना पढ़े संदेश, आधे काम, खुले सिलसिले" },
+      { "text": "अपना इनबॉक्स साफ़ करके संभालने लायक हालत में लाएँ", "note": "हर एक का जवाब दें, आर्काइव करें, या उसे एक काम में बदलें — छिपे हुए टू-डू की तरह न छोड़ें।" },
+      { "text": "दूसरों से जिस चीज़ का इंतज़ार है उस पर फ़ॉलो-अप करें" },
+      { "text": "अगले हफ़्ते का कैलेंडर, समय-सीमाएँ, और मीटिंग देखें", "note": "जिसमें आपकी ज़रूरत नहीं उसे मना करें या दोबारा शेड्यूल करें।" },
+      { "text": "अपनी काम की सूची अपडेट करें और अगले हफ़्ते की शीर्ष तीन प्राथमिकताएँ तय करें", "note": "इसे छोटा रखें ताकि ज़रूरी काम सचमुच हो जाए।" },
+      { "text": "अहम फ़ैसले नोट करें और प्रोजेक्ट दस्तावेज़ ताज़ा रहते ही अपडेट करें" },
+      { "text": "जो अच्छा रहा और जो आप दोबारा करेंगे उस पर सोचें" },
+      { "text": "अगले हफ़्ते सुधारने या अलग तरीके से करने के लिए एक चीज़ चुनें" },
+      { "text": "बाद की समीक्षाओं के लिए अपनी जीत और प्रगति दर्ज करें", "note": "मूल्यांकन के मौसम तक आप इनमें से ज़्यादातर भूल चुके होंगे।" },
+      { "text": "सिर्फ़ इस हफ़्ते के कामों पर नहीं, अपने लंबे लक्ष्यों पर भी नज़र डालें" },
+      { "text": "अपनी फ़ाइलें, डेस्कटॉप, और नोट्स व्यवस्थित करें ताकि सोमवार साफ़ शुरू हो" },
+      { "text": "अगले हफ़्ते अपने सबसे ज़रूरी काम के लिए फ़ोकस समय ब्लॉक करें", "note": "मीटिंग के कैलेंडर भरने से पहले इसकी रक्षा करें।" },
+      { "text": "मैनेजर या टीम के साथ उठाने लायक कोई भी बात नोट करें" }
+    ],
+    "faq": [
+      { "q": "साप्ताहिक समीक्षा क्या है और यह क्यों करें?", "a": "साप्ताहिक समीक्षा एक छोटी, नियमित जाँच है जिसमें आप हफ़्ते के काम पर पीछे मुड़कर देखते हैं और आगे का हफ़्ता प्लान करते हैं। यह फिसलते प्रोजेक्ट पकड़ती है, मन की उलझन साफ़ करती है, और आपको सोमवार को जो पहले आए उस पर प्रतिक्रिया देने के बजाय साफ़ प्राथमिकताओं के साथ शुरू करने देती है। आधा से एक घंटा आम तौर पर काफ़ी है।" },
+      { "q": "एक साप्ताहिक कार्य समीक्षा में क्या शामिल होना चाहिए?", "a": "जो आपने पूरा किया और जो अब भी खुला है उसे देखें, अपने प्रोजेक्ट की प्रगति जाँचें, इनबॉक्स और फ़ॉलो-अप साफ़ करें, और अगले हफ़्ते का कैलेंडर व समय-सीमाएँ देखें। फिर अपनी कुछ शीर्ष प्राथमिकताएँ तय करें, जो अच्छा रहा और जो सुधारना है उस पर सोचें, और टीम के साथ उठाने लायक कुछ भी नोट करें। अगले हफ़्ते की प्राथमिकताओं की सूची छोटी रखें ताकि वह व्यावहारिक हो।" },
+      { "q": "साप्ताहिक समीक्षा करने का सबसे अच्छा समय कब है?", "a": "शुक्रवार दोपहर अच्छा रहता है क्योंकि हफ़्ता ताज़ा होता है और आप एक साफ़ योजना के साथ निकल सकते हैं, पर सोमवार सुबह भी ठीक विकल्प है अगर आप हफ़्ते की शुरुआत उसे सेट करके करना चाहें। एक तय समय चुनें और उसकी रक्षा करें — आदत सही दिन से ज़्यादा मायने रखती है। असली बात हर हफ़्ते इसे करना है, समय को परफ़ेक्ट करना नहीं।" }
+    ]
+  }
+}

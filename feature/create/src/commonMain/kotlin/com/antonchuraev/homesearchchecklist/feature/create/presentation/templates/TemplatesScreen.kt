@@ -32,6 +32,8 @@ import androidx.compose.material.icons.filled.Cake
 import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material.icons.filled.Celebration
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Checklist
+import androidx.compose.material.icons.filled.ChildFriendly
 import androidx.compose.material.icons.filled.Checkroom
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.CleaningServices
@@ -507,6 +509,10 @@ private fun getIconForTemplate(iconName: String): ImageVector {
         "receipt_long" -> Icons.AutoMirrored.Filled.ReceiptLong
         "trending_up" -> Icons.AutoMirrored.Filled.TrendingUp
         "savings" -> Icons.Default.Savings
+        // Gallery-origin category defaults (checklists with no per-item icon fall back
+        // to their category icon from the landing CATEGORIES registry).
+        "child_friendly" -> Icons.Default.ChildFriendly
+        "checklist" -> Icons.Default.Checklist
         else -> Icons.Default.Check
     }
 }
@@ -528,6 +534,14 @@ private fun getIconBackgroundColor(category: String): Color {
         "fitness" -> Color(0xFFFCE4EC) // Light pink
         "cooking" -> Color(0xFFFFF8E1) // Light amber
         "finance" -> Color(0xFFE0F2F1) // Light teal
+        // Gallery-origin categories (kept in sync with the landing CATEGORIES tints)
+        "baby" -> Color(0xFFF0EAFB) // Light purple
+        "business" -> Color(0xFFE8EAFD) // Light indigo
+        "cleaning" -> Color(0xFFDDF3F5) // Light teal-cyan
+        "groceries" -> Color(0xFFE7F4EC) // Light green
+        "moving" -> Color(0xFFE3F2FD) // Light blue
+        "study" -> Color(0xFFEDE7F6) // Light deep-purple
+        "wedding" -> Color(0xFFFFF8E1) // Light amber
         else -> MaterialTheme.colorScheme.primaryContainer
     }
 }
@@ -549,6 +563,14 @@ private fun getIconColor(category: String): Color {
         "fitness" -> Color(0xFFC2185B) // Pink
         "cooking" -> Color(0xFFFF8F00) // Amber
         "finance" -> Color(0xFF00695C) // Teal
+        // Gallery-origin categories (kept in sync with the landing CATEGORIES tints)
+        "baby" -> Color(0xFF7E5BD0) // Deep purple
+        "business" -> Color(0xFF6366F1) // Indigo
+        "cleaning" -> Color(0xFF006874) // Teal-cyan
+        "groceries" -> Color(0xFF2E9E5B) // Green
+        "moving" -> Color(0xFF2196F3) // Blue
+        "study" -> Color(0xFF5E35B1) // Deep purple
+        "wedding" -> Color(0xFFD9A21E) // Gold
         else -> MaterialTheme.colorScheme.primary
     }
 }

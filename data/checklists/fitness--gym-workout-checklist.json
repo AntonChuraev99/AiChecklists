@@ -1,0 +1,64 @@
+{
+  "category": "fitness",
+  "slug": "gym-workout-checklist",
+  "order": 51,
+  "icon": "fitness_center",
+  "title": "Gym Workout Checklist",
+  "metaTitle": "Gym Workout Checklist (Full Session) | Gisti",
+  "metaDescription": "A gym workout checklist — warm up, hit upper body, lower body, and core, then cool down and log your sets. Free, or tailor it to your split with AI in Gisti.",
+  "cardDesc": "A full gym session in order — warm up, upper body, lower body, core, then cool down and log your sets.",
+  "ordered": true,
+  "intro": "A productive gym session isn't about doing more — it's about warming up properly, working each muscle group with good form, and leaving enough in the tank to cool down. This checklist walks through a balanced full-body session from your first warm-up set to logging your last lift. It's general fitness guidance, not personal training advice — adjust the exercises and weights to your level, and see the rest of our <a href=\"/checklists/fitness/\" class=\"text-primary hover:underline\">health and fitness checklists</a>.",
+  "items": [
+    { "text": "Set today's focus — full body, or a specific split like push, pull, or legs", "note": "Knowing the target keeps you from wandering randomly between machines." },
+    { "text": "Warm up for 5 to 10 minutes with light cardio to raise your heart rate" },
+    { "text": "Do dynamic mobility drills for the joints you're about to train", "note": "Leg swings, arm circles, and bodyweight squats prime the muscles better than static stretching." },
+    { "text": "Start with the biggest compound lifts while you're fresh — squats, deadlifts, bench, or rows", "note": "Heavy, technical lifts belong early, before fatigue hurts your form." },
+    { "text": "Work your upper body with a push and a pull movement" },
+    { "text": "Work your lower body with a squat or hinge and a single-leg movement" },
+    { "text": "Finish the main work with focused core exercises" },
+    { "text": "Use a weight you can control with good form for every rep", "note": "If your form breaks down, the weight is too heavy — drop it." },
+    { "text": "Rest 60 to 120 seconds between heavy sets, less for lighter accessory work" },
+    { "text": "Track each exercise, weight, and reps as you go", "note": "Logging is how you know to add weight next time — progressive overload drives results." },
+    { "text": "Sip water throughout the session, not just at the end" },
+    { "text": "Wipe down each machine and bench, and rerack your weights", "note": "Basic gym etiquette — leave equipment as you'd want to find it." },
+    { "text": "Cool down with 5 minutes of easy movement to bring your heart rate down" },
+    { "text": "Stretch the muscles you trained while they're still warm" },
+    { "text": "Log the session and note how it felt for next time" }
+  ],
+  "faq": [
+    { "q": "How long should a gym workout be?", "a": "Most effective sessions run 45 to 75 minutes, including warm-up and cool-down. Beyond that, focus and form usually fade and the extra time adds little. Quality and consistency beat marathon sessions — a focused hour a few times a week does far more than an occasional two-hour grind." },
+    { "q": "Should I do cardio or weights first?", "a": "Do whichever matches your main goal first, while you're fresh. If strength or muscle is the priority, lift first and save cardio for the end or a separate day. If endurance is the goal, run first. A short easy cardio warm-up before lifting is fine either way — that's different from a hard cardio session." },
+    { "q": "In what order should I do gym exercises?", "a": "Warm up first, then do your biggest compound lifts — squats, deadlifts, presses, rows — while you have the most energy and focus. Move to smaller isolation and accessory work after, and finish with core and a cool-down. Training the heaviest, most technical movements early protects your form and lowers injury risk." }
+  ],
+  "related": ["home-workout-checklist", "gym-bag-checklist", "meal-prep-checklist", "running-prep-checklist"],
+  "hi": {
+    "title": "जिम वर्कआउट चेकलिस्ट",
+    "metaTitle": "जिम वर्कआउट चेकलिस्ट (पूरा सेशन) | Gisti",
+    "metaDescription": "एक जिम वर्कआउट चेकलिस्ट — वार्म-अप करें, अपर बॉडी, लोअर बॉडी, और कोर पर काम करें, फिर कूल डाउन करें और अपने सेट लॉग करें। मुफ़्त, या Gisti में AI से अपने मुताबिक ढालें।",
+    "cardDesc": "क्रम में एक पूरा जिम सेशन — वार्म-अप, अपर बॉडी, लोअर बॉडी, कोर, फिर कूल डाउन और अपने सेट लॉग करें।",
+    "intro": "एक अच्छा जिम सेशन ज़्यादा करने के बारे में नहीं है — यह सही तरह वार्म-अप करने, हर मसल ग्रुप पर अच्छी फ़ॉर्म के साथ काम करने, और कूल डाउन के लिए पर्याप्त दम बचाने के बारे में है। यह चेकलिस्ट आपके पहले वार्म-अप सेट से लेकर आख़िरी लिफ़्ट लॉग करने तक एक संतुलित फ़ुल-बॉडी सेशन से गुज़ारती है। यह सामान्य फ़िटनेस मार्गदर्शन है, पर्सनल ट्रेनिंग सलाह नहीं — एक्सरसाइज़ और वज़न अपने स्तर के हिसाब से ढालें, और देखें हमारी बाक़ी <a href=\"/hi/checklists/fitness/\" class=\"text-primary hover:underline\">सेहत और फ़िटनेस चेकलिस्ट</a>।",
+    "items": [
+      { "text": "आज का फ़ोकस तय करें — फ़ुल बॉडी, या पुश, पुल, या लेग्स जैसा कोई ख़ास स्प्लिट", "note": "लक्ष्य पता होने से आप मशीनों के बीच बेतरतीब भटकने से बच जाते हैं।" },
+      { "text": "हार्ट रेट बढ़ाने के लिए 5 से 10 मिनट हल्के कार्डियो से वार्म-अप करें" },
+      { "text": "जिन जोड़ों को ट्रेन करना है उनके लिए डायनामिक मोबिलिटी ड्रिल करें", "note": "लेग स्विंग, आर्म सर्कल, और बॉडीवेट स्क्वैट मांसपेशियों को स्टैटिक स्ट्रेचिंग से बेहतर तैयार करते हैं।" },
+      { "text": "जब आप तरोताज़ा हों तब सबसे बड़ी कंपाउंड लिफ़्ट से शुरू करें — स्क्वैट, डेडलिफ़्ट, बेंच, या रो", "note": "भारी, तकनीकी लिफ़्ट पहले करनी चाहिए, इससे पहले कि थकान आपकी फ़ॉर्म बिगाड़े।" },
+      { "text": "अपनी अपर बॉडी पर एक पुश और एक पुल मूवमेंट से काम करें" },
+      { "text": "अपनी लोअर बॉडी पर एक स्क्वैट या हिंज और एक सिंगल-लेग मूवमेंट से काम करें" },
+      { "text": "मुख्य काम केंद्रित कोर एक्सरसाइज़ के साथ ख़त्म करें" },
+      { "text": "ऐसा वज़न इस्तेमाल करें जिसे आप हर रेप में अच्छी फ़ॉर्म के साथ नियंत्रित कर सकें", "note": "अगर आपकी फ़ॉर्म बिगड़ने लगे, तो वज़न ज़्यादा है — उसे घटाएँ।" },
+      { "text": "भारी सेट के बीच 60 से 120 सेकंड आराम करें, हल्के एक्सेसरी वर्क के लिए कम" },
+      { "text": "साथ-साथ हर एक्सरसाइज़, वज़न, और रेप्स ट्रैक करें", "note": "लॉग करने से ही पता चलता है कि अगली बार वज़न बढ़ाना है — प्रोग्रेसिव ओवरलोड नतीजे लाता है।" },
+      { "text": "पूरे सेशन में पानी पिएँ, सिर्फ़ अंत में नहीं" },
+      { "text": "हर मशीन और बेंच पोंछें, और अपने वज़न वापस रैक पर रखें", "note": "बुनियादी जिम शिष्टाचार — उपकरण वैसे ही छोड़ें जैसे आप ख़ुद पाना चाहेंगे।" },
+      { "text": "हार्ट रेट कम करने के लिए 5 मिनट की आसान मूवमेंट से कूल डाउन करें" },
+      { "text": "जिन मांसपेशियों को ट्रेन किया उन्हें गर्म रहते हुए स्ट्रेच करें" },
+      { "text": "सेशन लॉग करें और नोट करें कि अगली बार के लिए कैसा लगा" }
+    ],
+    "faq": [
+      { "q": "जिम वर्कआउट कितनी देर का होना चाहिए?", "a": "ज़्यादातर असरदार सेशन वार्म-अप और कूल-डाउन समेत 45 से 75 मिनट के होते हैं। इससे ज़्यादा पर आमतौर पर फ़ोकस और फ़ॉर्म कमज़ोर पड़ जाते हैं, और अतिरिक्त समय से ख़ास फ़ायदा नहीं होता। गुणवत्ता और निरंतरता लंबे सेशन से बेहतर हैं — हफ़्ते में कुछ बार का केंद्रित एक घंटा कभी-कभार की दो घंटे की मशक्कत से कहीं ज़्यादा काम करता है।" },
+      { "q": "पहले कार्डियो करूँ या वेट?", "a": "जो आपके मुख्य लक्ष्य से मेल खाए वही पहले करें, जब आप तरोताज़ा हों। अगर स्ट्रेंथ या मसल प्राथमिकता है, तो पहले लिफ़्ट करें और कार्डियो अंत के लिए या अलग दिन के लिए बचाएँ। अगर एंड्योरेंस लक्ष्य है, तो पहले दौड़ें। लिफ़्टिंग से पहले एक छोटा आसान कार्डियो वार्म-अप दोनों ही सूरत में ठीक है — वह एक कठिन कार्डियो सेशन से अलग बात है।" },
+      { "q": "जिम एक्सरसाइज़ किस क्रम में करूँ?", "a": "पहले वार्म-अप करें, फिर अपनी सबसे बड़ी कंपाउंड लिफ़्ट — स्क्वैट, डेडलिफ़्ट, प्रेस, रो — तब करें जब आपमें सबसे ज़्यादा ऊर्जा और फ़ोकस हो। इसके बाद छोटी आइसोलेशन और एक्सेसरी वर्क करें, और कोर व कूल-डाउन के साथ ख़त्म करें। सबसे भारी, तकनीकी मूवमेंट पहले करने से आपकी फ़ॉर्म बचती है और चोट का जोखिम घटता है।" }
+    ]
+  }
+}

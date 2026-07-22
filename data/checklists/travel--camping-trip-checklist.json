@@ -1,0 +1,66 @@
+{
+  "category": "travel",
+  "slug": "camping-trip-checklist",
+  "order": 53,
+  "icon": "forest",
+  "title": "Camping Trip Checklist",
+  "metaTitle": "Camping Trip Checklist (Tent, Gear & Food) | Gisti",
+  "metaDescription": "A camping trip checklist: tent and sleeping gear, stove and cookware, water, layers, first aid, and Leave No Trace. Free to use, or tailor it with AI in Gisti.",
+  "cardDesc": "Tent and sleeping gear, cooking, water, layers, safety, and Leave No Trace basics.",
+  "ordered": false,
+  "intro": "Camping is easy to enjoy and easy to get wrong — a missing tent pole or a bag too thin for a cold night can spoil an otherwise perfect trip. This checklist covers shelter, sleep, food, water, and safety, plus the small things that are miserable to be without. See more <a href=\"/checklists/travel/\" class=\"text-primary hover:underline\">travel checklists</a>.",
+  "items": [
+    { "text": "Reserve your campsite and check its rules on fires, pets, and check-in", "note": "Some sites ban campfires in dry season." },
+    { "text": "Pack the tent, groundsheet, and enough stakes, and pitch it once at home", "note": "Find missing parts before you're setting up in the dark." },
+    { "text": "Bring sleeping bags rated for the night-time low, plus sleeping pads", "note": "Most of the cold comes up from the ground, so the pad matters as much as the bag." },
+    { "text": "Pack a camp stove with enough fuel, a lighter, and waterproof matches" },
+    { "text": "Bring cookware, utensils, a sharp knife, and biodegradable soap" },
+    { "text": "Plan your meals and store food in a sealed cooler or bear-proof container", "note": "Keeps food fresh and wildlife out of camp." },
+    { "text": "Bring plenty of drinking water, plus a filter or purification tablets" },
+    { "text": "Pack headlamps, a lantern, and spare batteries" },
+    { "text": "Dress in layers, with rain gear and a warm hat for the evening" },
+    { "text": "Bring sturdy, broken-in footwear and several pairs of dry socks" },
+    { "text": "Pack a first aid kit, insect repellent, and sunscreen" },
+    { "text": "Carry a paper map and compass or GPS, and tell someone your plans", "note": "Cell signal is unreliable in the backcountry." },
+    { "text": "Bring trash bags and pack out everything you bring in", "note": "Leave No Trace: the site should look untouched when you go." },
+    { "text": "Pack a multi-tool, duct tape, and paracord for quick repairs" },
+    { "text": "Check the forecast and pack for the worst weather it suggests" },
+    { "text": "Bring toilet paper, a trowel, and hand sanitizer" }
+  ],
+  "faq": [
+    { "q": "What do I need for my first camping trip?", "a": "The essentials are shelter and sleep (tent, stakes, a sleeping bag rated for the temperature, sleeping pad), cooking (stove, fuel, cookware, water), light (headlamp and spare batteries), and safety (first aid, warm layers, a map). Borrow big-ticket gear for a first trip before you commit to buying." },
+    { "q": "How do I stay warm while camping?", "a": "Use a sleeping bag rated below the expected low and a sleeping pad to insulate you from the ground, which is where most heat is lost. Dress in dry layers, wear a hat to bed, and eat a warm meal before sleeping. Change into dry socks and base layers at night rather than sleeping in what you wore all day." },
+    { "q": "What food is easiest to bring camping?", "a": "Foods that don't need refrigeration or much prep: oats, trail mix, pasta, rice, canned beans, tortillas, and hard cheese. Pre-chop and portion ingredients at home to cut cleanup at the site. Keep anything perishable in a cooler with ice, and store all food sealed and away from your tent." }
+  ],
+  "related": ["road-trip-checklist", "vacation-preparation-checklist", "weekend-trip-packing-list"],
+  "hi": {
+    "title": "कैंपिंग ट्रिप चेकलिस्ट",
+    "metaTitle": "कैंपिंग ट्रिप चेकलिस्ट (टेंट, गियर और खाना) | Gisti",
+    "metaDescription": "एक कैंपिंग ट्रिप चेकलिस्ट: टेंट और सोने का सामान, स्टोव और बर्तन, पानी, लेयर, फ़र्स्ट एड, और Leave No Trace। मुफ़्त इस्तेमाल करें, या Gisti में AI से ढालें।",
+    "cardDesc": "टेंट और सोने का सामान, खाना, पानी, लेयर, सुरक्षा, और Leave No Trace की बुनियादी बातें।",
+    "intro": "कैंपिंग का मज़ा लेना आसान है और इसे बिगाड़ना भी — एक गायब टेंट पोल या ठंडी रात के लिए पतला बैग एक शानदार ट्रिप बिगाड़ सकता है। यह चेकलिस्ट आश्रय, नींद, खाना, पानी, और सुरक्षा कवर करती है, साथ ही वे छोटी चीज़ें जिनके बिना बुरा हाल हो जाता है। और देखें <a href=\"/hi/checklists/travel/\" class=\"text-primary hover:underline\">यात्रा चेकलिस्ट</a>।",
+    "items": [
+      { "text": "अपना कैंपसाइट बुक करें और आग, पालतू, और चेक-इन के नियम जाँचें", "note": "कुछ जगहें सूखे मौसम में कैंपफ़ायर पर रोक लगाती हैं।" },
+      { "text": "टेंट, ग्राउंडशीट, और पर्याप्त कीलें पैक करें, और इसे घर पर एक बार लगाएँ", "note": "अँधेरे में लगाने से पहले गायब हिस्से पता कर लें।" },
+      { "text": "रात के न्यूनतम तापमान के लिए रेटेड स्लीपिंग बैग लाएँ, साथ में स्लीपिंग पैड", "note": "ज़्यादातर ठंड ज़मीन से ऊपर आती है, इसलिए पैड बैग जितना ही अहम है।" },
+      { "text": "पर्याप्त ईंधन वाला एक कैंप स्टोव, एक लाइटर, और वॉटरप्रूफ़ माचिस पैक करें" },
+      { "text": "बर्तन, चम्मच-कांटे, एक तेज़ चाकू, और बायोडिग्रेडेबल साबुन लाएँ" },
+      { "text": "अपने भोजन प्लान करें और खाना एक सीलबंद कूलर या बेयर-प्रूफ़ कंटेनर में रखें", "note": "खाना ताज़ा रखता है और जंगली जानवरों को कैंप से दूर।" },
+      { "text": "भरपूर पीने का पानी लाएँ, साथ में एक फ़िल्टर या प्यूरिफ़िकेशन टैबलेट" },
+      { "text": "हेडलैंप, एक लालटेन, और अतिरिक्त बैटरियाँ पैक करें" },
+      { "text": "लेयर में कपड़े पहनें, शाम के लिए रेन गियर और एक गर्म टोपी के साथ" },
+      { "text": "मज़बूत, पहने हुए जूते और कई जोड़ी सूखे मोज़े लाएँ" },
+      { "text": "एक फ़र्स्ट एड किट, कीट-निरोधक, और सनस्क्रीन पैक करें" },
+      { "text": "एक पेपर मैप और कम्पास या GPS रखें, और किसी को अपनी योजना बताएँ", "note": "दूरदराज़ इलाकों में मोबाइल सिग्नल भरोसेमंद नहीं होता।" },
+      { "text": "कचरे की थैलियाँ लाएँ और जो कुछ लाएँ सब वापस ले जाएँ", "note": "Leave No Trace: जाते वक़्त जगह अछूती दिखनी चाहिए।" },
+      { "text": "जल्दी मरम्मत के लिए एक मल्टी-टूल, डक्ट टेप, और पैराकॉर्ड पैक करें" },
+      { "text": "पूर्वानुमान जाँचें और उसके बताए सबसे ख़राब मौसम के लिए पैक करें" },
+      { "text": "टॉयलेट पेपर, एक छोटी खुरपी, और हैंड सैनिटाइज़र लाएँ" }
+    ],
+    "faq": [
+      { "q": "अपनी पहली कैंपिंग ट्रिप के लिए मुझे क्या चाहिए?", "a": "ज़रूरी चीज़ें हैं आश्रय और नींद (टेंट, कीलें, तापमान के मुताबिक रेटेड स्लीपिंग बैग, स्लीपिंग पैड), खाना पकाना (स्टोव, ईंधन, बर्तन, पानी), रोशनी (हेडलैंप और अतिरिक्त बैटरियाँ), और सुरक्षा (फ़र्स्ट एड, गर्म लेयर, एक मैप)। पहली ट्रिप के लिए महँगा सामान ख़रीदने से पहले उधार लें।" },
+      { "q": "कैंपिंग करते हुए मैं गर्म कैसे रहूँ?", "a": "अपेक्षित न्यूनतम से नीचे रेटेड स्लीपिंग बैग और ज़मीन से अलग रखने वाला एक स्लीपिंग पैड इस्तेमाल करें, क्योंकि ज़्यादातर गर्मी वहीं से जाती है। सूखे लेयर पहनें, सोते वक़्त टोपी लगाएँ, और सोने से पहले गर्म भोजन करें। रात को दिन भर पहने कपड़ों में सोने के बजाय सूखे मोज़े और बेस लेयर पहनें।" },
+      { "q": "कैंपिंग के लिए सबसे आसान खाना क्या है?", "a": "ऐसा खाना जिसे फ़्रिज या ज़्यादा तैयारी की ज़रूरत न हो: ओट्स, ट्रेल मिक्स, पास्ता, चावल, डिब्बाबंद बीन्स, टॉर्टिला, और हार्ड चीज़। सामग्री घर पर काट और बाँट लें ताकि साइट पर सफ़ाई कम हो। कोई भी जल्दी ख़राब होने वाली चीज़ बर्फ़ वाले कूलर में रखें, और सारा खाना सीलबंद और अपने टेंट से दूर रखें।" }
+    ]
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "category": "wedding",
+  "slug": "holiday-season-checklist",
+  "order": 51,
+  "icon": "holiday_village",
+  "title": "Holiday Season Prep Checklist",
+  "metaTitle": "Holiday Season Prep Checklist | Gisti",
+  "metaDescription": "A holiday season checklist — budget, gift lists, decorating, meals, cards, and travel, all planned before the rush. Free, or tailor it with AI in Gisti.",
+  "cardDesc": "Get ahead of the holidays — budget, gifts, decorating, meals, cards, travel, and year-end tasks.",
+  "ordered": false,
+  "intro": "The holidays feel calmer when the big pieces are handled early — the gift list drafted before the shops get picked over, the travel booked before prices climb, the meal planned before the day itself. This checklist covers everything from budgeting and shopping to decorating, hosting, and wrapping up the year, so December is something you enjoy rather than scramble through. Start a few weeks out and tick things off as you go. See more in our <a href=\"/checklists/wedding/\" class=\"text-primary hover:underline\">party and event checklists</a>.",
+  "items": [
+    { "text": "Set an overall holiday budget covering gifts, food, travel, and decor", "note": "Setting the number first is the simplest way to avoid a January credit-card shock." },
+    { "text": "Make a gift list with a set amount per person", "note": "A per-person cap keeps the total in check and makes shopping faster." },
+    { "text": "Start shopping early and spread purchases across several weeks", "note": "Early shopping beats the crowds, the shipping cut-offs, and the price surges." },
+    { "text": "Note shipping deadlines for anything ordered online or posted abroad" },
+    { "text": "Plan holiday meals and menus, including any guest dietary needs" },
+    { "text": "Order or reserve anything special ahead of time — a turkey, a cake, or catering" },
+    { "text": "Write a grocery list and buy non-perishables early", "note": "Buy tinned, frozen, and dry goods now; save fresh produce for the last few days." },
+    { "text": "Send holiday cards or digital greetings, checking your address list first" },
+    { "text": "Decorate the home, and test lights before hanging them", "note": "Check every string works before it's up — far easier than fixing a dead section later." },
+    { "text": "Plan and RSVP to gatherings, and confirm who's hosting what" },
+    { "text": "Book travel and accommodation, and arrange pet or house sitting if you're away", "note": "Holiday travel books up and prices rise — lock it in as early as you can." },
+    { "text": "Buy wrapping paper, tape, gift bags, tags, and ribbon in one trip" },
+    { "text": "Wrap and label gifts as you get them, rather than all at once", "note": "Wrapping as you go avoids a stressful all-nighter before the big day." },
+    { "text": "Prepare for guests: spare bedding, towels, and a few easy extra meals" },
+    { "text": "Plan a New Year's celebration or a quiet night in" },
+    { "text": "Wrap up year-end tasks: donations, appointments, and next year's calendar", "note": "Many charitable donations and flexible-spending funds have a December 31 deadline." }
+  ],
+  "faq": [
+    { "q": "When should I start preparing for the holidays?", "a": "Ideally a few weeks to a couple of months ahead for the big commitments. Book travel and reserve any catering or special food orders early, since those fill up and get pricier closest to the date. Gift shopping, decorating, and cards can happen through late November and December — the earlier you start, the less the last-minute rush." },
+    { "q": "How do I stick to a holiday budget?", "a": "Set one overall number first, then split it across gifts, food, travel, and decorations, and give each person on your gift list a specific limit. Track what you spend as you go rather than tallying it in January. Homemade gifts, a Secret Santa instead of buying for everyone, and shopping the sales all stretch the budget without feeling stingy." },
+    { "q": "What do people forget when planning for the holidays?", "a": "Common misses are shipping and posting deadlines, batteries for gifts and lights, enough wrapping supplies, and dietary needs for holiday meals. People also forget year-end admin like charitable donations or flexible-spending deadlines that fall on December 31. A written list of gifts, guests, and tasks is the simplest fix." }
+  ],
+  "related": ["party-planning-checklist", "event-planning-checklist", "birthday-party-checklist"],
+  "hi": {
+    "title": "छुट्टियों के मौसम की तैयारी चेकलिस्ट",
+    "metaTitle": "छुट्टियों के मौसम की तैयारी चेकलिस्ट | Gisti",
+    "metaDescription": "एक छुट्टियों के मौसम की चेकलिस्ट — बजट, तोहफ़ों की सूची, सजावट, भोजन, कार्ड, और यात्रा, सब भागदौड़ से पहले प्लान करें। मुफ़्त, या Gisti में AI से अपने मुताबिक ढालें।",
+    "cardDesc": "छुट्टियों से पहले तैयार रहें — बजट, तोहफ़े, सजावट, भोजन, कार्ड, यात्रा, और साल के अंत के काम।",
+    "intro": "छुट्टियाँ तब ज़्यादा शांत लगती हैं जब बड़े काम पहले ही निपट जाएँ — तोहफ़ों की सूची दुकानें ख़ाली होने से पहले तैयार, यात्रा दाम चढ़ने से पहले बुक, और भोजन उस दिन से पहले प्लान। यह चेकलिस्ट बजट बनाने और ख़रीदारी से लेकर सजावट, मेज़बानी, और साल समेटने तक सब कुछ कवर करती है, ताकि दिसंबर आपके लिए मज़े की चीज़ हो, न कि भागदौड़। कुछ हफ़्ते पहले शुरू करें और साथ-साथ चीज़ें टिक करते जाएँ। और देखें हमारी <a href=\"/hi/checklists/wedding/\" class=\"text-primary hover:underline\">पार्टी और इवेंट चेकलिस्ट</a>।",
+    "items": [
+      { "text": "तोहफ़े, खाना, यात्रा, और सजावट को कवर करता एक कुल छुट्टी बजट तय करें", "note": "पहले रकम तय कर लेना जनवरी में क्रेडिट-कार्ड के झटके से बचने का सबसे आसान तरीका है।" },
+      { "text": "हर व्यक्ति के लिए एक तय रकम के साथ तोहफ़ों की सूची बनाएँ", "note": "प्रति-व्यक्ति सीमा कुल ख़र्च को क़ाबू में रखती है और ख़रीदारी तेज़ करती है।" },
+      { "text": "जल्दी ख़रीदारी शुरू करें और ख़रीद को कई हफ़्तों में फैलाएँ", "note": "जल्दी ख़रीदारी भीड़, शिपिंग की आख़िरी तारीख़ों, और दाम बढ़ने से बचा लेती है।" },
+      { "text": "ऑनलाइन ऑर्डर या विदेश भेजी जाने वाली किसी भी चीज़ की शिपिंग की आख़िरी तारीख़ें नोट करें" },
+      { "text": "मेहमानों की किसी आहार ज़रूरत समेत छुट्टी के भोजन और मेनू प्लान करें" },
+      { "text": "कोई ख़ास चीज़ पहले से ऑर्डर या रिज़र्व करें — एक टर्की, एक केक, या कैटरिंग" },
+      { "text": "एक ग्रोसरी सूची बनाएँ और न ख़राब होने वाली चीज़ें जल्दी ख़रीदें", "note": "डिब्बाबंद, फ़्रोज़न, और सूखा सामान अभी ख़रीदें; ताज़ी चीज़ें आख़िरी कुछ दिनों के लिए बचाएँ।" },
+      { "text": "अपनी पता-सूची पहले जाँचकर छुट्टी के कार्ड या डिजिटल शुभकामनाएँ भेजें" },
+      { "text": "घर सजाएँ, और लाइटें टाँगने से पहले उन्हें जाँच लें", "note": "टाँगने से पहले हर लड़ी की जाँच कर लें — बाद में बुझे हिस्से को ठीक करने से कहीं आसान है।" },
+      { "text": "गेट-टुगेदर की योजना बनाएँ और RSVP दें, और तय करें कौन क्या मेज़बानी कर रहा है" },
+      { "text": "यात्रा और ठहरना बुक करें, और बाहर जा रहे हों तो पालतू या घर की देखभाल का इंतज़ाम करें", "note": "छुट्टियों की यात्रा जल्दी भर जाती है और दाम चढ़ते हैं — जितनी जल्दी हो सके पक्का कर लें।" },
+      { "text": "रैपिंग पेपर, टेप, गिफ़्ट बैग, टैग, और रिबन एक ही बार में ख़रीदें" },
+      { "text": "तोहफ़ों को एक साथ के बजाय जैसे-जैसे मिलें वैसे-वैसे रैप और लेबल करें", "note": "साथ-साथ रैप करने से बड़े दिन से पहले की तनाव भरी रातजगा से बच जाते हैं।" },
+      { "text": "मेहमानों के लिए तैयारी करें: अतिरिक्त बिस्तर, तौलिए, और कुछ आसान अतिरिक्त भोजन" },
+      { "text": "एक नए साल का जश्न या घर पर एक शांत शाम प्लान करें" },
+      { "text": "साल के अंत के काम निपटाएँ: दान, अपॉइंटमेंट, और अगले साल का कैलेंडर", "note": "कई दान और फ़्लेक्सिबल-स्पेंडिंग फ़ंड की आख़िरी तारीख़ 31 दिसंबर होती है।" }
+    ],
+    "faq": [
+      { "q": "मुझे छुट्टियों की तैयारी कब शुरू करनी चाहिए?", "a": "बड़े कामों के लिए आदर्श रूप से कुछ हफ़्ते से लेकर एक-दो महीने पहले। यात्रा बुक करें और कोई कैटरिंग या ख़ास भोजन ऑर्डर जल्दी रिज़र्व करें, क्योंकि वे तारीख़ के सबसे क़रीब भर जाते हैं और महँगे हो जाते हैं। तोहफ़ों की ख़रीदारी, सजावट, और कार्ड नवंबर के आख़िर और दिसंबर में हो सकते हैं — जितनी जल्दी शुरू करेंगे, आख़िरी क्षण की भागदौड़ उतनी कम।" },
+      { "q": "छुट्टी के बजट पर कैसे टिका रहूँ?", "a": "पहले एक कुल रकम तय करें, फिर उसे तोहफ़ों, खाने, यात्रा, और सजावट में बाँटें, और अपनी तोहफ़ा-सूची के हर व्यक्ति को एक तय सीमा दें। जनवरी में जोड़ने के बजाय साथ-साथ ख़र्च ट्रैक करें। घर के बने तोहफ़े, सबके लिए ख़रीदने के बजाय एक सीक्रेट सैंटा, और सेल में ख़रीदारी, सब बजट को कंजूसी के बिना खींच देते हैं।" },
+      { "q": "छुट्टियों की प्लानिंग में लोग क्या भूल जाते हैं?", "a": "आम चूक हैं शिपिंग और डाक की आख़िरी तारीख़ें, तोहफ़ों और लाइटों के लिए बैटरियाँ, पर्याप्त रैपिंग सामान, और छुट्टी के भोजन के लिए आहार ज़रूरतें। लोग साल के अंत के कामकाज भी भूल जाते हैं जैसे दान या फ़्लेक्सिबल-स्पेंडिंग की 31 दिसंबर वाली आख़िरी तारीख़ें। तोहफ़ों, मेहमानों, और कामों की एक लिखी हुई सूची सबसे आसान हल है।" }
+    ]
+  }
+}

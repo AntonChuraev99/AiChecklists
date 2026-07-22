@@ -1,0 +1,62 @@
+{
+  "category": "finance",
+  "slug": "financial-goals-checklist",
+  "order": 4,
+  "icon": "savings",
+  "title": "Financial Goals Checklist",
+  "metaTitle": "Financial Goals Checklist (Plan and Track) | Gisti",
+  "metaDescription": "A financial goals checklist to plan and track: savings targets, emergency fund, debt payoff, and retirement. Free, or tailor it with AI in Gisti.",
+  "cardDesc": "Plan and track savings targets, emergency fund, debt payoff, insurance, and retirement in one place.",
+  "ordered": false,
+  "intro": "Financial goals only work when they're written down, sized, and tracked — a number and a date beat a vague someday. This checklist helps you lay out short- and long-term goals, size an emergency fund, map your debts, and keep an eye on progress over time. It's for organizing and tracking your own plan, not financial advice. See more <a href=\"/checklists/finance/\" class=\"text-primary hover:underline\">finance and money checklists</a>.",
+  "items": [
+    { "text": "List your short-term goals (under a year) with a target amount and date for each", "note": "A number and a date turn a wish into something you can actually track." },
+    { "text": "Set medium- and long-term goals — a home, education, retirement — with rough figures" },
+    { "text": "Check your emergency fund against a few months of essential expenses", "note": "Three to six months of costs is a common target, but any cushion beats none." },
+    { "text": "List every debt with its balance, interest rate, and minimum payment" },
+    { "text": "Note your debt-payoff progress since your last review" },
+    { "text": "Decide a monthly savings amount and where each portion goes" },
+    { "text": "Review your insurance coverage — health, life, home, vehicle — for gaps", "note": "The point of insurance is the big, rare event you can't self-fund." },
+    { "text": "Plan and price out any major purchases coming up" },
+    { "text": "Note your retirement target and whether contributions are on track" },
+    { "text": "Check your credit report and score, and flag any errors", "note": "You're often entitled to a free report — errors are common and worth disputing." },
+    { "text": "Review beneficiaries, a will, or estate documents if you have them" },
+    { "text": "Track your net worth — what you own minus what you owe — to see the trend", "note": "The trend over time matters more than the number on any single day." },
+    { "text": "Rank your goals so you know what to fund first when money is tight" },
+    { "text": "Schedule your next review — quarterly works well" }
+  ],
+  "faq": [
+    { "q": "How do I set financial goals?", "a": "Make each goal specific: a target amount, a date, and whether it's short-term (under a year) or long-term. Then work out what you'd need to save monthly to hit it, and rank your goals so you know which to fund first. Reviewing them every quarter keeps them realistic as your income and life change." },
+    { "q": "Should I save or pay off debt first?", "a": "A common approach is to build a small emergency cushion first, then focus on high-interest debt, since that interest usually costs more than savings earn. Once expensive debt is under control, people typically split between saving, investing, and any remaining lower-interest debt. What's right depends on your situation, so this checklist helps you lay out the pieces rather than dictate the order." },
+    { "q": "Is this financial goals checklist financial advice?", "a": "No — it's a tool for organizing and tracking your own plan, not financial advice. It doesn't tell you how much to save, which debts to clear, or how to invest for your circumstances. For decisions with real stakes, a qualified financial professional who knows your full picture is the right person to ask." }
+  ],
+  "related": ["monthly-budget-checklist", "tax-preparation-checklist", "investment-review-checklist"],
+  "hi": {
+    "title": "वित्तीय लक्ष्य चेकलिस्ट",
+    "metaTitle": "वित्तीय लक्ष्य चेकलिस्ट (योजना और ट्रैक) | Gisti",
+    "metaDescription": "एक वित्तीय लक्ष्य चेकलिस्ट योजना बनाने और ट्रैक करने के लिए: बचत लक्ष्य, emergency fund, कर्ज़ चुकाना, और retirement। मुफ़्त, या Gisti में AI से ढालें।",
+    "cardDesc": "बचत लक्ष्य, emergency fund, कर्ज़ चुकाना, insurance, और retirement एक जगह योजना बनाएँ और ट्रैक करें।",
+    "intro": "वित्तीय लक्ष्य तभी काम करते हैं जब वे लिखे, नापे, और ट्रैक किए जाएँ — एक रकम और एक तारीख़ एक अस्पष्ट 'कभी न कभी' से बेहतर हैं। यह चेकलिस्ट आपको छोटे- और लंबे-अवधि के लक्ष्य रखने, एक emergency fund नापने, अपने कर्ज़ों का नक्शा बनाने, और समय के साथ प्रगति पर नज़र रखने में मदद करती है। यह आपकी अपनी योजना को व्यवस्थित करने और ट्रैक करने के लिए है, वित्तीय सलाह नहीं। और देखें <a href=\"/hi/checklists/finance/\" class=\"text-primary hover:underline\">फ़ाइनेंस और पैसे की चेकलिस्ट</a>।",
+    "items": [
+      { "text": "अपने छोटे-अवधि के लक्ष्यों (एक साल से कम) को हर एक के लिए एक target रकम और तारीख़ के साथ सूचीबद्ध करें", "note": "एक रकम और एक तारीख़ एक इच्छा को ऐसी चीज़ में बदल देती है जिसे आप सचमुच ट्रैक कर सकें।" },
+      { "text": "मध्यम- और लंबे-अवधि के लक्ष्य तय करें — एक घर, शिक्षा, retirement — मोटे आँकड़ों के साथ" },
+      { "text": "अपने emergency fund की तुलना कुछ महीनों के ज़रूरी ख़र्चों से करें", "note": "तीन से छह महीने के ख़र्च एक आम target हैं, पर कोई भी गद्दी न होने से बेहतर है।" },
+      { "text": "हर कर्ज़ को उसकी बकाया रकम, ब्याज दर, और न्यूनतम भुगतान के साथ सूचीबद्ध करें" },
+      { "text": "अपनी पिछली समीक्षा के बाद से कर्ज़-चुकाने की प्रगति नोट करें" },
+      { "text": "एक मासिक बचत रकम तय करें और हर हिस्सा कहाँ जाता है" },
+      { "text": "अपने insurance कवरेज की समीक्षा करें — स्वास्थ्य, जीवन, घर, वाहन — कमियों के लिए", "note": "insurance का मक़सद वह बड़ी, विरल घटना है जिसे आप ख़ुद वहन नहीं कर सकते।" },
+      { "text": "आने वाली किसी भी बड़ी ख़रीद की योजना बनाएँ और क़ीमत आँकें" },
+      { "text": "अपना retirement target और क्या योगदान सही राह पर हैं नोट करें" },
+      { "text": "अपनी credit रिपोर्ट और स्कोर जाँचें, और किसी भी गलती को चिह्नित करें", "note": "अक्सर आप एक मुफ़्त रिपोर्ट के हक़दार होते हैं — गलतियाँ आम हैं और विवाद करने लायक़ हैं।" },
+      { "text": "beneficiary, एक वसीयत, या estate दस्तावेज़ों की समीक्षा करें अगर आपके पास हैं" },
+      { "text": "अपनी net worth ट्रैक करें — जो आपके पास है घटा जो आप पर बकाया है — रुझान देखने के लिए", "note": "समय के साथ का रुझान किसी एक दिन की संख्या से ज़्यादा मायने रखता है।" },
+      { "text": "अपने लक्ष्यों को क्रम दें ताकि पैसे की तंगी में पता हो पहले किसे fund करना है" },
+      { "text": "अपनी अगली समीक्षा तय करें — तिमाही अच्छा रहता है" }
+    ],
+    "faq": [
+      { "q": "मैं वित्तीय लक्ष्य कैसे तय करूँ?", "a": "हर लक्ष्य को ख़ास बनाएँ: एक target रकम, एक तारीख़, और क्या यह छोटी-अवधि (एक साल से कम) या लंबी-अवधि का है। फिर हिसाब लगाएँ कि इसे पाने के लिए आपको हर महीने कितना बचाना होगा, और अपने लक्ष्यों को क्रम दें ताकि पता हो पहले किसे fund करना है। हर तिमाही इनकी समीक्षा इन्हें आपकी आमदनी और ज़िंदगी बदलने के साथ हक़ीक़ी बनाए रखती है।" },
+      { "q": "मैं पहले बचत करूँ या कर्ज़ चुकाऊँ?", "a": "एक आम तरीक़ा है पहले एक छोटी emergency गद्दी बनाना, फिर ज़्यादा-ब्याज वाले कर्ज़ पर ध्यान देना, क्योंकि वह ब्याज आमतौर पर बचत की कमाई से ज़्यादा ख़र्च कराता है। महँगा कर्ज़ क़ाबू में आ जाने पर, लोग आमतौर पर बचत, निवेश, और बचे किसी कम-ब्याज कर्ज़ के बीच बाँटते हैं। क्या सही है यह आपकी स्थिति पर निर्भर करता है, इसलिए यह चेकलिस्ट क्रम तय करने के बजाय टुकड़े रखने में मदद करती है।" },
+      { "q": "क्या यह वित्तीय लक्ष्य चेकलिस्ट वित्तीय सलाह है?", "a": "नहीं — यह आपकी अपनी योजना को व्यवस्थित करने और ट्रैक करने का औज़ार है, वित्तीय सलाह नहीं। यह नहीं बताती कि कितना बचाएँ, कौन-से कर्ज़ चुकाएँ, या अपनी परिस्थिति के लिए कैसे निवेश करें। जिन फ़ैसलों में असली दाँव हो, उनके लिए एक योग्य वित्तीय पेशेवर जो आपकी पूरी तस्वीर जानता हो, पूछने के लिए सही व्यक्ति है।" }
+    ]
+  }
+}

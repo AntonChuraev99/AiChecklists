@@ -1,0 +1,64 @@
+{
+  "category": "finance",
+  "slug": "tax-preparation-checklist",
+  "order": 2,
+  "icon": "receipt_long",
+  "title": "Tax Preparation Checklist",
+  "metaTitle": "Tax Preparation Checklist (Gather Documents) | Gisti",
+  "metaDescription": "A tax preparation checklist to gather your documents: income statements, receipts, investment records, and health forms. Free, or tailor it with AI in Gisti.",
+  "cardDesc": "Gather every document you need to file — income, investment, deduction, and health records — in one place.",
+  "ordered": false,
+  "intro": "Most tax stress comes from hunting for documents at the last minute, not from the filing itself. This tax preparation checklist gathers everything in one place before you start — income and investment statements, deduction receipts, and last year's return — so filing yourself or handing off to an accountant goes smoothly. It's an organizing checklist, not tax advice; rules and forms vary by country, so check your local requirements. See more <a href=\"/checklists/finance/\" class=\"text-primary hover:underline\">finance and money checklists</a>.",
+  "items": [
+    { "text": "Confirm the filing deadline for your region and put it in your calendar", "note": "Deadlines and forms differ by country — check your local tax authority's dates." },
+    { "text": "Gather all income statements from employers and any freelance or contract work" },
+    { "text": "Collect records of interest, dividends, and any investment gains or sales" },
+    { "text": "Pull together receipts and records for deductible expenses", "note": "If you're not sure something is deductible, keep it anyway and ask when you file." },
+    { "text": "Organize records of charitable donations" },
+    { "text": "Gather mortgage, property tax, and loan interest statements" },
+    { "text": "Collect health insurance and medical expense documents" },
+    { "text": "Assemble records for any home-office or self-employment expenses", "note": "Business and home-office claims need clean records — keep them separate from personal spending." },
+    { "text": "Review last year's return to catch anything recurring you might forget", "note": "Last year's return is the best checklist for this year's documents." },
+    { "text": "Note any life changes this year — marriage, a new child, a move, a new job — that affect your taxes" },
+    { "text": "List the credits and deductions you may qualify for, to check or discuss" },
+    { "text": "Have your bank details ready for a refund or the account you'll pay from" },
+    { "text": "Decide whether you'll file yourself or with an accountant, and book them early", "note": "Good accountants fill up as the deadline nears — reach out well before." },
+    { "text": "Set aside money in case you owe a payment" },
+    { "text": "Keep a complete copy of the return and its supporting documents", "note": "Most tax authorities can ask you to prove a claim for several years afterward." }
+  ],
+  "faq": [
+    { "q": "What documents do I need to prepare my taxes?", "a": "The core set is your income statements (from jobs and any freelance work), records of interest, dividends and investment sales, and receipts for anything deductible — charitable gifts, medical costs, mortgage interest, and business or home-office expenses. Last year's return is the fastest way to remember what applies to you. Gathering it all before you start is what makes filing quick." },
+    { "q": "When should I start preparing for taxes?", "a": "Start gathering documents as soon as the year's income and expense statements arrive, rather than waiting for the deadline. Many arrive in the weeks after the tax year ends, so a folder — paper or digital — that you drop them into as they come saves a frantic search later. If you use an accountant, reach out early, because they book up as the deadline approaches." },
+    { "q": "Is this tax checklist tax advice?", "a": "No — it's an organizing checklist to help you gather and track your documents, not tax advice. Tax rules, forms, deadlines, and what counts as deductible vary by country and situation. For questions about what you owe or can claim, check your local tax authority or a qualified tax professional." }
+  ],
+  "related": ["monthly-budget-checklist", "investment-review-checklist", "financial-goals-checklist"],
+  "hi": {
+    "title": "टैक्स तैयारी चेकलिस्ट",
+    "metaTitle": "टैक्स तैयारी चेकलिस्ट (दस्तावेज़ जुटाएँ) | Gisti",
+    "metaDescription": "टैक्स तैयारी चेकलिस्ट अपने दस्तावेज़ जुटाने के लिए: आय-विवरण, रसीदें, निवेश रिकॉर्ड, और स्वास्थ्य फ़ॉर्म। मुफ़्त, या Gisti में AI से अपने हिसाब से ढालें।",
+    "cardDesc": "फ़ाइल करने के लिए ज़रूरी हर दस्तावेज़ — आय, निवेश, कटौती, और स्वास्थ्य रिकॉर्ड — एक जगह जुटाएँ।",
+    "intro": "ज़्यादातर टैक्स तनाव आख़िरी वक़्त पर दस्तावेज़ ढूँढने से आता है, फ़ाइलिंग से नहीं। यह टैक्स तैयारी चेकलिस्ट शुरू करने से पहले सब कुछ एक जगह जुटा लेती है — आय और निवेश विवरण, कटौती की रसीदें, और पिछले साल की रिटर्न — ताकि ख़ुद फ़ाइल करना या accountant को सौंपना आसान हो। यह एक व्यवस्थित करने वाली चेकलिस्ट है, टैक्स सलाह नहीं; नियम और फ़ॉर्म देश-दर-देश बदलते हैं, इसलिए अपनी स्थानीय ज़रूरतें जाँचें। और देखें <a href=\"/hi/checklists/finance/\" class=\"text-primary hover:underline\">फ़ाइनेंस और पैसे की चेकलिस्ट</a>।",
+    "items": [
+      { "text": "अपने क्षेत्र के लिए फ़ाइलिंग की डेडलाइन पक्की करें और उसे अपने calendar में डालें", "note": "डेडलाइन और फ़ॉर्म देश-दर-देश अलग होते हैं — अपने स्थानीय टैक्स विभाग की तारीख़ें जाँचें।" },
+      { "text": "नौकरी और किसी भी फ़्रीलांस या ठेके के काम से सारे आय-विवरण इकट्ठा करें" },
+      { "text": "ब्याज, लाभांश, और किसी भी निवेश लाभ या बिक्री के रिकॉर्ड जमा करें" },
+      { "text": "कटौती-योग्य ख़र्चों के लिए रसीदें और रिकॉर्ड एक साथ लाएँ", "note": "अगर पक्का नहीं कि कोई चीज़ कटौती-योग्य है, तो उसे रखें और फ़ाइल करते समय पूछें।" },
+      { "text": "दान के रिकॉर्ड व्यवस्थित करें" },
+      { "text": "होम लोन, संपत्ति कर, और कर्ज़ के ब्याज के विवरण इकट्ठा करें" },
+      { "text": "स्वास्थ्य बीमा और चिकित्सा ख़र्च के दस्तावेज़ जमा करें" },
+      { "text": "किसी भी होम-ऑफ़िस या स्व-रोज़गार ख़र्च के रिकॉर्ड जुटाएँ", "note": "व्यापार और होम-ऑफ़िस के दावों के लिए साफ़ रिकॉर्ड चाहिए — उन्हें निजी ख़र्च से अलग रखें।" },
+      { "text": "पिछले साल की रिटर्न देखें ताकि कोई दोहराने वाली चीज़ छूट न जाए", "note": "पिछले साल की रिटर्न इस साल के दस्तावेज़ों के लिए सबसे अच्छी चेकलिस्ट है।" },
+      { "text": "इस साल के किसी भी जीवन-बदलाव को नोट करें — शादी, नया बच्चा, स्थानांतरण, नई नौकरी — जो आपके टैक्स को प्रभावित करते हैं" },
+      { "text": "उन credits और कटौतियों की सूची बनाएँ जिनके आप हक़दार हो सकते हैं, जाँचने या चर्चा के लिए" },
+      { "text": "रिफ़ंड के लिए या जिस खाते से भुगतान करेंगे उसके बैंक विवरण तैयार रखें" },
+      { "text": "तय करें कि आप ख़ुद फ़ाइल करेंगे या accountant के साथ, और उन्हें जल्दी बुक करें", "note": "अच्छे accountant डेडलाइन पास आते ही भर जाते हैं — काफ़ी पहले संपर्क करें।" },
+      { "text": "भुगतान देना पड़े तो उसके लिए पैसे अलग रखें" },
+      { "text": "रिटर्न और उसके सहायक दस्तावेज़ों की एक पूरी कॉपी रखें", "note": "ज़्यादातर टैक्स विभाग कई साल बाद तक किसी दावे का सबूत माँग सकते हैं।" }
+    ],
+    "faq": [
+      { "q": "टैक्स तैयार करने के लिए मुझे कौन-से दस्तावेज़ चाहिए?", "a": "मूल सेट है आपके आय-विवरण (नौकरी और किसी भी फ़्रीलांस काम से), ब्याज, लाभांश और निवेश बिक्री के रिकॉर्ड, और कटौती-योग्य किसी भी चीज़ की रसीदें — दान, चिकित्सा ख़र्च, होम लोन का ब्याज, और व्यापार या होम-ऑफ़िस के ख़र्च। पिछले साल की रिटर्न यह याद करने का सबसे तेज़ तरीक़ा है कि आप पर क्या लागू होता है। शुरू करने से पहले सब इकट्ठा करना ही फ़ाइलिंग को तेज़ बनाता है।" },
+      { "q": "मुझे टैक्स की तैयारी कब शुरू करनी चाहिए?", "a": "डेडलाइन का इंतज़ार करने के बजाय, जैसे ही साल के आय और ख़र्च के विवरण आने लगें, दस्तावेज़ इकट्ठा करना शुरू करें। कई तो टैक्स साल ख़त्म होने के हफ़्तों बाद आते हैं, इसलिए एक फ़ोल्डर — काग़ज़ी या डिजिटल — जिसमें आप उन्हें आते ही डालते जाएँ, बाद की हड़बड़ी बचाता है। अगर accountant इस्तेमाल करते हैं, जल्दी संपर्क करें, क्योंकि डेडलाइन पास आते ही वे भर जाते हैं।" },
+      { "q": "क्या यह टैक्स चेकलिस्ट टैक्स सलाह है?", "a": "नहीं — यह आपके दस्तावेज़ इकट्ठा करने और ट्रैक करने में मदद के लिए एक व्यवस्थित करने वाली चेकलिस्ट है, टैक्स सलाह नहीं। टैक्स नियम, फ़ॉर्म, डेडलाइन, और क्या कटौती-योग्य गिना जाता है, यह देश और स्थिति के हिसाब से बदलता है। आप पर क्या बकाया है या क्या दावा कर सकते हैं, इसके लिए अपने स्थानीय टैक्स विभाग या एक योग्य टैक्स पेशेवर से जाँचें।" }
+    ]
+  }
+}

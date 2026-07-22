@@ -1,0 +1,66 @@
+{
+  "category": "travel",
+  "slug": "road-trip-checklist",
+  "order": 52,
+  "icon": "directions_car",
+  "title": "Road Trip Checklist",
+  "metaTitle": "Road Trip Checklist (Car, Route & Essentials) | Gisti",
+  "metaDescription": "A road trip checklist: car checks, route and offline maps, an emergency kit, snacks, and comfort for the drive. Free to use, or tailor it with AI in Gisti.",
+  "cardDesc": "Car checks, route and maps, emergency kit, snacks, and comfort for the long drive.",
+  "ordered": false,
+  "intro": "A good road trip is really two trips — the one you planned and the one where the car breaks down. This checklist covers both: get the vehicle road-ready, plan the route and stops, and pack for comfort and emergencies so a flat tire or a dead phone doesn't end the day. See more <a href=\"/checklists/travel/\" class=\"text-primary hover:underline\">travel checklists</a>.",
+  "items": [
+    { "text": "Check tire pressure and tread, including the spare", "note": "A blowout on the highway is far worse than five minutes with a gauge." },
+    { "text": "Top up oil, coolant, and washer fluid, and test the brakes and lights", "note": "Book a quick service if one's overdue." },
+    { "text": "Confirm your license, registration, and insurance are current and in the car" },
+    { "text": "Plan the route with fuel and rest stops, and download offline maps", "note": "Signal drops on rural and mountain stretches." },
+    { "text": "Check your roadside assistance coverage and save the number" },
+    { "text": "Pack an emergency kit: jumper cables, tire inflator, flashlight, and a warning triangle", "note": "Add a blanket and water in case you're stuck a while." },
+    { "text": "Pack a first aid kit and any daily medications" },
+    { "text": "Keep water and snacks within the driver's reach" },
+    { "text": "Charge every device and bring a car charger and a long cable" },
+    { "text": "Download a playlist, podcasts, or audiobooks for offline listening" },
+    { "text": "Bring cash and coins for tolls, parking, and small vendors" },
+    { "text": "Set up a phone mount so navigation stays in view, hands-free", "note": "Safer, and required by law in many places." },
+    { "text": "Pack sunglasses, and pillows and blankets for passengers" },
+    { "text": "Bring wet wipes, hand sanitizer, paper towels, and a trash bag" },
+    { "text": "Share your route and expected arrival time with someone" },
+    { "text": "Keep a paper map or written directions as a backup" }
+  ],
+  "faq": [
+    { "q": "What should I check on my car before a road trip?", "a": "Tire pressure and tread including the spare, oil and coolant levels, brakes, lights, and washer fluid. If a service is overdue or the trip is long, get a quick inspection first. Confirm your license, registration, and insurance are current and in the car." },
+    { "q": "What are the essentials for a long road trip?", "a": "Beyond a road-ready car: an emergency kit (jumper cables, inflator, flashlight, warning triangle), a first aid kit, water and snacks, chargers, offline maps and music, cash for tolls, and a phone mount. Comfort items like pillows and a blanket make the miles easier." },
+    { "q": "How do I stay alert on a long drive?", "a": "Take a break every two hours or so, swap drivers if you can, and stop the moment you feel drowsy rather than pushing through. Keep the car cool, stay hydrated, and avoid heavy meals before long stretches. Caffeine helps for a while, but real rest is the only fix for genuine tiredness." }
+  ],
+  "related": ["camping-trip-checklist", "vacation-preparation-checklist", "weekend-trip-packing-list", "beach-vacation-packing-list"],
+  "hi": {
+    "title": "रोड ट्रिप चेकलिस्ट",
+    "metaTitle": "रोड ट्रिप चेकलिस्ट (कार, रूट और ज़रूरी सामान) | Gisti",
+    "metaDescription": "एक रोड ट्रिप चेकलिस्ट: कार की जाँच, रूट और ऑफ़लाइन मैप, इमरजेंसी किट, स्नैक्स, और सफ़र का आराम। मुफ़्त इस्तेमाल करें, या Gisti में AI से ढालें।",
+    "cardDesc": "कार की जाँच, रूट और मैप, इमरजेंसी किट, स्नैक्स, और लंबे सफ़र का आराम।",
+    "intro": "एक अच्छी रोड ट्रिप असल में दो ट्रिप होती हैं — एक जो आपने प्लान की और एक जहाँ कार बीच रास्ते खराब हो जाती है। यह चेकलिस्ट दोनों कवर करती है: गाड़ी को सड़क के लिए तैयार करें, रूट और पड़ाव प्लान करें, और आराम व इमरजेंसी दोनों के लिए पैक करें ताकि एक पंक्चर या डेड फ़ोन दिन बर्बाद न करे। और देखें <a href=\"/hi/checklists/travel/\" class=\"text-primary hover:underline\">यात्रा चेकलिस्ट</a>।",
+    "items": [
+      { "text": "टायर का प्रेशर और घिसाव जाँचें, स्पेयर टायर समेत", "note": "हाईवे पर टायर फटना गेज के साथ पाँच मिनट से कहीं बुरा है।" },
+      { "text": "ऑयल, कूलेंट, और वॉशर फ़्लूइड टॉप-अप करें, और ब्रेक व लाइटें जाँचें", "note": "सर्विस बाक़ी हो तो एक जल्दी सर्विस करा लें।" },
+      { "text": "पक्का करें कि लाइसेंस, रजिस्ट्रेशन, और बीमा चालू हैं और कार में हैं" },
+      { "text": "ईंधन और आराम के पड़ावों के साथ रूट प्लान करें, और ऑफ़लाइन मैप डाउनलोड करें", "note": "गाँव और पहाड़ी हिस्सों में सिग्नल गिर जाता है।" },
+      { "text": "अपनी रोडसाइड असिस्टेंस कवरेज जाँचें और नंबर सेव करें" },
+      { "text": "एक इमरजेंसी किट पैक करें: जंपर केबल, टायर इन्फ़्लेटर, टॉर्च, और एक चेतावनी त्रिकोण", "note": "देर तक फँसने की स्थिति के लिए एक कंबल और पानी रखें।" },
+      { "text": "एक फ़र्स्ट एड किट और रोज़ की कोई दवाइयाँ पैक करें" },
+      { "text": "पानी और स्नैक्स ड्राइवर की पहुँच में रखें" },
+      { "text": "हर डिवाइस चार्ज करें और एक कार चार्जर व लंबी केबल लाएँ" },
+      { "text": "ऑफ़लाइन सुनने के लिए एक प्लेलिस्ट, पॉडकास्ट, या ऑडियोबुक डाउनलोड करें" },
+      { "text": "टोल, पार्किंग, और छोटे विक्रेताओं के लिए नकद और सिक्के लाएँ" },
+      { "text": "एक फ़ोन माउंट लगाएँ ताकि नेविगेशन बिना हाथ लगाए सामने दिखता रहे", "note": "ज़्यादा सुरक्षित, और कई जगह कानूनन ज़रूरी।" },
+      { "text": "धूप का चश्मा, और यात्रियों के लिए तकिए व कंबल पैक करें" },
+      { "text": "वेट वाइप्स, हैंड सैनिटाइज़र, पेपर टॉवल, और एक कचरे की थैली लाएँ" },
+      { "text": "अपना रूट और पहुँचने का अनुमानित समय किसी के साथ साझा करें" },
+      { "text": "बैकअप के तौर पर एक पेपर मैप या लिखे हुए दिशा-निर्देश रखें" }
+    ],
+    "faq": [
+      { "q": "रोड ट्रिप से पहले कार में क्या जाँचूँ?", "a": "टायर का प्रेशर और घिसाव, स्पेयर समेत, ऑयल और कूलेंट का स्तर, ब्रेक, लाइटें, और वॉशर फ़्लूइड। अगर सर्विस बाक़ी है या ट्रिप लंबी है, तो पहले एक जल्दी जाँच करा लें। पक्का करें कि लाइसेंस, रजिस्ट्रेशन, और बीमा चालू हैं और कार में हैं।" },
+      { "q": "एक लंबी रोड ट्रिप के लिए ज़रूरी चीज़ें क्या हैं?", "a": "सड़क के लिए तैयार कार के अलावा: एक इमरजेंसी किट (जंपर केबल, इन्फ़्लेटर, टॉर्च, चेतावनी त्रिकोण), एक फ़र्स्ट एड किट, पानी और स्नैक्स, चार्जर, ऑफ़लाइन मैप और संगीत, टोल के लिए नकद, और एक फ़ोन माउंट। तकिए और कंबल जैसी आराम की चीज़ें सफ़र आसान बनाती हैं।" },
+      { "q": "लंबी ड्राइव पर मैं चौकस कैसे रहूँ?", "a": "करीब हर दो घंटे में ब्रेक लें, हो सके तो ड्राइवर बदलें, और नींद आते ही रुकें, ज़ोर लगाकर आगे न बढ़ें। कार ठंडी रखें, पानी पीते रहें, और लंबे हिस्सों से पहले भारी भोजन से बचें। कैफ़ीन थोड़ी देर मदद करता है, पर असली थकान का एकमात्र इलाज सच्चा आराम है।" }
+    ]
+  }
+}

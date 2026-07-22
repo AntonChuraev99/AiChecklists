@@ -1,0 +1,66 @@
+{
+  "category": "work",
+  "slug": "first-day-at-work-checklist",
+  "order": 52,
+  "icon": "badge",
+  "title": "First Day at Work Checklist",
+  "metaTitle": "First Day at Work Checklist (New Job) | Gisti",
+  "metaDescription": "A first-day-at-work checklist for a new job: what to bring, arriving early, setup, meeting the team, and first-week priorities. Free, or tailor it in Gisti.",
+  "cardDesc": "What to bring, arriving early, setup, meeting the team, and first-week priorities.",
+  "ordered": false,
+  "intro": "The first day at a new job is mostly about arriving prepared and making a calm, friendly start — the deep work comes later. This checklist covers what to bring, how to set up, who to meet, and how to find your first-week priorities, so you look organized from hour one. See more <a href=\"/checklists/work/\" class=\"text-primary hover:underline\">work checklists</a>.",
+  "items": [
+    { "text": "Confirm your start time, location or video link, and who to ask for", "note": "Reception rarely knows you're coming — have a name ready." },
+    { "text": "Bring your ID and any documents HR requested", "note": "Tax forms and bank details get payroll and access set up on day one." },
+    { "text": "Lay out a professional outfit that matches the team's dress code", "note": "Ask your recruiter if you're unsure how formal it is." },
+    { "text": "Plan your commute to arrive ten to fifteen minutes early" },
+    { "text": "Pack lunch or know your options nearby, plus a water bottle" },
+    { "text": "Bring a notebook and pen to capture names, systems, and to-dos" },
+    { "text": "Learn the names of your manager and immediate teammates" },
+    { "text": "Set up your workstation, email, accounts, and required software", "note": "Flag anything missing to IT early so you're not blocked all week." },
+    { "text": "Read the onboarding materials, handbook, and key policies" },
+    { "text": "Ask about the logins and access you'll need for your role" },
+    { "text": "Note your key contacts: IT, HR, your manager, and a go-to teammate" },
+    { "text": "Ask your manager what your first-week priorities are", "note": "Knowing what 'done' looks like beats guessing." },
+    { "text": "Write questions down as they come up instead of interrupting constantly" },
+    { "text": "Learn the basics: where things are, how to book rooms, how expenses work" },
+    { "text": "Say yes to lunch or coffee to start building relationships" },
+    { "text": "Review your notes at the end of the day and confirm tomorrow's plan" }
+  ],
+  "faq": [
+    { "q": "What should I bring on my first day at a new job?", "a": "Bring your ID and any documents HR asked for (tax and bank details especially), a notebook and pen, and lunch or a plan for it. Dress to match the team's code, and arrive ten to fifteen minutes early. Most equipment is provided, but a charged phone and a positive, curious attitude help more than gadgets." },
+    { "q": "How do I make a good impression on my first day?", "a": "Show up early, be friendly and remember people's names, and listen more than you talk. Ask thoughtful questions, take notes, and follow through on anything you're asked to do. You're not expected to know everything on day one — being organized, approachable, and willing to learn makes the strongest impression." },
+    { "q": "What should I focus on in my first week?", "a": "Learn the people, the tools, and how work actually gets done, and ask your manager what your priorities and first goals should be. Set up your accounts and access, understand the basics like expenses and rooms, and start building relationships. Capture questions as they arise — the first week is for learning, not proving yourself." }
+  ],
+  "related": ["job-interview-checklist", "new-employee-onboarding-checklist", "remote-work-setup-checklist", "weekly-work-review-checklist"],
+  "hi": {
+    "title": "नौकरी के पहले दिन की चेकलिस्ट",
+    "metaTitle": "नौकरी के पहले दिन की चेकलिस्ट (नई जॉब) | Gisti",
+    "metaDescription": "नई नौकरी के पहले दिन की चेकलिस्ट: क्या लाएँ, जल्दी पहुँचना, सेटअप, टीम से मिलना, और पहले हफ़्ते की प्राथमिकताएँ। मुफ़्त, या Gisti में AI से ढालें।",
+    "cardDesc": "क्या लाएँ, जल्दी पहुँचना, सेटअप, टीम से मिलना, और पहले हफ़्ते की प्राथमिकताएँ।",
+    "intro": "नई नौकरी का पहला दिन ज़्यादातर तैयारी के साथ पहुँचने और एक शांत, दोस्ताना शुरुआत करने के बारे में होता है — गहरा काम बाद में आता है। यह चेकलिस्ट कवर करती है कि क्या लाएँ, कैसे सेटअप करें, किससे मिलें, और अपने पहले हफ़्ते की प्राथमिकताएँ कैसे पता करें, ताकि आप पहले घंटे से व्यवस्थित दिखें। और देखें <a href=\"/hi/checklists/work/\" class=\"text-primary hover:underline\">काम की चेकलिस्ट</a>।",
+    "items": [
+      { "text": "अपना शुरुआती समय, जगह या वीडियो लिंक, और किससे मिलना है, पुष्टि करें", "note": "रिसेप्शन को शायद ही पता होता है कि आप आ रहे हैं — एक नाम तैयार रखें।" },
+      { "text": "अपनी ID और HR द्वारा माँगे कोई भी दस्तावेज़ लाएँ", "note": "टैक्स फ़ॉर्म और बैंक विवरण पहले दिन ही पेरोल और एक्सेस सेट कर देते हैं।" },
+      { "text": "टीम के ड्रेस कोड से मेल खाता एक पेशेवर आउटफ़िट निकाल लें", "note": "कितना औपचारिक है, यकीन न हो तो अपने रिक्रूटर से पूछें।" },
+      { "text": "अपना सफ़र ऐसे प्लान करें कि दस से पंद्रह मिनट पहले पहुँचें" },
+      { "text": "लंच पैक करें या पास के विकल्प जानें, साथ में एक पानी की बोतल" },
+      { "text": "नाम, सिस्टम, और काम नोट करने के लिए एक नोटबुक और पेन लाएँ" },
+      { "text": "अपने मैनेजर और नज़दीकी साथियों के नाम याद करें" },
+      { "text": "अपना वर्कस्टेशन, ईमेल, अकाउंट, और ज़रूरी सॉफ़्टवेयर सेट करें", "note": "कोई चीज़ गायब हो तो IT को जल्दी बताएँ ताकि पूरे हफ़्ते अटके न रहें।" },
+      { "text": "ऑनबोर्डिंग सामग्री, हैंडबुक, और अहम नीतियाँ पढ़ें" },
+      { "text": "अपनी भूमिका के लिए ज़रूरी लॉगिन और एक्सेस के बारे में पूछें" },
+      { "text": "अपने अहम संपर्क नोट करें: IT, HR, आपका मैनेजर, और एक भरोसेमंद साथी" },
+      { "text": "अपने मैनेजर से पूछें कि पहले हफ़्ते की आपकी प्राथमिकताएँ क्या हैं", "note": "'पूरा' कैसा दिखता है यह जानना अंदाज़ा लगाने से बेहतर है।" },
+      { "text": "बार-बार टोकने के बजाय सवाल आते ही उन्हें लिख लें" },
+      { "text": "बुनियादी बातें सीखें: चीज़ें कहाँ हैं, रूम कैसे बुक करें, ख़र्च कैसे काम करता है" },
+      { "text": "रिश्ते बनाना शुरू करने के लिए लंच या कॉफ़ी के लिए हाँ कहें" },
+      { "text": "दिन के अंत में अपने नोट्स देखें और कल की योजना पक्की करें" }
+    ],
+    "faq": [
+      { "q": "नई नौकरी के पहले दिन मुझे क्या लाना चाहिए?", "a": "अपनी ID और HR द्वारा माँगे दस्तावेज़ (ख़ासकर टैक्स और बैंक विवरण), एक नोटबुक और पेन, और लंच या उसकी योजना लाएँ। टीम के कोड से मेल खाकर कपड़े पहनें, और दस से पंद्रह मिनट पहले पहुँचें। ज़्यादातर उपकरण दिए जाते हैं, पर एक चार्ज फ़ोन और एक सकारात्मक, जिज्ञासु रवैया गैजेट से ज़्यादा मदद करता है।" },
+      { "q": "पहले दिन मैं अच्छा प्रभाव कैसे डालूँ?", "a": "जल्दी पहुँचें, दोस्ताना रहें और लोगों के नाम याद रखें, और बोलने से ज़्यादा सुनें। सोच-समझकर सवाल पूछें, नोट्स लें, और जो कहा जाए उसे पूरा करें। पहले दिन आपसे सब कुछ जानने की उम्मीद नहीं है — व्यवस्थित, सुलभ, और सीखने को तैयार रहना सबसे मज़बूत प्रभाव डालता है।" },
+      { "q": "अपने पहले हफ़्ते में मुझे किस पर ध्यान देना चाहिए?", "a": "लोगों, उपकरणों, और काम असल में कैसे होता है, यह सीखें, और अपने मैनेजर से पूछें कि आपकी प्राथमिकताएँ और पहले लक्ष्य क्या होने चाहिए। अपने अकाउंट और एक्सेस सेट करें, ख़र्च और रूम जैसी बुनियादी बातें समझें, और रिश्ते बनाना शुरू करें। सवाल आते ही नोट करें — पहला हफ़्ता सीखने के लिए है, ख़ुद को साबित करने के लिए नहीं।" }
+    ]
+  }
+}

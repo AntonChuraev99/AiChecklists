@@ -1,0 +1,64 @@
+{
+  "category": "shopping",
+  "slug": "gift-shopping-checklist",
+  "order": 3,
+  "icon": "card_giftcard",
+  "title": "Gift Shopping Checklist",
+  "metaTitle": "Gift Shopping Checklist (Stay Organized) | Gisti",
+  "metaDescription": "A gift shopping checklist: list recipients, set a budget, track ideas and purchases, order early, and keep gift receipts. Free, or tailor it with AI in Gisti.",
+  "cardDesc": "Find the right gifts without the stress — budget, ideas, tracking, early ordering, and receipts.",
+  "ordered": false,
+  "intro": "Gift shopping goes off the rails when it's left late and unplanned — the budget creeps, the good stuff sells out, and you end up guessing. This checklist keeps it calm: list everyone, set a budget per person, track ideas and purchases in one place, and order early enough to skip the shipping panic. Thoughtful beats expensive almost every time. Find more <a href=\"/checklists/shopping/\" class=\"text-primary hover:underline\">shopping checklists</a>.",
+  "items": [
+    { "text": "List everyone you're buying for so no one gets forgotten at the last minute" },
+    { "text": "Set a total budget and a rough amount per person", "note": "A per-person number keeps the total from creeping up gift by gift." },
+    { "text": "Jot down each person's interests, hobbies, sizes, and anything they've hinted at", "note": "The best gifts come from paying attention all year — keep a running note on your phone." },
+    { "text": "Check for wish lists or registries before guessing", "note": "A wish list takes the pressure off and cuts down on returns and duplicates." },
+    { "text": "Note sizes and any allergies or preferences for clothing, food, or beauty gifts" },
+    { "text": "Brainstorm a few ideas per person across a range of prices" },
+    { "text": "Consider experiences or consumables for people who already have plenty of stuff", "note": "A class, a meal, or a subscription is often more welcome than another object to store." },
+    { "text": "Consider a handmade or personalised gift where it fits — they carry more meaning" },
+    { "text": "Track what you've bought, for whom, and where, in one running list", "note": "One list stops you double-buying and shows at a glance who still needs a gift." },
+    { "text": "Order early to beat shipping deadlines and stock running out", "note": "Popular items sell out and shipping slows near holidays — early is cheaper and less stressful." },
+    { "text": "Check delivery dates and any customs or shipping fees for gifts sent abroad" },
+    { "text": "Buy wrapping paper, gift bags, tape, and cards in one trip", "note": "Grab a little extra — you always need one more roll of tape or a spare gift bag." },
+    { "text": "Ask for gift receipts and keep them somewhere you'll find them", "note": "A gift receipt lets the recipient exchange or return without seeing the price." },
+    { "text": "Set aside time to wrap rather than leaving it all to the last night" },
+    { "text": "Keep a couple of small spare gifts on hand for anyone you missed", "note": "A few generic backups save you when an unexpected gift arrives or you forgot someone." }
+  ],
+  "faq": [
+    { "q": "How do I shop for gifts without overspending?", "a": "Set a total budget and a per-person amount before you start, and track what you buy in one list so the total doesn't creep. Wish lists, experiences, and a little planning beat panic-buying, which is where the money leaks. Deciding on the numbers first is the single best way to stay in control." },
+    { "q": "What can I get for someone who has everything?", "a": "Lean toward experiences and consumables rather than more objects — a class, an outing, a nice meal, a subscription, or something they'll use up and enjoy. A thoughtful, personalised item tied to a shared memory also lands well. When in doubt, a wish list or a gift card to somewhere they love beats a guess that gathers dust." },
+    { "q": "When should I start holiday gift shopping?", "a": "Earlier than feels necessary. Starting weeks ahead means better choices, lower prices, and no scramble against shipping deadlines or sold-out items. Keeping a running note of gift ideas through the year makes the whole thing much easier when the season arrives." }
+  ],
+  "related": ["seasonal-wardrobe-checklist", "electronics-buying-checklist"],
+  "hi": {
+    "title": "गिफ़्ट शॉपिंग चेकलिस्ट",
+    "metaTitle": "गिफ़्ट शॉपिंग चेकलिस्ट (व्यवस्थित रहें) | Gisti",
+    "metaDescription": "गिफ़्ट शॉपिंग चेकलिस्ट: प्राप्तकर्ता सूचीबद्ध करें, बजट तय करें, आइडिया व खरीद ट्रैक करें, जल्दी ऑर्डर करें, और गिफ़्ट रसीदें रखें। मुफ़्त, या Gisti में AI से ढालें।",
+    "cardDesc": "बिना तनाव सही गिफ़्ट ढूँढें — बजट, आइडिया, ट्रैकिंग, जल्दी ऑर्डर, और रसीदें।",
+    "intro": "गिफ़्ट शॉपिंग तब बिगड़ती है जब उसे देर तक और बिना योजना के छोड़ दिया जाए — बजट बढ़ता जाता है, अच्छी चीज़ें बिक जाती हैं, और आप अंदाज़े लगाने लगते हैं। यह चेकलिस्ट इसे शांत रखती है: सबको सूचीबद्ध करें, प्रति व्यक्ति बजट तय करें, आइडिया व खरीद एक जगह ट्रैक करें, और शिपिंग की घबराहट से बचने के लिए इतनी जल्दी ऑर्डर करें। सोच-समझकर चुना तोहफ़ा लगभग हर बार महँगे से बेहतर होता है। और देखें <a href=\"/hi/checklists/shopping/\" class=\"text-primary hover:underline\">शॉपिंग चेकलिस्ट</a>।",
+    "items": [
+      { "text": "जिन सबके लिए आप खरीद रहे हैं उन्हें सूचीबद्ध करें ताकि आख़िरी वक़्त कोई न छूटे" },
+      { "text": "कुल बजट और प्रति व्यक्ति एक अनुमानित रकम तय करें", "note": "प्रति व्यक्ति एक संख्या कुल को तोहफ़े-दर-तोहफ़े बढ़ने से रोकती है।" },
+      { "text": "हर व्यक्ति की रुचियाँ, शौक, साइज़, और उन्होंने जो इशारा किया हो, वह लिख लें", "note": "सबसे अच्छे तोहफ़े साल भर ध्यान देने से आते हैं — अपने फ़ोन पर एक चलती नोट रखें।" },
+      { "text": "अंदाज़ा लगाने से पहले विश लिस्ट या रजिस्ट्री जाँचें", "note": "विश लिस्ट दबाव हटाती है और वापसी व दोहराव कम करती है।" },
+      { "text": "कपड़ों, खाने, या सौंदर्य के तोहफ़ों के लिए साइज़ और कोई एलर्जी या पसंद नोट करें" },
+      { "text": "हर व्यक्ति के लिए अलग-अलग कीमतों में कुछ आइडिया सोचें" },
+      { "text": "जिनके पास पहले से बहुत सामान है उनके लिए अनुभव या उपभोग की चीज़ें सोचें", "note": "एक क्लास, एक भोजन, या एक सब्सक्रिप्शन अक्सर रखने की एक और चीज़ से ज़्यादा स्वागत योग्य होता है।" },
+      { "text": "जहाँ जँचे वहाँ हाथ से बनी या व्यक्तिगत तोहफ़े पर विचार करें — उनमें ज़्यादा भाव होता है" },
+      { "text": "आपने क्या, किसके लिए, और कहाँ से खरीदा, यह एक चलती सूची में ट्रैक करें", "note": "एक सूची आपको दोबारा खरीदने से रोकती है और एक नज़र में दिखाती है कि किसे अब भी तोहफ़ा चाहिए।" },
+      { "text": "शिपिंग की समय-सीमा और स्टॉक खत्म होने से पहले जल्दी ऑर्डर करें", "note": "लोकप्रिय चीज़ें बिक जाती हैं और त्योहारों के पास शिपिंग धीमी हो जाती है — जल्दी करना सस्ता और कम तनावपूर्ण है।" },
+      { "text": "विदेश भेजे जाने वाले तोहफ़ों के लिए डिलीवरी तारीख़ें और कोई कस्टम या शिपिंग शुल्क जाँचें" },
+      { "text": "रैपिंग पेपर, गिफ़्ट बैग, टेप, और कार्ड एक ही चक्कर में खरीद लें", "note": "थोड़ा ज़्यादा ले लें — आपको हमेशा एक और टेप का रोल या एक अतिरिक्त गिफ़्ट बैग चाहिए होता है।" },
+      { "text": "गिफ़्ट रसीदें माँगें और उन्हें ऐसी जगह रखें जहाँ आप ढूँढ लें", "note": "गिफ़्ट रसीद प्राप्तकर्ता को कीमत देखे बिना अदला-बदली या वापसी करने देती है।" },
+      { "text": "सब कुछ आख़िरी रात पर छोड़ने के बजाय रैप करने के लिए समय निकालें" },
+      { "text": "जो कोई छूट जाए उसके लिए कुछ छोटे अतिरिक्त तोहफ़े तैयार रखें", "note": "कुछ सामान्य बैकअप तब बचाते हैं जब कोई अनपेक्षित तोहफ़ा आ जाए या आप किसी को भूल जाएँ।" }
+    ],
+    "faq": [
+      { "q": "मैं ज़्यादा खर्च किए बिना तोहफ़े कैसे खरीदूँ?", "a": "शुरू करने से पहले कुल बजट और प्रति व्यक्ति रकम तय करें, और जो खरीदें उसे एक सूची में ट्रैक करें ताकि कुल न बढ़े। विश लिस्ट, अनुभव, और थोड़ी योजना घबराहट में खरीदने से बेहतर हैं, जहाँ पैसा लीक होता है। पहले संख्याएँ तय करना नियंत्रण में रहने का सबसे अच्छा तरीका है।" },
+      { "q": "जिसके पास सब कुछ है उसके लिए मैं क्या ला सकता हूँ?", "a": "और सामान के बजाय अनुभव और उपभोग की चीज़ों की ओर झुकें — एक क्लास, एक सैर, एक अच्छा भोजन, एक सब्सक्रिप्शन, या कोई चीज़ जिसे वे इस्तेमाल करके आनंद लें। किसी साझा याद से जुड़ा सोच-समझकर चुना, व्यक्तिगत तोहफ़ा भी अच्छा लगता है। संदेह हो तो, विश लिस्ट या उनकी पसंदीदा जगह का गिफ़्ट कार्ड धूल खाते अंदाज़े से बेहतर है।" },
+      { "q": "मुझे त्योहारों की गिफ़्ट शॉपिंग कब शुरू करनी चाहिए?", "a": "जितनी ज़रूरत लगे उससे पहले। हफ़्तों पहले शुरू करने का मतलब बेहतर विकल्प, कम कीमतें, और शिपिंग की समय-सीमा या बिक चुकी चीज़ों के ख़िलाफ़ कोई भागदौड़ नहीं। साल भर गिफ़्ट आइडिया की एक चलती नोट रखना सीज़न आने पर पूरी बात को बहुत आसान बना देता है।" }
+    ]
+  }
+}

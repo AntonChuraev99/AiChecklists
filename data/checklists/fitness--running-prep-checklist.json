@@ -1,0 +1,62 @@
+{
+  "category": "fitness",
+  "slug": "running-prep-checklist",
+  "order": 52,
+  "icon": "directions_run",
+  "title": "Running Prep Checklist",
+  "metaTitle": "Running Prep Checklist (Before You Run) | Gisti",
+  "metaDescription": "A pre-run checklist — check the weather, dress right, warm up, hydrate, and plan your route. Free, or tailor it to your run with AI in Gisti.",
+  "cardDesc": "Everything before you head out — weather, gear, warm-up, hydration, and your route.",
+  "ordered": true,
+  "intro": "The difference between a run you enjoy and one you cut short is usually in the ten minutes before you start. Checking the weather, dressing for it, and warming up properly turn a cold, stiff start into an easy one. This checklist covers everything to sort before you head out the door, whether it's an easy 5K or a long training run. See the rest of our <a href=\"/checklists/fitness/\" class=\"text-primary hover:underline\">health and fitness checklists</a>.",
+  "items": [
+    { "text": "Check the forecast and temperature right before you go", "note": "Dress for about 10°C / 15°F warmer than it reads — you heat up fast once moving." },
+    { "text": "Dress in moisture-wicking layers you can shed, not cotton" },
+    { "text": "Lace up proper running shoes with tread and life left in them", "note": "Most running shoes are done at 500 to 800 km — worn soles invite injury." },
+    { "text": "Have water ready, and drink if it's hot or you're going long" },
+    { "text": "Plan your route and distance, noting where you can refill or cut it short" },
+    { "text": "Queue a playlist or podcast, but keep one ear on traffic", "note": "Bone-conduction or open earbuds let you still hear cars and cyclists." },
+    { "text": "Tell someone your route, or share your live location if running alone" },
+    { "text": "Do a dynamic warm-up: leg swings, lunges, and high knees", "note": "Save static stretching for after — cold static stretching doesn't prevent injury." },
+    { "text": "Start with 3 to 5 minutes of brisk walking or an easy jog" },
+    { "text": "Ease into your target pace rather than sprinting off the line", "note": "Going out too fast is the most common way to blow up mid-run." },
+    { "text": "Keep your breathing steady and your shoulders and hands relaxed" },
+    { "text": "Cool down with a few minutes of easy walking at the end" },
+    { "text": "Do your static stretches while your muscles are still warm" },
+    { "text": "Log your distance, time, and how you felt", "note": "A simple log shows progress and flags when you're overdoing it." }
+  ],
+  "faq": [
+    { "q": "What should I do before I go running?", "a": "Check the weather and dress for it, put on proper running shoes, and have water ready if it's hot or you're going far. Then do a dynamic warm-up — leg swings, lunges, high knees — and start with a few minutes of brisk walking or easy jogging before picking up the pace. That short prep is what makes a run feel good instead of a slog." },
+    { "q": "Should I stretch before or after running?", "a": "Do dynamic stretches — moving warm-ups like leg swings and lunges — before you run, and save static stretches (holding a stretch) for afterwards, when your muscles are warm. Cold static stretching before a run doesn't prevent injury and can briefly reduce power. A brisk walk or easy jog is the best warm-up." },
+    { "q": "How should I dress for running in cold weather?", "a": "Dress for about 10°C / 15°F warmer than the actual temperature, because you heat up quickly once you're moving. Use moisture-wicking layers you can unzip or remove rather than one heavy jacket, and cover your hands and ears, which lose heat fastest. Avoid cotton — it holds sweat and turns cold and heavy." }
+  ],
+  "related": ["marathon-training-checklist", "gym-workout-checklist", "home-workout-checklist", "gym-bag-checklist"],
+  "hi": {
+    "title": "रनिंग प्रेप चेकलिस्ट",
+    "metaTitle": "रनिंग प्रेप चेकलिस्ट (दौड़ने से पहले) | Gisti",
+    "metaDescription": "एक दौड़-पूर्व चेकलिस्ट — मौसम जाँचें, सही कपड़े पहनें, वार्म-अप करें, हाइड्रेट करें, और अपना रूट प्लान करें। मुफ़्त, या Gisti में AI से अपनी दौड़ के मुताबिक ढालें।",
+    "cardDesc": "बाहर निकलने से पहले सब कुछ — मौसम, गियर, वार्म-अप, हाइड्रेशन, और आपका रूट।",
+    "intro": "एक ऐसी दौड़ जिसका आप मज़ा लें और एक ऐसी जिसे आप बीच में छोड़ दें, इनका फ़र्क़ आमतौर पर शुरू करने से पहले के दस मिनट में होता है। मौसम जाँचना, उसके हिसाब से कपड़े पहनना, और सही तरह वार्म-अप करना एक ठंडी, अकड़ी हुई शुरुआत को आसान बना देता है। यह चेकलिस्ट दरवाज़े से बाहर निकलने से पहले सुलझाने लायक सब कुछ कवर करती है, चाहे वह आसान 5K हो या लंबी ट्रेनिंग दौड़। देखें हमारी बाक़ी <a href=\"/hi/checklists/fitness/\" class=\"text-primary hover:underline\">सेहत और फ़िटनेस चेकलिस्ट</a>।",
+    "items": [
+      { "text": "निकलने से ठीक पहले पूर्वानुमान और तापमान जाँचें", "note": "जितना तापमान दिखे उससे करीब 10°C / 15°F गर्म के हिसाब से कपड़े पहनें — चलते ही आप जल्दी गर्म हो जाते हैं।" },
+      { "text": "कॉटन नहीं, बल्कि पसीना सोखने वाली परतों में कपड़े पहनें जिन्हें आप उतार सकें" },
+      { "text": "ऐसे सही रनिंग जूते पहनें जिनमें ग्रिप और जान बाक़ी हो", "note": "ज़्यादातर रनिंग जूते 500 से 800 km पर ख़त्म हो जाते हैं — घिसे तले चोट को न्योता देते हैं।" },
+      { "text": "पानी तैयार रखें, और गर्मी हो या लंबा जाना हो तो पिएँ" },
+      { "text": "अपना रूट और दूरी प्लान करें, यह भी नोट करें कि कहाँ पानी भर सकते हैं या दौड़ छोटी कर सकते हैं" },
+      { "text": "एक प्लेलिस्ट या पॉडकास्ट लगाएँ, पर एक कान ट्रैफ़िक पर रखें", "note": "बोन-कंडक्शन या ओपन ईयरबड्स से आप गाड़ियाँ और साइकिल सुन पाते हैं।" },
+      { "text": "किसी को अपना रूट बताएँ, या अकेले दौड़ रहे हों तो अपनी लाइव लोकेशन शेयर करें" },
+      { "text": "एक डायनामिक वार्म-अप करें: लेग स्विंग, लंज, और हाई नीज़", "note": "स्टैटिक स्ट्रेचिंग बाद के लिए बचाएँ — ठंडी स्टैटिक स्ट्रेचिंग चोट नहीं रोकती।" },
+      { "text": "3 से 5 मिनट की तेज़ चहलक़दमी या आसान जॉग से शुरू करें" },
+      { "text": "लाइन से झपटकर भागने के बजाय अपने लक्ष्य पेस में धीरे-धीरे ढलें", "note": "बहुत तेज़ शुरू करना दौड़ के बीच में दम टूटने का सबसे आम कारण है।" },
+      { "text": "अपनी साँस स्थिर और अपने कंधे व हाथ ढीले रखें" },
+      { "text": "अंत में कुछ मिनट की आसान चहलक़दमी से कूल डाउन करें" },
+      { "text": "अपनी स्टैटिक स्ट्रेच तब करें जब मांसपेशियाँ अब भी गर्म हों" },
+      { "text": "अपनी दूरी, समय, और कैसा महसूस हुआ, लॉग करें", "note": "एक साधारण लॉग प्रगति दिखाता है और बताता है कि आप कब ज़रूरत से ज़्यादा कर रहे हैं।" }
+    ],
+    "faq": [
+      { "q": "दौड़ने जाने से पहले मुझे क्या करना चाहिए?", "a": "मौसम जाँचें और उसके हिसाब से कपड़े पहनें, सही रनिंग जूते पहनें, और गर्मी हो या दूर जाना हो तो पानी तैयार रखें। फिर एक डायनामिक वार्म-अप करें — लेग स्विंग, लंज, हाई नीज़ — और पेस बढ़ाने से पहले कुछ मिनट की तेज़ चहलक़दमी या आसान जॉग से शुरू करें। यह छोटी तैयारी ही दौड़ को थकाऊ के बजाय अच्छी बनाती है।" },
+      { "q": "दौड़ने से पहले या बाद में स्ट्रेच करूँ?", "a": "दौड़ने से पहले डायनामिक स्ट्रेच करें — लेग स्विंग और लंज जैसे चलते-फिरते वार्म-अप — और स्टैटिक स्ट्रेच (एक जगह रुककर खिंचाव) बाद के लिए बचाएँ, जब मांसपेशियाँ गर्म हों। दौड़ से पहले ठंडी स्टैटिक स्ट्रेचिंग चोट नहीं रोकती और थोड़ी देर के लिए ताक़त घटा सकती है। तेज़ चहलक़दमी या आसान जॉग सबसे अच्छा वार्म-अप है।" },
+      { "q": "ठंडे मौसम में दौड़ने के लिए कैसे कपड़े पहनूँ?", "a": "असली तापमान से करीब 10°C / 15°F गर्म के हिसाब से कपड़े पहनें, क्योंकि चलते ही आप जल्दी गर्म हो जाते हैं। एक भारी जैकेट के बजाय पसीना सोखने वाली ऐसी परतें पहनें जिन्हें आप खोल या उतार सकें, और अपने हाथ व कान ढकें, जो सबसे तेज़ी से गर्मी खोते हैं। कॉटन से बचें — यह पसीना रोक लेता है और ठंडा व भारी हो जाता है।" }
+    ]
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "category": "real_estate",
+  "slug": "rental-agreement-checklist",
+  "order": 3,
+  "icon": "description",
+  "title": "Rental Agreement Checklist",
+  "metaTitle": "Rental Agreement Checklist (Before You Sign) | Gisti",
+  "metaDescription": "A rental agreement checklist: deposit, lease dates, utilities, repairs, and the fine print to check before you sign. Free, or tailor it with AI in Gisti.",
+  "cardDesc": "What to check in a lease before signing — deposit, dates, utilities, repairs, and the fine print.",
+  "ordered": false,
+  "intro": "A lease is a binding contract, and the time to catch a bad clause is before you sign it, not after. This checklist walks through the terms that trip renters up most — the deposit, utilities, repairs, early termination, and the quiet auto-renewal in the fine print. Document the place with photos before you move in, and get every promise in writing. Find more <a href=\"/checklists/real_estate/\" class=\"text-primary hover:underline\">real estate checklists</a>.",
+  "items": [
+    { "text": "Read the whole lease, including the small print and any addendums, before signing anything", "note": "Verbal promises don't count — if it isn't written in the lease, assume it won't happen." },
+    { "text": "Confirm the rent amount, due date, accepted payment methods, and any late fees" },
+    { "text": "Check the deposit amount, what it covers, and the exact conditions for getting it back", "note": "Ask how and when it's returned, and what counts as normal wear versus a deduction." },
+    { "text": "Confirm the lease start and end dates, and whether it renews automatically or goes month-to-month" },
+    { "text": "Read the early-termination clause and what breaking the lease actually costs", "note": "Know the notice period and penalty before you sign — plans change." },
+    { "text": "Check who pays which utilities and services — water, heat, electricity, gas, internet, trash", "note": "Get the split in writing; 'utilities included' sometimes comes with a cap." },
+    { "text": "Review the pet policy, any pet deposit or rent, and the rules on guests and subletting" },
+    { "text": "Note exactly which repairs and maintenance are yours versus the landlord's", "note": "Clarify who handles a blocked drain, a broken appliance, or a heating failure, and how fast." },
+    { "text": "Confirm parking, storage, and any shared-space details in writing" },
+    { "text": "Check the rules on rent increases and how much notice you'll get" },
+    { "text": "Understand the landlord's right of entry and how much notice they must give before visiting", "note": "Most places require reasonable written notice except in an emergency." },
+    { "text": "Photograph and video every room before move-in, including existing damage, and share it with the landlord", "note": "Timestamped photos are your best protection against losing the deposit over pre-existing wear." },
+    { "text": "Make sure every blank in the lease is filled in, and both parties sign and date it", "note": "Never sign a lease with empty blanks someone could fill in later." },
+    { "text": "Save the landlord or property manager's name, phone, email, and address for notices" },
+    { "text": "Keep a signed copy of the lease and every receipt and message in one place" }
+  ],
+  "faq": [
+    { "q": "What should I check before signing a lease?", "a": "Confirm the rent, deposit, and exact lease dates, and read the fine print on early termination, rent increases, and who pays which utilities. Check the pet, guest, and repair rules, and document the apartment's condition with photos before you move in. If a promise matters to you, make sure it's written into the lease." },
+    { "q": "Can I negotiate a rental agreement?", "a": "Often, yes — especially the deposit, move-in date, minor repairs, or adding a pet clause. Landlords are usually more flexible in a slow market or with a reliable tenant. Ask politely and get any agreed change written into the lease itself, not just promised over text or in person." },
+    { "q": "How do I protect my security deposit?", "a": "Document the place thoroughly with timestamped photos and video before you move in, and note existing damage in writing to the landlord. Keep it clean, report problems promptly, and read the deposit terms so you know what counts as a deduction. On move-out, do a final walk-through and get any deductions itemised. This is general guidance, not legal advice — local tenant laws vary." }
+  ],
+  "related": ["apartment-viewing-checklist", "home-buying-checklist", "house-inspection-checklist"],
+  "hi": {
+    "title": "रेंटल एग्रीमेंट चेकलिस्ट",
+    "metaTitle": "रेंटल एग्रीमेंट चेकलिस्ट (साइन करने से पहले) | Gisti",
+    "metaDescription": "रेंटल एग्रीमेंट चेकलिस्ट: साइन करने से पहले डिपॉज़िट, लीज़ की तारीख़ें, उपयोगिताएँ, मरम्मत, और बारीक शर्तें जाँचें। मुफ़्त, या Gisti में AI से ढालें।",
+    "cardDesc": "साइन करने से पहले लीज़ में क्या जाँचें — डिपॉज़िट, तारीख़ें, उपयोगिताएँ, मरम्मत, और बारीक शर्तें।",
+    "intro": "लीज़ एक बाध्यकारी अनुबंध है, और किसी बुरी शर्त को पकड़ने का समय साइन करने से पहले है, बाद में नहीं। यह चेकलिस्ट उन शर्तों से गुज़ारती है जो किराएदारों को सबसे ज़्यादा फँसाती हैं — डिपॉज़िट, उपयोगिताएँ, मरम्मत, जल्दी समाप्ति, और बारीक अक्षरों में छिपा ऑटो-नवीनीकरण। मूव-इन से पहले जगह की फ़ोटो लें, और हर वादा लिखित में लें। और देखें <a href=\"/hi/checklists/real_estate/\" class=\"text-primary hover:underline\">रियल एस्टेट चेकलिस्ट</a>।",
+    "items": [
+      { "text": "कुछ भी साइन करने से पहले पूरी लीज़ पढ़ें, बारीक अक्षर और कोई भी परिशिष्ट समेत", "note": "मौखिक वादे नहीं गिने जाते — अगर वह लीज़ में लिखा नहीं है, तो मान लें कि नहीं होगा।" },
+      { "text": "किराए की रकम, देय तारीख़, स्वीकार्य भुगतान तरीके, और कोई भी विलंब शुल्क पक्का करें" },
+      { "text": "डिपॉज़िट की रकम, वह किसे कवर करता है, और उसे वापस पाने की ठीक-ठीक शर्तें जाँचें", "note": "पूछें कि वह कैसे और कब लौटाया जाता है, और सामान्य टूट-फूट बनाम कटौती में क्या गिना जाता है।" },
+      { "text": "लीज़ की शुरू और समाप्ति की तारीख़ें पक्का करें, और यह कि वह अपने-आप नवीनीकृत होती है या महीना-दर-महीना चलती है" },
+      { "text": "जल्दी-समाप्ति की शर्त पढ़ें और लीज़ तोड़ने की असल कीमत जानें", "note": "साइन करने से पहले नोटिस अवधि और जुर्माना जान लें — योजनाएँ बदलती हैं।" },
+      { "text": "जाँचें कि कौन-सी उपयोगिताएँ और सेवाएँ कौन चुकाता है — पानी, हीट, बिजली, गैस, इंटरनेट, कचरा", "note": "बँटवारा लिखित में लें; 'उपयोगिताएँ शामिल' के साथ कभी-कभी एक सीमा होती है।" },
+      { "text": "पेट पॉलिसी, कोई भी पेट डिपॉज़िट या किराया, और मेहमान व सबलेटिंग के नियम देखें" },
+      { "text": "ठीक-ठीक नोट करें कि कौन-सी मरम्मत और रख-रखाव आपकी है बनाम मकान मालिक की", "note": "साफ़ करें कि बंद नाली, ख़राब उपकरण, या हीटिंग की गड़बड़ी कौन और कितनी जल्दी संभालता है।" },
+      { "text": "पार्किंग, स्टोरेज, और कोई भी साझा-स्थान का ब्योरा लिखित में पक्का करें" },
+      { "text": "किराया बढ़ने के नियम और आपको कितना नोटिस मिलेगा जाँचें" },
+      { "text": "मकान मालिक के प्रवेश के अधिकार को समझें और आने से पहले उन्हें कितना नोटिस देना है", "note": "ज़्यादातर जगहों में आपात स्थिति को छोड़कर उचित लिखित नोटिस ज़रूरी है।" },
+      { "text": "मूव-इन से पहले हर कमरे की फ़ोटो और वीडियो लें, मौजूदा नुकसान समेत, और मकान मालिक को भेजें", "note": "समय-मुहर वाली फ़ोटो पहले से मौजूद टूट-फूट पर डिपॉज़िट खोने के ख़िलाफ़ आपकी सबसे अच्छी सुरक्षा हैं।" },
+      { "text": "पक्का करें कि लीज़ में हर खाली जगह भरी है, और दोनों पक्ष साइन करके तारीख़ डालते हैं", "note": "ऐसी लीज़ कभी साइन न करें जिसमें खाली जगहें हों जो कोई बाद में भर सके।" },
+      { "text": "नोटिस के लिए मकान मालिक या प्रॉपर्टी मैनेजर का नाम, फ़ोन, ईमेल, और पता सहेजें" },
+      { "text": "लीज़ की साइन की हुई कॉपी और हर रसीद व संदेश एक जगह रखें" }
+    ],
+    "faq": [
+      { "q": "लीज़ साइन करने से पहले मुझे क्या जाँचना चाहिए?", "a": "किराया, डिपॉज़िट, और लीज़ की ठीक तारीख़ें पक्का करें, और जल्दी समाप्ति, किराया बढ़ोतरी, और कौन-सी उपयोगिताएँ कौन चुकाता है, इनकी बारीक शर्तें पढ़ें। पेट, मेहमान, और मरम्मत के नियम जाँचें, और मूव-इन से पहले अपार्टमेंट की हालत फ़ोटो में दर्ज करें। अगर कोई वादा आपके लिए मायने रखता है, तो पक्का करें कि वह लीज़ में लिखा हो।" },
+      { "q": "क्या मैं रेंटल एग्रीमेंट पर मोलभाव कर सकता हूँ?", "a": "अक्सर हाँ — ख़ासकर डिपॉज़िट, मूव-इन की तारीख़, छोटी मरम्मत, या पेट क्लॉज़ जोड़ना। धीमे बाज़ार में या भरोसेमंद किराएदार के साथ मकान मालिक आम तौर पर ज़्यादा लचीले होते हैं। विनम्रता से पूछें और तय हुआ कोई भी बदलाव लीज़ में ही लिखवाएँ, सिर्फ़ मैसेज या ज़ुबानी वादे में नहीं।" },
+      { "q": "मैं अपना सिक्योरिटी डिपॉज़िट कैसे सुरक्षित रखूँ?", "a": "मूव-इन से पहले जगह की समय-मुहर वाली फ़ोटो और वीडियो से पूरी तरह दर्ज करें, और मौजूदा नुकसान मकान मालिक को लिखित में बताएँ। इसे साफ़ रखें, समस्याएँ फ़ौरन बताएँ, और डिपॉज़िट की शर्तें पढ़ें ताकि पता हो कि कटौती में क्या गिना जाता है। मूव-आउट पर आख़िरी वॉक-थ्रू करें और कोई भी कटौती मदवार लिखवाएँ। यह सामान्य मार्गदर्शन है, कानूनी सलाह नहीं — स्थानीय किराएदारी कानून अलग-अलग होते हैं।" }
+    ]
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "category": "shopping",
+  "slug": "seasonal-wardrobe-checklist",
+  "order": 1,
+  "icon": "checkroom",
+  "title": "Seasonal Wardrobe Checklist",
+  "metaTitle": "Seasonal Wardrobe Refresh Checklist | Gisti",
+  "metaDescription": "A seasonal wardrobe checklist: clear out, spot the real gaps, pick a palette, set a budget, and buy versatile basics. Free, or tailor it with AI in Gisti.",
+  "cardDesc": "Refresh your closet smartly — clear out, spot real gaps, pick a palette, and buy versatile basics.",
+  "ordered": false,
+  "intro": "A wardrobe refresh works better as an edit than a shopping spree — most closets already hold more than they use. This checklist starts by clearing out and finding the real gaps, then helps you buy a few versatile pieces that mix with what you own, in a palette and budget you've decided on first. The result is more outfits from less stuff. Find more <a href=\"/checklists/shopping/\" class=\"text-primary hover:underline\">shopping checklists</a>.",
+  "items": [
+    { "text": "Take everything out and sort it into keep, repair, and let go", "note": "If you haven't worn it in a year and it isn't sentimental or seasonal, it's probably a let-go." },
+    { "text": "Try on the keep pile and check fit, wear, and whether you actually reach for it" },
+    { "text": "Note the real gaps: what you own but can't complete an outfit with", "note": "Gaps are more useful than trends — a missing pair of everyday shoes beats another statement piece." },
+    { "text": "Pick a small colour palette so new pieces mix with what you already own", "note": "A few neutrals plus one or two accent colours multiplies the outfits you can make." },
+    { "text": "List the basics worth replacing — worn-out staples do more work than trend pieces" },
+    { "text": "Set a budget and decide where it's worth spending more versus saving", "note": "Spend on the things you wear most and that take a beating — shoes, outerwear, everyday denim." },
+    { "text": "Check the weather you actually dress for, not just the calendar season" },
+    { "text": "Read care labels before buying — dry-clean-only adds hidden cost and effort", "note": "'Hand wash' or 'dry clean only' on a basic you'll wear weekly often isn't worth it." },
+    { "text": "Feel the fabric and check the seams, buttons, and stitching for quality" },
+    { "text": "Favour versatile pieces that work across several outfits and occasions" },
+    { "text": "Try things on rather than guessing your size across brands", "note": "Sizing varies wildly between brands — the number on the label means little." },
+    { "text": "Compare prices across stores and check for end-of-season sales before buying" },
+    { "text": "Keep receipts and tags until you're sure, and note the return windows", "note": "Online returns especially have deadlines — don't let the window close on something that didn't work." },
+    { "text": "Donate, sell, or recycle what you're letting go rather than letting it pile up", "note": "Clearing out makes space and shows you what you actually own and wear." },
+    { "text": "Store off-season clothes clean and protected to make room and keep them fresh", "note": "Wash before storing — body oils and stains set over months and attract moths." }
+  ],
+  "faq": [
+    { "q": "How do I update my wardrobe for a new season?", "a": "Start by clearing out and taking stock of what you already own, then note the real gaps rather than chasing trends. Pick a small colour palette so new pieces mix with old ones, set a budget, and buy versatile basics you'll wear often. Try things on, check the care labels, and let go of what you no longer wear." },
+    { "q": "How many clothes do I actually need?", "a": "Fewer than most closets hold. A working wardrobe is built on versatile basics in colours that mix, plus a few pieces you love — enough to make outfits for your real life without decision fatigue. Focus on the things you reach for weekly rather than a big number of items you rarely wear." },
+    { "q": "Should I follow trends when refreshing my wardrobe?", "a": "Trends are fine in small, cheap doses, but building a wardrobe on them gets expensive and dates fast. Spend your budget on quality basics and pieces that suit you, and let one or two trend items be the seasoning, not the meal. Clothes you'll wear for years are almost always the better buy." }
+  ],
+  "related": ["electronics-buying-checklist", "gift-shopping-checklist"],
+  "hi": {
+    "title": "मौसमी वॉर्डरोब चेकलिस्ट",
+    "metaTitle": "मौसमी वॉर्डरोब रीफ़्रेश चेकलिस्ट | Gisti",
+    "metaDescription": "मौसमी वॉर्डरोब चेकलिस्ट: पुराना छाँटें, असली कमियाँ पहचानें, एक पैलेट चुनें, बजट तय करें, और बहुउपयोगी बेसिक खरीदें। मुफ़्त, या Gisti में AI से ढालें।",
+    "cardDesc": "अपनी अलमारी समझदारी से रीफ़्रेश करें — पुराना छाँटें, असली कमियाँ पहचानें, पैलेट चुनें, बहुउपयोगी बेसिक खरीदें।",
+    "intro": "वॉर्डरोब रीफ़्रेश शॉपिंग की होड़ से बेहतर एक छँटाई के रूप में काम करता है — ज़्यादातर अलमारियों में इस्तेमाल से ज़्यादा सामान पहले से भरा होता है। यह चेकलिस्ट पुराना छाँटने और असली कमियाँ ढूँढने से शुरू होती है, फिर आपको कुछ बहुउपयोगी कपड़े खरीदने में मदद करती है जो आपके मौजूदा सामान से मिलें, ऐसे पैलेट और बजट में जो आपने पहले तय किया। नतीजा — कम सामान से ज़्यादा आउटफ़िट। और देखें <a href=\"/hi/checklists/shopping/\" class=\"text-primary hover:underline\">शॉपिंग चेकलिस्ट</a>।",
+    "items": [
+      { "text": "सब कुछ बाहर निकालें और रखने, ठीक करने, और छोड़ देने में बाँटें", "note": "अगर आपने साल भर में नहीं पहना और वह भावनात्मक या मौसमी नहीं है, तो वह शायद छोड़ने वाला है।" },
+      { "text": "रखने वाले ढेर को पहनकर देखें और फ़िट, घिसाव, और यह जाँचें कि आप उसे सच में उठाते हैं या नहीं" },
+      { "text": "असली कमियाँ नोट करें: जो आपके पास है पर जिससे आउटफ़िट पूरा नहीं होता", "note": "कमियाँ ट्रेंड से ज़्यादा काम की हैं — रोज़ के जूतों की कमी किसी और स्टेटमेंट पीस से बेहतर मुद्दा है।" },
+      { "text": "एक छोटा रंग पैलेट चुनें ताकि नए कपड़े आपके मौजूदा सामान से मिलें", "note": "कुछ न्यूट्रल के साथ एक-दो एक्सेंट रंग आपके बन सकने वाले आउटफ़िट कई गुना कर देते हैं।" },
+      { "text": "बदलने लायक बेसिक की सूची बनाएँ — घिसे-पिटे ज़रूरी कपड़े ट्रेंड पीस से ज़्यादा काम आते हैं" },
+      { "text": "बजट तय करें और तय करें कि कहाँ ज़्यादा खर्च करना बनाम बचाना सही है", "note": "उन चीज़ों पर खर्च करें जो आप सबसे ज़्यादा पहनते हैं और जो घिसती हैं — जूते, बाहरी कपड़े, रोज़ की जींस।" },
+      { "text": "उस मौसम के लिए जाँचें जिसके लिए आप सचमुच कपड़े पहनते हैं, सिर्फ़ कैलेंडर के मौसम के लिए नहीं" },
+      { "text": "खरीदने से पहले केयर लेबल पढ़ें — सिर्फ़-ड्राई-क्लीन छिपा खर्च और मेहनत जोड़ता है", "note": "जो बेसिक आप हर हफ़्ते पहनेंगे उस पर 'हैंड वॉश' या 'ड्राई क्लीन ओनली' अक्सर सही सौदा नहीं।" },
+      { "text": "कपड़ा महसूस करें और गुणवत्ता के लिए सिलाई, बटन, और टाँके जाँचें" },
+      { "text": "उन बहुउपयोगी कपड़ों को तरजीह दें जो कई आउटफ़िट और मौकों पर चलें" },
+      { "text": "ब्रांडों में अपनी साइज़ का अंदाज़ा लगाने के बजाय पहनकर देखें", "note": "ब्रांडों के बीच साइज़िंग बहुत बदलती है — लेबल पर लिखा नंबर बहुत कम मायने रखता है।" },
+      { "text": "खरीदने से पहले दुकानों में कीमतों की तुलना करें और मौसम-अंत की सेल जाँचें" },
+      { "text": "जब तक पक्का न हो, रसीदें और टैग रखें, और वापसी की समय-सीमा नोट करें", "note": "ख़ासकर ऑनलाइन वापसी की समय-सीमा होती है — जो चीज़ ठीक नहीं बैठी उस पर विंडो बंद न होने दें।" },
+      { "text": "जो छोड़ रहे हैं उसे जमा होने देने के बजाय दान करें, बेचें, या रीसायकल करें", "note": "छँटाई जगह बनाती है और दिखाती है कि आपके पास असल में क्या है और आप क्या पहनते हैं।" },
+      { "text": "बे-मौसम के कपड़े साफ़ और सुरक्षित रखें ताकि जगह बने और वे ताज़ा रहें", "note": "रखने से पहले धोएँ — शरीर के तेल और दाग महीनों में जम जाते हैं और कीड़े खींचते हैं।" }
+    ],
+    "faq": [
+      { "q": "नए मौसम के लिए मैं अपना वॉर्डरोब कैसे अपडेट करूँ?", "a": "पुराना छाँटने और यह देखने से शुरू करें कि आपके पास पहले से क्या है, फिर ट्रेंड के पीछे भागने के बजाय असली कमियाँ नोट करें। एक छोटा रंग पैलेट चुनें ताकि नए कपड़े पुरानों से मिलें, बजट तय करें, और ऐसे बहुउपयोगी बेसिक खरीदें जो आप अक्सर पहनें। कपड़े पहनकर देखें, केयर लेबल जाँचें, और जो अब नहीं पहनते उसे छोड़ दें।" },
+      { "q": "मुझे असल में कितने कपड़े चाहिए?", "a": "ज़्यादातर अलमारियों में जितने होते हैं उससे कम। एक काम का वॉर्डरोब मिलने वाले रंगों के बहुउपयोगी बेसिक पर बना होता है, साथ में कुछ कपड़े जो आपको पसंद हों — इतने कि फ़ैसले की थकान के बिना असल ज़िंदगी के आउटफ़िट बन जाएँ। शायद ही पहने जाने वाले बड़े ढेर के बजाय उन चीज़ों पर ध्यान दें जिन्हें आप हर हफ़्ते उठाते हैं।" },
+      { "q": "वॉर्डरोब रीफ़्रेश करते समय क्या मुझे ट्रेंड फ़ॉलो करने चाहिए?", "a": "ट्रेंड छोटी, सस्ती मात्रा में ठीक हैं, पर उन पर वॉर्डरोब बनाना महँगा पड़ता है और जल्दी पुराना हो जाता है। अपना बजट अच्छी गुणवत्ता के बेसिक और आप पर जँचने वाले कपड़ों पर लगाएँ, और एक-दो ट्रेंड आइटम को मसाला बनने दें, पूरा खाना नहीं। जो कपड़े आप सालों पहनेंगे वे लगभग हमेशा बेहतर सौदा होते हैं।" }
+    ]
+  }
+}

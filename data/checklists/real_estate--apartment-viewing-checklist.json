@@ -1,0 +1,64 @@
+{
+  "category": "real_estate",
+  "slug": "apartment-viewing-checklist",
+  "order": 1,
+  "icon": "apartment",
+  "title": "Apartment Viewing Checklist",
+  "metaTitle": "Apartment Viewing Checklist (What to Check) | Gisti",
+  "metaDescription": "A practical apartment viewing checklist: water pressure, damp, heating, noise, appliances, and what the rent includes. Free, or tailor it with AI in Gisti.",
+  "cardDesc": "What to check before you sign — water pressure, damp, heating, noise, appliances, and hidden costs.",
+  "ordered": false,
+  "intro": "A viewing goes fast, and it's easy to be charmed by good light and miss a slow-draining sink or a noisy street. This checklist walks you through the things that are costly or impossible to change after you sign — water, damp, heating, noise, and what the rent really covers. Take photos as you go so you can compare places fairly. Find more <a href=\"/checklists/real_estate/\" class=\"text-primary hover:underline\">real estate checklists</a>.",
+  "items": [
+    { "text": "Turn on the kitchen and bathroom taps to check water pressure and how long hot water takes to arrive", "note": "Weak pressure and a slow hot-water heater are common and awkward to fix once you've signed." },
+    { "text": "Flip every light switch and plug a charger into each outlet you can reach", "note": "A dead outlet or a switch that does nothing can point to old or unsafe wiring — ask about it." },
+    { "text": "Look for water stains, bubbling paint, or a musty smell around ceilings, windows, and under sinks", "note": "A musty smell is the clearest sign of hidden damp or mould." },
+    { "text": "Open, close, and lock every window, and feel for drafts around the frames" },
+    { "text": "Test the heating and any air conditioning, even if it's the wrong season", "note": "Ask the agent to switch it on; 'it works, trust me' isn't the same as seeing it run." },
+    { "text": "Walk the floors for soft spots, loud squeaks, and damage hidden under rugs" },
+    { "text": "Open every closet, cabinet, and storage space and picture where your things will go" },
+    { "text": "Confirm each included appliance actually runs — fridge, oven, stove, dishwasher, washer, dryer" },
+    { "text": "Stand still for a minute and listen for traffic, neighbours, and plumbing noise", "note": "A quiet weekday afternoon hides rush-hour, evening, and weekend noise — visit twice if you can." },
+    { "text": "Check the mobile signal in each room, including the bedrooms and bathroom", "note": "Signal varies by carrier and drops away from windows — test where you'll actually use your phone." },
+    { "text": "Look under the kitchen sink and around bins for droppings, traps, or roach signs" },
+    { "text": "Check the front-door lock, buzzer or intercom, and how secure the building entrance feels" },
+    { "text": "Ask exactly what the rent includes — water, heating, electricity, internet, parking", "note": "Utilities and parking can add a lot; get the split in writing before you compare places." },
+    { "text": "Note which way the windows face and how much natural light each room gets" },
+    { "text": "Take photos or a short video of the whole place as you walk through", "note": "It makes comparing several viewings easier and starts your move-in condition record." }
+  ],
+  "faq": [
+    { "q": "What should I look for when viewing an apartment?", "a": "Focus on the things that are expensive or impossible to change: water pressure, damp or mould, working heating, window condition, and noise. Test the appliances and outlets, check storage and mobile signal, and confirm what the rent actually includes. Photograph everything so you can compare places later." },
+    { "q": "What questions should I ask the landlord or agent during a viewing?", "a": "Ask what's included in the rent (utilities, water, parking, internet), how much the deposit is, who handles repairs, and how long previous tenants stayed. Ask why the current tenant is leaving and when the place is available. Getting the answers in writing protects you later." },
+    { "q": "Should I view an apartment more than once?", "a": "If you're seriously considering it, yes — a second visit at a different time of day is worth it. A place that's quiet on a weekday afternoon can be loud in the evening or on weekends, and the light changes a lot through the day. A second look also lets you re-check anything you rushed the first time." }
+  ],
+  "related": ["house-inspection-checklist", "rental-agreement-checklist", "home-buying-checklist"],
+  "hi": {
+    "title": "अपार्टमेंट देखने की चेकलिस्ट",
+    "metaTitle": "अपार्टमेंट देखने की चेकलिस्ट (क्या जाँचें) | Gisti",
+    "metaDescription": "अपार्टमेंट देखने की व्यावहारिक चेकलिस्ट: पानी का प्रेशर, नमी, हीटिंग, शोर, उपकरण, और किराए में क्या शामिल है। मुफ़्त, या Gisti में AI से ढालें।",
+    "cardDesc": "साइन करने से पहले क्या जाँचें — पानी का प्रेशर, नमी, हीटिंग, शोर, उपकरण, और छिपे खर्च।",
+    "intro": "विज़िट जल्दी बीत जाती है, और अच्छी रोशनी से मोहित होकर धीमे निकलते सिंक या शोरगुल वाली सड़क को अनदेखा करना आसान है। यह चेकलिस्ट आपको उन चीज़ों से गुज़ारती है जो साइन करने के बाद महँगी या बदलना नामुमकिन होती हैं — पानी, नमी, हीटिंग, शोर, और किराए में असल में क्या शामिल है। साथ-साथ फ़ोटो लेते चलें ताकि आप जगहों की सही तुलना कर सकें। और देखें <a href=\"/hi/checklists/real_estate/\" class=\"text-primary hover:underline\">रियल एस्टेट चेकलिस्ट</a>।",
+    "items": [
+      { "text": "किचन और बाथरूम के नल चलाकर पानी का प्रेशर और गर्म पानी आने में लगने वाला समय जाँचें", "note": "कमज़ोर प्रेशर और धीमा गर्म-पानी हीटर आम हैं और साइन करने के बाद ठीक करना झंझट भरा।" },
+      { "text": "हर लाइट स्विच दबाएँ और जिस भी आउटलेट तक पहुँच सकें उसमें चार्जर लगाकर देखें", "note": "मरा हुआ आउटलेट या बेकार स्विच पुरानी या असुरक्षित वायरिंग की ओर इशारा कर सकता है — इसके बारे में पूछें।" },
+      { "text": "छत, खिड़कियों, और सिंक के नीचे पानी के दाग, उखड़ता पेंट, या सीलन की गंध देखें", "note": "सीलन की गंध छिपी नमी या फफूँदी का सबसे साफ़ संकेत है।" },
+      { "text": "हर खिड़की खोलें, बंद करें, और लॉक करें, और फ़्रेम के आसपास हवा के झोंके महसूस करें" },
+      { "text": "हीटिंग और कोई भी AC चलाकर देखें, भले ही मौसम गलत हो", "note": "एजेंट से उसे चालू करने को कहें; 'चलता है, भरोसा करें' उसे चलते देखने जैसा नहीं है।" },
+      { "text": "फ़र्श पर नरम जगहें, तेज़ चरमराहट, और कालीन के नीचे छिपा नुकसान ढूँढें" },
+      { "text": "हर अलमारी, कैबिनेट, और स्टोरेज खोलें और सोचें कि आपका सामान कहाँ जाएगा" },
+      { "text": "पक्का करें कि हर शामिल उपकरण सच में चलता है — फ्रिज, ओवन, स्टोव, डिशवॉशर, वॉशर, ड्रायर" },
+      { "text": "एक मिनट चुपचाप खड़े होकर ट्रैफ़िक, पड़ोसियों, और प्लंबिंग का शोर सुनें", "note": "शांत वीकडे दोपहर रश-आवर, शाम, और वीकेंड का शोर छिपा देती है — हो सके तो दो बार जाएँ।" },
+      { "text": "हर कमरे में मोबाइल सिग्नल जाँचें, बेडरूम और बाथरूम समेत", "note": "सिग्नल कैरियर के हिसाब से बदलता है और खिड़कियों से दूर कमज़ोर होता है — वहाँ जाँचें जहाँ आप सच में फ़ोन इस्तेमाल करेंगे।" },
+      { "text": "किचन सिंक के नीचे और कूड़ेदान के आसपास बीट, जाल, या तिलचट्टे के निशान देखें" },
+      { "text": "सामने के दरवाज़े का लॉक, बज़र या इंटरकॉम, और बिल्डिंग का प्रवेश कितना सुरक्षित लगता है जाँचें" },
+      { "text": "पूछें कि किराए में ठीक-ठीक क्या शामिल है — पानी, हीटिंग, बिजली, इंटरनेट, पार्किंग", "note": "उपयोगिताएँ और पार्किंग काफ़ी जोड़ सकती हैं; जगहों की तुलना से पहले बँटवारा लिखित में लें।" },
+      { "text": "ध्यान दें कि खिड़कियाँ किस दिशा में हैं और हर कमरे में कितनी प्राकृतिक रोशनी आती है" },
+      { "text": "चलते-चलते पूरी जगह की फ़ोटो या छोटा वीडियो लें", "note": "इससे कई विज़िट की तुलना आसान होती है और आपका मूव-इन कंडीशन रिकॉर्ड शुरू होता है।" }
+    ],
+    "faq": [
+      { "q": "अपार्टमेंट देखते समय क्या जाँचना चाहिए?", "a": "उन चीज़ों पर ध्यान दें जो महँगी या बदलना नामुमकिन हैं: पानी का प्रेशर, नमी या फफूँदी, चलती हीटिंग, खिड़कियों की हालत, और शोर। उपकरण और आउटलेट जाँचें, स्टोरेज और मोबाइल सिग्नल देखें, और पक्का करें कि किराए में असल में क्या शामिल है। सब कुछ फ़ोटो में ले लें ताकि बाद में जगहों की तुलना कर सकें।" },
+      { "q": "विज़िट के दौरान मकान मालिक या एजेंट से क्या पूछना चाहिए?", "a": "पूछें कि किराए में क्या शामिल है (उपयोगिताएँ, पानी, पार्किंग, इंटरनेट), डिपॉज़िट कितना है, मरम्मत कौन करता है, और पिछले किराएदार कितने समय रुके। पूछें कि मौजूदा किराएदार क्यों जा रहा है और जगह कब उपलब्ध है। जवाब लिखित में लेना बाद में आपकी रक्षा करता है।" },
+      { "q": "क्या मुझे अपार्टमेंट एक से ज़्यादा बार देखना चाहिए?", "a": "अगर आप गंभीरता से सोच रहे हैं, तो हाँ — दिन के अलग समय पर दूसरी विज़िट फ़ायदेमंद है। जो जगह वीकडे दोपहर में शांत हो, वह शाम या वीकेंड पर शोरगुल भरी हो सकती है, और रोशनी दिन भर बहुत बदलती है। दूसरी नज़र से आप वह भी दोबारा जाँच सकते हैं जो पहली बार जल्दबाज़ी में छूट गया।" }
+    ]
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "category": "health",
+  "slug": "doctor-visit-checklist",
+  "order": 1,
+  "icon": "medical_services",
+  "title": "Doctor Visit Checklist",
+  "metaTitle": "Doctor Visit Checklist (What to Bring & Ask) | Gisti",
+  "metaDescription": "A doctor visit checklist to prepare before your appointment: what to bring, symptoms to note, and questions to ask. Free, or tailor it with AI in Gisti.",
+  "cardDesc": "What to bring, symptoms to note, and questions to ask so you make the most of your appointment.",
+  "ordered": false,
+  "intro": "A short appointment goes better when you walk in prepared — with your symptoms written down, your medications listed, and the questions you actually want answered. This checklist covers what to bring and note beforehand so nothing important gets forgotten in the moment. It's an organizational aid, not medical advice. Find more <a href=\"/checklists/health/\" class=\"text-primary hover:underline\">health and wellness checklists</a>.",
+  "items": [
+    { "text": "Write down your main reason for the visit and what you hope to resolve", "note": "Leading with your top concern means it gets covered even if the visit runs short." },
+    { "text": "List your current symptoms — when each started, how often, and what makes it better or worse" },
+    { "text": "Bring an up-to-date list of your medications and doses, including supplements", "note": "Over-the-counter meds and vitamins count; a clear photo of each label works too." },
+    { "text": "Note any allergies and past reactions to medications" },
+    { "text": "Write your questions in priority order", "note": "You'll get to the ones that matter even if time runs out." },
+    { "text": "Pack your insurance card and a photo ID" },
+    { "text": "Gather recent test results, scans, or reports from other clinics", "note": "Request copies ahead of time if another office is holding them." },
+    { "text": "Note relevant family medical history, such as heart disease, diabetes, or cancer" },
+    { "text": "Bring home-tracked numbers if you monitor them — blood pressure, blood sugar, or weight" },
+    { "text": "List other doctors or specialists you see, and what they treat" },
+    { "text": "Confirm the date, time, location, and any prep like fasting or forms", "note": "Some blood tests require skipping food that morning — check when you book." },
+    { "text": "Have a way to take notes during the visit — a small notepad or your phone" },
+    { "text": "Arrange for someone to come along if you'd like a second set of ears" },
+    { "text": "Know which pharmacy you use so any new prescription can be sent there" }
+  ],
+  "faq": [
+    { "q": "How do I prepare for a doctor's appointment?", "a": "Write down your symptoms and your questions before you go, and bring a current list of your medications, your allergies, and your insurance and ID. Having it on paper or your phone means you won't forget the one thing you meant to ask when the visit feels rushed." },
+    { "q": "What should I bring to a doctor visit?", "a": "Bring your insurance card and photo ID, a list of current medications and doses, any recent test results or reports, and your written questions. If you track anything at home — blood pressure, blood sugar, or weight — bring those readings too." },
+    { "q": "What questions should I ask my doctor?", "a": "Good ones to write down: what the diagnosis means, what your options are, what each medication is for and its side effects, and when to follow up or seek urgent care. This checklist is an organizational aid to help you prepare, not medical advice — your doctor is the person to answer health questions about your situation." }
+  ],
+  "related": ["medication-tracker-checklist", "dental-visit-checklist", "fitness/self-care-checklist"],
+  "hi": {
+    "title": "डॉक्टर विज़िट चेकलिस्ट",
+    "metaTitle": "डॉक्टर विज़िट चेकलिस्ट (क्या ले जाएँ और क्या पूछें) | Gisti",
+    "metaDescription": "अपनी अपॉइंटमेंट से पहले तैयारी के लिए डॉक्टर विज़िट चेकलिस्ट: क्या ले जाएँ, कौन-से लक्षण नोट करें, और कौन-से सवाल पूछें। मुफ़्त, या Gisti में AI से ढालें।",
+    "cardDesc": "क्या ले जाएँ, कौन-से लक्षण नोट करें, और क्या पूछें — ताकि आप अपनी अपॉइंटमेंट का पूरा फ़ायदा उठाएँ।",
+    "intro": "एक छोटी अपॉइंटमेंट तब बेहतर चलती है जब आप तैयार होकर जाते हैं — अपने लक्षण लिखकर, दवाइयाँ सूचीबद्ध करके, और वे सवाल लेकर जिनके जवाब आप सच में चाहते हैं। यह चेकलिस्ट बताती है कि पहले से क्या ले जाना और क्या नोट करना है ताकि मौके पर कोई ज़रूरी बात न छूटे। यह एक व्यवस्था-सहायक है, चिकित्सा सलाह नहीं। और देखें <a href=\"/hi/checklists/health/\" class=\"text-primary hover:underline\">स्वास्थ्य और वेलनेस चेकलिस्ट</a>।",
+    "items": [
+      { "text": "अपनी विज़िट का मुख्य कारण और आप क्या हल करना चाहते हैं, यह लिख लें", "note": "अपनी सबसे बड़ी चिंता पहले बताने से वह कवर हो जाती है, भले ही विज़िट छोटी रह जाए।" },
+      { "text": "अपने मौजूदा लक्षण सूचीबद्ध करें — हर एक कब शुरू हुआ, कितनी बार होता है, और किससे बेहतर या बदतर होता है" },
+      { "text": "अपनी दवाइयों और खुराक की ताज़ा सूची लाएँ, सप्लीमेंट सहित", "note": "बिना पर्ची वाली दवाएँ और विटामिन भी गिनती में हैं; हर लेबल की साफ़ फ़ोटो भी काम करती है।" },
+      { "text": "किसी भी एलर्जी और दवाओं पर पुरानी प्रतिक्रियाओं को नोट करें" },
+      { "text": "अपने सवाल प्राथमिकता के क्रम में लिखें", "note": "समय कम पड़ने पर भी ज़रूरी सवालों तक आप पहुँच जाएँगे।" },
+      { "text": "अपना बीमा कार्ड और एक फ़ोटो पहचान-पत्र रखें" },
+      { "text": "दूसरे क्लीनिकों के हाल के टेस्ट रिज़ल्ट, स्कैन, या रिपोर्ट इकट्ठा करें", "note": "अगर कोई और दफ़्तर उन्हें रखे हुए है तो पहले से कॉपी मँगवा लें।" },
+      { "text": "प्रासंगिक पारिवारिक चिकित्सा इतिहास नोट करें, जैसे हृदय रोग, मधुमेह, या कैंसर" },
+      { "text": "अगर आप घर पर मापते हैं तो वे आँकड़े लाएँ — ब्लड प्रेशर, ब्लड शुगर, या वज़न" },
+      { "text": "आप जिन दूसरे डॉक्टरों या विशेषज्ञों को दिखाते हैं और वे क्या इलाज करते हैं, सूचीबद्ध करें" },
+      { "text": "तारीख़, समय, जगह, और उपवास या फ़ॉर्म जैसी कोई तैयारी पक्की कर लें", "note": "कुछ ब्लड टेस्ट के लिए उस सुबह खाना छोड़ना पड़ता है — बुकिंग के समय पूछ लें।" },
+      { "text": "विज़िट के दौरान नोट लेने का ज़रिया रखें — एक छोटा नोटपैड या आपका फ़ोन" },
+      { "text": "अगर आप दूसरा कान चाहते हैं तो किसी को साथ आने के लिए कहें" },
+      { "text": "जानें कि आप कौन-सी फ़ार्मेसी इस्तेमाल करते हैं ताकि कोई नई पर्ची वहाँ भेजी जा सके" }
+    ],
+    "faq": [
+      { "q": "मैं डॉक्टर की अपॉइंटमेंट के लिए कैसे तैयारी करूँ?", "a": "जाने से पहले अपने लक्षण और सवाल लिख लें, और अपनी दवाइयों, एलर्जी, और बीमा व पहचान-पत्र की मौजूदा सूची लाएँ। कागज़ पर या फ़ोन में होने से, जब विज़िट जल्दबाज़ी में लगे, तब भी वह बात नहीं भूलेगी जो आप पूछना चाहते थे।" },
+      { "q": "डॉक्टर विज़िट पर मुझे क्या ले जाना चाहिए?", "a": "अपना बीमा कार्ड और फ़ोटो पहचान-पत्र, मौजूदा दवाइयों और खुराक की सूची, हाल की कोई टेस्ट रिपोर्ट, और अपने लिखे सवाल लाएँ। अगर आप घर पर कुछ मापते हैं — ब्लड प्रेशर, ब्लड शुगर, या वज़न — तो वे रीडिंग भी लाएँ।" },
+      { "q": "मुझे अपने डॉक्टर से कौन-से सवाल पूछने चाहिए?", "a": "लिखने लायक अच्छे सवाल: निदान का क्या मतलब है, आपके विकल्प क्या हैं, हर दवा किसलिए है और उसके दुष्प्रभाव क्या हैं, और दोबारा कब दिखाना या तुरंत मदद कब लेनी है। यह चेकलिस्ट तैयारी में मदद के लिए एक व्यवस्था-सहायक है, चिकित्सा सलाह नहीं — आपकी स्थिति के बारे में स्वास्थ्य सवालों के जवाब देने के लिए आपके डॉक्टर सही व्यक्ति हैं।" }
+    ]
+  }
+}

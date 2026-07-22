@@ -1,0 +1,66 @@
+{
+  "category": "travel",
+  "slug": "vacation-preparation-checklist",
+  "order": 51,
+  "icon": "flight_takeoff",
+  "title": "Vacation Preparation Checklist",
+  "metaTitle": "Vacation Preparation Checklist (Before You Go) | Gisti",
+  "metaDescription": "A vacation preparation checklist for the weeks before you go: passports, visas, insurance, bank alerts, home and pet care. Free, or tailor it with AI in Gisti.",
+  "cardDesc": "Everything to sort before you go — documents, insurance, money, home, and pet care.",
+  "ordered": false,
+  "intro": "Vacation stress usually comes from the admin you left until the last minute, not the trip itself. This checklist covers the weeks before you go — documents, money, health, and the home you're leaving behind — so you can actually relax once you land. See more <a href=\"/checklists/travel/\" class=\"text-primary hover:underline\">travel checklists</a>.",
+  "items": [
+    { "text": "Book flights and accommodation, and save the confirmations offline", "note": "Screenshots or PDFs work even with no signal at the airport." },
+    { "text": "Check your passport is valid for at least six months past your return date", "note": "Many countries deny entry otherwise." },
+    { "text": "Apply for any visa or travel authorization (ESTA, eTA) well ahead", "note": "Some approvals take days or weeks." },
+    { "text": "Check recommended or required vaccinations for your destination" },
+    { "text": "Buy travel insurance that covers medical care and trip cancellation", "note": "Medical bills abroad can be enormous without it." },
+    { "text": "Notify your bank and card issuer of your travel dates", "note": "Stops a foreign charge from freezing your card." },
+    { "text": "Get some local currency and a card with no foreign-transaction fees" },
+    { "text": "Arrange airport transfer or parking for both ends of the trip" },
+    { "text": "Arrange pet care, house-sitting, or plant watering" },
+    { "text": "Pause mail, deliveries, and any subscriptions you won't use" },
+    { "text": "Set an out-of-office reply and hand off anything urgent at work" },
+    { "text": "Check the weather, local holidays, and dress code at your destination" },
+    { "text": "Download offline maps, a translation app, and your airline and booking apps", "note": "Set them up on Wi-Fi before you leave." },
+    { "text": "Photograph your passport, tickets, and insurance, and store copies in the cloud", "note": "A backup if the originals are lost or stolen." },
+    { "text": "Sort your phone plan: international roaming or a local or eSIM data plan" },
+    { "text": "Leave your itinerary and copies of key documents with someone at home" }
+  ],
+  "faq": [
+    { "q": "How far in advance should I start preparing for a vacation?", "a": "Start about four to six weeks out for a domestic trip, and two to three months for international travel where visas or vaccinations are involved. Book flights and lodging first, then work through documents, insurance, and money. The last week is for packing and home prep, not paperwork." },
+    { "q": "What documents do I need before an international trip?", "a": "A passport valid for at least six months beyond your return, any required visa or travel authorization, and printed or saved copies of your flights, lodging, and travel insurance. Keep digital backups in the cloud in case the originals are lost. Check your specific destination's entry rules, as they vary by country." },
+    { "q": "Do I really need travel insurance?", "a": "For any trip with prepaid costs or international travel, yes — it covers medical emergencies, trip cancellation, and lost baggage, and medical care abroad can be very expensive out of pocket. For a cheap domestic trip you could skip it, but weigh what you'd lose if the trip fell through. This is general guidance, not financial advice." }
+  ],
+  "related": ["international-flight-checklist", "road-trip-checklist", "weekend-trip-packing-list", "beach-vacation-packing-list"],
+  "hi": {
+    "title": "छुट्टी की तैयारी चेकलिस्ट",
+    "metaTitle": "छुट्टी की तैयारी चेकलिस्ट (जाने से पहले) | Gisti",
+    "metaDescription": "जाने से पहले के हफ़्तों के लिए छुट्टी की तैयारी चेकलिस्ट: पासपोर्ट, वीज़ा, बीमा, बैंक अलर्ट, और घर व पालतू की देखभाल। मुफ़्त, या Gisti में AI से ढालें।",
+    "cardDesc": "जाने से पहले सब निपटाएँ — दस्तावेज़, बीमा, पैसा, घर, और पालतू की देखभाल।",
+    "intro": "छुट्टी का तनाव अक्सर आख़िरी वक़्त पर छोड़े गए काम से आता है, ख़ुद ट्रिप से नहीं। यह चेकलिस्ट जाने से पहले के हफ़्तों को कवर करती है — दस्तावेज़, पैसा, सेहत, और पीछे छूटने वाला घर — ताकि पहुँचते ही आप सच में आराम कर सकें। और देखें <a href=\"/hi/checklists/travel/\" class=\"text-primary hover:underline\">यात्रा चेकलिस्ट</a>।",
+    "items": [
+      { "text": "उड़ानें और ठहरने की बुकिंग करें, और पुष्टियाँ ऑफ़लाइन सेव करें", "note": "स्क्रीनशॉट या PDF एयरपोर्ट पर बिना सिग्नल के भी काम करते हैं।" },
+      { "text": "जाँचें कि आपका पासपोर्ट वापसी की तारीख़ से कम से कम छह महीने आगे तक वैध है", "note": "कई देश वरना प्रवेश नहीं देते।" },
+      { "text": "कोई भी वीज़ा या ट्रैवल अथॉराइज़ेशन (ESTA, eTA) काफ़ी पहले अप्लाई करें", "note": "कुछ मंज़ूरियों में दिन या हफ़्ते लगते हैं।" },
+      { "text": "अपने गंतव्य के लिए सुझाए गए या ज़रूरी टीके जाँचें" },
+      { "text": "ऐसा ट्रैवल बीमा लें जो मेडिकल इलाज और ट्रिप रद्द होना कवर करे", "note": "इसके बिना विदेश में मेडिकल बिल बहुत भारी हो सकते हैं।" },
+      { "text": "अपने बैंक और कार्ड जारीकर्ता को अपनी यात्रा की तारीख़ें बताएँ", "note": "विदेशी चार्ज से कार्ड फ़्रीज़ होने से बचाता है।" },
+      { "text": "थोड़ी स्थानीय मुद्रा और बिना विदेशी-लेनदेन शुल्क वाला कार्ड रखें" },
+      { "text": "ट्रिप के दोनों छोर के लिए एयरपोर्ट ट्रांसफ़र या पार्किंग की व्यवस्था करें" },
+      { "text": "पालतू की देखभाल, घर की निगरानी, या पौधों को पानी देने की व्यवस्था करें" },
+      { "text": "डाक, डिलीवरी, और जो सब्सक्रिप्शन इस्तेमाल नहीं होंगे उन्हें रोकें" },
+      { "text": "एक आउट-ऑफ़-ऑफ़िस रिप्लाई सेट करें और काम पर कुछ ज़रूरी हो तो सौंप दें" },
+      { "text": "अपने गंतव्य का मौसम, स्थानीय छुट्टियाँ, और ड्रेस कोड जाँचें" },
+      { "text": "ऑफ़लाइन मैप, एक ट्रांसलेशन ऐप, और अपनी एयरलाइन व बुकिंग ऐप डाउनलोड करें", "note": "निकलने से पहले इन्हें Wi-Fi पर सेट कर लें।" },
+      { "text": "अपने पासपोर्ट, टिकट, और बीमा की फ़ोटो लें, और कॉपियाँ क्लाउड में रखें", "note": "मूल खो या चोरी हो जाएँ तो एक बैकअप।" },
+      { "text": "अपना फ़ोन प्लान तय करें: इंटरनेशनल रोमिंग या एक स्थानीय या eSIM डेटा प्लान" },
+      { "text": "अपना यात्रा-कार्यक्रम और ज़रूरी दस्तावेज़ों की कॉपियाँ घर पर किसी के पास छोड़ें" }
+    ],
+    "faq": [
+      { "q": "छुट्टी की तैयारी मुझे कितना पहले शुरू करनी चाहिए?", "a": "घरेलू ट्रिप के लिए लगभग चार से छह हफ़्ते पहले, और जहाँ वीज़ा या टीके शामिल हों ऐसी अंतरराष्ट्रीय यात्रा के लिए दो से तीन महीने पहले शुरू करें। पहले उड़ानें और ठहरना बुक करें, फिर दस्तावेज़, बीमा, और पैसे पर काम करें। आख़िरी हफ़्ता पैकिंग और घर की तैयारी के लिए है, कागज़ी काम के लिए नहीं।" },
+      { "q": "अंतरराष्ट्रीय ट्रिप से पहले मुझे कौन-से दस्तावेज़ चाहिए?", "a": "वापसी से कम से कम छह महीने आगे तक वैध पासपोर्ट, कोई ज़रूरी वीज़ा या ट्रैवल अथॉराइज़ेशन, और अपनी उड़ानों, ठहरने, व ट्रैवल बीमा की प्रिंटेड या सेव की कॉपियाँ। मूल खो जाने की स्थिति में डिजिटल बैकअप क्लाउड में रखें। अपने ख़ास गंतव्य के प्रवेश नियम जाँचें, क्योंकि वे देश दर देश अलग होते हैं।" },
+      { "q": "क्या मुझे सच में ट्रैवल बीमा चाहिए?", "a": "किसी भी पहले से चुकाई लागत वाली या अंतरराष्ट्रीय ट्रिप के लिए, हाँ — यह मेडिकल इमरजेंसी, ट्रिप रद्द होना, और खोया सामान कवर करता है, और विदेश में मेडिकल इलाज अपनी जेब से बहुत महँगा पड़ सकता है। किसी सस्ती घरेलू ट्रिप के लिए आप इसे छोड़ सकते हैं, पर सोचें कि ट्रिप रद्द होने पर आपका कितना नुकसान होगा। यह सामान्य मार्गदर्शन है, वित्तीय सलाह नहीं।" }
+    ]
+  }
+}

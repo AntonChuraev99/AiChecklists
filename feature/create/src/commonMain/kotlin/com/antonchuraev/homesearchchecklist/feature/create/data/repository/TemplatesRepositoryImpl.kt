@@ -30,6 +30,14 @@ class TemplatesRepositoryImpl(
         "fitness" to "Fitness",
         "cooking" to "Cooking",
         "finance" to "Finance",
+        // Gallery-origin categories (unified templates library — see data/checklists/*.json)
+        "baby" to "Baby & Parenting",
+        "business" to "Business & Launch",
+        "cleaning" to "Cleaning & Chores",
+        "groceries" to "Grocery & Shopping",
+        "moving" to "Moving & Home",
+        "study" to "Study & Exam",
+        "wedding" to "Wedding & Events",
         "other" to "Other"
     )
 

@@ -1,0 +1,64 @@
+{
+  "category": "study",
+  "slug": "research-paper-checklist",
+  "order": 52,
+  "icon": "edit_document",
+  "title": "Research Paper Checklist",
+  "metaTitle": "Research Paper Checklist (Step-by-Step) | Gisti",
+  "metaDescription": "A step-by-step research paper checklist: pick a topic, gather sources, outline, draft, cite, edit, and submit on time. Free, or tailor it with AI in Gisti.",
+  "cardDesc": "A step-by-step path from topic and sources through drafting, citing, editing, and submitting on time.",
+  "ordered": true,
+  "intro": "A research paper goes far smoother when you treat it as a sequence rather than one big blank page. This checklist walks you through it in order — understanding the assignment, narrowing a topic, gathering sources, outlining, drafting, citing, and editing before you submit. Work through it step by step, and see more <a href=\"/checklists/study/\" class=\"text-primary hover:underline\">study and exam checklists</a>.",
+  "items": [
+    { "text": "Read the assignment closely: length, format, citation style, and due date", "note": "Getting the citation style wrong means reformatting every reference later." },
+    { "text": "Choose a topic that genuinely interests you and narrow it to a focused question", "note": "Too broad is the most common reason a paper wanders and runs long." },
+    { "text": "Do background reading to see what exists and where you can add something" },
+    { "text": "Gather credible sources, saving full citation details for each as you go", "note": "Recording sources as you read saves hours of backtracking at bibliography time." },
+    { "text": "Develop a clear, arguable thesis statement", "note": "A thesis someone could disagree with is stronger than a simple statement of fact." },
+    { "text": "Build an outline that maps your argument section by section" },
+    { "text": "Write a first draft without stopping to perfect every sentence", "note": "Getting words down beats polishing a blank page — you edit in the next pass." },
+    { "text": "Support each point with evidence and cite every source you use" },
+    { "text": "Write the introduction and conclusion once the body is in place" },
+    { "text": "Check that each paragraph makes one clear point that serves the thesis" },
+    { "text": "Format in-text citations and the bibliography in the required style" },
+    { "text": "Revise for structure and argument first, then edit for grammar and clarity", "note": "Fix the big-picture flow before fussing over individual sentences." },
+    { "text": "Run a plagiarism check and confirm every source is properly credited" },
+    { "text": "Proofread a final time — after a break, or by reading it aloud" },
+    { "text": "Submit before the deadline and keep a backup copy" }
+  ],
+  "faq": [
+    { "q": "How do I start a research paper?", "a": "Start by reading the assignment carefully — length, citation style, and deadline — then pick a topic you find interesting and narrow it into one focused, arguable question. Do enough background reading to see what's already been said and where you can add something, then draft a thesis. A clear question and thesis up front save you from rewriting later." },
+    { "q": "What order should I write a research paper in?", "a": "Outline first, then write the body of the argument, because it's easier to introduce and conclude a paper once you know what it actually says. Draft quickly without polishing, cite as you go, then add the introduction and conclusion. Save formatting, proofreading, and the plagiarism check for the end." },
+    { "q": "What's the difference between a research paper and a thesis?", "a": "A research paper is usually a course assignment — a focused argument backed by sources, often written over a few weeks. A thesis is a much longer, original project tied to a degree, with a supervisor, a formal proposal, and often original data or methodology. This checklist is for the paper; for the longer project, see the thesis writing checklist." }
+  ],
+  "related": ["thesis-writing-checklist", "online-course-checklist", "study-plan-checklist", "exam-prep-checklist"],
+  "hi": {
+    "title": "रिसर्च पेपर चेकलिस्ट",
+    "metaTitle": "रिसर्च पेपर चेकलिस्ट (कदम-दर-कदम) | Gisti",
+    "metaDescription": "कदम-दर-कदम रिसर्च पेपर चेकलिस्ट: टॉपिक चुनें, स्रोत जुटाएँ, outline बनाएँ, ड्राफ़्ट करें, citation दें, संपादन करें, और समय पर जमा करें। मुफ़्त, या Gisti में AI से ढालें।",
+    "cardDesc": "टॉपिक और स्रोतों से लेकर ड्राफ़्टिंग, citation, संपादन, और समय पर जमा करने तक कदम-दर-कदम रास्ता।",
+    "intro": "एक रिसर्च पेपर तब कहीं आसानी से बनता है जब आप इसे एक बड़े ख़ाली पन्ने के बजाय एक क्रम की तरह मानते हैं। यह चेकलिस्ट आपको इसे क्रम में गुज़ारती है — असाइनमेंट समझना, टॉपिक सीमित करना, स्रोत जुटाना, outline बनाना, ड्राफ़्ट करना, citation देना, और जमा करने से पहले संपादन करना। इसे कदम-दर-कदम पूरा करें, और ज़्यादा <a href=\"/hi/checklists/study/\" class=\"text-primary hover:underline\">स्टडी और परीक्षा चेकलिस्ट</a> देखें।",
+    "items": [
+      { "text": "असाइनमेंट को ध्यान से पढ़ें: लंबाई, फ़ॉर्मैट, citation style, और देय तारीख़", "note": "citation style ग़लत करने का मतलब है बाद में हर reference दोबारा फ़ॉर्मैट करना।" },
+      { "text": "एक ऐसा टॉपिक चुनें जिसमें आपकी सच्ची रुचि हो और उसे एक केंद्रित प्रश्न में सीमित करें", "note": "बहुत व्यापक होना पेपर के भटकने और लंबा खिंचने की सबसे आम वजह है।" },
+      { "text": "यह देखने के लिए background reading करें कि क्या मौजूद है और आप कहाँ कुछ जोड़ सकते हैं" },
+      { "text": "विश्वसनीय स्रोत इकट्ठा करें, साथ-साथ हर एक के पूरे citation विवरण सहेजते हुए", "note": "पढ़ते समय स्रोत दर्ज करना bibliography के समय घंटों की उलझन बचाता है।" },
+      { "text": "एक साफ़, बहस-योग्य thesis statement तैयार करें", "note": "जिस thesis से कोई असहमत हो सके वह एक साधारण तथ्य के कथन से मज़बूत है।" },
+      { "text": "एक outline बनाएँ जो आपके तर्क को सेक्शन-दर-सेक्शन दर्शाए" },
+      { "text": "हर वाक्य को परफ़ेक्ट करने के लिए रुके बिना पहला ड्राफ़्ट लिखें", "note": "शब्द काग़ज़ पर उतारना ख़ाली पन्ने को चमकाने से बेहतर है — अगले दौर में संपादन करेंगे।" },
+      { "text": "हर बिंदु को सबूत से समर्थन दें और इस्तेमाल किए हर स्रोत का citation दें" },
+      { "text": "body तैयार हो जाने पर introduction और conclusion लिखें" },
+      { "text": "जाँचें कि हर पैराग्राफ़ एक साफ़ बिंदु बनाता है जो thesis के काम आता है" },
+      { "text": "in-text citations और bibliography को ज़रूरी style में फ़ॉर्मैट करें" },
+      { "text": "पहले ढाँचे और तर्क के लिए संशोधन करें, फिर व्याकरण और स्पष्टता के लिए संपादन", "note": "अलग-अलग वाक्यों पर माथापच्ची से पहले बड़े स्तर का प्रवाह ठीक करें।" },
+      { "text": "एक plagiarism जाँच चलाएँ और पक्का करें कि हर स्रोत को ठीक से श्रेय दिया गया है" },
+      { "text": "एक आख़िरी बार प्रूफ़रीड करें — एक ब्रेक के बाद, या ज़ोर से पढ़कर" },
+      { "text": "डेडलाइन से पहले जमा करें और एक बैकअप कॉपी रखें" }
+    ],
+    "faq": [
+      { "q": "मैं एक रिसर्च पेपर कैसे शुरू करूँ?", "a": "असाइनमेंट को ध्यान से पढ़ने से शुरू करें — लंबाई, citation style, और डेडलाइन — फिर एक ऐसा टॉपिक चुनें जो आपको दिलचस्प लगे और उसे एक केंद्रित, बहस-योग्य प्रश्न में सीमित करें। इतनी background reading करें कि दिखे पहले क्या कहा जा चुका है और आप कहाँ कुछ जोड़ सकते हैं, फिर एक thesis का मसौदा बनाएँ। पहले से एक साफ़ प्रश्न और thesis आपको बाद में दोबारा लिखने से बचाते हैं।" },
+      { "q": "एक रिसर्च पेपर मुझे किस क्रम में लिखना चाहिए?", "a": "पहले outline, फिर तर्क का body लिखें, क्योंकि पेपर की शुरुआत और अंत तब लिखना आसान होता है जब आपको पता हो कि वह असल में क्या कहता है। बिना चमकाए तेज़ी से ड्राफ़्ट करें, साथ-साथ citation दें, फिर introduction और conclusion जोड़ें। फ़ॉर्मैटिंग, प्रूफ़रीडिंग, और plagiarism जाँच अंत के लिए बचा रखें।" },
+      { "q": "रिसर्च पेपर और thesis में क्या फ़र्क़ है?", "a": "एक रिसर्च पेपर आमतौर पर एक कोर्स असाइनमेंट होता है — स्रोतों से समर्थित एक केंद्रित तर्क, अक्सर कुछ हफ़्तों में लिखा जाता है। एक thesis एक बहुत लंबा, मौलिक प्रोजेक्ट है जो एक डिग्री से जुड़ा होता है, एक सुपरवाइज़र, एक औपचारिक प्रस्ताव, और अक्सर मौलिक डेटा या methodology के साथ। यह चेकलिस्ट पेपर के लिए है; लंबे प्रोजेक्ट के लिए, thesis लेखन चेकलिस्ट देखें।" }
+    ]
+  }
+}

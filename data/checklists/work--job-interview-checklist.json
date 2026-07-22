@@ -1,0 +1,66 @@
+{
+  "category": "work",
+  "slug": "job-interview-checklist",
+  "order": 51,
+  "icon": "work",
+  "title": "Job Interview Checklist",
+  "metaTitle": "Job Interview Checklist (Prep, Day & Follow-Up) | Gisti",
+  "metaDescription": "A job interview checklist: research the company, prep STAR answers, plan logistics, bring the right materials, and follow up. Free, or tailor it in Gisti.",
+  "cardDesc": "Research, STAR answers, questions to ask, logistics, and a strong follow-up.",
+  "ordered": false,
+  "intro": "Interviews reward preparation more than raw talent — the candidate who researched the company and rehearsed their stories almost always comes across better. This checklist takes you from research through the interview itself to the follow-up, so nothing catches you off guard. See more <a href=\"/checklists/work/\" class=\"text-primary hover:underline\">work checklists</a>.",
+  "items": [
+    { "text": "Research the company: what it sells, recent news, and its mission", "note": "Enough to explain why you want to work there specifically." },
+    { "text": "Re-read the job description and match your experience to each requirement" },
+    { "text": "Prepare stories for common questions using the STAR method", "note": "Situation, Task, Action, Result — keeps answers concrete." },
+    { "text": "Prepare three to five thoughtful questions to ask the interviewer", "note": "Not asking any reads as a lack of interest." },
+    { "text": "Look up your interviewers on LinkedIn if you know their names" },
+    { "text": "Practice a clear, confident introduction out loud" },
+    { "text": "Choose and lay out your outfit the night before" },
+    { "text": "Print several copies of your resume and a list of references" },
+    { "text": "Bring a notepad, pen, and any portfolio or work samples that fit the role" },
+    { "text": "Confirm the date, time, format, and location or video link", "note": "Know whether it's in person, phone, or video." },
+    { "text": "Plan your route to arrive ten to fifteen minutes early", "note": "For a video interview, test your camera, mic, and link ahead of time." },
+    { "text": "Prepare a salary range you'd accept, in case it comes up" },
+    { "text": "Silence your phone and bring a bottle of water" },
+    { "text": "Have questions ready about next steps and the timeline" },
+    { "text": "Send a short, specific thank-you email within 24 hours", "note": "Reference something you actually discussed." },
+    { "text": "Write down notes right after, while the details are fresh" }
+  ],
+  "faq": [
+    { "q": "How do I prepare for a job interview?", "a": "Research the company and role, then prepare STAR-method stories for common questions like your strengths, a challenge you handled, and why you want the job. Rehearse your introduction out loud, prepare questions to ask, and sort the logistics — outfit, route, copies of your resume — the night before. Preparation is what separates a calm interview from a stressful one." },
+    { "q": "What questions should I ask in an interview?", "a": "Ask about the role's day-to-day, what success looks like in the first few months, the team you'd join, and why the position is open. Good questions show you're serious and help you judge whether the job fits you. Avoid asking only about salary and time off in a first interview — save some of that for later stages." },
+    { "q": "Should I send a thank-you email after an interview?", "a": "Yes. Send a short, specific note within 24 hours thanking the interviewer and referencing something you discussed. It reinforces your interest and keeps you memorable, and surprisingly few candidates do it. Keep it to a few sentences — a genuine, concise message beats a long one." }
+  ],
+  "related": ["first-day-at-work-checklist", "new-employee-onboarding-checklist", "remote-work-setup-checklist", "meeting-prep-checklist"],
+  "hi": {
+    "title": "जॉब इंटरव्यू चेकलिस्ट",
+    "metaTitle": "जॉब इंटरव्यू चेकलिस्ट (तैयारी, दिन और फ़ॉलो-अप) | Gisti",
+    "metaDescription": "एक जॉब इंटरव्यू चेकलिस्ट: कंपनी पर रिसर्च, STAR जवाब तैयार करें, लॉजिस्टिक्स प्लान करें, सही सामग्री लाएँ, और फ़ॉलो-अप करें। मुफ़्त, या Gisti में AI से ढालें।",
+    "cardDesc": "रिसर्च, STAR जवाब, पूछने के सवाल, लॉजिस्टिक्स, और एक मज़बूत फ़ॉलो-अप।",
+    "intro": "इंटरव्यू कच्ची प्रतिभा से ज़्यादा तैयारी को इनाम देते हैं — जिस उम्मीदवार ने कंपनी पर रिसर्च की और अपनी कहानियाँ रिहर्स कीं वह लगभग हमेशा बेहतर दिखता है। यह चेकलिस्ट आपको रिसर्च से लेकर इंटरव्यू और फ़ॉलो-अप तक ले जाती है, ताकि कोई चीज़ आपको चौंका न सके। और देखें <a href=\"/hi/checklists/work/\" class=\"text-primary hover:underline\">काम की चेकलिस्ट</a>।",
+    "items": [
+      { "text": "कंपनी पर रिसर्च करें: वह क्या बेचती है, हाल की ख़बरें, और उसका मिशन", "note": "इतना कि आप बता सकें कि आप ख़ास वहीं क्यों काम करना चाहते हैं।" },
+      { "text": "जॉब विवरण दोबारा पढ़ें और अपने अनुभव को हर ज़रूरत से मिलाएँ" },
+      { "text": "आम सवालों के लिए STAR तरीके से कहानियाँ तैयार करें", "note": "Situation, Task, Action, Result — जवाब ठोस रखता है।" },
+      { "text": "इंटरव्यूअर से पूछने के लिए तीन से पाँच सोच-समझकर सवाल तैयार करें", "note": "एक भी न पूछना दिलचस्पी की कमी लगता है।" },
+      { "text": "अगर आपको नाम पता हों तो अपने इंटरव्यूअर को LinkedIn पर देखें" },
+      { "text": "एक साफ़, आत्मविश्वासी परिचय ज़ोर से बोलकर अभ्यास करें" },
+      { "text": "अपना आउटफ़िट एक रात पहले चुनकर निकाल लें" },
+      { "text": "अपने रेज़्यूमे की कई कॉपियाँ और संदर्भों की एक सूची प्रिंट करें" },
+      { "text": "एक नोटपैड, पेन, और भूमिका के मुताबिक कोई पोर्टफ़ोलियो या काम के नमूने लाएँ" },
+      { "text": "तारीख़, समय, स्वरूप, और जगह या वीडियो लिंक की पुष्टि करें", "note": "जानें कि यह आमने-सामने, फ़ोन पर, या वीडियो पर है।" },
+      { "text": "अपना रास्ता प्लान करें ताकि दस से पंद्रह मिनट पहले पहुँचें", "note": "वीडियो इंटरव्यू के लिए, अपना कैमरा, माइक, और लिंक पहले से जाँच लें।" },
+      { "text": "एक वेतन सीमा तैयार रखें जो आप स्वीकार करेंगे, अगर बात उठे" },
+      { "text": "अपना फ़ोन साइलेंट करें और पानी की एक बोतल लाएँ" },
+      { "text": "अगले कदमों और समय-सीमा के बारे में सवाल तैयार रखें" },
+      { "text": "24 घंटे के भीतर एक छोटा, ख़ास धन्यवाद ईमेल भेजें", "note": "किसी ऐसी बात का ज़िक्र करें जिस पर सचमुच चर्चा हुई।" },
+      { "text": "इंटरव्यू के तुरंत बाद, जब बातें ताज़ा हों, नोट्स लिख लें" }
+    ],
+    "faq": [
+      { "q": "मैं जॉब इंटरव्यू की तैयारी कैसे करूँ?", "a": "कंपनी और भूमिका पर रिसर्च करें, फिर अपनी ताक़त, संभाली गई किसी चुनौती, और आप यह नौकरी क्यों चाहते हैं जैसे आम सवालों के लिए STAR तरीके से कहानियाँ तैयार करें। अपना परिचय ज़ोर से रिहर्स करें, पूछने के सवाल तैयार करें, और लॉजिस्टिक्स — आउटफ़िट, रास्ता, रेज़्यूमे की कॉपियाँ — एक रात पहले निपटाएँ। तैयारी ही एक शांत इंटरव्यू को तनावभरे से अलग करती है।" },
+      { "q": "इंटरव्यू में मुझे कौन-से सवाल पूछने चाहिए?", "a": "भूमिका के रोज़मर्रा के काम, पहले कुछ महीनों में सफलता कैसी दिखती है, जिस टीम में आप जुड़ेंगे, और यह पद क्यों खाली है, इनके बारे में पूछें। अच्छे सवाल दिखाते हैं कि आप गंभीर हैं और आपको यह जानने में मदद करते हैं कि नौकरी आप पर सूट करती है या नहीं। पहले इंटरव्यू में सिर्फ़ वेतन और छुट्टियों के बारे में पूछने से बचें — कुछ बाद के चरणों के लिए बचाएँ।" },
+      { "q": "क्या इंटरव्यू के बाद मुझे धन्यवाद ईमेल भेजना चाहिए?", "a": "हाँ। 24 घंटे के भीतर एक छोटा, ख़ास संदेश भेजें जिसमें इंटरव्यूअर का शुक्रिया और चर्चा की किसी बात का ज़िक्र हो। यह आपकी दिलचस्पी दोहराता है और आपको यादगार रखता है, और हैरानी की बात है कि बहुत कम उम्मीदवार ऐसा करते हैं। इसे कुछ वाक्यों तक रखें — एक सच्चा, संक्षिप्त संदेश लंबे से बेहतर है।" }
+    ]
+  }
+}

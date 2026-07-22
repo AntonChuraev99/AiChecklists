@@ -1,0 +1,64 @@
+{
+  "category": "real_estate",
+  "slug": "home-buying-checklist",
+  "order": 4,
+  "icon": "real_estate_agent",
+  "title": "Home Buying Checklist",
+  "metaTitle": "Home Buying Checklist (Step by Step) | Gisti",
+  "metaDescription": "A step-by-step home buying checklist: budget, mortgage pre-approval, viewings, inspection, insurance, and signing. Free, or tailor it with AI in Gisti.",
+  "cardDesc": "Step by step from budget and pre-approval to inspection, insurance, closing costs, and keys.",
+  "ordered": true,
+  "intro": "Buying a home has a lot of moving parts, and the order you do them in matters — getting pre-approved before you fall for a place, inspecting before you close. This checklist lays out the process from budget to keys so nothing important slips between your agent, lender, and lawyer. Every situation is different, so treat it as a map, not financial advice. See more <a href=\"/checklists/real_estate/\" class=\"text-primary hover:underline\">real estate checklists</a>.",
+  "items": [
+    { "text": "Check your credit and pay down what you can before applying", "note": "A better score can mean a lower mortgage rate — worth doing a few months ahead." },
+    { "text": "Set a realistic budget that includes the down payment and monthly costs, not just the price", "note": "Factor in taxes, insurance, maintenance, and any HOA or strata fees — not only the mortgage payment." },
+    { "text": "Get a mortgage pre-approval so you know your true price range and can move fast", "note": "Pre-approval is stronger than pre-qualification and shows sellers you're serious." },
+    { "text": "Research neighbourhoods, commute, schools, and how the area feels at different times" },
+    { "text": "Make a must-have versus nice-to-have list to keep viewings focused" },
+    { "text": "Line up and attend viewings, and compare each place against your list", "note": "Photograph every place — after a few viewings they blur together." },
+    { "text": "Make an offer and negotiate the price and terms with your agent" },
+    { "text": "Hire a licensed home inspector once your offer is accepted", "note": "The inspection can uncover issues worth renegotiating or walking away over — don't skip it to save money." },
+    { "text": "Review the property title, survey, and history for liens, disputes, or easements", "note": "A title search makes sure the seller can actually sell and there are no surprise claims." },
+    { "text": "Get the property appraised, which your lender will usually require" },
+    { "text": "Compare home insurance quotes and lock in a policy before closing" },
+    { "text": "Budget for closing costs on top of the down payment", "note": "Closing costs often run a few percent of the price — legal fees, taxes, and lender charges add up." },
+    { "text": "Do a final walk-through to confirm the condition and that agreed repairs are done", "note": "This is your last chance to catch a new problem before the keys change hands." },
+    { "text": "Review and sign the closing documents, and keep copies of everything" },
+    { "text": "Set up utilities, change your address, and collect the keys and any codes or manuals" }
+  ],
+  "faq": [
+    { "q": "What are the steps to buying a house?", "a": "In rough order: check your credit and budget, get pre-approved for a mortgage, research areas and view homes, make an offer, get an inspection and appraisal, sort out insurance and closing costs, do a final walk-through, and sign the closing documents. Some steps overlap, but pre-approval before serious viewing and an inspection before closing are the ones not to skip." },
+    { "q": "How much do I need to save to buy a home?", "a": "Beyond the down payment, plan for closing costs (often a few percent of the price), moving costs, and a cushion for repairs and early bills. A larger down payment usually means a smaller loan and a better rate, but keep some savings back rather than spending everything on the purchase. This is general guidance, not financial advice — talk to a mortgage professional about your situation." },
+    { "q": "Do I really need a home inspection when buying?", "a": "In almost all cases, yes. An inspection can reveal problems — roof, foundation, wiring, plumbing — that cost far more than the inspection itself, and it gives you room to renegotiate or walk away. Skipping it to make an offer more attractive is a gamble that can go badly wrong. Even on a new build, an independent inspection is worth it." }
+  ],
+  "related": ["house-inspection-checklist", "apartment-viewing-checklist", "rental-agreement-checklist"],
+  "hi": {
+    "title": "होम बाइंग चेकलिस्ट",
+    "metaTitle": "होम बाइंग चेकलिस्ट (कदम-दर-कदम) | Gisti",
+    "metaDescription": "कदम-दर-कदम घर खरीदने की चेकलिस्ट: बजट, मॉर्गेज प्री-अप्रूवल, विज़िट, निरीक्षण, बीमा, और साइनिंग। मुफ़्त, या Gisti में AI से ढालें।",
+    "cardDesc": "बजट और प्री-अप्रूवल से लेकर निरीक्षण, बीमा, क्लोज़िंग खर्च, और चाबियों तक कदम-दर-कदम।",
+    "intro": "घर खरीदने में बहुत सारे हिस्से हैं, और आप उन्हें किस क्रम में करते हैं यह मायने रखता है — किसी जगह पर मोहित होने से पहले प्री-अप्रूवल लेना, क्लोज़ करने से पहले निरीक्षण करना। यह चेकलिस्ट बजट से चाबियों तक की प्रक्रिया रखती है ताकि आपके एजेंट, ऋणदाता, और वकील के बीच कोई ज़रूरी बात न छूटे। हर स्थिति अलग होती है, इसलिए इसे एक नक्शा मानें, वित्तीय सलाह नहीं। और देखें <a href=\"/hi/checklists/real_estate/\" class=\"text-primary hover:underline\">रियल एस्टेट चेकलिस्ट</a>।",
+    "items": [
+      { "text": "आवेदन से पहले अपना क्रेडिट जाँचें और जितना हो सके कर्ज़ चुकाएँ", "note": "बेहतर स्कोर का मतलब कम मॉर्गेज दर हो सकता है — कुछ महीने पहले करना फ़ायदेमंद है।" },
+      { "text": "एक वास्तविक बजट बनाएँ जिसमें सिर्फ़ कीमत नहीं, डाउन पेमेंट और मासिक खर्च भी शामिल हों", "note": "टैक्स, बीमा, रख-रखाव, और कोई भी HOA या सोसाइटी शुल्क गिनें — सिर्फ़ मॉर्गेज की किस्त नहीं।" },
+      { "text": "मॉर्गेज प्री-अप्रूवल लें ताकि आपको अपनी असली कीमत सीमा पता हो और आप तेज़ी से आगे बढ़ सकें", "note": "प्री-अप्रूवल, प्री-क्वालिफ़िकेशन से ज़्यादा मज़बूत है और विक्रेताओं को दिखाता है कि आप गंभीर हैं।" },
+      { "text": "मोहल्ले, आवाजाही, स्कूल, और अलग-अलग समय पर इलाका कैसा लगता है, इसकी जाँच करें" },
+      { "text": "विज़िट को केंद्रित रखने के लिए ज़रूरी बनाम अच्छा-हो-तो की सूची बनाएँ" },
+      { "text": "विज़िट तय करें और जाएँ, और हर जगह की तुलना अपनी सूची से करें", "note": "हर जगह की फ़ोटो लें — कुछ विज़िट के बाद वे आपस में घुलमिल जाती हैं।" },
+      { "text": "ऑफ़र दें और अपने एजेंट के साथ कीमत व शर्तों पर मोलभाव करें" },
+      { "text": "आपका ऑफ़र स्वीकार होते ही लाइसेंस्ड होम इंस्पेक्टर बुलाएँ", "note": "निरीक्षण ऐसी समस्याएँ उजागर कर सकता है जिन पर दोबारा मोलभाव करना या पीछे हटना सही हो — पैसे बचाने के लिए इसे न छोड़ें।" },
+      { "text": "प्रॉपर्टी का टाइटल, सर्वे, और इतिहास लीन, विवाद, या ईज़मेंट के लिए जाँचें", "note": "टाइटल सर्च पक्का करता है कि विक्रेता सच में बेच सकता है और कोई चौंकाने वाला दावा नहीं है।" },
+      { "text": "प्रॉपर्टी का मूल्यांकन करवाएँ, जो आपका ऋणदाता आम तौर पर ज़रूरी बनाता है" },
+      { "text": "होम इंश्योरेंस के कोट की तुलना करें और क्लोज़िंग से पहले एक पॉलिसी तय करें" },
+      { "text": "डाउन पेमेंट के ऊपर क्लोज़िंग खर्च के लिए बजट रखें", "note": "क्लोज़िंग खर्च अक्सर कीमत का कुछ प्रतिशत होता है — कानूनी फ़ीस, टैक्स, और ऋणदाता के शुल्क जुड़ते जाते हैं।" },
+      { "text": "हालत और तय हुई मरम्मत पूरी होने की पुष्टि के लिए आख़िरी वॉक-थ्रू करें", "note": "चाबियाँ बदलने से पहले किसी नई समस्या को पकड़ने का यह आपका आख़िरी मौका है।" },
+      { "text": "क्लोज़िंग दस्तावेज़ पढ़कर साइन करें, और हर चीज़ की कॉपी रखें" },
+      { "text": "उपयोगिताएँ चालू कराएँ, अपना पता बदलें, और चाबियाँ व कोई भी कोड या मैनुअल लें" }
+    ],
+    "faq": [
+      { "q": "घर खरीदने के कदम क्या हैं?", "a": "मोटे तौर पर इस क्रम में: अपना क्रेडिट और बजट जाँचें, मॉर्गेज के लिए प्री-अप्रूव हों, इलाके देखें और घर देखें, ऑफ़र दें, निरीक्षण और मूल्यांकन कराएँ, बीमा और क्लोज़िंग खर्च संभालें, आख़िरी वॉक-थ्रू करें, और क्लोज़िंग दस्तावेज़ साइन करें। कुछ कदम आपस में मिलते हैं, पर गंभीर विज़िट से पहले प्री-अप्रूवल और क्लोज़िंग से पहले निरीक्षण वे हैं जिन्हें छोड़ना नहीं चाहिए।" },
+      { "q": "घर खरीदने के लिए मुझे कितनी बचत चाहिए?", "a": "डाउन पेमेंट के अलावा, क्लोज़िंग खर्च (अक्सर कीमत का कुछ प्रतिशत), मूविंग खर्च, और मरम्मत व शुरुआती बिलों के लिए एक कुशन की योजना बनाएँ। ज़्यादा डाउन पेमेंट का मतलब आम तौर पर छोटा ऋण और बेहतर दर होता है, पर सब कुछ खरीद में लगाने के बजाय कुछ बचत बचाकर रखें। यह सामान्य मार्गदर्शन है, वित्तीय सलाह नहीं — अपनी स्थिति के लिए किसी मॉर्गेज पेशेवर से बात करें।" },
+      { "q": "क्या घर खरीदते समय मुझे सचमुच होम इंस्पेक्शन चाहिए?", "a": "लगभग हर मामले में, हाँ। निरीक्षण ऐसी समस्याएँ उजागर कर सकता है — छत, नींव, वायरिंग, प्लंबिंग — जो निरीक्षण से कहीं ज़्यादा महँगी हों, और यह आपको दोबारा मोलभाव करने या पीछे हटने की गुंजाइश देता है। ऑफ़र को आकर्षक बनाने के लिए इसे छोड़ना ऐसा जुआ है जो बुरी तरह गलत हो सकता है। नए बने घर पर भी, स्वतंत्र निरीक्षण फ़ायदेमंद है।" }
+    ]
+  }
+}
