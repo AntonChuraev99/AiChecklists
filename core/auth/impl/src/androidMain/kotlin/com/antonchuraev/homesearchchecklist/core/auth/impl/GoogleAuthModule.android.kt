@@ -5,6 +5,9 @@ import org.koin.dsl.module
 
 internal actual fun platformAuthModule(): Module = module {
     single<AuthProvider> {
-        AndroidGoogleAuthProvider(webClientId = getProperty("GOOGLE_WEB_CLIENT_ID"))
+        AndroidGoogleAuthProvider(
+            webClientId = getProperty("GOOGLE_WEB_CLIENT_ID"),
+            logger = get(),
+        )
     }
 }

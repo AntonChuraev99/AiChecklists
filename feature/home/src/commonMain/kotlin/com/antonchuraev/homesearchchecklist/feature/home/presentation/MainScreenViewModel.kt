@@ -1,6 +1,7 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation
 
 import com.antonchuraev.homesearchchecklist.core.auth.api.GoogleAuthRepository
+import com.antonchuraev.homesearchchecklist.core.auth.api.SignInException
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
@@ -21,6 +22,8 @@ import com.antonchuraev.homesearchchecklist.feature.user.data.device.getPlatform
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.UserData
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -326,48 +329,74 @@ class MainScreenViewModel(
             // and the exact failure (error_code + error_message) are visible in analytics instead
             // of only as a "couldn't sign in" snackbar with no cause.
             analyticsTracker.event(AnalyticsEvents.Auth.LOGIN_STARTED)
-            val result = googleAuthRepository.signInWithGoogle()
-            result.onSuccess { googleUser ->
-                val idToken = googleAuthRepository.getIdToken()
-                if (idToken == null) {
-                    // Google credential obtained but Firebase token missing — a distinct failure
-                    // from a cancelled/blocked sign-in; surface it rather than returning silently.
-                    analyticsTracker.event(
-                        AnalyticsEvents.Auth.LOGIN_FAILED,
-                        mapOf(AnalyticsParams.ERROR_CODE to "null_id_token"),
-                    )
-                    _sideEffect.emit(MainScreenSideEffect.ShowSnackbar("sign_in_unavailable"))
-                    return@launch
-                }
-                val platform = getPlatformName()
-                // Google sign-in already succeeded above; the account-linking write is a distinct
-                // failure surface. Without this guard a throw here emits neither login_success nor
-                // login_failed — the linking step would fail silently in analytics and show the
-                // user nothing.
-                try {
-                    userDataRepository.linkGoogleAccount(idToken, platform)
-                } catch (e: Exception) {
+            var terminalEmitted = false
+            try {
+                val result = googleAuthRepository.signInWithGoogle()
+                result.onSuccess { googleUser ->
+                    val idToken = googleAuthRepository.getIdToken()
+                    if (idToken == null) {
+                        // Google credential obtained but Firebase token missing — a distinct failure
+                        // from a cancelled/blocked sign-in; surface it rather than returning silently.
+                        analyticsTracker.event(
+                            AnalyticsEvents.Auth.LOGIN_FAILED,
+                            mapOf(AnalyticsParams.ERROR_CODE to "null_id_token"),
+                        )
+                        terminalEmitted = true
+                        _sideEffect.emit(MainScreenSideEffect.ShowSnackbar("sign_in_unavailable"))
+                        return@onSuccess
+                    }
+                    val platform = getPlatformName()
+                    // Google sign-in already succeeded above; the account-linking write is a distinct
+                    // failure surface. Without this guard a throw here emits neither login_success nor
+                    // login_failed — the linking step would fail silently in analytics and show the
+                    // user nothing.
+                    try {
+                        userDataRepository.linkGoogleAccount(idToken, platform)
+                    } catch (e: Exception) {
+                        analyticsTracker.event(
+                            AnalyticsEvents.Auth.LOGIN_FAILED,
+                            buildMap {
+                                put(AnalyticsParams.ERROR_CODE, "link_failed")
+                                e.message?.let { put(AnalyticsParams.ERROR_MESSAGE, it) }
+                            },
+                        )
+                        terminalEmitted = true
+                        _sideEffect.emit(MainScreenSideEffect.ShowSnackbar("sign_in_unavailable"))
+                        return@onSuccess
+                    }
+                    analyticsTracker.event(AnalyticsEvents.Auth.LOGIN_SUCCESS)
+                    terminalEmitted = true
+                    _sideEffect.emit(MainScreenSideEffect.ShowSnackbar("google_sign_in_success"))
+                }.onFailure { e ->
+                    // error_code = the STABLE SignInError.code forwarded by the Android provider
+                    // (USER_CANCELED / NO_CREDENTIAL / NETWORK / GENERIC) — R8-safe, unlike the old
+                    // e::class.simpleName. Falls back to simpleName for non-typed throwables.
                     analyticsTracker.event(
                         AnalyticsEvents.Auth.LOGIN_FAILED,
                         buildMap {
-                            put(AnalyticsParams.ERROR_CODE, "link_failed")
+                            put(
+                                AnalyticsParams.ERROR_CODE,
+                                (e as? SignInException)?.error?.code ?: e::class.simpleName ?: "unknown",
+                            )
                             e.message?.let { put(AnalyticsParams.ERROR_MESSAGE, it) }
                         },
                     )
-                    _sideEffect.emit(MainScreenSideEffect.ShowSnackbar("sign_in_unavailable"))
-                    return@launch
+                    terminalEmitted = true
+                    _sideEffect.emit(MainScreenSideEffect.ShowSnackbar(signInErrorSnackbarKey(e)))
                 }
-                analyticsTracker.event(AnalyticsEvents.Auth.LOGIN_SUCCESS)
-                _sideEffect.emit(MainScreenSideEffect.ShowSnackbar("google_sign_in_success"))
-            }.onFailure { e ->
-                analyticsTracker.event(
-                    AnalyticsEvents.Auth.LOGIN_FAILED,
-                    buildMap {
-                        put(AnalyticsParams.ERROR_CODE, e::class.simpleName ?: "unknown")
-                        e.message?.let { put(AnalyticsParams.ERROR_MESSAGE, it) }
-                    },
-                )
-                _sideEffect.emit(MainScreenSideEffect.ShowSnackbar(signInErrorSnackbarKey(e)))
+            } finally {
+                if (!terminalEmitted) {
+                    // The coroutine was cancelled before any terminal login_success/login_failed
+                    // (user navigated away / screen disposed mid sign-in). Emit a terminal event
+                    // under NonCancellable so every login_started pairs with a terminal — closes the
+                    // "login_started with no terminal" analytics gap (~42% of starts).
+                    withContext(NonCancellable) {
+                        analyticsTracker.event(
+                            AnalyticsEvents.Auth.LOGIN_FAILED,
+                            mapOf(AnalyticsParams.ERROR_CODE to "USER_CANCELED"),
+                        )
+                    }
+                }
             }
         }
     }

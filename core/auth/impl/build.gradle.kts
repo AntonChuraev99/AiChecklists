@@ -46,4 +46,10 @@ dependencies {
     add("androidMainImplementation", libs.credentials)
     add("androidMainImplementation", libs.credentials.play.services)
     add("androidMainImplementation", libs.googleid)
+    // AppLogger (Crashlytics-backed) for the Android provider — no cycle: core.common.api has no auth dep
+    add("androidMainImplementation", projects.core.common.api)
+    // Legacy GoogleSignInClient fallback (Identity Services unavailable) + ActivityResult bridge
+    add("androidMainImplementation", libs.play.services.auth)
+    add("androidMainImplementation", libs.androidx.activity)
+    add("androidMainImplementation", libs.kotlinx.coroutines.play.services)
 }
