@@ -156,8 +156,9 @@ fun PaywallRoute(
         monthlyEquivalent(yearlyProduct.priceString, yearlyProduct.priceAmount)
     } else PaywallUiState().yearlyMonthly
 
-    // Real trial length from RevenueCat — 0 means this offering has no free trial
-    // (e.g. the *NoTrial offering, whose products carry no introductoryDiscount).
+    // Real trial length from RevenueCat — 0 means no free trial for this user/offering
+    // (e.g. the *NoTrial offering, or a trial-ineligible user). Trial state is resolved per
+    // platform in the repository (Android: subscriptionOptions.freeTrial; iOS: introductoryDiscount).
     val resolvedTrialDays = yearlyProduct?.freeTrialDays?.takeIf { it > 0 }
         ?: monthlyProduct?.freeTrialDays?.takeIf { it > 0 }
         ?: 0

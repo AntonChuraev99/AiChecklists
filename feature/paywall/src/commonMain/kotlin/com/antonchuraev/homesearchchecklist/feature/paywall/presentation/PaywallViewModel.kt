@@ -299,12 +299,13 @@ class PaywallViewModel(
                         return@launch
                     }
 
-                    // Trust RevenueCat's trial data — do NOT fabricate a trial. A product
-                    // without an introductoryDiscount genuinely has no free trial (e.g. the
-                    // *NoTrial offering); showing trial copy for it would be deceptive
-                    // (Google Play policy) and simply wrong. The UI selects trial vs
-                    // no-trial copy via PaywallUiState.hasFreeTrial, derived from real
-                    // freeTrialDays in PaywallRoute.
+                    // Trust RevenueCat's trial data — do NOT fabricate a trial. Trial state is
+                    // resolved per platform in the repository (Android: subscriptionOptions.freeTrial;
+                    // iOS: introductoryDiscount) and carried on PaywallProduct.hasFreeTrial /
+                    // freeTrialDays. A product with no trial (the *NoTrial offering, or a
+                    // trial-ineligible user) genuinely has none; showing trial copy for it would be
+                    // deceptive (Google Play policy). The UI selects trial vs no-trial copy via
+                    // PaywallUiState.hasFreeTrial, derived from real freeTrialDays in PaywallRoute.
                     val defaultSelected = products.find { it.isPopular }?.id
                         ?: products.firstOrNull()?.id
 
@@ -422,6 +423,7 @@ class PaywallViewModel(
                         put(AnalyticsParams.PRODUCT_ID, selectedProduct.id)
                         put("sku_id", selectedProduct.id)
                         put("plan_type", currentState.selectedPlan.name.lowercase())
+                        put(AnalyticsParams.HAS_FREE_TRIAL, selectedProduct.hasFreeTrial)
                         put("price_str", selectedProduct.priceString.take(100))
                         analyticsContext?.toEventParams()?.let { putAll(it) }
                         putAll(modelArmParams())
@@ -470,6 +472,7 @@ class PaywallViewModel(
                         put(AnalyticsParams.PRODUCT_ID, selectedProduct.id)
                         put("sku_id", selectedProduct.id)
                         put("plan_type", currentState.selectedPlan.name.lowercase())
+                        put(AnalyticsParams.HAS_FREE_TRIAL, selectedProduct.hasFreeTrial)
                         put(AnalyticsParams.ERROR, result.message.take(100))
                         put("error_code", result.errorCode ?: "unknown")
                         put("underlying_error", (result.underlyingError ?: "none").take(100))

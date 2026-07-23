@@ -17,6 +17,7 @@ import com.antonchuraev.homesearchchecklist.feature.paywall.domain.repository.Pa
 import com.revenuecat.purchases.kmp.Purchases
 import com.revenuecat.purchases.kmp.PurchasesDelegate
 import com.revenuecat.purchases.kmp.models.CustomerInfo
+import com.revenuecat.purchases.kmp.models.freePhase
 import com.revenuecat.purchases.kmp.models.Package
 import com.revenuecat.purchases.kmp.models.PurchasesError
 import com.revenuecat.purchases.kmp.models.PurchasesErrorCode
@@ -138,20 +139,31 @@ class PaywallRepositoryImpl(
                     val products = currentOffering.availablePackages.map { pkg ->
                         val storeProduct = pkg.storeProduct
 
-                        // Determine free trial from introductoryDiscount
-                        // RevenueCat returns introductoryDiscount for free trials
-                        val introPrice = storeProduct.introductoryDiscount
+                        // Free-trial detection is platform-specific and must check BOTH fields:
+                        //  • iOS / App Store exposes the trial in `introductoryDiscount`
+                        //    ("App Store only, null otherwise" per RC docs — always null on Android).
+                        //  • Android / Google Play exposes it in `subscriptionOptions.freeTrial`,
+                        //    whose `freePhase` is the first PricingPhase with amountMicros == 0
+                        //    (null on iOS). Google Play filters this option out for trial-INELIGIBLE
+                        //    users, so a non-null freePhase means "this user is offered a free trial".
+                        // The previous code read ONLY introductoryDiscount → on Android hasFreeTrial
+                        // was ALWAYS false, so the paywall showed no-trial copy to eligible users and
+                        // analytics logged has_free_trial=false for everyone (repro 2026-07-23:
+                        // has_free_trial True=0 across 165 buy-taps). Checking subscriptionOptions
+                        // fixes Android without regressing iOS.
+                        val iosIntro = storeProduct.introductoryDiscount
+                        val androidTrialPhase = storeProduct.subscriptionOptions?.freeTrial?.freePhase
 
-                        // Check if it's a free trial:
-                        // 1. introductoryDiscount exists AND price is 0 (free)
-                        // 2. OR introductoryDiscount exists AND has "free" in phase type
-                        val hasFreeTrial = introPrice != null && (
-                            introPrice.price.amountMicros == 0L ||
-                            introPrice.subscriptionPeriod.value > 0
+                        val hasFreeTrial = androidTrialPhase != null || (
+                            iosIntro != null && (
+                                iosIntro.price.amountMicros == 0L ||
+                                iosIntro.subscriptionPeriod.value > 0
+                            )
                         )
 
-                        val freeTrialDays = if (introPrice != null) {
-                            val period = introPrice.subscriptionPeriod
+                        // Duration comes from whichever platform's trial period is present.
+                        val trialPeriod = androidTrialPhase?.billingPeriod ?: iosIntro?.subscriptionPeriod
+                        val freeTrialDays = trialPeriod?.let { period ->
                             when (period.unit.name.lowercase()) {
                                 "day" -> period.value
                                 "week" -> period.value * 7
@@ -159,9 +171,7 @@ class PaywallRepositoryImpl(
                                 "year" -> period.value * 365
                                 else -> 0
                             }
-                        } else {
-                            0
-                        }
+                        } ?: 0
 
                         PaywallProduct(
                             id = storeProduct.id,
@@ -182,7 +192,8 @@ class PaywallRepositoryImpl(
                     }
 
                     val skuIds = products.joinToString(",") { it.id }
-                    logger?.info(TAG, "[PAYWALL] getOfferings() success: offering=${currentOffering.identifier}, packages=${products.size}, skus=$skuIds")
+                    val trialSummary = products.joinToString(",") { "${it.id}:trial=${it.hasFreeTrial}(${it.freeTrialDays}d)" }
+                    logger?.info(TAG, "[PAYWALL] getOfferings() success: offering=${currentOffering.identifier}, packages=${products.size}, skus=$skuIds, trials=$trialSummary")
 
                     continuation.resume(
                         Result.success(
@@ -233,12 +244,18 @@ class PaywallRepositoryImpl(
                     val status = customerInfo.toSubscriptionStatus()
                     _subscriptionStatus.value = status
 
-                    // Determine trial status from the purchased package
+                    // Determine trial status from the purchased package. Same platform-specific
+                    // detection as getOfferings(): Android exposes the trial in
+                    // subscriptionOptions.freeTrial, iOS in introductoryDiscount — reading only the
+                    // latter was always false on Android.
                     val storeProduct = packageToPurchase.storeProduct
-                    val introPrice = storeProduct.introductoryDiscount
-                    val hasFreeTrial = introPrice != null && (
-                        introPrice.price.amountMicros == 0L ||
-                        introPrice.subscriptionPeriod.value > 0
+                    val iosIntro = storeProduct.introductoryDiscount
+                    val androidTrialPhase = storeProduct.subscriptionOptions?.freeTrial?.freePhase
+                    val hasFreeTrial = androidTrialPhase != null || (
+                        iosIntro != null && (
+                            iosIntro.price.amountMicros == 0L ||
+                            iosIntro.subscriptionPeriod.value > 0
+                        )
                     )
 
                     logger?.info(TAG, "[PAYWALL] purchase() success: txId=${storeTransaction.transactionId}, isPremium=${status.isActive}, hasFreeTrial=$hasFreeTrial")
