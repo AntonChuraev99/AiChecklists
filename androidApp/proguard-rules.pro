@@ -38,6 +38,13 @@
 -keepnames class com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavRoute
 -keepnames class com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavRoute$**
 
+# ── (3) app enums persisted / matched by Enum.name (NOT via the kotlinx serializer, which bakes
+# names as literals). e.g. ChecklistViewMode — Room TypeConverter `mode.name` + SyncRepositoryImpl
+# `entries.firstOrNull { it.name == viewMode }`. R8 renames the constant FIELDS (Weekly -> c); keep
+# the NAMES so `.name()` stays stable across the web(no-R8) <-> Android(R8) Firestore sync, else a
+# Weekly checklist synced from web silently reverts to Standard (`else -> Standard`, no crash).
+-keepnames enum com.antonchuraev.homesearchchecklist.** { *; }
+
 # Kotlin Serialization (unchanged — keeps generated $$serializer / Companion / serializer())
 -keepattributes *Annotation*, InnerClasses
 -dontnote kotlinx.serialization.AnnotationsKt
