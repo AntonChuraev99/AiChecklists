@@ -494,16 +494,22 @@ object AnalyticsParams {
      * breaking Android/Web parity). So we attach utm to the events that need it, explicitly,
      * instead of letting the SDK re-shape sessions.
      *
-     * Scope: these describe the CLICK campaign of an already-installed app. Install attribution is
-     * separate — the store links carry an encoded `referrer` param (Play drops bare utm_* on a
-     * store URL), which Play Console reports read. Nothing in the app reads the Install Referrer
-     * API today, so an install campaign is not available in-app.
+     * Scope: these keys describe two distinct paths that reuse the same property names:
+     *  - CLICK campaign of an already-installed app (deep-link query string, see AnalyticsUtm).
+     *  - INSTALL attribution — Play attaches an encoded `referrer` param to store links (Play drops
+     *    bare utm_* on a store URL). On Android, InstallReferrerCapture (composeApp/androidMain)
+     *    reads that once per install via the Play Install Referrer Library and forwards the same
+     *    utm_* keys (+ [GCLID]) as user-properties, so ad-install cohorts are segmentable in
+     *    Amplitude (its Android SDK has no UTM/referrer autocapture — Browser-SDK-only).
      */
     const val UTM_SOURCE = "utm_source"
     const val UTM_MEDIUM = "utm_medium"
     const val UTM_CAMPAIGN = "utm_campaign"
     const val UTM_TERM = "utm_term"
     const val UTM_CONTENT = "utm_content"
+
+    /** Google Ads click identifier — captured only from the Play install referrer (see InstallReferrerCapture). */
+    const val GCLID = "gclid"
     const val PROGRESS = "progress"
     const val COMPLETED_COUNT = "completed_count"
     const val HAD_TEXT = "had_text"

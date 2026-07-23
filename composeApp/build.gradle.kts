@@ -77,6 +77,10 @@ kotlin {
             implementation(libs.amplitude.analytics)
             implementation(libs.play.services.appset)
 
+            // Play Install Referrer — install-time UTM/gclid attribution for InstallReferrerCapture.
+            // Amplitude's Android/Kotlin SDK has no UTM/referrer autocapture (Browser-SDK-only).
+            implementation(libs.installreferrer)
+
             // Firebase — Analytics, Crashlytics, ConsentManager actuals stay in composeApp/androidMain
             // (runtime init via google-services plugin happens in androidApp)
             // BOM is added via dependencies { add(...) } below — KMP DSL deprecates platform() in sourceSet blocks

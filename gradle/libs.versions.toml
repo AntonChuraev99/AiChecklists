@@ -43,6 +43,9 @@ kotlinxDatetimeWasm = "0.8.0"
 # minimal ships only java.util.function + concurrent-collection fixes, NOT java.time.
 desugarJdk = "2.1.5"
 amplitude = "1.22.4"
+# Play Install Referrer Library — 2.2 (2021) is the current stable API release, NOT deprecated.
+# Only source of the encoded install `referrer` (utm_* + gclid) Play attaches to ad/store installs.
+installreferrer = "2.2"
 reorderable = "3.1.0"
 roborazzi = "1.63.0"
 robolectric = "4.16.1"
@@ -156,6 +159,9 @@ workmanager = { module = "androidx.work:work-runtime-ktx", version.ref = "workma
 # Amplitude Analytics
 amplitude-analytics = { group = "com.amplitude", name = "analytics-android", version.ref = "amplitude" }
 play-services-appset = { module = "com.google.android.gms:play-services-appset", version = "16.1.0" }
+
+# Play Install Referrer — install-time UTM/gclid attribution (Amplitude Android SDK has no autocapture)
+installreferrer = { group = "com.android.installreferrer", name = "installreferrer", version.ref = "installreferrer" }
 
 # Reorderable (drag & drop for LazyColumn/LazyRow)
 reorderable = { module = "sh.calvin.reorderable:reorderable", version.ref = "reorderable" }

@@ -5,6 +5,7 @@ import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
 import androidx.core.app.NotificationManagerCompat
+import com.antonchuraev.homesearchchecklist.attribution.InstallReferrerCapture
 import com.antonchuraev.homesearchchecklist.consent.ConsentManager
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
@@ -74,6 +75,12 @@ open class GistiApplication : Application() {
         // dependency, so it must not run on the cold-start main thread. Channels are created
         // synchronously above, so getNotificationChannel() still resolves inside the coroutine.
         emitPushPermissionState()
+
+        // Capture the Play install referrer (utm_* + gclid) once per install and forward it as
+        // Amplitude/Firebase user-properties, so ad-install cohorts are distinguishable from
+        // organic (the Amplitude Android SDK has no UTM/referrer autocapture). No-op after the
+        // first successful capture.
+        captureInstallReferrer()
 
         // Record this cold start as an activity sample (behavioral timing) and (re)schedule the
         // LOCAL retention auto-pushes (streak-save / overdue / weekly digest). Idempotent — user-set
@@ -222,6 +229,30 @@ open class GistiApplication : Application() {
             }.onFailure { e ->
                 GlobalContext.getOrNull()?.getOrNull<AppLogger>()
                     ?.warning("PushFcm", "permission_state emit failed: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Read the Google Play install referrer once per install and forward the campaign params
+     * (utm_source/medium/campaign/content/term + gclid) as analytics user-properties.
+     *
+     * Dispatched to [applicationScope] (Dispatchers.IO) so the SharedPreferences disk read that
+     * gates the one-shot never runs on the cold-start main thread. Requires Koin started AND
+     * Amplitude initialized — both happen inside startKoinIfNeeded() (called earlier in onCreate),
+     * so the [AnalyticsTracker] resolved here already batches into Amplitude. Null-safe against the
+     * widget process where the tracker may not be bound. All best-effort — failure never affects
+     * app start. See [InstallReferrerCapture] for the retry/one-shot semantics.
+     */
+    private fun captureInstallReferrer() {
+        applicationScope.launch {
+            val koin = GlobalContext.getOrNull() ?: return@launch
+            val tracker: AnalyticsTracker = koin.getOrNull() ?: return@launch
+            val logger: AppLogger? = koin.getOrNull()
+            runCatching {
+                InstallReferrerCapture(applicationContext, tracker, logger).capture()
+            }.onFailure { e ->
+                logger?.warning("InstallReferrer", "capture dispatch failed: ${e.message}")
             }
         }
     }
