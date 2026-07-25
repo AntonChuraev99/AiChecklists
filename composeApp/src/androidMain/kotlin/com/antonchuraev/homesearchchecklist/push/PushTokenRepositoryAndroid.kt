@@ -107,7 +107,14 @@ internal class PushTokenRepositoryAndroid(
             logger.warning(TAG, "touchLastActive skipped: user_id not ready yet")
             return
         }
-        val token = runCatching { FirebaseMessaging.getInstance().token.await() }.getOrNull()
+        val token = runCatching { FirebaseMessaging.getInstance().token.await() }
+            .onFailure { e ->
+                // Log the cause, not just the symptom: this is the ONLY place the FCM fetch failure
+                // surfaces now that the duplicate registration in GistiApplication is gone, and a
+                // bare getOrNull() would swallow the throwable entirely.
+                logger.error(TAG, "touchLastActive: FCM token fetch failed: ${e.message}", e)
+            }
+            .getOrNull()
         if (token.isNullOrBlank()) {
             logger.warning(TAG, "touchLastActive skipped: FCM token unavailable — activity bump deferred to next start")
             return

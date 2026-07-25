@@ -23,14 +23,12 @@ import com.antonchuraev.homesearchchecklist.push.PushNotificationChannels
 import com.antonchuraev.homesearchchecklist.retention.RetentionPrefs
 import com.antonchuraev.homesearchchecklist.retention.RetentionPushScheduler
 import java.util.Calendar
-import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
 import org.koin.core.context.GlobalContext
@@ -302,6 +300,12 @@ open class GistiApplication : Application() {
      * On app start, push the current FCM token and refresh lastActiveAt to Firestore so the
      * re-engagement campaign always has a fresh token + recency signal for this user.
      *
+     * [PushTokenRepository.touchLastActive] already fetches the current FCM token and re-registers
+     * it (the CF `register_push_token` is the only write path and it requires a token), so this is
+     * a SINGLE call, not a bump followed by a separate registration. Registering again here would
+     * issue a second, byte-identical POST ~0.3s later — that duplicate accounted for ~48% of all
+     * backend traffic until 2026-07-25.
+     *
      * No-ops gracefully when the user is not signed in (the repository logs a warning) — the
      * token is re-registered on a later start once the user authenticates. Token fetch failures
      * are non-critical: onNewToken still fires when FCM rotates the token.
@@ -310,15 +314,7 @@ open class GistiApplication : Application() {
         applicationScope.launch {
             val repository: PushTokenRepository =
                 GlobalContext.getOrNull()?.getOrNull() ?: return@launch
-            // Always bump activity, even if the token fetch fails.
             repository.touchLastActive()
-            try {
-                val token = FirebaseMessaging.getInstance().token.await()
-                repository.registerToken(token)
-            } catch (e: Exception) {
-                GlobalContext.getOrNull()?.getOrNull<AppLogger>()
-                    ?.warning("PushFcm", "App-start FCM token fetch failed: ${e.message}")
-            }
         }
     }
 
