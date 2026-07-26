@@ -63,6 +63,10 @@ class TemplatePreviewViewModel(
 
                     // Emitted only on a successful load: a template that failed to load was
                     // never seen, and counting it would inflate the previewed -> used funnel.
+                    // review-rules:allow-observed-event — `template_previewed` is NOT in
+                    // CsatManager's observed set (EVENT_WEIGHTS + the checklist_created /
+                    // reminder_notification_tapped / item_checked special cases), so this emit
+                    // cannot shift CSAT survey eligibility. Verified 2026-07-26.
                     analyticsTracker.event(
                         AnalyticsEvents.Template.PREVIEWED,
                         mapOf(
@@ -136,6 +140,9 @@ class TemplatePreviewViewModel(
 
                 // Alongside CREATED, never instead of it: the create funnel must stay complete,
                 // this only adds which template (and category) produced the checklist.
+                // review-rules:allow-observed-event — `template_used` is NOT observed by
+                // CsatManager; the CSAT-relevant emit on this path is the pre-existing
+                // `checklist_created` above, untouched here. Verified 2026-07-26.
                 analyticsTracker.event(
                     AnalyticsEvents.Template.USED,
                     mapOf(

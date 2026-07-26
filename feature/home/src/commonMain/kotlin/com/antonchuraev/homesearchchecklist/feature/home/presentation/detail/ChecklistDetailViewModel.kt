@@ -3376,6 +3376,8 @@ class ChecklistDetailViewModel(
                 height = h,
             )
             repository.addAttachment(fillId, intent.itemId, attachment)
+            // review-rules:allow-observed-event — `attachment_added` is NOT in CsatManager's
+            // observed set, so it cannot shift CSAT survey eligibility. Verified 2026-07-26.
             analyticsTracker.event(
                 AnalyticsEvents.Attachment.ADDED,
                 mapOf<String, Any>(
@@ -3483,6 +3485,8 @@ class ChecklistDetailViewModel(
                 height = h,
             ),
         )
+        // review-rules:allow-observed-event — see the sibling emit above; same event name,
+        // not observed by CsatManager. Verified 2026-07-26.
         analyticsTracker.event(
             AnalyticsEvents.Attachment.ADDED,
             mapOf<String, Any>(
