@@ -87,7 +87,7 @@ class TemplatePreviewViewModelTest {
         assertEquals(1, previewed.size, "template_previewed must fire exactly once per load")
 
         val params = previewed.single().second
-        assertEquals("morning-routine", params[AnalyticsParams.TEMPLATE_SLUG])
+        assertEquals("morning-routine", params[AnalyticsParams.BUNDLED_TEMPLATE_ID])
         assertEquals("Personal", params[AnalyticsParams.TEMPLATE_CATEGORY])
         assertEquals(3, params[AnalyticsParams.ITEM_COUNT])
     }
@@ -121,7 +121,7 @@ class TemplatePreviewViewModelTest {
         assertEquals(ChecklistSource.TEMPLATE.wire, created[AnalyticsParams.SOURCE])
 
         val used = analytics.events.first { it.first == AnalyticsEvents.Template.USED }.second
-        assertEquals("morning-routine", used[AnalyticsParams.TEMPLATE_SLUG])
+        assertEquals("morning-routine", used[AnalyticsParams.BUNDLED_TEMPLATE_ID])
         assertEquals("Personal", used[AnalyticsParams.TEMPLATE_CATEGORY])
         assertEquals(false, used[AnalyticsParams.WAS_EDITED], "an untouched template is not edited")
     }

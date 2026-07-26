@@ -70,7 +70,7 @@ class TemplatePreviewViewModel(
                     analyticsTracker.event(
                         AnalyticsEvents.Template.PREVIEWED,
                         mapOf(
-                            AnalyticsParams.TEMPLATE_SLUG to template.id,
+                            AnalyticsParams.BUNDLED_TEMPLATE_ID to template.id,
                             AnalyticsParams.TEMPLATE_CATEGORY to template.category,
                             AnalyticsParams.ITEM_COUNT to template.items.size,
                         ),
@@ -146,7 +146,7 @@ class TemplatePreviewViewModel(
                 analyticsTracker.event(
                     AnalyticsEvents.Template.USED,
                     mapOf(
-                        AnalyticsParams.TEMPLATE_SLUG to template.id,
+                        AnalyticsParams.BUNDLED_TEMPLATE_ID to template.id,
                         AnalyticsParams.TEMPLATE_CATEGORY to template.category,
                         AnalyticsParams.ITEM_COUNT to checklist.items.size,
                         // Templates are editable before creating — tells apart "used as shipped"

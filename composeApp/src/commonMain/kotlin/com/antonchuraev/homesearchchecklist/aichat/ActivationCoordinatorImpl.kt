@@ -52,6 +52,13 @@ class ActivationCoordinatorImpl(
             // every control user and `variant` was tautologically "true" (measured: 27 "true" /
             // 0 "false" over 30d, while control devices provably received activation_bundle_v1=
             // false in their activated RC config). Do not compare this param across that cut.
+            //
+            // ⚠️ Known limitation: the arm is sampled HERE (callers read the RC flag at checklist-
+            // creation time), while the marker is set back on splash at registration. For a user
+            // who registers and only creates their first AI checklist much later, the RC value may
+            // have changed in between — the event would then report an arm that user never
+            // experienced. Rare, but it grew relevant once both arms carry the marker. Fixing it
+            // properly means persisting the arm next to the marker and reading it back here.
             analytics.event(
                 AnalyticsEvents.Activation.FIRST_AI_CHECKLIST_CREATED,
                 mapOf(AnalyticsParams.VARIANT to activationBundleEnabled.toString()),

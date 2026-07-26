@@ -534,8 +534,23 @@ object AnalyticsParams {
     const val FILL_ID = "fill_id"
     const val ITEM_COUNT = "item_count"
 
-    /** Gallery deep-link: the template slug (= Firestore doc id = the landing-page URL segment). */
+    /**
+     * Slug of a PUBLIC gallery template — the Firestore doc id under `gallery_templates`, as
+     * carried on the `?g=create&template={slug}` deep-link. Gallery surface only.
+     *
+     * ⚠️ Do NOT reuse for the bundled library — its ids live in a different key space (the JSON
+     * sources under `data/checklists`) and would silently split every breakdown in two. Use
+     * [BUNDLED_TEMPLATE_ID] there.
+     */
     const val TEMPLATE_SLUG = "template_slug"
+
+    /**
+     * Id of a BUNDLED library template (JSON sources under `data/checklists`, e.g.
+     * `5-day-paris-packing-list`). Deliberately a separate key from [TEMPLATE_SLUG]: the two
+     * namespaces do not coincide, so folding them into one property would make both the gallery
+     * funnel and the library breakdown unreadable while looking perfectly fine.
+     */
+    const val BUNDLED_TEMPLATE_ID = "bundled_template_id"
 
     /**
      * Category a bundled template belongs to. Carried by [AnalyticsEvents.Template] events so a
