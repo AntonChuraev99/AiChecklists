@@ -1,6 +1,8 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation.detail
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AttachmentStoragePort
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppDatastore
@@ -148,6 +150,7 @@ class ChecklistDetailAttachmentsTest {
 
     private fun TestScope.createViewModel(
         paywallRepository: PaywallRepository = FakePaywallRepository(),
+        analytics: FakeAnalyticsTracker = FakeAnalyticsTracker(),
     ): ChecklistDetailViewModel {
         val datastore = AppDatastore(
             PreferenceDataStoreFactory.createWithPath(scope = backgroundScope) {
@@ -165,7 +168,7 @@ class ChecklistDetailAttachmentsTest {
                 paywallRepository,
                 FakeUserDataRepository(),
             ),
-            analyticsTracker = FakeAnalyticsTracker(),
+            analyticsTracker = analytics,
             reminderScheduler = FakeReminderScheduler(),
             datastore = datastore,
             smartDateParser = FakeSmartDateParser(),
@@ -210,6 +213,59 @@ class ChecklistDetailAttachmentsTest {
         assertTrue(!state.triggerFilePicker)
         assertEquals(fullItem.id, state.pendingAttachmentItemId)
         assertNull(state.snackbarMessage)
+    }
+
+    // ── attachment_added instrumentation (added 2026-07-26) ───────────────────
+    //
+    // attachment_load_failed shipped without a success counterpart, so a rising failure count
+    // was unreadable — it could mean the feature broke, or that usage grew. These two tests pin
+    // the denominator: it must fire on a real persist, and must NOT fire on a rejected file.
+
+    @Test
+    fun attachmentAdded_firesOnSuccessfulPersist_withSourceAndMime() = runTest {
+        val storedPath = "/data/attachments/10/${emptyItem.id}/att_new.jpg"
+        attachmentStorage.storeResult = storedPath
+        attachmentStorage.sizeResult = 2_048L
+        val analytics = FakeAnalyticsTracker()
+        val vm = createViewModel(analytics = analytics)
+
+        vm.onIntent(
+            ChecklistDetailIntent.OnAttachmentPicked(
+                itemId = emptyItem.id,
+                sourcePath = "/tmp/source.jpg",
+                fileName = "source.jpg",
+                mimeType = "image/jpeg",
+            ),
+        )
+
+        val added = analytics.events.filter { it.first == AnalyticsEvents.Attachment.ADDED }
+        assertEquals(1, added.size, "attachment_added must fire once per persisted attachment")
+
+        val params = added.single().second
+        assertEquals("item", params[AnalyticsParams.SOURCE])
+        assertEquals("image/jpeg", params[AnalyticsParams.MIME_TYPE])
+        assertEquals(2_048L, params[AnalyticsParams.SIZE_BYTES])
+    }
+
+    @Test
+    fun attachmentAdded_doesNotFireWhenFileIsRejected() = runTest {
+        // Oversized file: the repository write never happens, so counting it would inflate the
+        // denominator and make the failure rate look artificially healthy.
+        attachmentStorage.storeResult = "/data/attachments/10/${emptyItem.id}/att_big.jpg"
+        attachmentStorage.sizeResult = ChecklistDetailViewModel.MAX_ATTACHMENT_SIZE_BYTES + 1L
+        val analytics = FakeAnalyticsTracker()
+        val vm = createViewModel(analytics = analytics)
+
+        vm.onIntent(
+            ChecklistDetailIntent.OnAttachmentPicked(
+                itemId = emptyItem.id,
+                sourcePath = "/tmp/big.jpg",
+                fileName = "big.jpg",
+                mimeType = "image/jpeg",
+            ),
+        )
+
+        assertTrue(analytics.events.none { it.first == AnalyticsEvents.Attachment.ADDED })
     }
 
     // ── Test 3: storeAttachment returns null → load-error snackbar ─────────────
@@ -627,10 +683,12 @@ class ChecklistDetailAttachmentsTest {
     }
 
     private class FakeAnalyticsTracker : AnalyticsTracker {
+        val events = mutableListOf<Pair<String, Map<String, Any>>>()
+
         override fun setUserId(userId: String) {}
         override fun setUserProperties(properties: Map<String, Any>) {}
         override fun screenView(name: String) {}
-        override fun event(name: String, params: Map<String, Any>) {}
+        override fun event(name: String, params: Map<String, Any>) { events.add(name to params) }
     }
 
     private class FakeReminderScheduler : ChecklistReminderScheduler {

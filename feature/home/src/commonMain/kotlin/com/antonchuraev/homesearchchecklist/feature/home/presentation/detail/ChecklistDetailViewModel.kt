@@ -1975,7 +1975,11 @@ class ChecklistDetailViewModel(
                 "folder_deleted",
                 mapOf(
                     AnalyticsParams.CHECKLIST_ID to checklistId.toString(),
-                    "cascade_count" to removeIds.size.toString(),
+                    // Numeric, NOT a string: Amplitude cannot average or sum a string property,
+                    // and "how much did this delete take with it" is the whole point of the field.
+                    // Safe to change type — the event has never been ingested (taxonomy check
+                    // 2026-07-26), so there is no historical string value to conflict with.
+                    "cascade_count" to removeIds.size,
                 ),
             )
         }
@@ -3372,6 +3376,14 @@ class ChecklistDetailViewModel(
                 height = h,
             )
             repository.addAttachment(fillId, intent.itemId, attachment)
+            analyticsTracker.event(
+                AnalyticsEvents.Attachment.ADDED,
+                mapOf<String, Any>(
+                    AnalyticsParams.SOURCE to "item",
+                    AnalyticsParams.MIME_TYPE to (intent.mimeType ?: "unknown"),
+                    AnalyticsParams.SIZE_BYTES to sizeBytes,
+                ),
+            )
             logger.debug(
                 TAG,
                 "picked: addAttachment done fill=$fillId item=${intent.itemId} att=$attachmentId",
@@ -3469,6 +3481,14 @@ class ChecklistDetailViewModel(
                 createdAt = currentTimeMillis(),
                 width = w,
                 height = h,
+            ),
+        )
+        analyticsTracker.event(
+            AnalyticsEvents.Attachment.ADDED,
+            mapOf<String, Any>(
+                AnalyticsParams.SOURCE to "item_create",
+                AnalyticsParams.MIME_TYPE to (mimeType ?: "unknown"),
+                AnalyticsParams.SIZE_BYTES to sizeBytes,
             ),
         )
         return AttachResult.OK

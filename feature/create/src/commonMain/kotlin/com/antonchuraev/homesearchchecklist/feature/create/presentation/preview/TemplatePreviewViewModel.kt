@@ -60,6 +60,17 @@ class TemplatePreviewViewModel(
                             editableItems = template.items.toList()
                         )
                     }
+
+                    // Emitted only on a successful load: a template that failed to load was
+                    // never seen, and counting it would inflate the previewed -> used funnel.
+                    analyticsTracker.event(
+                        AnalyticsEvents.Template.PREVIEWED,
+                        mapOf(
+                            AnalyticsParams.TEMPLATE_SLUG to template.id,
+                            AnalyticsParams.TEMPLATE_CATEGORY to template.category,
+                            AnalyticsParams.ITEM_COUNT to template.items.size,
+                        ),
+                    )
                 } else {
                     _screenState.update {
                         it.copy(isLoading = false, error = getString(Res.string.error_template_not_found))
@@ -122,6 +133,20 @@ class TemplatePreviewViewModel(
                     AnalyticsParams.SOURCE to ChecklistSource.TEMPLATE.wire,
                     AnalyticsParams.ITEM_COUNT to checklist.items.size,
                 ))
+
+                // Alongside CREATED, never instead of it: the create funnel must stay complete,
+                // this only adds which template (and category) produced the checklist.
+                analyticsTracker.event(
+                    AnalyticsEvents.Template.USED,
+                    mapOf(
+                        AnalyticsParams.TEMPLATE_SLUG to template.id,
+                        AnalyticsParams.TEMPLATE_CATEGORY to template.category,
+                        AnalyticsParams.ITEM_COUNT to checklist.items.size,
+                        // Templates are editable before creating — tells apart "used as shipped"
+                        // from "used as a starting point", which is a different product signal.
+                        AnalyticsParams.WAS_EDITED to (state.editableItems != template.items),
+                    ),
+                )
 
                 _screenState.update { it.copy(isCreating = false) }
 

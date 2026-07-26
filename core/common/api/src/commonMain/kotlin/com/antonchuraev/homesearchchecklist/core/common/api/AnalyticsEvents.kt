@@ -80,6 +80,33 @@ object AnalyticsEvents {
     }
 
     /**
+     * Bundled template library (Templates -> TemplatePreview -> Use).
+     *
+     * The library doubled (47 -> 81 templates on 2026-07-22) with NO way to tell whether anyone
+     * opens or uses it: the only signal was `checklist_created` with source="template", which
+     * fires at the very end of the funnel and cannot separate "nobody browses templates" from
+     * "people browse but abandon the preview". These two events close that gap:
+     *
+     *   [PREVIEWED] = a template detail actually rendered (fires once per successful load,
+     *                 NOT on a load failure — a failed load is not a view)
+     *   -> [USED]   = the user turned that template into a checklist
+     *
+     * previewed - used = the abandonment the library is actually paying for. Both carry
+     * [AnalyticsParams.TEMPLATE_SLUG] so a single underperforming template is attributable,
+     * and [AnalyticsParams.TEMPLATE_CATEGORY] so a whole weak category is too.
+     *
+     * [USED] is emitted ALONGSIDE [Checklist.CREATED] (source="template"), never instead of it:
+     * the create funnel must stay complete, this pair only adds the template dimension.
+     */
+    object Template {
+        /** A template preview screen finished loading and is on screen. */
+        const val PREVIEWED = "template_previewed"
+
+        /** A template preview was converted into a real checklist. */
+        const val USED = "template_used"
+    }
+
+    /**
      * SEO checklist-gallery deep-link funnel (`app.gisti-ai.com/?g=create&template={slug}`).
      *
      * The gallery (gisti-ai.com/checklists/) is the Tier-1 organic acquisition surface, so its
@@ -412,6 +439,21 @@ object AnalyticsEvents {
          * Always carries [AnalyticsParams.MIME_TYPE] when known.
          */
         const val LOAD_FAILED = "attachment_load_failed"
+
+        /**
+         * An attachment was successfully persisted onto an item.
+         *
+         * Exists to give [LOAD_FAILED] a denominator. Until this shipped the only attachment
+         * event was the failure one, so a rising failure count was unreadable: it could mean the
+         * feature broke, or simply that more people started attaching files. A rate needs both.
+         *
+         * Fires AFTER the repository write succeeds — never on pick, never on a rejected file
+         * (too large / unreadable), so it counts attachments that actually exist.
+         * Carries [AnalyticsParams.SOURCE] to separate the two entry points: "item" (attach onto
+         * an existing item) vs "item_create" (staged while the item is still being typed) —
+         * they have different failure modes and different quotas.
+         */
+        const val ADDED = "attachment_added"
     }
 
     /**
@@ -484,6 +526,19 @@ object AnalyticsParams {
 
     /** Gallery deep-link: the template slug (= Firestore doc id = the landing-page URL segment). */
     const val TEMPLATE_SLUG = "template_slug"
+
+    /**
+     * Category a bundled template belongs to. Carried by [AnalyticsEvents.Template] events so a
+     * weak category is visible without enumerating all 81 template slugs one by one.
+     */
+    const val TEMPLATE_CATEGORY = "template_category"
+
+    /**
+     * Whether the user modified a bundled template before creating from it
+     * ([AnalyticsEvents.Template.USED]). Separates "shipped as-is" from "used as a starting
+     * point" — the same event count means two different things for the library.
+     */
+    const val WAS_EDITED = "was_edited"
 
     /**
      * Campaign attribution captured off a deep-link query string (see AnalyticsUtm).
@@ -578,6 +633,7 @@ object AnalyticsParams {
     const val STAGE = "stage"                     // "materialize" (cloud download) | "decode" (Coil)
     const val HAS_STORAGE_PATH = "has_storage_path" // was a cloud copy even expected?
     const val MIME_TYPE = "mime_type"
+    const val SIZE_BYTES = "size_bytes"           // attachment payload size on [Attachment.ADDED]
 
     // ─── Push / re-engagement (object Push) ──────────────────────────────────
     // Shared across every push event so a single metric can slice by type / channel /
