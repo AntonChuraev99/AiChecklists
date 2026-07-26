@@ -1094,7 +1094,7 @@ class ChecklistDetailViewModel(
             viewModelScope.launch {
                 repository.setFoldersEnabled(checklistId, true)
             }
-            analyticsTracker.event("folders_enabled_toggled", mapOf("enabled" to "true"))
+            analyticsTracker.event(AnalyticsEvents.Folder.ENABLED_TOGGLED, mapOf("enabled" to "true"))
             return
         }
 
@@ -1107,7 +1107,7 @@ class ChecklistDetailViewModel(
             viewModelScope.launch {
                 repository.setFoldersEnabled(checklistId, false)
             }
-            analyticsTracker.event("folders_enabled_toggled", mapOf("enabled" to "false"))
+            analyticsTracker.event(AnalyticsEvents.Folder.ENABLED_TOGGLED, mapOf("enabled" to "false"))
         }
     }
 
@@ -1187,7 +1187,7 @@ class ChecklistDetailViewModel(
             repository.updateChecklistTemplate(updatedChecklist)
             repository.setFoldersEnabled(checklistId, false)
             analyticsTracker.event(
-                "folders_flattened",
+                AnalyticsEvents.Folder.FLATTENED,
                 mapOf(
                     AnalyticsParams.CHECKLIST_ID to checklistId.toString(),
                     "removed_folders" to folderIds.size.toString(),
@@ -1631,7 +1631,7 @@ class ChecklistDetailViewModel(
             repository.updateChecklistTemplate(updatedChecklist)
 
             analyticsTracker.event(
-                "folder_created",
+                AnalyticsEvents.Folder.CREATED,
                 mapOf(
                     AnalyticsParams.CHECKLIST_ID to checklistId.toString(),
                     "depth" to (if (currentFolderId == null) "root" else "nested"),
@@ -1724,7 +1724,7 @@ class ChecklistDetailViewModel(
             repository.updateFill(updatedFill)
             repository.updateChecklistTemplate(updatedChecklist)
             analyticsTracker.event(
-                "folder_renamed",
+                AnalyticsEvents.Folder.RENAMED,
                 mapOf(AnalyticsParams.CHECKLIST_ID to checklistId.toString()),
             )
         }
@@ -1972,7 +1972,7 @@ class ChecklistDetailViewModel(
                 return@launch
             }
             analyticsTracker.event(
-                "folder_deleted",
+                AnalyticsEvents.Folder.DELETED,
                 mapOf(
                     AnalyticsParams.CHECKLIST_ID to checklistId.toString(),
                     // Numeric, NOT a string: Amplitude cannot average or sum a string property,

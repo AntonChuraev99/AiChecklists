@@ -209,7 +209,12 @@ globalThis.__analyticsSetUserProperties = (propsJson) => {
 const rc = getRemoteConfig(app);
 rc.settings.minimumFetchIntervalMillis = 43_200_000; // 12 hours — matches Android
 
-// Default values for graceful degradation when fetch fails
+// Default values for graceful degradation when fetch fails.
+//
+// ⚠️ These are a FOURTH config layer (found 2026-07-26) — next to the client RC template, the
+// server RC template and Firestore. A wrong value here is invisible until fetchAndActivate fails,
+// and then it silently decides limits and A/B arms for that session. Keep every entry in sync with
+// the client RC template defaults; when they must differ, say why on the line itself.
 rc.defaultConfig = {
     feature_ai_analysis_enabled: true,
     max_checklist_items: 100,
@@ -219,14 +224,24 @@ rc.defaultConfig = {
     ai_functions_base_url: "https://us-central1-aichecklists-40230.cloudfunctions.net",
     ai_daily_limit_free: 10,
     ai_daily_limit_premium: 300,
-    max_checklists_free: 4,
+    // 5, not 4 — matches the RC template and RemoteConfigDefaults (fixed 2026-07-26: web users
+    // whose fetch failed were held to a stricter free limit than the product actually grants).
+    max_checklists_free: 5,
     max_fills_free: 5,
     max_recurring_reminders_free: 10,
     max_weekly_checklists_free: 1,
     max_attachments_per_item_free: 3,
     templates_json: "[]",
-    onboarding: "interactive",
+    // "none", not "interactive" — the client RC template carries a Web condition pinning this key
+    // to "none", so a failed fetch used to drop web users into an onboarding the platform is not
+    // supposed to show, and enrol them into an OnboardingABC arm they were never assigned
+    // (fixed 2026-07-26).
+    onboarding: "none",
     paywall_variant: "features_v1",
+    // Deliberately `true` while the RC template default is `false`. Kept on purpose: a fetch
+    // failure should not cost the user the activation bundle, and the measurement cost is now
+    // negligible — RC activation failures are ~96% confined to legacy 1.17.x builds, so on current
+    // builds this default almost never applies. Revisit if that ratio moves.
     activation_bundle_v1: true,
 };
 

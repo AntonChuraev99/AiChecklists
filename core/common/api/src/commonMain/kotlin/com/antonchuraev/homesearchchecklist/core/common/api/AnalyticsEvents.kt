@@ -98,6 +98,25 @@ object AnalyticsEvents {
      * [USED] is emitted ALONGSIDE [Checklist.CREATED] (source="template"), never instead of it:
      * the create funnel must stay complete, this pair only adds the template dimension.
      */
+    /**
+     * Folder lifecycle inside a checklist. Named constants instead of the string literals these
+     * were emitted with until 2026-07-26: a literal drifts silently (a typo renames the event and
+     * the old name simply stops arriving), and it hides the set from anyone auditing coverage.
+     *
+     * [DELETED] has never been ingested in prod — folders get created, renamed and flattened, but
+     * not deleted. The emit is reachable (checked 2026-07-26), so this is a product fact, not a
+     * hole in the instrumentation.
+     */
+    object Folder {
+        const val CREATED = "folder_created"
+        const val RENAMED = "folder_renamed"
+        const val DELETED = "folder_deleted"
+        const val FLATTENED = "folders_flattened"
+
+        /** Folders turned on/off for a checklist. Carries `enabled`. */
+        const val ENABLED_TOGGLED = "folders_enabled_toggled"
+    }
+
     object Template {
         /** A template preview screen finished loading and is on screen. */
         const val PREVIEWED = "template_previewed"
