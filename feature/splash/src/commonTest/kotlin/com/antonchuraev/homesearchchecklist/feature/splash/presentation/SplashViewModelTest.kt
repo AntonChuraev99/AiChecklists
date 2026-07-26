@@ -599,9 +599,17 @@ class SplashViewModelTest {
     }
 
     /**
-     * Activation bundle OFF (control arm): the EXACT legacy behavior — a brand-new user in the
-     * AUTO_CREATE treatment enters the static auto-create branch (consults the per-uid seed gate),
-     * and is NOT marked new-user-pending. Proves the flag is a clean reversible switch.
+     * Activation bundle OFF (control arm): the legacy product behavior is intact — a brand-new user
+     * in the AUTO_CREATE treatment still enters the static auto-create branch (consults the per-uid
+     * seed gate). Proves the flag remains a clean reversible switch for what the USER sees.
+     *
+     * ⚠️ Changed 2026-07-26: the control arm is now ALSO marked new-user-pending. This assertion
+     * previously required the opposite, which locked the measurement defect in place as if it were
+     * intended: the marker is the gate for FIRST_AI_CHECKLIST_CREATED, so withholding it from the
+     * control arm made that event unreachable for control users and its `variant` param
+     * tautologically "true" (measured 27 "true" / 0 "false" over 30d, while control devices
+     * provably received activation_bundle_v1=false). Marking both arms is analytics-only — the
+     * reminder opt-in stays treatment-only, gated on the flag value in ActivationCoordinatorImpl.
      */
     @Test
     fun applyFirstChecklistExperiment_activationOff_newUser_performsLegacyAutoCreate() = testScope.runTest {
@@ -623,9 +631,11 @@ class SplashViewModelTest {
             fakeFirstChecklist.seedCheckedUids.contains("new-uuid"),
             "activation bundle OFF must enter the legacy auto-create branch (consult the seed gate)",
         )
-        assertFalse(
+        assertTrue(
             fakeActivationPrefs.pendingUids.contains("new-uuid"),
-            "activation bundle OFF must NOT mark new-user-pending (no AI-first-run funnel in control arm)",
+            "activation bundle OFF must ALSO mark new-user-pending — otherwise " +
+                "FIRST_AI_CHECKLIST_CREATED can never fire for a control user and the arms " +
+                "cannot be compared at all",
         )
     }
 

@@ -46,6 +46,12 @@ class ActivationCoordinatorImpl(
 
             // Fires in BOTH A/B arms (flag value is the variant param) — the activation funnel
             // must be able to compare static-seed vs AI-first-run cohorts.
+            //
+            // ⚠️ True only since 2026-07-26. Before that, `setNewUserPending` was called ONLY in
+            // the treatment branch of applyFirstChecklistExperiment, so the guard above rejected
+            // every control user and `variant` was tautologically "true" (measured: 27 "true" /
+            // 0 "false" over 30d, while control devices provably received activation_bundle_v1=
+            // false in their activated RC config). Do not compare this param across that cut.
             analytics.event(
                 AnalyticsEvents.Activation.FIRST_AI_CHECKLIST_CREATED,
                 mapOf(AnalyticsParams.VARIANT to activationBundleEnabled.toString()),

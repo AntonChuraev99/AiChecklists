@@ -89,6 +89,10 @@ class ActivationCoordinatorImplTest {
         assertEquals(
             1,
             analyticsOff.events.count { it.first == AnalyticsEvents.Activation.FIRST_AI_CHECKLIST_CREATED },
+            // NB this asserts the coordinator only. Until 2026-07-26 it held here but NOT in
+            // production, because the new-user-pending marker was set exclusively in the treatment
+            // branch, so a control user never reached this call. The marker is now set for both
+            // arms (SplashViewModel.applyFirstChecklistExperiment) — SplashViewModelTest covers it.
             "FIRST_AI_CHECKLIST_CREATED must fire in the control arm too",
         )
         assertTrue(collectedOff.isEmpty(), "control arm (flag OFF) must NOT request the reminder opt-in")

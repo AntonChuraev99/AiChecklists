@@ -473,8 +473,18 @@ object AnalyticsEvents {
 
         /**
          * A new user's FIRST checklist was created through the AI path (chat create / preview-
-         * confirmed / attachment). Distinct from [Checklist.CREATED] — fires at most once per user,
-         * in BOTH arms, so the activation funnel can compare static-seed vs AI-first-run cohorts.
+         * confirmed / attachment). Distinct from [Checklist.CREATED] — fires at most once per user.
+         *
+         * Carries [AnalyticsParams.VARIANT] = the `activation_bundle_v1` value, and since the
+         * 2026-07-26 fix it genuinely fires in BOTH arms.
+         *
+         * ⚠️ **Do not compare `variant` across the 2026-07-26 cut.** Before that date the emit was
+         * unreachable for control users: it is guarded by the per-UID new-user-pending marker, and
+         * that marker was set only inside the treatment branch of `applyFirstChecklistExperiment`.
+         * So every historical event carries `variant="true"` regardless of the real arm — measured
+         * 27 `"true"` / 0 `"false"` over the 30d before the fix, while control devices provably
+         * received `activation_bundle_v1=false` in their activated RC config. Any breakdown that
+         * spans the cut mixes "treatment only" with "both arms" and will read as a fake lift.
          */
         const val FIRST_AI_CHECKLIST_CREATED = "activation_first_ai_checklist_created"
 

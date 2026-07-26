@@ -10,7 +10,8 @@ import kotlinx.coroutines.flow.SharedFlow
  *  1. The dispatcher creates a checklist via the AI path and calls [onAiChecklistCreated].
  *  2. The implementation decides — using the persisted per-UID "new-user-pending" flag — whether
  *     this is the new user's *first* AI checklist. If so it fires
- *     [AnalyticsEvents.Activation.FIRST_AI_CHECKLIST_CREATED] (in BOTH A/B arms) and, only when the
+ *     [AnalyticsEvents.Activation.FIRST_AI_CHECKLIST_CREATED] (in BOTH A/B arms — genuinely so
+ *     since the 2026-07-26 fix; see the note under [onAiChecklistCreated]) and, only when the
  *     activation bundle is enabled AND the reminder opt-in has not been shown yet, emits the
  *     checklist id on [reminderOptInRequests].
  *  3. The app shell (App.kt) collects [reminderOptInRequests] and shows the one-time reminder

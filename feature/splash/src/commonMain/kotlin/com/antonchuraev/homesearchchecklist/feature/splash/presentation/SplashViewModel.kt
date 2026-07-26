@@ -359,6 +359,10 @@ class SplashViewModel(
      *  - **Activation bundle OFF:** EXACT pre-activation behavior — seed the one-time "Your first
      *    checklist" starter template for brand-new users in the `auto_create` treatment. Fully
      *    reversible: flipping the flag back to false restores the legacy flow with no code change.
+     *    (Since 2026-07-26 this arm ALSO gets the new-user-pending marker. That is analytics-only:
+     *    it makes FIRST_AI_CHECKLIST_CREATED reachable for control users so the two arms are
+     *    comparable at all. The reminder opt-in stays treatment-only — it is gated on the flag
+     *    value inside ActivationCoordinatorImpl, not on this marker.)
      *
      * Read AFTER fetchAndActivate() (see init), so the flag is fresh. The whole block is guarded so
      * a failure here never blocks or crashes the splash flow.
@@ -374,13 +378,22 @@ class SplashViewModel(
                 RemoteConfigDefaults.ACTIVATION_BUNDLE_V1,
             )
 
+            // Marked for BOTH arms on purpose (changed 2026-07-26). The flag is what lets
+            // FIRST_AI_CHECKLIST_CREATED fire exactly once per user; while it was set only in the
+            // treatment branch, the event could never reach a control user, so its `variant` param
+            // was always "true" and a breakdown by it silently compared treatment against nothing
+            // (measured: 27 "true" / 0 "false" over 30d, while control users provably received
+            // activation_bundle_v1=false in their activated RC config).
+            //
+            // Product behavior is unchanged: the reminder opt-in stays treatment-only because it is
+            // gated separately on the flag value in ActivationCoordinatorImpl, not on this marker.
+            if (isNewUser && uid.isNotBlank()) {
+                log("mark new-user-pending uid=${uid.take(8)} (activation bundle ${if (activationBundleEnabled) "ON" else "OFF"})")
+                activationPrefsRepository.setNewUserPending(uid)
+            }
+
             if (activationBundleEnabled) {
-                // Treatment arm: no static seed. Mark a brand-new user as awaiting their first AI
-                // checklist so the dispatcher-driven activation funnel can fire exactly once.
-                if (isNewUser && uid.isNotBlank()) {
-                    log("activation bundle ON — skip static auto-create, mark new-user-pending uid=${uid.take(8)}")
-                    activationPrefsRepository.setNewUserPending(uid)
-                }
+                // Treatment arm: no static seed — the AI-first activation funnel takes over.
                 return@runCatching
             }
 
