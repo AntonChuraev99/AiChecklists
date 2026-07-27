@@ -23,6 +23,8 @@ import com.antonchuraev.homesearchchecklist.core.datastore.api.AppDatastore
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppThemeMode
 import com.antonchuraev.homesearchchecklist.core.datastore.api.LanguageRepository
 import com.antonchuraev.homesearchchecklist.core.datastore.api.ThemeRepository
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -525,6 +527,10 @@ fun App() {
                     // link is consumed even on an unexpected throw, so the collector cannot get
                     // stuck re-processing the same link; the catch guarantees the user still gets
                     // feedback instead of a dead screen.
+                    // Guards the funnel invariant from the other side: the catch below must not add
+                    // a `failed` for an arrival that already reported `created` (a throw from
+                    // navigation would otherwise count one arrival twice).
+                    var terminalEmitted = false
                     try {
                         when (val result = createFromGalleryUseCase(link.slug)) {
                             is CreateChecklistFromGalleryTemplateUseCase.Result.Created -> {
@@ -535,6 +541,7 @@ fun App() {
                                         AnalyticsParams.CHECKLIST_ID to result.checklistId,
                                     ),
                                 )
+                                terminalEmitted = true
                                 navigator.navigateToChecklistDetail(result.checklistId, clearBackStack = true)
                             }
                             // A stale slug means the live gallery page and Firestore have drifted apart —
@@ -544,6 +551,7 @@ fun App() {
                                     AnalyticsEvents.Gallery.DEEPLINK_FAILED,
                                     linkParams + mapOf(AnalyticsParams.REASON to "not_found"),
                                 )
+                                terminalEmitted = true
                                 snackbarHostState.showSnackbar(galleryNotFoundMessage)
                             }
                             is CreateChecklistFromGalleryTemplateUseCase.Result.Error -> {
@@ -554,22 +562,36 @@ fun App() {
                                         AnalyticsParams.ERROR_MESSAGE to (result.cause.message ?: "unknown"),
                                     ),
                                 )
+                                terminalEmitted = true
                                 snackbarHostState.showSnackbar(galleryErrorMessage)
                             }
                         }
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Throwable) {
-                        analyticsTracker.event(
-                            AnalyticsEvents.Gallery.DEEPLINK_FAILED,
-                            linkParams + mapOf(
-                                AnalyticsParams.REASON to "error",
-                                AnalyticsParams.ERROR_MESSAGE to (e.message ?: "unknown"),
-                            ),
-                        )
+                        if (!terminalEmitted) {
+                            analyticsTracker.event(
+                                AnalyticsEvents.Gallery.DEEPLINK_FAILED,
+                                linkParams + mapOf(
+                                    AnalyticsParams.REASON to "error",
+                                    AnalyticsParams.ERROR_MESSAGE to (e.message ?: "unknown"),
+                                ),
+                            )
+                        }
                         snackbarHostState.showSnackbar(galleryErrorMessage)
                     } finally {
-                        pendingGalleryDeepLink.consume()
+                        // Two guards, and both are load-bearing:
+                        // - isActive: `finally` also runs on CANCELLATION. An Activity recreation
+                        //   (rotation, theme, locale — MainActivity declares no configChanges)
+                        //   tears this collector down mid-create. The holder is app-scoped and
+                        //   survives, so the next collector re-fires the link — unless we clear it
+                        //   here, which would lose the arrival entirely and re-open the very funnel
+                        //   hole this block exists to close.
+                        // - consume(link): identity-scoped, so a newer link submitted by a warm
+                        //   onNewIntent while this one was still creating is never swallowed.
+                        if (currentCoroutineContext().isActive) {
+                            pendingGalleryDeepLink.consume(link)
+                        }
                     }
                 }
             }

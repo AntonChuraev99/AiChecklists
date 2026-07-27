@@ -276,3 +276,37 @@ echo "  register_push_token: https://$REGION-$PROJECT_ID.cloudfunctions.net/regi
 #   curl -X POST "https://$REGION-$PROJECT_ID.cloudfunctions.net/send_promotions_batch" \
 #     -H "Content-Type: application/json" \
 #     -d '{"push_type":"reengagement","min_inactive_days":3,"dry_run":true,"admin_key":"..."}'
+
+# ── Firestore-triggered function ─────────────────────────────────────────────
+#
+# on_rc_event_created reconciles RevenueCat credits from rc_events/{eventId}.
+# It is NOT an HTTP function, so it needs --trigger-event-filters, and it has two
+# traps that cost a session to rediscover (2026-07-27):
+#
+#   1. --trigger-location is the FIRESTORE DATABASE region, not the function's.
+#      The database lives in nam5 while the function runs in us-central1; passing
+#      $REGION here fails with "Database '(default)' does not exist in region ...".
+#   2. --cpu=1 must be explicit. At 256MB gcloud picks a fractional CPU, which
+#      Cloud Run rejects for this service: "Total cpu < 1 is not supported with
+#      concurrency > 1" (the service runs containerConcurrency=80).
+#
+# Verify a deploy by the NEW Cloud Run revision, not the exit code — piping gcloud
+# into grep returns grep's status and makes a failed deploy look successful:
+#   gcloud run revisions list --service=on-rc-event-created --region=$REGION
+FIRESTORE_LOCATION="nam5"
+
+echo "Deploying on_rc_event_created..."
+gcloud functions deploy on_rc_event_created \
+    --gen2 \
+    --runtime=python312 \
+    --region=$REGION \
+    --source=. \
+    --entry-point=on_rc_event_created \
+    --trigger-location=$FIRESTORE_LOCATION \
+    --trigger-event-filters="type=google.cloud.firestore.document.v1.created" \
+    --trigger-event-filters="database=(default)" \
+    --trigger-event-filters="namespace=(default)" \
+    --trigger-event-filters-path-pattern="document=rc_events/{eventId}" \
+    --memory=256MB \
+    --cpu=1 \
+    --timeout=60s
