@@ -167,6 +167,18 @@ val MIGRATION_17_18 = object : Migration(17, 18) {
     }
 }
 
+// System Inbox (v2 nav arm): ChecklistEntity.isInbox. The DDL below is exactly what Room generates
+// for a `Boolean = false` property with no @ColumnInfo — `INTEGER NOT NULL DEFAULT 0` and the column
+// named verbatim after the property. It HAS to match byte-for-byte, because the database is built
+// with `fallbackToDestructiveMigration(dropAllTables = false)` (below): a migration that drifts from
+// the generated schema does NOT crash, Room silently recreates the table and the user loses every
+// local checklist. Same discipline as MIGRATION_17_18.
+val MIGRATION_18_19 = object : Migration(18, 19) {
+    override suspend fun migrate(connection: SQLiteConnection) {
+        connection.execSQL("ALTER TABLE checklists ADD COLUMN isInbox INTEGER NOT NULL DEFAULT 0")
+    }
+}
+
 @Database(
     entities = [
         ChecklistEntity::class,
@@ -174,7 +186,7 @@ val MIGRATION_17_18 = object : Migration(17, 18) {
         ChatHistoryEntry::class,
         AgentTranscriptEntity::class,
     ],
-    version = 18,
+    version = 19,
     exportSchema = true
 )
 @ColumnTypeConverters(ChecklistItemConverters::class, ReminderConverters::class)
@@ -190,7 +202,7 @@ abstract class ChecklistDatabase : RoomDatabase() {
             builder: Builder<ChecklistDatabase>
         ): ChecklistDatabase {
             return builder
-                .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18)
+                .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19)
                 .fallbackToDestructiveMigration(dropAllTables = false)
                 .setQueryCoroutineContext(Dispatchers.Default)
                 .build()

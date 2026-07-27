@@ -72,6 +72,14 @@ class ToolCallDispatcherImpl(
     private val analyticsTracker: AnalyticsTracker,
 ) : ToolCallDispatcher {
 
+    // NOTE: every checklist enumeration in this file reads `checklistRepository.projects`, never
+    // `.checklists`. The AI deliberately does NOT address the v2 system Inbox — it is hidden from
+    // every picker, so letting the chat resolve/rename/clear it would be the one surface where it
+    // leaks. It also keeps [FREE_CHECKLIST_LIMIT] counting the same population as
+    // GetUserLimitsUseCase; otherwise the v2 arm would hit the paywall one checklist early through
+    // the chat while the Home screen still showed a free slot.
+    // In the control arm no row is flagged, so `projects` == `checklists`.
+
     companion object {
         private const val TAG = "ToolCallDispatcher"
         private const val FREE_CHECKLIST_LIMIT = 4 // mirrors RemoteConfigDefaults.MAX_CHECKLISTS_FREE
@@ -326,7 +334,7 @@ class ToolCallDispatcherImpl(
         // Premium gate: check if free user is at checklist limit
         val userData = userDataRepository.getUserData()
         if (!userData.isPremium) {
-            val allChecklists = checklistRepository.checklists.first()
+            val allChecklists = checklistRepository.projects.first()
             if (allChecklists.size >= FREE_CHECKLIST_LIMIT) {
                 return DispatchOutcome.RequiresPremium
             }
@@ -389,7 +397,7 @@ class ToolCallDispatcherImpl(
         val offsetMs = toolCall.toDayStartMs - toolCall.fromDayStartMs
 
         // Move checklist-level reminders
-        val allChecklists = checklistRepository.checklists.first()
+        val allChecklists = checklistRepository.projects.first()
         var movedCount = 0
 
         for (checklist in allChecklists) {
@@ -415,7 +423,7 @@ class ToolCallDispatcherImpl(
             return DispatchOutcome.NotFound("chat_dispatch_find_blank", emptyList())
         }
 
-        val allChecklists = checklistRepository.checklists.first()
+        val allChecklists = checklistRepository.projects.first()
         val results = mutableListOf<Pair<String, String>>() // (checklistName, itemText)
 
         for (checklist in allChecklists) {
@@ -455,7 +463,7 @@ class ToolCallDispatcherImpl(
         // Premium gate
         val userData = userDataRepository.getUserData()
         if (!userData.isPremium) {
-            val allChecklists = checklistRepository.checklists.first()
+            val allChecklists = checklistRepository.projects.first()
             if (allChecklists.size >= FREE_CHECKLIST_LIMIT) {
                 return DispatchOutcome.RequiresPremium
             }
@@ -665,7 +673,7 @@ class ToolCallDispatcherImpl(
     // ─── RenameChecklist ──────────────────────────────────────────────────────
 
     private suspend fun handleRenameChecklist(toolCall: ToolCall.RenameChecklist): DispatchOutcome {
-        val allChecklists = checklistRepository.checklists.first()
+        val allChecklists = checklistRepository.projects.first()
         val matches = allChecklists.filter { it.name.contains(toolCall.checklistHint, ignoreCase = true) }
         val checklist = when {
             matches.isEmpty() -> return DispatchOutcome.NotFound(
@@ -703,7 +711,7 @@ class ToolCallDispatcherImpl(
      * for a valid operation that happened to have no effect.
      */
     private suspend fun handleClearCompleted(toolCall: ToolCall.ClearCompleted): DispatchOutcome {
-        val allChecklists = checklistRepository.checklists.first()
+        val allChecklists = checklistRepository.projects.first()
         if (allChecklists.isEmpty()) {
             return DispatchOutcome.NotFound("chat_dispatch_no_checklists", emptyList())
         }
@@ -840,7 +848,7 @@ class ToolCallDispatcherImpl(
      * reason on the rollback side).
      */
     private suspend fun resolveChecklistAndFill(id: Long?, hint: String?): Pair<Checklist, ChecklistFill>? {
-        val allChecklists = checklistRepository.checklists.first()
+        val allChecklists = checklistRepository.projects.first()
         if (allChecklists.isEmpty()) return null
 
         val checklist = when {
@@ -865,7 +873,7 @@ class ToolCallDispatcherImpl(
      * Must be called with the same [id] / [hint] the resolve was attempted with.
      */
     private suspend fun resolveChecklistFailure(id: Long?, hint: String?): DispatchOutcome {
-        val allChecklists = checklistRepository.checklists.first()
+        val allChecklists = checklistRepository.projects.first()
 
         if (id != null) {
             val byId = allChecklists.firstOrNull { it.id == id }

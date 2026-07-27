@@ -306,11 +306,24 @@ function toChecklistSyncData(cloudId: string, o: Record<string, unknown>): Check
     foldersEnabled: bool("foldersEnabled"),
     updatedAt: numD("updatedAt"),
     isDeleted: bool("isDeleted"),
+    isInbox: bool("isInbox"),
     fills,
   };
 }
 
-/** List all non-deleted checklists for a user (follows pagination). */
+/**
+ * List all non-deleted, non-Inbox checklists for a user (follows pagination).
+ *
+ * The system Inbox is filtered out here, which covers every DISCOVERY path: `collectChecklists`
+ * in mcp.ts fans this out for `list_checklists`, `search_checklists` and name resolution, so no
+ * tool can ever surface or auto-resolve the Inbox by name. It is an internal quick-capture
+ * surface, hidden from every picker in the app itself.
+ *
+ * ⚠ This is NOT the only gate, and it is not the one the write path uses: tools that take a raw
+ * `checklistId` go through [findChecklistWithOwner], which carries its own `!isInbox` check for
+ * exactly that reason. Both filters are load-bearing — do not drop one on the assumption that the
+ * other covers it.
+ */
 export async function getUserChecklists(env: FirestoreEnv, userId: string): Promise<ChecklistSyncData[]> {
   const out: ChecklistSyncData[] = [];
   let pageToken: string | undefined;
@@ -324,14 +337,21 @@ export async function getUserChecklists(env: FirestoreEnv, userId: string): Prom
     for (const doc of page.documents ?? []) {
       const cloudId = doc.name.split("/").pop() ?? "";
       const checklist = toChecklistSyncData(cloudId, unwrapFields(doc.fields));
-      if (!checklist.isDeleted) out.push(checklist);
+      if (!checklist.isDeleted && !checklist.isInbox) out.push(checklist);
     }
     pageToken = page.nextPageToken;
   } while (pageToken);
   return out;
 }
 
-/** Fetch a single checklist by cloudId, or null if missing. */
+/**
+ * Fetch a single checklist by cloudId, or null if missing.
+ *
+ * Deliberately RAW: no `isDeleted` and no `isInbox` filtering. The verification scripts read back
+ * soft-deleted and freshly-written docs through this, so a filter here would break them. Every
+ * caller reachable from an MCP tool goes through [findChecklistWithOwner], which applies both
+ * filters — if you add a new tool call site, use that, not this.
+ */
 export async function getChecklist(
   env: FirestoreEnv,
   userId: string,
@@ -361,7 +381,15 @@ export interface OwnedChecklist {
  * Find a checklist by cloudId across candidate user_ids AND report which doc owns it. Mutations
  * must read-modify-write the SAME doc they were found in (never migrate data between the
  * device-doc and the google_uid-doc), so callers pass ownerId back to `writeChecklist`.
- * Returns the first non-deleted hit, or null.
+ * Returns the first non-deleted, non-Inbox hit, or null.
+ *
+ * `!isInbox` is the WRITE-path gate for the system Inbox. Every mutating tool (rename, add_item,
+ * toggle_item, delete_checklist, …) resolves its `checklistId` through here, and `get_checklist`
+ * reads through here too — so a raw cloudId can neither read nor mutate the Inbox even though the
+ * ids are not discoverable through [getUserChecklists]. Filtering in the LIST query alone would
+ * have left the whole write path open (defence in depth, not a duplicate check). Callers already
+ * degrade to a `No checklist found with id …` message on null, so this stays a visible failure
+ * rather than a silent no-op.
  */
 export async function findChecklistWithOwner(
   env: FirestoreEnv,
@@ -370,7 +398,7 @@ export async function findChecklistWithOwner(
 ): Promise<OwnedChecklist | null> {
   for (const ownerId of ids) {
     const checklist = await getChecklist(env, ownerId, cloudId);
-    if (checklist && !checklist.isDeleted) return { checklist, ownerId };
+    if (checklist && !checklist.isDeleted && !checklist.isInbox) return { checklist, ownerId };
   }
   return null;
 }

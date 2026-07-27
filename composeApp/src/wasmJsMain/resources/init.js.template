@@ -243,6 +243,12 @@ rc.defaultConfig = {
     // negligible — RC activation failures are ~96% confined to legacy 1.17.x builds, so on current
     // builds this default almost never applies. Revisit if that ratio moves.
     activation_bundle_v1: true,
+    // Empty on purpose — mirrors RemoteConfigDefaults.NAV_V2_ARM. Empty means "no arm assigned",
+    // which the client resolves to CONTROL *without persisting it*, so a failed fetch pins web to
+    // today's navigation by construction. Any non-empty value here would silently enrol web users
+    // into an arm the console never assigned (the exact `onboarding` / `max_checklists_free` drift
+    // this block already carries scars from).
+    nav_v2_arm: "",
 };
 
 // Synchronous helpers — safe to call after __rcFetchPromise resolves (or immediately for defaults)

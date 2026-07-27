@@ -132,6 +132,29 @@ sealed interface AppNavRoute : NavKey {
     data object Onboardings : AppNavRoute
 
     /**
+     * v2-nav-arm-only tab destination: the quick-capture "Inbox" home.
+     *
+     * Only ever pushed while `NavVariant.V2` is active — the control arm's back stack is rooted at
+     * [Main] and never contains this key. The matching `entry<>` is nevertheless registered
+     * UNCONDITIONALLY in App.kt: a `rememberSaveable`d back stack can survive process death across
+     * an arm flip, and a route with no matching entry hard-crashes NavDisplay.
+     */
+    @Serializable
+    data object Inbox : AppNavRoute
+
+    /**
+     * v2-nav-arm-only tab destination: "Overview", the standalone screen that re-hosts everything
+     * the navigation drawer holds in the control arm (the drawer itself is unreachable in v2 because
+     * the shell passes `drawerState = null` to every screen).
+     *
+     * There is deliberately NO `Projects` sibling — the Projects tab reuses [Main] so that entry,
+     * its `ListDetailSceneStrategy.listPane` metadata and the two-pane behaviour stay byte-identical
+     * in both arms, and `AnalyticsScreens.MAIN` keeps one continuous historical series.
+     */
+    @Serializable
+    data object Overview : AppNavRoute
+
+    /**
      * Picker shown after an ACTION_PROCESS_TEXT action that needs a target checklist.
      *
      * [purpose] decides what selecting a checklist does:

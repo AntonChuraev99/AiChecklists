@@ -33,11 +33,15 @@ class ScreenCatalogViewModel(
     init {
         viewModelScope.launch {
             val userData = userDataRepository.getUserData()
-            val checklists = checklistRepository.checklists.first()
+            // .projects, not .checklists: the displayed count must match what the free-tier gate and
+            // the Home list count, and the system Inbox is excluded from both. Reading the
+            // unfiltered stream reported N+1 for every v2-arm user and made this debug readout
+            // disagree with the app while diagnosing the nav experiment.
+            val projects = checklistRepository.projects.first()
             _screenState.value = _screenState.value.copy(
                 isPremium = userData.isPremium,
                 aiCredits = userData.aiCredits,
-                checklistCount = checklists.size
+                checklistCount = projects.size
             )
         }
     }
@@ -155,6 +159,14 @@ class ScreenCatalogViewModel(
         }
     }
 
+    /**
+     * Deliberately reads the UNFILTERED [ChecklistRepository.checklists], unlike the count above:
+     * this is the destructive "wipe everything" helper behind Reset-to-empty and every Seed action,
+     * and it must delete the hidden system Inbox too. On `.projects` the Inbox would survive a
+     * "Seeded 0 checklists" reset, `ensureInbox` would silently reuse the stale row on the next
+     * Inbox entry, and the debug screen would report a state the database does not have — the exact
+     * confusion this readout exists to remove. Same reasoning as `DebugViewModel.clearData()`.
+     */
     private suspend fun clearAllChecklists() {
         val existing = checklistRepository.checklists.first()
         existing.forEach { checklistRepository.deleteChecklist(it) }

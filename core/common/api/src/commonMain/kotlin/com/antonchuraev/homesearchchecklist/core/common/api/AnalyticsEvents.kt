@@ -524,6 +524,92 @@ object AnalyticsEvents {
          */
         const val LANGUAGE_SELECTED = "language_selected"
     }
+
+    /**
+     * Navigation A/B experiment (`nav_v2_arm`): today's drawer + chat-dock shell (control) vs the
+     * Todoist-style 4-tab shell with the chat behind a FAB (v2).
+     *
+     * Every event here is segmented by the sticky [AnalyticsParams.NAV_ARM] user property, which is
+     * set in BOTH arms — see [SHELL_SHOWN] for why that matters.
+     *
+     * ⚠️ Deliberately absent: a per-swipe event for the Inbox project pager.
+     * `ObservableAnalyticsTracker` re-broadcasts every `event()` on a `MutableSharedFlow`
+     * (`extraBufferCapacity = 64`, `tryEmit` → drops on overflow) that `CsatManager` consumes to
+     * decide when to show the survey. A high-frequency event would flood that buffer and silently
+     * degrade CSAT triggering — an unrelated subsystem. [TAB_SELECTED] is user-initiated across 4
+     * destinations and is safe; anything per-keystroke or per-swipe is not.
+     */
+    object Nav {
+        /**
+         * The navigation shell mounted for the first time this process.
+         *
+         * Fires in BOTH arms — that is the entire point: this is the arm-exposure DENOMINATOR, so
+         * every downstream rate (activation, creates, chat opens) has a comparable base. The
+         * cautionary precedent is [Activation.FIRST_AI_CHECKLIST_CREATED], whose emit was reachable in
+         * one arm only and therefore produced a fake lift for a month.
+         *
+         * [AnalyticsParams.VARIANT] takes THREE values: `"control"`, `"v2"`, and `"unassigned"` for
+         * users Remote Config has not put in the experiment yet. They render the control shell as a
+         * fail-safe but carry no `nav_arm` user property, so counting them as control would pad the
+         * baseline with non-participants — **filter `variant != "unassigned"` before comparing arms.**
+         */
+        const val SHELL_SHOWN = "nav_shell_shown"
+
+        /**
+         * A bottom-nav / rail / drawer destination was tapped in the v2 shell. v2-only by
+         * construction (the control shell has no tab bar). Param: [AnalyticsParams.TAB].
+         */
+        const val TAB_SELECTED = "nav_tab_selected"
+
+        /**
+         * The AI chat was opened from a v2 chrome affordance. v2-only by construction.
+         *
+         * This is the v2-side substitute for the dock-scoped `ai_chat_opened(source="dock")`,
+         * which cannot fire in v2 because the dock is gone. Do NOT compare the arms on dock-scoped
+         * chat events — compare this plus `screen_view: chat` against the control dock events.
+         *
+         * [AnalyticsParams.SOURCE] distinguishes the affordances, which are NOT interchangeable:
+         * - `"fab"` — the shell's floating action button on a tab screen.
+         * - `"detail_toolbar"` — the top-bar action on a project detail screen, where the shell FAB
+         *   is hidden. Without this value the busiest screen in the app would contribute chat opens
+         *   with no attribution at all.
+         * - `"home_chip"` — one of the six prompt chips on the Projects tab (Create with AI / Photo /
+         *   PDF / Link / Remind / Plan day). In control these same chips live inside the dock, so this
+         *   is the value to compare against the control arm's dock chip taps.
+         */
+        const val CHAT_FAB_TAPPED = "nav_chat_fab_tapped"
+    }
+
+    /**
+     * The v2 Inbox — the quick-capture tab that replaces Home in the treatment arm. Every event
+     * here is v2-only by construction (the Inbox does not exist in control).
+     */
+    object Inbox {
+        /**
+         * The system Inbox checklist was auto-created for this user (fires once, on the
+         * absent → present transition).
+         *
+         * MUST NOT be [Checklist.CREATED]: the Inbox is created for us, once per user, in the v2
+         * arm only. Routing it through the normal create path would add exactly +1
+         * `checklist_created` per treatment user and invalidate every creation and activation
+         * comparison between the arms. Same reasoning — and the same solution — as
+         * [Onboarding.FIRST_CHECKLIST_AUTO_CREATED] (see the note at its declaration).
+         */
+        const val SYSTEM_CREATED = "inbox_system_created"
+
+        /**
+         * A task was captured through the pinned quick-add row. Param: [AnalyticsParams.SOURCE] =
+         * "inbox" (the Inbox page) | "project" (a project page of the pager), so capture-into-inbox
+         * and quick-add-to-project stay distinguishable — they are different user intents.
+         */
+        const val QUICK_ADDED = "inbox_quick_added"
+
+        /** A task was triaged out of the Inbox into a project. */
+        const val TASK_MOVED = "inbox_task_moved"
+
+        /** A task was deleted from the triage sheet. */
+        const val TASK_DELETED = "inbox_task_deleted"
+    }
 }
 
 /**
@@ -710,6 +796,29 @@ object AnalyticsParams {
      */
     const val PUSH_AB_EXPERIMENT = "push_ab_experiment"
     const val PUSH_AB_ARM = "push_ab_arm"
+
+    // ─── Navigation A/B experiment (object AnalyticsEvents.Nav) ──────────────
+    /**
+     * Navigation arm, "control" | "v2". Doubles as the sticky user-property KEY (same string),
+     * exactly like [AI_MODEL_VARIANT] and [PUSH_AB_ARM] — this is the ONLY reliable segmentation
+     * key for the nav experiment.
+     *
+     * Why not the usual `rc_activated=True` filter: [RC_ACTIVATED] is a param on
+     * `onboarding_rc_resolved`, which fires once per install on the not-yet-onboarded branch of
+     * splash. The nav-experiment population is overwhelmingly EXISTING users, who never fire that
+     * event, so filtering on it would empty the dataset.
+     *
+     * Set in both arms, but NEVER for a user Remote Config has not assigned yet — those carry no
+     * `nav_arm` at all and are excluded from the analysis instead of being miscounted as control.
+     *
+     * Always a String, never a Boolean: Firebase stringifies user properties while Amplitude
+     * preserves native types, so a boolean reads as "true" in GA4 and `true` in Amplitude and a
+     * dashboard filtering on the wrong type silently returns zero rows.
+     */
+    const val NAV_ARM = "nav_arm"
+
+    /** Which v2 destination was selected on [AnalyticsEvents.Nav.TAB_SELECTED]. Wire values are `V2Destination`'s constants. */
+    const val TAB = "tab"
 }
 
 /**
@@ -813,4 +922,12 @@ object AnalyticsScreens {
     const val PAYWALL_WEB_INSTALL = "paywall_web_install"
     const val SHARE = "share"
     const val UPDATE_FEED = "update_feed"
+
+    // ─── v2 navigation arm only ──────────────────────────────────────────────
+    // There is deliberately NO "projects" screen name: the v2 Projects tab renders the very same
+    // MainScreen and reports [MAIN], so the historical main-screen series stays ONE continuous,
+    // arm-comparable series. Inventing a second name would split it at the experiment start and
+    // make before/after impossible to read.
+    const val INBOX = "inbox"
+    const val OVERVIEW = "overview"
 }

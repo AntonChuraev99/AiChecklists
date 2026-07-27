@@ -123,8 +123,13 @@ class MainScreenViewModel(
         }
     }
 
+    // `projects`, not `checklists`: the auto-created system Inbox is not a project and must never
+    // surface on the home list. This is the SINGLE filter point for the whole screen — the reorder id
+    // list, the empty-state/activation-hero branch, the sync-banner threshold and the CSAT
+    // checklist_count all read through this flow. Applies in BOTH A/B arms: in control no row is ever
+    // flagged, so `projects` is identical to `checklists` and nothing moves.
     @OptIn(ExperimentalCoroutinesApi::class)
-    private val checklistsWithProgress = repository.checklists.flatMapLatest { checklists ->
+    private val checklistsWithProgress = repository.projects.flatMapLatest { checklists ->
         if (checklists.isEmpty()) {
             flowOf(emptyList())
         } else {
@@ -289,13 +294,19 @@ class MainScreenViewModel(
     }
 
     /**
-     * Reads `repository.checklists.first()` — the same Room stream that can fail — so it is launched
+     * Reads `repository.projects.first()` — the same Room stream that can fail — so it is launched
      * via [launchLogged]. A throw here used to die uncaught, silently dropping every user property
      * for the session (analytics segments quietly go stale, with nothing in the logs to explain it).
+     *
+     * Reads the PROJECT-filtered flow, not `checklists`: `checklist_count` is a cross-cutting
+     * segmentation property feeding cohorts and dashboards well beyond this experiment. Counting the
+     * v2 arm's hidden system Inbox would shift every v2 user exactly one bucket up, making the two
+     * arms non-comparable on any cohort defined by it — an asymmetry manufactured by the experiment
+     * itself rather than by user behaviour.
      */
     private suspend fun syncUserProperties() {
         val userData = userDataRepository.getUserData()
-        val checklistCount = repository.checklists.first().size
+        val checklistCount = repository.projects.first().size
         val totalFills = repository.getTotalAdditionalFillCount()
         val firstLaunchAt = userDataRepository.getFirstLaunchAtMillis()
         val daysSinceInstall = if (firstLaunchAt > 0) {

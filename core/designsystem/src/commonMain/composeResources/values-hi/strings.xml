@@ -1543,4 +1543,47 @@
     <string name="mcp_endpoint_copied">कॉपी हो गया</string>
     <string name="mcp_endpoint_copy_cd">MCP सर्वर URL कॉपी करें</string>
     <string name="mcp_requires_google">Google से साइन इन करना ज़रूरी है</string>
+
+    <!-- v2 navigation A/B arm (nav_v2_arm = "v2"): 4-tab shell + Inbox quick capture -->
+    <string name="nav_tab_inbox">इनबॉक्स</string>
+    <string name="nav_tab_projects">प्रोजेक्ट्स</string>
+    <string name="nav_tab_overview">ओवरव्यू</string>
+    <string name="nav_chat_fab_content_description">Gisti से पूछें</string>
+
+    <!-- Inbox screen (v2 home tab) -->
+    <string name="inbox_title">इनबॉक्स</string>
+    <string name="inbox_checklist_name">इनबॉक्स</string>
+    <string name="inbox_quick_add_placeholder">टास्क जोड़ें</string>
+    <string name="inbox_empty_title">आपका इनबॉक्स खाली है</string>
+    <string name="inbox_empty_description">आप जो कुछ भी नोट करेंगे वह पहले यहीं आएगा। अभी टास्क जोड़ें और बाद में उसे किसी प्रोजेक्ट में लगा दें।</string>
+    <string name="inbox_project_empty_description">इस प्रोजेक्ट में अभी कोई टास्क नहीं है।</string>
+    <string name="inbox_open_project_action">प्रोजेक्ट खोलें</string>
+    <string name="inbox_task_sheet_move">प्रोजेक्ट में ले जाएं</string>
+    <!-- Same wording as item_priority_mark / item_priority_unmark, on purpose -->
+    <string name="inbox_task_sheet_important">महत्वपूर्ण चिह्नित करें</string>
+    <string name="inbox_task_sheet_important_remove">महत्व हटाएं</string>
+    <string name="inbox_task_sheet_delete">टास्क हटाएं</string>
+    <string name="inbox_move_picker_title">यहां ले जाएं</string>
+    <string name="inbox_move_picker_empty">आपके पास अभी कोई प्रोजेक्ट नहीं है</string>
+    <string name="inbox_task_moved_message">टास्क ले जाया गया</string>
+    <string name="inbox_task_deleted_message">टास्क हटा दिया गया</string>
+    <string name="inbox_task_add_failed">टास्क नहीं जोड़ा जा सका। कृपया फिर से आज़माएं।</string>
+    <string name="inbox_task_move_failed">टास्क नहीं ले जाया जा सका। कृपया फिर से आज़माएं।</string>
+    <string name="inbox_task_delete_failed">टास्क नहीं हटाया जा सका। कृपया फिर से आज़माएं।</string>
+    <string name="inbox_task_update_failed">टास्क अपडेट नहीं हो सका। कृपया फिर से आज़माएं।</string>
+
+    <!-- Overview screen (v2 tab hosting what the navigation drawer holds in control) -->
+    <string name="overview_title">ओवरव्यू</string>
+
+    <!-- Checklist detail, v2 arm: inline add row + top-bar chat action -->
+    <string name="detail_inline_add_placeholder">टास्क जोड़ें</string>
+    <string name="detail_open_chat_action">Gisti से पूछें</string>
+    <!-- Debug-only: डिवाइस पर nav A/B आर्म जबरन चुनें। -->
+    <string name="debug_nav_arm_title">Nav A/B आर्म</string>
+    <string name="debug_nav_arm_current">सेव किया गया आर्म: %1$s</string>
+    <string name="debug_nav_arm_none">सेट नहीं है (Remote Config तय करता है)</string>
+    <string name="debug_nav_arm_force_v2">v2 चालू करें (Todoist टैब)</string>
+    <string name="debug_nav_arm_force_control">control चालू करें</string>
+    <string name="debug_nav_arm_clear">ओवरराइड हटाएँ</string>
+    <string name="debug_nav_arm_restart_hint">लागू करने के लिए ऐप रीस्टार्ट करें — आर्म हर प्रोसेस पर लॉक होता है।</string>
 </resources>

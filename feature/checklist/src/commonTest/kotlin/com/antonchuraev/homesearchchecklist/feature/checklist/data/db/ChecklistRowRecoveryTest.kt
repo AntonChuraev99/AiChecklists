@@ -35,6 +35,7 @@ class ChecklistRowRecoveryTest {
         items: String? = "",
         viewMode: String? = ChecklistViewMode.Standard.name,
         repeatRule: String? = null,
+        isInbox: Boolean = false,
     ) = ChecklistRow(
         id = id,
         name = name,
@@ -55,6 +56,7 @@ class ChecklistRowRecoveryTest {
         updatedAt = 0L,
         syncStatus = 0,
         isDeleted = false,
+        isInbox = isInbox,
     )
 
     @Test
@@ -114,5 +116,26 @@ class ChecklistRowRecoveryTest {
         val result = row(viewMode = null).toChecklistSafe(itemConverters, reminderConverters, logger)
 
         assertEquals(ChecklistViewMode.Standard, result.viewMode, "a null viewMode falls back to Standard")
+    }
+
+    /**
+     * [ChecklistRow] — not [ChecklistEntity] — is what the public `checklists` flow reads, so a
+     * missing `isInbox` in [toChecklistSafe] compiles clean and leaves the flag permanently false
+     * across the ENTIRE UI while the DB column is perfectly correct: the system Inbox would show up
+     * in the Projects list and eat a free-tier slot. This test is the tripwire for that omission.
+     */
+    @Test
+    fun toChecklistSafe_carriesIsInboxThrough() {
+        val logger = RecordingLogger()
+
+        assertTrue(
+            row(isInbox = true).toChecklistSafe(itemConverters, reminderConverters, logger).isInbox,
+            "isInbox must survive the row→domain mapping, else the system Inbox looks like a project",
+        )
+        assertEquals(
+            false,
+            row(isInbox = false).toChecklistSafe(itemConverters, reminderConverters, logger).isInbox,
+            "an ordinary checklist must never be mapped as the Inbox",
+        )
     }
 }

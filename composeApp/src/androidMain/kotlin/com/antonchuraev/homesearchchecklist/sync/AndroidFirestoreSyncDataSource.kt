@@ -226,6 +226,7 @@ internal fun ChecklistSyncData.toMap(): Map<String, Any?> = mapOf(
     "foldersEnabled" to foldersEnabled,
     "updatedAt" to updatedAt,
     "isDeleted" to isDeleted,
+    "isInbox" to isInbox,
     "fills" to fills.map { it.toMap() },
 )
 
@@ -263,6 +264,7 @@ internal fun Map<String, Any?>.toChecklistSyncData(documentId: String): Checklis
         foldersEnabled = (this["foldersEnabled"] as? Boolean) ?: false,
         updatedAt = this["updatedAt"].asEpochMillis(),
         isDeleted = (this["isDeleted"] as? Boolean) ?: false,
+        isInbox = (this["isInbox"] as? Boolean) ?: false,
         fills = fillsList,
     )
 }

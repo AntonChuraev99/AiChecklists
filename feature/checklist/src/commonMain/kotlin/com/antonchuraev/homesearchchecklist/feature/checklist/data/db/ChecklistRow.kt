@@ -41,6 +41,17 @@ data class ChecklistRow(
     val updatedAt: Long,
     val syncStatus: Int,
     val isDeleted: Boolean,
+    /**
+     * System-Inbox marker — see [Checklist.isInbox].
+     *
+     * Non-null like every other scalar column: it is `INTEGER NOT NULL DEFAULT 0`, so the cursor can
+     * never hand back NULL here and the crash-tolerance rationale above does not apply.
+     *
+     * This projection — NOT [ChecklistEntity] — backs the public `checklists` flow, so forgetting
+     * the field here compiles clean and leaves `isInbox` permanently false across the entire UI
+     * while the DB column is perfectly correct. Keep it wired in [toChecklistSafe].
+     */
+    val isInbox: Boolean,
 )
 
 internal const val CHECKLIST_ROW_TAG = "ChecklistRepository"
@@ -110,5 +121,6 @@ internal fun ChecklistRow.toChecklistSafe(
         updatedAt = updatedAt,
         syncStatus = syncStatus,
         isDeleted = isDeleted,
+        isInbox = isInbox,
     )
 }

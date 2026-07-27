@@ -1,7 +1,10 @@
 package com.antonchuraev.homesearchchecklist.desingsystem.components
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Apps
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.ChecklistRtl
+import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -148,6 +151,62 @@ fun listsNavBarItem(label: String) = AppNavBarItem(
 
 const val NAV_BAR_TODAY_ID = "today"
 const val NAV_BAR_LISTS_ID = "lists"
+
+// ---------------------------------------------------------------------------
+// v2 navigation A/B arm — the four Todoist-style destinations.
+//
+// A separate id namespace ("v2_*") from the ids above on purpose: the control arm's chrome must
+// stay untouched, so nothing here may rename or reuse an existing id. The values are duplicated as
+// `V2Destination`'s constants in composeApp — they MUST match byte-for-byte, because the shell
+// compares the selected id against them and the same strings are the wire values of the
+// `nav_tab_selected` analytics param.
+//
+// Every factory takes `label: String` (never a resource lookup) — designsystem must not resolve
+// user-facing strings, the calling screen does that via stringResource.
+// ---------------------------------------------------------------------------
+
+const val NAV_BAR_INBOX_ID = "v2_inbox"
+const val NAV_BAR_CALENDAR_ID = "v2_calendar"
+const val NAV_BAR_PROJECTS_ID = "v2_projects"
+const val NAV_BAR_OVERVIEW_ID = "v2_overview"
+
+/** v2 "Inbox" tab — the quick-capture home. */
+fun inboxNavBarItem(label: String) = AppNavBarItem(
+    id = NAV_BAR_INBOX_ID,
+    label = label,
+    // Same vector for both states — active/inactive is conveyed by the tonal indicator pill,
+    // matching todayNavBarItem/listsNavBarItem above.
+    selectedIcon = Icons.Outlined.Inbox,
+    unselectedIcon = Icons.Outlined.Inbox,
+    contentDescription = label,
+)
+
+/** v2 "Calendar" tab. */
+fun calendarNavBarItem(label: String) = AppNavBarItem(
+    id = NAV_BAR_CALENDAR_ID,
+    label = label,
+    selectedIcon = Icons.Outlined.CalendarMonth,
+    unselectedIcon = Icons.Outlined.CalendarMonth,
+    contentDescription = label,
+)
+
+/** v2 "Projects" tab — the existing checklist list under its v2 name. */
+fun projectsNavBarItem(label: String) = AppNavBarItem(
+    id = NAV_BAR_PROJECTS_ID,
+    label = label,
+    selectedIcon = Icons.Outlined.ChecklistRtl,
+    unselectedIcon = Icons.Outlined.ChecklistRtl,
+    contentDescription = label,
+)
+
+/** v2 "Overview" tab — everything the navigation drawer holds in the control arm. */
+fun overviewNavBarItem(label: String) = AppNavBarItem(
+    id = NAV_BAR_OVERVIEW_ID,
+    label = label,
+    selectedIcon = Icons.Outlined.Apps,
+    unselectedIcon = Icons.Outlined.Apps,
+    contentDescription = label,
+)
 
 // ---------------------------------------------------------------------------
 // Note: Compose Previews for this component live in androidMain.

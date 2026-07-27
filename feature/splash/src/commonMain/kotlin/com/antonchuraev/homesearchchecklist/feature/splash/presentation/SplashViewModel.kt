@@ -13,12 +13,14 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
+import com.antonchuraev.homesearchchecklist.core.common.api.NavExperimentResolver
 import com.antonchuraev.homesearchchecklist.core.datastore.api.ActivationPrefsRepository
 import com.antonchuraev.homesearchchecklist.core.datastore.api.FirstChecklistRepository
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDefaults
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.usecase.ReconcileInboxForControlArmUseCase
 import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.CompleteOnboardingUseCase
 import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.GetFirstChecklistVariantUseCase
 import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.GetFirstChecklistVariantUseCase.FirstChecklistVariant
@@ -53,6 +55,8 @@ class SplashViewModel(
     private val checklistRepository: ChecklistRepository,
     private val firstChecklistRepository: FirstChecklistRepository,
     private val activationPrefsRepository: ActivationPrefsRepository,
+    private val navExperimentResolver: NavExperimentResolver,
+    private val reconcileInboxForControlArm: ReconcileInboxForControlArmUseCase,
 ) : ViewModel() {
 
     init {
@@ -127,6 +131,32 @@ class SplashViewModel(
             // variant is read from fresh RC, and BEFORE navigate so the first screen_view
             // already carries the `first_checklist_variant` user property.
             applyFirstChecklistExperiment(userData, isNewUser)
+
+            // Navigation A/B arm — resolved HERE, before navigating, because Splash is the last
+            // moment at which no shell is mounted. App.kt latches the arm as soon as a shell
+            // appears: resolving it later would swap AdaptiveNavigationShell for V2NavigationShell
+            // under a live screen, which disposes and recreates the whole NavDisplay subtree (the
+            // user loses scroll position and in-progress edits) and re-roots the back stack
+            // mid-task. Deliberately awaited rather than fire-and-forget for the same reason.
+            //
+            // For a user whose arm is already persisted this is a DataStore read and costs nothing.
+            // For a user RC has not yet assigned it resolves to CONTROL without persisting, and the
+            // background fetchAndActivate() started in startBackgroundSync() makes the arm available
+            // from the NEXT launch — the assignment lands one launch late instead of mutating the
+            // shell in front of the user.
+            val resolvedArm = navExperimentResolver.ensureResolved()
+            log("nav experiment arm resolved before navigate: $resolvedArm")
+
+            // Rollback for a CONTROL-arm user who owns a system Inbox row (reinstall that re-synced
+            // the flagged row from Firestore, cleared DataStore, or an experiment wind-down): the row
+            // is hidden from Projects, every picker, the widget and MCP, and the only screen that can
+            // read it — the Inbox tab — does not exist in control, so the tasks inside are otherwise
+            // unreachable. The use case is one-shot, idempotent, and internally gated on an ASSIGNED
+            // control arm, so it can never touch a v2 user's Inbox.
+            //
+            // On appScope and NOT awaited: this must never delay navigate(). A rollback that costs
+            // startup latency would be paid by every launch, including the ~99% with nothing to repair.
+            appScope.launch { reconcileInboxForControlArm() }
 
             navigateTo(userData.isOnboardingPassed, rcActivated, rcFetchMs, rcError, rcAttempts, rcRecoveredOnAttempt)
         }

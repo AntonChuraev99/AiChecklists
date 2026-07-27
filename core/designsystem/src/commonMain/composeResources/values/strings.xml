@@ -1543,4 +1543,63 @@
     <string name="mcp_endpoint_copied">Copied</string>
     <string name="mcp_endpoint_copy_cd">Copy MCP server URL</string>
     <string name="mcp_requires_google">Requires signing in with Google</string>
+
+    <!-- v2 navigation A/B arm (nav_v2_arm = "v2"): 4-tab shell + Inbox quick capture.
+         Nothing here is referenced by the control arm.
+         Reused on purpose instead of new keys: calendar_nav_label (Calendar tab),
+         settings_title and update_feed_menu_item (Expanded drawer extras),
+         add_item (the shared AddItemInputField supplies its own send-button content
+         description, so the quick-add row needs no v2-only action key).
+         Every key here is also translated in values-hi and values-ru: the v2 arm must not
+         lose on presentation quality against the fully localized control arm. -->
+    <string name="nav_tab_inbox">Inbox</string>
+    <string name="nav_tab_projects">Projects</string>
+    <string name="nav_tab_overview">Overview</string>
+    <string name="nav_chat_fab_content_description">Ask Gisti</string>
+
+    <!-- Inbox screen (v2 home tab) -->
+    <string name="inbox_title">Inbox</string>
+    <!-- Name of the auto-created system Inbox checklist. Resolved in the presentation layer and
+         passed into EnsureInboxUseCase — the domain layer must never touch Compose Resources. -->
+    <string name="inbox_checklist_name">Inbox</string>
+    <string name="inbox_quick_add_placeholder">Add a task</string>
+    <string name="inbox_empty_title">Your inbox is empty</string>
+    <string name="inbox_empty_description">Anything you capture lands here first. Add a task now and sort it into a project later.</string>
+    <string name="inbox_project_empty_description">No tasks in this project yet.</string>
+    <string name="inbox_open_project_action">Open project</string>
+    <string name="inbox_task_sheet_move">Move to project</string>
+    <!-- Word-for-word duplicates of item_priority_mark / item_priority_unmark (already localized
+         in every locale). Kept as separate keys only because InboxTaskSheet.kt references these
+         names; the translations below are intentionally identical so the two sheets never drift. -->
+    <string name="inbox_task_sheet_important">Mark as important</string>
+    <string name="inbox_task_sheet_important_remove">Remove importance</string>
+    <string name="inbox_task_sheet_delete">Delete task</string>
+    <string name="inbox_move_picker_title">Move to</string>
+    <string name="inbox_move_picker_empty">You don't have any projects yet</string>
+    <string name="inbox_task_moved_message">Task moved</string>
+    <string name="inbox_task_deleted_message">Task deleted</string>
+    <string name="inbox_task_add_failed">Couldn't add the task. Please try again.</string>
+    <string name="inbox_task_move_failed">Couldn't move the task. Please try again.</string>
+    <string name="inbox_task_delete_failed">Couldn't delete the task. Please try again.</string>
+    <!-- Failure for the Inbox mutations with no message of their own: InboxViewModel.setTaskChecked
+         and .toggleImportant. Without it the row just snaps back and the tap reads as ignored. -->
+    <string name="inbox_task_update_failed">Couldn't update the task. Please try again.</string>
+
+    <!-- Debug-only: force the nav A/B arm on device. Writes the persisted arm the resolver reads
+         FIRST, so an override survives a restart and does not need a Remote Config parameter. -->
+    <string name="debug_nav_arm_title">Nav A/B arm</string>
+    <string name="debug_nav_arm_current">Persisted arm: %1$s</string>
+    <string name="debug_nav_arm_none">not set (Remote Config decides)</string>
+    <string name="debug_nav_arm_force_v2">Force v2 (Todoist tabs)</string>
+    <string name="debug_nav_arm_force_control">Force control</string>
+    <string name="debug_nav_arm_clear">Clear override</string>
+    <string name="debug_nav_arm_restart_hint">Restart the app to apply — the arm is latched per process.</string>
+
+    <!-- Overview screen (v2 tab hosting what the navigation drawer holds in control) -->
+    <string name="overview_title">Overview</string>
+
+    <!-- Checklist detail, v2 arm: the chat dock is gone, so item creation moves to an inline row
+         and the chat gets a top-bar action. -->
+    <string name="detail_inline_add_placeholder">Add a task</string>
+    <string name="detail_open_chat_action">Ask Gisti</string>
 </resources>

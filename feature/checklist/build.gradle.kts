@@ -36,7 +36,7 @@ kotlin {
             implementation(projects.core.common.api)
             implementation(projects.core.auth.api)
             implementation(projects.core.designsystem)
-
+            // Interfaces only (no DataStore runtime pulled into this module's public surface).
             implementation(libs.bundles.koin.library)
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)

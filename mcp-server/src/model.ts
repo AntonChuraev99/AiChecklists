@@ -90,6 +90,20 @@ export interface ChecklistSyncData {
   foldersEnabled: boolean;
   updatedAt: number;
   isDeleted: boolean;
+  /**
+   * Marks the app's auto-created system Inbox (v2 nav arm quick-capture zone). Optional because
+   * documents written before the flag existed simply omit the key.
+   *
+   * MCP hides these rows at BOTH gates — `getUserChecklists` (discovery: list/search/name
+   * resolution) and `findChecklistWithOwner` (every raw-`checklistId` read and mutation). The Inbox
+   * is an internal capture surface, not a project, and exposing it would let any MCP client
+   * list/rename/write to it. It is deliberately
+   * absent from `toChecklistDoc` / `CHECKLIST_DOC_FIELD_PATHS` — the worker never writes the flag,
+   * and a masked PATCH preserves fields outside the mask, so an app-set `isInbox` survives our
+   * writes untouched. If you ever add it to the mask you MUST add it to the doc builder too, or
+   * every PATCH writes null over it.
+   */
+  isInbox?: boolean;
   fills: FillSyncData[];
 }
 

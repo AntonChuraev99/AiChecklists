@@ -9,10 +9,75 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ItemR
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
 interface ChecklistRepository {
     // Checklists (templates)
     val checklists: Flow<List<Checklist>>
+
+    /**
+     * [checklists] minus the auto-created system Inbox — the user-visible "projects".
+     *
+     * This, not [checklists], is what every list / picker / free-tier counter must read: the Inbox
+     * is an implementation detail of the v2 nav arm's quick-capture zone, and letting it surface
+     * would both confuse the user and consume one of the 5 free checklist slots — a monetisation
+     * difference between the A/B arms rather than a cosmetic bug.
+     *
+     * In the control arm no row is ever flagged, so this is identical to [checklists].
+     *
+     * Has a default body (like [deleteCompletedItems] / [setReminderFullScreen]) purely so the many
+     * inline test fakes of this interface keep compiling; the real
+     * [com.antonchuraev.homesearchchecklist.feature.checklist.data.repository.ChecklistRepositoryImpl]
+     * overrides it with a dedicated SQL query instead of an in-memory filter.
+     */
+    val projects: Flow<List<Checklist>> get() = checklists.map { list -> list.filterNot { it.isInbox } }
+
+    /**
+     * Reactive system Inbox row, or null before [ensureInbox] has run (and always null in the
+     * control arm). Default body for the same test-fake reason as [projects].
+     */
+    fun observeInbox(): Flow<Checklist?> = checklists.map { list -> list.firstOrNull { it.isInbox } }
+
+    /**
+     * Returns the id of the system Inbox, creating it with [name] if it does not exist yet.
+     * Idempotent — safe to call on every Inbox screen entry.
+     *
+     * [name] is resolved by the **presentation** layer via Compose Resources
+     * (`getString(Res.string.inbox_checklist_name)`) and passed in: the domain layer must never
+     * touch Compose Resources, and a hardcoded literal here would ship one language to every user.
+     *
+     * Default body returns 0L so inline test fakes keep compiling; the real implementation creates
+     * the row plus its empty default fill.
+     */
+    suspend fun ensureInbox(name: String): Long = 0L
+
+    /**
+     * The inverse of [ensureInbox]: clears the `isInbox` flag on the system Inbox row, if one
+     * exists, so it becomes an ordinary project again. Returns true when a row was actually
+     * de-flagged, false when there was nothing to do.
+     *
+     * ## Why this has to exist
+     * A flagged row is invisible to [projects], to every picker, to the widget's DAO query, to the
+     * free-tier count and to MCP — and the ONLY screen that can read it is the v2 arm's Inbox tab.
+     * A user who ends up on CONTROL while owning a flagged row therefore loses access to every task
+     * captured in it: the row still exists and still syncs, but nothing in the control app can list,
+     * open or delete it. That happens for real — a reinstall re-syncs the flagged row from Firestore
+     * before Remote Config has assigned an arm, a cleared DataStore drops the sticky assignment, and
+     * an experiment wind-down leaves the console on "control". This is the rollback path for the
+     * experiment's lifecycle, not a cosmetic filter.
+     *
+     * Preserves the row's name, items, fills and cloudId — nothing is deleted, the row is only
+     * demoted — and marks it dirty so the cleared flag propagates to the user's other devices.
+     *
+     * Callers MUST gate this on a *definitively assigned* CONTROL arm; see
+     * [com.antonchuraev.homesearchchecklist.feature.checklist.domain.usecase.ReconcileInboxForControlArmUseCase],
+     * which is the only intended caller. Never call it from a screen: for a v2 user this would
+     * dissolve their Inbox into the Projects list.
+     *
+     * Default body returns false so inline test fakes keep compiling.
+     */
+    suspend fun clearInboxFlag(): Boolean = false
+
     suspend fun addChecklist(checklist: Checklist): Long
     suspend fun updateChecklist(checklist: Checklist)
     suspend fun updateChecklistTemplate(checklist: Checklist)
@@ -119,6 +184,11 @@ interface ChecklistRepository {
      *
      * Emits a new list whenever the underlying checklists or fills change.
      * Consumers use this to drive the Today screen.
+     *
+     * Scans ALL checklists, [projects] and the system Inbox alike: a reminder must surface wherever
+     * the task lives, and the detail deep-link resolves for the Inbox too. See the block comment
+     * above the implementation in `ChecklistRepositoryImpl` for the full rationale — this is a
+     * deliberate choice, not a missed filter.
      */
     fun observeRemindersInRange(fromMs: Long, toMs: Long): Flow<List<TodayReminderInfo>>
 

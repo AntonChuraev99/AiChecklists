@@ -19,10 +19,16 @@ class WidgetRepository(
 ) {
 
     /**
-     * Get all checklists for configuration screen
+     * Get all checklists for configuration screen.
+     *
+     * Uses [ChecklistDao.observeProjects] (Inbox excluded) rather than `observeChecklists()`: the
+     * widget reads the DAO directly and never passes through ChecklistRepository, so the
+     * repository-level `projects` filter does not reach it — without this the widget configuration
+     * screen would let a user bind the v2 system Inbox to a home-screen widget.
+     * Identical output in the control arm, where no row is flagged.
      */
     fun observeAllChecklists(): Flow<List<Checklist>> {
-        return checklistDao.observeChecklists().map { entities ->
+        return checklistDao.observeProjects().map { entities ->
             entities.map { it.toDomain() }
         }
     }

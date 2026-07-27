@@ -51,6 +51,7 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
@@ -139,6 +140,12 @@ fun AppNavigationDrawerContent(
     googleDisplayName: String? = null,
     onSignInClick: () -> Unit = {},
     onSignOutClick: () -> Unit = {},
+    /**
+     * Extra scroll room appended AFTER the footer, for hosts that render chrome over the bottom of
+     * this content (the v2 Overview tab sits under a bottom bar + chat FAB). Default `0.dp` keeps
+     * the drawer — the control arm's only caller — rendering exactly as before.
+     */
+    bottomContentPadding: Dp = 0.dp,
 ) {
     val uriHandler = LocalUriHandler.current
     val logger: AppLogger = koinInject()
@@ -343,6 +350,13 @@ fun AppNavigationDrawerContent(
 
         Spacer(modifier = Modifier.height(AppDimens.SpacingMd))
         DrawerFooter(versionName)
+        // Trailing scroll room, NOT container padding. The v2 Overview tab hosts this same content
+        // under a bottom bar + chat FAB and must keep the footer reachable; padding the host Box
+        // would instead SHRINK this scrollable Column's viewport, turning the reserved space into a
+        // permanently blank band. Default 0.dp means the drawer (control arm) renders unchanged.
+        if (bottomContentPadding > 0.dp) {
+            Spacer(modifier = Modifier.height(bottomContentPadding))
+        }
     }
 }
 

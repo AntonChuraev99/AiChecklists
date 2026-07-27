@@ -9,9 +9,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -95,9 +94,19 @@ fun AddItemInputField(
                 shape = RoundedCornerShape(12.dp),
                 color = if (isTextNotBlank) MaterialTheme.colorScheme.primary
                         else MaterialTheme.colorScheme.surfaceVariant,
-                modifier = Modifier
-                    .height(56.dp)
-                    .aspectRatio(1f),
+                // size(56.dp) — was height(56.dp).aspectRatio(1f), which is behaviourally IDENTICAL
+                // here: height() is the outer modifier, so aspectRatio receives min=max=56 and its
+                // maxWidth candidate fails isSatisfiedBy, leaving 56x56 whatever the row's width.
+                // Swapped only because one modifier expressing one square is honest about intent.
+                //
+                // ⚠️ Do NOT read this as the fix for the v2-Inbox symptom (send button rendered as a
+                // screen-wide square that swallowed the tab row). That was diagnosed here first and the
+                // diagnosis was WRONG — the real cause was the row living in a content Column with a
+                // manual imePadding(), i.e. an unbounded-height parent; it went away when the row moved
+                // into AppScaffold's bottomBar slot (see InboxScreen.PinnedQuickAddRow). Recorded
+                // because this component has 4 call sites and a false root cause would send the next
+                // session hunting the wrong modifier.
+                modifier = Modifier.size(56.dp),
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(

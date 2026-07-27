@@ -100,7 +100,10 @@ class AnalyzeViewModel(
 
     private fun loadChecklists() {
         viewModelScope.launch {
-            checklistRepository.checklists.collect { checklists ->
+            // `projects`: this list is the "apply the AI result to an existing checklist" picker,
+            // and the v2 system Inbox must be hidden from every picker. Same data as `checklists`
+            // in the control arm.
+            checklistRepository.projects.collect { checklists ->
                 _screenState.update { it.copy(availableChecklists = checklists) }
             }
         }

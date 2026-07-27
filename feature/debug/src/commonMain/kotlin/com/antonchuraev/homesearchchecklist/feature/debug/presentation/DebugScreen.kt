@@ -35,7 +35,9 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.material.icons.outlined.Screenshot
+import androidx.compose.material.icons.outlined.ViewSidebar
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -142,6 +144,32 @@ fun DebugScreen(
             stringResource(Res.string.debug_cancel_reason_description)
         ) {
             viewModel.sendIntent(DebugScreenIntent.ShowCancelReasonSheet)
+        },
+        // ── Nav A/B arm override ──────────────────────────────────────────────────────────────
+        // The arm is sticky AND latched per process, and no Remote Config parameter exists yet, so
+        // without these rows there is no way to view the v2 shell on a device at all. The wire values
+        // below are the persisted arm's own vocabulary (not user-facing copy), matching
+        // NavExperimentResolverImpl's ARM_V2 / control.
+        DebugItem(
+            Icons.Outlined.Inbox,
+            stringResource(Res.string.debug_nav_arm_force_v2),
+            navArmSubtitle(screenState.navArm)
+        ) {
+            viewModel.sendIntent(DebugScreenIntent.SetNavArm("v2"))
+        },
+        DebugItem(
+            Icons.Outlined.ViewSidebar,
+            stringResource(Res.string.debug_nav_arm_force_control),
+            navArmSubtitle(screenState.navArm)
+        ) {
+            viewModel.sendIntent(DebugScreenIntent.SetNavArm("control"))
+        },
+        DebugItem(
+            Icons.Default.Refresh,
+            stringResource(Res.string.debug_nav_arm_clear),
+            stringResource(Res.string.debug_nav_arm_restart_hint)
+        ) {
+            viewModel.sendIntent(DebugScreenIntent.SetNavArm(null))
         }
     )
 
@@ -365,6 +393,20 @@ private fun DebugToggleItem(
             )
         }
     }
+}
+
+/**
+ * Subtitle for the two "force arm" rows: what is persisted right now plus the restart reminder.
+ *
+ * Deliberately reports the PERSISTED value, not the arm this process is rendering — App.kt latches the
+ * arm at the first mounted shell, so tapping a row changes nothing on screen until the next launch and
+ * a subtitle showing the live arm would look like the tap failed.
+ */
+@Composable
+private fun navArmSubtitle(persistedArm: String?): String {
+    val current = persistedArm ?: stringResource(Res.string.debug_nav_arm_none)
+    return stringResource(Res.string.debug_nav_arm_current, current) +
+        " · " + stringResource(Res.string.debug_nav_arm_restart_hint)
 }
 
 @Composable

@@ -414,6 +414,65 @@ class SyncRepositoryImplTest {
         assertEquals("LocalWins", dao.checklists.single { it.cloudId == "c1" }.name)
     }
 
+    // ─── Tests: isInbox is write-once locally, NOT last-write-wins ───────
+    //
+    // The LWW branch replaces the whole local row from the remote snapshot. A document written by a
+    // device on an older build (or by the MCP worker) carries no `isInbox`; it decodes to false, and
+    // a plain overwrite would silently demote the system Inbox into an ordinary checklist that then
+    // pops up in the Projects list and eats a free-tier slot. The guard is a one-line `||` deep
+    // inside mergeRemoteChecklist — exactly the kind of edit that gets dropped in a rebase.
+
+    @Test
+    fun mergeRemote_newerRemoteWithoutIsInbox_doesNotDemoteLocalInbox() = runTest {
+        dao.checklists.add(localSynced(1L, "c1", "Inbox", updatedAt = 100L).copy(isInbox = true))
+        // remote() leaves isInbox at its default false — an old-build / MCP write.
+        firestore.fetchResult = AppResult.Success(listOf(remote("c1", "Inbox", updatedAt = 200L)))
+
+        val repo = newRepo()
+        auth.currentUserOverride = testUser
+
+        repo.pullAndMerge()
+
+        assertTrue(
+            dao.checklists.single { it.cloudId == "c1" }.isInbox,
+            "a remote false must never clear a local isInbox = true — the Inbox would become a project",
+        )
+    }
+
+    @Test
+    fun mergeRemote_newerRemoteWithIsInbox_promotesLocalRow() = runTest {
+        // Second device: the Inbox arrives from the cloud on a row that is already local (created
+        // before this device knew about the flag). It must become the Inbox, not stay a project —
+        // otherwise ensureInbox() creates a SECOND one and the user ends up with two.
+        dao.checklists.add(localSynced(1L, "c1", "Inbox", updatedAt = 100L))
+        firestore.fetchResult = AppResult.Success(
+            listOf(remote("c1", "Inbox", updatedAt = 200L).copy(isInbox = true)),
+        )
+
+        val repo = newRepo()
+        auth.currentUserOverride = testUser
+
+        repo.pullAndMerge()
+
+        assertTrue(dao.checklists.single { it.cloudId == "c1" }.isInbox)
+    }
+
+    @Test
+    fun mergeRemote_insertsNewInboxWithFlagPreserved() = runTest {
+        // NEW branch (toInsertEntity): a fresh pull on a second device must carry the flag, or that
+        // device shows the Inbox in its Projects list and creates its own duplicate.
+        firestore.fetchResult = AppResult.Success(
+            listOf(remote("c1", "Inbox", updatedAt = 50L).copy(isInbox = true)),
+        )
+
+        val repo = newRepo()
+        auth.currentUserOverride = testUser
+
+        repo.pullAndMerge()
+
+        assertTrue(dao.checklists.single { it.cloudId == "c1" }.isInbox)
+    }
+
     // ─── Tests: PENDING_UPLOAD merge guard (the reorder-clobber race) ────
     //
     // Root cause of "reorder reverts after leaving the screen": finalizeReorder persisted the
@@ -1012,9 +1071,16 @@ class SyncRepositoryImplTest {
             }
         }
 
+        override suspend fun getInbox(): ChecklistEntity? =
+            checklists.firstOrNull { it.isInbox && !it.isDeleted }
+
         // ── Unused stubs ──
         override fun observeChecklists(): Flow<List<ChecklistEntity>> = flowOf(emptyList())
         override fun observeChecklistRows(): Flow<List<ChecklistRow>> = flowOf(emptyList())
+        override fun observeProjectRows(): Flow<List<ChecklistRow>> = flowOf(emptyList())
+        override fun observeProjects(): Flow<List<ChecklistEntity>> = flowOf(emptyList())
+        override suspend fun getAllProjectsOrderedByPosition(): List<ChecklistEntity> =
+            checklists.filter { !it.isDeleted && !it.isInbox }.sortedBy { it.position }
         override suspend fun getById(id: Long): ChecklistEntity? = checklists.firstOrNull { it.id == id }
         override fun observeChecklistById(id: Long): Flow<ChecklistEntity?> = flowOf(null)
         override suspend fun updateSyncStatus(id: Long, status: Int) {}

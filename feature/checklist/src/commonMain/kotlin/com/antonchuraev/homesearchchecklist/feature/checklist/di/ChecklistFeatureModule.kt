@@ -15,7 +15,9 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.parser.Smar
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.parser.SmartDateParserImpl
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.SyncRepository
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.usecase.EnsureInboxUseCase
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.usecase.RecoverRecurringRemindersUseCase
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.usecase.ReconcileInboxForControlArmUseCase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -30,6 +32,18 @@ val checklistFeatureModule = module {
         )
     }
     single { RecoverRecurringRemindersUseCase(get(), get(), getOrNull()) }
+    // Stateless — a factory, not a single: the Inbox screen's ViewModel is the only caller and the
+    // use case itself is idempotent, so there is nothing worth keeping alive between screens.
+    factory { EnsureInboxUseCase(repository = get(), analytics = get(), logger = get()) }
+    // `single`, not `factory`, unlike EnsureInboxUseCase: the one-shot-per-process guard lives in a
+    // @Volatile field, and a factory would hand a fresh amnesiac instance to every caller.
+    single {
+        ReconcileInboxForControlArmUseCase(
+            repository = get(),
+            navResolver = get(),
+            logger = get(),
+        )
+    }
     single<SmartDateParser> { SmartDateParserImpl(get()) }
     single<ChatHistoryDao> { getChecklistDatabase(get<AttachmentStoragePort>()).chatHistoryDao() }
     single<AgentTranscriptDao> { getChecklistDatabase(get<AttachmentStoragePort>()).agentTranscriptDao() }

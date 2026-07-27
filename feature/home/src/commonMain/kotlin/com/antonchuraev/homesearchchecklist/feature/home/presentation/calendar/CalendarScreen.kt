@@ -67,6 +67,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.calendar_empty_cta
@@ -142,6 +143,12 @@ fun CalendarScreen(
     onTodayCreateChecklistClick: () -> Unit,
     onTodayRetry: () -> Unit,
     onCalendarIntent: (CalendarIntent) -> Unit,
+    /**
+     * Extra bottom inset the HOST reserves below this screen (v2 shell: bottom bar + chat FAB),
+     * threaded into both tab bodies' LazyColumn contentPadding. 0.dp (the default, and what the
+     * control arm passes) keeps the previous padding exactly.
+     */
+    contentBottomPadding: Dp = 0.dp,
 ) {
     val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState(initialPage = 0, pageCount = { 2 })
@@ -188,10 +195,12 @@ fun CalendarScreen(
                         onReminderClick = onTodayReminderClick,
                         onCreateChecklistClick = onTodayCreateChecklistClick,
                         onRetry = onTodayRetry,
+                        contentBottomPadding = contentBottomPadding,
                     )
                     1 -> CalendarTabBody(
                         state = calendarState,
                         onIntent = onCalendarIntent,
+                        contentBottomPadding = contentBottomPadding,
                     )
                 }
             }
@@ -204,10 +213,15 @@ fun CalendarScreen(
 private fun CalendarTabBody(
     state: CalendarState,
     onIntent: (CalendarIntent) -> Unit,
+    contentBottomPadding: Dp = 0.dp,
 ) {
     when (state) {
         CalendarState.Loading -> CalendarLoadingContent()
-        is CalendarState.Content -> CalendarContent(state = state, onIntent = onIntent)
+        is CalendarState.Content -> CalendarContent(
+            state = state,
+            onIntent = onIntent,
+            contentBottomPadding = contentBottomPadding,
+        )
         CalendarState.Empty -> CalendarEmptyState(onIntent = onIntent)
         is CalendarState.Error -> CalendarErrorState(state = state, onIntent = onIntent)
     }
@@ -235,6 +249,7 @@ private fun CalendarLoadingContent() {
 private fun CalendarContent(
     state: CalendarState.Content,
     onIntent: (CalendarIntent) -> Unit,
+    contentBottomPadding: Dp = 0.dp,
 ) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -340,6 +355,7 @@ private fun CalendarContent(
             listState = listState,
             highlightedEpochDay = tappedEpochDay,
             onReminderClick = { info -> onIntent(CalendarIntent.OnReminderClick(info)) },
+            contentBottomPadding = contentBottomPadding,
         )
     }
 }
@@ -355,11 +371,14 @@ private fun AgendaListContent(
     highlightedEpochDay: Long?,
     onReminderClick: (TodayReminderInfo) -> Unit,
     modifier: Modifier = Modifier,
+    contentBottomPadding: Dp = 0.dp,
 ) {
     LazyColumn(
         state = listState,
         modifier = modifier.fillMaxSize().adaptiveContentWidth(),
-        contentPadding = PaddingValues(bottom = AppDimens.SpacingXl),
+        // The host reserve is ADDED to the existing SpacingXl, never substituted for it: 0.dp in the
+        // control arm reproduces the original padding exactly.
+        contentPadding = PaddingValues(bottom = AppDimens.SpacingXl + contentBottomPadding),
     ) {
         // Render each AgendaItem — DateHeaders as stickyHeader, ReminderRows as items.
         // We iterate the flat list manually to mix stickyHeader + item calls.

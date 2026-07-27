@@ -26,6 +26,47 @@ interface ChecklistDao {
     @Query("SELECT * FROM checklists WHERE isDeleted = 0 ORDER BY position ASC")
     fun observeChecklistRows(): Flow<List<ChecklistRow>>
 
+    // ─── Projects (everything except the system Inbox) ───
+    //
+    // These are ADDITIVE siblings of the queries above, deliberately NOT a `AND isInbox = 0` patch
+    // on them: [observeChecklists] / [observeChecklistRows] / [getAllActive] /
+    // [getAllOrderedByPosition] are what the CONTROL arm of the nav experiment runs on, and touching
+    // their WHERE clause would change the SQL, the query plan, the exported schema and every DAO
+    // test for control too — which invalidates the A/B comparison.
+    //
+    // In the control arm no row ever has isInbox = 1, so these return exactly the same data as their
+    // unfiltered twins.
+
+    /**
+     * [observeChecklistRows] minus the system Inbox — backs `ChecklistRepository.projects`.
+     * Keep the ORDER identical to [observeChecklistRows] so the Projects list order is unchanged.
+     */
+    @Query("SELECT * FROM checklists WHERE isDeleted = 0 AND isInbox = 0 ORDER BY position ASC")
+    fun observeProjectRows(): Flow<List<ChecklistRow>>
+
+    /**
+     * Entity-typed twin of [observeProjectRows], for the Android home-screen widget, which reads the
+     * DAO directly and therefore never sees a repository-level filter. Without it the widget
+     * configuration screen would happily let a user bind the system Inbox to a widget.
+     */
+    @Query("SELECT * FROM checklists WHERE isDeleted = 0 AND isInbox = 0 ORDER BY position ASC")
+    fun observeProjects(): Flow<List<ChecklistEntity>>
+
+    /**
+     * [getAllOrderedByPosition] minus the system Inbox — used by position re-indexing so the
+     * Projects order stays dense even though the Inbox's own `position` is allowed to drift.
+     */
+    @Query("SELECT * FROM checklists WHERE isDeleted = 0 AND isInbox = 0 ORDER BY position ASC")
+    suspend fun getAllProjectsOrderedByPosition(): List<ChecklistEntity>
+
+    /**
+     * The single system-Inbox row, or null before it has been created.
+     * `LIMIT 1` is a safety net: the Inbox is created idempotently, but a cross-device sync race
+     * could in principle land two flagged rows and this must still resolve to one.
+     */
+    @Query("SELECT * FROM checklists WHERE isInbox = 1 AND isDeleted = 0 LIMIT 1")
+    suspend fun getInbox(): ChecklistEntity?
+
     @Query("SELECT * FROM checklists WHERE id = :id AND isDeleted = 0")
     suspend fun getById(id: Long): ChecklistEntity?
 

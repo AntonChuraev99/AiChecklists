@@ -1342,4 +1342,47 @@
     <string name="fill_checklist_picker_title">Выберите чек-лист для заполнения</string>
     <string name="fill_checklist_picker_subtitle">Выберите чек-лист, и ИИ заполнит его по выделенному тексту</string>
     <string name="fill_checklist_picker_empty_description">Сначала создайте чек-лист, затем ИИ сможет заполнить его по вашему тексту.</string>
+
+    <!-- Арм A/B навигации v2 (nav_v2_arm = "v2"): четыре таба + быстрая запись во Входящие -->
+    <string name="nav_tab_inbox">Входящие</string>
+    <string name="nav_tab_projects">Проекты</string>
+    <string name="nav_tab_overview">Обзор</string>
+    <string name="nav_chat_fab_content_description">Спросить Gisti</string>
+
+    <!-- Экран «Входящие» (домашний таб в v2) -->
+    <string name="inbox_title">Входящие</string>
+    <string name="inbox_checklist_name">Входящие</string>
+    <string name="inbox_quick_add_placeholder">Добавить задачу</string>
+    <string name="inbox_empty_title">Во входящих пусто</string>
+    <string name="inbox_empty_description">Всё, что вы записываете, сначала попадает сюда. Добавьте задачу сейчас, а разложить по проектам можно позже.</string>
+    <string name="inbox_project_empty_description">В этом проекте пока нет задач.</string>
+    <string name="inbox_open_project_action">Открыть проект</string>
+    <string name="inbox_task_sheet_move">Перенести в проект</string>
+    <!-- Та же формулировка, что у item_priority_mark / item_priority_unmark — намеренно -->
+    <string name="inbox_task_sheet_important">Отметить как важную</string>
+    <string name="inbox_task_sheet_important_remove">Снять пометку важного</string>
+    <string name="inbox_task_sheet_delete">Удалить задачу</string>
+    <string name="inbox_move_picker_title">Перенести в</string>
+    <string name="inbox_move_picker_empty">Проектов пока нет</string>
+    <string name="inbox_task_moved_message">Задача перенесена</string>
+    <string name="inbox_task_deleted_message">Задача удалена</string>
+    <string name="inbox_task_add_failed">Не удалось добавить задачу. Попробуйте снова.</string>
+    <string name="inbox_task_move_failed">Не удалось перенести задачу. Попробуйте снова.</string>
+    <string name="inbox_task_delete_failed">Не удалось удалить задачу. Попробуйте снова.</string>
+    <string name="inbox_task_update_failed">Не удалось обновить задачу. Попробуйте снова.</string>
+
+    <!-- Экран «Обзор» (таб v2, в котором живёт содержимое drawer-навигации control-арма) -->
+    <string name="overview_title">Обзор</string>
+
+    <!-- Детали чек-листа, арм v2: строка добавления вместо док-панели + действие чата в топбаре -->
+    <string name="detail_inline_add_placeholder">Добавить задачу</string>
+    <string name="detail_open_chat_action">Спросить Gisti</string>
+    <!-- Debug-only: принудительный выбор арма nav A/B на устройстве. -->
+    <string name="debug_nav_arm_title">Арм nav A/B</string>
+    <string name="debug_nav_arm_current">Сохранённый арм: %1$s</string>
+    <string name="debug_nav_arm_none">не задан (решает Remote Config)</string>
+    <string name="debug_nav_arm_force_v2">Включить v2 (табы как в Todoist)</string>
+    <string name="debug_nav_arm_force_control">Включить control</string>
+    <string name="debug_nav_arm_clear">Сбросить переопределение</string>
+    <string name="debug_nav_arm_restart_hint">Перезапустите приложение — арм фиксируется на процесс.</string>
 </resources>

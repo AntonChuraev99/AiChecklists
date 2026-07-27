@@ -28,6 +28,16 @@ data class ChecklistEntity(
     val updatedAt: Long = 0L,
     val syncStatus: Int = 0,
     val isDeleted: Boolean = false,
+    /**
+     * System-Inbox marker for the v2 nav arm — see [Checklist.isInbox].
+     *
+     * Deliberately declared WITHOUT `@ColumnInfo` (like every other column in this table), so the
+     * SQL column name is the property name verbatim: `isInbox`. `MIGRATION_18_19` must therefore
+     * add exactly `isInbox INTEGER NOT NULL DEFAULT 0` — anything else drifts from the KSP-generated
+     * schema, and because the database is built with `fallbackToDestructiveMigration(dropAllTables
+     * = false)` a drifting migration does not crash, it silently wipes every local checklist.
+     */
+    val isInbox: Boolean = false,
 )
 
 fun ChecklistEntity.toDomain() = Checklist(
@@ -50,6 +60,7 @@ fun ChecklistEntity.toDomain() = Checklist(
     updatedAt = updatedAt,
     syncStatus = syncStatus,
     isDeleted = isDeleted,
+    isInbox = isInbox,
 )
 
 fun Checklist.toEntity() = ChecklistEntity(
@@ -72,4 +83,5 @@ fun Checklist.toEntity() = ChecklistEntity(
     updatedAt = updatedAt,
     syncStatus = syncStatus,
     isDeleted = isDeleted,
+    isInbox = isInbox,
 )

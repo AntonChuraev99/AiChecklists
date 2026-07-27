@@ -312,6 +312,46 @@ class ChecklistRepositoryImplTest {
         assertEquals(SyncStatus.SYNCED.value, savedFill.syncStatus, "no checked rows → no write, the fill stays clean")
     }
 
+    // ─── Tests: clearInboxFlag demotes the Inbox without losing anything ──────
+
+    /**
+     * The CONTROL-arm rollback. A flagged row is invisible to `projects`, to every picker, to the
+     * widget query and to MCP, and only the v2 Inbox tab can read it — so a control user must be able
+     * to get it back as an ordinary project, with its name and tasks intact.
+     */
+    @Test
+    fun clearInboxFlag_flaggedRowExists_demotesItToAProjectPreservingContent() = runTest {
+        val task = ChecklistItem(text = "Call the dentist")
+        val inboxRow = Checklist(id = 7L, name = "Inbox", items = listOf(task))
+            .toEntityRow()
+            .copy(isInbox = true, position = -1)
+        checklistDao.checklists.add(inboxRow)
+
+        val cleared = newRepo().clearInboxFlag()
+
+        assertTrue(cleared, "a flagged row present → the call reports that it repaired something")
+        val saved = checklistDao.checklists.single { it.id == 7L }
+        assertEquals(false, saved.isInbox, "the flag must be cleared so the row reappears in projects")
+        // Nothing may be lost: this is a demotion, not a delete.
+        assertEquals("Inbox", saved.name, "the row keeps its name")
+        assertEquals(listOf(task), saved.items, "the captured tasks must survive untouched")
+        assertEquals(inboxRow.cloudId, saved.cloudId, "same cloud document — this is not a new row")
+        // Dirty + newer, so the pull merge SKIPs this row until our push lands and the cleared flag
+        // then propagates to the user's other devices.
+        assertEquals(SyncStatus.PENDING_UPLOAD.value, saved.syncStatus)
+        assertTrue(saved.updatedAt > inboxRow.updatedAt, "updatedAt must move forward for sync LWW")
+    }
+
+    /** Idempotent: after the first pass (or in the control arm, which never creates one) it is a no-op. */
+    @Test
+    fun clearInboxFlag_noFlaggedRow_isNoOpReturningFalse() = runTest {
+        checklistDao.checklists.add(Checklist(id = 1L, name = "Groceries", items = emptyList()).toEntityRow())
+
+        assertEquals(false, newRepo().clearInboxFlag(), "nothing flagged → nothing repaired")
+        val untouched = checklistDao.checklists.single { it.id == 1L }
+        assertEquals(SyncStatus.SYNCED.value, untouched.syncStatus, "an ordinary project must not be dirtied")
+    }
+
     // ─── System under test factory + fakes ───────────────────────────────────
 
     private val checklistDao = FakeChecklistDao()
@@ -403,9 +443,16 @@ class ChecklistRepositoryImplTest {
             checklists.addAll(mapped)
         }
 
+        override suspend fun getInbox(): ChecklistEntity? =
+            checklists.firstOrNull { it.isInbox && !it.isDeleted }
+
         // ── Unused stubs ──
         override fun observeChecklists(): Flow<List<ChecklistEntity>> = flowOf(emptyList())
         override fun observeChecklistRows(): Flow<List<ChecklistRow>> = flowOf(emptyList())
+        override fun observeProjectRows(): Flow<List<ChecklistRow>> = flowOf(emptyList())
+        override fun observeProjects(): Flow<List<ChecklistEntity>> = flowOf(emptyList())
+        // Mirrors the getAllOrderedByPosition() stub below — reindexPositions() is not under test here.
+        override suspend fun getAllProjectsOrderedByPosition(): List<ChecklistEntity> = emptyList()
         override fun observeChecklistById(id: Long): Flow<ChecklistEntity?> = flowOf(null)
         override suspend fun insert(checklist: ChecklistEntity): Long = checklist.id
         override suspend fun updateSyncStatus(id: Long, status: Int) {}

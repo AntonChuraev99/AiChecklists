@@ -6,6 +6,7 @@ import com.antonchuraev.homesearchchecklist.core.datastore.api.AiExperimentPrefs
 import com.antonchuraev.homesearchchecklist.core.datastore.api.FirstChecklistRepository
 import com.antonchuraev.homesearchchecklist.core.datastore.api.HintsRepository
 import com.antonchuraev.homesearchchecklist.core.datastore.api.LanguageRepository
+import com.antonchuraev.homesearchchecklist.core.datastore.api.NavExperimentPrefsRepository
 import com.antonchuraev.homesearchchecklist.core.datastore.api.ThemeRepository
 import com.antonchuraev.homesearchchecklist.core.datastore.impl.ActivationPrefsRepositoryImpl
 import com.antonchuraev.homesearchchecklist.core.datastore.impl.AiChatPreferencesRepositoryImpl
@@ -13,6 +14,7 @@ import com.antonchuraev.homesearchchecklist.core.datastore.impl.AiExperimentPref
 import com.antonchuraev.homesearchchecklist.core.datastore.impl.FirstChecklistRepositoryImpl
 import com.antonchuraev.homesearchchecklist.core.datastore.impl.HintsRepositoryImpl
 import com.antonchuraev.homesearchchecklist.core.datastore.impl.LanguageRepositoryImpl
+import com.antonchuraev.homesearchchecklist.core.datastore.impl.NavExperimentPrefsRepositoryImpl
 import com.antonchuraev.homesearchchecklist.core.datastore.impl.ThemeRepositoryImpl
 import org.koin.dsl.module
 
@@ -24,4 +26,5 @@ val datastoreModule = module {
     single<FirstChecklistRepository> { FirstChecklistRepositoryImpl(dataStore = get()) }
     single<ActivationPrefsRepository> { ActivationPrefsRepositoryImpl(dataStore = get()) }
     single<AiExperimentPrefsRepository> { AiExperimentPrefsRepositoryImpl(dataStore = get()) }
+    single<NavExperimentPrefsRepository> { NavExperimentPrefsRepositoryImpl(dataStore = get()) }
 }

@@ -8,6 +8,7 @@ import androidx.compose.foundation.gestures.animateTo
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Row
@@ -143,6 +144,24 @@ fun MainScreen(
      * back to plainly opening the chat (legacy [MainScreenIntent.OnAiChatClick]).
      */
     onQuickAction: ((GistiQuickAction) -> Unit)? = null,
+    /**
+     * v2 only — handler for the DOCK-FREE quick-action chip row rendered directly above the list.
+     *
+     * The six AI entry points (New list / Create with AI / Photo / Remind / Link / Plan day) live
+     * INSIDE the chat dock's morph (see [chatDockContent] below). v2 passes `chatDockContent = null`,
+     * which would silently delete every one-tap AI-create shortcut from the app's flagship surface
+     * and leave only the manual top-bar "+". The product decision was to drop the DOCK, not the
+     * entry points, so the identical chip set is re-surfaced here as a plain row.
+     *
+     * Non-null → the row is rendered and every chip reports its [GistiQuickAction] here.
+     * null (the default) → nothing is rendered and the control arm's node tree is untouched — there
+     * the same chips keep living inside the dock.
+     *
+     * Deliberately a SEPARATE callback from [onQuickAction]: [onQuickAction] only prefills the
+     * singleton chat ViewModel and relies on a dock being on screen to show the result. With no dock
+     * the host MUST also navigate to the chat route, or the tap is a silent no-op.
+     */
+    onInlineQuickAction: ((GistiQuickAction) -> Unit)? = null,
     /** Navigate to the Templates screen (manual checklist creation entry).
      *  When non-null, a "+" action appears in the top bar and a "New list" chip
      *  is prepended to the prompt chips. Wired in App.kt NavHost. */
@@ -158,6 +177,26 @@ fun MainScreen(
     /** Hero template chip tapped → (chipKey for analytics, resolved prompt). App.kt fires the
      *  CHIP_TAPPED event then sends the prompt down the AI create path. */
     onActivationChipTapped: ((String, String) -> Unit)? = null,
+    /**
+     * Extra bottom inset the HOST reserves below this screen (v2 shell: bottom bar + chat FAB).
+     *
+     * Required because [contentExtendsBehindNavBar] is true, so content runs to the physical bottom:
+     * without it the last checklist card slides under the v2 NavigationBar and FAB. Folded into the
+     * existing `contentBottomPadding` expression rather than replacing it, so the control arm's
+     * dock/navbar math is untouched.
+     *
+     * Defaults to 0.dp — the control arm passes nothing and renders exactly as before.
+     */
+    extraBottomPadding: Dp = 0.dp,
+    /**
+     * Whether BACK at the home root is swallowed.
+     *
+     * v1 (true, the default): BACK on Home does nothing, so the user is never kicked out to the
+     * launcher. v2 (false): Home is the *Projects tab*, not the root — BACK must fall through to
+     * NavDisplay so it pops back to the Inbox. Leaving this true in v2 would make BACK silently
+     * dead on three of the four tabs.
+     */
+    swallowRootBack: Boolean = true,
 ) {
     val analyticsTracker: AnalyticsTracker = koinInject()
     LaunchedEffect(Unit) { analyticsTracker.screenView(AnalyticsScreens.MAIN) }
@@ -253,7 +292,10 @@ fun MainScreen(
     }
     // 2) True root (drawer closed, dock collapsed) → swallow. Product decision: BACK on the home
     //    screen does nothing so the user is never kicked out of the app (they leave via Home).
-    PlatformBackHandler(enabled = drawerState?.isOpen != true && !dockExpanded) {
+    //    v2 passes swallowRootBack = false: there this screen is the *Projects tab*, not the root,
+    //    and BACK must reach NavDisplay so it pops back to the Inbox. The condition is otherwise
+    //    unchanged, so the control arm registers exactly the handler it always did.
+    PlatformBackHandler(enabled = swallowRootBack && drawerState?.isOpen != true && !dockExpanded) {
         // Intentionally no-op.
     }
     // 3) Dock expanded: hide the keyboard and ALWAYS collapse to peek on BACK. A draft is NOT lost — the
@@ -400,10 +442,13 @@ fun MainScreen(
                 // navigationBarsPadding), so the list clears both. When hidden (edit mode), add the
                 // navbar inset explicitly so the last row isn't swallowed by the navigation bar.
                 val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                // extraBottomPadding is ADDED to the existing expression, never replaces a branch:
+                // the dock/navbar math above is control-arm behaviour and must not move. It is 0.dp
+                // in v1, so both branches evaluate exactly as before.
                 val contentBottomPadding = if (showDock) {
-                    dockHeight + AppDimens.SpacingXxl
+                    dockHeight + AppDimens.SpacingXxl + extraBottomPadding
                 } else {
-                    navBottom + AppDimens.SpacingXxl
+                    navBottom + AppDimens.SpacingXxl + extraBottomPadding
                 }
                 // FIX B: the answer cap (status bar → keyboard top), computed HERE at the host where
                 // WindowInsets.ime is reliable — a deep read inside the dock returns 0 once the host
@@ -417,6 +462,44 @@ fun MainScreen(
                     Dp.Unspecified
                 }
 
+                // The home list/grid. Hoisted into a local composable lambda ONLY so the v2 chip row
+                // can wrap it in a Column without adding layout nodes to the control arm: below, the
+                // control branch still invokes it as the single, direct child of the hazeSource Box,
+                // so the control arm's rendered tree is unchanged.
+                val homeListContent: @Composable () -> Unit = {
+                    MainScreenContent(
+                        screenState = state,
+                        isEditMode = isEditMode,
+                        onChecklistClick = { checklistWithProgress ->
+                            viewModel.sendIntent(MainScreenIntent.OnChecklistClick(checklistWithProgress))
+                        },
+                        onAddChecklistClick = {
+                            viewModel.sendIntent(MainScreenIntent.OnAddChecklistClick)
+                        },
+                        onAiAnalyzeClick = {
+                            viewModel.sendIntent(MainScreenIntent.OnAiAnalyzeClick)
+                        },
+                        onPremiumBannerClick = {
+                            viewModel.sendIntent(MainScreenIntent.OnPremiumBannerClick)
+                        },
+                        onEnterEditMode = { onEditModeChange(true) },
+                        onExitEditMode = { onEditModeChange(false) },
+                        onReorderChecklists = { orderedIds ->
+                            viewModel.sendIntent(MainScreenIntent.OnReorderChecklists(orderedIds))
+                        },
+                        onSignInClick = {
+                            viewModel.sendIntent(MainScreenIntent.OnSignInClick)
+                        },
+                        onDismissSyncBanner = {
+                            viewModel.sendIntent(MainScreenIntent.OnDismissSyncBanner)
+                        },
+                        activationEnabled = activationEnabled,
+                        onActivationGenerate = { prompt -> onActivationGenerate?.invoke(prompt) },
+                        onActivationChipTapped = { key, prompt -> onActivationChipTapped?.invoke(key, prompt) },
+                        contentBottomPadding = contentBottomPadding,
+                    )
+                }
+
                 Box(modifier = Modifier.fillMaxSize()) {
                     // hazeSource on the CONTAINER (not the LazyColumn items — Haze #865 only blurs
                     // centre cells when the source is on items). The opaque background gives the blur
@@ -427,37 +510,47 @@ fun MainScreen(
                             .background(MaterialTheme.colorScheme.background)
                             .hazeSource(hazeState),
                     ) {
-                        MainScreenContent(
-                            screenState = state,
-                            isEditMode = isEditMode,
-                            onChecklistClick = { checklistWithProgress ->
-                                viewModel.sendIntent(MainScreenIntent.OnChecklistClick(checklistWithProgress))
-                            },
-                            onAddChecklistClick = {
-                                viewModel.sendIntent(MainScreenIntent.OnAddChecklistClick)
-                            },
-                            onAiAnalyzeClick = {
-                                viewModel.sendIntent(MainScreenIntent.OnAiAnalyzeClick)
-                            },
-                            onPremiumBannerClick = {
-                                viewModel.sendIntent(MainScreenIntent.OnPremiumBannerClick)
-                            },
-                            onEnterEditMode = { onEditModeChange(true) },
-                            onExitEditMode = { onEditModeChange(false) },
-                            onReorderChecklists = { orderedIds ->
-                                viewModel.sendIntent(MainScreenIntent.OnReorderChecklists(orderedIds))
-                            },
-                            onSignInClick = {
-                                viewModel.sendIntent(MainScreenIntent.OnSignInClick)
-                            },
-                            onDismissSyncBanner = {
-                                viewModel.sendIntent(MainScreenIntent.OnDismissSyncBanner)
-                            },
-                            activationEnabled = activationEnabled,
-                            onActivationGenerate = { prompt -> onActivationGenerate?.invoke(prompt) },
-                            onActivationChipTapped = { key, prompt -> onActivationChipTapped?.invoke(key, prompt) },
-                            contentBottomPadding = contentBottomPadding,
-                        )
+                        // v2 (onInlineQuickAction != null): the dock is gone, so the SAME six chips it
+                        // hosted get their own row above the list — losing them would delete every
+                        // one-tap AI-create shortcut from the flagship surface. null → the control arm
+                        // renders the list alone, as it always did.
+                        //
+                        // The BRANCH KEY IS THE ARM ONLY — never `&& !isEditMode`. The arm is latched
+                        // for the process, so this choice is fixed at first composition; folding edit
+                        // mode into it would move homeListContent() between two composition groups on
+                        // every Done/edit toggle, disposing it and discarding the rememberLazyListState
+                        // inside MainScreenContent — the list would visibly jump to the top. Edit mode
+                        // is gated on the CHIPS instead (reorder mode owns the screen; its only action
+                        // is "Done", which is why the dock hid too).
+                        if (onInlineQuickAction != null) {
+                            Column(modifier = Modifier.fillMaxSize()) {
+                                if (!isEditMode) {
+                                    GistiPromptChips(
+                                        chips = gistiDefaultPromptChips(
+                                            createAiLabel = stringResource(Res.string.main_create_with_ai_action),
+                                            photoLabel = stringResource(Res.string.main_prompt_photo),
+                                            remindLabel = stringResource(Res.string.main_prompt_remind),
+                                            linkLabel = stringResource(Res.string.main_prompt_link),
+                                            planDayLabel = stringResource(Res.string.main_prompt_plan_day),
+                                        ),
+                                        onChipClick = onInlineQuickAction,
+                                        // Leading "➕ New list" chip → Templates (manual create), same as
+                                        // in the dock. Null when the host wires no manual-create route.
+                                        onNewListClick = onCreateFromTemplatesClick,
+                                        newListLabel = stringResource(Res.string.main_prompt_new_list),
+                                        // No horizontal padding here on purpose — GistiPromptChips owns it
+                                        // as LazyRow contentPadding so chips bleed past the screen edge
+                                        // while scrolling (stacking padding here kills that signal).
+                                        modifier = Modifier.padding(top = AppDimens.SpacingSm),
+                                    )
+                                }
+                                // Single weighted child → takes all remaining height, so the list keeps
+                                // measuring exactly as it does without the row above it.
+                                Box(modifier = Modifier.weight(1f)) { homeListContent() }
+                            }
+                        } else {
+                            homeListContent()
+                        }
                     }
 
                     // Nav-bar grey: paint the system navigation-bar zone with the dock's own flat-grey

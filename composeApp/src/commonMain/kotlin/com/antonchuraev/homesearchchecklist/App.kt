@@ -40,6 +40,20 @@ import com.antonchuraev.homesearchchecklist.navigation.AdaptiveNavigationShell
 import com.antonchuraev.homesearchchecklist.navigation.DrawerDestination
 import com.antonchuraev.homesearchchecklist.navigation.EmptyDetailPlaceholder
 import com.antonchuraev.homesearchchecklist.navigation.shouldUseSinglePaneLayout
+// ── v2 navigation A/B arm ────────────────────────────────────────────────────────────────────
+// Everything the v2 arm needs is imported here and gated inside this file only. Keeping ALL the
+// arm branching in App.kt is deliberate: a reviewer can prove the control arm is untouched by
+// reading one diff, which a CompositionLocal (an invisible second channel readable from any
+// shared composable) would make impossible.
+import com.antonchuraev.homesearchchecklist.core.common.api.NavExperimentResolver
+import com.antonchuraev.homesearchchecklist.core.common.api.NavVariant
+import com.antonchuraev.homesearchchecklist.desingsystem.adaptive.AppWindowSizeClass
+import com.antonchuraev.homesearchchecklist.desingsystem.adaptive.rememberAppWindowSizeClass
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.inbox.InboxRoute
+import com.antonchuraev.homesearchchecklist.navigation.OverviewScreen
+import com.antonchuraev.homesearchchecklist.navigation.V2Destination
+import com.antonchuraev.homesearchchecklist.navigation.V2NavigationShell
+import com.antonchuraev.homesearchchecklist.navigation.V2ShellMetrics
 import com.antonchuraev.homesearchchecklist.gestures.ApplyEdgeSwipeExclusion
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -569,6 +583,38 @@ fun App() {
                 }
             }
 
+            // ── Navigation A/B arm (nav_v2_arm) ──────────────────────────────────────────────
+            // The arm is held in ONE state holder owned by this composable — deliberately not a
+            // CompositionLocal. Every v2 branch below therefore reads `navVariant` by name, so the
+            // full set of gated call sites is greppable in this file and nothing outside it can
+            // silently read the arm inside code the CONTROL arm also executes.
+            //
+            // currentArm() is non-suspending and returns CONTROL until the resolver has an answer,
+            // so the very first frame always renders the safe arm.
+            val navResolver: NavExperimentResolver = koinInject()
+            var navVariant by remember { mutableStateOf(navResolver.currentArm()) }
+            // LATCHED once a shell is mounted (set in the nav_shell_shown effect below).
+            //
+            // SplashViewModel awaits ensureResolved() before it navigates, so by the time a tab
+            // route exists the arm is already in the resolver's per-process cache and the effect
+            // below merely adopts it without suspending. The latch covers the paths that bypass
+            // Splash's await (a deep link landing straight on a tab, a process restart into a saved
+            // stack): without it a late-arriving arm would flip navVariant under a LIVE screen,
+            // which swaps AdaptiveNavigationShell for V2NavigationShell in the `when` far below —
+            // disposing and recreating the whole NavDisplay subtree, so the SaveableStateHolder is
+            // rebuilt and the user loses scroll position and in-progress edits — and then re-roots
+            // the back stack at Inbox mid-task.
+            //
+            // Once latched the resolver is no longer polled, which also stops the unbounded
+            // DataStore + Remote Config round-trip that an unassigned arm would otherwise repeat on
+            // every single top-route change, for the life of the install, in the CONTROL arm.
+            var armLatched by remember { mutableStateOf(false) }
+            LaunchedEffect(currentTopRoute) {
+                if (!armLatched) {
+                    navVariant = navResolver.ensureResolved()
+                }
+            }
+
             // Callback passed down to home screens — no aichat import needed.
             // For MainScreen: called with (null, null) — no checklist context.
             // For ChecklistDetailScreen: called with (checklistId, checklistName).
@@ -1056,6 +1102,165 @@ fun App() {
                 key is AppNavRoute.UpdateFeed || key is AppNavRoute.Settings
             }
 
+            // ── v2 shell computations (parallel to selectedDestination / showShell above) ─────
+            // Written as SIBLINGS of the three control-arm blocks rather than as branches inside
+            // them: the control-arm blocks stay textually identical to their pre-experiment form,
+            // which is the cheapest possible proof that the baseline did not move. Everything below
+            // is inert while navVariant == CONTROL (showV2Shell is false and nothing reads the rest).
+
+            // True while ANY v2 tab route is anywhere in the stack — mirrors showShell's .any {} so the
+            // shell stays mounted (and the tab state alive) under a pushed detail screen.
+            val v2AnyTabInStack = navigator.backStack.any { key ->
+                key is AppNavRoute.Inbox || key is AppNavRoute.Calendar ||
+                key is AppNavRoute.Main || key is AppNavRoute.Overview
+            }
+
+            // findLast, not last: on Expanded two-pane a ChecklistDetail sits on top while Main still
+            // renders in the list pane, and the bar must keep pointing at the tab underneath.
+            val v2SelectedTab = remember(navigator.backStack.toList()) {
+                val topTab = navigator.backStack.findLast { key ->
+                    key is AppNavRoute.Inbox || key is AppNavRoute.Calendar ||
+                    key is AppNavRoute.Main || key is AppNavRoute.Overview
+                }
+                when (topTab) {
+                    is AppNavRoute.Calendar -> V2Destination.Calendar
+                    is AppNavRoute.Main -> V2Destination.Projects
+                    is AppNavRoute.Overview -> V2Destination.Overview
+                    else -> V2Destination.Inbox
+                }
+            }
+
+            // Chrome visibility is decided by the TOP entry (unlike showV2Shell): the bar and the FAB
+            // must not float over ChecklistDetail / AiChat / Settings pushed on top of a tab.
+            val v2BarVisible = navigator.backStack.lastOrNull().let { top ->
+                top is AppNavRoute.Inbox || top is AppNavRoute.Calendar ||
+                top is AppNavRoute.Main || top is AppNavRoute.Overview
+            }
+
+            val showV2Shell = navVariant == NavVariant.V2 && v2AnyTabInStack
+
+            // Only Compact has a bottom bar + FAB to clear; the rail and the permanent drawer sit
+            // beside the content, so a non-zero inset there would just be dead space.
+            //
+            // The window-size read is nested INSIDE the v2 branch on purpose. App.kt read no
+            // window/configuration state at all before this experiment, and rememberAppWindowSizeClass()
+            // is not free: on Android it reads LocalConfiguration.current, so hoisting it would make
+            // this whole composable recompose on every configuration change; on wasmJs it registers a
+            // resize listener, so every browser resize would recompose the entire App body
+            // (sceneStrategy, entryProvider, every lambda) — a measurable behaviour change in the
+            // BASELINE arm, which must stay untouched. Conditional @Composable calls are perfectly
+            // legal: the runtime inserts and removes the group. The arm is latched at the first
+            // mounted shell, so the branch cannot oscillate either.
+            // Two values, because the reservation depends on whether the screen's content box stops
+            // above the v2 bar or runs behind it — see V2ShellMetrics. A single conservative constant
+            // left an ~88dp blank band on the AppScaffold-hosted tabs.
+            val v2IsCompact =
+                navVariant == NavVariant.V2 &&
+                    rememberAppWindowSizeClass() == AppWindowSizeClass.Compact
+            // Inbox / Calendar / Overview: only the floating chat FAB overlaps them.
+            val v2FabBandPadding = if (v2IsCompact) V2ShellMetrics.FabBandPadding else 0.dp
+            // MainScreen / ChecklistDetailScreen: contentExtendsBehindNavBar = true, so they must
+            // clear the bar as well as the FAB.
+            val v2BarAndFabPadding = if (v2IsCompact) V2ShellMetrics.BarAndFabBandPadding else 0.dp
+
+            // Re-root the stack at Inbox once per process, the first time a tab route appears.
+            // The control arm never executes this (guarded on navVariant).
+            //
+            // Plain `remember`, deliberately NOT rememberSaveable: the flag guards the back stack of
+            // the AppNavigator SINGLETON, which is re-created (and re-seeded with Splash) on process
+            // death. A saved `true` would outlive the stack it describes and skip the rewrite on the
+            // next cold start, landing the user on Projects instead of Inbox. Plain remember resets
+            // in lockstep with the navigator. A recomposition-only reset (Activity recreate, where
+            // the navigator DOES survive) is harmless — the `none { Inbox }` guard makes a re-run a
+            // no-op.
+            var v2RootApplied by remember { mutableStateOf(false) }
+            LaunchedEffect(navVariant, v2AnyTabInStack) {
+                if (navVariant == NavVariant.V2 && v2AnyTabInStack && !v2RootApplied) {
+                    v2RootApplied = true
+                    if (navigator.backStack.none { it is AppNavRoute.Inbox }) {
+                        val mainIdx = navigator.backStack.indexOfFirst { it is AppNavRoute.Main }
+                        // Never clear() then add(): NavDisplay requires a non-empty stack at ALL
+                        // times, not just at first composition (the same reason
+                        // AppNavigatorImpl.replaceStack sets [0] first and only then trims).
+                        if (mainIdx == 0) {
+                            navigator.backStack[0] = AppNavRoute.Inbox
+                        } else {
+                            navigator.backStack.add(0, AppNavRoute.Inbox)
+                        }
+                    }
+                }
+            }
+
+            val v2OnNavigate: (String) -> Unit = { dest ->
+                // POP to the Inbox root, then push the tab — never a bare push. Every top-level nav
+                // helper in this app is pushLaunchSingleTop, so a bottom bar wired to them would grow
+                // the stack on each tap and Android BACK would walk the tab history instead of
+                // returning home. This is the Main branch's pop-to-existing idiom generalised to all
+                // four tabs, and it keeps each tab exactly one entry deep.
+                val inboxIdx = navigator.backStack.indexOfFirst { it is AppNavRoute.Inbox }
+                if (inboxIdx < 0) {
+                    // The v2 root was displaced — navigateToChecklistDetail(clearBackStack = true)
+                    // (gallery deep link, weekly-checklist create) rebuilds the stack around Main via
+                    // popToMainThenPush. Re-root in place rather than trimming to a foreign [0], which
+                    // would leave "Inbox" selected while Main is on screen.
+                    navigator.backStack[0] = AppNavRoute.Inbox
+                    while (navigator.backStack.size > 1) {
+                        navigator.backStack.removeAt(navigator.backStack.size - 1)
+                    }
+                } else {
+                    while (navigator.backStack.size > inboxIdx + 1) {
+                        navigator.backStack.removeAt(navigator.backStack.size - 1)
+                    }
+                }
+                when (dest) {
+                    V2Destination.Inbox -> Unit   // the root itself — popping above was the whole job
+                    V2Destination.Calendar -> navigator.backStack.add(AppNavRoute.Calendar)
+                    V2Destination.Projects -> navigator.backStack.add(AppNavRoute.Main)
+                    V2Destination.Overview -> navigator.backStack.add(AppNavRoute.Overview)
+                }
+                analyticsTracker.event(
+                    AnalyticsEvents.Nav.TAB_SELECTED,
+                    mapOf(AnalyticsParams.TAB to dest),
+                )
+            }
+
+            // Arm-exposure denominator. Fired ONCE per process in BOTH arms — a v2-only emit would
+            // leave the arms incomparable (no control baseline to divide by).
+            //
+            // ensureResolved() is awaited HERE rather than reading navVariant directly, because
+            // navVariant seeds from the non-suspending currentArm() (CONTROL until resolution lands).
+            // Stamping the denominator from that seed would file a v2 user under variant="control"
+            // and then latch shellEventSent, so the record could never be corrected — inflating
+            // control and deflating v2, exactly the bias this event exists to rule out. The call
+            // short-circuits on the arm SplashViewModel already resolved, so it costs nothing.
+            //
+            // This is also where the arm is LATCHED: from the first mounted shell onwards the value
+            // is frozen for the process, so no later resolution can swap the shell under the user.
+            var shellEventSent by remember { mutableStateOf(false) }
+            LaunchedEffect(showShell, showV2Shell) {
+                if (!shellEventSent && (showShell || showV2Shell)) {
+                    val arm = navResolver.ensureResolved()
+                    navVariant = arm
+                    armLatched = true
+                    shellEventSent = true
+                    // Three values, not two. A user Remote Config has not assigned an arm to renders
+                    // the CONTROL shell as a fail-safe but is NOT in the experiment — they carry no
+                    // nav_arm user property by design. Filing them under "control" would pad the
+                    // baseline's exposure denominator with non-participants (the rc-activation gap is
+                    // ~35% of new users here), deflating every rate the treatment is measured against.
+                    analyticsTracker.event(
+                        AnalyticsEvents.Nav.SHELL_SHOWN,
+                        mapOf(
+                            AnalyticsParams.VARIANT to when {
+                                !navResolver.isArmAssigned() -> "unassigned"
+                                arm == NavVariant.V2 -> "v2"
+                                else -> "control"
+                            }
+                        ),
+                    )
+                }
+            }
+
             val shellOnNavigate: (String) -> Unit = { dest ->
                 when (dest) {
                     DrawerDestination.Main -> {
@@ -1470,9 +1675,15 @@ fun App() {
                                 isEditMode = isEditMode,
                                 onEditModeChange = { isEditMode = it },
                                 // Continuous-drag dock content (MainScreen owns its own drag state).
-                                chatDockContent = chatDockContent,
+                                // v2 removes the bottom chat dock everywhere — gated HERE at the call
+                                // site rather than at the chatDockContent declaration, so the diff is
+                                // two lines and the control arm's slot is provably unchanged. Both
+                                // slots are nullable and every dock-dependent branch inside MainScreen
+                                // already null-degrades (dockShown / showDock / contentBottomPadding),
+                                // so passing null needs no structural edit to the screen.
+                                chatDockContent = if (navVariant == NavVariant.V2) null else chatDockContent,
                                 // FULL overlay content (MainScreen owns its own per-screen full state).
-                                chatFullContent = chatFullContent,
+                                chatFullContent = if (navVariant == NavVariant.V2) null else chatFullContent,
                                 // When MainScreen's dock opens/closes → seed the home (null) chat context
                                 // + fire the open analytics (chatSheetOpen mirror drives those effects).
                                 onChatExpandedChanged = { expandedNow ->
@@ -1484,6 +1695,23 @@ fun App() {
                                 // link/remind prefill, plan-day prefill+send) via the singleton
                                 // ChatViewModel + inline dock. See onQuickAction above.
                                 onQuickAction = onQuickAction,
+                                // v2 only: the dock that used to host these six chips is gone, so the
+                                // chips move to their own row and the host must ALSO navigate — plain
+                                // onQuickAction just prefills the singleton chat ViewModel and relies
+                                // on a dock being on screen, so without the navigate every chip would
+                                // be a silent no-op. null in control leaves that arm's tree untouched.
+                                onInlineQuickAction = if (navVariant == NavVariant.V2) {
+                                    { action ->
+                                        onQuickAction(action)
+                                        analyticsTracker.event(
+                                            AnalyticsEvents.Nav.CHAT_FAB_TAPPED,
+                                            mapOf(AnalyticsParams.SOURCE to "home_chip"),
+                                        )
+                                        navigator.navigateToAiChat()
+                                    }
+                                } else {
+                                    null
+                                },
                                 // Top-bar "+" and the leading "New list" prompt chip both
                                 // route to the manual create screen (CreateChecklistScreen).
                                 // From there the user can still pick a template via the
@@ -1495,6 +1723,14 @@ fun App() {
                                 activationEnabled = activationBundleEnabled,
                                 onActivationGenerate = onActivationGenerate,
                                 onActivationChipTapped = onActivationChipTapped,
+                                // v2 only (0.dp in control): MainScreen runs contentExtendsBehindNavBar,
+                                // so without this the last card slides under the bottom bar and the FAB.
+                                extraBottomPadding = v2BarAndFabPadding,
+                                // MainScreen unconditionally SWALLOWS Android BACK whenever the drawer
+                                // is closed and the dock collapsed — which in v2 is always true. Left
+                                // on, "BACK returns to Inbox" would silently do nothing on the Projects
+                                // tab. Control keeps the swallow (true), so its behaviour is unchanged.
+                                swallowRootBack = navVariant == NavVariant.CONTROL,
                             )
                         }
                     }
@@ -1576,12 +1812,40 @@ fun App() {
                                 onOpenChatSheet(checklistId, checklistName)
                             },
                             onChatCollapse = { chatSheetOpen = false },
-                            chatDockContent = chatDockContent,
-                            chatFullContent = chatFullContent,
+                            // v2 removes the dock here too (DECISION 2). This also removes the dock's
+                            // ChatDockItemCreateOverride fast-add path — replaced by the inline
+                            // "+ Add task" row below, NOT dropped: losing fast item entry would be a
+                            // regression, not a simplification.
+                            chatDockContent = if (navVariant == NavVariant.V2) null else chatDockContent,
+                            chatFullContent = if (navVariant == NavVariant.V2) null else chatFullContent,
                             chatInputBlank = chatUiState.inputText.isBlank(),
                             routeCollapseSignal = routeCollapseSignal,
                             onChecklistQuickAction = { checklistId, checklistName, action ->
                                 onChecklistQuickAction(checklistId, checklistName, action)
+                            },
+                            // v2 only: the Todoist-style inline add row, plus zeroing the item-create
+                            // scrim (state.itemCreateMode drives it independently of the dock, so
+                            // without this the screen would dim with no dock to justify it).
+                            useInlineAddRow = navVariant == NavVariant.V2,
+                            // The shell's chat FAB is hidden on detail screens (barVisible = false), so
+                            // v2 restores chat access with one top-bar action. null in control = zero
+                            // extra actions rendered, i.e. the control top bar is untouched.
+                            onOpenChat = if (navVariant == NavVariant.V2) {
+                                {
+                                    // Instrumented with a distinct source: without this, chat opens
+                                    // from a project were the ONE chat entry point in v2 with no
+                                    // event at all (the shell FAB emits this, control emits
+                                    // ai_chat_opened(source="dock")), leaving the experiment's
+                                    // headline question — does the chat lose usage once it loses
+                                    // focus — unanswerable for detail screens.
+                                    analyticsTracker.event(
+                                        AnalyticsEvents.Nav.CHAT_FAB_TAPPED,
+                                        mapOf(AnalyticsParams.SOURCE to "detail_toolbar"),
+                                    )
+                                    navigator.navigateToAiChat()
+                                }
+                            } else {
+                                null
                             },
                         )
                     }
@@ -1635,6 +1899,19 @@ fun App() {
                     ) {
                         TodayRoute(
                             drawerState = drawerState,
+                            // v2 reaches Today from the Overview tab as a pushed screen: the bottom bar
+                            // and FAB hide (Today is not a tab) and the shell passes drawerState = null,
+                            // so no hamburger renders either. On wasmJs PlatformBackHandler is a no-op
+                            // and Nav 3 has no browser-history integration, which left the user with no
+                            // way off the screen at all. The arm gate is REQUIRED, not defensive: in
+                            // control, Medium/Expanded also pass drawerState = null (rail / permanent
+                            // drawer), so an unconditional onBack would add a back arrow to the control
+                            // arm's tablet top bar.
+                            onBack = if (navVariant == NavVariant.V2) {
+                                { navigator.onBack() }
+                            } else {
+                                null
+                            },
                             onCreateChecklistClick = { navigator.navigateToCreateChecklistScreen() },
                         )
                     }
@@ -1647,6 +1924,65 @@ fun App() {
                         CalendarRoute(
                             drawerState = drawerState,
                             onCreateChecklistClick = { navigator.navigateToCreateChecklistScreen() },
+                            // 0.dp in control — Calendar's inner lists keep their current insets there.
+                            contentBottomPadding = v2FabBandPadding,
+                        )
+                    }
+
+                    // ── v2 tab destinations ──────────────────────────────────────────────────
+                    // Registered UNCONDITIONALLY, never behind `if (navVariant == V2)`. entryProvider
+                    // is rebuilt on every renderNav recomposition, and a rememberSaveable'd back stack
+                    // can outlive a process death that lands on the other arm — a route with no
+                    // matching entry<> hard-crashes NavDisplay. Registering them is free: in the
+                    // control arm neither route is ever pushed.
+
+                    entry<AppNavRoute.Inbox>(
+                        metadata = ListDetailSceneStrategy.listPane(
+                            detailPlaceholder = { EmptyDetailPlaceholder() }
+                        )
+                    ) {
+                        InboxRoute(
+                            contentBottomPadding = v2FabBandPadding,
+                            // Swallow BACK only while the Inbox IS the top of the stack. On Expanded
+                            // this entry is a listPane that stays composed beside a pushed
+                            // ChecklistDetail, and a handler registered later than NavDisplay's wins —
+                            // so an always-on handler makes BACK dead instead of dismissing the detail
+                            // pane. backStack is a SnapshotStateList, so this re-evaluates on push/pop.
+                            swallowRootBack = navigator.backStack.lastOrNull() is AppNavRoute.Inbox,
+                        )
+                    }
+
+                    entry<AppNavRoute.Overview> {
+                        OverviewScreen(
+                            contentBottomPadding = v2FabBandPadding,
+                            // Rows that point at a v2 TAB go through the tab router; everything else
+                            // (Today / AiChat / Mcp / UpdateFeed / Settings) keeps the v1 router, so
+                            // those behave identically in both arms.
+                            //
+                            // shellOnNavigate cannot serve the tabs here. Its Main branch only POPS
+                            // to an existing AppNavRoute.Main and never pushes — and in v2 the stack
+                            // while Overview is on screen is always [Inbox, Overview], so Main is
+                            // absent and "Home" did nothing at all: no navigation, no message, no
+                            // log. Its Calendar branch has the opposite flaw: pushLaunchSingleTop
+                            // produced [Inbox, Overview, Calendar], so BACK returned to Overview
+                            // instead of Inbox and a stale Overview entry lingered underneath —
+                            // reaching Calendar from the bar and from here left different stacks.
+                            // v2OnNavigate is pop-to-root-then-push, keeping every tab one entry deep.
+                            onNavigate = { dest ->
+                                when (dest) {
+                                    DrawerDestination.Main -> v2OnNavigate(V2Destination.Projects)
+                                    DrawerDestination.Calendar -> v2OnNavigate(V2Destination.Calendar)
+                                    else -> shellOnNavigate(dest)
+                                }
+                            },
+                            onRateApp = { csatViewModel.sendIntent(CsatIntent.ForceShow) },
+                            onLeaveFeedback = { csatViewModel.sendIntent(CsatIntent.ForceShowFeedback) },
+                            versionName = AppBuildConfig.versionName,
+                            isGoogleLinked = userData.isGoogleLinked,
+                            googleEmail = userData.googleEmail,
+                            googleDisplayName = userData.googleDisplayName,
+                            onSignInClick = handleSignIn,
+                            onSignOutClick = handleSignOut,
                         )
                     }
 
@@ -1669,8 +2005,31 @@ fun App() {
             ) // end NavDisplay
             } // end renderNav lambda
 
-            if (showShell) {
-                AdaptiveNavigationShell(
+            // Shell mount. The v2 branch is checked FIRST and the control branch below is a literal
+            // copy of the pre-experiment `if (showShell) { … }` body — no reordering, no added
+            // parameters — so `git diff` shows the control arm's chrome is byte-identical.
+            when {
+                showV2Shell -> V2NavigationShell(
+                    selectedTab = v2SelectedTab,
+                    onNavigate = v2OnNavigate,
+                    onOpenChat = {
+                        // Tagged "fab" so it stays distinguishable from the detail screen's top-bar
+                        // action, which emits the same event with source="detail_toolbar". Two very
+                        // different surfaces; collapsing them would hide where chat access actually
+                        // survived the dock removal.
+                        analyticsTracker.event(
+                            AnalyticsEvents.Nav.CHAT_FAB_TAPPED,
+                            mapOf(AnalyticsParams.SOURCE to "fab"),
+                        )
+                        navigator.navigateToAiChat()
+                    },
+                    onOpenSettings = { navigator.navigateToSettings() },
+                    onOpenUpdates = { navigator.navigateToUpdateFeed() },
+                    barVisible = v2BarVisible,
+                    content = renderNav,
+                )
+
+                showShell -> AdaptiveNavigationShell(
                     selectedDestination = selectedDestination,
                     onNavigate = shellOnNavigate,
                     onRateApp = { csatViewModel.sendIntent(CsatIntent.ForceShow) },
@@ -1688,8 +2047,8 @@ fun App() {
                     drawerGesturesEnabled = !chatSheetOpen,
                     content = renderNav,
                 )
-            } else {
-                renderNav(null)
+
+                else -> renderNav(null)
             }
 
             SnackbarHost(
@@ -1831,7 +2190,10 @@ fun App() {
             LaunchedEffect(Unit) {
                 if (!isWidgetSupported()) return@LaunchedEffect
                 if (appDatastore.observeBoolean(WIDGET_PROMO_SHOWN_KEY, false).first()) return@LaunchedEffect
-                val checklistCount = checklistRepository.checklists.first().size
+                // `.projects`, not `.checklists`: the v2 arm auto-creates a system Inbox, which would
+                // otherwise push every user over WIDGET_PROMO_MIN_CHECKLISTS one real checklist early
+                // — a retention-prompt timing difference between the arms, not a cosmetic one.
+                val checklistCount = checklistRepository.projects.first().size
                 if (checklistCount < WIDGET_PROMO_MIN_CHECKLISTS) return@LaunchedEffect
                 // Never overlap the activation reminder soft-ask (which also drives the notif ask).
                 if (activationReminderChecklistId != null) return@LaunchedEffect

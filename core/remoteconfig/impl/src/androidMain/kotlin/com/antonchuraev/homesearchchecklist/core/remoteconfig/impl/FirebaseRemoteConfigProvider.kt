@@ -61,6 +61,7 @@ class FirebaseRemoteConfigProvider(
         RemoteConfigKeys.PAYWALL_CONFIG to RemoteConfigDefaults.PAYWALL_CONFIG,
         RemoteConfigKeys.ACTIVATION_BUNDLE_V1 to RemoteConfigDefaults.ACTIVATION_BUNDLE_V1,
         RemoteConfigKeys.PUSH_TIMING_ARM to RemoteConfigDefaults.PUSH_TIMING_ARM,
+        RemoteConfigKeys.NAV_V2_ARM to RemoteConfigDefaults.NAV_V2_ARM,
     )
 
     @Volatile

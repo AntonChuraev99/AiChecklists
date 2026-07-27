@@ -1,7 +1,9 @@
 package com.antonchuraev.homesearchchecklist.feature.debug.presentation
 
 import androidx.lifecycle.viewModelScope
+import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
+import com.antonchuraev.homesearchchecklist.core.datastore.api.NavExperimentPrefsRepository
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
@@ -17,11 +19,17 @@ import kotlinx.coroutines.launch
 class DebugViewModel(
     private val appNavigator: AppNavigator,
     private val userDataRepository: UserDataRepository,
-    private val checklistRepository: ChecklistRepository
+    private val checklistRepository: ChecklistRepository,
+    private val navExperimentPrefs: NavExperimentPrefsRepository,
+    private val logger: AppLogger
 ) : AppViewModel<DebugScreenState, DebugScreenIntent, Nothing>() {
 
     private val _screenState = MutableStateFlow(DebugScreenState())
     override val screenState: StateFlow<DebugScreenState> = _screenState.asStateFlow()
+
+    init {
+        loadNavArm()
+    }
 
     override fun onIntent(intent: DebugScreenIntent) {
         when (intent) {
@@ -46,7 +54,37 @@ class DebugViewModel(
                 _screenState.value.copy(showCancelReasonSheet = true)
             DebugScreenIntent.HideCancelReasonSheet -> _screenState.value =
                 _screenState.value.copy(showCancelReasonSheet = false)
+
+            is DebugScreenIntent.SetNavArm -> setNavArm(intent.arm)
         }
+    }
+
+    /** Shows what will apply on the NEXT launch — the current process has already latched its arm. */
+    private fun loadNavArm() {
+        viewModelScope.launch {
+            runCatching { navExperimentPrefs.getNavArm() }
+                .onSuccess { arm -> _screenState.value = _screenState.value.copy(navArm = arm) }
+                .onFailure { logger.error(TAG, "failed to read the persisted nav arm: ${it.message}", it) }
+        }
+    }
+
+    /**
+     * Forces the nav A/B arm, or clears the override when [arm] is null.
+     *
+     * Writes the value the resolver consults BEFORE Remote Config, which is the only way to reach the
+     * v2 shell while no console parameter exists. The empty string is the repository's absent
+     * sentinel, so it is how the override is removed.
+     */
+    private fun setNavArm(arm: String?) {
+        viewModelScope.launch {
+            runCatching { navExperimentPrefs.setNavArm(arm ?: "") }
+                .onSuccess { _screenState.value = _screenState.value.copy(navArm = arm) }
+                .onFailure { logger.error(TAG, "failed to write the nav arm '$arm': ${it.message}", it) }
+        }
+    }
+
+    private companion object {
+        private const val TAG = "DebugViewModel"
     }
 
     private fun resetOnboarding() {
@@ -57,6 +95,9 @@ class DebugViewModel(
 
     private fun clearData() {
         viewModelScope.launch {
+            // Deliberately the UNFILTERED flow: "clear data" must also delete the v2 arm's hidden
+            // system Inbox. Reading `projects` here would leave it (and every task captured in it)
+            // behind, so a wiped install would silently resurrect old content.
             val checklists = checklistRepository.checklists.first()
             checklists.forEach { checklist ->
                 checklistRepository.deleteChecklist(checklist)

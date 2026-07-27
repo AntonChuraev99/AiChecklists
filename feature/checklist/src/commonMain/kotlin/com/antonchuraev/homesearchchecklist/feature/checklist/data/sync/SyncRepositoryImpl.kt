@@ -466,7 +466,13 @@ class SyncRepositoryImpl(
             log("merge: SKIP '${remote.name}' (local has pending unsynced edits)")
         } else if (remote.updatedAt > local.updatedAt) {
             log("merge: UPDATE '${remote.name}' remote=${remote.updatedAt} > local=${local.updatedAt}")
-            val updated = remote.toDomain().toUpdateEntity(localId = local.id)
+            // isInbox is WRITE-ONCE locally, not last-write-wins: a document written by an older
+            // build or by the MCP worker carries no isInbox, decodes to false, and a plain overwrite
+            // would demote the system Inbox into an ordinary checklist that then appears in Projects.
+            val updated = remote.toDomain().toUpdateEntity(
+                localId = local.id,
+                isInbox = remote.isInbox || local.isInbox,
+            )
             checklistDao.update(updated)
             // Merge fills by cloudId: insert ones the cloud has but we don't, and
             // overwrite local fills with a newer remote version.
@@ -590,6 +596,7 @@ class SyncRepositoryImpl(
         foldersEnabled = foldersEnabled,
         updatedAt = updatedAt,
         isDeleted = isDeleted,
+        isInbox = isInbox,
         fills = fills,
     )
 
@@ -624,6 +631,7 @@ class SyncRepositoryImpl(
         cloudId = cloudId,
         updatedAt = updatedAt,
         isDeleted = isDeleted,
+        isInbox = isInbox,
     )
 
     private fun Checklist.toInsertEntity() = com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistEntity(
@@ -645,9 +653,20 @@ class SyncRepositoryImpl(
         updatedAt = updatedAt,
         syncStatus = SyncStatus.SYNCED.value,
         isDeleted = isDeleted,
+        isInbox = isInbox,
     )
 
-    private fun Checklist.toUpdateEntity(localId: Long) = com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistEntity(
+    /**
+     * @param isInbox the value to persist. Defaults to the remote's, but the LWW caller passes
+     *   `remote.isInbox || local.isInbox`: the flag is **write-once locally**. A device on an older
+     *   build (or the MCP worker) writes a document with no `isInbox`; it decodes to false, and a
+     *   plain overwrite here would silently demote the system Inbox to an ordinary checklist that
+     *   then pops up in the Projects list. Never let a remote `false` clear a local `true`.
+     */
+    private fun Checklist.toUpdateEntity(
+        localId: Long,
+        isInbox: Boolean = this.isInbox,
+    ) = com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistEntity(
         id = localId,
         name = name,
         items = items,
@@ -667,6 +686,7 @@ class SyncRepositoryImpl(
         updatedAt = updatedAt,
         syncStatus = SyncStatus.SYNCED.value,
         isDeleted = isDeleted,
+        isInbox = isInbox,
     )
 
     private fun FillSyncData.toInsertEntity(checklistId: Long) =
