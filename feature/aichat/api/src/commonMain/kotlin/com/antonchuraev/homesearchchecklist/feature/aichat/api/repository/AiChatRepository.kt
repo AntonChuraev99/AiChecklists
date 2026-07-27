@@ -145,4 +145,14 @@ sealed interface TranscriptionOutcome {
 
     /** Server returned a non-402 error (5xx, Gemini failure, audio too large). */
     data object ServiceError : TranscriptionOutcome
+
+    /**
+     * The user is not registered yet (blank `userId`), so the request never left the device.
+     *
+     * Split out from [ServiceError] on 2026-07-27: both were reported as `outcome=service_error`,
+     * which made the two indistinguishable in analytics — all 6 prod failures landed in that one
+     * bucket, so it was impossible to tell a real server fault from a device that simply had not
+     * finished registering. Same root cause as the `linkGoogleAccount` "User not registered" path.
+     */
+    data object NotRegistered : TranscriptionOutcome
 }

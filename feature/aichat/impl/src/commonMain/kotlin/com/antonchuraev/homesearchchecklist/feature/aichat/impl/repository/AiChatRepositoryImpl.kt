@@ -230,7 +230,10 @@ internal class AiChatRepositoryImpl(
         if (userId.isBlank()) {
             logger.warning(TAG, "transcribeAudio skipped: userId blank (user not registered yet)")
             AudioFileBytes.delete(audioPath)
-            return TranscriptionOutcome.ServiceError
+            // NOT ServiceError: the request never left the device, so reporting it as a server
+            // fault made the two indistinguishable in analytics (every prod failure showed up as
+            // outcome=service_error) and told the user the wrong story.
+            return TranscriptionOutcome.NotRegistered
         }
 
         val base64 = Base64.encode(bytes)

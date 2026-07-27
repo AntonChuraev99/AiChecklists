@@ -217,9 +217,30 @@ class UserDataRepositoryImpl(
         idToken: String,
         platform: String,
     ): Result<LinkGoogleAccountResult> {
-        val userId = appDatastore.observeString(USER_ID_KEY, "").first()
+        // A blank user_id here means device registration never landed — the observed prod cause is
+        // `FirebaseInstallations Service is unavailable` killing register_user, after which the user
+        // taps "Sign in with Google" seconds later (Crashlytics fa36c2ee). Google auth has ALREADY
+        // succeeded at this point, so failing outright strands the user with a Firebase session
+        // linked to nothing. Recover by registering once — ensureUserRegistered() is itself a single
+        // round-trip, so this is one retry, never a loop.
+        var userId = appDatastore.observeString(USER_ID_KEY, "").first()
         if (userId.isBlank()) {
-            return Result.failure(IllegalStateException("User not registered"))
+            logger.warning(TAG, "linkGoogleAccount: no user_id yet — registering before linking")
+            userId = ensureUserRegistered()
+                .onFailure { e ->
+                    logger.error(TAG, "linkGoogleAccount: recovery registration failed: ${e.message}", e)
+                }
+                .getOrNull()
+                ?.userData
+                ?.userId
+                .orEmpty()
+        }
+        if (userId.isBlank()) {
+            // Never a silent failure: this is the throwable the caller surfaces to the user, and the
+            // only place it is attributable to "registration missing" rather than a linking error.
+            val error = IllegalStateException("User not registered")
+            logger.error(TAG, "linkGoogleAccount: no user_id after registration retry — link aborted", error)
+            return Result.failure(error)
         }
 
         return userApiService.linkGoogleAccount(

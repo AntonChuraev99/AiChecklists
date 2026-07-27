@@ -13,9 +13,16 @@ import kotlin.concurrent.Volatile
  * The arm ("behavioral" | "fixed") comes from Remote Config ([RemoteConfigKeys.PUSH_TIMING_ARM]). It
  * is sticky per install — unlike the server copy-arm (an event-scoped param assigned per send), the
  * timing arm keeps the user in one bucket forever — so the first time it is resolved we mirror it into
- * the sticky user-property [AnalyticsParams.PUSH_AB_ARM] (guarded per process, exactly like
+ * the sticky user-property [AnalyticsParams.PUSH_TIMING_ARM] (guarded per process, exactly like
  * `AiModelExperimentTracker`), and every retention push event additionally carries
- * [AnalyticsParams.PUSH_AB_EXPERIMENT] = "timing".
+ * [AnalyticsParams.PUSH_AB_EXPERIMENT] = "timing" alongside [AnalyticsParams.PUSH_AB_ARM].
+ *
+ * ⚠️ The user-property and the event-property are deliberately DIFFERENT keys. On an event, the arm
+ * is disambiguated by its [AnalyticsParams.PUSH_AB_EXPERIMENT] companion; a user-property has no such
+ * companion, so writing the timing arm to `push_ab_arm` (as this class did until 2026-07-27) makes it
+ * indistinguishable from the server's push-COPY arm — which is what every reader assumes that name
+ * means. Result: `gp:push_ab_arm` = "behavioral" for 190/190 users, and the copy A/B silently
+ * compared its control arm against itself.
  *
  * Delivery hour:
  *  - behavioral -> the user's most-active hour ([RetentionPrefs.mostActiveHour]).
@@ -41,18 +48,18 @@ class PushTimingResolver(
     }
 
     /**
-     * Set the sticky [AnalyticsParams.PUSH_AB_ARM] user-property once per process (idempotent guard).
-     * Safe to call on every scheduling pass — only the first successful set actually writes.
+     * Set the sticky [AnalyticsParams.PUSH_TIMING_ARM] user-property once per process (idempotent
+     * guard). Safe to call on every scheduling pass — only the first successful set actually writes.
      */
     fun ensureStickyArm() {
         if (stickyArmSet) return
         stickyArmSet = true
         runCatching {
-            analytics.setUserProperties(mapOf(AnalyticsParams.PUSH_AB_ARM to arm()))
+            analytics.setUserProperties(mapOf(AnalyticsParams.PUSH_TIMING_ARM to arm()))
         }.onFailure { e ->
             // Allow a retry on the next pass if the set failed (e.g. tracker not ready yet).
             stickyArmSet = false
-            logger.warning(TAG, "ensureStickyArm: failed to set push_ab_arm — ${e.message}")
+            logger.warning(TAG, "ensureStickyArm: failed to set ${AnalyticsParams.PUSH_TIMING_ARM} — ${e.message}")
         }
     }
 

@@ -44,8 +44,9 @@ object RemoteConfigKeys {
     //   behavioral — the local retention auto-pushes (streak-save / overdue / weekly digest) are
     //                delivered at the user's most-active hour (a 24-slot on-device activity histogram).
     //   fixed      — delivered at a fixed default window (~19:00 local).
-    // Sticky per user (client reads it once, mirrors it into the sticky user-property push_ab_arm and
-    // tags every retention push event with push_ab_experiment="timing"). Live from release -> assigned
+    // Sticky per user (client reads it once, mirrors it into the sticky user-property push_timing_arm
+    // — NOT push_ab_arm, which is the server's per-send push-COPY arm — and tags every retention push
+    // event with push_ab_experiment="timing"). Live from release -> assigned
     // in the Firebase RC console via a percent split; NEVER hardcoded. Only affects OUR auto-pushes —
     // user-set reminders always fire at the time the user chose.
     const val PUSH_TIMING_ARM = "push_timing_arm"

@@ -1,10 +1,14 @@
 specVersion: v1alpha1
 endpoints:
+  # 512MB, not the 256MB default: every endpoint imports the same main.py module graph
+  # (firebase_admin + google-genai + flask), so import-time RSS alone sits near the 244 MiB
+  # ceiling — register_user was OOM-killed there on 2026-07-06. Keep in sync with deploy.sh.
   register_user:
     entryPoint: register_user
     httpsTrigger: {}
     region: us-central1
     platform: gcfv2
+    availableMemoryMb: 512
 
   analyze_and_fill_checklist:
     entryPoint: analyze_and_fill_checklist

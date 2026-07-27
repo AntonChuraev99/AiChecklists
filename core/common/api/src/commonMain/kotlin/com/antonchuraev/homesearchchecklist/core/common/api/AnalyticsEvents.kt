@@ -430,7 +430,18 @@ object AnalyticsEvents {
         const val DISMISSED = "csat_dismissed"
         const val RATING_SELECTED = "csat_rating_selected"
         const val REVIEW_TAPPED = "csat_review_tapped"
-        // Review flow returned (rated / dismissed / quota-exceeded — the store API never says which).
+        /**
+         * Review flow returned (rated / dismissed / quota-exceeded — the store API never says which).
+         *
+         * Carries [AnalyticsParams.SOURCE]:
+         *  - `review_launch`   — closes the launch its [REVIEW_TAPPED] started. **At most one per
+         *    tap — this is the arm to funnel on.**
+         *  - `repeat_callback` — the launcher called back again for a tap already completed (the
+         *    composable re-entered composition while the launch flag was still latched). Kept as an
+         *    event rather than dropped so the duplication stays measurable.
+         *
+         * Funnel on the unfiltered event and completed can EXCEED tapped (prod, 30d: 6 vs 4).
+         */
         const val REVIEW_COMPLETED = "csat_review_completed"
         const val FEEDBACK_OPENED = "feedback_opened"
         const val SUBMITTED = "csat_submitted"
@@ -702,14 +713,33 @@ object AnalyticsParams {
      * Push A/B experiment dimension. Two params so several experiments can run at once
      * without colliding: [PUSH_AB_EXPERIMENT] = which experiment ("copy" | "timing" |
      * "cadence"), [PUSH_AB_ARM] = the assigned variant ("control" | "a" | "b" | …).
-     * [PUSH_AB_ARM] doubles as a sticky user-property (same pattern as [AI_MODEL_VARIANT]).
      * Server assigns the arm for promo pushes via the Remote Config SERVER template
      * (the `assign_model_arm` mechanism); client reads it from the push payload and also
      * carries a client-side arm for timing experiments. Live from release -> managed in the
      * Firebase RC console (percent split), never hardcoded.
+     *
+     * ⚠️ EVENT-SCOPED ONLY. The pair is what makes it unambiguous — the arm alone is
+     * meaningless, since "control" (copy) and "behavioral" (timing) share this key. Never
+     * mirror it into a user-property: a user-property has no [PUSH_AB_EXPERIMENT] companion,
+     * so it silently reads as the server copy-arm for every consumer. That exact bug shipped
+     * (2026-07-27 healthcheck): the client wrote the TIMING arm here as a user-property, so
+     * `gp:push_ab_arm` was "behavioral" for 190/190 users and every push-copy A/B segmentation
+     * compared an arm against itself with nothing in the output to show it. The timing arm's
+     * user-property is [PUSH_TIMING_ARM].
      */
     const val PUSH_AB_EXPERIMENT = "push_ab_experiment"
     const val PUSH_AB_ARM = "push_ab_arm"
+
+    /**
+     * Sticky USER-property: the retention-push TIMING arm ("behavioral" | "fixed"), mirroring
+     * the value of Remote Config key `push_timing_arm` this install resolved (same name on
+     * purpose — same source, same value domain, so `gp:push_timing_arm` needs no glossary).
+     *
+     * A DIFFERENT experiment from the server-assigned push COPY arm, which arrives per-send as
+     * the event-property [PUSH_AB_ARM] ("control" | "a" | "b") from `push_promotions.py` and is
+     * never a user-property. Segmenting the copy A/B by a user-property is always wrong.
+     */
+    const val PUSH_TIMING_ARM = "push_timing_arm"
 }
 
 /**

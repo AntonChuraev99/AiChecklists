@@ -35,6 +35,7 @@ import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetSu
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.usecase.GetUserLimitsUseCase
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.UserData
 import com.antonchuraev.homesearchchecklist.feature.user.domain.model.RegistrationData
+import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.LinkGoogleAccountResult
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import kotlinx.coroutines.Dispatchers
@@ -83,11 +84,15 @@ private class FakeHintsRepository(
     }
 }
 
-private class FakeGoogleAuthRepository : GoogleAuthRepository {
+private class FakeGoogleAuthRepository(
+    /** Google credential step outcome. Default keeps the pre-existing "not wired" behaviour. */
+    private val signInResult: Result<GoogleUser> = Result.failure(NotImplementedError()),
+    private val idToken: String? = null,
+) : GoogleAuthRepository {
     override val authState: StateFlow<GoogleAuthState> = MutableStateFlow(GoogleAuthState.NotAuthenticated)
-    override suspend fun signInWithGoogle(): Result<GoogleUser> = Result.failure(NotImplementedError())
+    override suspend fun signInWithGoogle(): Result<GoogleUser> = signInResult
     override suspend fun signOut() {}
-    override suspend fun getIdToken(): String? = null
+    override suspend fun getIdToken(): String? = idToken
     override suspend fun restoreSession() {}
 }
 
@@ -214,7 +219,22 @@ private class FakePaywallRepository : PaywallRepository {
     override suspend fun logOut(): Result<SubscriptionStatus> = Result.success(SubscriptionStatus.FREE)
 }
 
-private class FakeUserDataRepository : UserDataRepository {
+private class FakeUserDataRepository(
+    /**
+     * Outcome of the account-linking write. Default mirrors the interface default
+     * (`Result.failure`) — the very case the ViewModel used to drop on the floor.
+     */
+    private val linkResult: Result<LinkGoogleAccountResult> =
+        Result.failure(IllegalStateException("User not registered")),
+) : UserDataRepository {
+    var linkCallCount = 0
+        private set
+
+    override suspend fun linkGoogleAccount(idToken: String, platform: String): Result<LinkGoogleAccountResult> {
+        linkCallCount++
+        return linkResult
+    }
+
     private val _userData = MutableStateFlow(UserData())
     override fun getUserDataFlow(): StateFlow<UserData> = _userData
     override suspend fun getUserData(): UserData = _userData.value
@@ -250,9 +270,11 @@ private fun makeViewModel(
     checklistRepository: FakeChecklistRepository = FakeChecklistRepository(checklists),
     syncRepository: SyncRepository = FakeSyncRepository(),
     logger: AppLogger = FakeAppLogger(),
+    googleAuthRepository: GoogleAuthRepository = FakeGoogleAuthRepository(),
+    userDataRepository: FakeUserDataRepository = FakeUserDataRepository(),
 ): MainScreenViewModel {
     val fakePaywallRepo = FakePaywallRepository()
-    val fakeUserDataRepo = FakeUserDataRepository()
+    val fakeUserDataRepo = userDataRepository
     val fakeRemoteConfig = FakeRemoteConfigProvider()
     return MainScreenViewModel(
         repository = checklistRepository,
@@ -267,7 +289,7 @@ private fun makeViewModel(
         ),
         analyticsTracker = FakeAnalyticsTracker(),
         hintsRepository = hintsRepository,
-        googleAuthRepository = FakeGoogleAuthRepository(),
+        googleAuthRepository = googleAuthRepository,
         syncRepository = syncRepository,
         logger = logger,
     )
@@ -337,6 +359,84 @@ class MainScreenViewModelTest {
         assertFalse(
             updatedState.showHamburgerHint,
             "After OnHamburgerHintCompleted, hint should be hidden in subsequent state"
+        )
+    }
+
+    // ─── Google sign-in feedback ─────────────────────────────────────────────
+
+    /**
+     * Crashlytics fa36c2ee: linkGoogleAccount RETURNS Result.failure ("User not registered") — it
+     * does not throw — so the old try/catch never saw it and the failed Result was dropped. The user
+     * got "Signed in successfully" on an account linked to nothing. Every user action needs a
+     * truthful response, so a failed link must surface the error snackbar instead.
+     */
+    @Test
+    fun signInClick_whenLinkGoogleAccountReturnsFailure_showsErrorNotSuccess() = runTest {
+        val userDataRepo = FakeUserDataRepository(
+            linkResult = Result.failure(IllegalStateException("User not registered")),
+        )
+        val vm = makeViewModel(
+            FakeHintsRepository(),
+            googleAuthRepository = FakeGoogleAuthRepository(
+                signInResult = Result.success(
+                    GoogleUser(firebaseUid = "uid-1", email = "u@gmail.com", displayName = "U"),
+                ),
+                idToken = "id-token",
+            ),
+            userDataRepository = userDataRepo,
+        )
+        vm.awaitSuccess()
+
+        val effects = mutableListOf<MainScreenSideEffect>()
+        backgroundScope.launch(Dispatchers.Main) { vm.sideEffect.collect { effects.add(it) } }
+
+        vm.sendIntent(MainScreenIntent.OnSignInClick)
+
+        assertEquals(1, userDataRepo.linkCallCount, "Linking must be attempted after a successful Google sign-in")
+        val snackbarKeys = effects.filterIsInstance<MainScreenSideEffect.ShowSnackbar>().map { it.messageKey }
+        assertTrue(
+            snackbarKeys.contains("sign_in_unavailable"),
+            "A failed account link must tell the user why — got $snackbarKeys",
+        )
+        assertFalse(
+            snackbarKeys.contains("google_sign_in_success"),
+            "A failed account link must NOT report success — got $snackbarKeys",
+        )
+    }
+
+    @Test
+    fun signInClick_whenLinkGoogleAccountSucceeds_reportsSuccess() = runTest {
+        val vm = makeViewModel(
+            FakeHintsRepository(),
+            googleAuthRepository = FakeGoogleAuthRepository(
+                signInResult = Result.success(
+                    GoogleUser(firebaseUid = "uid-1", email = "u@gmail.com", displayName = "U"),
+                ),
+                idToken = "id-token",
+            ),
+            userDataRepository = FakeUserDataRepository(
+                linkResult = Result.success(
+                    LinkGoogleAccountResult(
+                        googleEmail = "u@gmail.com",
+                        aiCredits = 100,
+                        isPremium = false,
+                        bonusCreditsGranted = 100,
+                        isExistingAccount = false,
+                    ),
+                ),
+            ),
+        )
+        vm.awaitSuccess()
+
+        val effects = mutableListOf<MainScreenSideEffect>()
+        backgroundScope.launch(Dispatchers.Main) { vm.sideEffect.collect { effects.add(it) } }
+
+        vm.sendIntent(MainScreenIntent.OnSignInClick)
+
+        val snackbarKeys = effects.filterIsInstance<MainScreenSideEffect.ShowSnackbar>().map { it.messageKey }
+        assertTrue(
+            snackbarKeys.contains("google_sign_in_success"),
+            "A successful link must still confirm success — got $snackbarKeys",
         )
     }
 
