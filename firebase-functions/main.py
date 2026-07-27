@@ -31,6 +31,13 @@ from firebase_admin import auth as firebase_auth, credentials, firestore, messag
 from flask import Request, jsonify, make_response
 from google import genai
 from google.genai import types
+# Firestore query filters MUST be built with FieldFilter, never positionally:
+# `query.where("f", "==", v)` is deprecated and makes the SDK emit a UserWarning
+# ("Detected filter using positional arguments") on EVERY call — hundreds of lines of
+# log noise per month across register_user / link_google_account / refill_premium_credits /
+# send_promotions_batch. `where(filter=FieldFilter(...))` is the semantically identical
+# supported form.
+from google.cloud.firestore_v1.base_query import FieldFilter
 import functions_framework
 from firebase_functions import firestore_fn  # 2nd gen Firestore trigger
 import requests as http_requests  # avoid conflict with flask Request
@@ -420,7 +427,9 @@ def get_authenticated_user_id(request: Request, data: dict) -> tuple[str | None,
 
     if decoded_token:
         firebase_uid = decoded_token["uid"]
-        users = db.collection("users").where("google_uid", "==", firebase_uid).limit(1).get()
+        users = (db.collection("users")
+                 .where(filter=FieldFilter("google_uid", "==", firebase_uid))
+                 .limit(1).get())
         for user_doc in users:
             return user_doc.id, None
         return None, ("No linked user found. Please sign in first.", 404)
@@ -941,7 +950,7 @@ def register_user(request: Request):
 
         # Check if user with this device_id already exists
         users_ref = db.collection("users")
-        existing_users = users_ref.where("device_id", "==", device_id).limit(1).get()
+        existing_users = users_ref.where(filter=FieldFilter("device_id", "==", device_id)).limit(1).get()
 
         for user_doc in existing_users:
             # User exists - return existing data
@@ -1033,7 +1042,9 @@ def link_google_account(request: Request):
 
     try:
         # Check if this Google account is already linked to another user
-        existing = db.collection("users").where("google_uid", "==", firebase_uid).limit(1).get()
+        existing = (db.collection("users")
+                    .where(filter=FieldFilter("google_uid", "==", firebase_uid))
+                    .limit(1).get())
         for doc in existing:
             if doc.id != user_id:
                 existing_data = doc.to_dict()
@@ -1560,7 +1571,7 @@ def refill_premium_credits(request: Request):
 
         # Query all premium users
         users_ref = db.collection("users")
-        premium_users = users_ref.where("is_premium", "==", True).get()
+        premium_users = users_ref.where(filter=FieldFilter("is_premium", "==", True)).get()
 
         users_updated = 0
         users_skipped = 0
@@ -1774,10 +1785,10 @@ def send_promotions_batch(request: Request):
         # client-side filter (is_eligible_for_promo) is cheaper than the index; revisit (add a
         # composite index) if the dormant base grows large. Two bounds on the SAME field
         # (lastActiveAt) are allowed.
-        base_query = db.collection("users").where("lastActiveAt", "<", upper)
+        base_query = db.collection("users").where(filter=FieldFilter("lastActiveAt", "<", upper))
         if max_days is not None:
             lower = now - timedelta(days=int(max_days))
-            base_query = base_query.where("lastActiveAt", ">", lower)
+            base_query = base_query.where(filter=FieldFilter("lastActiveAt", ">", lower))
         page_size = 500
         base_query = base_query.order_by("lastActiveAt").limit(page_size)
 
