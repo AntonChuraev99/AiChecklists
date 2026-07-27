@@ -67,6 +67,12 @@ class CsatViewModel(
         private const val SOURCE_AUTO = "auto"
         private const val SOURCE_MANUAL = "manual"
         private const val SOURCE_FEEDBACK = "feedback"
+
+        /** csat_review_completed closing the review launch its csat_review_tapped started (1:1). */
+        private const val SOURCE_REVIEW_LAUNCH = "review_launch"
+
+        /** csat_review_completed with no launch outstanding — a repeat callback for the same tap. */
+        private const val SOURCE_REPEAT_CALLBACK = "repeat_callback"
     }
 
     private val _screenState = MutableStateFlow(CsatState())
@@ -80,6 +86,21 @@ class CsatViewModel(
     private var entrySource: String = SOURCE_AUTO
     private var currentTriggerEvent: String? = null
     private var currentScore: Int? = null
+
+    // Is a review launch outstanding? Set with csat_review_tapped, cleared by the completion that
+    // closes it, so csat_review_completed can say WHICH tap it belongs to.
+    //
+    // Why this is needed: prod showed 6 csat_review_completed against 4 csat_review_tapped over 30
+    // days — impossible if a completion only ever follows a tap. `shouldLaunchReview` was the sole
+    // guard, and it is a poor one: this ViewModel is a Koin SINGLETON (see AppModule) while the
+    // InAppReviewLauncher that reads the flag is a transient composable, AND the intent bus is
+    // asynchronous (AppViewModel tryEmit -> collector), so the flag stays latched true for a window
+    // after onComplete already fired. Any composition re-entry in that window (Activity recreation:
+    // rotation, dark-mode/locale switch, multi-window resize, "don't keep activities" — all likely
+    // right as the user returns from the Play review card) re-runs LaunchedEffect(shouldLaunch=true)
+    // and emits a SECOND completion for one tap. The event is still emitted either way — dropping it
+    // would hide the duplication instead of measuring it — but it is now labelled.
+    private var reviewLaunchPending = false
 
     init {
         csatManager.startObserving(
@@ -155,6 +176,7 @@ class CsatViewModel(
         // docs/active/csat-loveit-direct-review-2026-06-13.md.
         if (rating == CsatRating.LoveIt) {
             analyticsTracker.event(AnalyticsEvents.Csat.REVIEW_TAPPED)
+            reviewLaunchPending = true
             viewModelScope.launch {
                 csatManager.recordOutcome(CsatManager.OUTCOME_SUBMITTED)
             }
@@ -247,9 +269,27 @@ class CsatViewModel(
         // Log flow completion so the review funnel isn't blind after csat_review_tapped — the
         // Play/StoreKit API never reports whether the user actually rated, so this is the only
         // signal that the launched review returned.
-        analyticsTracker.event(AnalyticsEvents.Csat.REVIEW_COMPLETED)
+        //
+        // AnalyticsParams.SOURCE separates the completion that closes a real launch from a repeat
+        // callback for the same tap (see [reviewLaunchPending]). The honest funnel is
+        // csat_review_completed WHERE source = "review_launch": that arm is at most one per
+        // csat_review_tapped, so completed can no longer exceed tapped.
+        val closesLaunch = reviewLaunchPending
+        reviewLaunchPending = false
+        analyticsTracker.event(
+            AnalyticsEvents.Csat.REVIEW_COMPLETED,
+            mapOf(
+                AnalyticsParams.SOURCE to if (closesLaunch) SOURCE_REVIEW_LAUNCH else SOURCE_REPEAT_CALLBACK,
+            ),
+        )
         _screenState.update {
-            it.copy(shouldLaunchReview = false, showBottomSheet = false, showFeedbackThanks = true)
+            it.copy(
+                shouldLaunchReview = false,
+                showBottomSheet = false,
+                // A repeat callback must not re-trigger the thanks snackbar the user already saw,
+                // and must never clear one another flow is waiting to show.
+                showFeedbackThanks = it.showFeedbackThanks || closesLaunch,
+            )
         }
         resetState()
     }

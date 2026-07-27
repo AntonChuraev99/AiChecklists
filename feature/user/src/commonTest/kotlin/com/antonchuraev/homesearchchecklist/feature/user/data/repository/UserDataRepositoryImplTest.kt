@@ -472,7 +472,7 @@ class UserDataRepositoryImplTest {
     }
 
     @Test
-    fun linkGoogleAccount_noUserId_returnsFailure() = runTest {
+    fun linkGoogleAccount_noUserId_andRecoveryRegistrationFails_returnsFailure() = runTest {
         val apiService = FakeUserApiService(linkResults = emptyList())
         val datastore = createStubDatastore() // no user_id
         val repo = createRepositoryWith(datastore, apiService, NoOpAnalyticsTracker())
@@ -480,12 +480,61 @@ class UserDataRepositoryImplTest {
 
         val result = repo.linkGoogleAccount(idToken = "id-token", platform = "android")
 
-        // Assert: returns failure with "User not registered"
+        // Assert: registration was attempted first (the blank user_id is recoverable — the prod
+        // cause is a failed register_user, not a permanently unregisterable device)
+        assertEquals(1, apiService.registerCallCount)
+
+        // Assert: registration also failed -> returns failure with "User not registered"
         assertTrue(result.isFailure)
         assertTrue(result.exceptionOrNull()?.message?.contains("User not registered") == true)
 
-        // Assert: API was never called
+        // Assert: linking API was never called with a blank userId
         assertEquals(0, apiService.linkCallCount)
+    }
+
+    @Test
+    fun linkGoogleAccount_noUserId_recoversByRegistering_thenLinks() = runTest {
+        // The prod path (Crashlytics fa36c2ee): register_user failed on launch (FirebaseInstallations
+        // unavailable), the user taps Sign in seconds later. Registration now succeeds on retry, so
+        // linking must go through instead of stranding a signed-in user on an unlinked account.
+        val apiService = FakeUserApiService(
+            linkResults = listOf(
+                Result.success(
+                    LinkGoogleAccountApiResult(
+                        userId = "recovered-user-1",
+                        googleEmail = "recovered@gmail.com",
+                        isExistingAccount = false,
+                        aiCredits = 100,
+                        isPremium = false,
+                        bonusCreditsGranted = 100,
+                    )
+                )
+            ),
+            registerResults = listOf(
+                Result.success(
+                    RegisterUserResult(
+                        userId = "recovered-user-1",
+                        isNewUser = true,
+                        isPremium = false,
+                        aiCredits = 10,
+                        createdAt = "2026-07-27T00:00:00Z",
+                    )
+                )
+            ),
+        )
+        val datastore = createStubDatastore() // no user_id
+        val repo = createRepositoryWith(datastore, apiService, NoOpAnalyticsTracker())
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val result = repo.linkGoogleAccount(idToken = "id-token", platform = "android")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Assert: registered exactly once (one retry, never a loop) and then linked
+        assertEquals(1, apiService.registerCallCount)
+        assertEquals(1, apiService.linkCallCount)
+        assertEquals("recovered-user-1", apiService.lastLinkUserId)
+        assertTrue(result.isSuccess)
+        assertEquals("recovered@gmail.com", result.getOrThrow().googleEmail)
     }
 
     @Test
@@ -710,6 +759,7 @@ class UserDataRepositoryImplTest {
     private class FakeUserApiService(
         private val restoreResults: List<Result<RestoreCreditsResult>> = emptyList(),
         private val linkResults: List<Result<LinkGoogleAccountApiResult>> = emptyList(),
+        private val registerResults: List<Result<RegisterUserResult>> = emptyList(),
     ) : UserApiService {
         var restoreCallCount = 0
             private set
@@ -721,10 +771,19 @@ class UserDataRepositoryImplTest {
         var lastLinkUserId: String? = null
             private set
 
+        var registerCallCount = 0
+            private set
+
         override suspend fun registerUser(
             deviceId: String, appVersion: String?, platform: String?
-        ): Result<RegisterUserResult> =
-            Result.failure(Exception("Not implemented in test"))
+        ): Result<RegisterUserResult> {
+            val index = registerCallCount++
+            return if (index < registerResults.size) {
+                registerResults[index]
+            } else {
+                Result.failure(Exception("Not implemented in test"))
+            }
+        }
 
         override suspend fun restoreCreditsAfterPurchase(userId: String): Result<RestoreCreditsResult> {
             lastRestoreUserId = userId

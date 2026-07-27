@@ -2180,10 +2180,15 @@ class ChatViewModel(
                 }
                 TranscriptionOutcome.FileMissing,
                 TranscriptionOutcome.NetworkError,
+                TranscriptionOutcome.NotRegistered,
                 TranscriptionOutcome.ServiceError -> {
                     val reason = when (outcome) {
                         TranscriptionOutcome.FileMissing -> "file_missing"
                         TranscriptionOutcome.NetworkError -> "network_error"
+                        // Distinct from service_error on purpose: the request never left the
+                        // device. Both used to report service_error, so all 6 prod failures
+                        // collapsed into one bucket and the real cause was unknowable.
+                        TranscriptionOutcome.NotRegistered -> "not_registered"
                         TranscriptionOutcome.ServiceError -> "service_error"
                         else -> "unknown"
                     }

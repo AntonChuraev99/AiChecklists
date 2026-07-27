@@ -23,6 +23,8 @@ import com.antonchuraev.homesearchchecklist.core.datastore.api.AppDatastore
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppThemeMode
 import com.antonchuraev.homesearchchecklist.core.datastore.api.LanguageRepository
 import com.antonchuraev.homesearchchecklist.core.datastore.api.ThemeRepository
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import com.antonchuraev.homesearchchecklist.desingsystem.emoji.LocalEmojiFont
@@ -126,6 +128,7 @@ import aichecklists.core.designsystem.generated.resources.chat_recording_cancell
 import aichecklists.core.designsystem.generated.resources.chat_requires_premium
 import aichecklists.core.designsystem.generated.resources.chat_thumb_up_thanks
 import aichecklists.core.designsystem.generated.resources.chat_transcribe_empty
+import aichecklists.core.designsystem.generated.resources.sign_in_unavailable
 import aichecklists.core.designsystem.generated.resources.chat_transcribe_error
 import aichecklists.core.designsystem.generated.resources.chat_transcribing
 import aichecklists.core.designsystem.generated.resources.chat_unknown_intent_hint
@@ -378,6 +381,12 @@ fun App() {
 
         val scope = rememberCoroutineScope()
 
+        // Sign-in failures used to be logged and nothing else: the user tapped "Sign in", Firebase
+        // signed them in, linkGoogleAccount failed, and the drawer just kept saying "Sign in" with
+        // no explanation (Crashlytics fa36c2ee). snackbarHostState is declared further down the
+        // tree, so the failure is relayed through this flow instead of restructuring the layout.
+        val signInFailed = remember { MutableSharedFlow<Unit>(extraBufferCapacity = 1) }
+
         val handleSignIn: () -> Unit = {
             scope.launch {
                 authDiagLogger.debug("AuthDiag", "handleSignIn: click -> calling signInWithGoogle()")
@@ -394,6 +403,7 @@ fun App() {
                                 "AuthDiag",
                                 "handleSignIn: getIdToken() returned NULL -> linkGoogleAccount SKIPPED, drawer will NOT update",
                             )
+                            signInFailed.tryEmit(Unit)
                             return@launch
                         }
                         userDataRepository.linkGoogleAccount(
@@ -414,10 +424,12 @@ fun App() {
                                         ") -> Firebase signed in but drawer stays 'Sign in'",
                                     it,
                                 )
+                                signInFailed.tryEmit(Unit)
                             }
                     }
                     .onFailure { e ->
                         authDiagLogger.error("AuthDiag", "handleSignIn: signInWithGoogle FAILED (" + e.message + ")", e)
+                        signInFailed.tryEmit(Unit)
                     }
             }
         }
@@ -476,6 +488,14 @@ fun App() {
                 }
             }
 
+            // Google sign-in from the drawer: every failure branch above emits here, so a tap can
+            // no longer end in silence. Without this the account silently stayed unlinked and the
+            // drawer kept offering "Sign in" — indistinguishable, to the user, from a dead button.
+            val signInUnavailableMessage = stringResource(Res.string.sign_in_unavailable)
+            LaunchedEffect(Unit) {
+                signInFailed.collect { snackbarHostState.showSnackbar(signInUnavailableMessage) }
+            }
+
             // ── Gallery deep-link (app.gisti-ai.com/?g=create&template={slug}) ─────────
             // Platform entry points (wasmJs main.kt / Android MainActivity) parse the link and
             // push it into PendingGalleryDeepLink; we observe it here, create the checklist
@@ -499,38 +519,58 @@ fun App() {
                     val linkParams: Map<String, Any> =
                         mapOf(AnalyticsParams.TEMPLATE_SLUG to link.slug) + link.utm
                     analyticsTracker.event(AnalyticsEvents.Gallery.DEEPLINK_OPENED, linkParams)
-                    when (val result = createFromGalleryUseCase(link.slug)) {
-                        is CreateChecklistFromGalleryTemplateUseCase.Result.Created -> {
-                            analyticsTracker.event(
-                                AnalyticsEvents.Checklist.CREATED,
-                                linkParams + mapOf(
-                                    AnalyticsParams.SOURCE to ChecklistSource.GALLERY.wire,
-                                    AnalyticsParams.CHECKLIST_ID to result.checklistId,
-                                ),
-                            )
-                            navigator.navigateToChecklistDetail(result.checklistId, clearBackStack = true)
+                    // Every path out of here MUST either create or fail — the funnel contract is
+                    // opened = created + failed, and a silent third outcome is invisible in prod
+                    // (it reads as "traffic that evaporated"). try/finally guarantees the pending
+                    // link is consumed even on an unexpected throw, so the collector cannot get
+                    // stuck re-processing the same link; the catch guarantees the user still gets
+                    // feedback instead of a dead screen.
+                    try {
+                        when (val result = createFromGalleryUseCase(link.slug)) {
+                            is CreateChecklistFromGalleryTemplateUseCase.Result.Created -> {
+                                analyticsTracker.event(
+                                    AnalyticsEvents.Checklist.CREATED,
+                                    linkParams + mapOf(
+                                        AnalyticsParams.SOURCE to ChecklistSource.GALLERY.wire,
+                                        AnalyticsParams.CHECKLIST_ID to result.checklistId,
+                                    ),
+                                )
+                                navigator.navigateToChecklistDetail(result.checklistId, clearBackStack = true)
+                            }
+                            // A stale slug means the live gallery page and Firestore have drifted apart —
+                            // a content bug that is otherwise invisible (the user just sees a snackbar).
+                            CreateChecklistFromGalleryTemplateUseCase.Result.NotFound -> {
+                                analyticsTracker.event(
+                                    AnalyticsEvents.Gallery.DEEPLINK_FAILED,
+                                    linkParams + mapOf(AnalyticsParams.REASON to "not_found"),
+                                )
+                                snackbarHostState.showSnackbar(galleryNotFoundMessage)
+                            }
+                            is CreateChecklistFromGalleryTemplateUseCase.Result.Error -> {
+                                analyticsTracker.event(
+                                    AnalyticsEvents.Gallery.DEEPLINK_FAILED,
+                                    linkParams + mapOf(
+                                        AnalyticsParams.REASON to "error",
+                                        AnalyticsParams.ERROR_MESSAGE to (result.cause.message ?: "unknown"),
+                                    ),
+                                )
+                                snackbarHostState.showSnackbar(galleryErrorMessage)
+                            }
                         }
-                        // A stale slug means the live gallery page and Firestore have drifted apart —
-                        // a content bug that is otherwise invisible (the user just sees a snackbar).
-                        CreateChecklistFromGalleryTemplateUseCase.Result.NotFound -> {
-                            analyticsTracker.event(
-                                AnalyticsEvents.Gallery.DEEPLINK_FAILED,
-                                linkParams + mapOf(AnalyticsParams.REASON to "not_found"),
-                            )
-                            snackbarHostState.showSnackbar(galleryNotFoundMessage)
-                        }
-                        is CreateChecklistFromGalleryTemplateUseCase.Result.Error -> {
-                            analyticsTracker.event(
-                                AnalyticsEvents.Gallery.DEEPLINK_FAILED,
-                                linkParams + mapOf(
-                                    AnalyticsParams.REASON to "error",
-                                    AnalyticsParams.ERROR_MESSAGE to (result.cause.message ?: "unknown"),
-                                ),
-                            )
-                            snackbarHostState.showSnackbar(galleryErrorMessage)
-                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        analyticsTracker.event(
+                            AnalyticsEvents.Gallery.DEEPLINK_FAILED,
+                            linkParams + mapOf(
+                                AnalyticsParams.REASON to "error",
+                                AnalyticsParams.ERROR_MESSAGE to (e.message ?: "unknown"),
+                            ),
+                        )
+                        snackbarHostState.showSnackbar(galleryErrorMessage)
+                    } finally {
+                        pendingGalleryDeepLink.consume()
                     }
-                    pendingGalleryDeepLink.consume()
                 }
             }
 

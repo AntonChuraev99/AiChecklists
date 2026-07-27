@@ -15,6 +15,7 @@ import kotlin.random.Random
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -162,6 +163,62 @@ class CsatViewModelTest {
         assertNull(state.selectedRating, "Rating must reset after review completes")
     }
 
+    // --- Review completion is attributable to the tap that started it ---
+
+    @Test
+    fun reviewComplete_afterLoveIt_isStampedAsReviewLaunch() = runTest {
+        val vm = createViewModel()
+
+        vm.onIntent(CsatIntent.ForceShow)
+        vm.onIntent(CsatIntent.SelectRating(CsatRating.LoveIt))
+        vm.onIntent(CsatIntent.ReviewComplete)
+        advanceUntilIdle()
+
+        assertEquals(
+            1,
+            fakeAnalyticsTracker.countEvents("csat_review_completed"),
+            "One tap must produce exactly one completion",
+        )
+        assertEquals(
+            "review_launch",
+            fakeAnalyticsTracker.paramOf("csat_review_completed", "source"),
+            "The completion that closes a real launch must be attributable to its tap",
+        )
+    }
+
+    /**
+     * Prod showed 6 csat_review_completed against 4 csat_review_tapped over 30 days. The launcher
+     * composable can call back twice for ONE tap (Activity recreation re-runs its
+     * LaunchedEffect while the review flag is still latched — the flag is cleared asynchronously
+     * through the intent bus). The repeat must NOT be counted as another completed review.
+     */
+    @Test
+    fun reviewComplete_repeatCallbackForSameTap_isNotCountedAsAnotherReview() = runTest {
+        val vm = createViewModel()
+
+        vm.onIntent(CsatIntent.ForceShow)
+        vm.onIntent(CsatIntent.SelectRating(CsatRating.LoveIt))
+        vm.onIntent(CsatIntent.ReviewComplete)
+        vm.onIntent(CsatIntent.ReviewComplete) // launcher re-entered composition
+        advanceUntilIdle()
+
+        assertEquals(
+            1,
+            fakeAnalyticsTracker.countEvents("csat_review_tapped"),
+            "Sanity: still a single tap",
+        )
+        assertEquals(
+            1,
+            fakeAnalyticsTracker.countEventsWithParam("csat_review_completed", "source", "review_launch"),
+            "Only ONE completion may be attributed to the tap — the funnel arm must not exceed tapped",
+        )
+        assertEquals(
+            1,
+            fakeAnalyticsTracker.countEventsWithParam("csat_review_completed", "source", "repeat_callback"),
+            "The repeat is labelled, not dropped — the duplication must stay measurable",
+        )
+    }
+
     // --- FeedbackThanksShown clears the snackbar trigger ---
 
     @Test
@@ -210,5 +267,10 @@ class CsatViewModelTest {
         }
 
         fun hasEvent(name: String): Boolean = events.any { it.first == name }
+        fun countEvents(name: String): Int = events.count { it.first == name }
+        fun paramOf(name: String, param: String): Any? =
+            events.firstOrNull { it.first == name }?.second?.get(param)
+        fun countEventsWithParam(name: String, param: String, value: Any): Int =
+            events.count { it.first == name && it.second[param] == value }
     }
 }
