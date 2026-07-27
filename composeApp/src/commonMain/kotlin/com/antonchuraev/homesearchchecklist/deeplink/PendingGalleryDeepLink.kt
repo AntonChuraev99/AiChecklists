@@ -49,8 +49,18 @@ class PendingGalleryDeepLink {
         _pending.value = link
     }
 
-    /** Called by App.kt after handling a link so it is not processed twice. */
-    fun consume() {
-        _pending.value = null
+    /**
+     * Called by App.kt after handling [handled] so it is not processed twice.
+     *
+     * Compare-and-set, not a blind `value = null`: a warm `onNewIntent` can submit a NEWER link
+     * while the previous one is still being created, and an unconditional clear would swallow it
+     * silently.
+     *
+     * ⚠️ This alone does not make the call safe from a `finally` — on cancellation the stored link
+     * still equals [handled], so the CAS would succeed and drop it. The caller additionally skips
+     * the call when its coroutine was cancelled; see the `isActive` guard in `App.kt`.
+     */
+    fun consume(handled: GalleryDeepLink) {
+        _pending.compareAndSet(expect = handled, update = null)
     }
 }
