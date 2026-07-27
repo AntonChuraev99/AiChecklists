@@ -208,12 +208,20 @@ private fun InboxContent(
         onIntent(InboxIntent.OnPageSelected(pagerState.currentPage))
     }
 
-    // The other half of the anchor: when the list itself changes, follow the anchored checklist to
+    // The other half of the anchor: when the SET of pages changes, follow the anchored checklist to
     // its new slot. scrollToPage settles immediately, so the effect above then reports the new index
     // and re-records the same anchor — no feedback loop, because the anchor id does not change.
-    LaunchedEffect(pages) {
+    //
+    // Keyed on the id LIST, not on `pages`: an InboxPage carries its tasks, so keying on the whole
+    // list re-ran this on every checked box and every background sync — i.e. constantly, for changes
+    // that cannot move a page. The isScrollInProgress guard covers the rest: mid-swipe `currentPage`
+    // may already report the neighbour, and calling scrollToPage then yanks the pager out from under
+    // the user's finger.
+    val pageIds = remember(pages) { pages.map { it.checklistId } }
+    LaunchedEffect(pageIds) {
         val anchor = anchorChecklistId ?: return@LaunchedEffect
-        val index = pages.indexOfFirst { it.checklistId == anchor }
+        if (pagerState.isScrollInProgress) return@LaunchedEffect
+        val index = pageIds.indexOfFirst { it == anchor }
         if (index < 0) {
             // Anchored checklist gone (deleted here or on another device): re-anchor on whatever
             // occupies the slot now instead of chasing a dead id on every future change.

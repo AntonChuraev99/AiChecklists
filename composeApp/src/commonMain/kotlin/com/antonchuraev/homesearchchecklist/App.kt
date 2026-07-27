@@ -56,6 +56,7 @@ import com.antonchuraev.homesearchchecklist.navigation.V2NavigationShell
 import com.antonchuraev.homesearchchecklist.navigation.V2ShellMetrics
 import com.antonchuraev.homesearchchecklist.gestures.ApplyEdgeSwipeExclusion
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -609,9 +610,15 @@ fun App() {
             // DataStore + Remote Config round-trip that an unassigned arm would otherwise repeat on
             // every single top-route change, for the life of the install, in the CONTROL arm.
             var armLatched by remember { mutableStateOf(false) }
+            // True once ensureResolved() has returned at least once in this process — NOT the same as
+            // "an arm was assigned". It gates the shell mount below so no shell is built on the
+            // pre-resolution CONTROL seed and then swapped. Seeded from the resolver's own cache, so a
+            // launch that already resolved during Splash renders its shell on the very first frame.
+            var armResolved by remember { mutableStateOf(navResolver.isArmAssigned()) }
             LaunchedEffect(currentTopRoute) {
                 if (!armLatched) {
                     navVariant = navResolver.ensureResolved()
+                    armResolved = true
                 }
             }
 
@@ -1151,17 +1158,14 @@ fun App() {
             // BASELINE arm, which must stay untouched. Conditional @Composable calls are perfectly
             // legal: the runtime inserts and removes the group. The arm is latched at the first
             // mounted shell, so the branch cannot oscillate either.
-            // Two values, because the reservation depends on whether the screen's content box stops
-            // above the v2 bar or runs behind it — see V2ShellMetrics. A single conservative constant
-            // left an ~88dp blank band on the AppScaffold-hosted tabs.
+            // ONE value for every Compact v2 tab: the FAB band. The shell renders its bar outside the
+            // content slot AND consumes WindowInsets.navigationBars while the bar is visible, so a
+            // hosted screen never has to reserve either the bar or the system strip. An earlier
+            // second constant that also reserved the bar height left a blank ~88dp band on Projects.
             val v2IsCompact =
                 navVariant == NavVariant.V2 &&
                     rememberAppWindowSizeClass() == AppWindowSizeClass.Compact
-            // Inbox / Calendar / Overview: only the floating chat FAB overlaps them.
             val v2FabBandPadding = if (v2IsCompact) V2ShellMetrics.FabBandPadding else 0.dp
-            // MainScreen / ChecklistDetailScreen: contentExtendsBehindNavBar = true, so they must
-            // clear the bar as well as the FAB.
-            val v2BarAndFabPadding = if (v2IsCompact) V2ShellMetrics.BarAndFabBandPadding else 0.dp
 
             // Re-root the stack at Inbox once per process, the first time a tab route appears.
             // The control arm never executes this (guarded on navVariant).
@@ -1725,7 +1729,7 @@ fun App() {
                                 onActivationChipTapped = onActivationChipTapped,
                                 // v2 only (0.dp in control): MainScreen runs contentExtendsBehindNavBar,
                                 // so without this the last card slides under the bottom bar and the FAB.
-                                extraBottomPadding = v2BarAndFabPadding,
+                                extraBottomPadding = v2FabBandPadding,
                                 // MainScreen unconditionally SWALLOWS Android BACK whenever the drawer
                                 // is closed and the dock collapsed — which in v2 is always true. Left
                                 // on, "BACK returns to Inbox" would silently do nothing on the Projects
@@ -2009,6 +2013,26 @@ fun App() {
             // copy of the pre-experiment `if (showShell) { … }` body — no reordering, no added
             // parameters — so `git diff` shows the control arm's chrome is byte-identical.
             when {
+                // Hold a bare background for the frame(s) before the arm is known, rather than
+                // mounting a shell we may have to swap.
+                //
+                // The three branches below are three DIFFERENT call sites, so moving between them
+                // disposes and rebuilds the whole renderNav / NavDisplay subtree — a fresh
+                // SaveableStateHolder, i.e. the user loses scroll position and in-progress edits. The
+                // latch alone does not prevent that: navVariant seeds from the non-suspending
+                // currentArm() (CONTROL until resolution lands) and only freezes once a shell has
+                // mounted, so on a path that skips Splash's await — a deep link straight into a tab, a
+                // process restart into a saved back stack — frame 1 would mount the control shell and
+                // the resolver would then flip it. SplashViewModel resolves before navigating, so the
+                // ordinary launch never reaches this branch at all.
+                !armResolved && (showShell || showV2Shell) -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.background)
+                    )
+                }
+
                 showV2Shell -> V2NavigationShell(
                     selectedTab = v2SelectedTab,
                     onNavigate = v2OnNavigate,

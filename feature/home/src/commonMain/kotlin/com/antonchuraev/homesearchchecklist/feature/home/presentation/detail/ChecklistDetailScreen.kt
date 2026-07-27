@@ -707,6 +707,35 @@ private fun ChecklistDetailContent(
 
     var isEditMode by rememberSaveable { mutableStateOf(false) }
     val listState = rememberLazyListState()
+
+    /**
+     * LazyColumn index of the v2 inline add row, which sits directly AFTER the active rows:
+     * `[header(s)][active rows][inline_add_item][completed_header][completed rows]`.
+     *
+     * Exists because the row must be scrolled into view before it can take focus — it lives inside the
+     * LazyColumn, so its FocusRequester only attaches while it is composed. Same arithmetic the
+     * added-item scroll below uses; kept as one lambda so the two cannot drift apart.
+     */
+    val inlineAddRowIndex: () -> Int = {
+        val checkedIds = if (state.separateCompleted) {
+            state.defaultFill?.items?.filter { it.checked }?.map { it.id }?.toSet().orEmpty()
+        } else {
+            emptySet()
+        }
+        val activeNodeCount = if (state.foldersEnabled) {
+            state.levelNodes.count { node ->
+                node !is LevelNode.Leaf || node.fillItemId !in checkedIds
+            }
+        } else {
+            val visibleIds = state.visibleFillItemIds
+            val visible = state.defaultFill?.items?.let { items ->
+                if (visibleIds == null) items else items.filter { it.id in visibleIds }
+            }.orEmpty()
+            visible.count { it.id !in checkedIds }
+        }
+        val headerCount = 1 + (if (state.additionalFillsCount > 0) 1 else 0)
+        headerCount + activeNodeCount
+    }
     // Pinned (not exitUntilCollapsed): the toolbar action icons (share / add / reminder /
     // overflow-settings) must stay reachable while the list scrolls. exitUntilCollapsed on the
     // single-row CenterAlignedTopAppBar (Compact) treats the whole bar height as collapsible and
@@ -936,11 +965,20 @@ private fun ChecklistDetailContent(
                                 // inline row into view and putting the caret in it. Scroll FIRST so
                                 // the row is composed (and its FocusRequester attached) by the time
                                 // the row's own effect reacts to the bumped signal.
+                                //
+                                // Targets the inline row's OWN index, not totalItemsCount - 1. The
+                                // list is [header(s)][active rows][inline_add_item][completed_header]
+                                // [completed rows], so with separateCompleted on and a screenful of
+                                // completed items the last index scrolls PAST the inline row — it
+                                // leaves the composition, its LaunchedEffect never runs, and the tap
+                                // becomes a silent no-op (only a warning in the log).
                                 inlineAddFocusSignal++
                                 dockScope.launch {
-                                    val last = (listState.layoutInfo.totalItemsCount - 1)
-                                        .coerceAtLeast(0)
-                                    listState.animateScrollToItem(last)
+                                    val total = listState.layoutInfo.totalItemsCount
+                                    if (total > 0) {
+                                        val target = inlineAddRowIndex().coerceIn(0, total - 1)
+                                        listState.animateScrollToItem(target)
+                                    }
                                 }
                             } else {
                                 dockScope.launch {

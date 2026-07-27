@@ -1560,8 +1560,6 @@
     <string name="inbox_open_project_action">प्रोजेक्ट खोलें</string>
     <string name="inbox_task_sheet_move">प्रोजेक्ट में ले जाएं</string>
     <!-- Same wording as item_priority_mark / item_priority_unmark, on purpose -->
-    <string name="inbox_task_sheet_important">महत्वपूर्ण चिह्नित करें</string>
-    <string name="inbox_task_sheet_important_remove">महत्व हटाएं</string>
     <string name="inbox_task_sheet_delete">टास्क हटाएं</string>
     <string name="inbox_move_picker_title">यहां ले जाएं</string>
     <string name="inbox_move_picker_empty">आपके पास अभी कोई प्रोजेक्ट नहीं है</string>

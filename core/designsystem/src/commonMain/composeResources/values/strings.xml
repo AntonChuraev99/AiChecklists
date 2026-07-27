@@ -1571,8 +1571,6 @@
     <!-- Word-for-word duplicates of item_priority_mark / item_priority_unmark (already localized
          in every locale). Kept as separate keys only because InboxTaskSheet.kt references these
          names; the translations below are intentionally identical so the two sheets never drift. -->
-    <string name="inbox_task_sheet_important">Mark as important</string>
-    <string name="inbox_task_sheet_important_remove">Remove importance</string>
     <string name="inbox_task_sheet_delete">Delete task</string>
     <string name="inbox_move_picker_title">Move to</string>
     <string name="inbox_move_picker_empty">You don't have any projects yet</string>

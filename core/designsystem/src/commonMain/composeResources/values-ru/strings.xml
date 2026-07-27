@@ -1359,8 +1359,6 @@
     <string name="inbox_open_project_action">Открыть проект</string>
     <string name="inbox_task_sheet_move">Перенести в проект</string>
     <!-- Та же формулировка, что у item_priority_mark / item_priority_unmark — намеренно -->
-    <string name="inbox_task_sheet_important">Отметить как важную</string>
-    <string name="inbox_task_sheet_important_remove">Снять пометку важного</string>
     <string name="inbox_task_sheet_delete">Удалить задачу</string>
     <string name="inbox_move_picker_title">Перенести в</string>
     <string name="inbox_move_picker_empty">Проектов пока нет</string>

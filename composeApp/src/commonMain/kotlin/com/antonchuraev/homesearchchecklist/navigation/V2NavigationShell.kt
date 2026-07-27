@@ -3,9 +3,12 @@ package com.antonchuraev.homesearchchecklist.navigation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -90,29 +93,21 @@ object V2Destination {
  */
 object V2ShellMetrics {
     /**
-     * Bottom inset for a Compact v2 tab screen whose content box ALREADY ends above the bar — i.e.
-     * anything hosted in an `AppScaffold` with the default `contentExtendsBehindNavBar = false`
-     * (Inbox, Calendar, Overview). Only the floating chat FAB overlaps such a screen: FAB 56 + gap 8.
+     * The ONLY bottom reserve a Compact v2 tab screen needs: the floating chat FAB, which is the only
+     * chrome that actually overlaps the content (FAB 56 + gap 8).
      *
-     * The bar itself needs no reservation here because [V2NavigationShell] renders it OUTSIDE the
-     * content slot (`Column { Box(weight(1f)) { content() }; AppNavigationBar() }`). Reserving a full
-     * bar height on top of that produced a permanently blank ~88dp band — visibly, the Inbox
-     * quick-add row floated far above the bar with the FAB alone in the gap.
+     * The bar needs no reservation because [V2NavigationShell] renders it OUTSIDE the content slot
+     * (`Column { Box(weight(1f)) { content() }; AppNavigationBar() }`) — the content box already ends
+     * at the bar's top edge — and because that same box now CONSUMES `WindowInsets.navigationBars`
+     * while the bar is visible, so a hosted screen cannot reserve the system strip twice either.
+     *
+     * There used to be a second, larger constant (bar + gap + FAB + gap = 152dp) for the screens that
+     * pass `contentExtendsBehindNavBar = true`. It was wrong on both counts: that flag only disables
+     * AppScaffold's inset, it does not make the content box grow past the bar — so the extra bar
+     * height became a permanently blank ~88dp band under the last card, on top of the screen's own
+     * `navBottom`. One value, applied to every Compact tab, is the whole rule now.
      */
     val FabBandPadding: Dp = 64.dp
-
-    /**
-     * Bottom inset for a Compact v2 tab screen that deliberately extends edge-to-edge BEHIND the
-     * system navigation bar (`contentExtendsBehindNavBar = true` — MainScreen, ChecklistDetailScreen).
-     * Such a screen's content box runs past the v2 bar, so it must clear the bar as well as the FAB:
-     * NavigationBar 80 + gap 8 + FAB 56 + gap 8.
-     *
-     * Those screens also run their own `navigationBarsPadding()` arithmetic internally, which the
-     * CONTROL arm executes too — so this value is added on top rather than reconciled inside the
-     * screen, keeping the baseline's inset code untouched. Zero on Medium/Expanded, which have no
-     * bottom bar at all.
-     */
-    val BarAndFabBandPadding: Dp = 152.dp
 }
 
 /**
@@ -246,7 +241,21 @@ private fun V2ShellCompactBar(
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    // While the bar is on screen it OWNS the navigation-bar inset: it renders below
+                    // this box and applies the inset itself. Consuming it here stops the hosted screen
+                    // from reserving the same strip a second time — AppScaffold, its bottomBar slot and
+                    // MainScreen's own navBottom arithmetic all read WindowInsets.navigationBars, so
+                    // without this the reserve stacked and left a dead band (bar height + inset) under
+                    // the last row. Not consumed when the bar is hidden: then nothing covers the
+                    // system nav and the screen must inset itself as usual.
+                    .then(
+                        if (barVisible) {
+                            Modifier.consumeWindowInsets(WindowInsets.navigationBars)
+                        } else {
+                            Modifier
+                        }
+                    ),
             ) {
                 content(null)
             }

@@ -5,8 +5,8 @@ import aichecklists.core.designsystem.generated.resources.inbox_move_picker_empt
 import aichecklists.core.designsystem.generated.resources.inbox_move_picker_title
 import aichecklists.core.designsystem.generated.resources.inbox_open_project_action
 import aichecklists.core.designsystem.generated.resources.inbox_task_sheet_delete
-import aichecklists.core.designsystem.generated.resources.inbox_task_sheet_important
-import aichecklists.core.designsystem.generated.resources.inbox_task_sheet_important_remove
+import aichecklists.core.designsystem.generated.resources.item_priority_mark
+import aichecklists.core.designsystem.generated.resources.item_priority_unmark
 import aichecklists.core.designsystem.generated.resources.inbox_task_sheet_move
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -68,7 +68,9 @@ internal fun InboxTaskSheet(
     if (movePickerOpen) {
         AdaptiveSheetOrDialog(
             onDismiss = { onIntent(InboxIntent.OnMovePickerDismiss) },
-            title = { Text(stringResource(Res.string.inbox_move_picker_title)) },
+            // No `title` argument: the heading is rendered by the content below so it also appears on
+            // Compact (AdaptiveSheetOrDialog forwards `title` only to the AlertDialog branch). Passing
+            // both showed it TWICE on Medium/Expanded.
         ) {
             Column(
                 modifier = Modifier
@@ -157,9 +159,9 @@ internal fun InboxTaskSheet(
                     MaterialTheme.colorScheme.onSurfaceVariant
                 },
                 title = if (task.priority > 0) {
-                    stringResource(Res.string.inbox_task_sheet_important_remove)
+                    stringResource(Res.string.item_priority_unmark)
                 } else {
-                    stringResource(Res.string.inbox_task_sheet_important)
+                    stringResource(Res.string.item_priority_mark)
                 },
                 onClick = { onIntent(InboxIntent.OnToggleImportant) },
             )

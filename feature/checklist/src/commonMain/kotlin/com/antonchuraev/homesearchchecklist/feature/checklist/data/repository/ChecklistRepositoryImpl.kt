@@ -125,20 +125,25 @@ class ChecklistRepositoryImpl(
      * Uses the plain `update` path rather than a dedicated `UPDATE ... SET isInbox = 0` query so the
      * DAO surface the CONTROL arm compiles against is not touched at all.
      *
-     * PENDING_UPLOAD + a fresh `updatedAt` are both load-bearing:
-     *  - the pull merge SKIPs rows with local pending edits, so a listener echo carrying the old
-     *    `isInbox = true` cannot re-flag the row before our push lands;
-     *  - after the push the cloud document reads `isInbox = false`, so other devices stop seeing a
-     *    flagged row too.
+     * PENDING_UPLOAD + a fresh `updatedAt` are load-bearing for the LOCAL device: the pull merge SKIPs
+     * rows with local pending edits, so a listener echo carrying the old `isInbox = true` cannot
+     * re-flag the row before our push lands.
      *
-     * `position` is deliberately left alone. [ensureInbox] inserts the row at -1, so as a project it
-     * sorts to the very TOP of the Projects list — exactly where the user should find the tasks that
-     * just reappeared — and the next [reindexPositions] compacts it to 0 like any other row.
+     * The demotion is **local-effective only.** Pushing `isInbox = false` does NOT clear the flag on
+     * other devices: `mergeRemoteChecklist` applies `remote.isInbox || local.isInbox` (write-once), so
+     * a remote `false` can never turn a local `true` off. That merge rule is deliberate — it stops an
+     * older build's document from demoting a live v2 Inbox — and the consequence is a residual
+     * mixed-arm case: on one account running v2 on the phone and control on a tablet, the v2 device
+     * re-flags the row on its next push and this rollback de-flags it again on the control device's
+     * next launch. Each pass marks the row PENDING_UPLOAD, so it is a slow per-launch sync ping-pong
+     * with the row appearing and disappearing from the control device's Projects list. Known residual,
+     * NOT self-healing; it ends when both installs land on the same arm.
      *
-     * Note the residual multi-device case: `mergeRemoteChecklist` treats `isInbox` as write-once
-     * (`remote.isInbox || local.isInbox`) to stop an older build's document from demoting a live
-     * Inbox, so a *v2* device that later pushes an edit re-flags this row here. That is inherent to
-     * one account running both arms, and it self-heals: the reconcile use case re-runs every launch.
+     * `position` is set explicitly rather than left at [ensureInbox]'s -1: [addChecklist] runs
+     * `incrementAllPositions()`, which bumps the Inbox row too, so after a couple of new checklists
+     * its position has drifted into the middle of the list — the recovered tasks would surface exactly
+     * where the user is least likely to notice them. -1 puts it back on top for the next
+     * [reindexPositions] to compact to 0.
      */
     override suspend fun clearInboxFlag(): Boolean {
         val inbox = checklistDao.getInbox() ?: return false
@@ -146,6 +151,7 @@ class ChecklistRepositoryImpl(
         checklistDao.update(
             inbox.copy(
                 isInbox = false,
+                position = -1,
                 updatedAt = now,
                 syncStatus = SyncStatus.PENDING_UPLOAD.value,
             )

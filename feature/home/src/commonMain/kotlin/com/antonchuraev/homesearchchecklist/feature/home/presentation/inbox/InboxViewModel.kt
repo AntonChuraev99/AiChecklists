@@ -340,7 +340,10 @@ class InboxViewModel(
         )
         analytics.event(
             AnalyticsEvents.Item.AUTO_DELETED,
-            mapOf(AnalyticsParams.CHECKLIST_ID to checklist.id.toString()),
+            mapOf(
+                AnalyticsParams.CHECKLIST_ID to checklist.id.toString(),
+                AnalyticsParams.SOURCE to SOURCE_INBOX_TAB,
+            ),
         )
     }
 
@@ -360,6 +363,7 @@ class InboxViewModel(
             mapOf(
                 AnalyticsParams.CHECKLIST_ID to checklistId.toString(),
                 AnalyticsParams.PROGRESS to progress,
+                AnalyticsParams.SOURCE to SOURCE_INBOX_TAB,
             ),
         )
         if (checked && totalItems > 0 && checkedCount == totalItems) {
@@ -368,6 +372,7 @@ class InboxViewModel(
                 mapOf(
                     AnalyticsParams.CHECKLIST_ID to checklistId.toString(),
                     AnalyticsParams.ITEM_COUNT to totalItems.toString(),
+                    AnalyticsParams.SOURCE to SOURCE_INBOX_TAB,
                 ),
             )
         }
@@ -614,5 +619,21 @@ class InboxViewModel(
         /** Wire values of [AnalyticsParams.SOURCE] on `inbox_quick_added`. */
         const val SOURCE_INBOX = "inbox"
         const val SOURCE_PROJECT = "project"
+
+        /**
+         * Stamped on every emit this screen shares with the control arm (`item_checked`,
+         * `item_unchecked`, `item_auto_deleted`, `fill_completed`).
+         *
+         * Two jobs, and both matter:
+         *  * analytics keeps receiving the events, so checks performed here are comparable with the
+         *    control arm's — omitting them would make the treatment arm look less engaged;
+         *  * `CsatManager` skips them when SCORING, because this tab performs the same actions one
+         *    screen earlier than control, and a faster-accumulating score would make the survey (and
+         *    the Play in-app review behind it) fire at different rates in the two arms.
+         *
+         * Applied for EVERY page of the pager, project pages included: the cheapness comes from the
+         * tab being the home screen, not from which checklist the row belongs to.
+         */
+        const val SOURCE_INBOX_TAB = "inbox_tab"
     }
 }
