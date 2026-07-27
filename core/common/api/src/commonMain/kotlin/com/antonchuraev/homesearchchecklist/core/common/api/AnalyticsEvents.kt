@@ -431,16 +431,28 @@ object AnalyticsEvents {
         const val RATING_SELECTED = "csat_rating_selected"
         const val REVIEW_TAPPED = "csat_review_tapped"
         /**
-         * Review flow returned (rated / dismissed / quota-exceeded — the store API never says which).
+         * A review request returned (rated / dismissed / quota-exceeded / never launched — the
+         * store API never says which).
          *
          * Carries [AnalyticsParams.SOURCE]:
-         *  - `review_launch`   — closes the launch its [REVIEW_TAPPED] started. **At most one per
-         *    tap — this is the arm to funnel on.**
-         *  - `repeat_callback` — the launcher called back again for a tap already completed (the
-         *    composable re-entered composition while the launch flag was still latched). Kept as an
-         *    event rather than dropped so the duplication stays measurable.
+         *  - `review_launch`   — the platform ACCEPTED the launch, closing the request its
+         *    [REVIEW_TAPPED] started. **At most one per tap — this is the arm to funnel on.**
+         *    It is an upper bound on real impressions, not a count of them: Play renders nothing
+         *    once the review quota is spent and reports no error for it, so a quota-suppressed
+         *    card lands here. No API reports whether a card appeared or a rating was left.
+         *  - `not_shown`       — the request never reached the platform. Split by `not_shown_reason`
+         *    = `no_host_activity` | `launch_failed` | `cancelled` | `unsupported` (web/iOS have no
+         *    review API). These four are one arm only because none of them is a launch.
+         *  - `repeat_callback` — the launcher called back again for a request already completed.
+         *    Kept as an event rather than dropped so any duplication stays measurable; since
+         *    2026-07-27 requests are one-shot ([kotlinx.coroutines.channels.Channel] CONFLATED,
+         *    consumed on receipt) so this **should flatline at zero** — a non-zero count means the
+         *    one-shot guarantee broke.
          *
-         * Funnel on the unfiltered event and completed can EXCEED tapped (prod, 30d: 6 vs 4).
+         * History: before 2026-07-27 the arm was two-way and a never-launched request was stamped
+         * `review_launch`; unfiltered, completed could EXCEED tapped (prod, 30d: 6 vs 4). Note the
+         * inverse is now possible: two rapid taps conflate into one launch, so `review_launch` can
+         * fall BELOW `tapped` without any review being lost.
          */
         const val REVIEW_COMPLETED = "csat_review_completed"
         const val FEEDBACK_OPENED = "feedback_opened"

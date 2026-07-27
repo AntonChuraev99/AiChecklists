@@ -1922,8 +1922,8 @@ fun App() {
 
             // In-App Review launcher — side-effect composable, no UI
             InAppReviewLauncher(
-                shouldLaunch = csatState.shouldLaunchReview,
-                onComplete = { csatViewModel.sendIntent(CsatIntent.ReviewComplete) },
+                requests = csatViewModel.reviewRequests,
+                onComplete = { outcome -> csatViewModel.sendIntent(CsatIntent.ReviewComplete(outcome)) },
             )
 
             // In-App Update launcher — side-effect composable, no UI. Android-only (no-op on
