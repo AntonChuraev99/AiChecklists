@@ -541,7 +541,16 @@ fun MainScreen(
                                         // No horizontal padding here on purpose — GistiPromptChips owns it
                                         // as LazyRow contentPadding so chips bleed past the screen edge
                                         // while scrolling (stacking padding here kills that signal).
-                                        modifier = Modifier.padding(top = AppDimens.SpacingSm),
+                                        //
+                                        // Vertical padding is SYMMETRIC. With bottom = 0 the row had
+                                        // 13dp of air above (8 + the chip's ~5dp phantom inset) and 5dp
+                                        // below, so the chips read as the first item of the list rather
+                                        // than as a band of their own — and a scrolling card came within
+                                        // 5dp of them, white on white.
+                                        modifier = Modifier.padding(
+                                            top = AppDimens.SpacingSm,
+                                            bottom = AppDimens.SpacingSm,
+                                        ),
                                     )
                                 }
                                 // Single weighted child → takes all remaining height, so the list keeps

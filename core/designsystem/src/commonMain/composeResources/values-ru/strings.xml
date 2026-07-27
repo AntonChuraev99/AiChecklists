@@ -1348,6 +1348,7 @@
     <string name="nav_tab_projects">Проекты</string>
     <string name="nav_tab_overview">Обзор</string>
     <string name="nav_chat_fab_content_description">Спросить Gisti</string>
+    <string name="nav_add_task_fab_content_description">Добавить задачу</string>
 
     <!-- Экран «Входящие» (домашний таб в v2) -->
     <string name="inbox_title">Входящие</string>

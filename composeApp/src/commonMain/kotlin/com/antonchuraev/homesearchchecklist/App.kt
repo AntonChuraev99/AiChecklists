@@ -51,6 +51,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.adaptive.AppWindowSizeC
 import com.antonchuraev.homesearchchecklist.desingsystem.adaptive.rememberAppWindowSizeClass
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.inbox.InboxRoute
 import com.antonchuraev.homesearchchecklist.navigation.OverviewScreen
+import com.antonchuraev.homesearchchecklist.navigation.V2ChatDockOverlay
 import com.antonchuraev.homesearchchecklist.navigation.V2Destination
 import com.antonchuraev.homesearchchecklist.navigation.V2NavigationShell
 import com.antonchuraev.homesearchchecklist.navigation.V2ShellMetrics
@@ -164,7 +165,14 @@ import aichecklists.core.designsystem.generated.resources.chat_result_undone_add
 import aichecklists.core.designsystem.generated.resources.chat_result_undone_complete
 import aichecklists.core.designsystem.generated.resources.chat_undo_item_gone
 import aichecklists.core.designsystem.generated.resources.chat_panel_greeting
+import aichecklists.core.designsystem.generated.resources.main_ask_gisti_placeholder
+import aichecklists.core.designsystem.generated.resources.main_create_with_ai_action
 import aichecklists.core.designsystem.generated.resources.main_create_with_ai_prefill
+import aichecklists.core.designsystem.generated.resources.main_prompt_new_list
+import aichecklists.core.designsystem.generated.resources.main_prompt_photo
+import aichecklists.core.designsystem.generated.resources.main_prompt_remind
+import aichecklists.core.designsystem.generated.resources.main_prompt_link
+import aichecklists.core.designsystem.generated.resources.main_prompt_plan_day
 import aichecklists.core.designsystem.generated.resources.main_prompt_link_prefill
 import aichecklists.core.designsystem.generated.resources.main_prompt_remind_prefill
 import aichecklists.core.designsystem.generated.resources.main_prompt_plan_day_query
@@ -205,6 +213,8 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.DockAn
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.DockFullExpandState
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiExpandableDockContent
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiFullChatOverlay
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiPromptChips
+import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiDefaultPromptChips
 import com.antonchuraev.homesearchchecklist.feature.aichat.impl.presentation.components.ChatAttachmentSourceSheet
 import com.antonchuraev.homesearchchecklist.core.filepicker.api.picker.FilePickerType
 import com.antonchuraev.homesearchchecklist.core.filepicker.api.picker.rememberFilePickerLauncher
@@ -1146,6 +1156,31 @@ fun App() {
 
             val showV2Shell = navVariant == NavVariant.V2 && v2AnyTabInStack
 
+            // ── v2 in-place chat / create surfaces ───────────────────────────────────────────
+            // Both flags are owned HERE rather than by V2NavigationShell because several unrelated
+            // surfaces raise them — the shell's two FABs, ChecklistDetail's top-bar action, and the
+            // Projects tab's prompt chips — and every one of them must drive the SAME dock. A flag
+            // per surface is how you end up with two docks stacked on one screen.
+            //
+            // The chat used to be a ROUTE in v2 (navigateToAiChat), which made the assistant a place
+            // you go instead of help you get: the screen the question was about disappeared behind
+            // it. It now opens over the current screen via V2ChatDockOverlay.
+            var v2ChatDockOpen by remember { mutableStateOf(false) }
+            // The Inbox capture dock. Held HERE, not inside the Inbox screen, for one reason: the
+            // FABs are shell chrome drawn above the screen, so they have to hide while the dock is
+            // up — and the shell can only know that if the flag lives above both of them. Passing a
+            // one-way "open" signal down instead would leave the "+" FAB floating over its own dock.
+            var v2CreateDockOpen by remember { mutableStateOf(false) }
+            // Any route change closes both docks — each is anchored to the screen it was opened over,
+            // so carrying one onto the next screen leaves a stale context (a chat banner reading
+            // "Ask about <list>", or a capture input aimed at a page that is no longer showing).
+            // Mirrors the control arm's routeCollapseSignal, which collapses each screen's own dock
+            // back to Peek for the same reason.
+            LaunchedEffect(currentTopRoute) {
+                v2ChatDockOpen = false
+                v2CreateDockOpen = false
+            }
+
             // Only Compact has a bottom bar + FAB to clear; the rail and the permanent drawer sit
             // beside the content, so a non-zero inset there would just be dead space.
             //
@@ -1166,6 +1201,12 @@ fun App() {
                 navVariant == NavVariant.V2 &&
                     rememberAppWindowSizeClass() == AppWindowSizeClass.Compact
             val v2FabBandPadding = if (v2IsCompact) V2ShellMetrics.FabBandPadding else 0.dp
+            // The Inbox is the one tab that shows BOTH FABs, so it is the one tab that has to clear a
+            // 132dp stack instead of a 64dp button. Kept as a second value rather than raising the
+            // shared one: applying the taller reserve everywhere would cut 68dp off the bottom of
+            // Calendar, Projects and Overview to clear a button they never render.
+            val v2InboxFabBandPadding =
+                if (v2IsCompact) V2ShellMetrics.FabStackBandPadding else 0.dp
 
             // Re-root the stack at Inbox once per process, the first time a tab route appears.
             // The control arm never executes this (guarded on navVariant).
@@ -1711,7 +1752,11 @@ fun App() {
                                             AnalyticsEvents.Nav.CHAT_FAB_TAPPED,
                                             mapOf(AnalyticsParams.SOURCE to "home_chip"),
                                         )
-                                        navigator.navigateToAiChat()
+                                        // onQuickAction only prefills / sends into the singleton chat
+                                        // ViewModel — it needs a chat surface on screen or the tap is
+                                        // invisible. That surface is now the shell's dock, opened over
+                                        // this tab, instead of the pushed chat route it used to be.
+                                        v2ChatDockOpen = true
                                     }
                                 } else {
                                     null
@@ -1846,7 +1891,11 @@ fun App() {
                                         AnalyticsEvents.Nav.CHAT_FAB_TAPPED,
                                         mapOf(AnalyticsParams.SOURCE to "detail_toolbar"),
                                     )
-                                    navigator.navigateToAiChat()
+                                    // Opens the shell's dock OVER this checklist instead of pushing
+                                    // the chat route. Asking "what am I missing here?" only makes
+                                    // sense while "here" is still on screen — navigating away took
+                                    // the subject of the question with it.
+                                    v2ChatDockOpen = true
                                 }
                             } else {
                                 null
@@ -1946,7 +1995,11 @@ fun App() {
                         )
                     ) {
                         InboxRoute(
-                            contentBottomPadding = v2FabBandPadding,
+                            contentBottomPadding = v2InboxFabBandPadding,
+                            // Raised by the shell's "+" FAB, cleared on dismiss. Owned by App so the
+                            // shell can hide its FABs while the dock is up (see fabsVisible).
+                            createDockOpen = v2CreateDockOpen,
+                            onCreateDockDismiss = { v2CreateDockOpen = false },
                             // Swallow BACK only while the Inbox IS the top of the stack. On Expanded
                             // this entry is a listPane that stays composed beside a pushed
                             // ChecklistDetail, and a handler registered later than NavDisplay's wins —
@@ -2045,11 +2098,86 @@ fun App() {
                             AnalyticsEvents.Nav.CHAT_FAB_TAPPED,
                             mapOf(AnalyticsParams.SOURCE to "fab"),
                         )
-                        navigator.navigateToAiChat()
+                        // Clear the checklist context FIRST. The FAB only exists on tab screens, so a
+                        // chat opened from it is about nothing in particular — but chatSheetContextId
+                        // persists after the dock closes, so without this a chat opened from the FAB
+                        // right after one opened on a checklist would silently stay anchored to that
+                        // checklist and answer "what's missing?" about a list the user left behind.
+                        chatSheetContextId = null
+                        chatSheetContextLabel = null
+                        // Close the capture dock: both are bottom surfaces, and the rail / permanent
+                        // drawer keep their chat button visible while it is up, so without this the
+                        // two would stack — capture input with the keyboard raised, under the chat's
+                        // scrim. The mirror of what onOpenCreate does to the chat.
+                        v2CreateDockOpen = false
+                        v2ChatDockOpen = true
+                    },
+                    // The "+" FAB only exists where there is a task list to add to: the Inbox tab and
+                    // its project pages. On Calendar / Overview / Projects it would be an affordance
+                    // with no target — a create button that has to ask "into what?" is a worse
+                    // entry point than no button.
+                    //
+                    // v2BarVisible is part of the condition, not decoration. v2SelectedTab is computed
+                    // with findLast, so it still reads Inbox while a ChecklistDetail or Settings sits
+                    // on top — and the dock this button opens lives inside InboxScreen, which is
+                    // disposed under a pushed route on anything but an Expanded two-pane. The Compact
+                    // shell hides all chrome on those routes anyway; the rail and the drawer do not,
+                    // so there the button rendered, was tapped, and NOTHING happened — no dock, no
+                    // message, no log. Feedback on every user action is a project invariant.
+                    showCreateFab = v2SelectedTab == V2Destination.Inbox && v2BarVisible,
+                    onOpenCreate = {
+                        analyticsTracker.event(
+                            AnalyticsEvents.Nav.CREATE_FAB_TAPPED,
+                            mapOf(AnalyticsParams.SOURCE to "fab"),
+                        )
+                        // Closing the chat first: both surfaces are bottom docks, so leaving the chat
+                        // mounted would stack two of them on one screen.
+                        v2ChatDockOpen = false
+                        v2CreateDockOpen = true
                     },
                     onOpenSettings = { navigator.navigateToSettings() },
                     onOpenUpdates = { navigator.navigateToUpdateFeed() },
                     barVisible = v2BarVisible,
+                    // Hide the FABs while either dock is up: they are drawn above the content, so
+                    // they would float over the dock (and over the chat's scrim), inviting taps that
+                    // land on chrome the user has already left behind.
+                    fabsVisible = !v2ChatDockOpen && !v2CreateDockOpen,
+                    // The chat, hosted ONCE for every route the shell renders (tabs and pushed detail
+                    // screens alike) — that is what makes "the AI button opens chat right here" true
+                    // on all of them without a per-screen dock.
+                    overlayContent = {
+                        V2ChatDockOverlay(
+                            visible = v2ChatDockOpen,
+                            onDismissRequest = { v2ChatDockOpen = false },
+                            chatDockContent = chatDockContent,
+                            chatFullContent = chatFullContent,
+                            peekPlaceholder = stringResource(Res.string.main_ask_gisti_placeholder),
+                            chips = {
+                                GistiPromptChips(
+                                    chips = gistiDefaultPromptChips(
+                                        createAiLabel = stringResource(Res.string.main_create_with_ai_action),
+                                        photoLabel = stringResource(Res.string.main_prompt_photo),
+                                        remindLabel = stringResource(Res.string.main_prompt_remind),
+                                        linkLabel = stringResource(Res.string.main_prompt_link),
+                                        planDayLabel = stringResource(Res.string.main_prompt_plan_day),
+                                    ),
+                                    onChipClick = onQuickAction,
+                                    onNewListClick = { navigator.navigateToCreateChecklistScreen() },
+                                    newListLabel = stringResource(Res.string.main_prompt_new_list),
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            },
+                            // Seeds the chat context + fires ai_chat_opened, the same two things
+                            // MainScreen's dock does in the control arm.
+                            onExpandedChanged = { expandedNow ->
+                                if (expandedNow) {
+                                    onOpenChatSheet(chatSheetContextId, chatSheetContextLabel)
+                                } else {
+                                    chatSheetOpen = false
+                                }
+                            },
+                        )
+                    },
                     content = renderNav,
                 )
 

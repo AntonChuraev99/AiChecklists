@@ -23,6 +23,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
@@ -43,6 +45,12 @@ import org.jetbrains.compose.resources.stringResource
  *   Position rationale (Option A — chip above): a chip below the input disappears behind
  *   the soft keyboard on small screens, giving the user no visual confirmation that a
  *   reminder will be set. A chip above the field is always visible, regardless of IME state.
+ *
+ * @param focusRequester attaches to the TEXT FIELD itself, so a caller that reveals this row on
+ *   demand (the v2 Inbox capture dock) can raise the keyboard with it. It has to be threaded in
+ *   rather than applied to `modifier` by the caller: a requester on the wrapping Column moves focus
+ *   to the column, not into the field, and the keyboard never appears. Null (default) = the four
+ *   existing call sites are untouched.
  */
 @Composable
 fun AddItemInputField(
@@ -52,6 +60,7 @@ fun AddItemInputField(
     placeholder: String = stringResource(Res.string.add_item_placeholder),
     modifier: Modifier = Modifier,
     leadingPreview: (@Composable () -> Unit)? = null,
+    focusRequester: FocusRequester? = null,
 ) {
     val isTextNotBlank = text.isNotBlank()
 
@@ -81,7 +90,15 @@ fun AddItemInputField(
                 onValueChange = onTextChange,
                 placeholder = placeholder,
                 singleLine = false,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .then(
+                        if (focusRequester != null) {
+                            Modifier.focusRequester(focusRequester)
+                        } else {
+                            Modifier
+                        }
+                    ),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(
                     onDone = { if (isTextNotBlank) onAdd() }

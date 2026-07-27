@@ -1556,6 +1556,7 @@
     <string name="nav_tab_projects">Projects</string>
     <string name="nav_tab_overview">Overview</string>
     <string name="nav_chat_fab_content_description">Ask Gisti</string>
+    <string name="nav_add_task_fab_content_description">Add task</string>
 
     <!-- Inbox screen (v2 home tab) -->
     <string name="inbox_title">Inbox</string>

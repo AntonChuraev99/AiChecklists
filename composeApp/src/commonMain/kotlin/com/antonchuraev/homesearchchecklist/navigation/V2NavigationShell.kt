@@ -1,9 +1,11 @@
 package com.antonchuraev.homesearchchecklist.navigation
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.add
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.CalendarMonth
@@ -46,6 +49,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.calendar_nav_label
+import aichecklists.core.designsystem.generated.resources.nav_add_task_fab_content_description
 import aichecklists.core.designsystem.generated.resources.nav_chat_fab_content_description
 import aichecklists.core.designsystem.generated.resources.nav_tab_inbox
 import aichecklists.core.designsystem.generated.resources.nav_tab_overview
@@ -108,6 +112,15 @@ object V2ShellMetrics {
      * `navBottom`. One value, applied to every Compact tab, is the whole rule now.
      */
     val FabBandPadding: Dp = 64.dp
+
+    /**
+     * The reserve for the TWO-button stack on the Inbox tab: AI 56 + gap 12 + "+" 56 + gap 8 = 132dp.
+     *
+     * A second constant rather than one raised value, because only the Inbox shows both buttons —
+     * applying 132dp everywhere would cut 68dp off the bottom of Calendar, Projects and Overview to
+     * clear a button they never render.
+     */
+    val FabStackBandPadding: Dp = 132.dp
 }
 
 /**
@@ -145,12 +158,24 @@ object V2ShellMetrics {
  * @param onNavigate invoked with a [V2Destination] constant when the user picks a tab. Debounced
  *   here (see below), so App.kt may mutate the back stack unguarded.
  * @param onOpenChat the AI chat entry point. In v2 the bottom chat dock is gone, so this FAB (rail
- *   header / drawer button on larger windows) is the only chat affordance on a tab screen.
+ *   header / drawer button on larger windows) is the only chat affordance on a tab screen. It opens
+ *   the chat IN PLACE via [overlayContent], over whatever screen the user is on.
+ * @param showCreateFab whether the manual "+" create FAB is offered alongside the AI one. True only
+ *   where there is a task list to add to (the Inbox tab and its project pages) — elsewhere a create
+ *   button would have no target.
+ * @param onOpenCreate tapped "+". The host opens its create surface; the shell owns no create state.
  * @param onOpenSettings / [onOpenUpdates] Expanded-only extras — destinations that are drawer items
  *   in the control arm and Overview-tab rows on Compact/Medium.
  * @param barVisible false hides the bar and the FAB while a non-tab route (ChecklistDetail, AiChat,
  *   Settings…) is on top of the stack, so the chrome never floats over a detail screen. The shell
  *   itself stays mounted, which is what keeps the tab state alive underneath.
+ * @param fabsVisible false hides BOTH FABs without hiding the bar — used while the chat dock is up,
+ *   where they would float over its scrim and invite taps that do nothing. Separate from
+ *   [barVisible], which answers a different question (is this route a tab at all).
+ * @param overlayContent rendered ABOVE the content, the bar and the FABs, at every window size. This
+ *   is where the v2 chat dock lives: hosting it once here is what makes "the AI button opens the chat
+ *   right on this screen" true for every route the shell renders, including pushed detail screens,
+ *   with no per-screen dock wiring.
  * @param content the NavDisplay renderer; always receives `null` for the drawer state.
  */
 @Composable
@@ -160,7 +185,11 @@ fun V2NavigationShell(
     onOpenChat: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenUpdates: () -> Unit,
+    showCreateFab: Boolean = false,
+    onOpenCreate: () -> Unit = {},
     barVisible: Boolean = true,
+    fabsVisible: Boolean = true,
+    overlayContent: (@Composable () -> Unit)? = null,
     content: @Composable (drawerState: DrawerState?) -> Unit,
 ) {
     // Same 500ms guard as AdaptiveNavigationShell: a rapid double-tap on a tab otherwise races the
@@ -179,30 +208,48 @@ fun V2NavigationShell(
         onNavigate(destination)
     }
 
-    when (rememberAppWindowSizeClass()) {
-        AppWindowSizeClass.Compact -> V2ShellCompactBar(
-            selectedTab = selectedTab,
-            onNavigate = ::guardedNavigate,
-            onOpenChat = onOpenChat,
-            barVisible = barVisible,
-            content = content,
-        )
+    // One Box around all three variants so [overlayContent] is drawn LAST — above the bar, the rail,
+    // the permanent drawer and both FABs — at every window size, without each variant repeating the
+    // z-order rule.
+    Box(modifier = Modifier.fillMaxSize()) {
+        when (rememberAppWindowSizeClass()) {
+            AppWindowSizeClass.Compact -> V2ShellCompactBar(
+                selectedTab = selectedTab,
+                onNavigate = ::guardedNavigate,
+                onOpenChat = onOpenChat,
+                showCreateFab = showCreateFab,
+                onOpenCreate = onOpenCreate,
+                barVisible = barVisible,
+                fabsVisible = fabsVisible,
+                content = content,
+            )
 
-        AppWindowSizeClass.Medium -> V2ShellRail(
-            selectedTab = selectedTab,
-            onNavigate = ::guardedNavigate,
-            onOpenChat = onOpenChat,
-            content = content,
-        )
+            AppWindowSizeClass.Medium -> V2ShellRail(
+                selectedTab = selectedTab,
+                onNavigate = ::guardedNavigate,
+                onOpenChat = onOpenChat,
+                // fabsVisible is folded into showCreateFab here (and in the drawer below) rather than
+                // hiding the rail's whole header: the rail is permanent chrome, so blanking it while
+                // a dock is open would make the navigation itself flicker. Only the create button —
+                // the one that would float over its own dock — goes away.
+                showCreateFab = showCreateFab && fabsVisible,
+                onOpenCreate = onOpenCreate,
+                content = content,
+            )
 
-        AppWindowSizeClass.Expanded -> V2ShellPermanent(
-            selectedTab = selectedTab,
-            onNavigate = ::guardedNavigate,
-            onOpenChat = onOpenChat,
-            onOpenSettings = onOpenSettings,
-            onOpenUpdates = onOpenUpdates,
-            content = content,
-        )
+            AppWindowSizeClass.Expanded -> V2ShellPermanent(
+                selectedTab = selectedTab,
+                onNavigate = ::guardedNavigate,
+                onOpenChat = onOpenChat,
+                showCreateFab = showCreateFab && fabsVisible,
+                onOpenCreate = onOpenCreate,
+                onOpenSettings = onOpenSettings,
+                onOpenUpdates = onOpenUpdates,
+                content = content,
+            )
+        }
+
+        overlayContent?.invoke()
     }
 }
 
@@ -223,7 +270,10 @@ private fun V2ShellCompactBar(
     selectedTab: String,
     onNavigate: (String) -> Unit,
     onOpenChat: () -> Unit,
+    showCreateFab: Boolean,
+    onOpenCreate: () -> Unit,
     barVisible: Boolean,
+    fabsVisible: Boolean,
     content: @Composable (DrawerState?) -> Unit,
 ) {
     val items = listOf(
@@ -235,6 +285,7 @@ private fun V2ShellCompactBar(
         overviewNavBarItem(stringResource(Res.string.nav_tab_overview)),
     )
     val fabDescription = stringResource(Res.string.nav_chat_fab_content_description)
+    val createFabDescription = stringResource(Res.string.nav_add_task_fab_content_description)
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -249,9 +300,20 @@ private fun V2ShellCompactBar(
                     // without this the reserve stacked and left a dead band (bar height + inset) under
                     // the last row. Not consumed when the bar is hidden: then nothing covers the
                     // system nav and the screen must inset itself as usual.
+                    //
+                    // The BAR'S OWN HEIGHT is consumed too, and that part is about the KEYBOARD.
+                    // Insets are measured from the bottom of the WINDOW, but this box stops one bar
+                    // higher — so a hosted screen lifting its bottomBar by the raw `ime` inset lifts
+                    // it by a bar height too much and strands the input in a blank band above the
+                    // keyboard (seen live on the Inbox capture dock). Consuming bar + system strip
+                    // states the truth: that much of any bottom inset is already accounted for by
+                    // this box ending where it does.
                     .then(
                         if (barVisible) {
-                            Modifier.consumeWindowInsets(WindowInsets.navigationBars)
+                            Modifier.consumeWindowInsets(
+                                WindowInsets.navigationBars
+                                    .add(WindowInsets(bottom = AppDimens.BottomBarHeight))
+                            )
                         } else {
                             Modifier
                         }
@@ -268,11 +330,27 @@ private fun V2ShellCompactBar(
             }
         }
 
-        if (barVisible) {
-            FloatingActionButton(
-                onClick = onOpenChat,
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        if (barVisible && fabsVisible) {
+            // Vertical stack: AI on top, manual "+" at the bottom.
+            //
+            // The BOTTOM slot is the ergonomic anchor — it holds whichever create action is primary
+            // on this tab. On the Inbox that is the manual "+" (filled `primary`), with the AI button
+            // tonal above it; on the other three tabs the AI button is the only one and takes the
+            // anchor itself. The AI button therefore shifts down by one slot when leaving the Inbox.
+            // That is deliberate: freezing it would mean reserving an empty 68dp slot — and 68dp of
+            // list — on three tabs to hold a button they never show.
+            //
+            // Both are full-size 56dp FABs; the hierarchy is carried by colour (filled `primary` over
+            // tonal `primaryContainer`), not by size. Shrinking the AI button to a 40dp small FAB
+            // would make it change size between tabs, since it is the ONLY affordance on three of
+            // them and a lone 40dp FAB is below the M3 bar for a screen's main action.
+            //
+            // Inset order matters: navigationBarsPadding() FIRST (outermost), then the bar-height
+            // offset — the reverse drops the stack into the gesture-nav strip on devices with a
+            // non-zero bottom inset.
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingMd),
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .navigationBarsPadding()
@@ -281,7 +359,22 @@ private fun V2ShellCompactBar(
                         bottom = AppDimens.BottomBarHeight + AppDimens.SpacingSm,
                     ),
             ) {
-                Icon(Icons.Outlined.AutoAwesome, contentDescription = fabDescription)
+                FloatingActionButton(
+                    onClick = onOpenChat,
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                ) {
+                    Icon(Icons.Outlined.AutoAwesome, contentDescription = fabDescription)
+                }
+                if (showCreateFab) {
+                    FloatingActionButton(
+                        onClick = onOpenCreate,
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                    ) {
+                        Icon(Icons.Filled.Add, contentDescription = createFabDescription)
+                    }
+                }
             }
         }
     }
@@ -299,6 +392,8 @@ private fun V2ShellRail(
     selectedTab: String,
     onNavigate: (String) -> Unit,
     onOpenChat: () -> Unit,
+    showCreateFab: Boolean,
+    onOpenCreate: () -> Unit,
     content: @Composable (DrawerState?) -> Unit,
 ) {
     val inboxLabel = stringResource(Res.string.nav_tab_inbox)
@@ -306,6 +401,7 @@ private fun V2ShellRail(
     val projectsLabel = stringResource(Res.string.nav_tab_projects)
     val overviewLabel = stringResource(Res.string.nav_tab_overview)
     val fabDescription = stringResource(Res.string.nav_chat_fab_content_description)
+    val createFabDescription = stringResource(Res.string.nav_add_task_fab_content_description)
 
     Row(modifier = Modifier.fillMaxSize()) {
         NavigationRail(
@@ -318,6 +414,18 @@ private fun V2ShellRail(
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 ) {
                     Icon(Icons.Outlined.AutoAwesome, contentDescription = fabDescription)
+                }
+                // Not a Compact-only affordance: the capture row that used to be pinned to the Inbox
+                // was removed on ALL window sizes, so without this button there is no way to add a
+                // task at rail width at all.
+                if (showCreateFab) {
+                    FloatingActionButton(
+                        onClick = onOpenCreate,
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                    ) {
+                        Icon(Icons.Filled.Add, contentDescription = createFabDescription)
+                    }
                 }
                 HorizontalDivider(modifier = Modifier.width(56.dp))
             },
@@ -367,6 +475,8 @@ private fun V2ShellPermanent(
     selectedTab: String,
     onNavigate: (String) -> Unit,
     onOpenChat: () -> Unit,
+    showCreateFab: Boolean,
+    onOpenCreate: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenUpdates: () -> Unit,
     content: @Composable (DrawerState?) -> Unit,
@@ -378,6 +488,7 @@ private fun V2ShellPermanent(
     val settingsLabel = stringResource(Res.string.settings_title)
     val updatesLabel = stringResource(Res.string.update_feed_menu_item)
     val chatLabel = stringResource(Res.string.nav_chat_fab_content_description)
+    val createLabel = stringResource(Res.string.nav_add_task_fab_content_description)
     val itemColors = NavigationDrawerItemDefaults.colors(
         unselectedTextColor = MaterialTheme.colorScheme.onSurface,
         unselectedIconColor = MaterialTheme.colorScheme.onSurface,
@@ -396,10 +507,29 @@ private fun V2ShellPermanent(
                     icon = { Icon(Icons.Outlined.AutoAwesome, contentDescription = null) },
                     text = { Text(chatLabel) },
                     modifier = Modifier.padding(
-                        horizontal = AppDimens.SpacingLg,
-                        vertical = AppDimens.SpacingMd,
+                        start = AppDimens.SpacingLg,
+                        end = AppDimens.SpacingLg,
+                        top = AppDimens.SpacingMd,
+                        bottom = if (showCreateFab) AppDimens.SpacingSm else AppDimens.SpacingMd,
                     ),
                 )
+                // Same reasoning as the rail: the pinned capture row is gone at every width, so
+                // desktop-class windows need their own create affordance or the Inbox becomes
+                // read-only there.
+                if (showCreateFab) {
+                    ExtendedFloatingActionButton(
+                        onClick = onOpenCreate,
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        icon = { Icon(Icons.Filled.Add, contentDescription = null) },
+                        text = { Text(createLabel) },
+                        modifier = Modifier.padding(
+                            start = AppDimens.SpacingLg,
+                            end = AppDimens.SpacingLg,
+                            bottom = AppDimens.SpacingMd,
+                        ),
+                    )
+                }
                 NavigationDrawerItem(
                     label = { Text(inboxLabel) },
                     icon = { Icon(Icons.Outlined.Inbox, contentDescription = null) },

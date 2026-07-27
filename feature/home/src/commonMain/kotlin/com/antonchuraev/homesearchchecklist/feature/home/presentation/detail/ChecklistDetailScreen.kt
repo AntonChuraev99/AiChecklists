@@ -938,7 +938,16 @@ private fun ChecklistDetailContent(
                 // the detail screen's chat entry point. Null in the control arm → nothing rendered,
                 // toolbar unchanged.
                 if (onOpenChat != null) {
-                    IconButton(onClick = onOpenChat) {
+                    IconButton(
+                        onClick = {
+                            // Seed the chat with THIS checklist BEFORE opening it. In the control arm
+                            // the dock's own expand callback does this; in v2 the dock lives in the
+                            // shell and has no idea which screen raised it, so a chat opened here
+                            // would answer "what am I missing?" against no checklist at all.
+                            onOpenChatSheet?.invoke()
+                            onOpenChat()
+                        },
+                    ) {
                         Icon(
                             Icons.Outlined.AutoAwesome,
                             contentDescription = stringResource(Res.string.detail_open_chat_action),

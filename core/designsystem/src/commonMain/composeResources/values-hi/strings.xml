@@ -1549,6 +1549,7 @@
     <string name="nav_tab_projects">प्रोजेक्ट्स</string>
     <string name="nav_tab_overview">ओवरव्यू</string>
     <string name="nav_chat_fab_content_description">Gisti से पूछें</string>
+    <string name="nav_add_task_fab_content_description">कार्य जोड़ें</string>
 
     <!-- Inbox screen (v2 home tab) -->
     <string name="inbox_title">इनबॉक्स</string>

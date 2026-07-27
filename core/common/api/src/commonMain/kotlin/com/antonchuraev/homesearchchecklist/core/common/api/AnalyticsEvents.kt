@@ -578,6 +578,21 @@ object AnalyticsEvents {
          *   is the value to compare against the control arm's dock chip taps.
          */
         const val CHAT_FAB_TAPPED = "nav_chat_fab_tapped"
+
+        /**
+         * The manual "+" FAB was tapped — the v2 arm's create-a-task entry point. v2-only by
+         * construction, and deliberately a SEPARATE event from [CHAT_FAB_TAPPED]: the two FABs sit
+         * side by side and answer the experiment's second question — when both an AI and a manual
+         * create affordance are one tap away, which one do people actually reach for. Folding them
+         * into one event with a `source` param would erase exactly that comparison.
+         *
+         * [AnalyticsParams.SOURCE] is `"fab"` today; the param exists so a future second create
+         * surface (empty-state CTA, long-press shortcut) stays distinguishable without a new event.
+         *
+         * NOTE this counts INTENT, not creation: the dock it opens can be dismissed without adding
+         * anything. Join against [Inbox.QUICK_ADDED] for the completion rate.
+         */
+        const val CREATE_FAB_TAPPED = "nav_create_fab_tapped"
     }
 
     /**

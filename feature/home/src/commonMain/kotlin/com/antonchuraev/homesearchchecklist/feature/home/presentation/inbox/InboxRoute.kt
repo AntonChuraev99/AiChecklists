@@ -28,11 +28,20 @@ import org.koin.compose.viewmodel.koinViewModel
  *   is not the top of the back stack — on Expanded the Inbox is a two-pane listPane that stays
  *   composed beside a pushed ChecklistDetail, and swallowing there kills the BACK that should dismiss
  *   the detail pane.
+ * @param createDockOpen whether the capture dock is showing. Hoisted to the shell host rather than
+ *   held here because the shell's FABs are drawn ABOVE this screen and must hide while the dock is
+ *   up — a flag private to this screen would leave the "+" FAB floating over its own dock.
+ * @param onCreateDockDismiss fired when the user dismisses the dock (BACK, scrim tap). The host
+ *   clears [createDockOpen]; this screen never hides the dock on its own.
  */
 @Composable
 fun InboxRoute(
     contentBottomPadding: Dp = 0.dp,
     swallowRootBack: Boolean = true,
+    // No defaults — see InboxScreen: a host that forgets to wire these gets a dead "+" button and a
+    // silent compiler, which is how the rail shipped one.
+    createDockOpen: Boolean,
+    onCreateDockDismiss: () -> Unit,
     viewModel: InboxViewModel = koinViewModel(),
 ) {
     val state by viewModel.screenState.collectAsStateWithLifecycle()
@@ -54,5 +63,7 @@ fun InboxRoute(
         onIntent = viewModel::sendIntent,
         snackbarHostState = snackbarHostState,
         swallowRootBack = swallowRootBack,
+        createDockOpen = createDockOpen,
+        onCreateDockDismiss = onCreateDockDismiss,
     )
 }
