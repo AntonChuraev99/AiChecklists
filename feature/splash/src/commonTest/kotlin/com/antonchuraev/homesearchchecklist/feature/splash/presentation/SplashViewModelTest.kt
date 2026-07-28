@@ -420,6 +420,9 @@ class SplashViewModelTest {
      * "not authorized" (API-key restriction / App Check) is the largest prod RC-failure bucket and
      * is NOT client-recoverable — a Cloud config fix, not something a retry can resolve. It must be
      * issued exactly once (no wasted splash time), then fall back to the client default.
+     *
+     * Since 2026-07-28 that fallback is the AI welcome flow, not slides: an unreachable Remote
+     * Config must not keep dumping ~89% of failed activations into the legacy slides arm.
      */
     @Test
     fun navigateTo_newUser_authFailure_notRetried_fallsBackToClientDefault() = testScope.runTest {
@@ -448,9 +451,10 @@ class SplashViewModelTest {
             "a non-transient authorization failure must NOT be retried",
         )
         assertEquals(
-            listOf("onboarding"),
+            listOf("welcome_onboarding"),
             nav.routes,
-            "after the single failed fetch, fall back to the client default (slides)",
+            "after the single failed fetch, fall back to the client-default arm — ai_welcome " +
+                "since 2026-07-28, no longer slides",
         )
     }
 
