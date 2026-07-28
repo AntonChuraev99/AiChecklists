@@ -13,6 +13,7 @@ import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
 import com.antonchuraev.homesearchchecklist.feature.create.domain.usecase.CreateChecklistFromGalleryTemplateUseCase
 import com.antonchuraev.homesearchchecklist.feature.create.domain.usecase.CreateWeeklyChecklistUseCase
 import com.antonchuraev.homesearchchecklist.deeplink.PendingGalleryDeepLink
+import com.antonchuraev.homesearchchecklist.deeplink.handleGalleryDeepLink
 import com.antonchuraev.homesearchchecklist.csat.CsatBottomSheet
 import com.antonchuraev.homesearchchecklist.csat.CsatIntent
 import com.antonchuraev.homesearchchecklist.csat.CsatViewModel
@@ -23,9 +24,6 @@ import com.antonchuraev.homesearchchecklist.core.datastore.api.AppDatastore
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppThemeMode
 import com.antonchuraev.homesearchchecklist.core.datastore.api.LanguageRepository
 import com.antonchuraev.homesearchchecklist.core.datastore.api.ThemeRepository
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
@@ -231,7 +229,6 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
-import com.antonchuraev.homesearchchecklist.core.common.api.ChecklistSource
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDefaults
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigKeys
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
@@ -500,14 +497,10 @@ fun App() {
 
             // ── Gallery deep-link (app.gisti-ai.com/?g=create&template={slug}) ─────────
             // Platform entry points (wasmJs main.kt / Android MainActivity) parse the link and
-            // push it into PendingGalleryDeepLink; we observe it here, create the checklist
-            // AS-IS (no AI credit) and land on it. Unknown slug / fetch error → snackbar
-            // (visible feedback — no silent skip). consume() prevents a recompose re-fire.
-            //
-            // Analytics lives HERE, not in the UseCase: the domain layer must not know about
-            // analytics (same rule that keeps Compose Resources out of it). This is also the one
-            // place that sees BOTH the outcome and the deep-link's utm, so every branch is
-            // measurable — opened = created(gallery) + failed, with no silent third case.
+            // push it into PendingGalleryDeepLink; we observe it here and hand each arrival to
+            // handleGalleryDeepLink, which owns the funnel + create + consumption. The body lives
+            // in deeplink/GalleryDeepLinkHandler.kt so its cancellation behaviour is unit-testable
+            // (a LaunchedEffect body is not) — see GalleryDeepLinkFunnelTest.
             val pendingGalleryDeepLink: PendingGalleryDeepLink = koinInject()
             val createFromGalleryUseCase: CreateChecklistFromGalleryTemplateUseCase = koinInject()
             val analyticsTracker: AnalyticsTracker = koinInject()
@@ -516,83 +509,17 @@ fun App() {
             LaunchedEffect(Unit) {
                 pendingGalleryDeepLink.pending.collect { link ->
                     if (link == null || link.slug.isBlank()) return@collect
-                    // Top-of-funnel: fires BEFORE the fetch, so an arrival is counted even when the
-                    // create then fails. Without it, "no traffic" and "all slugs broken" look identical.
-                    val linkParams: Map<String, Any> =
-                        mapOf(AnalyticsParams.TEMPLATE_SLUG to link.slug) + link.utm
-                    analyticsTracker.event(AnalyticsEvents.Gallery.DEEPLINK_OPENED, linkParams)
-                    // Every path out of here MUST either create or fail — the funnel contract is
-                    // opened = created + failed, and a silent third outcome is invisible in prod
-                    // (it reads as "traffic that evaporated"). try/finally guarantees the pending
-                    // link is consumed even on an unexpected throw, so the collector cannot get
-                    // stuck re-processing the same link; the catch guarantees the user still gets
-                    // feedback instead of a dead screen.
-                    // Guards the funnel invariant from the other side: the catch below must not add
-                    // a `failed` for an arrival that already reported `created` (a throw from
-                    // navigation would otherwise count one arrival twice).
-                    var terminalEmitted = false
-                    try {
-                        when (val result = createFromGalleryUseCase(link.slug)) {
-                            is CreateChecklistFromGalleryTemplateUseCase.Result.Created -> {
-                                analyticsTracker.event(
-                                    AnalyticsEvents.Checklist.CREATED,
-                                    linkParams + mapOf(
-                                        AnalyticsParams.SOURCE to ChecklistSource.GALLERY.wire,
-                                        AnalyticsParams.CHECKLIST_ID to result.checklistId,
-                                    ),
-                                )
-                                terminalEmitted = true
-                                navigator.navigateToChecklistDetail(result.checklistId, clearBackStack = true)
-                            }
-                            // A stale slug means the live gallery page and Firestore have drifted apart —
-                            // a content bug that is otherwise invisible (the user just sees a snackbar).
-                            CreateChecklistFromGalleryTemplateUseCase.Result.NotFound -> {
-                                analyticsTracker.event(
-                                    AnalyticsEvents.Gallery.DEEPLINK_FAILED,
-                                    linkParams + mapOf(AnalyticsParams.REASON to "not_found"),
-                                )
-                                terminalEmitted = true
-                                snackbarHostState.showSnackbar(galleryNotFoundMessage)
-                            }
-                            is CreateChecklistFromGalleryTemplateUseCase.Result.Error -> {
-                                analyticsTracker.event(
-                                    AnalyticsEvents.Gallery.DEEPLINK_FAILED,
-                                    linkParams + mapOf(
-                                        AnalyticsParams.REASON to "error",
-                                        AnalyticsParams.ERROR_MESSAGE to (result.cause.message ?: "unknown"),
-                                    ),
-                                )
-                                terminalEmitted = true
-                                snackbarHostState.showSnackbar(galleryErrorMessage)
-                            }
-                        }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Throwable) {
-                        if (!terminalEmitted) {
-                            analyticsTracker.event(
-                                AnalyticsEvents.Gallery.DEEPLINK_FAILED,
-                                linkParams + mapOf(
-                                    AnalyticsParams.REASON to "error",
-                                    AnalyticsParams.ERROR_MESSAGE to (e.message ?: "unknown"),
-                                ),
-                            )
-                        }
-                        snackbarHostState.showSnackbar(galleryErrorMessage)
-                    } finally {
-                        // Two guards, and both are load-bearing:
-                        // - isActive: `finally` also runs on CANCELLATION. An Activity recreation
-                        //   (rotation, theme, locale — MainActivity declares no configChanges)
-                        //   tears this collector down mid-create. The holder is app-scoped and
-                        //   survives, so the next collector re-fires the link — unless we clear it
-                        //   here, which would lose the arrival entirely and re-open the very funnel
-                        //   hole this block exists to close.
-                        // - consume(link): identity-scoped, so a newer link submitted by a warm
-                        //   onNewIntent while this one was still creating is never swallowed.
-                        if (currentCoroutineContext().isActive) {
-                            pendingGalleryDeepLink.consume(link)
-                        }
-                    }
+                    handleGalleryDeepLink(
+                        link = link,
+                        pending = pendingGalleryDeepLink,
+                        analyticsTracker = analyticsTracker,
+                        createFromGallery = { slug -> createFromGalleryUseCase(slug) },
+                        onCreated = { checklistId ->
+                            navigator.navigateToChecklistDetail(checklistId, clearBackStack = true)
+                        },
+                        showNotFoundMessage = { snackbarHostState.showSnackbar(galleryNotFoundMessage) },
+                        showErrorMessage = { snackbarHostState.showSnackbar(galleryErrorMessage) },
+                    )
                 }
             }
 

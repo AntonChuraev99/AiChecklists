@@ -50,6 +50,34 @@ const ASSETLINKS_JSON = JSON.stringify([
   },
 ]);
 
+// robots.txt for app.gisti-ai.com. Served by the WORKER for the same reason as
+// assetlinks.json above: the assets dir is wasm build output (wiped every rebuild) and the
+// SPA not_found fallback would otherwise answer /robots.txt with index.html.
+//
+// That fallback is exactly the bug this fixes (found 2026-07-28): the subdomain had NO
+// robots.txt at all — the request returned 200 with a 12KB HTML shell, Google parsed it,
+// found no directives, and concluded "everything is allowed". robots.txt is a per-HOST
+// resource, so the apex gisti-ai.com/robots.txt never governed this subdomain.
+//
+// Consequence: Googlebot crawled gallery deep-links like
+// /?g=create&template=<slug>&utm_source=gallery and filed them as "duplicate, no
+// user-selected canonical" — correct, since the Compose/Skiko canvas returns the same
+// empty DOM at every URL. Meanwhile 14 real gallery pages listed in the landing sitemap
+// had never been crawled at all. The crawl budget was going to an unbounded URL space
+// that can never rank, instead of to the pages that can.
+//
+// The bare root stays crawlable: brand queries ("gisti") legitimately resolve to it.
+const ROBOTS_TXT = `# app.gisti-ai.com — the Gisti web app (Compose/Skiko canvas).
+# Every URL here renders the same empty DOM, so crawling beyond the root cannot
+# produce a useful result. Indexable content lives on https://gisti-ai.com/.
+User-agent: *
+Allow: /$
+Allow: /.well-known/
+Disallow: /
+
+Sitemap: https://gisti-ai.com/sitemap.xml
+`;
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -58,6 +86,15 @@ export default {
       url.protocol = "https:";
       url.port = "";
       return Response.redirect(url.toString(), 301);
+    }
+    // Must answer before the asset/SPA fallback, or it becomes index.html (see ROBOTS_TXT).
+    if (url.pathname === "/robots.txt") {
+      return new Response(ROBOTS_TXT, {
+        headers: {
+          "content-type": "text/plain; charset=utf-8",
+          "cache-control": "public, max-age=3600",
+        },
+      });
     }
     // Android App Links verification file — must return the JSON directly (200, no
     // redirect) before the asset/SPA fallback can turn it into index.html.

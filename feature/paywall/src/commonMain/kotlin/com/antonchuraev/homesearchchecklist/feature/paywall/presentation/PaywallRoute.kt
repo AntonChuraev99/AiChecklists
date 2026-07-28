@@ -74,11 +74,18 @@ fun PaywallRoute(
     // so we don't spin up a PaywallViewModel + offerings flow we won't use.
     if (isWebPaywallTarget) {
         val navigator: AppNavigator = koinInject()
+        // The only paywall_shown emitted outside PaywallViewModel: this branch returns BEFORE the
+        // VM is injected, so no VM exists to emit it. Tagged web_install so it can be excluded —
+        // it is an impression that can never convert (no products, no billing in the browser),
+        // and leaving it untagged in the denominator silently depresses every conversion rate.
         LaunchedEffect(Unit) {
             analyticsTracker.screenView(AnalyticsScreens.PAYWALL_WEB_INSTALL)
             analyticsTracker.event(
                 AnalyticsEvents.Paywall.SHOWN,
-                mapOf(AnalyticsParams.SOURCE to (sourceOverride ?: "unknown")),
+                mapOf(
+                    AnalyticsParams.SOURCE to (sourceOverride ?: "unknown"),
+                    AnalyticsParams.SURFACE to AnalyticsEvents.Paywall.SURFACE_WEB_INSTALL,
+                ),
             )
         }
         WebInstallAppScreen(
@@ -105,16 +112,11 @@ fun PaywallRoute(
     val viewModel: PaywallViewModel = koinViewModel(key = "paywall_${sourceOverride}_$forceVariant") { parametersOf(sourceOverride, forceVariant) }
     val state by viewModel.screenState.collectAsStateWithLifecycle()
 
-    // paywall_shown — gate-attribution funnel entry. screen_view (above) stays for GA4
-    // screen-tracking; this carries the `source` that opened the paywall so we can join
-    // shown → purchase_button_clicked → purchase_completed by source. Keyed on state.source
-    // so it fires once the VM has resolved the canonical source (constructor / nav-arg).
-    LaunchedEffect(state.source) {
-        analyticsTracker.event(
-            AnalyticsEvents.Paywall.SHOWN,
-            mapOf(AnalyticsParams.SOURCE to state.source),
-        )
-    }
+    // paywall_shown is NOT emitted here — PaywallViewModel.init owns it (next to paywall_opened,
+    // from one shared param map). Emitting it from this Route was the funnel bug: the two
+    // onboarding paywall hosts drive the SAME ViewModel but never compose this Route, so they
+    // produced purchase taps with no matching impression and "paywall → tap" read ~71%.
+    // screen_view (above) stays for GA4 screen-tracking.
 
     // Navigate away on purchase success (handled by ViewModel in Phase 2)
     LaunchedEffect(state.purchaseSuccess) {

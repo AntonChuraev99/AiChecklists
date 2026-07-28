@@ -1096,7 +1096,12 @@ def link_google_account(request: Request):
         })
 
     except Exception as e:
-        return create_error_response(f"Failed to link Google account: {str(e)}", 500)
+        # Without this the 500 is unrecoverable after the fact: Cloud Logging keeps the request
+        # log (a bare "500") but no traceback, so the root cause is gone. Precedent 2026-07-27:
+        # a 500 here (5.04s latency) left zero app-log lines and could not be diagnosed at all.
+        logger.exception("link_google_account: failed (%s)", type(e).__name__)
+        # Do NOT put str(e) in the response body — it ships Firestore/genai internals to the client.
+        return create_error_response("Failed to link Google account", 500)
 
 
 # ============================================================================
@@ -1221,7 +1226,8 @@ def register_push_token(request: Request):
         )
         return create_success_response({})
     except Exception as e:
-        return create_error_response(f"Failed to register push token: {str(e)}", 500)
+        logger.exception("register_push_token: failed (%s)", type(e).__name__)
+        return create_error_response("Failed to register push token", 500)
 
 
 # ============================================================================
@@ -1626,7 +1632,8 @@ def refill_premium_credits(request: Request):
         })
 
     except Exception as e:
-        return create_error_response(f"Failed to refill credits: {str(e)}", 500)
+        logger.exception("refill_premium_credits: failed (%s)", type(e).__name__)
+        return create_error_response("Failed to refill credits", 500)
 
 
 # ============================================================================
@@ -1930,7 +1937,8 @@ def send_promotions_batch(request: Request):
         return create_success_response(result)
 
     except Exception as e:  # noqa: BLE001
-        return create_error_response(f"Failed to send promotions: {str(e)}", 500)
+        logger.exception("send_promotions_batch: failed (%s)", type(e).__name__)
+        return create_error_response("Failed to send promotions", 500)
 
 
 # ============================================================================
@@ -2457,7 +2465,7 @@ def classify_chat_intent(request: Request):
         # Refund the credit so the user is not charged for our failure.
         # Best-effort — refund failure is swallowed; original error is surfaced.
         refund_chat_credit(user_id, reason=f"chat_classifier_gemini_failure: {type(e).__name__}")
-        return create_error_response(f"classification failed: {str(e)}", 500)
+        return create_error_response("Classification failed", 500)
 
 
 # ============================================================================
@@ -2570,7 +2578,7 @@ def transcribe_audio(request: Request):
         # Gemini call failed AFTER reserve_chat_credit deducted 1.
         # Refund so the user is not charged for our failure.
         refund_chat_credit(user_id, reason=f"transcribe_audio_gemini_failure: {type(e).__name__}")
-        return create_error_response(f"transcription failed: {str(e)}", 500)
+        return create_error_response("Transcription failed", 500)
 
 
 # ============================================================================
@@ -2899,11 +2907,14 @@ def chat_completion(request: Request):
         })
 
     except Exception as e:
+        # Log BEFORE refunding: if the refund itself throws, the original traceback would
+        # otherwise be replaced by the refund's and the real cause would be lost.
+        logger.exception("chat_completion: failed (%s)", type(e).__name__)
         refund_chat_completion_credits(
             user_id,
             reason=f"chat_completion_gemini_failure: {type(e).__name__}"
         )
-        return create_error_response(f"completion failed: {str(e)}", 500)
+        return create_error_response("Completion failed", 500)
 
 
 # ============================================================================
@@ -3634,4 +3645,4 @@ def chat_agent(request: Request):
                 refund_credits(user_id, CHAT_AGENT_COST, reason, request_id)
             else:
                 refund_chat_completion_credits(user_id, reason=reason)
-        return create_error_response(f"agent step failed: {str(e)}", 500)
+        return create_error_response("Agent step failed", 500)

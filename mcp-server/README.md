@@ -85,16 +85,47 @@ breaks its own test.
 
 ## Analytics (`analytics.ts`)
 
-Three events to Amplitude project **786722** via the HTTP V2 API (plain `fetch`, no SDK). They
-answer: how many people connected · which of the 16 tools are live vs dead · which fail · and
-whether MCP users retain better — the last one only works because the events land on the **same
-user profile the app writes**.
+Seven events to Amplitude project **786722** via the HTTP V2 API (plain `fetch`, no SDK). They
+answer: did anyone even get through OAuth · how many people connected, from which client · which of
+the 16 tools are live vs dead · which fail, how, and how slowly · and whether MCP users retain
+better — the last one only works because the events land on the **same user profile the app writes**.
 
 | Event | Properties |
 |---|---|
-| `mcp_session_started` | `linked` (false = connected but no Gisti account yet). Once per MCP session, on its first tool call |
-| `mcp_tool_called` | `tool_name`. Every invocation |
-| `mcp_tool_failed` | `tool_name`, `reason` — `cf_402` (no credits) / `cf_429` / `cf_503` / `cf_network` / `exception` |
+| `mcp_auth_started` | *(none)* — `/authorize` accepted the client and redirected to Google |
+| `mcp_auth_completed` | *(none)* — the grant exists and the client is connected |
+| `mcp_auth_failed` | `reason` — `invalid_request` / `missing_client_id` / `missing_code_or_state` / `invalid_state` / `state_missing_client_id` / `google_token_<status>` / `no_id_token` / `id_token_unreadable` / `no_email` / `grant_failed` |
+| `mcp_session_started` | `linked` (false = connected but no Gisti account yet), `identity_resolved`, `client_name`, `client_version`. Once per MCP session, on its first tool call |
+| `mcp_tool_called` | `tool_name`. Every invocation, emitted **before** the handler runs |
+| `mcp_tool_completed` | `tool_name`, `duration_ms`, `outcome` (`ok` / `soft_fail`), `reason` (only when `soft_fail`) — `rate_limited` / `not_linked` / `checklist_not_found` / `fill_not_found` / `item_not_found` / `empty_query` / `empty_name` / `no_items` |
+| `mcp_tool_failed` | `tool_name`, `duration_ms`, `reason` — `cf_402` (no credits) / `cf_429` / `cf_503` / `cf_network` / `exception` |
+
+**Reading the data — four traps:**
+
+- **The OAuth funnel is EVENT TOTALS, not unique users.** `/authorize` has no email, so
+  `mcp_auth_started` / `mcp_auth_failed` are attributed to one shared synthetic device
+  (`mcp_auth_flow`) — a per-attempt random id would mint a new Amplitude "user" per attempt and
+  inflate DAU. `mcp_auth_completed` is the exception: by then the email is known, so it carries the
+  real `mcp_<sha256(email)>` device and joins to the person. Zero `mcp_session_started` with a
+  healthy `mcp_auth_started` count means people arrived and bounced — that distinction is the whole
+  reason these three exist.
+- **A tool has three outcomes, and `mcp_tool_called` is not one of them.** `called` fires before the
+  handler (so a hang still leaves a trace) and is closed by exactly one of `mcp_tool_completed` /
+  `mcp_tool_failed`. Success rate = `completed[outcome=ok] ÷ called`; `called − completed − failed`
+  is the never-returned bucket. **`mcp_tool_failed` only fires on a thrown error** — every "soft"
+  refusal (rate-limit deny, `SIGN_IN_HINT`, "No checklist found with id X") is an ordinary return
+  and shows up as `mcp_tool_completed{outcome:soft_fail}`. `checklist_not_found` / `item_not_found` /
+  `fill_not_found` are the "the agent invented an id" signal.
+- **`linked=false` means "no Gisti account" only when `identity_resolved=true`.** When the Firestore
+  identity lookup fails the session degrades to a device-id-only identity and reports
+  `identity_resolved=false`; filter those out before quoting the unlinked population. (Previously
+  such a session was dropped from analytics entirely — no events at all, not even `session_started`.)
+- **`mcp_session_started` counts CONNECTIONS, not people.** It is once per MCP session id, persisted
+  in Durable Object storage so an evicted/hibernated DO does not re-fire it — but a client that
+  reconnects legitimately opens a new session. MCP has no user-level session concept; count people
+  with distinct `user_id` / `device_id`.
+
+Notes:
 
 - **`user_id` = the `users/{doc_id}` UUID** (`resolveUserContext().creditUserId`), sent verbatim.
   That is exactly what the app passes to `setUserId` (`Analytics.kt` ← `SplashViewModel` ←
@@ -103,27 +134,35 @@ user profile the app writes**.
   and makes the retention question unanswerable. An unlinked email gets no `user_id`, only a
   pseudonymous `device_id` = `mcp_<sha256(email)[0:16]>` (the email itself never leaves the worker).
 - **Privacy: checklist names, item text, notes, and prompts are never sent.** Enforced by the type
-  system, not by discipline — `McpEvent` is a closed union with no free-text field, so a raw error
-  message (which quotes user data) cannot be attached without a compile error. `analytics.test.ts`
-  pins the payload's key allowlist.
+  system, not by discipline — `McpEvent` is a closed union whose payloads are tool names, reasons
+  from fixed vocabularies, and durations, so a raw error message (which quotes user data) cannot be
+  attached without a compile error. The one non-enumerable string is the MCP client's self-reported
+  `clientInfo`, and it is forced through `sanitizeClientSlug` / `sanitizeClientVersion` into a
+  ≤24-char `[a-z0-9-]` token first. `analytics.test.ts` pins the payload key allowlist across
+  **every** event variant (`Record<McpEvent["type"], McpEvent>` makes a new event fail to compile
+  until it is added to the privacy tests).
 - **Never on the critical path** — fire-and-forget; a missing key or a failed POST logs and no-ops.
-  No `ctx.waitUntil()`: these run inside the Durable Object, where `waitUntil` [has no
-  effect](https://developers.cloudflare.com/durable-objects/api/state/) — a DO stays alive on its
-  own while the fetch is pending.
+  Tool events use **no** `ctx.waitUntil()`: they run inside the Durable Object, where `waitUntil`
+  [has no effect](https://developers.cloudflare.com/durable-objects/api/state/) — a DO stays alive
+  on its own while the fetch is pending. The `mcp_auth_*` events are the opposite case: they run in
+  a plain Worker request that can be torn down at response time, so `executionCtx.waitUntil` there
+  is required, not cargo cult.
 
 ## Files
 
 | File | Purpose |
 |------|---------|
 | `src/index.ts` | Worker entry — `OAuthProvider` wiring, `serve("/mcp")` |
-| `src/google-handler.ts` | Upstream Google OAuth leg (`/authorize`, `/callback`) |
-| `src/mcp.ts` | `GistiMCP` McpAgent — all tools |
+| `src/google-handler.ts` | Upstream Google OAuth leg (`/authorize`, `/callback`) + the `mcp_auth_*` funnel |
+| `src/mcp.ts` | `GistiMCP` McpAgent — all tools, `tracked()` instrumentation wrapper |
+| `src/types.ts` | Worker `Env` bindings/secrets + the OAuth `Props` (proven Google claims) |
 | `src/firestore.ts` | SA-JWT auth + Firestore REST (resolve, read, write) |
 | `src/model.ts` | Domain types + `itemsJson` decoders (read path) |
 | `src/encode.ts` | `itemsJson` + Firestore-doc encoders (write path) |
 | `src/mutate.ts` | Pure domain mutations for the write tools |
 | `src/cf.ts` | Cloud Function client (AI write) |
 | `src/security.ts` | OAuth state, rate limiting, request_id |
+| `src/analytics.ts` | Amplitude event union, identity, privacy sanitisers, HTTP V2 upload |
 | `src/*.test.ts` | vitest unit + contract tests |
 | `scripts/verify-*.ts` | Node scripts to exercise the real read/write path against prod |
 
@@ -132,7 +171,7 @@ user profile the app writes**.
 ```bash
 npm install
 npm run typecheck            # tsc --noEmit
-npm run test                 # vitest (encode contract + mutate + security)
+npm run test                 # vitest (encode contract + mutate + security + analytics privacy)
 npm run dev                  # wrangler dev (local)
 
 # deploy (gmail Cloudflare account — account_id pinned in wrangler.jsonc)

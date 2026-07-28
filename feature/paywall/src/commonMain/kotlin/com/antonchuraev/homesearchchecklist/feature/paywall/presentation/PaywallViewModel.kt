@@ -70,6 +70,27 @@ class PaywallViewModel(
         ?: savedStateHandle[AppNavRoute.Paywall::source.name]
         ?: "unknown"
 
+    /**
+     * WHICH paywall UI this instance drives, derived from [source]. Both onboarding hosts pass
+     * [AnalyticsEvents.Paywall.SOURCE_ONBOARDING_TRIAL]; everything else reaches the paywall via
+     * `navigateToPaywall`, i.e. the standalone screen. Attached to every funnel event so an
+     * onboarding impression is never pooled with a limit-gate impression.
+     */
+    private val surface: String =
+        if (source == AnalyticsEvents.Paywall.SOURCE_ONBOARDING_TRIAL) {
+            AnalyticsEvents.Paywall.SURFACE_ONBOARDING
+        } else {
+            AnalyticsEvents.Paywall.SURFACE_PAYWALL_SCREEN
+        }
+
+    /**
+     * A purchase started by an earlier tap is still running. Analytics-only — deliberately NOT
+     * [PaywallState.isPurchasing]: that one is set inside the purchase coroutine (one dispatch
+     * later) and drives the UI, so it cannot see a second tap that lands in the same frame, which
+     * is exactly the tap we want to mark. Never gates the purchase itself.
+     */
+    private var purchaseInFlight: Boolean = false
+
     private val _screenState = MutableStateFlow(PaywallState(source = source))
     override val screenState: StateFlow<PaywallState> = _screenState.asStateFlow()
 
@@ -152,16 +173,23 @@ class PaywallViewModel(
                 "paywall_default_plan" to resolvedPlan.name.lowercase(),
             ),
         )
-        analyticsTracker.event(
-            "paywall_opened",
-            buildMap {
-                put("source", source)
-                put("variant", resolvedVariant.name)
-                put("default_plan", resolvedPlan.name.lowercase())
-                getDeviceCountry()?.let { put("country", it) }
-                getPlayStoreVersion()?.let { put("play_store_version", it) }
-            },
-        )
+        // ONE map, TWO wire names. `paywall_opened` is the historical name the PaywallsV1 A/B
+        // experiment and the existing dashboards read; `paywall_shown` is the funnel-entry name.
+        // They used to be emitted from different layers with different coverage — `paywall_shown`
+        // only from PaywallRoute, so neither onboarding paywall produced an impression while both
+        // produced purchase taps, which is what inflated "paywall → tap" to ~71%. Emitting both
+        // from the same map at the same point makes that drift structurally impossible. Neither
+        // name may be renamed or dropped: historical series hang off both.
+        val impressionParams = buildMap {
+            put(AnalyticsParams.SOURCE, source)
+            put(AnalyticsParams.SURFACE, surface)
+            put(AnalyticsParams.VARIANT, resolvedVariant.name)
+            put("default_plan", resolvedPlan.name.lowercase())
+            getDeviceCountry()?.let { put("country", it) }
+            getPlayStoreVersion()?.let { put("play_store_version", it) }
+        }
+        analyticsTracker.event("paywall_opened", impressionParams)
+        analyticsTracker.event(AnalyticsEvents.Paywall.SHOWN, impressionParams)
 
         // Read the persisted A/B arm off the main path — best-effort attribution for the purchase
         // funnel. Never blocks product load or the purchase itself.
@@ -398,10 +426,18 @@ class PaywallViewModel(
 
         logger?.info(TAG, "[PAYWALL] purchase() initiated: plan=${currentState.selectedPlan.name}, sku=${selectedProduct.id}, pkg=${selectedProduct.packageId}")
 
+        // Read-then-set, synchronously, so a second tap landing in the SAME frame as the first is
+        // reported as the duplicate it is instead of as a second user intent. Marked, never
+        // dropped — the duplicate rate measures how long the billing sheet keeps users waiting.
+        val isRepeatTap = purchaseInFlight
+        purchaseInFlight = true
+
         analyticsTracker.event(
             AnalyticsEvents.Paywall.PURCHASE_BUTTON_CLICKED,
             buildMap {
                 put(AnalyticsParams.SOURCE, source)
+                put(AnalyticsParams.SURFACE, surface)
+                put(AnalyticsParams.IS_REPEAT_TAP, isRepeatTap)
                 put(AnalyticsParams.PRODUCT_ID, selectedProduct.id)
                 put(AnalyticsParams.HAS_FREE_TRIAL, selectedProduct.hasFreeTrial)
                 put("sku_id", selectedProduct.id)
@@ -413,13 +449,14 @@ class PaywallViewModel(
             },
         )
 
-        viewModelScope.launch {
+        val purchaseJob = viewModelScope.launch {
             _screenState.update { it.copy(isPurchasing = true, error = null) }
 
             when (val result = purchaseProductUseCase(selectedProduct.packageId)) {
                 is PurchaseResult.Success -> {
                     analyticsTracker.event(AnalyticsEvents.Paywall.PURCHASE_COMPLETED, buildMap {
                         put(AnalyticsParams.SOURCE, source)
+                        put(AnalyticsParams.SURFACE, surface)
                         put(AnalyticsParams.PRODUCT_ID, selectedProduct.id)
                         put("sku_id", selectedProduct.id)
                         put("plan_type", currentState.selectedPlan.name.lowercase())
@@ -438,6 +475,7 @@ class PaywallViewModel(
                 is PurchaseResult.Cancelled -> {
                     val cancelParams = buildMap<String, Any> {
                         put(AnalyticsParams.SOURCE, source)
+                        put(AnalyticsParams.SURFACE, surface)
                         put(AnalyticsParams.PRODUCT_ID, selectedProduct.id)
                         put("sku_id", selectedProduct.id)
                         put("plan_type", currentState.selectedPlan.name.lowercase())
@@ -469,6 +507,7 @@ class PaywallViewModel(
                 is PurchaseResult.Error -> {
                     analyticsTracker.event(AnalyticsEvents.Paywall.PURCHASE_FAILED, buildMap {
                         put(AnalyticsParams.SOURCE, source)
+                        put(AnalyticsParams.SURFACE, surface)
                         put(AnalyticsParams.PRODUCT_ID, selectedProduct.id)
                         put("sku_id", selectedProduct.id)
                         put("plan_type", currentState.selectedPlan.name.lowercase())
@@ -486,6 +525,10 @@ class PaywallViewModel(
                 }
             }
         }
+        // Clears on EVERY exit — normal completion, a throw from a result branch, or cancellation
+        // when the VM dies mid-purchase. A leaked `true` would misreport every later tap as a
+        // repeat and quietly zero the funnel numerator.
+        purchaseJob.invokeOnCompletion { purchaseInFlight = false }
     }
 
     private fun restorePurchases() {

@@ -16,9 +16,15 @@
  * Public-launch hardening (security.ts): opaque OAuth state, per-user rate limiting, deterministic
  * request_id (retry dedup), and a tracked() wrapper so a tool never leaks an unhandled error.
  *
- * Instrumentation (analytics.ts): every tool goes through `tracked()`, which emits the three
- * `mcp_*` Amplitude events off the critical path. Identity joins to the app's own Amplitude
- * profile via `creditUserId`; no checklist content is ever sent. See analytics.ts for both.
+ * Instrumentation (analytics.ts): every tool goes through `tracked()`, which emits the `mcp_tool_*`
+ * Amplitude events off the critical path. Identity joins to the app's own Amplitude profile via
+ * `creditUserId`; no checklist content is ever sent. See analytics.ts for both.
+ *
+ * A tool has THREE outcomes, and all three are measured: it worked, it threw (`mcp_tool_failed`),
+ * or it returned a soft refusal — rate-limit deny, SIGN_IN_HINT, "no checklist found with id X".
+ * The soft refusals are the interesting ones (an agent inventing an id is the classic MCP failure)
+ * and they are ordinary returns, so they must be TAGGED at the return site with `softResult()`;
+ * anything returned via plain `textResult()` counts as success.
  */
 import { McpAgent } from "agents/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -68,10 +74,16 @@ import {
 } from "./security";
 import {
   failureReason,
+  markSoftFail,
   pseudonymousDeviceId,
+  sanitizeClientSlug,
+  sanitizeClientVersion,
   sendMcpEvent,
+  softFailReasonOf,
+  UNKNOWN_CLIENT,
   type AnalyticsIdentity,
   type McpEvent,
+  type ToolSoftFailReason,
 } from "./analytics";
 
 const SIGN_IN_HINT =
@@ -81,6 +93,15 @@ type ToolResult = { content: Array<{ type: "text"; text: string }> };
 
 function textResult(text: string): ToolResult {
   return { content: [{ type: "text" as const, text }] };
+}
+
+/**
+ * A tool result that did NOT do what was asked (see `ToolSoftFailReason`). The client sees exactly
+ * the same payload as `textResult(text)` — the reason rides on a non-enumerable symbol key that
+ * `JSON.stringify` ignores and only `tracked()` reads. Behaviour unchanged; visibility added.
+ */
+function softResult(reason: ToolSoftFailReason, text: string): ToolResult {
+  return markSoftFail(textResult(text), reason);
 }
 
 /** One-line summary for the list view. */
@@ -177,32 +198,96 @@ export class GistiMCP extends McpAgent<Env, unknown, Props> {
 
   /** Memoised per DO instance (= per MCP session): the identity resolve costs a Firestore query. */
   private analyticsIdentity?: Promise<AnalyticsIdentity | null>;
-  /** `mcp_session_started` fires once per DO instance, on the first tool call. */
+  /** In-memory half of the `mcp_session_started` guard; the durable half is `SESSION_EVENT_KEY`. */
   private sessionTracked = false;
+
+  /**
+   * Durable-storage key for "this MCP session already emitted `mcp_session_started`".
+   *
+   * The in-memory flag alone was not enough: it lives in the Durable Object instance, and an
+   * evicted/hibernated DO comes back with it cleared, so ONE MCP session re-fired the event on its
+   * next tool call. That is why prod showed 8 "sessions" for 12 tool calls. Persisting the flag
+   * makes the event once-per-session-id.
+   *
+   * RESIDUAL LIMITATION (unfixable here, and documented in README): a client that reconnects gets a
+   * NEW MCP session id and therefore a new DO, so it legitimately counts as a new session. MCP has
+   * no user-level session concept — `mcp_session_started` counts CONNECTIONS, not people. Count
+   * people with unique `user_id` / `device_id`.
+   */
+  private static readonly SESSION_EVENT_KEY = "analytics:sessionStarted";
 
   /**
    * The caller's Amplitude identity, resolved at most once per session. Cached because it is only
    * an analytics label — staleness within one session is harmless, and re-resolving per tool call
    * would add a Firestore round-trip to the very path this is supposed to stay out of.
    *
-   * Never rejects: a resolve failure yields null (events dropped), so the memo can't poison the
-   * session with a permanently rejected promise.
+   * Never rejects. A Firestore hiccup DEGRADES (device-id only, `resolved: false`) rather than
+   * dropping the whole session's analytics — the previous `return null` meant one failed lookup
+   * erased the session from the data entirely, `mcp_session_started` included, and left no trace
+   * that it had happened. `resolved: false` also stops a degraded session from being counted as an
+   * unlinked one, which would have been a silent lie in the exact metric this event exists for.
    */
   private identityForAnalytics(): Promise<AnalyticsIdentity | null> {
     this.analyticsIdentity ??= (async (): Promise<AnalyticsIdentity | null> => {
       const email = this.props?.claims.email;
-      if (!email) return null;
+      if (!email) {
+        // Cannot happen behind the OAuth provider; if it ever does, it is a bug worth seeing.
+        console.warn("[gisti-mcp] analytics: no email on props — events dropped for this session");
+        return null;
+      }
+      let deviceId: string;
+      try {
+        deviceId = await pseudonymousDeviceId(email);
+      } catch (e) {
+        console.warn("[gisti-mcp] analytics: device id hash failed:", e instanceof Error ? e.message : e);
+        return null;
+      }
       try {
         // `creditUserId` IS the users/{doc_id} the app passes to Amplitude's setUserId — the join
         // key. Null (unlinked email) → the caller is still counted under the pseudonymous id.
         const ctx = await resolveUserContext(this.env, email);
-        return { userId: ctx?.creditUserId ?? null, deviceId: await pseudonymousDeviceId(email) };
+        return { userId: ctx?.creditUserId ?? null, deviceId, resolved: true };
       } catch (e) {
         console.warn("[gisti-mcp] analytics identity resolve failed:", e instanceof Error ? e.message : e);
-        return null;
+        return { userId: null, deviceId, resolved: false };
       }
     })();
     return this.analyticsIdentity;
+  }
+
+  /**
+   * Which MCP client is on the other end, from the initialize handshake — the server is in the
+   * public registry and had no way of telling Claude Desktop from Claude Code from a third party.
+   * Sanitised to a bounded slug in analytics.ts; `getClientVersion()` is reached defensively
+   * because it is SDK internals, and a missing name must degrade to `unknown`, never throw.
+   */
+  private clientInfo(): { name: string; version: string } {
+    try {
+      const impl = (
+        this.server as unknown as {
+          server?: { getClientVersion?: () => { name?: unknown; version?: unknown } | undefined };
+        }
+      ).server?.getClientVersion?.();
+      return { name: sanitizeClientSlug(impl?.name), version: sanitizeClientVersion(impl?.version) };
+    } catch (e) {
+      console.warn("[gisti-mcp] analytics: client info unavailable:", e instanceof Error ? e.message : e);
+      return { name: UNKNOWN_CLIENT, version: UNKNOWN_CLIENT };
+    }
+  }
+
+  /** True exactly once per MCP session (survives DO eviction — see `SESSION_EVENT_KEY`). */
+  private async claimSessionStart(): Promise<boolean> {
+    // Check-and-set with no await between them → two concurrent tool calls can't double-fire.
+    if (this.sessionTracked) return false;
+    this.sessionTracked = true;
+    try {
+      if (await this.ctx.storage.get<boolean>(GistiMCP.SESSION_EVENT_KEY)) return false;
+      await this.ctx.storage.put(GistiMCP.SESSION_EVENT_KEY, true);
+    } catch (e) {
+      // Storage unavailable → fall back to the in-memory guard (at worst a duplicate after evict).
+      console.warn("[gisti-mcp] analytics: session flag persist failed:", e instanceof Error ? e.message : e);
+    }
+    return true;
   }
 
   /**
@@ -216,13 +301,18 @@ export class GistiMCP extends McpAgent<Env, unknown, Props> {
     void (async () => {
       const identity = await this.identityForAnalytics();
       if (!identity) return;
-      // Check-and-set with no await between them → two concurrent tool calls can't double-fire.
-      if (!this.sessionTracked) {
-        this.sessionTracked = true;
+      if (await this.claimSessionStart()) {
+        const client = this.clientInfo();
         await sendMcpEvent(
           this.env,
           identity,
-          { type: "mcp_session_started", linked: identity.userId !== null },
+          {
+            type: "mcp_session_started",
+            linked: identity.userId !== null,
+            identityResolved: identity.resolved,
+            clientName: client.name,
+            clientVersion: client.version,
+          },
           Date.now(),
         );
       }
@@ -238,6 +328,12 @@ export class GistiMCP extends McpAgent<Env, unknown, Props> {
    * Instrumentation sits INSIDE the catch on purpose: the error is classified before it is turned
    * into a friendly string, so `mcp_tool_failed.reason` sees the real cause. Only the closed
    * `ToolFailureReason` vocabulary is uploaded — the message itself is logged, never sent.
+   *
+   * `mcp_tool_called` stays BEFORE the handler (so a call that hangs or times out still leaves a
+   * trace) and is joined by exactly one terminal event: `mcp_tool_completed` when the handler
+   * returns — carrying `duration_ms` and whether that return was a soft refusal — or
+   * `mcp_tool_failed` when it throws. `called` therefore counts attempts, and the difference
+   * `called − completed − failed` is the "never came back" bucket.
    */
   private tracked<A>(
     toolName: string,
@@ -245,10 +341,25 @@ export class GistiMCP extends McpAgent<Env, unknown, Props> {
   ): (args: A) => Promise<ToolResult> {
     return async (args: A) => {
       this.track({ type: "mcp_tool_called", toolName });
+      // Wall clock, not perf.now(): the AI tools' cost is a network hop to the Cloud Functions,
+      // and the question is how long the user waited, not how long this isolate computed.
+      const startedAt = Date.now();
       try {
-        return await handler(args);
+        const result = await handler(args);
+        this.track({
+          type: "mcp_tool_completed",
+          toolName,
+          durationMs: Date.now() - startedAt,
+          softFail: softFailReasonOf(result),
+        });
+        return result;
       } catch (e) {
-        this.track({ type: "mcp_tool_failed", toolName, reason: failureReason(e) });
+        this.track({
+          type: "mcp_tool_failed",
+          toolName,
+          reason: failureReason(e),
+          durationMs: Date.now() - startedAt,
+        });
         if (e instanceof CfError) return textResult(cfErrorHint(e));
         console.error("[gisti-mcp] tool error:", e instanceof Error ? (e.stack ?? e.message) : e);
         return textResult("Something went wrong handling that request. Please try again.");
@@ -256,13 +367,17 @@ export class GistiMCP extends McpAgent<Env, unknown, Props> {
     };
   }
 
-  /** Best-effort per-user rate limit. Returns a deny message, or null when allowed / unauthenticated. */
-  private async rateLimited(tier: RateTier): Promise<string | null> {
+  /**
+   * Best-effort per-user rate limit. Returns the ready-made deny result (tagged `rate_limited` so
+   * the throttle is countable), or null when allowed / unauthenticated.
+   */
+  private async rateLimited(tier: RateTier): Promise<ToolResult | null> {
     const email = this.props?.claims.email;
     if (!email) return null;
     const { limit, windowSeconds } = RATE_TIERS[tier];
     const r = await rateLimit(this.env.OAUTH_KV, `${tier}:${email}`, limit, windowSeconds, Date.now());
-    return r.allowed ? null : `You're doing that too fast — try again in about ${r.resetSeconds}s.`;
+    if (r.allowed) return null;
+    return softResult("rate_limited", `You're doing that too fast — try again in about ${r.resetSeconds}s.`);
   }
 
   async init() {
@@ -279,9 +394,9 @@ export class GistiMCP extends McpAgent<Env, unknown, Props> {
       {},
       this.tracked("list_checklists", async () => {
         const denied = await this.rateLimited("read");
-        if (denied) return textResult(denied);
+        if (denied) return denied;
         const ids = await this.userIds();
-        if (ids.length === 0) return textResult(SIGN_IN_HINT);
+        if (ids.length === 0) return softResult("not_linked", SIGN_IN_HINT);
         const checklists = await collectChecklists(this.env, ids);
         if (checklists.length === 0) return textResult("You have no checklists yet.");
         return textResult(checklists.map(summarizeChecklist).join("\n"));
@@ -297,13 +412,13 @@ export class GistiMCP extends McpAgent<Env, unknown, Props> {
       },
       this.tracked("get_checklist", async ({ checklistId, fillId }) => {
         const denied = await this.rateLimited("read");
-        if (denied) return textResult(denied);
+        if (denied) return denied;
         const ids = await this.userIds();
-        if (ids.length === 0) return textResult(SIGN_IN_HINT);
+        if (ids.length === 0) return softResult("not_linked", SIGN_IN_HINT);
         const owned = await findChecklistWithOwner(this.env, ids, checklistId);
-        if (!owned) return textResult(`No checklist found with id ${checklistId}.`);
+        if (!owned) return softResult("checklist_not_found", `No checklist found with id ${checklistId}.`);
         const fill = fillId ? findFill(owned.checklist, fillId) : null;
-        if (fillId && !fill) return textResult(`No fill found with id ${fillId} in "${owned.checklist.name}".`);
+        if (fillId && !fill) return softResult("fill_not_found", `No fill found with id ${fillId} in "${owned.checklist.name}".`);
         return textResult(renderChecklist(owned.checklist, fill));
       }),
     );
@@ -314,11 +429,11 @@ export class GistiMCP extends McpAgent<Env, unknown, Props> {
       { query: z.string().describe("Text to match against checklist names and item text.") },
       this.tracked("search_checklists", async ({ query }) => {
         const denied = await this.rateLimited("read");
-        if (denied) return textResult(denied);
+        if (denied) return denied;
         const ids = await this.userIds();
-        if (ids.length === 0) return textResult(SIGN_IN_HINT);
+        if (ids.length === 0) return softResult("not_linked", SIGN_IN_HINT);
         const q = query.trim().toLowerCase();
-        if (!q) return textResult("Empty query.");
+        if (!q) return softResult("empty_query", "Empty query.");
         const checklists = await collectChecklists(this.env, ids);
         const hits = checklists.filter((c) => {
           if (c.name.toLowerCase().includes(q)) return true;
@@ -343,9 +458,9 @@ export class GistiMCP extends McpAgent<Env, unknown, Props> {
       },
       this.tracked("create_checklist_ai", async ({ prompt, locale }) => {
         const denied = await this.rateLimited("ai");
-        if (denied) return textResult(denied);
+        if (denied) return denied;
         const ctx = await this.context();
-        if (!ctx) return textResult(SIGN_IN_HINT);
+        if (!ctx) return softResult("not_linked", SIGN_IN_HINT);
         const requestId = await stableRequestId(
           [ctx.creditUserId, "create", prompt, locale ?? ""],
           REQUEST_ID_BUCKET_MS,
@@ -377,16 +492,16 @@ export class GistiMCP extends McpAgent<Env, unknown, Props> {
       },
       this.tracked("fill_checklist_ai", async ({ checklistId, input, inputType, fillId }) => {
         const denied = await this.rateLimited("ai");
-        if (denied) return textResult(denied);
+        if (denied) return denied;
         const ctx = await this.context();
-        if (!ctx) return textResult(SIGN_IN_HINT);
+        if (!ctx) return softResult("not_linked", SIGN_IN_HINT);
         const owned = await findChecklistWithOwner(this.env, ctx.allIds, checklistId);
-        if (!owned) return textResult(`No checklist found with id ${checklistId}.`);
+        if (!owned) return softResult("checklist_not_found", `No checklist found with id ${checklistId}.`);
         if (fillId && !findFill(owned.checklist, fillId)) {
-          return textResult(`No fill found with id ${fillId} in "${owned.checklist.name}".`);
+          return softResult("fill_not_found", `No fill found with id ${fillId} in "${owned.checklist.name}".`);
         }
         const items = flattenFillForAi(owned.checklist, Date.now(), fillId ?? null);
-        if (items.length === 0) return textResult("That checklist has no items to fill.");
+        if (items.length === 0) return softResult("no_items", "That checklist has no items to fill.");
         const requestId = await stableRequestId(
           [ctx.creditUserId, "fill", checklistId, fillId ?? "", inputType ?? "text", input],
           REQUEST_ID_BUCKET_MS,
@@ -423,13 +538,13 @@ export class GistiMCP extends McpAgent<Env, unknown, Props> {
       missing = "That item was not found in the checklist.",
     ): Promise<ToolResult> => {
       const denied = await this.rateLimited("write");
-      if (denied) return textResult(denied);
+      if (denied) return denied;
       const ctx = await this.context();
-      if (!ctx) return textResult(SIGN_IN_HINT);
+      if (!ctx) return softResult("not_linked", SIGN_IN_HINT);
       const owned = await findChecklistWithOwner(this.env, ctx.allIds, checklistId);
-      if (!owned) return textResult(`No checklist found with id ${checklistId}.`);
+      if (!owned) return softResult("checklist_not_found", `No checklist found with id ${checklistId}.`);
       const next = fn(owned.checklist, Date.now());
-      if (!next) return textResult(missing);
+      if (!next) return softResult("item_not_found", missing);
       await writeChecklist(this.env, owned.ownerId, next);
       return textResult(ok(next));
     };
@@ -463,11 +578,11 @@ export class GistiMCP extends McpAgent<Env, unknown, Props> {
       },
       this.tracked("add_item", async ({ checklistId, text, parentId }) => {
         const denied = await this.rateLimited("write");
-        if (denied) return textResult(denied);
+        if (denied) return denied;
         const ctx = await this.context();
-        if (!ctx) return textResult(SIGN_IN_HINT);
+        if (!ctx) return softResult("not_linked", SIGN_IN_HINT);
         const owned = await findChecklistWithOwner(this.env, ctx.allIds, checklistId);
-        if (!owned) return textResult(`No checklist found with id ${checklistId}.`);
+        if (!owned) return softResult("checklist_not_found", `No checklist found with id ${checklistId}.`);
         const { checklist, itemId } = addItem(owned.checklist, text, parentId ?? null, Date.now());
         await writeChecklist(this.env, owned.ownerId, checklist);
         return textResult(`✓ Added "${text}". (id: ${itemId})`);
@@ -565,9 +680,9 @@ export class GistiMCP extends McpAgent<Env, unknown, Props> {
       },
       this.tracked("create_checklist_empty", async ({ name, items }) => {
         const denied = await this.rateLimited("write");
-        if (denied) return textResult(denied);
+        if (denied) return denied;
         const ctx = await this.context();
-        if (!ctx) return textResult(SIGN_IN_HINT);
+        if (!ctx) return softResult("not_linked", SIGN_IN_HINT);
         const checklist = createEmptyChecklist(name, items ?? [], Date.now());
         await writeChecklist(this.env, ctx.writeUserId, checklist);
         const n = leafItemCount(checklist);
@@ -582,11 +697,11 @@ export class GistiMCP extends McpAgent<Env, unknown, Props> {
       { checklistId: z.string().describe("The checklist id.") },
       this.tracked("list_fills", async ({ checklistId }) => {
         const denied = await this.rateLimited("read");
-        if (denied) return textResult(denied);
+        if (denied) return denied;
         const ids = await this.userIds();
-        if (ids.length === 0) return textResult(SIGN_IN_HINT);
+        if (ids.length === 0) return softResult("not_linked", SIGN_IN_HINT);
         const owned = await findChecklistWithOwner(this.env, ids, checklistId);
-        if (!owned) return textResult(`No checklist found with id ${checklistId}.`);
+        if (!owned) return softResult("checklist_not_found", `No checklist found with id ${checklistId}.`);
         const fills = listFills(owned.checklist);
         if (fills.length === 0) return textResult("That checklist has no fills.");
         return textResult(
@@ -609,13 +724,13 @@ export class GistiMCP extends McpAgent<Env, unknown, Props> {
       },
       this.tracked("create_fill", async ({ checklistId, name }) => {
         const denied = await this.rateLimited("write");
-        if (denied) return textResult(denied);
+        if (denied) return denied;
         const trimmed = name.trim();
-        if (!trimmed) return textResult("Please give the new fill a name.");
+        if (!trimmed) return softResult("empty_name", "Please give the new fill a name.");
         const ctx = await this.context();
-        if (!ctx) return textResult(SIGN_IN_HINT);
+        if (!ctx) return softResult("not_linked", SIGN_IN_HINT);
         const owned = await findChecklistWithOwner(this.env, ctx.allIds, checklistId);
-        if (!owned) return textResult(`No checklist found with id ${checklistId}.`);
+        if (!owned) return softResult("checklist_not_found", `No checklist found with id ${checklistId}.`);
         const { checklist, fillId } = createNamedFill(owned.checklist, trimmed, Date.now());
         await writeChecklist(this.env, owned.ownerId, checklist);
         return textResult(`✓ Created fill "${trimmed}". (fill id: ${fillId})`);

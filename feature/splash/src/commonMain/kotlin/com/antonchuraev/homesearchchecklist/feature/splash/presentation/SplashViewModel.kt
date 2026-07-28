@@ -98,9 +98,9 @@ class SplashViewModel(
                 // fetchTimeout (FirebaseRemoteConfigProvider.setFetchTimeoutInSeconds), not in a
                 // guessed constant here. The previous hard 3s cap aborted slow first-launch
                 // fetches on real devices, so the A/B experiment assignment never arrived and the
-                // onboarding variant silently fell back to the empty client default (slides) —
-                // collapsing the live split to 0% "none" in production while emulators (instant
-                // fetch) looked fine.
+                // onboarding variant silently fell back to the empty client default (the fallback
+                // arm — slides then, ai_welcome since 2026-07-28) — collapsing the live split to
+                // 0% "none" in production while emulators (instant fetch) looked fine.
                 val rc = fetchAndActivateWithFastRetry()
                 rcActivated = rc.activated
                 rcFetchMs = rc.totalMs
@@ -155,7 +155,9 @@ class SplashViewModel(
      * biggest *transient* cause is "Firebase Installations failed to get installation auth token" —
      * FIS registration races the very first fetch on a cold start. It can need MORE than one retry
      * to settle, so a single retry (the previous behavior) still gave up too early and forced the
-     * user onto the empty client default (slides), contaminating every RC-driven A/B. We now retry
+     * user onto the empty client default (the fallback arm), contaminating every RC-driven A/B —
+     * which is why A/B analysis must filter on rc_activated=true regardless of which arm that is.
+     * We now retry
      * up to [RC_MAX_FAST_ATTEMPTS] times, with a small [RC_RETRY_BACKOFF_MS] backoff to let the FIS
      * token propagate — but ONLY while each attempt fails FAST. A slow failure means the SDK fetch
      * timeout elapsed (offline / dead network), where more attempts would just multiply the splash
@@ -271,7 +273,7 @@ class SplashViewModel(
                     }
                     analyticsTracker.setUserProperties(mapOf("onboarding_type" to variantName))
                     // Surface RC resolution health so a future "experiment never assigns" bug
-                    // (slow-network fetch miss → empty default → forced slides) shows up in
+                    // (slow-network fetch miss → empty default → forced fallback arm) shows up in
                     // analytics, not only in user reports. RC_VALUE_EMPTY=true means the fetch
                     // returned nothing and we fell back to the client default — the exact signal
                     // that silently collapsed the A/B split to 0% none in prod.

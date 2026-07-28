@@ -141,9 +141,20 @@ object AnalyticsEvents {
      * nothing (stale gallery page / Firestore drift) — invisible before these events existed.
      * Every event carries [AnalyticsParams.TEMPLATE_SLUG] plus any utm_* captured off the
      * deep-link, so organic traffic is attributable to the exact landing page.
+     *
+     * ⚠️ Data BEFORE 2026-07-28 does not satisfy that equation: an arrival whose create was
+     * interrupted (Activity recreation) was retried by the next collector and re-emitted
+     * [DEEPLINK_OPENED] each time, so the left side inflated while the right side stayed put
+     * (measured: 7 opened / 1 created / 0 failed over ~1.5 unique users). `opened` is now
+     * deduplicated per arrival, so only later data is directly comparable — treat any older
+     * `opened` count as an upper bound, and prefer unique-user counts across the boundary.
      */
     object Gallery {
-        /** A gallery deep-link was parsed and handed to the create flow. Fires once per link. */
+        /**
+         * A gallery deep-link was parsed and handed to the create flow. Fires once per ARRIVAL —
+         * not once per processing attempt: a cancelled-and-retried create is still one arrival
+         * (deduplicated in `PendingGalleryDeepLink.markOpenedReported`).
+         */
         const val DEEPLINK_OPENED = "gallery_deeplink_opened"
 
         /**
@@ -362,9 +373,59 @@ object AnalyticsEvents {
 
     // ─── Paywall & purchase funnel ───────────────────────────────────────────
     object Paywall {
+        /**
+         * A paywall impression — the funnel entry, the denominator of every conversion rate.
+         *
+         * Emitted by `PaywallViewModel.init` (NOT by a screen), because the paywall is rendered by
+         * three different hosts and only the ViewModel is common to all of them:
+         *  - the standalone paywall screen (`PaywallRoute`),
+         *  - the onboarding paywall page (slides onboarding),
+         *  - the onboarding paywall step (interactive onboarding).
+         *
+         * ⚠️ Until 2026-07-28 this fired from `PaywallRoute` only, while
+         * [PURCHASE_BUTTON_CLICKED] fired from the shared ViewModel — so the two ends of the
+         * funnel counted DIFFERENT populations and the "paywall → tap" rate read ~71% (both
+         * onboarding surfaces contributed taps but no impressions). Series before and after that
+         * date are not comparable: `paywall_shown` volume steps up by the onboarding surfaces.
+         * Always split on [AnalyticsParams.SURFACE].
+         *
+         * Fires 1:1 with `paywall_opened` and carries the same params; `paywall_opened` is the
+         * older name kept alive because the `PaywallsV1` A/B experiment and existing dashboards
+         * are built on it. Both are emitted from ONE param map so they can never drift again.
+         * For a NEW chart prefer this one.
+         *
+         * ⚠️ Known over-count on [SURFACE_ONBOARDING], slides-onboarding variant only: that screen
+         * builds `PaywallViewModel` eagerly on page 1 (to preload products), not on the paywall
+         * page, so a user who taps Skip before reaching it still emits an impression. The
+         * interactive onboarding builds the ViewModel lazily at its paywall step and is exact.
+         * This is inherited from `paywall_opened`, which has always behaved this way. Treat
+         * `surface=onboarding` as an UPPER bound until the slides screen is made lazy.
+         */
         const val SHOWN = "paywall_shown"
         const val CLOSED = "paywall_closed"
+
+        /**
+         * The subscribe CTA was tapped, before billing runs. Carries
+         * [AnalyticsParams.IS_REPEAT_TAP] — filter `false` for a funnel, or the numerator
+         * double-counts users who re-tapped a slow billing sheet.
+         */
         const val PURCHASE_BUTTON_CLICKED = "purchase_button_clicked"
+
+        // ── Values of [AnalyticsParams.SURFACE] ───────────────────────────────
+        /** Standalone paywall screen reached via `navigateToPaywall` (a limit/gate was hit). */
+        const val SURFACE_PAYWALL_SCREEN = "paywall_screen"
+        /** Paywall page/step embedded in onboarding — shown to everyone, no gate was hit. */
+        const val SURFACE_ONBOARDING = "onboarding"
+        /** Web "install the mobile app" stand-in — no products, can never produce a purchase. */
+        const val SURFACE_WEB_INSTALL = "web_install"
+
+        /**
+         * The [AnalyticsParams.SOURCE] tag both onboarding paywall hosts pass into
+         * `PaywallViewModel`; it is what maps them to [SURFACE_ONBOARDING]. Kept here (not in the
+         * onboarding module) because the paywall module must resolve the surface without
+         * depending on onboarding.
+         */
+        const val SOURCE_ONBOARDING_TRIAL = "onboarding_trial"
         const val TERMS_CLICKED = "paywall_terms_clicked"
         const val PRIVACY_CLICKED = "paywall_privacy_clicked"
         const val SUPPORT_CLICKED = "paywall_support_clicked"
@@ -658,6 +719,27 @@ object AnalyticsParams {
     // Paywall / purchase
     const val PRODUCT_ID = "product_id"
     const val HAS_FREE_TRIAL = "has_free_trial"
+
+    /**
+     * WHICH paywall UI this event came from — see the `SURFACE_*` values on
+     * [AnalyticsEvents.Paywall]. Distinct from [SOURCE], which says WHY the paywall was opened
+     * (`checklist_limit`, `chat_insufficient_credits`, …).
+     *
+     * The paywall is rendered by more than one host (the standalone paywall screen AND the
+     * onboarding paywall step), so a funnel that does not split on `surface` mixes two
+     * populations with very different intent. Present on every event of the purchase funnel.
+     */
+    const val SURFACE = "surface"
+
+    /**
+     * `true` when the subscribe CTA was tapped while a purchase started by an EARLIER tap was
+     * still running. Such a tap is a duplicate of the intent, not a new one — funnels on
+     * [AnalyticsEvents.Paywall.PURCHASE_BUTTON_CLICKED] should filter `is_repeat_tap = false`.
+     *
+     * Marked rather than dropped: a silently swallowed event makes duplicate taps unmeasurable,
+     * and the duplicate rate is itself a UX signal (a slow billing sheet makes users re-tap).
+     */
+    const val IS_REPEAT_TAP = "is_repeat_tap"
     const val ITEM_ID = "item_id"
     const val ITEM_NAME = "item_name"
     const val TRIAL_DURATION = "trial_duration"
