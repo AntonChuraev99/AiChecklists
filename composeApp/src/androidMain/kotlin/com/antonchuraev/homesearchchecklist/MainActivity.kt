@@ -129,7 +129,17 @@ class MainActivity : ComponentActivity() {
 
         // Cold start from a gallery App Link (app.gisti-ai.com/?g=create&template={slug}). The slug
         // is stashed in the retained StateFlow; App.kt's LaunchedEffect consumes it once mounted.
-        submitGalleryDeepLinkIfPresent(intent)
+        //
+        // Guarded on savedInstanceState == null for the same reason as emitPushOpenedIfPresent
+        // above: a config-change recreate (rotation / theme / locale) re-delivers the SAME launch
+        // intent, so an unguarded call re-submits an already-handled arrival. Worse than
+        // double-counting `gallery_deeplink_opened` — once the first arrival was consumed the
+        // holder is empty, so the re-submit emits again and creates a DUPLICATE checklist.
+        // PendingGalleryDeepLink's own guards cannot cover this: they scope to one arrival, and a
+        // re-submit is indistinguishable from a genuinely new tap at that layer.
+        if (savedInstanceState == null) {
+            submitGalleryDeepLinkIfPresent(intent)
+        }
 
         setContent {
             // Reactive edge-to-edge: switch status bar icon style when app theme changes
