@@ -1,0 +1,48 @@
+# Structural guards for Cloud Functions error handling.
+#
+# WHY THIS EXISTS: the "silent 500" defect recurred three times (2026-07-27 link_google_account,
+# 2026-07-28 eight handlers, 2026-07-29 the last three) because every fix pass enumerated the
+# handlers by hand and every list was incomplete. The fix for that is an invariant, not a longer
+# list — but an invariant nobody runs is just a list again. This workflow is what makes
+# TestFiveHundredBranchesAreDiagnosable actually binding.
+#
+# Deliberately narrow: only the AST guards, only when Cloud Functions source changes. It needs no
+# credentials, no emulator and no network, so it stays fast enough that nobody wants to skip it.
+# The rest of test_main.py is not run here — it has pre-existing failures unrelated to this guard,
+# and a red check people learn to ignore protects nothing.
+
+name: functions-guard
+
+on:
+  pull_request:
+    paths:
+      - 'firebase-functions/**.py'
+      - '.github/workflows/functions-guard.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'firebase-functions/**.py'
+
+jobs:
+  five-hundred-branches:
+    name: every 500 leaves a traceback and leaks nothing
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: firebase-functions/requirements.txt
+
+      # pytest alone. test_main_structure.py parses main.py with `ast` and never imports it, so
+      # neither Flask nor the Google SDKs are needed. (The guards used to live in test_main.py,
+      # whose autouse fixture imports firebase_admin — that would have required the full
+      # dependency set and made this job slow enough to be worth skipping.)
+      - name: Install pytest
+        run: pip install pytest
+
+      - name: Run structural guards
+        working-directory: firebase-functions
+        run: pytest test_main_structure.py -q
