@@ -411,7 +411,12 @@ def verify_firebase_token(request: Request) -> tuple[dict | None, tuple | None]:
         return None, ("Invalid or expired authentication token", 401)
     except firebase_auth.UserDisabledError:
         return None, ("User account is disabled", 403)
-    except Exception:
+    except Exception as e:
+        # Shared helper: every caller turns this tuple into a 500 of its own. Without a traceback
+        # here the failure surfaces under the calling endpoint with no cause attached, so the
+        # per-endpoint logging added on 2026-07-28 still reports "500" and nothing else.
+        # The expected auth failures above are handled by type and stay unlogged on purpose.
+        logger.exception("verify_firebase_token: verification failed (%s)", type(e).__name__)
         return None, ("Authentication verification failed", 500)
 
 
@@ -989,9 +994,13 @@ def register_user(request: Request):
         })))
 
     except Exception as e:
-        return add_cors_headers(make_response(
-            jsonify({"success": False, "error": f"Failed to register user: {str(e)}"}), 500
-        ))
+        # Same defect the 2026-07-28 pass closed in the other eight 500-branches; this handler was
+        # not in that deploy set and kept both halves of it. Without the traceback the 500 leaves
+        # only a bare request log and the root cause is unrecoverable after the fact — and this is
+        # the second-busiest endpoint (~225 calls/week), so it was the costliest place to still miss.
+        logger.exception("register_user: failed (%s)", type(e).__name__)
+        # Do NOT put str(e) in the response body — it ships Firestore internals to the client.
+        return create_error_response("Failed to register user", 500)
 
 
 # ============================================================================
@@ -2049,9 +2058,10 @@ def restore_credits_after_purchase(request: Request):
         })))
 
     except Exception as e:
-        return add_cors_headers(make_response(
-            jsonify({"success": False, "error": "Failed to restore credits. Please try again."}), 500
-        ))
+        logger.exception("restore_credits_after_purchase: failed (%s)", type(e).__name__)
+        # Body is byte-identical to the hand-rolled one it replaces — create_error_response emits
+        # the same {"success": False, "error": ...} shape, so no client contract changes.
+        return create_error_response("Failed to restore credits. Please try again.", 500)
 
 
 # ============================================================================
