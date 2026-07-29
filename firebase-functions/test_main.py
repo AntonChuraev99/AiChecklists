@@ -1232,3 +1232,95 @@ class TestChatAgentEmptyCandidate:
         mock_incr.assert_called_once()
         # Happy path: exactly one Gemini call, no retry.
         assert mock_client.models.generate_content.call_count == 1
+
+
+# ---------------------------------------------------------------------------
+# Structural guard: every 500 must leave a traceback, and none may leak str(e)
+# ---------------------------------------------------------------------------
+
+class TestFiveHundredBranchesAreDiagnosable:
+    """Source-level invariants over main.py, deliberately NOT per-handler tests.
+
+    This defect class recurred twice by the same mechanism: someone enumerated the
+    handlers that return 500, fixed the ones on the list, and a handler that was not
+    on the list kept the defect. On 2026-07-27 `link_google_account` returned a 500
+    that left zero app-log lines and could not be diagnosed at all; the 2026-07-28
+    pass fixed eight handlers and still missed `register_user` — the second-busiest
+    endpoint — plus the shared `verify_firebase_token` helper.
+
+    Enumerating by hand is the bug. These tests walk the AST instead, so a new
+    500-branch is covered the moment it is written, without anyone maintaining a list.
+    """
+
+    @staticmethod
+    def _main_tree():
+        import ast
+        import pathlib
+        source = (pathlib.Path(__file__).parent / "main.py").read_text(encoding="utf-8")
+        return ast.parse(source), source
+
+    @staticmethod
+    def _returns_500(node):
+        import ast
+        return any(
+            isinstance(n, ast.Constant) and n.value == 500 for n in ast.walk(node)
+        )
+
+    def test_every_500_branch_logs_the_exception(self):
+        import ast
+        tree, _ = self._main_tree()
+        unlogged = []
+        for handler in ast.walk(tree):
+            if not isinstance(handler, ast.ExceptHandler):
+                continue
+            if not self._returns_500(handler):
+                continue
+            logged = any(
+                isinstance(n, ast.Call)
+                and isinstance(n.func, ast.Attribute)
+                and n.func.attr in ("exception", "error")
+                for n in ast.walk(handler)
+            )
+            if not logged:
+                unlogged.append(handler.lineno)
+
+        assert not unlogged, (
+            "except-branches that return 500 without logging the exception, at main.py lines "
+            f"{unlogged}. A 500 with no traceback is unrecoverable after the fact: Cloud Logging "
+            "keeps the request log (a bare '500') but nothing about the cause. Add "
+            "logger.exception(...) as the FIRST statement of the handler."
+        )
+
+    def test_no_500_branch_leaks_the_exception_text_to_the_client(self):
+        import ast
+        tree, _ = self._main_tree()
+        leaking = []
+        for handler in ast.walk(tree):
+            if not isinstance(handler, ast.ExceptHandler):
+                continue
+            if not self._returns_500(handler):
+                continue
+            bound = handler.name  # `except Exception as e` -> "e"
+            if not bound:
+                continue
+            for call in ast.walk(handler):
+                # jsonify(...) / create_error_response(...) carrying str(<bound>)
+                if not isinstance(call, ast.Call):
+                    continue
+                func = call.func
+                name = getattr(func, "id", None) or getattr(func, "attr", None)
+                if name not in ("jsonify", "create_error_response", "make_response"):
+                    continue
+                for inner in ast.walk(call):
+                    if (
+                        isinstance(inner, ast.Call)
+                        and getattr(inner.func, "id", None) == "str"
+                        and inner.args
+                        and getattr(inner.args[0], "id", None) == bound
+                    ):
+                        leaking.append(handler.lineno)
+        assert not leaking, (
+            f"500 response bodies that embed str(exception), at main.py lines {leaking}. "
+            "That ships Firestore/genai internals to the client. Log the exception instead and "
+            "return a static message."
+        )
