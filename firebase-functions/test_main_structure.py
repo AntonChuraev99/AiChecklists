@@ -142,3 +142,91 @@ class TestFiveHundredBranchesAreDiagnosable:
             "That ships Firestore/genai internals to the client. Covers str(e), repr(e) and "
             'f"...{e}". Log the exception instead and return a static message.'
         )
+
+
+# ---------------------------------------------------------------------------
+# Structural guard: FCM multicast fan-out must not outgrow the HTTP pool
+# ---------------------------------------------------------------------------
+
+class TestFcmChunkFitsConnectionPool:
+    """`send_each_for_multicast` opens one thread per token; the pool must be able to hold them.
+
+    `messaging.send_each_for_multicast` delegates to `send_each()`, which builds
+    `ThreadPoolExecutor(max_workers=len(messages))` — one thread per token — while every
+    thread shares one `requests.Session` whose urllib3 pool defaults to 10 connections.
+    Chunking by FCM's 500-token cap therefore raced 500 threads over 10 slots and urllib3
+    discarded the surplus: `Connection pool is full, discarding connection:
+    fcm.googleapis.com`, 21 times in the 7 days to 2026-07-31, 8 of them on the
+    then-current revision.
+
+    The failure is silent by construction — every send still returns 2xx, so nothing in the
+    response, the metrics or the error rate moves. It only ever showed up as a WARNING line
+    that a human happened to read. That is exactly the kind of regression a test has to
+    catch, because production will not complain the second time either.
+    """
+
+    @staticmethod
+    def _assignments():
+        source = (pathlib.Path(__file__).parent / "main.py").read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        found = {}
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Assign):
+                continue
+            for target in node.targets:
+                if isinstance(target, ast.Name) and isinstance(node.value, ast.Constant):
+                    found[target.id] = node.value.value
+        return found, tree
+
+    def test_chunk_size_does_not_exceed_pool(self):
+        found, _ = self._assignments()
+        pool = found.get("_FCM_URLLIB3_POOL_MAXSIZE")
+        assert pool is not None, (
+            "_FCM_URLLIB3_POOL_MAXSIZE disappeared from main.py. It records the urllib3 "
+            "default that firebase-admin does not override; without it the chunk size below "
+            "is an unexplained magic number."
+        )
+        # The chunk may be written as the pool constant itself (an ast.Name, not a Constant),
+        # which is the intended form — resolve that case before falling back to a literal.
+        source = (pathlib.Path(__file__).parent / "main.py").read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        chunk = None
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign) and any(
+                isinstance(t, ast.Name) and t.id == "_FCM_TOKENS_PER_MULTICAST"
+                for t in node.targets
+            ):
+                if isinstance(node.value, ast.Name):
+                    chunk = found.get(node.value.id)
+                elif isinstance(node.value, ast.Constant):
+                    chunk = node.value.value
+        assert chunk is not None, "_FCM_TOKENS_PER_MULTICAST missing from main.py"
+        assert chunk <= pool, (
+            f"FCM chunk is {chunk} tokens but the HTTP pool holds {pool} connections. "
+            "send_each_for_multicast opens one thread per token, so the surplus threads "
+            "will fight over the pool and urllib3 will discard connections. Raise "
+            "_FCM_URLLIB3_POOL_MAXSIZE together with the chunk, and make the pool actually "
+            "that large (firebase-admin exposes no pool_maxsize — see the comment in main.py)."
+        )
+
+    def test_multicast_chunking_uses_the_constant(self):
+        """A literal in the chunked() call would silently bypass the bound asserted above."""
+        source = (pathlib.Path(__file__).parent / "main.py").read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        offenders = []
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            if getattr(node.func, "attr", None) != "chunked":
+                continue
+            # chunked(seq, size) — a bare int for `size` is the regression we guard against.
+            if len(node.args) >= 2 and isinstance(node.args[1], ast.Constant):
+                offenders.append((node.lineno, node.args[1].value))
+        token_chunking = [
+            (line, size) for line, size in offenders if size > 100  # Amplitude batches use ≤100
+        ]
+        assert not token_chunking, (
+            f"chunked() called with a hardcoded size at main.py lines {token_chunking}. "
+            "FCM token chunking must go through _FCM_TOKENS_PER_MULTICAST so the pool bound "
+            "stays enforceable."
+        )

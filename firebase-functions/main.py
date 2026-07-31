@@ -227,6 +227,28 @@ AMPLITUDE_HTTP_ENDPOINT = os.environ.get(
 # open, like refill_premium_credits (relies on the function being scheduler-invoked).
 PUSH_ADMIN_KEY = os.environ.get("PUSH_ADMIN_KEY", "")
 
+# Tokens per multicast call. FCM itself accepts 500, but that number is NOT the
+# constraint that matters here: `messaging.send_each_for_multicast` fans out ONE THREAD
+# PER TOKEN — `send_each()` builds `ThreadPoolExecutor(max_workers=len(messages))` — and
+# every thread shares a single `requests.Session` whose urllib3 pool defaults to 10
+# connections. A 500-token chunk therefore races 500 threads for 10 slots, and urllib3
+# discards + reopens the surplus. Observed in prod as
+# `Connection pool is full, discarding connection: fcm.googleapis.com` — 21 hits in 7d
+# (2026-07-31), including 8 on the then-current revision. Every send still returned 2xx,
+# so the cost was sockets and latency, never delivery.
+#
+# Sizing the chunk to the pool makes fan-out fit exactly. The audience is small (95
+# eligible on the 2026-07-22 campaign), so the extra sequential round-trips are
+# irrelevant, and this stays on public API: firebase-admin never exposed `pool_maxsize`
+# (upstream request firebase/firebase-admin-python#648 was never implemented, and
+# reaching into `_get_messaging_service()._client.session` is private-API territory).
+#
+# ⚠️ These two numbers move TOGETHER. Raising the chunk without also raising the urllib3
+# pool re-creates the exact contention this constant exists to remove — test_main_structure
+# asserts the bound so the regression fails the suite instead of the logs.
+_FCM_URLLIB3_POOL_MAXSIZE = 10  # requests/urllib3 default; firebase-admin does not override it
+_FCM_TOKENS_PER_MULTICAST = _FCM_URLLIB3_POOL_MAXSIZE
+
 # ---------------------------------------------------------------------------
 # Proprietary AI prompts live OUTSIDE the public repo.
 #   real:   prompts_private.py          (gitignored — must be present at deploy)
@@ -1854,7 +1876,9 @@ def send_promotions_batch(request: Request):
             data_payload = push_promotions.build_data_payload(
                 push_type, campaign_id, arm, title, body
             )
-            for chunk in push_promotions.chunked(group, 500):  # FCM cap = 500 tokens/multicast
+            # Chunk is bounded by the HTTP pool, not by FCM's 500 cap — see
+            # _FCM_TOKENS_PER_MULTICAST for why the smaller number is the correct one.
+            for chunk in push_promotions.chunked(group, _FCM_TOKENS_PER_MULTICAST):
                 tokens = [g[1] for g in chunk]
                 arm_breakdown[arm] = arm_breakdown.get(arm, 0) + len(tokens)
                 if dry_run:
