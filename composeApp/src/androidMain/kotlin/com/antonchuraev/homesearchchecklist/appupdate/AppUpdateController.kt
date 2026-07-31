@@ -135,6 +135,15 @@ class AppUpdateController(
                 }
             }
         }.onFailure { e ->
+            // runCatching catches Throwable, so a cancelled coroutine lands here too. Leaving it
+            // to fall through reported every screen-leave as app_update_unexpected_error AND put
+            // the observable updateState into Error — the UI would then render a failure for a
+            // check the user simply navigated away from. Rethrow so cancellation stays
+            // cancellation. This is the root of the mangled error_class values below: two of the
+            // observed offenders (LeftCompositionCancellationException,
+            // ForgottenCoroutineScopeException) are CancellationExceptions that never belonged
+            // in that metric.
+            if (e is CancellationException) throw e
             logFailure(e, "Failed to check for updates", source = "check")
             _updateState.value = AppUpdateState.Error(e)
         }
@@ -175,6 +184,8 @@ class AppUpdateController(
                 }
             }
         }.onFailure { e ->
+            // Same reason as checkAndStartUpdate: cancellation is not a failure to report.
+            if (e is CancellationException) throw e
             logFailure(e, "Failed to resume update", source = "resume")
         }
     }

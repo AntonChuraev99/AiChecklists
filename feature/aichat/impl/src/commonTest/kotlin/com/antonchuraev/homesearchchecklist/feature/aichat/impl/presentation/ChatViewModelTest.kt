@@ -2934,11 +2934,13 @@ class ChatViewModelTest {
         val thumbDowns = analytics.events.filter { it.first == "ai_chat_thumb_down" }
         assertEquals(3, thumbDowns.size,
             "every tap is still reported — repeats are marked, never dropped")
-        assertEquals("false", thumbDowns[0].second["is_repeat_tap"],
+        // Boolean, matching how the paywall emits the same property — asserted as Boolean so a
+        // silent switch back to .toString() fails here instead of splitting the property in Amplitude.
+        assertEquals(false, thumbDowns[0].second["is_repeat_tap"],
             "first dislike of a message is not a repeat")
-        assertEquals("true", thumbDowns[1].second["is_repeat_tap"],
+        assertEquals(true, thumbDowns[1].second["is_repeat_tap"],
             "reopening feedback on the same message must be marked as a repeat")
-        assertEquals("false", thumbDowns[2].second["is_repeat_tap"],
+        assertEquals(false, thumbDowns[2].second["is_repeat_tap"],
             "a different message starts its own count")
     }
 

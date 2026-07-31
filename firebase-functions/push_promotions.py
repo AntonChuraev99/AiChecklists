@@ -251,6 +251,12 @@ def classify_send_error(exc: Any) -> str:
 
 
 def chunked(seq, size):
-    """Yield successive [size]-length chunks of [seq] (FCM ≤500 tokens; Amplitude ≤100 events)."""
+    """Yield successive [size]-length chunks of [seq].
+
+    Callers pick [size]: Amplitude batches use ≤100 events. FCM *accepts* 500 tokens per
+    multicast, but the sender chunks far smaller — send_each_for_multicast opens one thread
+    per token against a 10-connection pool, so main.py sizes the chunk to the pool via
+    _FCM_TOKENS_PER_MULTICAST. Do not "restore" 500 here.
+    """
     for i in range(0, len(seq), size):
         yield seq[i:i + size]

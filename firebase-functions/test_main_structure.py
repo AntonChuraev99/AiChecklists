@@ -222,11 +222,9 @@ class TestFcmChunkFitsConnectionPool:
             # chunked(seq, size) — a bare int for `size` is the regression we guard against.
             if len(node.args) >= 2 and isinstance(node.args[1], ast.Constant):
                 offenders.append((node.lineno, node.args[1].value))
-        token_chunking = [
-            (line, size) for line, size in offenders if size > 100  # Amplitude batches use ≤100
-        ]
-        assert not token_chunking, (
-            f"chunked() called with a hardcoded size at main.py lines {token_chunking}. "
+        assert not offenders, (
+            f"chunked() called with a hardcoded size at main.py lines {offenders}. "
             "FCM token chunking must go through _FCM_TOKENS_PER_MULTICAST so the pool bound "
-            "stays enforceable."
+            "stays enforceable; Amplitude batching should use a named constant too, so that a "
+            "reader can tell which limit a number belongs to."
         )

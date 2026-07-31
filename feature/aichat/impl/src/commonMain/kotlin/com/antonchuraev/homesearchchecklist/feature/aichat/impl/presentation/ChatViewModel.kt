@@ -535,7 +535,10 @@ class ChatViewModel(
                     params = mapOf(
                         AnalyticsParams.MESSAGE_ID to msg.id,
                         AnalyticsParams.ROUTED_LAYER to (msg.routedLayer?.name ?: "unknown"),
-                        AnalyticsParams.IS_REPEAT_TAP to isRepeatTap.toString(),
+                        // Boolean, not String: the paywall emits this same property as a Boolean
+                        // (PaywallViewModel:440), and one property arriving as two types splits it
+                        // in Amplitude. Firebase normalises either way, Amplitude does not.
+                        AnalyticsParams.IS_REPEAT_TAP to isRepeatTap,
                         AnalyticsParams.DEEP_THINKING_ENABLED to _screenState.value.deepThinkingEnabled.toString(),
                     ),
                 )

@@ -249,6 +249,11 @@ PUSH_ADMIN_KEY = os.environ.get("PUSH_ADMIN_KEY", "")
 _FCM_URLLIB3_POOL_MAXSIZE = 10  # requests/urllib3 default; firebase-admin does not override it
 _FCM_TOKENS_PER_MULTICAST = _FCM_URLLIB3_POOL_MAXSIZE
 
+# Amplitude's HTTP V2 batch limit. Named for the same reason as the constant above: a bare
+# number at the call site gives a reader no way to tell WHICH service's limit it encodes, and
+# the structural guard cannot tell a deliberate limit from a regression.
+_AMPLITUDE_EVENTS_PER_BATCH = 100
+
 # ---------------------------------------------------------------------------
 # Proprietary AI prompts live OUTSIDE the public repo.
 #   real:   prompts_private.py          (gitignored — must be present at deploy)
@@ -1728,7 +1733,7 @@ def _emit_amplitude_events(events: list) -> int:
               "NOT counted (CTR denominator missing). Configure the secret to measure opens.")
         return 0
     uploaded = 0
-    for batch in push_promotions.chunked(events, 100):
+    for batch in push_promotions.chunked(events, _AMPLITUDE_EVENTS_PER_BATCH):
         try:
             resp = http_requests.post(
                 AMPLITUDE_HTTP_ENDPOINT,
