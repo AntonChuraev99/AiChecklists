@@ -166,6 +166,19 @@ class ChatViewModel(
     val sideEffect: Flow<ChatScreenSideEffect> = _sideEffect.asSharedFlow()
 
     /**
+     * Assistant messages this session has already thumbed down, so a reopened feedback sheet
+     * is reported as the repeat it is.
+     *
+     * Measured 2026-07-31: one message_id carried 6 `ai_chat_thumb_down` events, another 3,
+     * two more 2 each — 13 of 27 events were repeats on 4 messages. Without a marker the
+     * counter reads as "26 answers users disliked", which is the same inflation `purchase_failed`
+     * showed (13 events, ≤5 users). We mark instead of dropping: how often someone re-dislikes
+     * the same reply is real signal, so the raw stream stays whole and the funnel filters on
+     * `is_repeat_tap = false`. Same contract as the paywall's repeat-tap marker.
+     */
+    private val thumbedDownMessageIds = mutableSetOf<String>()
+
+    /**
      * Pause/resume mechanism for the agent loop choice block.
      *
      * When the agent returns mutating tool calls, [runAgentTurn] sets this to a new
@@ -514,11 +527,15 @@ class ChatViewModel(
                 // is the dislike affordance — there is no separate OnThumbDownClick intent). Track
                 // THUMB_DOWN here; the FEEDBACK event fires later on Submit with the written text.
                 val msg = intent.message
+                // add() returns false when the id was already present — that IS the repeat,
+                // read and recorded in one step so a double-open can't slip through between them.
+                val isRepeatTap = !thumbedDownMessageIds.add(msg.id)
                 analytics.event(
                     name = AnalyticsEvents.Chat.THUMB_DOWN,
                     params = mapOf(
                         AnalyticsParams.MESSAGE_ID to msg.id,
                         AnalyticsParams.ROUTED_LAYER to (msg.routedLayer?.name ?: "unknown"),
+                        AnalyticsParams.IS_REPEAT_TAP to isRepeatTap.toString(),
                         AnalyticsParams.DEEP_THINKING_ENABLED to _screenState.value.deepThinkingEnabled.toString(),
                     ),
                 )
