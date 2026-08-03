@@ -3337,6 +3337,31 @@ def _extract_present_options(parts) -> dict | None:
     return None
 
 
+def _salvage_present_options_prompt(parts) -> str:
+    """The prompt of a present_options call that _extract_present_options rejected.
+
+    A malformed present_options (no prompt, or fewer than CHAT_AGENT_MIN_OPTIONS usable labels)
+    leaves nothing behind anywhere else: the extractor returns None, _serialize_function_calls
+    skips it as server-terminal, and such a response carries no text part. So it used to reach
+    the caller as "empty" — the transient-blip classification — and earn a retry against an
+    unchanged input, which reproduces the same call and burns a second Gemini turn before
+    degrading to "Sorry, I couldn't generate a response".
+
+    Observed in prod 2026-07-31 with finish_reason=STOP: the model finished normally, the server
+    just could not use a valid answer. Salvaging the prompt turns that into a real reply — a
+    question without tappable chips still answers the user.
+
+    Returns "" when there is no present_options call or it wrote no prompt: the salvage may only
+    surface text the model actually produced, never invent one.
+    """
+    for part in parts or []:
+        fc = getattr(part, "function_call", None)
+        if fc is None or getattr(fc, "name", None) != "present_options":
+            continue
+        return (str((dict(fc.args or {})).get("prompt") or "")).strip()
+    return ""
+
+
 def _extract_final_text(response, parts) -> str:
     """Join text parts into the final assistant message."""
     text_parts = [p.text for p in (parts or []) if getattr(p, "text", None)]
@@ -3373,6 +3398,13 @@ def _interpret_agent_response(response):
     content = _extract_final_text(response, parts)
     if content:
         return ("final", content)
+
+    # Before calling it empty: a present_options the extractor rejected is invisible to every
+    # branch above, so it would be retried as a transient blip even though the input is
+    # unchanged and the outcome deterministic. Surface its prompt instead when it wrote one.
+    salvaged = _salvage_present_options_prompt(parts)
+    if salvaged:
+        return ("final", salvaged)
 
     return ("empty", getattr(candidate, "finish_reason", None))
 
