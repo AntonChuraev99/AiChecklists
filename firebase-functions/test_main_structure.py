@@ -228,3 +228,44 @@ class TestFcmChunkFitsConnectionPool:
             "stays enforceable; Amplitude batching should use a named constant too, so that a "
             "reader can tell which limit a number belongs to."
         )
+
+
+class TestAmplitudeBatchWithinApiLimit:
+    """The other `chunked()` caller has its own, unrelated ceiling.
+
+    `test_multicast_chunking_uses_the_constant` above only forbids a bare literal — it cannot
+    tell whether the named constant holds a legal value. Amplitude's HTTP V2 API rejects a
+    batch of more than 100 events outright (413), so a well-meaning "let's send fewer, larger
+    batches" edit would break ingestion rather than degrade it. Both callers now share the
+    same shape (named constant), which is precisely why each needs its own bound asserted:
+    the FCM number is capped by a connection pool, this one by a remote API.
+    """
+
+    AMPLITUDE_HTTP_V2_MAX_EVENTS = 100
+
+    def test_amplitude_batch_constant_exists_and_fits_the_api(self):
+        source = (pathlib.Path(__file__).parent / "main.py").read_text(encoding="utf-8")
+        tree = ast.parse(source)
+
+        value = None
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign) and any(
+                isinstance(t, ast.Name) and t.id == "_AMPLITUDE_EVENTS_PER_BATCH"
+                for t in node.targets
+            ) and isinstance(node.value, ast.Constant):
+                value = node.value.value
+
+        assert value is not None, (
+            "_AMPLITUDE_EVENTS_PER_BATCH missing from main.py. Without it the batch size at "
+            "the call site is a bare number again, and a reader cannot tell which service's "
+            "limit it encodes — the exact confusion that made the FCM chunk wrong."
+        )
+        assert isinstance(value, int) and value > 0, (
+            f"_AMPLITUDE_EVENTS_PER_BATCH must be a positive int, got {value!r}"
+        )
+        assert value <= self.AMPLITUDE_HTTP_V2_MAX_EVENTS, (
+            f"_AMPLITUDE_EVENTS_PER_BATCH is {value}, but Amplitude's HTTP V2 endpoint "
+            f"rejects batches over {self.AMPLITUDE_HTTP_V2_MAX_EVENTS} events with a 413. "
+            "Analytics would stop ingesting silently from the app's point of view — nothing "
+            "in the product breaks, the data just stops arriving."
+        )
