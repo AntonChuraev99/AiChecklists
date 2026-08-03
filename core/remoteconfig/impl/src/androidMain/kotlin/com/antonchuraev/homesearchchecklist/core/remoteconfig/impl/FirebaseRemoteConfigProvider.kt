@@ -83,7 +83,8 @@ class FirebaseRemoteConfigProvider(
             // Do NOT swallow: capture the real cause so onboarding diagnostics can report it.
             // A Play-signed build rejected by App Check / API-key SHA restrictions fails here
             // with a 403-class FirebaseRemoteConfigServerException; without this the onboarding
-            // A/B silently collapses to the empty client default (always "slides").
+            // A/B silently collapses to the empty client default — which since 2026-07-28
+            // resolves to the "ai_welcome" arm (was "slides"); see GetOnboardingVariantUseCase.
             lastError = e
             false
         }

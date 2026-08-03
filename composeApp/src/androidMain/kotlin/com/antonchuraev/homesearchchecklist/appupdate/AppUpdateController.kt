@@ -3,6 +3,7 @@ package com.antonchuraev.homesearchchecklist.appupdate
 import android.content.Context
 import android.content.SharedPreferences
 import android.os.Build
+import android.os.RemoteException
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.IntentSenderRequest
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
@@ -21,6 +22,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
+import java.io.IOException
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.time.Duration.Companion.days
@@ -132,6 +135,15 @@ class AppUpdateController(
                 }
             }
         }.onFailure { e ->
+            // runCatching catches Throwable, so a cancelled coroutine lands here too. Leaving it
+            // to fall through reported every screen-leave as app_update_unexpected_error AND put
+            // the observable updateState into Error — the UI would then render a failure for a
+            // check the user simply navigated away from. Rethrow so cancellation stays
+            // cancellation. This is the root of the mangled error_class values below: two of the
+            // observed offenders (LeftCompositionCancellationException,
+            // ForgottenCoroutineScopeException) are CancellationExceptions that never belonged
+            // in that metric.
+            if (e is CancellationException) throw e
             logFailure(e, "Failed to check for updates", source = "check")
             _updateState.value = AppUpdateState.Error(e)
         }
@@ -172,6 +184,8 @@ class AppUpdateController(
                 }
             }
         }.onFailure { e ->
+            // Same reason as checkAndStartUpdate: cancellation is not a failure to report.
+            if (e is CancellationException) throw e
             logFailure(e, "Failed to resume update", source = "resume")
         }
     }
@@ -392,7 +406,7 @@ class AppUpdateController(
                 EVENT_UNEXPECTED_ERROR,
                 versionParams() + mapOf(
                     "source" to source,
-                    "error_class" to (error::class.simpleName ?: "Unknown"),
+                    "error_class" to stableErrorClass(error),
                     "error_code" to (errorCode?.toString() ?: "n/a"),
                 ),
             )
@@ -527,4 +541,40 @@ private fun AppUpdateInfo.isImmediateUpdateAvailable(): Boolean {
 private fun AppUpdateInfo.isFlexibleUpdateAvailable(): Boolean {
     return updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE &&
         isUpdateTypeAllowed(AppUpdateType.FLEXIBLE)
+}
+
+/**
+ * R8-stable label for [error], for the `error_class` analytics parameter.
+ *
+ * `::class.simpleName` is NOT stable in a release build. `androidApp/proguard-rules.pro`
+ * keeps names only for our own models and enums; `androidx.compose.**`, `io.ktor.**`,
+ * `okhttp3.**` and `okio.**` carry `-dontwarn` alone, so R8 renames those types freely.
+ * Measured 2026-07-31 in Amplitude: on 1.18.4 / 1.18.5 / 1.18.6 all 13 `error_class`
+ * values arrived as tokens (`ng1`, `xg1`, `yg1`, `q13`) and none were readable, while
+ * the same exception reached 1.17.16 and 1.18.2 as `LeftCompositionCancellationException`.
+ * The app was never broken by this — only the dashboard was, which is why it went
+ * unnoticed for three releases.
+ *
+ * Matching on supertypes keeps the label readable without naming R8-renamed classes:
+ * every observed offender is reachable this way (`LeftCompositionCancellationException`
+ * and `ForgottenCoroutineScopeException` are [CancellationException]s, ktor's
+ * `HttpRequestTimeoutException` is an [IOException]). Anything unmatched falls back to
+ * `simpleName`, which may still be obfuscated — a known, accepted gap rather than a
+ * silent one.
+ *
+ * The alternative was a global `-keepnames class * extends java.lang.Throwable`, which
+ * would publish every Throwable name in a decompilable APK to fix one parameter.
+ *
+ * Top-level and `internal` rather than a private method: the mapping is a pure function of
+ * [error], and the R8 effect it guards against cannot be reproduced in a unit test (debug
+ * builds do not obfuscate). What CAN be tested is the mapping itself — which branch wins for
+ * a given throwable, and that the fallback still returns something. Constructing the whole
+ * controller (Play SDK, prefs, analytics) just to reach it would have meant no test at all.
+ */
+internal fun stableErrorClass(error: Throwable): String = when (error) {
+    is InstallException -> "InstallException"
+    is RemoteException -> "RemoteException"
+    is CancellationException -> "CancellationException"
+    is IOException -> "IOException"
+    else -> error::class.simpleName ?: "Unknown"
 }

@@ -31,6 +31,13 @@ from firebase_admin import auth as firebase_auth, credentials, firestore, messag
 from flask import Request, jsonify, make_response
 from google import genai
 from google.genai import types
+# Firestore query filters MUST be built with FieldFilter, never positionally:
+# `query.where("f", "==", v)` is deprecated and makes the SDK emit a UserWarning
+# ("Detected filter using positional arguments") on EVERY call — hundreds of lines of
+# log noise per month across register_user / link_google_account / refill_premium_credits /
+# send_promotions_batch. `where(filter=FieldFilter(...))` is the semantically identical
+# supported form.
+from google.cloud.firestore_v1.base_query import FieldFilter
 import functions_framework
 from firebase_functions import firestore_fn  # 2nd gen Firestore trigger
 import requests as http_requests  # avoid conflict with flask Request
@@ -220,6 +227,33 @@ AMPLITUDE_HTTP_ENDPOINT = os.environ.get(
 # open, like refill_premium_credits (relies on the function being scheduler-invoked).
 PUSH_ADMIN_KEY = os.environ.get("PUSH_ADMIN_KEY", "")
 
+# Tokens per multicast call. FCM itself accepts 500, but that number is NOT the
+# constraint that matters here: `messaging.send_each_for_multicast` fans out ONE THREAD
+# PER TOKEN — `send_each()` builds `ThreadPoolExecutor(max_workers=len(messages))` — and
+# every thread shares a single `requests.Session` whose urllib3 pool defaults to 10
+# connections. A 500-token chunk therefore races 500 threads for 10 slots, and urllib3
+# discards + reopens the surplus. Observed in prod as
+# `Connection pool is full, discarding connection: fcm.googleapis.com` — 21 hits in 7d
+# (2026-07-31), including 8 on the then-current revision. Every send still returned 2xx,
+# so the cost was sockets and latency, never delivery.
+#
+# Sizing the chunk to the pool makes fan-out fit exactly. The audience is small (95
+# eligible on the 2026-07-22 campaign), so the extra sequential round-trips are
+# irrelevant, and this stays on public API: firebase-admin never exposed `pool_maxsize`
+# (upstream request firebase/firebase-admin-python#648 was never implemented, and
+# reaching into `_get_messaging_service()._client.session` is private-API territory).
+#
+# ⚠️ These two numbers move TOGETHER. Raising the chunk without also raising the urllib3
+# pool re-creates the exact contention this constant exists to remove — test_main_structure
+# asserts the bound so the regression fails the suite instead of the logs.
+_FCM_URLLIB3_POOL_MAXSIZE = 10  # requests/urllib3 default; firebase-admin does not override it
+_FCM_TOKENS_PER_MULTICAST = _FCM_URLLIB3_POOL_MAXSIZE
+
+# Amplitude's HTTP V2 batch limit. Named for the same reason as the constant above: a bare
+# number at the call site gives a reader no way to tell WHICH service's limit it encodes, and
+# the structural guard cannot tell a deliberate limit from a regression.
+_AMPLITUDE_EVENTS_PER_BATCH = 100
+
 # ---------------------------------------------------------------------------
 # Proprietary AI prompts live OUTSIDE the public repo.
 #   real:   prompts_private.py          (gitignored — must be present at deploy)
@@ -404,7 +438,12 @@ def verify_firebase_token(request: Request) -> tuple[dict | None, tuple | None]:
         return None, ("Invalid or expired authentication token", 401)
     except firebase_auth.UserDisabledError:
         return None, ("User account is disabled", 403)
-    except Exception:
+    except Exception as e:
+        # Shared helper: every caller turns this tuple into a 500 of its own. Without a traceback
+        # here the failure surfaces under the calling endpoint with no cause attached, so the
+        # per-endpoint logging added on 2026-07-28 still reports "500" and nothing else.
+        # The expected auth failures above are handled by type and stay unlogged on purpose.
+        logger.exception("verify_firebase_token: verification failed (%s)", type(e).__name__)
         return None, ("Authentication verification failed", 500)
 
 
@@ -420,7 +459,9 @@ def get_authenticated_user_id(request: Request, data: dict) -> tuple[str | None,
 
     if decoded_token:
         firebase_uid = decoded_token["uid"]
-        users = db.collection("users").where("google_uid", "==", firebase_uid).limit(1).get()
+        users = (db.collection("users")
+                 .where(filter=FieldFilter("google_uid", "==", firebase_uid))
+                 .limit(1).get())
         for user_doc in users:
             return user_doc.id, None
         return None, ("No linked user found. Please sign in first.", 404)
@@ -941,7 +982,7 @@ def register_user(request: Request):
 
         # Check if user with this device_id already exists
         users_ref = db.collection("users")
-        existing_users = users_ref.where("device_id", "==", device_id).limit(1).get()
+        existing_users = users_ref.where(filter=FieldFilter("device_id", "==", device_id)).limit(1).get()
 
         for user_doc in existing_users:
             # User exists - return existing data
@@ -980,9 +1021,13 @@ def register_user(request: Request):
         })))
 
     except Exception as e:
-        return add_cors_headers(make_response(
-            jsonify({"success": False, "error": f"Failed to register user: {str(e)}"}), 500
-        ))
+        # Same defect the 2026-07-28 pass closed in the other eight 500-branches; this handler was
+        # not in that deploy set and kept both halves of it. Without the traceback the 500 leaves
+        # only a bare request log and the root cause is unrecoverable after the fact — and this is
+        # the second-busiest endpoint (~225 calls/week), so it was the costliest place to still miss.
+        logger.exception("register_user: failed (%s)", type(e).__name__)
+        # Do NOT put str(e) in the response body — it ships Firestore internals to the client.
+        return create_error_response("Failed to register user", 500)
 
 
 # ============================================================================
@@ -1033,7 +1078,9 @@ def link_google_account(request: Request):
 
     try:
         # Check if this Google account is already linked to another user
-        existing = db.collection("users").where("google_uid", "==", firebase_uid).limit(1).get()
+        existing = (db.collection("users")
+                    .where(filter=FieldFilter("google_uid", "==", firebase_uid))
+                    .limit(1).get())
         for doc in existing:
             if doc.id != user_id:
                 existing_data = doc.to_dict()
@@ -1085,7 +1132,12 @@ def link_google_account(request: Request):
         })
 
     except Exception as e:
-        return create_error_response(f"Failed to link Google account: {str(e)}", 500)
+        # Without this the 500 is unrecoverable after the fact: Cloud Logging keeps the request
+        # log (a bare "500") but no traceback, so the root cause is gone. Precedent 2026-07-27:
+        # a 500 here (5.04s latency) left zero app-log lines and could not be diagnosed at all.
+        logger.exception("link_google_account: failed (%s)", type(e).__name__)
+        # Do NOT put str(e) in the response body — it ships Firestore/genai internals to the client.
+        return create_error_response("Failed to link Google account", 500)
 
 
 # ============================================================================
@@ -1210,7 +1262,8 @@ def register_push_token(request: Request):
         )
         return create_success_response({})
     except Exception as e:
-        return create_error_response(f"Failed to register push token: {str(e)}", 500)
+        logger.exception("register_push_token: failed (%s)", type(e).__name__)
+        return create_error_response("Failed to register push token", 500)
 
 
 # ============================================================================
@@ -1560,7 +1613,7 @@ def refill_premium_credits(request: Request):
 
         # Query all premium users
         users_ref = db.collection("users")
-        premium_users = users_ref.where("is_premium", "==", True).get()
+        premium_users = users_ref.where(filter=FieldFilter("is_premium", "==", True)).get()
 
         users_updated = 0
         users_skipped = 0
@@ -1615,7 +1668,8 @@ def refill_premium_credits(request: Request):
         })
 
     except Exception as e:
-        return create_error_response(f"Failed to refill credits: {str(e)}", 500)
+        logger.exception("refill_premium_credits: failed (%s)", type(e).__name__)
+        return create_error_response("Failed to refill credits", 500)
 
 
 # ============================================================================
@@ -1679,7 +1733,7 @@ def _emit_amplitude_events(events: list) -> int:
               "NOT counted (CTR denominator missing). Configure the secret to measure opens.")
         return 0
     uploaded = 0
-    for batch in push_promotions.chunked(events, 100):
+    for batch in push_promotions.chunked(events, _AMPLITUDE_EVENTS_PER_BATCH):
         try:
             resp = http_requests.post(
                 AMPLITUDE_HTTP_ENDPOINT,
@@ -1774,10 +1828,10 @@ def send_promotions_batch(request: Request):
         # client-side filter (is_eligible_for_promo) is cheaper than the index; revisit (add a
         # composite index) if the dormant base grows large. Two bounds on the SAME field
         # (lastActiveAt) are allowed.
-        base_query = db.collection("users").where("lastActiveAt", "<", upper)
+        base_query = db.collection("users").where(filter=FieldFilter("lastActiveAt", "<", upper))
         if max_days is not None:
             lower = now - timedelta(days=int(max_days))
-            base_query = base_query.where("lastActiveAt", ">", lower)
+            base_query = base_query.where(filter=FieldFilter("lastActiveAt", ">", lower))
         page_size = 500
         base_query = base_query.order_by("lastActiveAt").limit(page_size)
 
@@ -1827,7 +1881,9 @@ def send_promotions_batch(request: Request):
             data_payload = push_promotions.build_data_payload(
                 push_type, campaign_id, arm, title, body
             )
-            for chunk in push_promotions.chunked(group, 500):  # FCM cap = 500 tokens/multicast
+            # Chunk is bounded by the HTTP pool, not by FCM's 500 cap — see
+            # _FCM_TOKENS_PER_MULTICAST for why the smaller number is the correct one.
+            for chunk in push_promotions.chunked(group, _FCM_TOKENS_PER_MULTICAST):
                 tokens = [g[1] for g in chunk]
                 arm_breakdown[arm] = arm_breakdown.get(arm, 0) + len(tokens)
                 if dry_run:
@@ -1919,7 +1975,8 @@ def send_promotions_batch(request: Request):
         return create_success_response(result)
 
     except Exception as e:  # noqa: BLE001
-        return create_error_response(f"Failed to send promotions: {str(e)}", 500)
+        logger.exception("send_promotions_batch: failed (%s)", type(e).__name__)
+        return create_error_response("Failed to send promotions", 500)
 
 
 # ============================================================================
@@ -2030,9 +2087,10 @@ def restore_credits_after_purchase(request: Request):
         })))
 
     except Exception as e:
-        return add_cors_headers(make_response(
-            jsonify({"success": False, "error": "Failed to restore credits. Please try again."}), 500
-        ))
+        logger.exception("restore_credits_after_purchase: failed (%s)", type(e).__name__)
+        # Body is byte-identical to the hand-rolled one it replaces — create_error_response emits
+        # the same {"success": False, "error": ...} shape, so no client contract changes.
+        return create_error_response("Failed to restore credits. Please try again.", 500)
 
 
 # ============================================================================
@@ -2446,7 +2504,7 @@ def classify_chat_intent(request: Request):
         # Refund the credit so the user is not charged for our failure.
         # Best-effort — refund failure is swallowed; original error is surfaced.
         refund_chat_credit(user_id, reason=f"chat_classifier_gemini_failure: {type(e).__name__}")
-        return create_error_response(f"classification failed: {str(e)}", 500)
+        return create_error_response("Classification failed", 500)
 
 
 # ============================================================================
@@ -2559,7 +2617,7 @@ def transcribe_audio(request: Request):
         # Gemini call failed AFTER reserve_chat_credit deducted 1.
         # Refund so the user is not charged for our failure.
         refund_chat_credit(user_id, reason=f"transcribe_audio_gemini_failure: {type(e).__name__}")
-        return create_error_response(f"transcription failed: {str(e)}", 500)
+        return create_error_response("Transcription failed", 500)
 
 
 # ============================================================================
@@ -2888,11 +2946,14 @@ def chat_completion(request: Request):
         })
 
     except Exception as e:
+        # Log BEFORE refunding: if the refund itself throws, the original traceback would
+        # otherwise be replaced by the refund's and the real cause would be lost.
+        logger.exception("chat_completion: failed (%s)", type(e).__name__)
         refund_chat_completion_credits(
             user_id,
             reason=f"chat_completion_gemini_failure: {type(e).__name__}"
         )
-        return create_error_response(f"completion failed: {str(e)}", 500)
+        return create_error_response("Completion failed", 500)
 
 
 # ============================================================================
@@ -3276,6 +3337,31 @@ def _extract_present_options(parts) -> dict | None:
     return None
 
 
+def _salvage_present_options_prompt(parts) -> str:
+    """The prompt of a present_options call that _extract_present_options rejected.
+
+    A malformed present_options (no prompt, or fewer than CHAT_AGENT_MIN_OPTIONS usable labels)
+    leaves nothing behind anywhere else: the extractor returns None, _serialize_function_calls
+    skips it as server-terminal, and such a response carries no text part. So it used to reach
+    the caller as "empty" — the transient-blip classification — and earn a retry against an
+    unchanged input, which reproduces the same call and burns a second Gemini turn before
+    degrading to "Sorry, I couldn't generate a response".
+
+    Observed in prod 2026-07-31 with finish_reason=STOP: the model finished normally, the server
+    just could not use a valid answer. Salvaging the prompt turns that into a real reply — a
+    question without tappable chips still answers the user.
+
+    Returns "" when there is no present_options call or it wrote no prompt: the salvage may only
+    surface text the model actually produced, never invent one.
+    """
+    for part in parts or []:
+        fc = getattr(part, "function_call", None)
+        if fc is None or getattr(fc, "name", None) != "present_options":
+            continue
+        return (str((dict(fc.args or {})).get("prompt") or "")).strip()
+    return ""
+
+
 def _extract_final_text(response, parts) -> str:
     """Join text parts into the final assistant message."""
     text_parts = [p.text for p in (parts or []) if getattr(p, "text", None)]
@@ -3312,6 +3398,13 @@ def _interpret_agent_response(response):
     content = _extract_final_text(response, parts)
     if content:
         return ("final", content)
+
+    # Before calling it empty: a present_options the extractor rejected is invisible to every
+    # branch above, so it would be retried as a transient blip even though the input is
+    # unchanged and the outcome deterministic. Surface its prompt instead when it wrote one.
+    salvaged = _salvage_present_options_prompt(parts)
+    if salvaged:
+        return ("final", salvaged)
 
     return ("empty", getattr(candidate, "finish_reason", None))
 
@@ -3623,4 +3716,4 @@ def chat_agent(request: Request):
                 refund_credits(user_id, CHAT_AGENT_COST, reason, request_id)
             else:
                 refund_chat_completion_credits(user_id, reason=reason)
-        return create_error_response(f"agent step failed: {str(e)}", 500)
+        return create_error_response("Agent step failed", 500)

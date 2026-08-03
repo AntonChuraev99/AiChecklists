@@ -358,17 +358,26 @@ class MainScreenViewModel(
                     }
                     val platform = getPlatformName()
                     // Google sign-in already succeeded above; the account-linking write is a distinct
-                    // failure surface. Without this guard a throw here emits neither login_success nor
-                    // login_failed — the linking step would fail silently in analytics and show the
-                    // user nothing.
-                    try {
+                    // failure surface. Without this guard a failure here emits neither login_success
+                    // nor login_failed — the linking step would fail silently in analytics and show
+                    // the user nothing.
+                    //
+                    // linkGoogleAccount RETURNS Result.failure (e.g. "User not registered" when the
+                    // device registration never landed) far more often than it throws, so a plain
+                    // try/catch never saw it: the failed Result was dropped and the user got the
+                    // "Signed in successfully" snackbar on an account that was linked to nothing.
+                    // runCatching folds the throwing path into the same Result so BOTH are handled.
+                    val linkResult = runCatching {
                         userDataRepository.linkGoogleAccount(idToken, platform)
-                    } catch (e: Exception) {
+                    }.getOrElse { Result.failure(it) }
+                    val linkError = linkResult.exceptionOrNull()
+                    if (linkError != null) {
+                        logger.error(TAG, "handleSignInClick: linkGoogleAccount failed: ${linkError.message}", linkError)
                         analyticsTracker.event(
                             AnalyticsEvents.Auth.LOGIN_FAILED,
                             buildMap {
                                 put(AnalyticsParams.ERROR_CODE, "link_failed")
-                                e.message?.let { put(AnalyticsParams.ERROR_MESSAGE, it) }
+                                linkError.message?.let { put(AnalyticsParams.ERROR_MESSAGE, it) }
                             },
                         )
                         terminalEmitted = true

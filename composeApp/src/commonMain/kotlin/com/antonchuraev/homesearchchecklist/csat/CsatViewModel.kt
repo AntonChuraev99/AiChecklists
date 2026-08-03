@@ -8,10 +8,13 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.common.api.Intent
 import com.antonchuraev.homesearchchecklist.core.common.api.SideEffect
 import com.antonchuraev.homesearchchecklist.core.common.api.State
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -37,7 +40,6 @@ data class CsatState(
     val selectedChips: Set<FeedbackChip> = emptySet(),
     val feedbackText: String = "",
     val isSubmitting: Boolean = false,
-    val shouldLaunchReview: Boolean = false,
     val isFeedbackOnly: Boolean = false,
     val showFeedbackThanks: Boolean = false,
 ) : State
@@ -48,7 +50,9 @@ sealed interface CsatIntent : Intent {
     data class UpdateText(val text: String) : CsatIntent
     data object Submit : CsatIntent
     data object Dismiss : CsatIntent
-    data object ReviewComplete : CsatIntent
+
+    /** The review request finished; [outcome] says whether the launch went through, and why not. */
+    data class ReviewComplete(val outcome: ReviewLaunchOutcome) : CsatIntent
     data object ForceShow : CsatIntent
     data object ForceShowFeedback : CsatIntent
     data object FeedbackThanksShown : CsatIntent
@@ -67,6 +71,29 @@ class CsatViewModel(
         private const val SOURCE_AUTO = "auto"
         private const val SOURCE_MANUAL = "manual"
         private const val SOURCE_FEEDBACK = "feedback"
+
+        /**
+         * csat_review_completed closing a launch the platform ACCEPTED.
+         *
+         * "Accepted", not "shown": Play renders nothing once the review quota is spent and reports
+         * no error for it, and the API never says whether a card appeared or a rating was left. So
+         * this arm is an upper bound on real review impressions, never a count of them.
+         */
+        private const val SOURCE_REVIEW_LAUNCH = "review_launch"
+
+        /**
+         * csat_review_completed closing a launch that never reached the platform at all — no host
+         * Activity, a rejected request, a cancelled launcher, or a platform with no review API.
+         * The flow legitimately ended, but counting it as a launch would inflate the funnel.
+         * [PARAM_NOT_SHOWN_REASON] splits the arm; without it these four are indistinguishable.
+         */
+        private const val SOURCE_NOT_SHOWN = "not_shown"
+
+        /** csat_review_completed with no launch outstanding — a repeat callback for the same tap. */
+        private const val SOURCE_REPEAT_CALLBACK = "repeat_callback"
+
+        /** Why a `not_shown` completion never launched — [ReviewLaunchOutcome.analyticsReason]. */
+        private const val PARAM_NOT_SHOWN_REASON = "not_shown_reason"
     }
 
     private val _screenState = MutableStateFlow(CsatState())
@@ -80,6 +107,29 @@ class CsatViewModel(
     private var entrySource: String = SOURCE_AUTO
     private var currentTriggerEvent: String? = null
     private var currentScore: Int? = null
+
+    // One-shot review requests. CONFLATED, not a state flag: the launcher consumes each element on
+    // receipt, so a re-created collector cannot replay it.
+    //
+    // Why a flag could not work: prod showed 6 csat_review_completed against 4 csat_review_tapped
+    // over 30 days — impossible if a completion only ever follows a tap. The guard was a
+    // `shouldLaunchReview` Boolean in state, and this ViewModel is a Koin SINGLETON (see AppModule)
+    // while the InAppReviewLauncher reading it is a transient composable; the intent bus is
+    // asynchronous too (AppViewModel tryEmit -> collector), so the flag stayed latched true for a
+    // window after onComplete had already fired. Any composition re-entry in that window (Activity
+    // recreation: rotation, dark-mode/locale switch, multi-window resize, "don't keep activities" —
+    // all likely right as the user returns from the Play review card) re-ran
+    // LaunchedEffect(shouldLaunch = true), calling the Play API a SECOND time for one tap and
+    // emitting a second completion. Conflated is the right capacity here: two taps that arrive
+    // before the launcher collects are one review, not two.
+    private val _reviewRequests = Channel<Unit>(Channel.CONFLATED)
+    val reviewRequests: Flow<Unit> = _reviewRequests.receiveAsFlow()
+
+    // Is a review launch outstanding? Set with csat_review_tapped, cleared by the completion that
+    // closes it, so csat_review_completed can say WHICH tap it belongs to. The channel above should
+    // make a second completion per tap impossible — this stays as the measurement that proves it:
+    // SOURCE_REPEAT_CALLBACK must now flatline at zero in prod.
+    private var reviewLaunchPending = false
 
     init {
         csatManager.startObserving(
@@ -117,7 +167,7 @@ class CsatViewModel(
             is CsatIntent.UpdateText -> handleUpdateText(intent.text)
             CsatIntent.Submit -> handleSubmit()
             CsatIntent.Dismiss -> handleDismiss()
-            CsatIntent.ReviewComplete -> handleReviewComplete()
+            is CsatIntent.ReviewComplete -> handleReviewComplete(intent.outcome)
             CsatIntent.ForceShow -> handleForceShow()
             CsatIntent.ForceShowFeedback -> handleForceShowFeedback()
             CsatIntent.FeedbackThanksShown -> _screenState.update { it.copy(showFeedbackThanks = false) }
@@ -155,6 +205,8 @@ class CsatViewModel(
         // docs/active/csat-loveit-direct-review-2026-06-13.md.
         if (rating == CsatRating.LoveIt) {
             analyticsTracker.event(AnalyticsEvents.Csat.REVIEW_TAPPED)
+            reviewLaunchPending = true
+            _reviewRequests.trySend(Unit)
             viewModelScope.launch {
                 csatManager.recordOutcome(CsatManager.OUTCOME_SUBMITTED)
             }
@@ -162,7 +214,6 @@ class CsatViewModel(
                 it.copy(
                     selectedRating = rating,
                     showBottomSheet = false,
-                    shouldLaunchReview = true,
                 )
             }
             return
@@ -242,14 +293,42 @@ class CsatViewModel(
         handleClose()
     }
 
-    private fun handleReviewComplete() {
-        // Review flow finished (shown, dismissed, or quota-exceeded) → thank the user.
-        // Log flow completion so the review funnel isn't blind after csat_review_tapped — the
-        // Play/StoreKit API never reports whether the user actually rated, so this is the only
-        // signal that the launched review returned.
-        analyticsTracker.event(AnalyticsEvents.Csat.REVIEW_COMPLETED)
+    private fun handleReviewComplete(outcome: ReviewLaunchOutcome) {
+        // The review request finished → thank the user. Log it so the funnel isn't blind after
+        // csat_review_tapped: the store APIs never report whether the user actually rated, so a
+        // returned request is the only signal there is.
+        //
+        // AnalyticsParams.SOURCE carries two independent facts, which is why it is a three-way and
+        // not a boolean:
+        //   review_launch   — the platform accepted the launch; closes its tap (the funnel arm)
+        //   not_shown       — never reached the platform; PARAM_NOT_SHOWN_REASON says why
+        //   repeat_callback — no launch outstanding; a second completion for one tap
+        // Stamping a request that never launched as review_launch is what previously made the arm
+        // unreadable: an Activity-less skip and a real launch were the same event.
+        val closesLaunch = reviewLaunchPending
+        reviewLaunchPending = false
+        val source = when {
+            !closesLaunch -> SOURCE_REPEAT_CALLBACK
+            outcome == ReviewLaunchOutcome.Launched -> SOURCE_REVIEW_LAUNCH
+            else -> SOURCE_NOT_SHOWN
+        }
+        analyticsTracker.event(
+            AnalyticsEvents.Csat.REVIEW_COMPLETED,
+            buildMap {
+                put(AnalyticsParams.SOURCE, source)
+                outcome.analyticsReason?.let { put(PARAM_NOT_SHOWN_REASON, it) }
+            },
+        )
         _screenState.update {
-            it.copy(shouldLaunchReview = false, showBottomSheet = false, showFeedbackThanks = true)
+            it.copy(
+                showBottomSheet = false,
+                // Gated on closesLaunch, NOT on the outcome: a user who picked "Love It" is owed
+                // the thanks snackbar even where no review can launch (web, iOS, no Activity) —
+                // otherwise the tap produces no visible response at all. A repeat callback must not
+                // re-trigger the snackbar the user already saw, nor clear one another flow is
+                // waiting to show.
+                showFeedbackThanks = it.showFeedbackThanks || closesLaunch,
+            )
         }
         resetState()
     }
@@ -283,7 +362,6 @@ class CsatViewModel(
                 selectedChips = emptySet(),
                 feedbackText = "",
                 isSubmitting = false,
-                shouldLaunchReview = false,
                 isFeedbackOnly = false,
             )
         }

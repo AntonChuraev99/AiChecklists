@@ -17,6 +17,9 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "gisti-landing",
+	// Личный аккаунт (churaevanton@gmail.com), как и у основного worker'а и mcp-server.
+	// Явно указан, чтобы деплой из-под другого логина падал с ошибкой доступа.
+	"account_id": "2c9dfaadbca94b44f59f13dbf70519d7",
 	"compatibility_date": "2026-05-08",
 	"routes": [
 		{ "pattern": "gisti-ai.com", "custom_domain": true },

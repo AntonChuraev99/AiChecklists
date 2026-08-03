@@ -35,9 +35,12 @@ SCOPES = [
 # Functions to deploy
 FUNCTIONS = [
     {
+        # 512M, not the 256M default: every function imports the same heavy main.py graph,
+        # and register_user was OOM-killed at the 244 MiB ceiling on 2026-07-06.
+        # Keep in sync with deploy.sh / functions.yaml.
         "name": "register_user",
         "entry_point": "register_user",
-        "memory": "256M",
+        "memory": "512M",
         "timeout": "30s",
     },
     {

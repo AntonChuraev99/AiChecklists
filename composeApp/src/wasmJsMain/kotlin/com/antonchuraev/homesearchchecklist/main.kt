@@ -72,6 +72,13 @@ fun main() {
     // part of any later app state, and Amplitude campaign autocapture is deliberately off.
     parseGalleryDeepLink(window.location.search)?.let { link ->
         koin.get<PendingGalleryDeepLink>().submit(link)
+        // Strip the marker from the address bar right after handing the link off. Without this the
+        // query survives in the URL, so every reload (F5, back-forward cache, session restore)
+        // re-parses it and re-submits: a single arrival is counted as several
+        // `gallery_deeplink_opened`, and a successful re-run silently creates a DUPLICATE checklist.
+        // replaceState (not pushState) so no extra history entry appears and Back still leaves.
+        // The holder already has the link, so clearing the URL cannot lose it.
+        window.history.replaceState(null, "", window.location.pathname)
     }
 
     // Teach the singleton Coil ImageLoader how to read "opfs://..." attachment paths

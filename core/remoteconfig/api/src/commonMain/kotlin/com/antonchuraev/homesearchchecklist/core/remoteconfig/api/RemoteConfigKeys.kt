@@ -20,7 +20,9 @@ object RemoteConfigKeys {
     const val MAX_WEEKLY_CHECKLISTS_FREE = "max_weekly_checklists_free"
     const val MAX_ATTACHMENTS_PER_ITEM_FREE = "max_attachments_per_item_free"
 
-    // Onboarding type: "interactive" | "default" | "none" (none = skip to main)
+    // Onboarding type: "ai_welcome" | "interactive" | "default" (slides) | "none" (skip to main).
+    // "ai_welcome" is Android-only — every other platform degrades it to "default"
+    // (see GetOnboardingVariantUseCase).
     const val ONBOARDING = "onboarding"
 
     // Paywall A/B variant: "timeline_v1" | "features_v1" | "compare_v1"
@@ -44,8 +46,9 @@ object RemoteConfigKeys {
     //   behavioral — the local retention auto-pushes (streak-save / overdue / weekly digest) are
     //                delivered at the user's most-active hour (a 24-slot on-device activity histogram).
     //   fixed      — delivered at a fixed default window (~19:00 local).
-    // Sticky per user (client reads it once, mirrors it into the sticky user-property push_ab_arm and
-    // tags every retention push event with push_ab_experiment="timing"). Live from release -> assigned
+    // Sticky per user (client reads it once, mirrors it into the sticky user-property push_timing_arm
+    // — NOT push_ab_arm, which is the server's per-send push-COPY arm — and tags every retention push
+    // event with push_ab_experiment="timing"). Live from release -> assigned
     // in the Firebase RC console via a percent split; NEVER hardcoded. Only affects OUR auto-pushes —
     // user-set reminders always fire at the time the user chose.
     const val PUSH_TIMING_ARM = "push_timing_arm"
@@ -101,14 +104,19 @@ object RemoteConfigDefaults {
     const val MAX_WEEKLY_CHECKLISTS_FREE = 1L
     const val MAX_ATTACHMENTS_PER_ITEM_FREE = 3L
 
-    // Onboarding type: "interactive" | "default" | "none" (none = skip to main)
+    // Onboarding type: "ai_welcome" | "interactive" | "default" (slides) | "none" (skip to main).
     //
-    // Empty client default is intentional: any non-empty value MUST come from Firebase
-    // Remote Config so we can distinguish "RC successfully returned a variant" from
-    // "fetch failed / experiment not assigned yet". Empty value falls back to DEFAULT
-    // (slide-based onboarding) inside GetOnboardingVariantUseCase. Without this guard
-    // every user with stale/empty RC silently lands in the "interactive" treatment,
-    // collapsing the A/B distribution.
+    // ⚠️ MUST STAY EMPTY. This value is also pushed into the Firebase SDK's in-app defaults
+    // (FirebaseRemoteConfigProvider.getDefaultsMap), so remoteConfig.getString("onboarding")
+    // returns exactly what is written here whenever nothing was fetched. Empty is therefore the
+    // only sentinel that lets us tell "RC returned a real assignment" apart from "fetch failed /
+    // not assigned yet" — the distinction the onboarding_rc_resolved.rc_value_empty analytics
+    // param is built on. Putting a real arm name here would silently pin that param to false
+    // forever and blind the A/B health signal.
+    //
+    // WHICH ARM the empty sentinel resolves to is a separate, product-level decision and lives in
+    // GetOnboardingVariantUseCase — since 2026-07-28 it is AI_WELCOME (was: slides), so a user
+    // whose Remote Config never arrived still gets the flagship AI first-run.
     const val ONBOARDING = ""
 
     // Paywall A/B variant default

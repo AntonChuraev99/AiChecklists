@@ -7,8 +7,10 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.data.sync.GalleryT
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Creates a checklist from a public gallery template (`gallery_templates/{slug}`) AS-IS —
@@ -52,7 +54,15 @@ class CreateChecklistFromGalleryTemplateUseCase(
                     logger.error(TAG, "fetchGalleryTemplate('$slug') failed: ${res.exception.message}", res.exception)
                     return Result.Error(res.exception)
                 }
-                AppResult.Loading -> return Result.NotFound
+                // NOT NotFound: mapping Loading to NotFound made the funnel lie. `not_found` is the
+                // signal that the live gallery page and Firestore have drifted apart (a content bug
+                // worth chasing); a terminal Loading is an unfinished fetch and must not be counted
+                // as a stale slug, or every such case pollutes the drift signal.
+                AppResult.Loading -> {
+                    val e = IllegalStateException("fetchGalleryTemplate('$slug') returned Loading as a terminal value")
+                    logger.error(TAG, "unexpected terminal Loading for slug '$slug'", e)
+                    return Result.Error(e)
+                }
             }
 
         return runCatching {
@@ -77,21 +87,42 @@ class CreateChecklistFromGalleryTemplateUseCase(
                 .toMap()
 
             if (noteByTemplateId.isNotEmpty()) {
-                val defaultFill = checklistRepository
-                    .getDefaultFillByChecklistId(checklistId)
-                    .filterNotNull()
-                    .first()
-                val withNotes = defaultFill.copy(
-                    items = defaultFill.items.map { fillItem ->
-                        val note = fillItem.templateItemId?.let { noteByTemplateId[it] }
-                        if (note != null) fillItem.withNote(note) else fillItem
-                    },
-                )
-                checklistRepository.updateFill(withNotes)
+                // BOUNDED wait. `first()` on a filterNotNull()'d flow suspends FOREVER when the
+                // default fill never materialises — and because the checklist is already persisted
+                // at this point, the caller then emits neither `checklist_created` nor
+                // `gallery_deeplink_failed`, shows no snackbar, and never consumes the pending link.
+                // That is exactly the prod symptom: 7 `gallery_deeplink_opened` against 1 created
+                // and 0 failed. Notes are a nice-to-have; the checklist is the deliverable, so a
+                // timeout degrades to "created without notes" instead of hanging the whole flow.
+                val defaultFill = withTimeoutOrNull(DEFAULT_FILL_TIMEOUT_MS) {
+                    checklistRepository
+                        .getDefaultFillByChecklistId(checklistId)
+                        .filterNotNull()
+                        .first()
+                }
+                if (defaultFill == null) {
+                    logger.error(
+                        TAG,
+                        "default fill for checklist $checklistId (slug '$slug') did not appear " +
+                            "within ${DEFAULT_FILL_TIMEOUT_MS}ms — checklist created WITHOUT notes",
+                        IllegalStateException("default fill timeout"),
+                    )
+                } else {
+                    val withNotes = defaultFill.copy(
+                        items = defaultFill.items.map { fillItem ->
+                            val note = fillItem.templateItemId?.let { noteByTemplateId[it] }
+                            if (note != null) fillItem.withNote(note) else fillItem
+                        },
+                    )
+                    checklistRepository.updateFill(withNotes)
+                }
             }
 
             Result.Created(checklistId)
         }.getOrElse { e ->
+            // runCatching catches Throwable, which includes CancellationException — swallowing it
+            // breaks structured concurrency and reports a cancelled coroutine as a genuine failure.
+            if (e is CancellationException) throw e
             logger.error(TAG, "create from gallery template '$slug' failed: ${e.message}", e)
             Result.Error(e)
         }
@@ -99,5 +130,12 @@ class CreateChecklistFromGalleryTemplateUseCase(
 
     private companion object {
         const val TAG = "GalleryDeepLink"
+
+        /**
+         * Upper bound on waiting for the auto-created default fill. Generous on purpose — the fill
+         * is written by [ChecklistRepository.addChecklist] in the same transaction, so in practice
+         * it is already there; this only guards the pathological case that used to hang forever.
+         */
+        const val DEFAULT_FILL_TIMEOUT_MS = 5_000L
     }
 }

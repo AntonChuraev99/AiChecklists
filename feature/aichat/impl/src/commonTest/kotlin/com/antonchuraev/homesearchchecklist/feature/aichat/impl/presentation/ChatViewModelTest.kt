@@ -2902,6 +2902,48 @@ class ChatViewModelTest {
             "ai_chat_feedback must not fire on open, only on submit")
     }
 
+    // ── A7b. thumb_down — reopening feedback on the SAME message is marked as a repeat ──
+    /**
+     * Measured in prod 2026-07-31: one message_id carried 6 thumb_down events, another 3,
+     * two more 2 each — 13 of 27 events were repeat taps on 4 messages. Read as "26 disliked
+     * answers", the number is inflated by however often a frustrated user reopened the sheet.
+     *
+     * The fix marks rather than drops, mirroring `is_repeat_tap` on purchase_button_clicked
+     * (PaywallViewModel:432). Dropping would hide how often people re-dislike the same reply,
+     * which is itself signal; marking lets the funnel filter `is_repeat_tap = false` and keeps
+     * the raw stream intact.
+     */
+    @Test
+    fun onFeedbackOpen_marksRepeatThumbDownOnSameMessage() = runTest {
+        val analytics = FakeAnalyticsTracker()
+        val vm = makeVm(analytics = analytics)
+        fun msg(id: String) = ChatMessage(
+            id = id,
+            role = ChatRole.Assistant,
+            content = "A bad answer.",
+            timestamp = 1_000L,
+            routedLayer = RoutingLayer.FullChat,
+        )
+
+        vm.sendIntent(ChatScreenIntent.OnFeedbackOpen(msg("asst_repeat")))
+        vm.sendIntent(ChatScreenIntent.OnFeedbackDismiss)
+        vm.sendIntent(ChatScreenIntent.OnFeedbackOpen(msg("asst_repeat")))
+        vm.sendIntent(ChatScreenIntent.OnFeedbackDismiss)
+        vm.sendIntent(ChatScreenIntent.OnFeedbackOpen(msg("asst_other")))
+
+        val thumbDowns = analytics.events.filter { it.first == "ai_chat_thumb_down" }
+        assertEquals(3, thumbDowns.size,
+            "every tap is still reported — repeats are marked, never dropped")
+        // Boolean, matching how the paywall emits the same property — asserted as Boolean so a
+        // silent switch back to .toString() fails here instead of splitting the property in Amplitude.
+        assertEquals(false, thumbDowns[0].second["is_repeat_tap"],
+            "first dislike of a message is not a repeat")
+        assertEquals(true, thumbDowns[1].second["is_repeat_tap"],
+            "reopening feedback on the same message must be marked as a repeat")
+        assertEquals(false, thumbDowns[2].second["is_repeat_tap"],
+            "a different message starts its own count")
+    }
+
     // ── A8. thumb_up — migrated to catalog name, value-preserving params ──
     @Test
     fun onThumbUpClick_emitsThumbUpWithMigratedParams() = runTest {

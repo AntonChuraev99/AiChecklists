@@ -1124,6 +1124,47 @@ class TestInterpretAgentResponse:
         kind, _ = main._interpret_agent_response(resp)
         assert kind == "options"
 
+    def test_underfilled_present_options_falls_back_to_its_prompt(self, _import_main):
+        """A present_options call with too few labels must NOT read as "empty".
+
+        Reproduces the 2026-07-31 prod degrade: the model returned exactly one part — a
+        present_options call carrying a real prompt but a single usable label. The extractor
+        rejects it (needs CHAT_AGENT_MIN_OPTIONS), _serialize_function_calls skips it as
+        server-terminal, and there is no text part — so the turn used to classify as "empty",
+        get retried against an unchanged input (same result, one wasted Gemini call), and then
+        degrade into "Sorry, I couldn't generate a response". The model did write a question;
+        showing it without chips answers the user instead of failing the turn.
+        """
+        main = _import_main
+        resp = _response(parts=[_fc_part(
+            "present_options",
+            {"prompt": "Which list should I add it to?", "options": ["Groceries"]},
+        )])
+        kind, payload = main._interpret_agent_response(resp)
+        assert kind == "final"
+        assert payload == "Which list should I add it to?"
+
+    def test_present_options_without_prompt_stays_empty(self, _import_main):
+        """Guard on the fallback: with no prompt there is nothing to salvage.
+
+        Keeps the salvage narrow — it may only surface text the model actually wrote, never
+        invent a reply. This case legitimately stays "empty" and keeps the retry+degrade path.
+        """
+        main = _import_main
+        resp = _response(parts=[_fc_part("present_options", {"options": ["OnlyOne"]})])
+        kind, payload = main._interpret_agent_response(resp)
+        assert kind == "empty"
+        assert payload == "STOP"
+
+    def test_absent_present_options_still_reads_as_empty(self, _import_main):
+        """The salvage must not fire when no present_options call exists at all."""
+        main = _import_main
+        resp = _response(parts=[_fc_part("add_item", {})], finish_reason="MAX_TOKENS")
+        kind, payload = main._interpret_agent_response(resp)
+        # add_item with empty args is still a dispatchable tool call, not a salvage case.
+        assert kind == "tool_calls"
+        assert payload[0]["name"] == "add_item"
+
 
 class TestChatAgentEmptyCandidate:
     """chat_agent must retry once on an empty Gemini candidate, then degrade gracefully

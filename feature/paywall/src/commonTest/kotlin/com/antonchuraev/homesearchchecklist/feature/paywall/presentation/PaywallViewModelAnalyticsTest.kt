@@ -28,6 +28,7 @@ import com.antonchuraev.homesearchchecklist.feature.user.domain.model.UserData
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -55,8 +56,9 @@ import kotlin.test.assertTrue
  * the subscribe CTA, BEFORE billing runs. Without it we can only see paywall_shown
  * and purchase_completed, so a drop between "looked" and "tapped" is invisible.
  *
- * Note: paywall_shown lives in PaywallRoute (a @Composable side-effect) and is not
- * reachable from a pure ViewModel test — covered manually / by the screen layer.
+ * Also covers the funnel ENTRY — `paywall_shown`. Since 2026-07-28 it is emitted by this
+ * ViewModel (it used to live in PaywallRoute, which the two onboarding paywall hosts never
+ * compose, so they produced taps with no impression), which makes it unit-testable here.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class PaywallViewModelAnalyticsTest {
@@ -105,11 +107,14 @@ class PaywallViewModelAnalyticsTest {
         purchaseResult: PurchaseResult = PurchaseResult.Cancelled,
         // null = "arm unknown" (experiment off / not seen yet); non-null = a persisted arm.
         experimentArm: AiModelArm? = null,
+        // > 0 keeps a purchase in flight across the next intent — see FakePaywallRepository.
+        purchaseDelayMs: Long = 0L,
     ): Pair<PaywallViewModel, RecordingAnalyticsTracker> {
         val tracker = RecordingAnalyticsTracker()
         val paywallRepo = FakePaywallRepository(
             offering = PaywallOffering(id = "default", products = listOf(product)),
             purchaseResult = purchaseResult,
+            purchaseDelayMs = purchaseDelayMs,
         )
         val userRepo = FakeUserDataRepository()
         val remoteConfig = FakeRemoteConfigProvider()
@@ -129,6 +134,161 @@ class PaywallViewModelAnalyticsTest {
         )
         return vm to tracker
     }
+
+    // ── Funnel entry: paywall_shown must cover EVERY paywall host ─────────────
+
+    @Test
+    fun init_firesPaywallShown_soEveryHostOfThisViewModelProducesAnImpression() =
+        testScope.runTest {
+            val (_, tracker) = createViewModel(monthlyTrialProduct)
+            advanceUntilIdle()
+
+            val shown = tracker.events.filter { it.first == AnalyticsEvents.Paywall.SHOWN }
+            assertEquals(
+                1,
+                shown.size,
+                "paywall_shown must fire exactly once per ViewModel — it is the funnel " +
+                    "denominator, and every paywall host (standalone screen + both onboarding " +
+                    "steps) drives this ViewModel",
+            )
+            assertEquals("test_source", shown.first().second[AnalyticsParams.SOURCE])
+        }
+
+    @Test
+    fun init_paywallShownAndPaywallOpened_carryIdenticalParams() =
+        testScope.runTest {
+            val (_, tracker) = createViewModel(monthlyTrialProduct)
+            advanceUntilIdle()
+
+            val shown = tracker.events.first { it.first == AnalyticsEvents.Paywall.SHOWN }.second
+            val opened = tracker.events.first { it.first == "paywall_opened" }.second
+            assertEquals(
+                opened,
+                shown,
+                "the two names must stay interchangeable: they drifted apart once (different " +
+                    "emit layers, different surface coverage) and that broke the funnel",
+            )
+        }
+
+    @Test
+    fun onboardingSource_isTaggedAsTheOnboardingSurface_notThePaywallScreen() =
+        testScope.runTest {
+            val (_, tracker) = createViewModel(
+                product = monthlyTrialProduct,
+                source = AnalyticsEvents.Paywall.SOURCE_ONBOARDING_TRIAL,
+            )
+            advanceUntilIdle()
+
+            val shown = tracker.events.first { it.first == AnalyticsEvents.Paywall.SHOWN }.second
+            assertEquals(
+                AnalyticsEvents.Paywall.SURFACE_ONBOARDING,
+                shown[AnalyticsParams.SURFACE],
+                "an onboarding paywall is shown to everyone; pooling it with limit-gate " +
+                    "impressions mixes two populations with very different intent",
+            )
+        }
+
+    @Test
+    fun gateSource_isTaggedAsThePaywallScreenSurface() =
+        testScope.runTest {
+            val (_, tracker) = createViewModel(monthlyTrialProduct, source = "checklist_limit")
+            advanceUntilIdle()
+
+            val shown = tracker.events.first { it.first == AnalyticsEvents.Paywall.SHOWN }.second
+            assertEquals(
+                AnalyticsEvents.Paywall.SURFACE_PAYWALL_SCREEN,
+                shown[AnalyticsParams.SURFACE],
+            )
+        }
+
+    @Test
+    fun purchaseFunnel_impressionTapAndOutcome_allCarryTheSameSurface() =
+        testScope.runTest {
+            val (vm, tracker) = createViewModel(
+                product = monthlyTrialProduct,
+                source = AnalyticsEvents.Paywall.SOURCE_ONBOARDING_TRIAL,
+            )
+            advanceUntilIdle()
+
+            vm.sendIntent(PaywallIntent.Purchase)
+            advanceUntilIdle()
+
+            listOf(
+                AnalyticsEvents.Paywall.SHOWN,
+                AnalyticsEvents.Paywall.PURCHASE_BUTTON_CLICKED,
+                AnalyticsEvents.Paywall.PURCHASE_CANCELLED,
+            ).forEach { name ->
+                assertEquals(
+                    AnalyticsEvents.Paywall.SURFACE_ONBOARDING,
+                    tracker.events.first { it.first == name }.second[AnalyticsParams.SURFACE],
+                    "$name must carry surface, or the funnel cannot be split per host",
+                )
+            }
+        }
+
+    // ── Duplicate taps are marked, never dropped ──────────────────────────────
+
+    @Test
+    fun purchaseIntent_firstTap_isNotMarkedAsRepeat() =
+        testScope.runTest {
+            val (vm, tracker) = createViewModel(monthlyTrialProduct)
+            advanceUntilIdle()
+
+            vm.sendIntent(PaywallIntent.Purchase)
+            advanceUntilIdle()
+
+            val params = tracker.events
+                .first { it.first == AnalyticsEvents.Paywall.PURCHASE_BUTTON_CLICKED }
+                .second
+            assertEquals(false, params[AnalyticsParams.IS_REPEAT_TAP])
+        }
+
+    @Test
+    fun purchaseIntent_secondTapInSameFrame_isEmittedAndMarkedAsRepeat() =
+        testScope.runTest {
+            val (vm, tracker) = createViewModel(monthlyTrialProduct, purchaseDelayMs = 10L)
+            advanceUntilIdle()
+
+            // No advance between the taps: state.isPurchasing is only set INSIDE the purchase
+            // coroutine, so this is exactly the window in which the UI still shows an idle CTA.
+            vm.sendIntent(PaywallIntent.Purchase)
+            vm.sendIntent(PaywallIntent.Purchase)
+            advanceUntilIdle()
+
+            val taps = tracker.events
+                .filter { it.first == AnalyticsEvents.Paywall.PURCHASE_BUTTON_CLICKED }
+            assertEquals(2, taps.size, "the duplicate must be recorded, not silently swallowed")
+            assertEquals(false, taps[0].second[AnalyticsParams.IS_REPEAT_TAP])
+            assertEquals(
+                true,
+                taps[1].second[AnalyticsParams.IS_REPEAT_TAP],
+                "a tap landing while a purchase is already running is a duplicate of the same " +
+                    "intent — counting it as a second intent inflates the funnel numerator",
+            )
+        }
+
+    @Test
+    fun purchaseIntent_afterAnEarlierPurchaseFinished_isNotMarkedAsRepeat() =
+        testScope.runTest {
+            val (vm, tracker) = createViewModel(monthlyTrialProduct)
+            advanceUntilIdle()
+
+            vm.sendIntent(PaywallIntent.Purchase)
+            advanceUntilIdle() // first purchase runs to completion (Cancelled) -> flag clears
+
+            vm.sendIntent(PaywallIntent.Purchase)
+            advanceUntilIdle()
+
+            val taps = tracker.events
+                .filter { it.first == AnalyticsEvents.Paywall.PURCHASE_BUTTON_CLICKED }
+            assertEquals(2, taps.size)
+            assertEquals(
+                false,
+                taps[1].second[AnalyticsParams.IS_REPEAT_TAP],
+                "a genuine retry after a cancelled purchase is a NEW intent — a leaked " +
+                    "in-flight flag would misreport every later tap and zero the numerator",
+            )
+        }
 
     @Test
     fun purchaseIntent_firesPurchaseButtonClicked_withSourceProductIdAndTrialFlag() =
@@ -260,11 +420,18 @@ class PaywallViewModelAnalyticsTest {
     private class FakePaywallRepository(
         private val offering: PaywallOffering?,
         private val purchaseResult: PurchaseResult,
+        // Real billing suspends (the store sheet is open). With 0 the purchase coroutine runs to
+        // completion before the NEXT buffered intent is dequeued, so the "two taps while one
+        // purchase is running" window cannot be reproduced at all.
+        private val purchaseDelayMs: Long = 0L,
     ) : PaywallRepository {
         override val subscriptionStatus: Flow<SubscriptionStatus> = flowOf(SubscriptionStatus.FREE)
         override suspend fun getOfferings(offeringId: String): Result<PaywallOffering?> =
             Result.success(offering)
-        override suspend fun purchase(packageId: String): PurchaseResult = purchaseResult
+        override suspend fun purchase(packageId: String): PurchaseResult {
+            if (purchaseDelayMs > 0) delay(purchaseDelayMs)
+            return purchaseResult
+        }
         override suspend fun restorePurchases(): RestoreResult = RestoreResult.NoActiveSubscription
         override suspend fun refreshSubscriptionStatus() {}
         override fun isConfigured(): Boolean = true

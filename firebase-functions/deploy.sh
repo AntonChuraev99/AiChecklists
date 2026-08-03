@@ -136,11 +136,46 @@ gcloud functions deploy register_push_token \
     --memory=256MB \
     --timeout=30s
 
+# ── Infra functions (no Gemini) ─────────────────────────────────────────────
+# NOTE: get_credits_info is still deployed separately; not folded in here yet.
+#
+# ⚠️ MEMORY = 512MB, not the 256MB default. Every function in this codebase imports the
+# SAME main.py module graph (firebase_admin + google-genai + flask + requests), so even a
+# "small" infra function pays the full import-time RSS. At 256MB the container sits close
+# to the ceiling and Cloud Run has killed it with "Memory limit of 244 MiB exceeded" —
+# observed on link_google_account (2026-07-27), register_user (2026-07-06) and
+# classify_chat_intent (2026-07-18). All three OOMs landed OUTSIDE a request (no request
+# log in the window), so no user saw a 5xx yet — this is the latent-risk fix, not an
+# incident fix. Cost delta is ~0: these are low-volume (8 / 210 / 25 calls a week) and the
+# extra GiB-s stays inside the Cloud Run free tier.
+echo "Deploying register_user..."
+gcloud functions deploy register_user \
+    --gen2 \
+    --runtime=python312 \
+    --region=$REGION \
+    --source=. \
+    --entry-point=register_user \
+    --trigger-http \
+    --allow-unauthenticated \
+    --memory=512MB \
+    --timeout=30s
+
+echo "Deploying link_google_account..."
+gcloud functions deploy link_google_account \
+    --gen2 \
+    --runtime=python312 \
+    --region=$REGION \
+    --source=. \
+    --entry-point=link_google_account \
+    --trigger-http \
+    --allow-unauthenticated \
+    --memory=512MB \
+    --timeout=30s
+
 # ── AI Chat functions (all use GEMINI_API_KEY) ──────────────────────────────
-# NOTE: register_user / link_google_account / get_credits_info are infra
-# functions (no Gemini) deployed separately; not folded in here yet.
 
 # Deploy classify_chat_intent (Layer 2 — cheap classifier)
+# 512MB (was 256MB): OOM-killed at the 244 MiB ceiling on 2026-07-18 — see the note above.
 echo "Deploying classify_chat_intent..."
 gcloud functions deploy classify_chat_intent \
     --gen2 \
@@ -151,7 +186,7 @@ gcloud functions deploy classify_chat_intent \
     --trigger-http \
     --allow-unauthenticated \
     --update-secrets="GEMINI_API_KEY=gemini-api-key:latest" \
-    --memory=256MB \
+    --memory=512MB \
     --timeout=60s
 
 # Deploy chat_completion (Layer 3 — text-only fallback; kept as kill-switch path)
@@ -241,3 +276,37 @@ echo "  register_push_token: https://$REGION-$PROJECT_ID.cloudfunctions.net/regi
 #   curl -X POST "https://$REGION-$PROJECT_ID.cloudfunctions.net/send_promotions_batch" \
 #     -H "Content-Type: application/json" \
 #     -d '{"push_type":"reengagement","min_inactive_days":3,"dry_run":true,"admin_key":"..."}'
+
+# ── Firestore-triggered function ─────────────────────────────────────────────
+#
+# on_rc_event_created reconciles RevenueCat credits from rc_events/{eventId}.
+# It is NOT an HTTP function, so it needs --trigger-event-filters, and it has two
+# traps that cost a session to rediscover (2026-07-27):
+#
+#   1. --trigger-location is the FIRESTORE DATABASE region, not the function's.
+#      The database lives in nam5 while the function runs in us-central1; passing
+#      $REGION here fails with "Database '(default)' does not exist in region ...".
+#   2. --cpu=1 must be explicit. At 256MB gcloud picks a fractional CPU, which
+#      Cloud Run rejects for this service: "Total cpu < 1 is not supported with
+#      concurrency > 1" (the service runs containerConcurrency=80).
+#
+# Verify a deploy by the NEW Cloud Run revision, not the exit code — piping gcloud
+# into grep returns grep's status and makes a failed deploy look successful:
+#   gcloud run revisions list --service=on-rc-event-created --region=$REGION
+FIRESTORE_LOCATION="nam5"
+
+echo "Deploying on_rc_event_created..."
+gcloud functions deploy on_rc_event_created \
+    --gen2 \
+    --runtime=python312 \
+    --region=$REGION \
+    --source=. \
+    --entry-point=on_rc_event_created \
+    --trigger-location=$FIRESTORE_LOCATION \
+    --trigger-event-filters="type=google.cloud.firestore.document.v1.created" \
+    --trigger-event-filters="database=(default)" \
+    --trigger-event-filters="namespace=(default)" \
+    --trigger-event-filters-path-pattern="document=rc_events/{eventId}" \
+    --memory=256MB \
+    --cpu=1 \
+    --timeout=60s

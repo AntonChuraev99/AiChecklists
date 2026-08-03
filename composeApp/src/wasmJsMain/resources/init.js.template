@@ -231,7 +231,9 @@ rc.defaultConfig = {
     max_recurring_reminders_free: 10,
     max_weekly_checklists_free: 1,
     max_attachments_per_item_free: 3,
-    templates_json: "[]",
+    // templates_json intentionally absent: the key is dead client-side (the bundled template
+    // library is a Compose Resource read by TemplatesRepositoryImpl, not RC), so shipping a
+    // default here only invited someone to "fix" the empty array later. Removed 2026-07-27.
     // "none", not "interactive" — the client RC template carries a Web condition pinning this key
     // to "none", so a failed fetch used to drop web users into an onboarding the platform is not
     // supposed to show, and enrol them into an OnboardingABC arm they were never assigned
