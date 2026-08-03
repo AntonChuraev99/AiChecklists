@@ -16,9 +16,11 @@ Guidance for Claude Code in this repo. Keep this file **≤200 lines** (Anthropi
 
 **MCP server** (`mcp-server/`): a remote Cloudflare Worker exposing each signed-in user's checklists (read + AI-generate + CRUD) to any MCP client over Google OAuth — live at `https://gisti-mcp.gisti.workers.dev/mcp`. Full reference: `mcp-server/README.md`.
 
-**Product:** the AI Chat Assistant is the flagship interaction layer; secondary AI flows (Create/Fill) turn content into checklists. Full feature catalog, tiers, platform-parity matrix: `docs/product-features.md`.
+**Product:** the AI Chat Assistant is the flagship interaction layer; secondary AI flows (Create/Fill) turn content into checklists. UI languages: EN · RU · HI.
+**→ Start here for anything product-shaped: `docs/PRODUCT.md`** — positioning, competitors, business model, live A/B, decisions-not-to-reopen, current metrics, open forks. Feature-level detail (per-feature UX, parity matrix, version history): `docs/product-features.md`. Both gitignored.
 
-**Business model:** Free (5 checklists, 5 fills each, 10 AI credits/day, 10 recurring reminders) · Premium $1.99/mo (unlimited + 300 credits/day + Calendar + Weekly) · 3-day trial.
+**Business model:** Free (5 checklists, 5 fills each, 10 recurring reminders, 1 weekly, 3 attachments/item) · Premium $1.99/mo (unlimited + Calendar + Weekly) · 3-day trial · entitlement `"AiChecklists Pro"`, premium = `revenueCat || firestore`.
+⚠️ **The binding Free limit is the credit wallet, not the daily cap:** 100 lifetime credits at 20/action = **5 AI generations ever**, no Free refill, 0 on web until Google sign-in (Firestore `remote_config/current`, not Firebase RC). `ai_daily_limit_free=10` is effectively unreachable.
 
 ## Repository Visibility & Security
 
@@ -72,10 +74,13 @@ This **overrides** the global "do it yourself via tools" autonomy rule for the p
 ## Architecture
 
 ```
-composeApp/  androidMain (widget, notifications, AlarmManager, review) · iosMain · wasmJsMain (Firebase JS, OPFS driver, pickers; init.js.template)
-core/        common(api|impl) · designsystem · datastore(api|impl) · navigation(api|impl) · remoteconfig(api|impl)
-feature/     checklist · create · home · onboarding · splash · analyze · paywall · sharing · user · debug
+composeApp/  commonMain (activation, csat, appupdate, deeplink, mcp, aichat/ToolCallDispatcher, sync)
+             androidMain (widget, retention/push, notifications, AlarmManager, calendar, attribution, ProcessText, review)
+             iosMain (built, not released) · wasmJsMain (Firebase JS, OPFS driver, pickers; init.js.template)
+core/        common(api|impl) · designsystem · datastore(api|impl) · navigation(api|impl) · remoteconfig(api|impl) · auth(api|impl) · filepicker(api)
+feature/     aichat(api|impl) · analyze · checklist · create · debug · home · onboarding · paywall · settings · sharing · splash · updatefeed · user
 ```
+Outside Gradle: `firebase-functions/` (Python CFs) · `mcp-server/` (TS Cloudflare Worker) · `landing/` + `landing-src/` (SEO site) · `data/checklists/` (81 gallery JSONs) · `hosting/` · `e2e/` + `playwright/`.
 
 - **API/impl split:** core modules expose interfaces in `api`, impls in `impl`. Reference modules as `projects.core.common.api`.
 - **MVI:** ViewModels extend `AppViewModel<State, Intent, SideEffect>` (`core:common:api`). Files: `*ScreenContract.kt` (State/Intent sealed), `*ViewModel.kt` (`onIntent()`), `*Screen.kt` (observes `screenState`, calls `sendIntent()`).
@@ -94,9 +99,9 @@ Every error path **MUST** use `AppLogger.error(tag, message, throwable)` — nev
 
 One-liner map; deep rules load when you edit the feature. Full catalog: `docs/product-features.md`.
 
-- **AI Chat** (`feature/aichat/`) — 3-tier routing, flagship. Hard rules (FEATURE_CATALOG, TDD bad-answer fixes) → rule `ai-chat`; skill `/ai-chat-feedback-fixer`.
+- **AI Chat** (`feature/aichat/`) — flagship. **TWO active layers, not three:** L2 classifier CF `classify_chat_intent` (1 credit) → L3 agent CF `chat_agent` (3 flat/turn, 10 tools, max 5 rounds). **L1 `LocalIntentRouterImpl` is DISCONNECTED** (no Koin binding, `AiChatFeatureModule.kt:43`, decision 2026-07-15) — code + 168 tests parked; ⛔ never widen its lexicon. Legacy `chat_completion` still deployed, gets 0 calls. Hard rules → rule `ai-chat`; skill `/ai-chat-feedback-fixer`.
 - **Analyze** (`feature/analyze/`) — Gemini via Cloud Functions (Photo/PDF/Text/Link/Voice). `GeminiAiAnalyzer`, `AnalyzeViewModel`.
-- **Templates** (`feature/create/`) — bundled Compose Resource read by `TemplatesRepositoryImpl` (the `templates_json` RC key is dead/unread); Templates → TemplatePreview → Use.
+- **Templates** (`feature/create/`) — **81 templates / 15 categories** in a bundled Compose Resource read by `TemplatesRepositoryImpl` (the `templates_json` RC key is dead/unread); mirrored as `data/checklists/*.json` for the SEO gallery. Templates → TemplatePreview → Use.
 - **Paywall** (`feature/paywall/`) — RevenueCat. Credit-restore flow → rule `credit-restore`.
 - **Sharing** (`feature/sharing/`) — `ShareFormat.Text`/`.Pdf`; `ShareLauncher`/`PdfGenerator` expect/actual.
 - **Updates Feed** (`feature/updatefeed/`) — in-code release feed. Hard rules → rule `updates-feed`; skill `/create-release`.
@@ -104,6 +109,10 @@ One-liner map; deep rules load when you edit the feature. Full catalog: `docs/pr
 - **Widget** (`composeApp/androidMain/widget/`) — Glance, binds a checklist, WorkManager sync, deep-links to detail.
 - **CSAT** (`composeApp/commonMain/csat/`) — `CsatManager` survey + Play in-app review (`InAppReviewLauncher`).
 - **Debug** (`feature/debug/`) — debug builds; unlock Volume Up→Down→Up.
+- **Onboarding** (`feature/onboarding/`) — 4 arms via RC `onboarding`: `default` (slides+paywall) · `interactive` · `none` · `ai_welcome`. ⚠️ RC-fail fallback is `ai_welcome` since 1.18.6, which **has no paywall step** (deliberate, [ADR 07-28]).
+- **MCP** (`mcp-server/` + `composeApp/commonMain/mcp/`) — remote Cloudflare Worker, 16 tools, Google OAuth; in-app connection screen. Reference: `mcp-server/README.md`.
+- **Retention / push** (`composeApp/androidMain/retention/`, `push/`) — day-1 comeback + habit nudges, `PushTimingResolver`. Note `push_timing_arm` exists in **no** RC template → everyone runs `behavioral`.
+- **Gallery deep-link** (`composeApp/commonMain/deeplink/`) — SEO page → create-from-template via App Link `app.gisti-ai.com`. `gisti://` is **internal only**, not in the manifest.
 
 ## Diagnostics
 
@@ -111,7 +120,8 @@ One-liner map; deep rules load when you edit the feature. Full catalog: `docs/pr
 
 ## Analytics & A/B — keep the source-of-truth docs current
 
-`docs/marketing/ab-tests-overview-2026-06-18.md` is the single source of truth for A/B experiments, Remote Config params, and live product metrics (retention/funnel/CSAT/login). **Update it whenever you** change an RC key (`RemoteConfigKeys.kt` / `RemoteConfigDefaults.kt` or the Firebase RC template), start/stop a Firebase A/B experiment, or pull a fresh Amplitude snapshot — otherwise it silently drifts from prod. Keep the RC-limits table in `docs/unit-economics.md` in sync too. Both docs are gitignored (local-only). Prod truth = Firebase Console (RC + A/B Tests) + Amplitude project `786722`.
+`docs/marketing/ab-tests-overview-2026-06-18.md` is the source of truth for A/B experiments and Remote Config params; its §7 metrics block is a **dated snapshot, not current state** — for that read `docs/PRODUCT.md` §9. **Update it whenever you** change an RC key (both `RemoteConfigKeys` and `RemoteConfigDefaults` live in `RemoteConfigKeys.kt` — there is no separate `RemoteConfigDefaults.kt` — or the Firebase RC template), start/stop a Firebase A/B experiment, or pull a fresh Amplitude snapshot — otherwise it silently drifts from prod.
+**Config has FOUR layers** — check all before concluding: Firebase RC client template · server template `firebase-server` (all percentage conditions) · Firestore `remote_config/current` (credits) · web `init.js` (drifts). Mandatory measurement filters: `products_load_failed = 0` (strips review emulators; without it RC-fail reads 40% instead of ~4%) and `rc_activated = True`; compare **raw** shares across runs, never cleaned ones. **No new revenue-objective experiments** while purchases run ~4/month ([ADR 07-15]). Keep the RC-limits table in `docs/unit-economics.md` in sync too. Both docs are gitignored (local-only). Prod truth = Firebase Console (RC + A/B Tests) + Amplitude project `786722`.
 
 **Starting/stopping a Firebase A/B experiment ALSO requires syncing the daily Telegram analytics routine.** The Claude cloud routine "Gisti — Daily Analytics → Telegram" emails a morning report whose A/B block carries a **hardcoded experiment registry inside the routine prompt** — Firebase A/B results have no public API, so it cannot auto-refresh. When you start or stop an experiment, tell Claude **"обнови A/B в рутине"** and it will sync the registry (via the `RemoteTrigger` tool / `/schedule`) so the report stops showing a stale experiment set. Bot token/chat_id live ONLY in the routine prompt (never commit them). Details: project memory `telegram-daily-analytics-routine`.
 
@@ -127,19 +137,26 @@ Strategy + phased plan: **`docs/plans/2026-07-14-seo-organic-growth-strategy.md`
 
 - **Indexable pages are static files under `landing/`, served by worker `gisti-landing` (`wrangler.landing.jsonc`, apex + www). NEVER an app route** — `app.gisti-ai.com` is wasmJs Compose (Skiko `<canvas>`) = empty DOM for crawlers = SEO-zero. Replicate the `landing/mcp/index.html` pattern for new pages.
 - **Public gallery = curated/opt-in content ONLY** — never expose Firestore user checklists (private data under `users/{google_uid}`).
-- Phase 0 foundation LIVE: `robots.txt` + `sitemap.xml` (124 URLs, 61 hi + 63 en) + IndexNow, all serving; GSC domain property verified. Pages **are** indexed — the gap is **ranking / domain authority** (backlinks + internal links + Pinterest), not infra or indexing. Current GSC state + owner actions live in the SEO plan's verification block (gitignored).
+- Phase 0 foundation LIVE: `robots.txt` + `sitemap.xml` (**196 URLs, 97 hi + ~96 en**, verified 2026-08-03) + IndexNow, all serving; GSC domain property verified. Pages **are** indexed — the gap is **ranking / domain authority** (0 backlinks, position ~72), not infra or indexing. Current GSC state + owner actions live in the SEO plan's verification block (gitignored).
 - Landing infra + deploy account trap (gmail acct, `wrangler whoami` first): `docs/plans/2026-07-01-landing-root-swap-migration-plan.md`; SEO-landing history: `docs/completed/seo-landing-page-2026-07-01.md`.
 
 ## Dependencies & Economics
 
 All dependency versions live in `gradle/libs.versions.toml` — the single source of truth; check it, don't trust a number duplicated in prose. **Gemini SDK is intentionally NOT a client dependency** — all AI inference is server-side. Unit economics: `docs/unit-economics.md` (gemini-2.5-flash-lite ~$0.0002/req, positive at max usage). Geo-tiered pricing & organic-growth strategy (India + low-ARPU markets priced at minimal markup to drive organic installs/ratings; **gitignored, business-sensitive**): `docs/pricing-strategy.md`.
 
-| Limit (Remote Config) | Free | Premium |
-|---|---|---|
-| AI requests/day | 10 | 300 |
-| Max checklists | 5 | unlimited |
-| Max fills/checklist | 5 | unlimited |
-| Recurring reminders | 10 | unlimited |
+**Gemini models are an allowlist, not a constant** (`main.py:89-95`): `gemini-2.5-flash-lite` · `gemini-2.5-flash` · `gemini-3.1-flash-lite` · `gemini-3.5-flash`; anything else 500s. A live server A/B (`ai_model_arm`) runs `gemini-3.1-flash-lite` against control. ⏰ **All `gemini-2.5-*` hit EOL 2026-10-16** — including the control arm.
+
+| Limit (Remote Config) | Free | Premium | Defaults in code |
+|---|---|---|---|
+| AI requests/day | 10 | 300 | `RemoteConfigKeys.kt:75-76` |
+| Max checklists | 5 | unlimited | `:82` |
+| Max fills/checklist | 5 | unlimited | `:83` |
+| Recurring reminders | 10 | unlimited | `:84` |
+| Weekly checklists | 1 | unlimited | `:85` |
+| Attachments per item | 3 | unlimited | `:86` |
+| Items per checklist | 100 | 100 | `:70` |
+
+⚠️ **Read limits from `GetUserLimitsUseCase`, never from a local constant.** Several stale mirrors exist and are tracked in `docs/todos/` + `docs/backlog/`: `ToolCallDispatcherImpl.kt:77` hardcodes `FREE_CHECKLIST_LIMIT = 4` (RC default is 5), `PaywallScreen.kt:572` carries the same stale comment, and `main.py:292` holds a third value for the premium daily cap. A comment saying "mirrors X" is not checked by the compiler — treat it as a smell, not as documentation.
 
 ## `.claude/rules/` map (file-scoped, auto-loaded on matching edits)
 
