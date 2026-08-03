@@ -1,8 +1,27 @@
 # Google Play Store Listing — EN
 
-_Updated: 2026-07-02 · App version: 1.17.7 · ASO audit revision_
+_Updated: 2026-07-02 · App version: 1.17.7 · ASO audit revision · **copy reviewed against the app 2026-08-03 (app now 1.18.7)**_
 
 **This file is the source of truth for the Play Store listing.** Whenever the listing changes in Play Console, update this doc in the same task — and vice versa: any listing edit starts here, then gets pasted into the console.
+
+> ⚠️ **Copy below is deliberately NOT edited (reviewed 2026-08-03).** This doc mirrors what is
+> pasted into Play Console; rewriting it here without touching the console would just create the
+> same drift in the opposite direction. Two gaps found against app 1.18.7 — **apply them to the
+> console and this doc together, in one task:**
+>
+> 1. **Languages are stale.** Line ~50 says _"Works in English and Russian"_ — the app has shipped
+>    **Hindi UI since 1.18.2**, the AI chat greets and replies in the user's language since 1.18.1,
+>    and a separate Hindi listing exists (`store-listing-hi.md`). India is an explicit growth market
+>    (`docs/pricing-strategy.md` Tier C), so this omission costs a targeted market.
+> 2. **Nothing from 1.18 is reflected** — chat that remembers context across sessions and applies
+>    reversible actions (the single headline feature of the 1.18 line), and the template library
+>    grown **47 → 81** (1.18.3). "Ready-made templates" is unnumbered here, so it is not *wrong* —
+>    but 81 is a stronger claim than the unstated 47 the Update Feed still advertises.
+>
+> Not changed on purpose: _"100 AI credits"_ (line ~104) is factually correct — `initial_ai_credits`
+> is 100. Whether to keep advertising it is a **product** question, not a copy error: at
+> `ai_action_cost=20` it buys 5 AI generations for the lifetime of a Free account
+> (see [`docs/PRODUCT.md`](../PRODUCT.md) §2).
 
 **Changes vs live listing (ASO audit 2026-07-02):**
 - Short description: added `checklist` + `to-do list` keywords (the live version had neither — the second-highest-weight indexed field carried no primary keyword).
