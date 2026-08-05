@@ -57,6 +57,7 @@ class AndroidFirestoreSyncDataSourceMappingTest {
         foldersEnabled = true,
         updatedAt = 1_700_000_999_000L,
         isDeleted = true,
+        isInbox = true,
         fills = listOf(
             FillSyncData(
                 cloudId = "fill-cloud-1",
@@ -116,6 +117,47 @@ class AndroidFirestoreSyncDataSourceMappingTest {
             "a cloud document with reminderFullScreen = true must parse back as true, else the " +
                 "pull merge wipes the flag on every other device",
         )
+    }
+
+    @Test
+    fun checklistSyncData_toMap_writesIsInbox() {
+        // Write half for the v2 system Inbox flag: absent from toMap(), the marker never reaches
+        // Firestore, so a second Android device pulls the row as an ordinary checklist and creates
+        // its OWN Inbox — the user ends up with two.
+        val map = fullyPopulated().toMap()
+
+        assertTrue(
+            "isInbox" in map,
+            "toMap() must write isInbox, otherwise the system-Inbox marker never leaves the device",
+        )
+        assertEquals(true, map["isInbox"])
+    }
+
+    @Test
+    fun checklistSyncData_toChecklistSyncData_readsIsInbox() {
+        // Read half: parsed as false, the LWW merge would demote the local Inbox to a normal
+        // checklist, which then shows up in the Projects list and eats a free-tier slot.
+        val cloudDocument = fullyPopulated().toMap().throughFirestoreWire()
+
+        val restored = cloudDocument.toChecklistSyncData(documentId = "checklist-cloud-1")
+
+        assertTrue(
+            restored.isInbox,
+            "a cloud document with isInbox = true must parse back as true, else the pull merge " +
+                "demotes the system Inbox into an ordinary project",
+        )
+    }
+
+    @Test
+    fun checklistSyncData_toChecklistSyncData_defaultsIsInboxToFalse_whenKeyAbsent() {
+        // Documents written before this field existed (and by the MCP worker) carry no isInbox key.
+        // They must decode as a plain project, not blow up — the local write-once merge guard in
+        // SyncRepositoryImpl is what protects an existing local Inbox from such a document.
+        val legacyDocument = fullyPopulated().toMap().throughFirestoreWire() - "isInbox"
+
+        val restored = legacyDocument.toChecklistSyncData(documentId = "checklist-cloud-1")
+
+        assertEquals(false, restored.isInbox)
     }
 
     @Test

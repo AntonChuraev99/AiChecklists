@@ -13,6 +13,7 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
+import com.antonchuraev.homesearchchecklist.core.common.api.NavExperimentResolver
 import com.antonchuraev.homesearchchecklist.core.datastore.api.ActivationPrefsRepository
 import com.antonchuraev.homesearchchecklist.core.datastore.api.FirstChecklistRepository
 import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDefaults
@@ -53,6 +54,7 @@ class SplashViewModel(
     private val checklistRepository: ChecklistRepository,
     private val firstChecklistRepository: FirstChecklistRepository,
     private val activationPrefsRepository: ActivationPrefsRepository,
+    private val navExperimentResolver: NavExperimentResolver,
 ) : ViewModel() {
 
     init {
@@ -127,6 +129,27 @@ class SplashViewModel(
             // variant is read from fresh RC, and BEFORE navigate so the first screen_view
             // already carries the `first_checklist_variant` user property.
             applyFirstChecklistExperiment(userData, isNewUser)
+
+            // Navigation A/B arm — resolved HERE, before navigating, because Splash is the last
+            // moment at which no shell is mounted. App.kt latches the arm as soon as a shell
+            // appears: resolving it later would swap AdaptiveNavigationShell for V2NavigationShell
+            // under a live screen, which disposes and recreates the whole NavDisplay subtree (the
+            // user loses scroll position and in-progress edits) and re-roots the back stack
+            // mid-task. Deliberately awaited rather than fire-and-forget for the same reason.
+            //
+            // A DataStore read, or the v2 default for an install that never opened Settings.
+            val resolvedVariant = navExperimentResolver.ensureResolved()
+            log("nav variant resolved before navigate: $resolvedVariant")
+
+            // NOTE: the v1 Inbox rollback (ReconcileInboxForControlArmUseCase) used to run here and
+            // was REMOVED on 2026-08-03. It cleared `isInbox` whenever the user resolved to v1, which
+            // was correct while the arm was a permanent RC assignment. Now that v1/v2 is a setting the
+            // user can flip back, clearing the flag on every visit to v1 would orphan the Inbox: the
+            // next switch to v2 would auto-create a SECOND one and the captured tasks would sit in an
+            // ordinary checklist nobody looks at. Reachability in v1 is solved where it belongs, in
+            // the screen: MainScreenViewModel lists the unfiltered `checklists` flow, so an Inbox
+            // holding tasks shows up as an ordinary row while KEEPING its flag — which is what makes
+            // the switch reversible.
 
             navigateTo(userData.isOnboardingPassed, rcActivated, rcFetchMs, rcError, rcAttempts, rcRecoveredOnAttempt)
         }

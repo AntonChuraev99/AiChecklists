@@ -30,6 +30,18 @@ data class Checklist(
     val updatedAt: Long = 0L,
     val syncStatus: Int = 0,
     val isDeleted: Boolean = false,
+    /**
+     * True only for the auto-created **system Inbox** (v2 nav arm quick-capture zone).
+     *
+     * It stays a real checklist row so sync / Firestore / widget / MCP keep working unchanged, but
+     * it is hidden from the Projects list and from every checklist picker, and is never counted
+     * against the free-tier checklist limit — otherwise the v2 arm would silently lose one of the
+     * 5 free slots, a monetisation delta *inside* the A/B experiment.
+     *
+     * Kept LAST in the constructor on purpose: [Checklist] is `@Serializable` and appending a
+     * defaulted field keeps every already-persisted JSON payload decodable.
+     */
+    val isInbox: Boolean = false,
 )
 
 /**

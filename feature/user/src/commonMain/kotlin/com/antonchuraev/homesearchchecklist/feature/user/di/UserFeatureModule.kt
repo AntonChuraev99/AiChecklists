@@ -1,9 +1,11 @@
 package com.antonchuraev.homesearchchecklist.feature.user.di
 
+import com.antonchuraev.homesearchchecklist.core.common.api.NavExperimentResolver
 import com.antonchuraev.homesearchchecklist.core.datastore.api.UserAppDatastoreProvider
 import com.antonchuraev.homesearchchecklist.feature.user.data.remote.UserApiService
 import com.antonchuraev.homesearchchecklist.feature.user.data.remote.UserApiServiceImpl
 import com.antonchuraev.homesearchchecklist.feature.user.data.repository.UserDataRepositoryImpl
+import com.antonchuraev.homesearchchecklist.feature.user.domain.experiment.NavExperimentResolverImpl
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.CompleteOnboardingUseCase
 import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.GetFirstChecklistVariantUseCase
@@ -37,4 +39,16 @@ val userFeatureModule = module {
         )
     }
     factory { GetFirstChecklistVariantUseCase(remoteConfigProvider = get(), logger = get()) }
+
+    // `single`, not `factory`: the resolver's stickiness lives in per-process @Volatile fields
+    // (cached variant + "user property already mirrored" guard). A factory would hand out a fresh,
+    // amnesiac instance to every caller and re-read DataStore on each navigation change — and, worse,
+    // a variant changed in Settings would not reach the instance the shell is reading.
+    single<NavExperimentResolver> {
+        NavExperimentResolverImpl(
+            prefs = get(),
+            analytics = get(),
+            logger = get(),
+        )
+    }
 }

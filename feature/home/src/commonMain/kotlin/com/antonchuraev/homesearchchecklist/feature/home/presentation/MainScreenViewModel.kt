@@ -123,6 +123,16 @@ class MainScreenViewModel(
         }
     }
 
+    // `checklists`, not `projects`: v1 (Classic layout) is the only shell with no Inbox surface, so a
+    // filtered list here strands every quick-captured task the moment the user turns the setting on —
+    // the row is absent from the home list, the drawer lists no checklists, and there is no Inbox tab
+    // to open. Showing it as an ordinary row is what makes the v2 → v1 → v2 round trip lossless: the
+    // `isInbox` flag is never cleared, so switching back finds the SAME Inbox instead of a second one
+    // (see ChecklistRepository.clearInboxFlag for why de-flagging is the wrong repair).
+    //
+    // COUNT-like reads deliberately stay on `projects`: the free-tier gate (GetUserLimitsUseCase),
+    // the `checklist_count` user property (syncUserProperties) and the sync-banner threshold in
+    // buildScreenState. The system row becomes visible without becoming billable or measurable.
     @OptIn(ExperimentalCoroutinesApi::class)
     private val checklistsWithProgress = repository.checklists.flatMapLatest { checklists ->
         if (checklists.isEmpty()) {
@@ -140,6 +150,15 @@ class MainScreenViewModel(
             combine(fillFlows) { it.toList() }
         }
     }
+        // An EMPTY Inbox is dropped again: it strands nothing, and letting it through would silently
+        // kill the v1 empty state. Every v2 user gets an Inbox row the first time the Inbox tab
+        // composes (InboxViewModel.init → ensureInbox), and v1 is reachable only from Settings — i.e.
+        // only AFTER v2 has run — so the list would never be empty again and both the EmptyState and
+        // the activation hero would become dead branches.
+        //
+        // Emptiness is judged on the computed progress, not on `checklist.items`: quick capture writes
+        // the fill + template pair, but a row pulled in from another device can arrive fill-first.
+        .map { rows -> rows.filterNot { it.checklist.isInbox && it.totalItems == 0 } }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     override val screenState: StateFlow<MainScreenState> = _retryTrigger
@@ -189,8 +208,13 @@ class MainScreenViewModel(
             // more than one checklist (an empty list / single auto-created checklist isn't nagged),
             // never when already Google-linked, suppressed for this session once dismissed, and hidden
             // forever after enough lifetime dismissals.
+            //
+            // Counted over PROJECTS: `checklists` now carries the system Inbox row, and counting it
+            // would nag a user whose only real list is the auto-created starter one — the exact case
+            // SYNC_BANNER_MIN_CHECKLISTS exists to keep quiet.
+            val projectCount = checklists.count { !it.checklist.isInbox }
             val showSyncBanner = !userData.isGoogleLinked &&
-                checklists.size > SYNC_BANNER_MIN_CHECKLISTS &&
+                projectCount > SYNC_BANNER_MIN_CHECKLISTS &&
                 flags.syncBannerDismissCount < SYNC_BANNER_MAX_DISMISSALS &&
                 !flags.syncBannerDismissedThisSession
             MainScreenState.Success(
@@ -289,13 +313,20 @@ class MainScreenViewModel(
     }
 
     /**
-     * Reads `repository.checklists.first()` — the same Room stream that can fail — so it is launched
+     * Reads `repository.projects.first()` — the same Room stream that can fail — so it is launched
      * via [launchLogged]. A throw here used to die uncaught, silently dropping every user property
      * for the session (analytics segments quietly go stale, with nothing in the logs to explain it).
+     *
+     * Reads the PROJECT-filtered flow, not `checklists` — deliberately diverging from the home list
+     * above, which does show the Inbox row: `checklist_count` is a cross-cutting segmentation
+     * property feeding cohorts and dashboards well beyond this experiment. Counting the system Inbox
+     * would shift every v2 user exactly one bucket up, making the two arms non-comparable on any
+     * cohort defined by it — an asymmetry manufactured by the experiment itself rather than by user
+     * behaviour.
      */
     private suspend fun syncUserProperties() {
         val userData = userDataRepository.getUserData()
-        val checklistCount = repository.checklists.first().size
+        val checklistCount = repository.projects.first().size
         val totalFills = repository.getTotalAdditionalFillCount()
         val firstLaunchAt = userDataRepository.getFirstLaunchAtMillis()
         val daysSinceInstall = if (firstLaunchAt > 0) {

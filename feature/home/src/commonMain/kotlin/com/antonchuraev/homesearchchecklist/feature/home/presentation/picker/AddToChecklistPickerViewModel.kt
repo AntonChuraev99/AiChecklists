@@ -43,7 +43,10 @@ class AddToChecklistPickerViewModel(
 
     private fun observeChecklists() {
         viewModelScope.launch {
-            checklistRepository.checklists.collect { checklists ->
+            // `projects`, not `checklists`: the system Inbox must never appear in a checklist picker.
+            // Unconditional in both A/B arms — in control nothing is ever flagged, so this is the
+            // same list it always was.
+            checklistRepository.projects.collect { checklists ->
                 _screenState.update { it.copy(isLoading = false, checklists = checklists) }
             }
         }

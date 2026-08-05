@@ -200,7 +200,9 @@ class RetentionPushReceiver : BroadcastReceiver() {
      */
     private suspend fun findComeback(deps: Deps, intent: Intent, force: Boolean): RetentionPushSpec? {
         val extraId = intent.getLongExtra(EXTRA_COMEBACK_CHECKLIST_ID, -1L).takeIf { it > 0L }
-        val checklists = deps.repository.checklists.first()
+        // `projects`: the force path picks `maxByOrNull { it.id }`, which would ALWAYS be the
+        // freshly auto-created system Inbox in the v2 arm — a push about a list the user never made.
+        val checklists = deps.repository.projects.first()
         val target = when {
             extraId != null -> checklists.firstOrNull { it.id == extraId }
             force -> checklists.maxByOrNull { it.id }
@@ -284,7 +286,8 @@ class RetentionPushReceiver : BroadcastReceiver() {
      */
     private suspend fun findOverdue(deps: Deps): RetentionPushSpec? {
         val now = System.currentTimeMillis()
-        val checklists = deps.repository.checklists.first()
+        // `projects`: an untouched auto-created Inbox is not an "abandoned in-progress list".
+        val checklists = deps.repository.projects.first()
         var bestId: Long? = null
         var bestName = ""
         var bestUnchecked = 0
@@ -326,7 +329,10 @@ class RetentionPushReceiver : BroadcastReceiver() {
      */
     private suspend fun buildDigest(context: Context, deps: Deps): RetentionPushSpec? {
         val now = System.currentTimeMillis()
-        val checklists = deps.repository.checklists.first()
+        // `projects`: `checklists.size` below goes straight into a user-visible plural ("N active
+        // checklists"). Counting the hidden system Inbox would show a number the user cannot
+        // reconcile with their own list — and would inflate the digest count in the v2 arm only.
+        val checklists = deps.repository.projects.first()
         if (checklists.isEmpty()) return null
         var openItems = 0
         for (checklist in checklists) {

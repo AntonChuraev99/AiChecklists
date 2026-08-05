@@ -5,14 +5,18 @@ import com.antonchuraev.homesearchchecklist.core.datastore.api.AiChatPreferences
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AiExperimentPrefsRepository
 import com.antonchuraev.homesearchchecklist.core.datastore.api.FirstChecklistRepository
 import com.antonchuraev.homesearchchecklist.core.datastore.api.HintsRepository
+import com.antonchuraev.homesearchchecklist.core.datastore.api.InboxDisplayPrefsRepository
 import com.antonchuraev.homesearchchecklist.core.datastore.api.LanguageRepository
+import com.antonchuraev.homesearchchecklist.core.datastore.api.NavExperimentPrefsRepository
 import com.antonchuraev.homesearchchecklist.core.datastore.api.ThemeRepository
 import com.antonchuraev.homesearchchecklist.core.datastore.impl.ActivationPrefsRepositoryImpl
 import com.antonchuraev.homesearchchecklist.core.datastore.impl.AiChatPreferencesRepositoryImpl
 import com.antonchuraev.homesearchchecklist.core.datastore.impl.AiExperimentPrefsRepositoryImpl
 import com.antonchuraev.homesearchchecklist.core.datastore.impl.FirstChecklistRepositoryImpl
 import com.antonchuraev.homesearchchecklist.core.datastore.impl.HintsRepositoryImpl
+import com.antonchuraev.homesearchchecklist.core.datastore.impl.InboxDisplayPrefsRepositoryImpl
 import com.antonchuraev.homesearchchecklist.core.datastore.impl.LanguageRepositoryImpl
+import com.antonchuraev.homesearchchecklist.core.datastore.impl.NavExperimentPrefsRepositoryImpl
 import com.antonchuraev.homesearchchecklist.core.datastore.impl.ThemeRepositoryImpl
 import org.koin.dsl.module
 
@@ -24,4 +28,10 @@ val datastoreModule = module {
     single<FirstChecklistRepository> { FirstChecklistRepositoryImpl(dataStore = get()) }
     single<ActivationPrefsRepository> { ActivationPrefsRepositoryImpl(dataStore = get()) }
     single<AiExperimentPrefsRepository> { AiExperimentPrefsRepositoryImpl(dataStore = get()) }
+    single<NavExperimentPrefsRepository> { NavExperimentPrefsRepositoryImpl(dataStore = get()) }
+    // logger: the read path degrades to defaults instead of throwing (a throw would pin the Inbox
+    // tab on Loading forever), so the reason has to reach Crashlytics or the fallback is invisible.
+    single<InboxDisplayPrefsRepository> {
+        InboxDisplayPrefsRepositoryImpl(dataStore = get(), logger = get())
+    }
 }

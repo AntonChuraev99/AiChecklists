@@ -607,6 +607,126 @@ object AnalyticsEvents {
          * measurable (the flagship Hindi launch shipped with zero language events).
          */
         const val LANGUAGE_SELECTED = "language_selected"
+
+        /**
+         * User switched the navigation shell in Settings. Carries [AnalyticsParams.NAV_ARM] =
+         * "control" | "v2" (the value CHOSEN) and [AnalyticsParams.SOURCE] = "settings".
+         *
+         * The one signal that answers "is anyone opting out of the new navigation?" — the sticky
+         * `nav_arm` user property cannot, because it is written once per process and a user who
+         * toggles is counted under whichever value that process happened to mirror.
+         */
+        const val NAV_VARIANT_SELECTED = "nav_variant_selected"
+    }
+
+    /**
+     * Navigation shell events. Since 2026-08-03 the shell is a user SETTING, not an A/B arm
+     * (`docs/decisions/2026-08-03-shift-from-ai-first-to-checklist-first.md`): v2 (the Todoist-style
+     * 4-tab shell with the chat behind a FAB) is the default, v1 (drawer + chat dock) is opt-in.
+     *
+     * Every event here is segmented by the sticky [AnalyticsParams.NAV_ARM] user property, which is
+     * set for BOTH shells — see [SHELL_SHOWN] for why that matters. It is now a *description of what
+     * rendered*, not an experiment dimension: any dashboard that treated it as an A/B split must be
+     * retired rather than reused, and a user who switches mid-session is attributed to whichever
+     * value the process mirrored first ([Settings.NAV_VARIANT_SELECTED] is what records the switch).
+     *
+     * ⚠️ Deliberately absent: a per-swipe event for the Inbox project pager.
+     * `ObservableAnalyticsTracker` re-broadcasts every `event()` on a `MutableSharedFlow`
+     * (`extraBufferCapacity = 64`, `tryEmit` → drops on overflow) that `CsatManager` consumes to
+     * decide when to show the survey. A high-frequency event would flood that buffer and silently
+     * degrade CSAT triggering — an unrelated subsystem. [TAB_SELECTED] is user-initiated across 4
+     * destinations and is safe; anything per-keystroke or per-swipe is not.
+     */
+    object Nav {
+        /**
+         * The navigation shell mounted for the first time this process.
+         *
+         * Fires in BOTH arms — that is the entire point: this is the arm-exposure DENOMINATOR, so
+         * every downstream rate (activation, creates, chat opens) has a comparable base. The
+         * cautionary precedent is [Activation.FIRST_AI_CHECKLIST_CREATED], whose emit was reachable in
+         * one arm only and therefore produced a fake lift for a month.
+         *
+         * [AnalyticsParams.VARIANT] takes TWO values: `"control"` and `"v2"`.
+         *
+         * It took a third, `"unassigned"`, while the shell was a Remote Config experiment: those users
+         * rendered the control shell as a fail-safe without being in the experiment, and analyses had
+         * to filter them out. Since 2026-08-04 the shell is a Settings choice, the resolver reads no
+         * Remote Config, and every user resolves to a concrete arm — so `"unassigned"` is no longer
+         * emitted. **A series spanning that date must treat its disappearance as a definition change,
+         * not as the population going to zero.**
+         */
+        const val SHELL_SHOWN = "nav_shell_shown"
+
+        /**
+         * A bottom-nav / rail / drawer destination was tapped in the v2 shell. v2-only by
+         * construction (the control shell has no tab bar). Param: [AnalyticsParams.TAB].
+         */
+        const val TAB_SELECTED = "nav_tab_selected"
+
+        /**
+         * The AI chat was opened from a v2 chrome affordance. v2-only by construction.
+         *
+         * This is the v2-side substitute for the dock-scoped `ai_chat_opened(source="dock")`,
+         * which cannot fire in v2 because the dock is gone. Do NOT compare the arms on dock-scoped
+         * chat events — compare this plus `screen_view: chat` against the control dock events.
+         *
+         * [AnalyticsParams.SOURCE] distinguishes the affordances, which are NOT interchangeable:
+         * - `"fab"` — the shell's floating action button on a tab screen.
+         * - `"detail_toolbar"` — the top-bar action on a project detail screen, where the shell FAB
+         *   is hidden. Without this value the busiest screen in the app would contribute chat opens
+         *   with no attribution at all.
+         * - `"home_chip"` — one of the six prompt chips on the Projects tab (Create with AI / Photo /
+         *   PDF / Link / Remind / Plan day). In control these same chips live inside the dock, so this
+         *   is the value to compare against the control arm's dock chip taps.
+         */
+        const val CHAT_FAB_TAPPED = "nav_chat_fab_tapped"
+
+        /**
+         * The manual "+" FAB was tapped — the v2 arm's create-a-task entry point. v2-only by
+         * construction, and deliberately a SEPARATE event from [CHAT_FAB_TAPPED]: the two FABs sit
+         * side by side and answer the experiment's second question — when both an AI and a manual
+         * create affordance are one tap away, which one do people actually reach for. Folding them
+         * into one event with a `source` param would erase exactly that comparison.
+         *
+         * [AnalyticsParams.SOURCE] is `"fab"` today; the param exists so a future second create
+         * surface (empty-state CTA, long-press shortcut) stays distinguishable without a new event.
+         *
+         * NOTE this counts INTENT, not creation: the dock it opens can be dismissed without adding
+         * anything. Join against [Inbox.QUICK_ADDED] for the completion rate.
+         */
+        const val CREATE_FAB_TAPPED = "nav_create_fab_tapped"
+    }
+
+    /**
+     * The v2 Inbox — the quick-capture tab that replaces Home in the treatment arm. Every event
+     * here is v2-only by construction (the Inbox does not exist in control).
+     */
+    object Inbox {
+        /**
+         * The system Inbox checklist was auto-created for this user (fires once, on the
+         * absent → present transition).
+         *
+         * MUST NOT be [Checklist.CREATED]: the Inbox is created for us, once per user, in the v2
+         * arm only. Routing it through the normal create path would add exactly +1
+         * `checklist_created` per treatment user and invalidate every creation and activation
+         * comparison between the arms. Same reasoning — and the same solution — as
+         * [Onboarding.FIRST_CHECKLIST_AUTO_CREATED] (see the note at its declaration).
+         */
+        const val SYSTEM_CREATED = "inbox_system_created"
+
+        /**
+         * A task was captured through the quick-add dock. Param: [AnalyticsParams.SOURCE] =
+         * "inbox" (the Inbox page) | "project" (a project page of the pager) | "calendar" (the
+         * Calendar tab's capture, which always lands in the system Inbox), so capture-into-inbox
+         * and quick-add-to-project stay distinguishable — they are different user intents.
+         */
+        const val QUICK_ADDED = "inbox_quick_added"
+
+        /** A task was triaged out of the Inbox into a project. */
+        const val TASK_MOVED = "inbox_task_moved"
+
+        /** A task was deleted from the triage sheet. */
+        const val TASK_DELETED = "inbox_task_deleted"
     }
 }
 
@@ -834,6 +954,29 @@ object AnalyticsParams {
      * never a user-property. Segmenting the copy A/B by a user-property is always wrong.
      */
     const val PUSH_TIMING_ARM = "push_timing_arm"
+
+    // ─── Navigation A/B experiment (object AnalyticsEvents.Nav) ──────────────
+    /**
+     * Navigation arm, "control" | "v2". Doubles as the sticky user-property KEY (same string),
+     * exactly like [AI_MODEL_VARIANT] and [PUSH_AB_ARM] — this is the ONLY reliable segmentation
+     * key for the nav experiment.
+     *
+     * Why not the usual `rc_activated=True` filter: [RC_ACTIVATED] is a param on
+     * `onboarding_rc_resolved`, which fires once per install on the not-yet-onboarded branch of
+     * splash. The nav-experiment population is overwhelmingly EXISTING users, who never fire that
+     * event, so filtering on it would empty the dataset.
+     *
+     * Set in both arms, but NEVER for a user Remote Config has not assigned yet — those carry no
+     * `nav_arm` at all and are excluded from the analysis instead of being miscounted as control.
+     *
+     * Always a String, never a Boolean: Firebase stringifies user properties while Amplitude
+     * preserves native types, so a boolean reads as "true" in GA4 and `true` in Amplitude and a
+     * dashboard filtering on the wrong type silently returns zero rows.
+     */
+    const val NAV_ARM = "nav_arm"
+
+    /** Which v2 destination was selected on [AnalyticsEvents.Nav.TAB_SELECTED]. Wire values are `V2Destination`'s constants. */
+    const val TAB = "tab"
 }
 
 /**
@@ -937,4 +1080,24 @@ object AnalyticsScreens {
     const val PAYWALL_WEB_INSTALL = "paywall_web_install"
     const val SHARE = "share"
     const val UPDATE_FEED = "update_feed"
+
+    // ─── v2 navigation only ──────────────────────────────────────────────────
+    const val INBOX = "inbox"
+    const val OVERVIEW = "overview"
+
+    /**
+     * The v2 Projects tab.
+     *
+     * This name did NOT exist while the tab rendered `MainScreen`: reporting [MAIN] kept the
+     * historical main-screen series continuous and arm-comparable, and a second name would have
+     * split it at the experiment start. That reasoning expired on 2026-08-03 — the tab is now a
+     * different screen (a flat list, `AppNavRoute.Projects`) and [MAIN] is the classic layout's home
+     * screen. Filing both under one name would make "which of the two did the user actually see"
+     * unanswerable.
+     *
+     * ⚠️ The `main` series therefore CHANGES MEANING from the release that ships this: before it was
+     * "home screen OR v2 projects tab", after it is "home screen on the classic layout only". Any
+     * before/after read across that boundary must add the two names together.
+     */
+    const val PROJECTS = "projects"
 }

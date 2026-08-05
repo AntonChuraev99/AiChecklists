@@ -234,6 +234,17 @@ class CsatManager(
      * [REMINDER_WINDOW]). Returns the trigger-source label to attribute a survey show to when the
      * event makes the survey due, or null otherwise. `internal` so unit tests drive scoring
      * deterministically without the analytics SharedFlow + a collector dispatcher in the way.
+     *
+     * Scoring is surface-blind: the same event weighs the same wherever it was performed. Emits
+     * stamped `source = "inbox_tab"` used to be skipped outright, to keep the survey — and the Play
+     * in-app review riding on it — firing at comparable rates in the two navigation A/B arms. The
+     * Inbox is the default home for the whole user base now, so there is no second arm to protect
+     * and the skip only silenced `fill_completed` and the reminder composite on the app's PRIMARY
+     * surface, starving the survey for everyone.
+     *
+     * What keeps a survey from landing mid-capture is not that skip and must stay: no capture event
+     * carries weight. `inbox_quick_added` is not observed at all, and a bare `checklist_created`
+     * scores only at the 3rd/5th milestone — so the survey can still only come due on a completion.
      */
     internal suspend fun processEvent(eventName: String): String? {
         val weight = EVENT_WEIGHTS[eventName]

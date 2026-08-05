@@ -60,6 +60,12 @@ object RemoteConfigKeys {
     // When OFF: the EXACT pre-activation behavior (static auto-create + first_checklist_variant
     // A/B + plain EmptyState). Remotely toggleable so the whole bundle can be A/B-tested later.
     const val ACTIVATION_BUNDLE_V1 = "activation_bundle_v1"
+
+    // NOTE: `nav_v2_arm` was removed on 2026-08-04. Which navigation shell renders is a persisted
+    // USER SETTING now (Settings -> "Classic layout"), resolved by NavExperimentResolver, and Remote
+    // Config is not consulted at all — a console value must not be able to override a choice the user
+    // made. The parameter was never created in the Firebase console, so nothing in production depended
+    // on it. See `docs/decisions/2026-08-03-shift-from-ai-first-to-checklist-first.md`.
 }
 
 /**

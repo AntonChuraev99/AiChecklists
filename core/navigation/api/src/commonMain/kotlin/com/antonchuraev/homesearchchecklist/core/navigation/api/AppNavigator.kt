@@ -33,6 +33,20 @@ interface AppNavigator {
 
     fun onBack()
 
+    /**
+     * Declare the route a stack-CLEARING navigation ([navigateToChecklistDetail] /
+     * [navigateToFillDetail] with `clearBackStack = true`) rebuilds the stack around when the stack
+     * holds no top-level route at all — e.g. arriving straight from splash/onboarding, which
+     * replaced it with their own single entry.
+     *
+     * Which route that is depends on the navigation shell (v1 is rooted at [AppNavRoute.Main], the
+     * v2 shell at [AppNavRoute.Inbox]) and `core:navigation` cannot see which one is mounted, so the
+     * host declares it once the arm is resolved. Default no-op body so the lightweight
+     * [AppNavigator] fakes in feature tests need not implement it; the production implementation
+     * falls back to [AppNavRoute.Main] until told otherwise.
+     */
+    fun setDefaultRootRoute(route: AppNavRoute) = Unit
+
     fun navigateToOnboarding()
 
     fun navigateToInteractiveOnboarding()

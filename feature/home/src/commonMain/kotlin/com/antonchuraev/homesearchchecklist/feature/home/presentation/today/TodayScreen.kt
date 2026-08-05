@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -42,12 +43,14 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.main_create_checklist
 import aichecklists.core.designsystem.generated.resources.today_all_done_description
 import aichecklists.core.designsystem.generated.resources.today_all_done_title
 import aichecklists.core.designsystem.generated.resources.today_empty_state_description
+import aichecklists.core.designsystem.generated.resources.today_empty_state_description_no_capture
 import aichecklists.core.designsystem.generated.resources.today_empty_state_title
 import aichecklists.core.designsystem.generated.resources.today_error_description
 import aichecklists.core.designsystem.generated.resources.today_error_retry
@@ -167,6 +170,17 @@ sealed interface TodayScreenState : State {
  *        - If fillId == null → navigate to ChecklistDetail(checklistId)
  * @param onCreateChecklistClick Called from NoChecklists empty state CTA.
  * @param onRetry Called from the [TodayScreenState.Error] retry CTA — re-fetches reminders.
+ * @param onBack Optional explicit back affordance, rendered as the TopAppBar back arrow ONLY when
+ *   [drawerState] is null (with a drawer the hamburger owns that slot).
+ *
+ *   Required by hosts that PUSH this screen instead of showing it as a top-level destination — the
+ *   v2 shell reaches Today from the Overview tab, where Today is not a tab, so the bottom bar and
+ *   FAB are hidden and `drawerState` is null. Without an arrow the only way off the screen would be
+ *   Android's system BACK: on the wasmJs Web target `PlatformBackHandler` is a no-op and Navigation 3
+ *   has no browser-history integration, so the user would be stranded on a production platform.
+ *   Every other pushed destination (Mcp / Settings / UpdateFeed / AiChat) already passes one.
+ *
+ *   Null (the default) → no arrow, i.e. rendering is identical to before for every existing caller.
  * @param modifier Optional modifier for the root scaffold.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -177,6 +191,7 @@ fun TodayScreen(
     onReminderClick: (checklistId: Long, fillId: Long?) -> Unit,
     onCreateChecklistClick: () -> Unit,
     onRetry: () -> Unit,
+    onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
@@ -184,6 +199,10 @@ fun TodayScreen(
 
     AppScaffold(
         title = stringResource(Res.string.today_title),
+        // The hamburger wins whenever a drawer exists (AppScaffold prefers navigationIcon over
+        // onBackButtonClick anyway — spelled out here so the precedence is visible at this call site
+        // and cannot flip if AppScaffold's resolution order is ever touched).
+        onBackButtonClick = if (drawerState == null) onBack else null,
         navigationIcon = if (drawerState != null) {
             {
                 IconButton(onClick = { scope.launch { drawerState.open() } }) {
@@ -214,6 +233,15 @@ fun TodayScreen(
  * [TodayScreen] composable wraps this body in [AppScaffold].
  *
  * @param onRetry Called from the [TodayScreenState.Error] retry CTA — re-fetches reminders.
+ * @param contentBottomPadding extra bottom inset the HOST reserves below the agenda list (v2 shell:
+ *   bottom bar + chat FAB). 0.dp — the default, and what the standalone [TodayScreen] and the
+ *   control-arm Calendar tab pass — reproduces the previous padding exactly.
+ * @param canCapture whether the HOST offers a quick-capture input for this body. Only the empty
+ *   state reads it, and only to pick its wording: this body has three hosts and just one of them
+ *   (the v2 Calendar tab) has a capture affordance, so the capture-aware copy — which points at an
+ *   input — is a lie on the standalone Today route and on the classic Calendar screen, neither of
+ *   which renders a FAB or a dock. Default false = the neutral wording, i.e. every existing caller
+ *   is correct without a change.
  */
 @Composable
 fun TodayBody(
@@ -222,6 +250,8 @@ fun TodayBody(
     onCreateChecklistClick: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
+    contentBottomPadding: Dp = 0.dp,
+    canCapture: Boolean = false,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         when (state) {
@@ -230,7 +260,11 @@ fun TodayBody(
             TodayScreenState.Empty -> EmptyState(
                 icon = Icons.Outlined.WbSunny,
                 title = stringResource(Res.string.today_empty_state_title),
-                description = stringResource(Res.string.today_empty_state_description),
+                description = if (canCapture) {
+                    stringResource(Res.string.today_empty_state_description)
+                } else {
+                    stringResource(Res.string.today_empty_state_description_no_capture)
+                },
             )
 
             TodayScreenState.AllDone -> EmptyState(
@@ -268,6 +302,7 @@ fun TodayBody(
             is TodayScreenState.Success -> TodaySuccessContent(
                 state = state,
                 onReminderClick = onReminderClick,
+                contentBottomPadding = contentBottomPadding,
             )
         }
     }
@@ -295,10 +330,22 @@ private fun TodayLoadingContent() {
 private fun TodaySuccessContent(
     state: TodayScreenState.Success,
     onReminderClick: (checklistId: Long, fillId: Long?) -> Unit,
+    contentBottomPadding: Dp = 0.dp,
 ) {
     LazyColumn(
-        modifier = Modifier.fillMaxSize().adaptiveContentWidth(),
-        contentPadding = PaddingValues(bottom = AppDimens.SpacingXl),
+        // wrapContentWidth between the fill and the cap is what makes the cap bind at all:
+        // fillMaxSize pins minWidth == maxWidth to the pane, and Constraints.constrain() coerces a
+        // widthIn(max) back up into that fixed range, so `.fillMaxSize().adaptiveContentWidth()` is
+        // a no-op — on a 1280dp window the rows spanned the whole pane, alarm icon at one edge and
+        // time at the other. This relaxes the minimum back to 0 so the cap can cut the width, then
+        // centres the capped column in the pane it still occupies. Same chain as the Inbox and
+        // Projects tabs.
+        modifier = Modifier
+            .fillMaxSize()
+            .wrapContentWidth(Alignment.CenterHorizontally)
+            .adaptiveContentWidth(),
+        // Host reserve ADDED to the existing SpacingXl (0.dp in the control arm → unchanged).
+        contentPadding = PaddingValues(bottom = AppDimens.SpacingXl + contentBottomPadding),
     ) {
         // ---- Date header ----
         item(key = "date_header") {
@@ -538,8 +585,8 @@ private fun TodayReminderRow(
 }
 
 // ---------------------------------------------------------------------------
-// Note: Compose Previews for TodayScreen live in androidMain.
-// commonMain does not support @Preview without the multiplatform preview
-// plugin. Add previews in:
+// Note: this screen has NO Compose Previews yet, and they cannot be added here —
+// commonMain does not support @Preview without the multiplatform preview plugin.
+// Add them in androidMain (the file does not exist yet):
 //   feature/home/src/androidMain/.../today/TodayScreenPreviews.kt
 // ---------------------------------------------------------------------------

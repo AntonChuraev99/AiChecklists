@@ -3,6 +3,8 @@ package com.antonchuraev.homesearchchecklist.settings
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
+import com.antonchuraev.homesearchchecklist.core.common.api.NavExperimentResolver
+import com.antonchuraev.homesearchchecklist.core.common.api.NavVariant
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppLanguage
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppThemeMode
 import com.antonchuraev.homesearchchecklist.core.datastore.api.LanguageRepository
@@ -36,6 +38,7 @@ class SettingsViewModelTest {
     private lateinit var fakeRepository: FakeThemeRepository
     private lateinit var fakeLanguageRepository: FakeLanguageRepository
     private lateinit var fakeAnalytics: FakeAnalyticsTracker
+    private lateinit var fakeNavResolver: FakeNavVariantResolver
     private lateinit var viewModel: SettingsViewModel
 
     @BeforeTest
@@ -44,7 +47,13 @@ class SettingsViewModelTest {
         fakeRepository = FakeThemeRepository()
         fakeLanguageRepository = FakeLanguageRepository()
         fakeAnalytics = FakeAnalyticsTracker()
-        viewModel = SettingsViewModel(fakeRepository, fakeLanguageRepository, fakeAnalytics)
+        fakeNavResolver = FakeNavVariantResolver()
+        viewModel = SettingsViewModel(
+            fakeRepository,
+            fakeLanguageRepository,
+            fakeNavResolver,
+            fakeAnalytics,
+        )
     }
 
     @AfterTest
@@ -61,6 +70,109 @@ class SettingsViewModelTest {
         assertEquals(AnalyticsEvents.Settings.LANGUAGE_SELECTED, event.first)
         assertEquals("hi", event.second[AnalyticsParams.LANGUAGE])
         assertEquals("settings", event.second[AnalyticsParams.SOURCE])
+    }
+
+    @Test
+    fun toggleClassicNavigation_persistsVariantAndSignalsHostToReRoot() = runTest {
+        val effects = mutableListOf<SettingsSideEffect>()
+        val job = launch { viewModel.sideEffect.collect { effects += it } }
+        advanceUntilIdle()
+
+        viewModel.sendIntent(SettingsIntent.ToggleClassicNavigation(enabled = true))
+        advanceUntilIdle()
+
+        assertEquals(NavVariant.CONTROL, fakeNavResolver.variant)
+        assertTrue(viewModel.screenState.value.classicNavigationEnabled)
+        // Without this the host keeps a back stack rooted for the shell the user just left, and the
+        // first navigation afterwards renders a route the new shell's chrome cannot address.
+        assertTrue(effects.contains(SettingsSideEffect.NavigationVariantChanged))
+        job.cancel()
+    }
+
+    @Test
+    fun toggleClassicNavigation_off_returnsToV2() = runTest {
+        viewModel.sendIntent(SettingsIntent.ToggleClassicNavigation(enabled = true))
+        advanceUntilIdle()
+        viewModel.sendIntent(SettingsIntent.ToggleClassicNavigation(enabled = false))
+        advanceUntilIdle()
+
+        assertEquals(NavVariant.V2, fakeNavResolver.variant)
+        assertFalse(viewModel.screenState.value.classicNavigationEnabled)
+    }
+
+    @Test
+    fun toggleClassicNavigation_emitsVariantSelectedEvent() = runTest {
+        viewModel.sendIntent(SettingsIntent.ToggleClassicNavigation(enabled = true))
+        advanceUntilIdle()
+
+        val event = fakeAnalytics.events.last()
+        assertEquals(AnalyticsEvents.Settings.NAV_VARIANT_SELECTED, event.first)
+        // The value CHOSEN, not the one previously in effect — this event is the only signal of an
+        // opt-out, and reporting the old value would invert it.
+        assertEquals("control", event.second[AnalyticsParams.NAV_ARM])
+        assertEquals("settings", event.second[AnalyticsParams.SOURCE])
+    }
+
+    /**
+     * A write that does not land must leave no trace of having landed.
+     *
+     * All three assertions are the same bug seen from three sides: the switch would stay on and then
+     * revert on the next launch; the host would re-root onto a shell the app is not keeping; and
+     * `nav_variant_selected` — the only signal of how many users opt out — would count an intent the
+     * app dropped.
+     */
+    @Test
+    fun toggleClassicNavigation_persistFails_revertsSwitchAndReportsNothing() = runTest {
+        val resolver = FakeNavVariantResolver(persistSucceeds = false)
+        val analytics = FakeAnalyticsTracker()
+        val vm = SettingsViewModel(fakeRepository, fakeLanguageRepository, resolver, analytics)
+        val effects = mutableListOf<SettingsSideEffect>()
+        val job = launch { vm.sideEffect.collect { effects += it } }
+        advanceUntilIdle()
+
+        vm.sendIntent(SettingsIntent.ToggleClassicNavigation(enabled = true))
+        advanceUntilIdle()
+
+        assertFalse(vm.screenState.value.classicNavigationEnabled)
+        assertFalse(effects.contains(SettingsSideEffect.NavigationVariantChanged))
+        assertTrue(
+            analytics.events.none { it.first == AnalyticsEvents.Settings.NAV_VARIANT_SELECTED },
+        )
+        job.cancel()
+    }
+
+    /**
+     * Reverting the switch is not enough on its own — a control that springs back and says nothing
+     * reads as a dead tap, which is the silent early exit the project rules call a bug. The user is
+     * told the change was not saved.
+     */
+    @Test
+    fun toggleClassicNavigation_persistFails_tellsTheUser() = runTest {
+        val resolver = FakeNavVariantResolver(persistSucceeds = false)
+        val vm = SettingsViewModel(fakeRepository, fakeLanguageRepository, resolver, fakeAnalytics)
+        val effects = mutableListOf<SettingsSideEffect>()
+        val job = launch { vm.sideEffect.collect { effects += it } }
+        advanceUntilIdle()
+
+        vm.sendIntent(SettingsIntent.ToggleClassicNavigation(enabled = true))
+        advanceUntilIdle()
+
+        assertTrue(effects.contains(SettingsSideEffect.NavigationVariantSaveFailed))
+        job.cancel()
+    }
+
+    /** The mirror image: a switch that DID save must not also claim it failed. */
+    @Test
+    fun toggleClassicNavigation_persistSucceeds_reportsNoFailure() = runTest {
+        val effects = mutableListOf<SettingsSideEffect>()
+        val job = launch { viewModel.sideEffect.collect { effects += it } }
+        advanceUntilIdle()
+
+        viewModel.sendIntent(SettingsIntent.ToggleClassicNavigation(enabled = true))
+        advanceUntilIdle()
+
+        assertFalse(effects.contains(SettingsSideEffect.NavigationVariantSaveFailed))
+        job.cancel()
     }
 
     @Test
@@ -228,4 +340,23 @@ private class FakeAnalyticsTracker : AnalyticsTracker {
     override fun event(name: String, params: Map<String, Any>) {
         events += name to params
     }
+}
+
+/** Starts on the product default (v2), i.e. the classic-layout switch reads off. */
+private class FakeNavVariantResolver(private val persistSucceeds: Boolean = true) :
+    NavExperimentResolver {
+    var variant: NavVariant = NavVariant.V2
+    override fun currentArm(): NavVariant = variant
+    override suspend fun ensureResolved(): NavVariant = variant
+
+    /** Like the real resolver: the readable variant advances only once the write has landed. */
+    override suspend fun setVariant(variant: NavVariant) {
+        if (persistSucceeds) this.variant = variant
+    }
+
+    override suspend fun clearVariant() {
+        if (persistSucceeds) variant = NavVariant.V2
+    }
+
+    override fun isArmAssigned(): Boolean = true
 }

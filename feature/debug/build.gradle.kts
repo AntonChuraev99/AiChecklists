@@ -32,6 +32,10 @@ kotlin {
             implementation(projects.core.common.api)
             implementation(projects.core.navigation.api)
             implementation(projects.core.designsystem)
+            // Debug-only nav A/B arm override: writes the persisted arm that NavExperimentResolver
+            // reads before Remote Config, so a tester can force either shell without a console
+            // parameter and without touching production Remote Config.
+            implementation(projects.core.datastore.api)
 
             implementation(projects.feature.checklist)
             implementation(projects.feature.user)

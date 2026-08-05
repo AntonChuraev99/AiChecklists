@@ -116,7 +116,12 @@ open class GistiApplication : Application() {
             if (prefs.isComebackArmed()) return@launch
 
             var sawEmpty = false
-            repository.checklists.collect { list ->
+            // `projects`, NOT `checklists`: this arms the one-shot come-back nudge on the user's
+            // FIRST checklist. The v2 arm auto-creates the system Inbox at first launch, which would
+            // instantly satisfy "saw empty, then non-empty" and fire a retention push at a user who
+            // has created nothing — a user-visible defect and a retention-metric confound between
+            // the arms.
+            repository.projects.collect { list ->
                 when {
                     list.isEmpty() -> sawEmpty = true
                     // First checklist after we saw the empty day-0 state -> arm, then stop observing.

@@ -43,7 +43,12 @@ class UpdateFeedDeepLinkHandler(private val navigator: AppNavigator) {
                 true
             }
             "home" -> {
-                navigator.navigateToMainScreen()
+                // clearBackStack, not a bare push: the bare branch pushes AppNavRoute.Main literally,
+                // which in the v2 shell drops the classic home screen ON TOP of the tab stack. The
+                // clearing branch collapses to whichever root the stack already has, so "home" means
+                // the home of the shell the user is actually in — Inbox in v2, Main in v1 — and a CTA
+                // tapped from the feed cannot leave a stale feed entry underneath either.
+                navigator.navigateToMainScreen(clearBackStack = true)
                 true
             }
             "widget_instruction" -> {

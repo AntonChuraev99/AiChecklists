@@ -20,6 +20,13 @@ data class ChecklistSyncData(
     val foldersEnabled: Boolean = false,
     val updatedAt: Long = 0L,
     val isDeleted: Boolean = false,
+    /**
+     * System-Inbox marker (v2 nav arm). Defaulted so cloud documents written before this field
+     * existed — and by any client that still does not know it (older builds, the MCP worker) — keep
+     * decoding. The local merge treats the flag as write-once for exactly that reason; see
+     * `SyncRepositoryImpl.mergeRemoteChecklist`.
+     */
+    val isInbox: Boolean = false,
     val fills: List<FillSyncData> = emptyList(),
 )
 

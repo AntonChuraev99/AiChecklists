@@ -18,6 +18,7 @@ import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigPr
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Attachment
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistRepeatInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ItemReminderInfo
@@ -255,8 +256,12 @@ private class FakeRemoteConfigProvider : RemoteConfigProvider {
 }
 
 private class FakeAnalyticsTracker : AnalyticsTracker {
+    /** Latest value per user property, so tests can assert what segmentation actually received. */
+    val userProperties = mutableMapOf<String, Any>()
     override fun setUserId(userId: String) {}
-    override fun setUserProperties(properties: Map<String, Any>) {}
+    override fun setUserProperties(properties: Map<String, Any>) {
+        userProperties.putAll(properties)
+    }
     override fun screenView(name: String) {}
     override fun event(name: String, params: Map<String, Any>) {}
 }
@@ -272,6 +277,7 @@ private fun makeViewModel(
     logger: AppLogger = FakeAppLogger(),
     googleAuthRepository: GoogleAuthRepository = FakeGoogleAuthRepository(),
     userDataRepository: FakeUserDataRepository = FakeUserDataRepository(),
+    analyticsTracker: FakeAnalyticsTracker = FakeAnalyticsTracker(),
 ): MainScreenViewModel {
     val fakePaywallRepo = FakePaywallRepository()
     val fakeUserDataRepo = userDataRepository
@@ -287,7 +293,7 @@ private fun makeViewModel(
             paywallRepository = fakePaywallRepo,
             userDataRepository = fakeUserDataRepo,
         ),
-        analyticsTracker = FakeAnalyticsTracker(),
+        analyticsTracker = analyticsTracker,
         hintsRepository = hintsRepository,
         googleAuthRepository = googleAuthRepository,
         syncRepository = syncRepository,
@@ -476,6 +482,23 @@ class MainScreenViewModelTest {
     }
 
     @Test
+    fun syncBanner_hidden_whenSingleProjectPlusInbox() = runTest {
+        val vm = makeViewModel(
+            FakeHintsRepository(),
+            checklists = listOf(inbox(taskCount = 2)) + checklists(1),
+        )
+
+        val state = vm.awaitSuccess()
+
+        assertEquals(2, state.checklists.size, "Precondition: the list shows the Inbox next to the project")
+        assertFalse(
+            state.showSyncBanner,
+            "The threshold counts projects: one real list plus the system Inbox is still the " +
+                "'nothing worth syncing yet' case the banner must stay quiet for",
+        )
+    }
+
+    @Test
     fun syncBanner_hidden_whenDismissCountAtPermanentThreshold() = runTest {
         // 3 lifetime dismissals = permanent hide, even with multiple checklists and a fresh session.
         val vm = makeViewModel(
@@ -501,6 +524,76 @@ class MainScreenViewModelTest {
         val after = vm.awaitSuccess()
         assertFalse(after.showSyncBanner, "Dismiss hides the banner for the rest of this session")
         assertEquals(1, hints.dismissCountValue, "Dismiss must bump the persistent lifetime count")
+    }
+
+    // ─── v1 (Classic layout) Inbox visibility ────────────────────────────────
+
+    /**
+     * Regression guard for the v1 rollback defect: the home list read the Inbox-filtered `projects`
+     * flow, so turning "Classic layout" on hid the system Inbox — and with it every quick-captured
+     * task. v1 has no Inbox tab and its drawer lists no checklists, so those tasks were unreachable
+     * by any means until the user switched back.
+     */
+    @Test
+    fun homeList_containsInboxRow_whenInboxHoldsTasks() = runTest {
+        val vm = makeViewModel(
+            FakeHintsRepository(),
+            checklists = listOf(inbox(taskCount = 3)) + checklists(1),
+        )
+
+        val state = vm.awaitSuccess()
+
+        val inboxRow = state.checklists.firstOrNull { it.checklist.isInbox }
+        assertTrue(
+            inboxRow != null,
+            "The classic home list must show the system Inbox as an ordinary row, otherwise the " +
+                "captured tasks are unreachable; got ${state.checklists.map { it.checklist.name }}",
+        )
+        assertEquals(3, inboxRow.totalItems, "The row must carry the Inbox's own progress")
+    }
+
+    /**
+     * The counterpart guard: an EMPTY Inbox strands nothing and must stay out of the list. Every v2
+     * user gets an Inbox row the first time the Inbox tab composes, and v1 is reachable only from
+     * Settings — i.e. only after v2 has run — so listing it unconditionally would leave the classic
+     * list permanently non-empty and silently kill the EmptyState / activation-hero branch.
+     */
+    @Test
+    fun homeList_omitsEmptyInboxRow_soTheEmptyStateSurvives() = runTest {
+        val vm = makeViewModel(FakeHintsRepository(), checklists = listOf(inbox(taskCount = 0)))
+
+        val state = vm.awaitSuccess()
+
+        assertTrue(
+            state.checklists.isEmpty(),
+            "An empty system Inbox must not occupy the classic list; got " +
+                state.checklists.map { it.checklist.name },
+        )
+    }
+
+    /**
+     * `checklist_count` is a cross-cutting segmentation property feeding cohorts and dashboards well
+     * beyond this experiment. It must stay on the project-filtered flow even though the list beside
+     * it now shows the Inbox — counting the system row would shift every v2 user one bucket up and
+     * make the two shells non-comparable on any cohort defined by it.
+     */
+    @Test
+    fun checklistCountUserProperty_excludesInbox_evenThoughTheListShowsIt() = runTest {
+        val analytics = FakeAnalyticsTracker()
+        val vm = makeViewModel(
+            FakeHintsRepository(),
+            checklists = listOf(inbox(taskCount = 3)) + checklists(1),
+            analyticsTracker = analytics,
+        )
+
+        val state = vm.awaitSuccess()
+
+        assertEquals(2, state.checklists.size, "Precondition: the list shows the Inbox next to the project")
+        assertEquals(
+            1,
+            analytics.userProperties["checklist_count"],
+            "checklist_count must count projects only; got ${analytics.userProperties}",
+        )
     }
 
     // ── Failure observability ───────────────────────────────────────────────
@@ -667,3 +760,17 @@ private fun throwingRepository(cause: Throwable): FakeChecklistRepository =
 /** Builds [count] minimal checklists for sync-banner visibility tests. */
 private fun checklists(count: Int): List<Checklist> =
     (1..count).map { Checklist(id = it.toLong(), name = "List $it", items = emptyList()) }
+
+/**
+ * The auto-created system Inbox holding [taskCount] captured tasks.
+ *
+ * Its id is far from the [checklists] range so the two helpers can be combined. The fake repository
+ * serves no fills, so the row's progress comes from the template items — which is also what quick
+ * capture writes (it updates the fill + template pair).
+ */
+private fun inbox(taskCount: Int): Checklist = Checklist(
+    id = 99L,
+    name = "Inbox",
+    items = (1..taskCount).map { ChecklistItem(text = "Captured $it") },
+    isInbox = true,
+)

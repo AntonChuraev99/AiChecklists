@@ -280,7 +280,7 @@ class ChatViewModel(
         viewModelScope.launch {
             combine(
                 aiChatPreferencesRepository.defaultChecklistIdFlow,
-                checklistRepository.checklists,
+                checklistRepository.projects,
             ) { id, checklists -> checklists.firstOrNull { it.id == id }?.name }
                 .catch { e -> logger.error(TAG, "Default checklist name flow failed", e) }
                 .collect { name ->
@@ -1010,7 +1010,7 @@ class ChatViewModel(
                                 return@runCatching
                             }
                             val names = runCatching {
-                                checklistRepository.checklists.first().map { it.name }
+                                checklistRepository.projects.first().map { it.name }
                             }.getOrDefault(emptyList())
                             if (names.size >= 2) {
                                 showWhichListChoice(toolCall, names, sourceLayer = classification.layer)
@@ -1395,7 +1395,7 @@ class ChatViewModel(
     private suspend fun rememberedDefault(): ListTarget? {
         val id = runCatching { aiChatPreferencesRepository.defaultChecklistIdFlow.first() }
             .getOrNull() ?: return null
-        val checklist = runCatching { checklistRepository.checklists.first() }
+        val checklist = runCatching { checklistRepository.projects.first() }
             .getOrNull()
             ?.firstOrNull { it.id == id }
             ?: return null
@@ -1438,7 +1438,7 @@ class ChatViewModel(
      * occurrences line up 1:1.
      */
     private suspend fun rankCandidates(names: List<String>): List<ListCandidate> {
-        val known = runCatching { checklistRepository.checklists.first() }
+        val known = runCatching { checklistRepository.projects.first() }
             .onFailure { logger.warning(TAG, "rankCandidates: checklists unavailable — ${it.message}") }
             .getOrDefault(emptyList())
         val unclaimed = known.groupBy { it.name }.mapValues { (_, rows) -> ArrayDeque(rows) }
@@ -1602,7 +1602,7 @@ class ChatViewModel(
     private fun showMoveTargets(handle: UndoHandle.AddedItem) {
         viewModelScope.launch {
             runCatching {
-                val candidates = checklistRepository.checklists.first()
+                val candidates = checklistRepository.projects.first()
                     .map { it.name }
                     .filter { !it.equals(handle.checklistName, ignoreCase = true) }
                 if (candidates.isEmpty()) {
@@ -1808,7 +1808,7 @@ class ChatViewModel(
         // called "Покупки" the item lands in the tapped one while `firstOrNull { name == }` pins
         // the preference to the other, so every later add silently changes destination. Falling
         // back to the name only where there is no id (a server-built call) keeps the old path.
-        val id = checklistId ?: runCatching { checklistRepository.checklists.first() }
+        val id = checklistId ?: runCatching { checklistRepository.projects.first() }
             .getOrNull()
             ?.firstOrNull { it.name.equals(listName, ignoreCase = true) }
             ?.id
@@ -2253,7 +2253,7 @@ class ChatViewModel(
      */
     private suspend fun buildChecklistsSummary(): List<ChecklistContext> = runCatching {
         var remainingBudget = RECENT_ITEMS_TOTAL_BUDGET
-        checklistRepository.checklists.first()
+        checklistRepository.projects.first()
             .take(CHECKLIST_SUMMARY_LIMIT)
             .map { checklist ->
                 // Index the FULL item list first so position reflects the real list order,

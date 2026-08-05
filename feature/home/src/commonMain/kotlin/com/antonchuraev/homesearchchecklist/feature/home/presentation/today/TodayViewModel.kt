@@ -1,20 +1,40 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation.today
 
+import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.inbox_checklist_name
+import aichecklists.core.designsystem.generated.resources.inbox_task_add_failed
+import aichecklists.core.designsystem.generated.resources.today_task_captured_action
+import aichecklists.core.designsystem.generated.resources.today_task_captured_message
+import androidx.lifecycle.viewModelScope
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsEvents
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
 import com.antonchuraev.homesearchchecklist.core.common.api.Intent
+import com.antonchuraev.homesearchchecklist.core.common.api.SideEffect
 import com.antonchuraev.homesearchchecklist.core.common.api.currentTimeMillis
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFillItem
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.usecase.EnsureInboxUseCase
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.getString
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Instant
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
@@ -22,6 +42,12 @@ import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
 
 private const val TAG = "TodayViewModel"
+
+/**
+ * Wire value of [AnalyticsParams.SOURCE] on `inbox_quick_added` for captures made from the Calendar
+ * tab, alongside the Inbox pager's own "inbox" / "project".
+ */
+private const val SOURCE_CALENDAR = "calendar"
 
 /**
  * ViewModel for the Today screen.
@@ -49,12 +75,29 @@ private const val TAG = "TodayViewModel"
  */
 class TodayViewModel(
     private val repository: ChecklistRepository,
+    private val ensureInbox: EnsureInboxUseCase,
     private val appNavigator: AppNavigator,
+    private val analytics: AnalyticsTracker,
     private val logger: AppLogger,
-) : AppViewModel<TodayScreenState, TodayIntent, Nothing>() {
+) : AppViewModel<TodayScreenState, TodayIntent, TodaySideEffect>() {
 
     /** Stable snapshot of "now" at VM creation (epoch millis). */
     private val nowMs: Long = currentTimeMillis()
+
+    private val _quickAddText = MutableStateFlow("")
+    val quickAddText: StateFlow<String> = _quickAddText
+
+    private val _sideEffect = MutableSharedFlow<TodaySideEffect>(extraBufferCapacity = 16)
+    val sideEffect: Flow<TodaySideEffect> = _sideEffect.asSharedFlow()
+
+    /**
+     * Id of the checklist the last capture landed in, so the snackbar's "Open" can reach it.
+     *
+     * Held here rather than carried in the side effect because the side effect crosses a snackbar,
+     * and the user may tap Open several seconds later — by which point a value captured in the UI
+     * lambda would be from whichever capture happened to be the last one recomposed.
+     */
+    private var lastCapturedChecklistId: Long? = null
 
     /** Start-of-today (midnight) and end-of-today (23:59:59.999) in epoch millis. */
     private val todayRange: Pair<Long, Long> = computeTodayRange(nowMs)
@@ -87,7 +130,116 @@ class TodayViewModel(
             }
             TodayIntent.OnCreateChecklistClick -> appNavigator.navigateToTemplatesScreen()
             TodayIntent.OnRefresh -> _retryTrigger.update { it + 1 }
+            is TodayIntent.OnQuickAddTextChanged -> _quickAddText.value = intent.text
+            TodayIntent.OnQuickAddSubmit -> captureTask()
+            TodayIntent.OnOpenCapturedChecklist -> {
+                val id = lastCapturedChecklistId
+                if (id == null) {
+                    logger.warning(TAG, "open-captured skipped: no capture recorded")
+                } else {
+                    appNavigator.navigateToChecklistDetail(id)
+                }
+            }
         }
+    }
+
+    /**
+     * Captures a task into the system Inbox from the Today screen.
+     *
+     * ## Why the Inbox and not "today"
+     * This screen renders REMINDERS inside today's window, so a task without one cannot appear in it.
+     * Giving the capture an automatic reminder would make it visible — and would also schedule a
+     * notification the user never asked for, which is a heavier side effect than a quick capture
+     * should have. The task therefore goes to the Inbox and the snackbar says where it went, with an
+     * Open action: nothing is hidden, and no alarm is created behind the user's back.
+     *
+     * Mirrors `InboxViewModel.addTask`'s write shape (template item first so the fill row carries its
+     * stable id from birth); it cannot call it directly because that one targets the pager's visible
+     * page, which does not exist here.
+     */
+    private fun captureTask() {
+        val text = _quickAddText.value.trim()
+        if (text.isEmpty()) {
+            // Defensive: the Add affordance is disabled on blank input. Logged rather than a bare
+            // return — an invisible drop reads as a freeze.
+            logger.warning(TAG, "today quick-add skipped: blank text")
+            return
+        }
+
+        viewModelScope.launch {
+            runCatching {
+                // The Inbox row may legitimately not exist yet: a user can reach the Calendar tab
+                // before ever opening the Inbox tab, and EnsureInboxUseCase is invoked from there.
+                val inboxName = getString(Res.string.inbox_checklist_name)
+                val inboxId = ensureInbox(inboxName) ?: error("Inbox unavailable")
+                val checklist = repository.getChecklistById(inboxId)
+                    ?: error("Checklist $inboxId not found")
+                val fill = repository.getDefaultFillByChecklistId(inboxId).first()
+                    ?: error("No default fill for checklist $inboxId")
+
+                val templateItem = ChecklistItem(text = text)
+                val fillItem = ChecklistFillItem(
+                    text = text,
+                    checked = false,
+                    note = null,
+                    templateItemId = templateItem.id,
+                )
+                repository.updateFill(fill.copy(items = fill.items + fillItem))
+                repository.updateChecklistTemplate(checklist.copy(items = checklist.items + templateItem))
+                inboxId
+            }.onSuccess { inboxId ->
+                _quickAddText.value = ""
+                lastCapturedChecklistId = inboxId
+                // Same event and param shape as `InboxViewModel.addTask`, with this tab's own SOURCE
+                // value: the create-FAB funnel counts `inbox_quick_added`, so a capture made here and
+                // not emitted is a capture the funnel never sees. A third wire value rather than
+                // reusing "inbox" — the task does land in the Inbox, but WHERE the user captured it
+                // is the thing the two v2 capture surfaces have to stay separable on.
+                analytics.event(
+                    AnalyticsEvents.Inbox.QUICK_ADDED,
+                    mapOf(AnalyticsParams.SOURCE to SOURCE_CALENDAR),
+                )
+                emitSideEffect(
+                    TodaySideEffect.ShowCaptureMessage(
+                        text = getString(Res.string.today_task_captured_message),
+                        actionLabel = getString(Res.string.today_task_captured_action),
+                    )
+                )
+            }.onFailure { e ->
+                if (e is CancellationException) throw e
+                logger.error(TAG, "today quick-add failed: ${e.message}", e)
+                emitSideEffect(
+                    TodaySideEffect.ShowCaptureMessage(
+                        text = getString(Res.string.inbox_task_add_failed),
+                        actionLabel = null,
+                    )
+                )
+            }
+        }
+    }
+
+    /**
+     * Hands [effect] to the screen, WAITING for a collector instead of dropping it.
+     *
+     * `tryEmit` on a replay-0 [MutableSharedFlow] returns **true** and silently discards the value
+     * whenever `subscriptionCount == 0` — no exception, no log, nothing to grep. That made it the
+     * only link in the capture chain that can fail without leaving a trace, and the message it
+     * carries is the ONLY feedback a capture has: the task goes to the Inbox and cannot appear on
+     * this screen (it has no reminder), so a dropped message reads as "my tap did nothing".
+     *
+     * The single subscriber is a `LaunchedEffect` inside `CalendarRoute`. It is registered
+     * asynchronously (a LaunchedEffect coroutine is dispatched, it does not run inline with
+     * composition) and torn down whenever that route leaves composition — a tab switch, a pushed
+     * detail screen, a window-size-class change in the v2 shell all do it. "Somebody is listening"
+     * is therefore not a guarantee this ViewModel can make, and it must not silently assume it.
+     * Same fix, same reason, as `InboxViewModel.emitMessage`.
+     *
+     * `internal` rather than private for the regression test — the drop is invisible from outside,
+     * so the guarantee has to be asserted on this function directly.
+     */
+    internal suspend fun emitSideEffect(effect: TodaySideEffect) {
+        _sideEffect.subscriptionCount.first { it > 0 }
+        _sideEffect.emit(effect)
     }
 
     // ─── Flow assembly ────────────────────────────────────────────────────────
@@ -238,10 +390,29 @@ sealed interface TodayIntent : Intent {
     data class OnReminderClick(val checklistId: Long, val fillId: Long?) : TodayIntent
     /** User tapped "Create Checklist" in the NoChecklists empty state. */
     data object OnCreateChecklistClick : TodayIntent
+
+    data class OnQuickAddTextChanged(val text: String) : TodayIntent
+
+    /** Captures the typed text into the system Inbox. See `TodayViewModel.captureTask`. */
+    data object OnQuickAddSubmit : TodayIntent
+
+    /** Snackbar action after a capture — opens the checklist the task landed in. */
+    data object OnOpenCapturedChecklist : TodayIntent
     /**
      * Explicit refresh/retry request. Re-subscribes the reminders flow from scratch —
      * the recovery path out of [TodayScreenState.Error].
      */
     data object OnRefresh : TodayIntent
+}
+
+/**
+ * [text] and [actionLabel] arrive already resolved from Compose Resources — a resource KEY here
+ * would push string resolution into the collector and make it easy to leak a literal. Same contract
+ * as `InboxSideEffect.ShowMessage`.
+ *
+ * [actionLabel] is null for failures: "Open" would point at a checklist nothing was written to.
+ */
+sealed interface TodaySideEffect : SideEffect {
+    data class ShowCaptureMessage(val text: String, val actionLabel: String?) : TodaySideEffect
 }
 

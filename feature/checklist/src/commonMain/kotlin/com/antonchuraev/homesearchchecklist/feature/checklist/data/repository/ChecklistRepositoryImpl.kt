@@ -56,6 +56,113 @@ class ChecklistRepositoryImpl(
         rows.map { it.toChecklistSafe(itemConverters, reminderConverters, logger) }
     }
 
+    /**
+     * Overrides the interface's in-memory `filterNot { it.isInbox }` with a SQL-level filter so the
+     * Inbox row never even reaches the mapper. Same crash-tolerant ChecklistRow path as [checklists].
+     */
+    override val projects: Flow<List<Checklist>> = checklistDao.observeProjectRows().map { rows ->
+        rows.map { it.toChecklistSafe(itemConverters, reminderConverters, logger) }
+    }
+
+    /**
+     * Derived from [checklists] rather than a dedicated query: the Inbox screen already collects
+     * projects, and reusing the same upstream flow means the Inbox page and the project pages always
+     * come from one consistent snapshot instead of two independently-emitting queries.
+     */
+    override fun observeInbox(): Flow<Checklist?> =
+        checklists.map { list -> list.firstOrNull { it.isInbox } }
+
+    /**
+     * Creates the system Inbox on first use and returns its id; a no-op returning the existing id
+     * afterwards.
+     *
+     * Deliberately does NOT route through [addChecklist]: that helper calls
+     * [ChecklistDao.incrementAllPositions] (which would shove every project down by one on the very
+     * first Inbox access) and mirrors template items into the default fill (the Inbox starts empty,
+     * so there is nothing to mirror). The row is inserted with `position = -1` so it sorts before
+     * everything if it is ever read by an unfiltered query — its position is otherwise irrelevant
+     * because every ordering read excludes it.
+     *
+     * The empty default fill is created here too, matching the shape [addChecklist] builds: quick-add
+     * writes go to the fill + template PAIR, and a missing default fill would make the first capture
+     * silently fail.
+     */
+    override suspend fun ensureInbox(name: String): Long {
+        checklistDao.getInbox()?.let { return it.id }
+
+        val now = currentTimeMillis()
+        val inboxId = checklistDao.insert(
+            ChecklistEntity(
+                name = name,
+                items = emptyList(),
+                position = -1,
+                isInbox = true,
+                cloudId = generateCloudId(),
+                updatedAt = now,
+                syncStatus = SyncStatus.PENDING_UPLOAD.value,
+            )
+        )
+        fillDao.insert(
+            ChecklistFill(
+                checklistId = inboxId,
+                name = "",
+                items = emptyList(),
+                createdAt = now,
+                isDefault = true,
+                cloudId = generateCloudId(),
+                updatedAt = now,
+                syncStatus = SyncStatus.PENDING_UPLOAD.value,
+            ).toEntity()
+        )
+        logger.info(TAG, "ensureInbox: created system inbox id=$inboxId")
+        return inboxId
+    }
+
+    /**
+     * Demotes the system Inbox back to an ordinary project — the CONTROL-arm rollback path. See the
+     * interface KDoc for why the app must be able to do this at all.
+     *
+     * Uses the plain `update` path rather than a dedicated `UPDATE ... SET isInbox = 0` query so the
+     * DAO surface the CONTROL arm compiles against is not touched at all.
+     *
+     * PENDING_UPLOAD + a fresh `updatedAt` are load-bearing for the LOCAL device: the pull merge SKIPs
+     * rows with local pending edits, so a listener echo carrying the old `isInbox = true` cannot
+     * re-flag the row before our push lands.
+     *
+     * The demotion is **local-effective only.** Pushing `isInbox = false` does NOT clear the flag on
+     * other devices: `mergeRemoteChecklist` applies `remote.isInbox || local.isInbox` (write-once), so
+     * a remote `false` can never turn a local `true` off. That merge rule is deliberate — it stops an
+     * older build's document from demoting a live v2 Inbox — and the consequence is a residual
+     * mixed-arm case: on one account running v2 on the phone and control on a tablet, the v2 device
+     * re-flags the row on its next push and this rollback de-flags it again on the control device's
+     * next launch. Each pass marks the row PENDING_UPLOAD, so it is a slow per-launch sync ping-pong
+     * with the row appearing and disappearing from the control device's Projects list. Known residual,
+     * NOT self-healing; it ends when both installs land on the same arm.
+     *
+     * `position` is set explicitly rather than left at [ensureInbox]'s -1: [addChecklist] runs
+     * `incrementAllPositions()`, which bumps the Inbox row too, so after a couple of new checklists
+     * its position has drifted into the middle of the list — the recovered tasks would surface exactly
+     * where the user is least likely to notice them. -1 puts it back on top for the next
+     * [reindexPositions] to compact to 0.
+     */
+    override suspend fun clearInboxFlag(): Boolean {
+        val inbox = checklistDao.getInbox() ?: return false
+        val now = currentTimeMillis()
+        checklistDao.update(
+            inbox.copy(
+                isInbox = false,
+                position = -1,
+                updatedAt = now,
+                syncStatus = SyncStatus.PENDING_UPLOAD.value,
+            )
+        )
+        logger.info(
+            TAG,
+            "clearInboxFlag: de-flagged system inbox id=${inbox.id} — it is an ordinary project now",
+        )
+        return true
+    }
+
     override suspend fun addChecklist(checklist: Checklist): Long {
         checklistDao.incrementAllPositions()
         val now = currentTimeMillis()
@@ -551,8 +658,14 @@ class ChecklistRepositoryImpl(
         }
     }
 
+    /**
+     * Compacts `position` to 0..n-1 over the PROJECTS only. The system Inbox is skipped on purpose:
+     * it is excluded from every ordering read, so letting its position drift is harmless, while
+     * including it here would leave a permanent gap in the Projects sequence.
+     * A no-op difference in the control arm, where no Inbox row exists.
+     */
     private suspend fun reindexPositions() {
-        val all = checklistDao.getAllOrderedByPosition()
+        val all = checklistDao.getAllProjectsOrderedByPosition()
         all.forEachIndexed { index, entity ->
             if (entity.position != index) {
                 checklistDao.updatePosition(entity.id, index)
@@ -561,6 +674,23 @@ class ChecklistRepositoryImpl(
     }
 
     // ─── Today reminders ───
+    //
+    // Both scans read the UNFILTERED [ChecklistDao.observeChecklists] on purpose — Inbox reminders
+    // DO belong on Today and Calendar. Rationale, so nobody "fixes" this into observeProjectRows():
+    //
+    //  * A reminder is a promise the user made to themselves. Filtering by where the task happens to
+    //    live would silently drop it from Today and Calendar — the two surfaces whose entire job is
+    //    "everything due now" — and a dropped reminder is a far worse defect than an Inbox row
+    //    appearing in a list. An Inbox task can carry a reminder legitimately: it may have been set
+    //    before triage, or synced in from another device's quick capture.
+    //  * The deep-link resolves. Tapping the row opens the checklist detail screen, which reads
+    //    [observeChecklistById] — deliberately unfiltered — so the Inbox opens like any checklist
+    //    even though Projects does not list it. In the v2 arm the Inbox is a first-class tab anyway.
+    //  * Zero difference for the CONTROL arm: no row there is ever flagged, so these queries return
+    //    exactly the same data as before the experiment. Switching to a filtered query would change
+    //    the SQL that control runs — the thing the Inbox queries were kept additive to avoid.
+    //
+    // The one visible artefact is `checklistName` reading "Inbox" on such a row, which is accurate.
 
     override fun observeRemindersInRange(fromMs: Long, toMs: Long): Flow<List<TodayReminderInfo>> {
         // Combine the checklists flow with all default fills flow to react to any change.

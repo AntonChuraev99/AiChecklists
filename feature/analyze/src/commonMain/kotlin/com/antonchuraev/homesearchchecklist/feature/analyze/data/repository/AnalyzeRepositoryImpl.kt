@@ -137,8 +137,10 @@ class AnalyzeRepositoryImpl(
         result: AnalyzeResult
     ): Result<Checklist> {
         return try {
-            // Get the existing checklist
-            val checklists = checklistRepository.checklists.first()
+            // Project-filtered on purpose: AI analysis never targets the v2 arm's system Inbox, and
+            // reading the same flow as AnalyzeViewModel keeps both halves of the feature consistent
+            // (a split source is how the Inbox leak would creep back in on the next edit).
+            val checklists = checklistRepository.projects.first()
             val existingChecklist = checklists.find { it.id == checklistId }
                 ?: return Result.failure(IllegalArgumentException("Checklist not found: $checklistId"))
 

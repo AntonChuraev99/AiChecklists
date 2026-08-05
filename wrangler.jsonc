@@ -26,6 +26,10 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "checklists",
+	// Личный аккаунт (churaevanton@gmail.com) — тот же, что у mcp-server/wrangler.jsonc.
+	// Указан явно, чтобы деплой из-под другого логина падал с ошибкой доступа, а не уезжал
+	// в чужой аккаунт: на этой машине wrangler может быть залогинен рабочей почтой.
+	"account_id": "2c9dfaadbca94b44f59f13dbf70519d7",
 	"compatibility_date": "2026-05-08",
 	"preview_urls": true,
 	// Keep the legacy workers.dev URL alive: once routes exist, wrangler flips

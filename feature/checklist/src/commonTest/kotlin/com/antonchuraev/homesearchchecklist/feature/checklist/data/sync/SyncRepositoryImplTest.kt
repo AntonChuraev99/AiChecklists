@@ -132,6 +132,29 @@ class SyncRepositoryImplTest {
         isDeleted = false,
     )
 
+    /** A system-Inbox row as `ensureInbox()` leaves it, already pushed (SYNCED) by the first sync. */
+    private fun localInbox(
+        id: Long,
+        cloudId: String,
+        items: List<ChecklistItem> = emptyList(),
+        updatedAt: Long = 100L,
+    ) = localSynced(id, cloudId, "Inbox", updatedAt).copy(isInbox = true, items = items)
+
+    /** Cloud twin of [localInbox] — an Inbox document as another device wrote it. */
+    private fun remoteInbox(
+        cloudId: String,
+        updatedAt: Long = 200L,
+        items: List<ChecklistItem> = emptyList(),
+        fills: List<FillSyncData> = emptyList(),
+    ) = ChecklistSyncData(
+        cloudId = cloudId,
+        name = "Inbox",
+        itemsJson = itemsJson.encodeToString(ListSerializer(ChecklistItem.serializer()), items),
+        updatedAt = updatedAt,
+        isInbox = true,
+        fills = fills,
+    )
+
     private fun localPendingUpload(
         id: Long,
         cloudId: String,
@@ -412,6 +435,249 @@ class SyncRepositoryImplTest {
         repo.pullAndMerge()
 
         assertEquals("LocalWins", dao.checklists.single { it.cloudId == "c1" }.name)
+    }
+
+    // ─── Tests: isInbox is write-once locally, NOT last-write-wins ───────
+    //
+    // The LWW branch replaces the whole local row from the remote snapshot. A document written by a
+    // device on an older build (or by the MCP worker) carries no `isInbox`; it decodes to false, and
+    // a plain overwrite would silently demote the system Inbox into an ordinary checklist that then
+    // pops up in the Projects list and eats a free-tier slot. The guard is a one-line `||` deep
+    // inside mergeRemoteChecklist — exactly the kind of edit that gets dropped in a rebase.
+
+    @Test
+    fun mergeRemote_newerRemoteWithoutIsInbox_doesNotDemoteLocalInbox() = runTest {
+        dao.checklists.add(localSynced(1L, "c1", "Inbox", updatedAt = 100L).copy(isInbox = true))
+        // remote() leaves isInbox at its default false — an old-build / MCP write.
+        firestore.fetchResult = AppResult.Success(listOf(remote("c1", "Inbox", updatedAt = 200L)))
+
+        val repo = newRepo()
+        auth.currentUserOverride = testUser
+
+        repo.pullAndMerge()
+
+        assertTrue(
+            dao.checklists.single { it.cloudId == "c1" }.isInbox,
+            "a remote false must never clear a local isInbox = true — the Inbox would become a project",
+        )
+    }
+
+    @Test
+    fun mergeRemote_newerRemoteWithIsInbox_promotesLocalRow() = runTest {
+        // Second device: the Inbox arrives from the cloud on a row that is already local (created
+        // before this device knew about the flag). It must become the Inbox, not stay a project —
+        // otherwise ensureInbox() creates a SECOND one and the user ends up with two.
+        dao.checklists.add(localSynced(1L, "c1", "Inbox", updatedAt = 100L))
+        firestore.fetchResult = AppResult.Success(
+            listOf(remote("c1", "Inbox", updatedAt = 200L).copy(isInbox = true)),
+        )
+
+        val repo = newRepo()
+        auth.currentUserOverride = testUser
+
+        repo.pullAndMerge()
+
+        assertTrue(dao.checklists.single { it.cloudId == "c1" }.isInbox)
+    }
+
+    @Test
+    fun mergeRemote_insertsNewInboxWithFlagPreserved() = runTest {
+        // NEW branch (toInsertEntity): a fresh pull on a second device must carry the flag, or that
+        // device shows the Inbox in its Projects list and creates its own duplicate.
+        firestore.fetchResult = AppResult.Success(
+            listOf(remote("c1", "Inbox", updatedAt = 50L).copy(isInbox = true)),
+        )
+
+        val repo = newRepo()
+        auth.currentUserOverride = testUser
+
+        repo.pullAndMerge()
+
+        assertTrue(dao.checklists.single { it.cloudId == "c1" }.isInbox)
+    }
+
+    // ─── Tests: the system Inbox stays SINGLE across the create/pull race ──
+    //
+    // ensureInbox() dedupes against the LOCAL database only. A cold start that roots at the Inbox tab
+    // therefore mints a brand-new Inbox row + cloudId before the first pull can deliver the account's
+    // own Inbox document (reinstall, or a second device). The two never match by cloudId, and the
+    // blind insert left BOTH rows flagged: getInbox()/observeInbox() return one of them and the other
+    // drops out of the Inbox tab, Projects, the pickers, the widget and MCP with no way back — every
+    // task the user had captured, invisible. Every outcome below must keep one flag and lose nothing.
+    //
+    // The fetch sets carry the LOCAL Inbox's own document too, because that is the production shape:
+    // onUserAuthenticated pushes before it pulls, so the freshly created row is already in the cloud.
+
+    @Test
+    fun mergeRemote_remoteInboxWithTasks_replacesThrowawayLocalInbox() = runTest {
+        // The reinstall shape: the local Inbox was auto-created seconds ago and holds nothing, while
+        // the cloud carries the account's real Inbox under a different cloudId.
+        dao.checklists.add(localInbox(1L, "local-inbox"))
+        fillDao.fills.add(fillEntity(id = 10L, checklistId = 1L, cloudId = "local-fill"))
+        firestore.fetchResult = AppResult.Success(
+            listOf(
+                remoteInbox(
+                    "cloud-inbox",
+                    items = items("Call the dentist"),
+                    fills = listOf(
+                        remoteFillWithItems("cloud-fill", updatedAt = 200L, items = fillItems("Call the dentist")),
+                    ),
+                ),
+                remoteInbox("local-inbox"),
+            ),
+        )
+
+        val repo = newRepo()
+        auth.currentUserOverride = testUser
+
+        repo.pullAndMerge()
+
+        val inbox = dao.checklists.single { it.isInbox && !it.isDeleted }
+        assertEquals("cloud-inbox", inbox.cloudId, "the account's own Inbox must take the tab")
+        assertEquals(listOf("Call the dentist"), inbox.items.map { it.text })
+        assertEquals(
+            listOf("Call the dentist"),
+            fillDao.fills.single { it.cloudId == "cloud-fill" }.items.map { it.text },
+            "the cloud Inbox's fill items must come with it",
+        )
+
+        // The throwaway row is TOMBSTONED, not merely unflagged and not hard-deleted: only
+        // PENDING_DELETE makes the next push remove the document initialUpload already wrote for it,
+        // and a document left in the cloud would be re-delivered as a duplicate on every pull.
+        val retired = dao.checklists.single { it.cloudId == "local-inbox" }
+        assertTrue(retired.isDeleted, "the empty local Inbox must be retired")
+        assertEquals(SyncStatus.PENDING_DELETE.value, retired.syncStatus)
+        assertTrue(fillDao.fills.none { it.checklistId == 1L }, "its empty fills go with it")
+    }
+
+    @Test
+    fun mergeRemote_bothInboxesHoldTasks_incomingLandsAsAVisibleProject() = runTest {
+        // Both devices captured before either could sync. Nothing may be deleted here, so the loser
+        // becomes an ordinary project the user can see and empty — never a second invisible Inbox.
+        dao.checklists.add(localInbox(1L, "local-inbox", items = items("captured here")))
+        firestore.fetchResult = AppResult.Success(
+            listOf(
+                remoteInbox("cloud-inbox", items = items("captured there")),
+                remoteInbox("local-inbox", items = items("captured here")),
+            ),
+        )
+
+        val repo = newRepo()
+        auth.currentUserOverride = testUser
+
+        repo.pullAndMerge()
+
+        val inbox = dao.checklists.single { it.isInbox && !it.isDeleted }
+        assertEquals("local-inbox", inbox.cloudId, "an Inbox holding tasks is never retired")
+        assertEquals(listOf("captured here"), inbox.items.map { it.text })
+
+        val landed = dao.checklists.single { it.cloudId == "cloud-inbox" }
+        assertFalse(landed.isInbox, "the loser must be an ordinary project, not a second Inbox")
+        assertFalse(landed.isDeleted)
+        assertEquals(
+            listOf("captured there"),
+            landed.items.map { it.text },
+            "no task may be dropped — the row is demoted, its content untouched",
+        )
+    }
+
+    @Test
+    fun mergeRemote_throwawayDuplicateInbox_isNotMaterialised() = runTest {
+        // The common second-device state: both auto-created Inboxes are still empty. Materialising
+        // the other one would put an empty "Inbox" in Projects and eat a free-tier checklist slot,
+        // and it carries nothing to lose. It self-heals: once it gains a task it merges as usual.
+        dao.checklists.add(localInbox(1L, "local-inbox"))
+        firestore.fetchResult = AppResult.Success(
+            listOf(remoteInbox("local-inbox"), remoteInbox("other-inbox")),
+        )
+
+        val repo = newRepo()
+        auth.currentUserOverride = testUser
+
+        repo.pullAndMerge()
+
+        assertEquals(1, dao.checklists.size, "an empty duplicate Inbox must not become a row")
+        assertEquals("local-inbox", dao.checklists.single().cloudId)
+        assertTrue(dao.checklists.single().isInbox)
+    }
+
+    @Test
+    fun mergeRemote_ordinaryChecklistStillInsertsWhileAnInboxExists() = runTest {
+        // The guard must be invisible to every non-Inbox document: same insert as before.
+        dao.checklists.add(localInbox(1L, "local-inbox"))
+        firestore.fetchResult = AppResult.Success(
+            listOf(
+                remoteInbox("local-inbox"),
+                remoteWithItems("c1", "Groceries", updatedAt = 200L, items = items("Milk")),
+            ),
+        )
+
+        val repo = newRepo()
+        auth.currentUserOverride = testUser
+
+        repo.pullAndMerge()
+
+        val inserted = dao.checklists.single { it.cloudId == "c1" }
+        assertEquals("Groceries", inserted.name)
+        assertFalse(inserted.isInbox)
+        assertEquals(listOf("Milk"), inserted.items.map { it.text })
+        assertTrue(dao.checklists.single { it.cloudId == "local-inbox" }.isInbox, "the Inbox is untouched")
+    }
+
+    @Test
+    fun mergeRemote_duplicateInboxResolution_isIdempotentAcrossPulls() = runTest {
+        // The real-time listener re-pulls the same snapshot on every cloud change, so the resolution
+        // must converge, not oscillate: no new row, no re-retirement, no flag ping-pong.
+        dao.checklists.add(localInbox(1L, "local-inbox"))
+        firestore.fetchResult = AppResult.Success(
+            listOf(
+                remoteInbox("cloud-inbox", items = items("Call the dentist")),
+                remoteInbox("local-inbox"),
+            ),
+        )
+
+        val repo = newRepo()
+        auth.currentUserOverride = testUser
+
+        repo.pullAndMerge()
+        repo.pullAndMerge()
+
+        assertEquals(
+            2,
+            dao.checklists.size,
+            "the adopted Inbox plus the retired row's tombstone — a repeat pull must add nothing",
+        )
+        val inbox = dao.checklists.single { it.isInbox && !it.isDeleted }
+        assertEquals("cloud-inbox", inbox.cloudId)
+        assertEquals(listOf("Call the dentist"), inbox.items.map { it.text })
+        assertTrue(dao.checklists.single { it.cloudId == "local-inbox" }.isDeleted)
+    }
+
+    @Test
+    fun mergeRemote_newerRemoteClaimingInboxOnAnotherRow_doesNotCreateASecondInbox() = runTest {
+        // The UPDATE branch of the same rule: a document that claims the flag while another local row
+        // already holds it (an older build's write, or a checklist promoted on a device whose own
+        // Inbox differs) must not turn its row into a second Inbox.
+        dao.checklists.add(localInbox(1L, "local-inbox"))
+        dao.checklists.add(localSynced(2L, "c2", "Groceries", updatedAt = 100L))
+        firestore.fetchResult = AppResult.Success(
+            listOf(
+                remoteInbox("local-inbox"),
+                remote("c2", "Groceries", updatedAt = 200L).copy(isInbox = true),
+            ),
+        )
+
+        val repo = newRepo()
+        auth.currentUserOverride = testUser
+
+        repo.pullAndMerge()
+
+        assertEquals(
+            "local-inbox",
+            dao.checklists.single { it.isInbox && !it.isDeleted }.cloudId,
+            "exactly one row may carry the flag, and it stays the one that already had it",
+        )
+        assertFalse(dao.checklists.single { it.cloudId == "c2" }.isInbox)
     }
 
     // ─── Tests: PENDING_UPLOAD merge guard (the reorder-clobber race) ────
@@ -1012,13 +1278,33 @@ class SyncRepositoryImplTest {
             }
         }
 
+        override suspend fun getInbox(): ChecklistEntity? =
+            checklists.firstOrNull { it.isInbox && !it.isDeleted }
+
+        override suspend fun softDelete(id: Long, updatedAt: Long) {
+            replaceWith {
+                if (it.id == id) {
+                    it.copy(
+                        isDeleted = true,
+                        syncStatus = SyncStatus.PENDING_DELETE.value,
+                        updatedAt = updatedAt,
+                    )
+                } else {
+                    it
+                }
+            }
+        }
+
         // ── Unused stubs ──
         override fun observeChecklists(): Flow<List<ChecklistEntity>> = flowOf(emptyList())
         override fun observeChecklistRows(): Flow<List<ChecklistRow>> = flowOf(emptyList())
+        override fun observeProjectRows(): Flow<List<ChecklistRow>> = flowOf(emptyList())
+        override fun observeProjects(): Flow<List<ChecklistEntity>> = flowOf(emptyList())
+        override suspend fun getAllProjectsOrderedByPosition(): List<ChecklistEntity> =
+            checklists.filter { !it.isDeleted && !it.isInbox }.sortedBy { it.position }
         override suspend fun getById(id: Long): ChecklistEntity? = checklists.firstOrNull { it.id == id }
         override fun observeChecklistById(id: Long): Flow<ChecklistEntity?> = flowOf(null)
         override suspend fun updateSyncStatus(id: Long, status: Int) {}
-        override suspend fun softDelete(id: Long, updatedAt: Long) {}
         override suspend fun setSeparateCompleted(id: Long, value: Boolean) {}
         override suspend fun setAutoDeleteCompleted(id: Long, value: Boolean) {}
         override suspend fun setFoldersEnabled(id: Long, value: Boolean) {}

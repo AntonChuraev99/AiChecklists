@@ -4,6 +4,8 @@ import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
+import com.antonchuraev.homesearchchecklist.core.common.api.NavExperimentResolver
+import com.antonchuraev.homesearchchecklist.core.common.api.NavVariant
 import com.antonchuraev.homesearchchecklist.core.datastore.api.ActivationPrefsRepository
 import com.antonchuraev.homesearchchecklist.core.datastore.api.FirstChecklistRepository
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AddToChecklistPurpose
@@ -139,7 +141,23 @@ class SplashViewModelTest {
             checklistRepository = fakeChecklist,
             firstChecklistRepository = fakeFirstChecklist,
             activationPrefsRepository = fakeActivationPrefs,
+            // Splash resolves the nav variant before navigating (so the shell can never be swapped
+            // under a live screen). These tests are about the paywall-link and onboarding routing, so
+            // the variant is pinned and never read further.
+            navExperimentResolver = ControlArmResolver(),
         )
+    }
+
+    /**
+     * Pins the navigation variant so Splash's own resolve is a no-op. These tests are about
+     * paywall-linking and onboarding routing; the shell they would render is irrelevant to them.
+     */
+    private class ControlArmResolver : NavExperimentResolver {
+        override fun currentArm(): NavVariant = NavVariant.CONTROL
+        override suspend fun ensureResolved(): NavVariant = NavVariant.CONTROL
+        override suspend fun setVariant(variant: NavVariant) = Unit
+        override suspend fun clearVariant() = Unit
+        override fun isArmAssigned(): Boolean = true
     }
 
     // ============================================================

@@ -47,9 +47,21 @@ import kotlin.test.assertTrue
 class ChecklistCorruptRowRecoveryTest {
 
     private companion object {
-        // Identity hash of schema version 18 (schemas/.../18.json → database.identityHash).
-        // Must match so Room trusts the existing (drifted) table instead of recreating it.
-        const val SCHEMA_18_IDENTITY_HASH = "11be07424f82168d806ccc68135e0bfa"
+        /**
+         * Identity hash of the CURRENT schema version (schemas/.../19.json → database.identityHash).
+         *
+         * Must match so Room trusts the existing (drifted) table instead of migrating or recreating
+         * it — which is the whole point of this test: it exercises the READ path over a table whose
+         * column definitions drifted from the entity. Seeding an OLDER version instead would make
+         * Room run the migration chain and then VALIDATE the result, and validation legitimately
+         * rejects the deliberate drift (`name`/`items` nullable here, NOT NULL in the entity) — the
+         * test would fail on Room's schema check before ever reaching the recovery code.
+         *
+         * So this constant and the `PRAGMA user_version` below must be bumped together with every
+         * schema version. Last bump: 18 → 19 (`isInbox`).
+         */
+        const val CURRENT_SCHEMA_IDENTITY_HASH = "185ed1d859f9a0adf791f47ab449925a"
+        const val CURRENT_SCHEMA_VERSION = 19
     }
 
     private val dbFiles = mutableListOf<File>()
@@ -89,7 +101,10 @@ class ChecklistCorruptRowRecoveryTest {
                     "`position` INTEGER NOT NULL, `autoDeleteCompleted` INTEGER NOT NULL, " +
                     "`viewMode` TEXT NOT NULL, `foldersEnabled` INTEGER NOT NULL, " +
                     "`cloudId` TEXT, `userId` TEXT, `updatedAt` INTEGER NOT NULL, " +
-                    "`syncStatus` INTEGER NOT NULL, `isDeleted` INTEGER NOT NULL)"
+                    "`syncStatus` INTEGER NOT NULL, `isDeleted` INTEGER NOT NULL, " +
+                    // Present so the table matches the current entity everywhere EXCEPT the one
+                    // deliberate drift (nullable name/items) this test is about.
+                    "`isInbox` INTEGER NOT NULL)"
             )
 
             // Room identity bookkeeping — makes the production open path trust this file as version 18.
@@ -97,29 +112,30 @@ class ChecklistCorruptRowRecoveryTest {
                 "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY, identity_hash TEXT)"
             )
             connection.execSQL(
-                "INSERT OR REPLACE INTO room_master_table (id, identity_hash) VALUES(42, '$SCHEMA_18_IDENTITY_HASH')"
+                "INSERT OR REPLACE INTO room_master_table (id, identity_hash) VALUES(42, '$CURRENT_SCHEMA_IDENTITY_HASH')"
             )
-            connection.execSQL("PRAGMA user_version = 18")
+            connection.execSQL("PRAGMA user_version = $CURRENT_SCHEMA_VERSION")
 
             val cols =
                 "(name, items, repeatOccurrenceCount, reminderFullScreen, separateCompleted, " +
-                    "position, autoDeleteCompleted, viewMode, foldersEnabled, updatedAt, syncStatus, isDeleted)"
+                    "position, autoDeleteCompleted, viewMode, foldersEnabled, updatedAt, syncStatus, " +
+                    "isDeleted, isInbox)"
             // Valid row.
             connection.execSQL(
-                "INSERT INTO checklists $cols VALUES ('Groceries', '[]', 0, 0, 0, 0, 0, 'Standard', 0, 0, 0, 0)"
+                "INSERT INTO checklists $cols VALUES ('Groceries', '[]', 0, 0, 0, 0, 0, 'Standard', 0, 0, 0, 0, 0)"
             )
             // Corrupt row A: NULL name (coerced to "" by the JVM driver — see class KDoc).
             connection.execSQL(
-                "INSERT INTO checklists $cols VALUES (NULL, '[]', 0, 0, 0, 1, 0, 'Standard', 0, 0, 0, 0)"
+                "INSERT INTO checklists $cols VALUES (NULL, '[]', 0, 0, 0, 1, 0, 'Standard', 0, 0, 0, 0, 0)"
             )
             // Corrupt row B: NULL items (coerced to "" by the JVM driver — see class KDoc).
             connection.execSQL(
-                "INSERT INTO checklists $cols VALUES ('HasNullItems', NULL, 0, 0, 0, 2, 0, 'Standard', 0, 0, 0, 0)"
+                "INSERT INTO checklists $cols VALUES ('HasNullItems', NULL, 0, 0, 0, 2, 0, 'Standard', 0, 0, 0, 0, 0)"
             )
             // Corrupt row C: non-empty INVALID JSON in items — the host-reproducible RED trigger.
             // The current converter rethrows this as ChecklistJsonDecodeException and the flow dies.
             connection.execSQL(
-                "INSERT INTO checklists $cols VALUES ('HasCorruptJson', 'not-a-json', 0, 0, 0, 3, 0, 'Standard', 0, 0, 0, 0)"
+                "INSERT INTO checklists $cols VALUES ('HasCorruptJson', 'not-a-json', 0, 0, 0, 3, 0, 'Standard', 0, 0, 0, 0, 0)"
             )
         } finally {
             connection.close()

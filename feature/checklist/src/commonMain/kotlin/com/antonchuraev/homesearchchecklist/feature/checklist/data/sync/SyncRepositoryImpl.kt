@@ -442,9 +442,15 @@ class SyncRepositoryImpl(
     private suspend fun mergeRemoteChecklist(remote: ChecklistSyncData) {
         val local = checklistDao.getByCloudId(remote.cloudId)
         if (local == null) {
+            // An incoming system-Inbox document must be reconciled against the Inbox this device may
+            // have created for itself before it ever knew about the account's one — inserting it
+            // blind leaves two flagged rows and strands one of them (see [resolveIncomingInbox]).
+            if (remote.isInbox && !resolveIncomingInbox(remote)) return
             log("merge: NEW '${remote.name}' cloudId=${remote.cloudId}")
             val domainChecklist = remote.toDomain()
-            val localId = checklistDao.insert(domainChecklist.toInsertEntity())
+            val localId = checklistDao.insert(
+                domainChecklist.toInsertEntity(isInbox = resolveIsInbox(remote, local = null)),
+            )
             for (fillData in remote.fills) {
                 fillDao.insert(fillData.toInsertEntity(checklistId = localId))
             }
@@ -466,7 +472,14 @@ class SyncRepositoryImpl(
             log("merge: SKIP '${remote.name}' (local has pending unsynced edits)")
         } else if (remote.updatedAt > local.updatedAt) {
             log("merge: UPDATE '${remote.name}' remote=${remote.updatedAt} > local=${local.updatedAt}")
-            val updated = remote.toDomain().toUpdateEntity(localId = local.id)
+            // isInbox is WRITE-ONCE locally, not last-write-wins: a document written by an older
+            // build or by the MCP worker carries no isInbox, decodes to false, and a plain overwrite
+            // would demote the system Inbox into an ordinary checklist that then appears in Projects.
+            // [resolveIsInbox] applies exactly that rule, bounded to ONE flagged row per device.
+            val updated = remote.toDomain().toUpdateEntity(
+                localId = local.id,
+                isInbox = resolveIsInbox(remote, local = local),
+            )
             checklistDao.update(updated)
             // Merge fills by cloudId: insert ones the cloud has but we don't, and
             // overwrite local fills with a newer remote version.
@@ -491,6 +504,116 @@ class SyncRepositoryImpl(
             log("merge: SKIP '${remote.name}' (local is newer or equal)")
         }
     }
+
+    /**
+     * Resolves the `isInbox` value a merged row must be written with, keeping the system-Inbox
+     * identity SINGLE on this device.
+     *
+     * The write-once rule (`remote.isInbox || local.isInbox`) is preserved verbatim — see
+     * [toUpdateEntity] for why a remote `false` may never clear a local `true`. What this adds is the
+     * bound the rule was missing: the flag is granted only while NO OTHER row holds it. Two
+     * `isInbox = 1` rows cannot both be the Inbox — [ChecklistDao.getInbox] and `observeInbox()` each
+     * take one of them, and the loser silently drops out of the projects list, the pickers, the
+     * widget and MCP with no way to reach it again. A visible ordinary project is a far better
+     * outcome than an unreachable row, so the second candidate is written unflagged and logged.
+     *
+     * Deciding against the CURRENT database state (rather than against the checklist being merged)
+     * is what makes repeated pulls idempotent: once a winner exists, every later pull re-derives the
+     * same answer for both rows.
+     *
+     * @param local the row being updated, or null when the merge is inserting a new one.
+     */
+    private suspend fun resolveIsInbox(remote: ChecklistSyncData, local: ChecklistEntity?): Boolean {
+        if (!remote.isInbox && local?.isInbox != true) return false
+        val existingInbox = checklistDao.getInbox()
+        if (existingInbox == null || existingInbox.id == local?.id) return true
+        logWarn(
+            "merge: '${remote.name}' cloudId=${remote.cloudId} claims the system Inbox but local " +
+                "id=${existingInbox.id} already holds it — writing it as an ordinary project so it " +
+                "stays reachable",
+        )
+        return false
+    }
+
+    /**
+     * Reconciles an incoming system-Inbox document against the Inbox row this device already has,
+     * and reports whether the document may be inserted at all.
+     *
+     * How the collision happens: after a reinstall (or on a second device) the Inbox tab roots the
+     * cold start, `ensureInbox()` finds an empty database and mints a brand-new Inbox row with a new
+     * cloudId, and the pull that follows carries the account's ORIGINAL Inbox document. Nothing
+     * matches the two by cloudId, so a blind insert leaves two `isInbox = 1` rows — and only one of
+     * them is ever returned by [ChecklistDao.getInbox] / `observeInbox()`, so the other becomes
+     * unreachable: absent from the Inbox tab, from Projects, from the pickers, the widget and MCP.
+     *
+     * Three outcomes, all of them losing nothing:
+     *  1. the local Inbox is a throwaway (no task, no reminder, no repeat) and the incoming one
+     *     carries content — retire the local row and let the account's real Inbox take the tab;
+     *  2. the incoming document is itself a throwaway — a duplicate with nothing in it, so it is not
+     *     materialised at all (an empty second "Inbox" in Projects would just eat a free-tier slot).
+     *     If it later gains content on its own device, a subsequent pull re-evaluates it as case 1
+     *     or 3;
+     *  3. both hold content — the document is inserted, and [resolveIsInbox] demotes it to an
+     *     ordinary visible project so everything stays reachable while one row keeps the flag.
+     *
+     * Case 1 is deliberately asymmetric (throwaway local vs content-bearing remote): two devices can
+     * never both satisfy it against each other, so they cannot delete each other's Inbox document in
+     * a loop. Case 2 stops the common "both devices auto-created an empty Inbox" state from
+     * cluttering Projects, and self-heals the moment either side captures its first task.
+     *
+     * The retirement uses the ordinary PENDING_DELETE tombstone rather than a hard delete: the empty
+     * row may already have been pushed by `initialUpload()`, and only the tombstone makes the next
+     * push remove that document too — left in the cloud it would come back on every pull.
+     */
+    private suspend fun resolveIncomingInbox(remote: ChecklistSyncData): Boolean {
+        val localInbox = checklistDao.getInbox() ?: return true
+        // "Throwaway" = nothing to lose on either side. Reminder/repeat are checked on top of the
+        // task scan: a task-less Inbox can still carry a schedule the user set, and that is content.
+        val remoteIsThrowaway = remote.holdsNoTasks() &&
+            remote.reminderAt == null &&
+            remote.repeatRule == null
+        if (remoteIsThrowaway) {
+            logWarn(
+                "merge: empty duplicate Inbox cloudId=${remote.cloudId} — not materialising it, " +
+                    "local Inbox id=${localInbox.id} keeps the tab",
+            )
+            return false
+        }
+        val localIsThrowaway = localInbox.holdsNoTasks() &&
+            localInbox.reminderAt == null &&
+            localInbox.repeatRule == null
+        if (localIsThrowaway) {
+            // Fills first, then the row — same order as reconcileDeletedRemotely, so no fill is left
+            // pointing at a checklist that is on its way out.
+            fillDao.deleteByChecklistId(localInbox.id)
+            checklistDao.softDelete(localInbox.id, updatedAt = currentTimeMillis())
+            logInfo(
+                "merge: retired empty locally-created Inbox id=${localInbox.id} in favour of cloud " +
+                    "Inbox cloudId=${remote.cloudId}",
+            )
+        }
+        // Case 3 needs no log here — resolveIsInbox reports the demotion when it writes the row.
+        return true
+    }
+
+    /** True when this local row carries no task at all — neither template items nor any fill item. */
+    private suspend fun ChecklistEntity.holdsNoTasks(): Boolean =
+        items.isEmpty() && fillDao.getActiveFillsByChecklistId(id).all { it.items.isEmpty() }
+
+    /**
+     * Remote twin of [ChecklistEntity.holdsNoTasks]. Quick capture writes the template + fill PAIR,
+     * so the template alone would answer for an Inbox written by this app — the fills are scanned
+     * too so that a fill-only writer (an older build, the MCP worker) can never make a task-bearing
+     * document look empty and get itself discarded.
+     */
+    private fun ChecklistSyncData.holdsNoTasks(): Boolean =
+        toDomain().items.isEmpty() &&
+            fills.all { fill ->
+                json.decodeFromString(
+                    ListSerializer(ChecklistFillItem.serializer()),
+                    fill.itemsJson.ifEmpty { "[]" },
+                ).isEmpty()
+            }
 
     /**
      * Removes local SYNCED checklists that are absent from the cloud fetch — i.e.
@@ -559,6 +682,7 @@ class SyncRepositoryImpl(
 
     private fun log(msg: String) = logger.debug(TAG, msg)
     private fun logInfo(msg: String) = logger.info(TAG, msg)
+    private fun logWarn(msg: String) = logger.warning(TAG, msg)
     private fun logError(msg: String, e: Throwable? = null) = logger.error(TAG, msg, e)
 
     // ── Mapping helpers ──
@@ -590,6 +714,7 @@ class SyncRepositoryImpl(
         foldersEnabled = foldersEnabled,
         updatedAt = updatedAt,
         isDeleted = isDeleted,
+        isInbox = isInbox,
         fills = fills,
     )
 
@@ -624,9 +749,18 @@ class SyncRepositoryImpl(
         cloudId = cloudId,
         updatedAt = updatedAt,
         isDeleted = isDeleted,
+        isInbox = isInbox,
     )
 
-    private fun Checklist.toInsertEntity() = com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistEntity(
+    /**
+     * @param isInbox the value to persist. Defaults to the remote's, but the merge passes the value
+     *   [resolveIsInbox] arrived at: a cloud document may carry the flag while this device already
+     *   has an Inbox row of its own, and inserting a second flagged row makes one of the two
+     *   unreachable.
+     */
+    private fun Checklist.toInsertEntity(
+        isInbox: Boolean = this.isInbox,
+    ) = com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistEntity(
         name = name,
         items = items,
         reminderAt = reminderAt,
@@ -645,9 +779,20 @@ class SyncRepositoryImpl(
         updatedAt = updatedAt,
         syncStatus = SyncStatus.SYNCED.value,
         isDeleted = isDeleted,
+        isInbox = isInbox,
     )
 
-    private fun Checklist.toUpdateEntity(localId: Long) = com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistEntity(
+    /**
+     * @param isInbox the value to persist. Defaults to the remote's, but the LWW caller passes
+     *   `remote.isInbox || local.isInbox`: the flag is **write-once locally**. A device on an older
+     *   build (or the MCP worker) writes a document with no `isInbox`; it decodes to false, and a
+     *   plain overwrite here would silently demote the system Inbox to an ordinary checklist that
+     *   then pops up in the Projects list. Never let a remote `false` clear a local `true`.
+     */
+    private fun Checklist.toUpdateEntity(
+        localId: Long,
+        isInbox: Boolean = this.isInbox,
+    ) = com.antonchuraev.homesearchchecklist.feature.checklist.data.db.ChecklistEntity(
         id = localId,
         name = name,
         items = items,
@@ -667,6 +812,7 @@ class SyncRepositoryImpl(
         updatedAt = updatedAt,
         syncStatus = SyncStatus.SYNCED.value,
         isDeleted = isDeleted,
+        isInbox = isInbox,
     )
 
     private fun FillSyncData.toInsertEntity(checklistId: Long) =

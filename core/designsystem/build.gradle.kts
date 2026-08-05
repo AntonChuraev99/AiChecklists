@@ -54,7 +54,13 @@ kotlin {
             // Haze 1.7.2 (stable) — backdrop blur for the glass chat dock (Android + wasmJs/Skiko, KMP, no
             // expect/actual). Single module: blur + HazeStyle/HazeTint live in core `haze`. (2.0-alpha split
             // blur into haze-blur + blurEffect{} but did not render the backdrop in this project — reverted.)
-            implementation(libs.haze)
+            //
+            // `api`, not `implementation`: HazeState appears in the PUBLIC signature of
+            // GistiGlassChatDock, so every module that hosts the dock needs the type on its compile
+            // classpath. Under `implementation` the type was leaked without being exported, and the
+            // first host outside feature/home (the v2 shell in composeApp) failed to compile with
+            // "Cannot access class dev.chrisbanes.haze.HazeState".
+            api(libs.haze)
         }
         androidMain.dependencies {
             implementation(libs.androidx.window)

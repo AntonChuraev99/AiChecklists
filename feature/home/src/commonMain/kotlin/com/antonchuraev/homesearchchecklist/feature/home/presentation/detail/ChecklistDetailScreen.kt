@@ -52,6 +52,8 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Surface
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -146,6 +148,8 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -277,6 +281,25 @@ fun ChecklistDetailScreen(
      * context and dispatch the right prefill / send. Wired by App.kt.
      */
     onChecklistQuickAction: ((Long, String, GistiChecklistAction) -> Unit)? = null,
+    /**
+     * v2 nav arm: render the inline "+ Add task" row instead of the dock's item-create mode, and
+     * zero the item-create scrim.
+     *
+     * The dock itself is removed by App.kt passing `chatDockContent = null`; this flag exists because
+     * that also removes the dock's [ChatDockItemCreateOverride] fast-add path, and shipping the arm
+     * without a replacement input would be a REGRESSION (losing 4 reminder presets, Important,
+     * Repeat, the live Smart-Add chip, attachment staging and multi-add) even though items still
+     * get created. Default false → the control arm renders no extra row.
+     */
+    useInlineAddRow: Boolean = false,
+    /**
+     * v2 nav arm: non-null adds ONE AI-chat action to the top bar.
+     *
+     * The v2 chat FAB is hidden on non-tab routes (this screen is one), so without this the detail
+     * screen would have no chat entry point at all once the dock is gone. Null in the control arm →
+     * zero extra actions, so the toolbar is byte-identical.
+     */
+    onOpenChat: (() -> Unit)? = null,
     viewModel: ChecklistDetailViewModel = koinViewModel(
         key = "checklist_detail_${checklistId}_${currentFolderId ?: "root"}"
     ) { parametersOf(checklistId, currentFolderId) }
@@ -312,6 +335,8 @@ fun ChecklistDetailScreen(
             onChecklistQuickAction = onChecklistQuickAction?.let { cb ->
                 { action -> cb(currentState.checklist.id, currentState.checklist.name, action) }
             },
+            useInlineAddRow = useInlineAddRow,
+            onOpenChat = onOpenChat,
         )
     }
 }
@@ -409,8 +434,22 @@ private fun ChecklistDetailContent(
     chatDockContent: (@Composable (AnchoredDraggableState<DockAnchor>, String, Dp, @Composable () -> Unit, ChatDockItemCreateOverride?, () -> Unit) -> Unit)? = null,
     chatFullContent: (@Composable (DockFullExpandState, Int) -> Unit)? = null,
     onChecklistQuickAction: ((GistiChecklistAction) -> Unit)? = null,
+    /** v2: see [ChecklistDetailScreen]'s parameter of the same name. */
+    useInlineAddRow: Boolean = false,
+    /** v2: see [ChecklistDetailScreen]'s parameter of the same name. */
+    onOpenChat: (() -> Unit)? = null,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
+    // Focus plumbing for the v2 inline add row, so the toolbar "+" still has somewhere to send the
+    // caret now that there is no dock to expand. A signal counter rather than a direct
+    // requestFocus() call: the row lives INSIDE the LazyColumn, so its FocusRequester is only
+    // attached while the row is composed — calling requestFocus from the toolbar would throw
+    // whenever the row is scrolled off screen. The toolbar bumps the signal and scrolls; the row
+    // focuses itself when it composes. `handled` stops a later re-composition (scrolling the row
+    // back into view) from popping the keyboard again on a stale signal.
+    val inlineAddFocusRequester = remember { FocusRequester() }
+    var inlineAddFocusSignal by remember { mutableStateOf(0) }
+    var inlineAddFocusHandled by remember { mutableStateOf(0) }
 
     // Measured chat-dock height (already includes the dock's own ime + navbar insets). Hoisted ABOVE
     // AppScaffold so the snackbarHost slot can lift snackbars/toasts to sit just above the dock
@@ -460,6 +499,12 @@ private fun ChecklistDetailContent(
     PlatformBackHandler(enabled = dockExpanded || state.itemCreateMode) {
         chatFocusManager.clearFocus()
         when {
+            // v2 (inline add row): there is NO dock, so dockState.offset is permanently NaN and the
+            // branch below would do nothing at all — BACK swallowed with no visible effect, which is
+            // a bug, not a no-op. Exit item-create directly instead; once it is off this handler
+            // disables and the next BACK reaches NavDisplay.
+            useInlineAddRow && state.itemCreateMode ->
+                onIntent(ChecklistDetailIntent.OnDockItemCreateClosed)
             // Item-create: Back closes the create dock and returns the screen to its OPENED (peek)
             // state. ALWAYS collapse to Peek (regardless of the unrelated chat-input draft) — settling
             // to Peek flips dockExpanded→false, which fires OnDockItemCreateClosed and exits the mode.
@@ -662,6 +707,35 @@ private fun ChecklistDetailContent(
 
     var isEditMode by rememberSaveable { mutableStateOf(false) }
     val listState = rememberLazyListState()
+
+    /**
+     * LazyColumn index of the v2 inline add row, which sits directly AFTER the active rows:
+     * `[header(s)][active rows][inline_add_item][completed_header][completed rows]`.
+     *
+     * Exists because the row must be scrolled into view before it can take focus — it lives inside the
+     * LazyColumn, so its FocusRequester only attaches while it is composed. Same arithmetic the
+     * added-item scroll below uses; kept as one lambda so the two cannot drift apart.
+     */
+    val inlineAddRowIndex: () -> Int = {
+        val checkedIds = if (state.separateCompleted) {
+            state.defaultFill?.items?.filter { it.checked }?.map { it.id }?.toSet().orEmpty()
+        } else {
+            emptySet()
+        }
+        val activeNodeCount = if (state.foldersEnabled) {
+            state.levelNodes.count { node ->
+                node !is LevelNode.Leaf || node.fillItemId !in checkedIds
+            }
+        } else {
+            val visibleIds = state.visibleFillItemIds
+            val visible = state.defaultFill?.items?.let { items ->
+                if (visibleIds == null) items else items.filter { it.id in visibleIds }
+            }.orEmpty()
+            visible.count { it.id !in checkedIds }
+        }
+        val headerCount = 1 + (if (state.additionalFillsCount > 0) 1 else 0)
+        headerCount + activeNodeCount
+    }
     // Pinned (not exitUntilCollapsed): the toolbar action icons (share / add / reminder /
     // overflow-settings) must stay reachable while the list scrolls. exitUntilCollapsed on the
     // single-row CenterAlignedTopAppBar (Compact) treats the whole bar height as collapsible and
@@ -798,8 +872,12 @@ private fun ChecklistDetailContent(
     // from the content anchor's position in the root; the top scrim uses exactly it, so the two scrims
     // tile edge-to-edge with no double-dark seam and no bright gap. Pinned app bar (pinnedScrollBehavior)
     // → the height is stable, and onGloballyPositioned re-measures on any layout change regardless.
+    //
+    // v2 (useInlineAddRow): forced to 0f. Both scrims are driven by state.itemCreateMode ALONE, not
+    // by showDock — so with the dock removed they would still dim the entire screen with nothing
+    // bright left to justify the dimming. There is no scrim in the inline-row design.
     val scrimAlpha by animateFloatAsState(
-        targetValue = if (state.itemCreateMode) 0.5f else 0f,
+        targetValue = if (state.itemCreateMode && !useInlineAddRow) 0.5f else 0f,
         animationSpec = tween(durationMillis = 220),
         label = "item_create_scrim",
     )
@@ -856,6 +934,26 @@ private fun ChecklistDetailContent(
                 IconButton(onClick = { onIntent(ChecklistDetailIntent.OnShareClick) }) {
                     Icon(Icons.Outlined.Share, contentDescription = stringResource(Res.string.share))
                 }
+                // v2 only: the chat FAB is hidden on non-tab routes and the dock is gone, so this is
+                // the detail screen's chat entry point. Null in the control arm → nothing rendered,
+                // toolbar unchanged.
+                if (onOpenChat != null) {
+                    IconButton(
+                        onClick = {
+                            // Seed the chat with THIS checklist BEFORE opening it. In the control arm
+                            // the dock's own expand callback does this; in v2 the dock lives in the
+                            // shell and has no idea which screen raised it, so a chat opened here
+                            // would answer "what am I missing?" against no checklist at all.
+                            onOpenChatSheet?.invoke()
+                            onOpenChat()
+                        },
+                    ) {
+                        Icon(
+                            Icons.Outlined.AutoAwesome,
+                            contentDescription = stringResource(Res.string.detail_open_chat_action),
+                        )
+                    }
+                }
                 // Toolbar "+" only in Standard view. In Weekly view items are added via the
                 // per-day section "+" (inline WeeklyAddItemRow), which already targets the correct
                 // weekday — a toolbar "+" there would need a day to land in and is redundant.
@@ -871,8 +969,30 @@ private fun ChecklistDetailContent(
                             if (!state.itemCreateMode) {
                                 onIntent(ChecklistDetailIntent.OnDockItemCreateOpened(null))
                             }
-                            dockScope.launch {
-                                if (!dockState.offset.isNaN()) dockState.animateTo(DockAnchor.Expanded)
+                            if (useInlineAddRow) {
+                                // v2: no dock to expand — the equivalent affordance is scrolling the
+                                // inline row into view and putting the caret in it. Scroll FIRST so
+                                // the row is composed (and its FocusRequester attached) by the time
+                                // the row's own effect reacts to the bumped signal.
+                                //
+                                // Targets the inline row's OWN index, not totalItemsCount - 1. The
+                                // list is [header(s)][active rows][inline_add_item][completed_header]
+                                // [completed rows], so with separateCompleted on and a screenful of
+                                // completed items the last index scrolls PAST the inline row — it
+                                // leaves the composition, its LaunchedEffect never runs, and the tap
+                                // becomes a silent no-op (only a warning in the log).
+                                inlineAddFocusSignal++
+                                dockScope.launch {
+                                    val total = listState.layoutInfo.totalItemsCount
+                                    if (total > 0) {
+                                        val target = inlineAddRowIndex().coerceIn(0, total - 1)
+                                        listState.animateScrollToItem(target)
+                                    }
+                                }
+                            } else {
+                                dockScope.launch {
+                                    if (!dockState.offset.isNaN()) dockState.animateTo(DockAnchor.Expanded)
+                                }
                             }
                         }
                     ) {
@@ -1211,6 +1331,86 @@ private fun ChecklistDetailContent(
                 // Add-item input moved to the shared chat dock (item-create mode, the "+" toolbar
                 // button). The former inline LazyColumn field has been removed — adding items now
                 // reuses the dock's bottom input + selectable reminder/property chips.
+                //
+                // …EXCEPT in the v2 nav arm, where the dock is gone. The row below is its
+                // replacement. It is emitted only when [useInlineAddRow] is true — not an empty
+                // `item {}` — so the control arm's LazyColumn gets no extra slot and no extra
+                // `spacedBy` gap. Everything binds to the EXISTING item-create intents:
+                // OnAddItemWithParse is the single source of truth for the template+fill dual write,
+                // Smart-Add parsing and reminder scheduling (rule `checklist-domain`), so no item is
+                // ever written from here.
+                if (useInlineAddRow) {
+                    item(key = "inline_add_item") {
+                        // Focus the row when the toolbar "+" asked for it AND the row is actually
+                        // composed. A failure is logged, never swallowed: a "+" that silently does
+                        // nothing reads as a frozen screen.
+                        LaunchedEffect(inlineAddFocusSignal) {
+                            if (inlineAddFocusSignal > inlineAddFocusHandled) {
+                                inlineAddFocusHandled = inlineAddFocusSignal
+                                runCatching { inlineAddFocusRequester.requestFocus() }
+                                    .onFailure { e ->
+                                        logger.warning(
+                                            "ChecklistDetail",
+                                            "inline add-row focus request failed: ${e.message}",
+                                        )
+                                    }
+                            }
+                        }
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
+                        ) {
+                            // Chips + staged attachments appear once the row is active, exactly as
+                            // they did inside the expanded dock — an input that only takes text
+                            // would be a regression even though items still get created.
+                            if (state.itemCreateMode) {
+                                ItemCreateChipsRow(
+                                    state = state,
+                                    onIntent = onIntent,
+                                    horizontalPadding = 0.dp,
+                                )
+                                ItemCreateAttachmentStrip(
+                                    pending = state.itemCreatePendingAttachments,
+                                    onRemove = { sourcePath ->
+                                        onIntent(
+                                            ChecklistDetailIntent
+                                                .OnRemoveItemCreatePendingAttachment(sourcePath)
+                                        )
+                                    },
+                                    horizontalPadding = 0.dp,
+                                )
+                            }
+                            InlineAddItemInput(
+                                text = state.pendingItemInput,
+                                canSend = state.pendingItemInput.isNotBlank(),
+                                focusRequester = inlineAddFocusRequester,
+                                onTextChange = {
+                                    onIntent(ChecklistDetailIntent.OnItemInputChanged(it))
+                                },
+                                onSubmit = { onIntent(ChecklistDetailIntent.OnAddItemWithParse) },
+                                onAttachClick = {
+                                    onIntent(ChecklistDetailIntent.OnItemCreateAttachClick)
+                                },
+                                onFocusChanged = { focused ->
+                                    when {
+                                        // Focus IS the "open item-create" gesture here: it reveals
+                                        // the chips and initialises their state, mirroring what the
+                                        // dock's "+" used to do.
+                                        focused && !state.itemCreateMode ->
+                                            onIntent(
+                                                ChecklistDetailIntent.OnDockItemCreateOpened(null)
+                                            )
+                                        // Blur with a draft KEEPS the mode (and the chip selections)
+                                        // alive — the dock's own "a draft holds it open" rule.
+                                        !focused && state.itemCreateMode &&
+                                            state.pendingItemInput.isBlank() ->
+                                            onIntent(ChecklistDetailIntent.OnDockItemCreateClosed)
+                                    }
+                                },
+                            )
+                        }
+                    }
+                }
 
                 // Completed section (only when separateCompleted is on and there are completed items)
                 if (state.separateCompleted && completedItems.isNotEmpty()) {
@@ -3847,6 +4047,12 @@ private fun CompletedSectionHeader(
 private fun ItemCreateChipsRow(
     state: ChecklistDetailState.Content,
     onIntent: (ChecklistDetailIntent) -> Unit,
+    /**
+     * Edge inset for the token chip and the chip row. Defaults to the screen padding because the
+     * dock hosts this with no outer padding of its own; the v2 inline row passes 0.dp since its
+     * LazyColumn already applies the screen padding (double padding — rule `ui-card-patterns`).
+     */
+    horizontalPadding: Dp = AppDimens.ScreenPaddingHorizontal,
 ) {
     val tz = TimeZone.currentSystemDefault()
     val pickTimeLabel = state.itemCreateReminderAt
@@ -3869,7 +4075,7 @@ private fun ItemCreateChipsRow(
         if (token != null && state.itemCreateReminderAt == null) {
             Box(
                 modifier = Modifier
-                    .padding(horizontal = AppDimens.ScreenPaddingHorizontal)
+                    .padding(horizontal = horizontalPadding)
                     .padding(bottom = AppDimens.SpacingSm)
             ) {
                 TokenChipPreview(
@@ -3879,6 +4085,7 @@ private fun ItemCreateChipsRow(
             }
         }
         GistiSelectableChipRow(
+            contentPadding = PaddingValues(horizontal = horizontalPadding),
             chips = gistiItemCreatePromptChips(
                 in1HourLabel = stringResource(Res.string.item_create_chip_in_1_hour),
                 tomorrowMorningLabel = stringResource(Res.string.item_create_chip_tomorrow_morning),
@@ -3920,6 +4127,8 @@ private fun ItemCreateChipsRow(
 private fun ItemCreateAttachmentStrip(
     pending: List<PendingItemAttachment>,
     onRemove: (sourcePath: String) -> Unit,
+    /** See [ItemCreateChipsRow]'s parameter of the same name — 0.dp from the v2 inline row. */
+    horizontalPadding: Dp = AppDimens.ScreenPaddingHorizontal,
 ) {
     if (pending.isEmpty()) return
     val tileShape = RoundedCornerShape(8.dp)
@@ -3927,7 +4136,7 @@ private fun ItemCreateAttachmentStrip(
     LazyRow(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = AppDimens.ScreenPaddingHorizontal),
+            .padding(horizontal = horizontalPadding),
         horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
         contentPadding = PaddingValues(vertical = AppDimens.SpacingXs),
     ) {
@@ -3980,6 +4189,80 @@ private fun ItemCreateAttachmentStrip(
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * Todoist-style "+ Add task" row — the v2 replacement for the dock's item-create input.
+ *
+ * Deliberately dumb: it owns NO create logic. [onSubmit] fires
+ * [ChecklistDetailIntent.OnAddItemWithParse], which is the single source of truth for the
+ * template+fill dual write, Smart-Add parsing and reminder scheduling. Writing the item here would
+ * re-open the template/fill desync bug and skip the Smart-Add parser entirely.
+ *
+ * Unlike the original pre-dock inline input (removed in 2ac512ed) this row does NOT self-dismiss
+ * when the keyboard hides: in v2 it is a permanent affordance at the end of the list, so a closing
+ * keyboard must leave it in place. It also never clears its own focus after a send — the ViewModel
+ * keeps item-create mode on precisely so the user can add several tasks in a row
+ * (asserted by `ChecklistDetailSmartAddTest`).
+ *
+ * @param canSend false while the input is blank → both submit paths are inert, so a blank item can
+ *   never be created.
+ * @param focusRequester lets the toolbar "+" put the caret here (there is no dock left to expand).
+ * @param onFocusChanged drives item-create mode: focus opens it (revealing the chips), blur closes
+ *   it only when the draft is empty.
+ */
+@Composable
+private fun InlineAddItemInput(
+    text: String,
+    canSend: Boolean,
+    focusRequester: FocusRequester,
+    onTextChange: (String) -> Unit,
+    onSubmit: () -> Unit,
+    onAttachClick: () -> Unit,
+    onFocusChanged: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
+    ) {
+        AppTextField(
+            value = text,
+            onValueChange = onTextChange,
+            placeholder = stringResource(Res.string.detail_inline_add_placeholder),
+            singleLine = false,
+            modifier = Modifier
+                .weight(1f)
+                .focusRequester(focusRequester)
+                .onFocusChanged { onFocusChanged(it.isFocused) },
+            keyboardOptions = KeyboardOptions(
+                imeAction = ImeAction.Done,
+                capitalization = KeyboardCapitalization.Sentences,
+            ),
+            keyboardActions = KeyboardActions(onDone = { if (canSend) onSubmit() }),
+        )
+        IconButton(onClick = onAttachClick) {
+            Icon(
+                imageVector = Icons.Outlined.AttachFile,
+                // Reuses the existing attachment label rather than minting a v2-only key: the
+                // contract's string list has none for this button, and inventing one would drift
+                // in translation against the identical action elsewhere in this screen.
+                contentDescription = stringResource(Res.string.attachment_add_file_button),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        IconButton(onClick = onSubmit, enabled = canSend) {
+            Icon(
+                imageVector = Icons.Outlined.Add,
+                contentDescription = stringResource(Res.string.add_item),
+                tint = if (canSend) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+            )
         }
     }
 }
