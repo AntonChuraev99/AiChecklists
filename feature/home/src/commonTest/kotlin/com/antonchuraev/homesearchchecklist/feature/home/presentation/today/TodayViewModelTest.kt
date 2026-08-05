@@ -1,5 +1,6 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation.today
 
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavEvent
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavRoute
@@ -15,6 +16,7 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ItemR
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
+import com.antonchuraev.homesearchchecklist.feature.checklist.domain.usecase.EnsureInboxUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -224,7 +226,7 @@ class TodayViewModelTest {
     @Test
     fun emptyState_whenNoReminders() = runTest {
         val repo = FakeRepository(remindersInRange = emptyList())
-        val vm = TodayViewModel(repo, FakeNavigator(), logger)
+        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpAnalytics(), logger)
 
         val state = vm.awaitState()
         assertIs<TodayScreenState.Empty>(state)
@@ -251,7 +253,7 @@ class TodayViewModelTest {
                 checklistLevelReminder(checklistId = 2L, reminderAt = FUTURE_TODAY_MS),
             )
         )
-        val vm = TodayViewModel(repo, FakeNavigator(), logger)
+        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpAnalytics(), logger)
         val state = vm.awaitState()
 
         assertIs<TodayScreenState.Success>(state)
@@ -284,7 +286,7 @@ class TodayViewModelTest {
                 checklistLevelReminder(checklistId = 1L, reminderAt = earlierMs),
             )
         )
-        val vm = TodayViewModel(repo, FakeNavigator(), logger)
+        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpAnalytics(), logger)
         val state = vm.awaitState()
 
         assertIs<TodayScreenState.Success>(state)
@@ -298,7 +300,7 @@ class TodayViewModelTest {
     @Test
     fun intentOnReminderClick_itemLevel_navigatesToFillDetail() = runTest {
         val navigator = FakeNavigator()
-        val vm = TodayViewModel(FakeRepository(), navigator, logger)
+        val vm = TodayViewModel(FakeRepository(), ensureInbox(FakeRepository()), navigator, NoOpAnalytics(), logger)
 
         vm.sendIntent(TodayIntent.OnReminderClick(checklistId = 5L, fillId = 42L))
 
@@ -311,7 +313,7 @@ class TodayViewModelTest {
     @Test
     fun intentOnReminderClick_checklistLevel_navigatesToChecklistDetail() = runTest {
         val navigator = FakeNavigator()
-        val vm = TodayViewModel(FakeRepository(), navigator, logger)
+        val vm = TodayViewModel(FakeRepository(), ensureInbox(FakeRepository()), navigator, NoOpAnalytics(), logger)
 
         vm.sendIntent(TodayIntent.OnReminderClick(checklistId = 7L, fillId = null))
 
@@ -324,7 +326,7 @@ class TodayViewModelTest {
     @Test
     fun intentOnCreateChecklistClick_navigatesToTemplates() = runTest {
         val navigator = FakeNavigator()
-        val vm = TodayViewModel(FakeRepository(), navigator, logger)
+        val vm = TodayViewModel(FakeRepository(), ensureInbox(FakeRepository()), navigator, NoOpAnalytics(), logger)
 
         vm.sendIntent(TodayIntent.OnCreateChecklistClick)
 
@@ -340,7 +342,7 @@ class TodayViewModelTest {
                 itemLevelReminder(reminderAt = FUTURE_TODAY_MS, itemText = "Buy milk"),
             )
         )
-        val vm = TodayViewModel(repo, FakeNavigator(), logger)
+        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpAnalytics(), logger)
         val state = vm.awaitState()
 
         assertIs<TodayScreenState.Success>(state)
@@ -361,7 +363,7 @@ class TodayViewModelTest {
                 checklistLevelReminder(reminderAt = FUTURE_TODAY_MS, isRecurring = true),
             )
         )
-        val vm = TodayViewModel(repo, FakeNavigator(), logger)
+        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpAnalytics(), logger)
         val state = vm.awaitState()
 
         assertIs<TodayScreenState.Success>(state)
@@ -401,7 +403,7 @@ class TodayViewModelTest {
     @Test
     fun intentOnRefresh_doesNotNavigate() = runTest {
         val navigator = FakeNavigator()
-        val vm = TodayViewModel(FakeRepository(), navigator, logger)
+        val vm = TodayViewModel(FakeRepository(), ensureInbox(FakeRepository()), navigator, NoOpAnalytics(), logger)
 
         // Refresh is a data concern — it must never move the user off the screen.
         vm.sendIntent(TodayIntent.OnRefresh)
@@ -457,7 +459,7 @@ class TodayViewModelTest {
             )
         )
 
-        val vm = TodayViewModel(repo, FakeNavigator(), logger)
+        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpAnalytics(), logger)
         val state = vm.awaitState()
 
         assertIs<TodayScreenState.Success>(state)
@@ -515,7 +517,7 @@ class TodayViewModelTest {
             ): Flow<List<TodayReminderInfo>> = flow { throw cause }
         }
 
-        val vm = TodayViewModel(repo, FakeNavigator(), logger)
+        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpAnalytics(), logger)
         val state = vm.awaitState()
 
         assertIs<TodayScreenState.Error>(state)
@@ -541,7 +543,7 @@ class TodayViewModelTest {
             ): Flow<List<TodayReminderInfo>> = flow { throw NullPointerException() }
         }
 
-        val vm = TodayViewModel(repo, FakeNavigator(), logger)
+        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpAnalytics(), logger)
 
         assertIs<TodayScreenState.Error>(vm.awaitState())
         assertTrue(logger.errors.isNotEmpty(), "AppLogger.error must be called on failure")
@@ -564,7 +566,7 @@ class TodayViewModelTest {
                 }
         }
 
-        val vm = TodayViewModel(repo, FakeNavigator(), logger)
+        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpAnalytics(), logger)
         assertIs<TodayScreenState.Error>(vm.awaitState())
 
         // Heal the repository, then retry: flatMapLatest must re-subscribe.
@@ -593,7 +595,7 @@ class TodayViewModelTest {
                 throw RuntimeException("DB failure")
             }
         }
-        val vm = TodayViewModel(repo, FakeNavigator(), logger)
+        val vm = TodayViewModel(repo, ensureInbox(repo), FakeNavigator(), NoOpAnalytics(), logger)
 
         val seen = mutableListOf<TodayScreenState>()
         // Must be unconfined AND share runTest's scheduler: backgroundScope defaults to
@@ -618,5 +620,75 @@ class TodayViewModelTest {
         )
         assertIs<TodayScreenState.Error>(seen.last())
         job.cancel()
+    }
+
+    // ── 16. Capture feedback must survive a collector that subscribes late ──
+
+    /**
+     * Regression guard for the live defect where a Calendar-tab capture wrote the task and said
+     * nothing: the message is the ONLY feedback that action has — the task goes to the system Inbox
+     * and cannot appear on this screen, because it has no reminder — so a message that never
+     * arrives reads as "my tap did nothing".
+     *
+     * `tryEmit` on a replay-0 SharedFlow returns **true** and DISCARDS the value while nobody
+     * collects, leaving no exception and no log line: it was the only step of the capture chain that
+     * can fail without a trace. The single subscriber is a `LaunchedEffect` inside `CalendarRoute`,
+     * registered asynchronously and torn down whenever that route leaves composition, so an emit
+     * into an empty channel is reachable rather than theoretical. Subscribing AFTER the emit is
+     * exactly the case `tryEmit` loses and [TodayViewModel.emitSideEffect] must survive.
+     */
+    @Test
+    fun sideEffect_reachesACollectorThatSubscribesAfterTheEmit() = runTest {
+        val vm = TodayViewModel(
+            FakeRepository(),
+            ensureInbox(FakeRepository()),
+            FakeNavigator(),
+            NoOpAnalytics(),
+            logger,
+        )
+        val message = TodaySideEffect.ShowCaptureMessage(
+            text = "Added to Inbox",
+            actionLabel = "Open",
+        )
+
+        // Emit with NOBODY listening yet. Unconfined + the shared scheduler so the emitter actually
+        // reaches its suspension point before the collector below is launched.
+        val emitter = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            vm.emitSideEffect(message)
+        }
+
+        val received = mutableListOf<TodaySideEffect>()
+        val collector = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            vm.sideEffect.toList(received)
+        }
+        testScheduler.advanceUntilIdle()
+
+        assertEquals<List<TodaySideEffect>>(
+            listOf(message),
+            received,
+            "The capture message must be delivered, not dropped for want of a subscriber",
+        )
+        emitter.cancel()
+        collector.cancel()
+    }
+
+    /**
+     * Real use case over the test's own fake repository — not a stub.
+     *
+     * These tests never exercise capture, so the use case is inert here; wiring the real one anyway
+     * means a future capture test gets the true write path (template + fill pair) instead of a fake
+     * that silently diverges from it.
+     */
+    private fun ensureInbox(repository: ChecklistRepository) = EnsureInboxUseCase(
+        repository = repository,
+        analytics = NoOpAnalytics(),
+        logger = FakeAppLogger(),
+    )
+
+    private class NoOpAnalytics : AnalyticsTracker {
+        override fun setUserId(userId: String) = Unit
+        override fun setUserProperties(properties: Map<String, Any>) = Unit
+        override fun screenView(name: String) = Unit
+        override fun event(name: String, params: Map<String, Any>) = Unit
     }
 }

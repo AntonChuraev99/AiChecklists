@@ -607,14 +607,28 @@ object AnalyticsEvents {
          * measurable (the flagship Hindi launch shipped with zero language events).
          */
         const val LANGUAGE_SELECTED = "language_selected"
+
+        /**
+         * User switched the navigation shell in Settings. Carries [AnalyticsParams.NAV_ARM] =
+         * "control" | "v2" (the value CHOSEN) and [AnalyticsParams.SOURCE] = "settings".
+         *
+         * The one signal that answers "is anyone opting out of the new navigation?" — the sticky
+         * `nav_arm` user property cannot, because it is written once per process and a user who
+         * toggles is counted under whichever value that process happened to mirror.
+         */
+        const val NAV_VARIANT_SELECTED = "nav_variant_selected"
     }
 
     /**
-     * Navigation A/B experiment (`nav_v2_arm`): today's drawer + chat-dock shell (control) vs the
-     * Todoist-style 4-tab shell with the chat behind a FAB (v2).
+     * Navigation shell events. Since 2026-08-03 the shell is a user SETTING, not an A/B arm
+     * (`docs/decisions/2026-08-03-shift-from-ai-first-to-checklist-first.md`): v2 (the Todoist-style
+     * 4-tab shell with the chat behind a FAB) is the default, v1 (drawer + chat dock) is opt-in.
      *
      * Every event here is segmented by the sticky [AnalyticsParams.NAV_ARM] user property, which is
-     * set in BOTH arms — see [SHELL_SHOWN] for why that matters.
+     * set for BOTH shells — see [SHELL_SHOWN] for why that matters. It is now a *description of what
+     * rendered*, not an experiment dimension: any dashboard that treated it as an A/B split must be
+     * retired rather than reused, and a user who switches mid-session is attributed to whichever
+     * value the process mirrored first ([Settings.NAV_VARIANT_SELECTED] is what records the switch).
      *
      * ⚠️ Deliberately absent: a per-swipe event for the Inbox project pager.
      * `ObservableAnalyticsTracker` re-broadcasts every `event()` on a `MutableSharedFlow`
@@ -632,10 +646,14 @@ object AnalyticsEvents {
          * cautionary precedent is [Activation.FIRST_AI_CHECKLIST_CREATED], whose emit was reachable in
          * one arm only and therefore produced a fake lift for a month.
          *
-         * [AnalyticsParams.VARIANT] takes THREE values: `"control"`, `"v2"`, and `"unassigned"` for
-         * users Remote Config has not put in the experiment yet. They render the control shell as a
-         * fail-safe but carry no `nav_arm` user property, so counting them as control would pad the
-         * baseline with non-participants — **filter `variant != "unassigned"` before comparing arms.**
+         * [AnalyticsParams.VARIANT] takes TWO values: `"control"` and `"v2"`.
+         *
+         * It took a third, `"unassigned"`, while the shell was a Remote Config experiment: those users
+         * rendered the control shell as a fail-safe without being in the experiment, and analyses had
+         * to filter them out. Since 2026-08-04 the shell is a Settings choice, the resolver reads no
+         * Remote Config, and every user resolves to a concrete arm — so `"unassigned"` is no longer
+         * emitted. **A series spanning that date must treat its disappearance as a definition change,
+         * not as the population going to zero.**
          */
         const val SHELL_SHOWN = "nav_shell_shown"
 
@@ -697,8 +715,9 @@ object AnalyticsEvents {
         const val SYSTEM_CREATED = "inbox_system_created"
 
         /**
-         * A task was captured through the pinned quick-add row. Param: [AnalyticsParams.SOURCE] =
-         * "inbox" (the Inbox page) | "project" (a project page of the pager), so capture-into-inbox
+         * A task was captured through the quick-add dock. Param: [AnalyticsParams.SOURCE] =
+         * "inbox" (the Inbox page) | "project" (a project page of the pager) | "calendar" (the
+         * Calendar tab's capture, which always lands in the system Inbox), so capture-into-inbox
          * and quick-add-to-project stay distinguishable — they are different user intents.
          */
         const val QUICK_ADDED = "inbox_quick_added"
@@ -1062,11 +1081,23 @@ object AnalyticsScreens {
     const val SHARE = "share"
     const val UPDATE_FEED = "update_feed"
 
-    // ─── v2 navigation arm only ──────────────────────────────────────────────
-    // There is deliberately NO "projects" screen name: the v2 Projects tab renders the very same
-    // MainScreen and reports [MAIN], so the historical main-screen series stays ONE continuous,
-    // arm-comparable series. Inventing a second name would split it at the experiment start and
-    // make before/after impossible to read.
+    // ─── v2 navigation only ──────────────────────────────────────────────────
     const val INBOX = "inbox"
     const val OVERVIEW = "overview"
+
+    /**
+     * The v2 Projects tab.
+     *
+     * This name did NOT exist while the tab rendered `MainScreen`: reporting [MAIN] kept the
+     * historical main-screen series continuous and arm-comparable, and a second name would have
+     * split it at the experiment start. That reasoning expired on 2026-08-03 — the tab is now a
+     * different screen (a flat list, `AppNavRoute.Projects`) and [MAIN] is the classic layout's home
+     * screen. Filing both under one name would make "which of the two did the user actually see"
+     * unanswerable.
+     *
+     * ⚠️ The `main` series therefore CHANGES MEANING from the release that ships this: before it was
+     * "home screen OR v2 projects tab", after it is "home screen on the classic layout only". Any
+     * before/after read across that boundary must add the two names together.
+     */
+    const val PROJECTS = "projects"
 }

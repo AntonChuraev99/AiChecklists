@@ -1,290 +1,293 @@
 package com.antonchuraev.homesearchchecklist.feature.user.domain.experiment
 
+import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.NavVariant
 import com.antonchuraev.homesearchchecklist.core.datastore.api.NavExperimentPrefsRepository
-import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDefaults
-import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigKeys
-import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigProvider
-import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.GetNavVariantUseCase
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+/**
+ * Covers the resolver AFTER the 2026-08-03 direction change: the navigation shell is a persisted
+ * USER SETTING, not a Remote Config A/B arm
+ * (`docs/decisions/2026-08-03-shift-from-ai-first-to-checklist-first.md`).
+ *
+ * The previous suite tested the experiment machinery — the "empty RC value must never be persisted
+ * as control" invariant, the unassigned negative-cache backoff, and RC read counts. All three
+ * describe code that no longer exists; keeping them would have meant asserting on a mechanism the
+ * product deliberately removed.
+ */
 class NavExperimentResolverImplTest {
 
     // ---------------------------------------------------------------------
-    // The invariant this whole class exists to protect
+    // The invariant this class exists to protect
     // ---------------------------------------------------------------------
 
     /**
-     * The experiment-killing bug: SplashViewModel only awaits `fetchAndActivate()` for users who
-     * have not passed onboarding, so an existing user routinely reaches the shell with Remote
-     * Config still un-activated and `nav_v2_arm` empty. If that empty read were persisted as
-     * "control", the entire installed base would be pinned to control forever and the experiment
-     * would read 100/0.
+     * v2 is the product; v1 is the opt-out. An install that has never opened Settings must get v2.
+     *
+     * This inverts the old experiment default, and getting it wrong is silent: falling back to v1
+     * would ship the previous app to every user who never touched the switch, and nothing would
+     * fail — it would simply look like the redesign was never released.
      */
     @Test
-    fun ensureResolved_rcEmpty_returnsControlButPersistsNothing() = runTest {
-        val prefs = FakeNavPrefs()
-        val analytics = RecordingAnalytics()
-        val resolver = resolver(rcValue = "", prefs = prefs, analytics = analytics)
-
-        val arm = resolver.ensureResolved()
-
-        assertEquals(NavVariant.CONTROL, arm, "an unassigned arm must render the safe shell")
-        assertNull(prefs.stored, "an un-activated RC read must NEVER be persisted as control")
-        assertTrue(
-            analytics.userPropertyCalls.isEmpty(),
-            "unassigned users must carry no nav_arm — they are the rc-activation-gap population " +
-                "and must be excluded from the analysis, not counted as control",
-        )
-    }
-
-    /** An unassigned read must leave the resolver unresolved so a later call can still pick up the arm. */
-    @Test
-    fun ensureResolved_rcEmptyThenAssigned_picksUpTheArmOnRetry() = runTest {
-        val prefs = FakeNavPrefs()
-        val rc = MutableRemoteConfig(value = "")
-        val clock = FakeClock()
-        val resolver = NavExperimentResolverImpl(
-            getNavVariant = GetNavVariantUseCase(rc, NoOpLogger()),
-            prefs = prefs,
-            analytics = RecordingAnalytics(),
-            logger = NoOpLogger(),
-            nowMs = clock::now,
-        )
-
-        assertEquals(NavVariant.CONTROL, resolver.ensureResolved())
-        assertEquals(NavVariant.CONTROL, resolver.currentArm(), "must stay unresolved, not cached")
-
-        rc.value = "v2" // the fetch finally landed
-        clock.advance(NavExperimentResolverImpl.UNASSIGNED_BACKOFF_MS) // past the negative cache
+    fun ensureResolved_nothingStored_returnsV2() = runTest {
+        val resolver = resolver(prefs = FakeNavPrefs(stored = null))
 
         assertEquals(NavVariant.V2, resolver.ensureResolved())
-        assertEquals("v2", prefs.stored)
     }
 
-    // ---------------------------------------------------------------------
-    // Negative cache for the rc-activation-gap population
-    // ---------------------------------------------------------------------
-
-    /**
-     * An unassigned attempt must not be repeated on every call: for the ~35% of users whose Remote
-     * Config never activates, nothing is ever cached, so each call would otherwise pay a suspending
-     * DataStore read + an RC read forever.
-     */
+    /** Before resolution runs, the non-suspending read must also report v2 — not a flash of v1. */
     @Test
-    fun ensureResolved_unassigned_backsOffInsteadOfReAttemptingEveryCall() = runTest {
-        val prefs = FakeNavPrefs()
-        val rc = MutableRemoteConfig(value = "")
-        val clock = FakeClock()
-        val resolver = NavExperimentResolverImpl(
-            getNavVariant = GetNavVariantUseCase(rc, NoOpLogger()),
-            prefs = prefs,
-            analytics = RecordingAnalytics(),
-            logger = NoOpLogger(),
-            nowMs = clock::now,
-        )
+    fun currentArm_beforeResolution_returnsV2() {
+        val resolver = resolver(prefs = FakeNavPrefs(stored = null))
 
-        assertEquals(NavVariant.CONTROL, resolver.ensureResolved())
-        assertEquals(1, rc.readCount)
-        assertEquals(1, prefs.readCount)
-
-        // Three more calls inside the window — the shell still renders CONTROL, at zero I/O cost.
-        clock.advance(NavExperimentResolverImpl.UNASSIGNED_BACKOFF_MS - 1)
-        repeat(3) { assertEquals(NavVariant.CONTROL, resolver.ensureResolved()) }
-        assertEquals(1, rc.readCount, "calls inside the backoff window must not re-read Remote Config")
-        assertEquals(1, prefs.readCount, "calls inside the backoff window must not re-read DataStore")
-
-        // Nothing is persisted either way, so stickiness is unaffected by the backoff.
-        assertNull(prefs.stored, "the negative cache must never turn into a persisted control arm")
-
-        // Past the window the round-trip resumes.
-        clock.advance(1L)
-        assertEquals(NavVariant.CONTROL, resolver.ensureResolved())
-        assertEquals(2, rc.readCount, "the window must expire, not latch")
-    }
-
-    /**
-     * A backwards clock jump (NTP correction, user changing the date) must expire the window rather
-     * than pin it: a negative elapsed time satisfies a bare `elapsed < BACKOFF` test, which would
-     * freeze the resolver in the window until the clock caught back up.
-     */
-    @Test
-    fun ensureResolved_clockJumpsBackwards_expiresTheBackoffWindow() = runTest {
-        val rc = MutableRemoteConfig(value = "")
-        val clock = FakeClock(startAt = 10_000_000L)
-        val resolver = NavExperimentResolverImpl(
-            getNavVariant = GetNavVariantUseCase(rc, NoOpLogger()),
-            prefs = FakeNavPrefs(),
-            analytics = RecordingAnalytics(),
-            logger = NoOpLogger(),
-            nowMs = clock::now,
-        )
-
-        assertEquals(NavVariant.CONTROL, resolver.ensureResolved())
-        assertEquals(1, rc.readCount)
-
-        clock.advance(-5_000_000L) // clock corrected backwards
-        assertEquals(NavVariant.CONTROL, resolver.ensureResolved())
-        assertEquals(2, rc.readCount, "a backwards clock must not freeze the resolver in the window")
-    }
-
-    /**
-     * A console typo is a mistake, not an assignment. Caching or persisting it would make the
-     * mistake permanent for the install even after the console is fixed.
-     */
-    @Test
-    fun ensureResolved_unknownRcValue_returnsControlAndPersistsNothing() = runTest {
-        val prefs = FakeNavPrefs()
-        val resolver = resolver(rcValue = "V2_beta", prefs = prefs)
-
-        assertEquals(NavVariant.CONTROL, resolver.ensureResolved())
-        assertNull(prefs.stored)
-    }
-
-    // ---------------------------------------------------------------------
-    // Stickiness
-    // ---------------------------------------------------------------------
-
-    @Test
-    fun ensureResolved_assignedArm_isCachedPersistedAndMirroredOnce() = runTest {
-        val prefs = FakeNavPrefs()
-        val analytics = RecordingAnalytics()
-        val resolver = resolver(rcValue = "v2", prefs = prefs, analytics = analytics)
-
-        assertEquals(NavVariant.V2, resolver.ensureResolved())
-        assertEquals(NavVariant.V2, resolver.ensureResolved()) // idempotent re-entry
         assertEquals(NavVariant.V2, resolver.currentArm())
-
-        assertEquals("v2", prefs.stored)
-        assertEquals(1, prefs.writeCount, "a resolved arm must not be re-persisted on every call")
-        assertEquals(
-            listOf<Map<String, Any>>(mapOf("nav_arm" to "v2")),
-            analytics.userPropertyCalls,
-            "nav_arm must be set exactly once per process",
-        )
+        assertFalse(resolver.isArmAssigned(), "nothing has been read yet")
     }
 
-    /** Control is an arm too: without the property a breakdown compares treatment vs "undefined". */
     @Test
-    fun ensureResolved_controlArm_alsoMirrorsUserProperty() = runTest {
-        val analytics = RecordingAnalytics()
-        val prefs = FakeNavPrefs()
-        val resolver = resolver(rcValue = "control", prefs = prefs, analytics = analytics)
+    fun ensureResolved_storedControl_returnsControl() = runTest {
+        val resolver = resolver(prefs = FakeNavPrefs(stored = "control"))
 
         assertEquals(NavVariant.CONTROL, resolver.ensureResolved())
-        assertEquals("control", prefs.stored)
-        assertEquals(listOf<Map<String, Any>>(mapOf("nav_arm" to "control")), analytics.userPropertyCalls)
+    }
+
+    @Test
+    fun ensureResolved_storedV2_returnsV2() = runTest {
+        val resolver = resolver(prefs = FakeNavPrefs(stored = "v2"))
+
+        assertEquals(NavVariant.V2, resolver.ensureResolved())
     }
 
     /**
-     * Once persisted, Remote Config must never be consulted again — otherwise a mid-session
-     * `fetchAndActivate()` could swap the whole navigation shell out from under the user.
+     * A value written by a future version (or a corrupted one) must degrade to the DEFAULT, not to
+     * v1. Downgrading an unknown string to the old shell would turn any future rename of the wire
+     * value into a silent mass rollback.
      */
     @Test
-    fun ensureResolved_persistedArmWins_overADisagreeingRemoteConfig() = runTest {
-        val prefs = FakeNavPrefs(stored = "v2")
-        val rc = MutableRemoteConfig(value = "control") // console flipped after assignment
-        val resolver = NavExperimentResolverImpl(
-            getNavVariant = GetNavVariantUseCase(rc, NoOpLogger()),
-            prefs = prefs,
-            analytics = RecordingAnalytics(),
-            logger = NoOpLogger(),
-        )
+    fun ensureResolved_unknownStoredValue_fallsBackToDefault() = runTest {
+        val resolver = resolver(prefs = FakeNavPrefs(stored = "v3-experimental"))
 
         assertEquals(NavVariant.V2, resolver.ensureResolved())
-        assertEquals(0, rc.readCount, "a persisted arm must short-circuit the RC read entirely")
     }
 
-    /** A corrupted / future-version stored value must degrade to today's navigation. */
+    /**
+     * A BLANK stored value is "never chose", not "corrupt".
+     *
+     * The empty string is the prefs layer's own absent sentinel, so it can reach the resolver from any
+     * writer that clears the choice. Treating it as unrecognised resolved to the same variant but
+     * logged a corruption warning on every launch of an install that had simply never opened Settings
+     * — noise that would bury a real corrupt value when one shows up.
+     */
     @Test
-    fun ensureResolved_corruptedPersistedArm_readsAsControl() = runTest {
-        val resolver = resolver(rcValue = "v2", prefs = FakeNavPrefs(stored = "v3_unreleased"))
+    fun ensureResolved_blankStoredValue_isTreatedAsAbsent() = runTest {
+        val logger = RecordingLogger()
+        val resolver = resolver(prefs = FakeNavPrefs(stored = ""), logger = logger)
 
-        assertEquals(NavVariant.CONTROL, resolver.ensureResolved())
+        assertEquals(NavVariant.V2, resolver.ensureResolved())
+        assertTrue(logger.warnings.isEmpty(), "blank is absent, not corrupt: ${logger.warnings}")
+    }
+
+    /** DataStore being unreadable must not break navigation — it renders the default instead. */
+    @Test
+    fun ensureResolved_datastoreThrows_stillResolvesToDefault() = runTest {
+        val resolver = resolver(prefs = ThrowingNavPrefs())
+
+        assertEquals(NavVariant.V2, resolver.ensureResolved())
     }
 
     // ---------------------------------------------------------------------
-    // Never break navigation
+    // Caching
     // ---------------------------------------------------------------------
 
+    /**
+     * The stored value is read ONCE per process. Re-reading it would let a write from another screen
+     * swap the whole shell out from under a live screen — the failure mode the resolver is shaped
+     * to prevent.
+     */
     @Test
-    fun ensureResolved_datastoreThrows_stillResolvesFromRemoteConfig() = runTest {
-        val resolver = resolver(rcValue = "v2", prefs = ThrowingNavPrefs())
+    fun ensureResolved_calledRepeatedly_readsStorageOnce() = runTest {
+        val prefs = FakeNavPrefs(stored = "control")
+        val resolver = resolver(prefs = prefs)
 
-        assertEquals(
-            NavVariant.V2,
-            resolver.ensureResolved(),
-            "a broken DataStore must cost stickiness, never the shell",
-        )
+        repeat(5) { resolver.ensureResolved() }
+
+        assertEquals(1, prefs.readCount)
     }
 
     @Test
-    fun ensureResolved_analyticsThrows_stillResolvesAndRetriesTheProperty() = runTest {
-        val analytics = RecordingAnalytics(failTimes = 1)
-        val resolver = resolver(rcValue = "v2", analytics = analytics)
+    fun isArmAssigned_afterResolution_isTrue() = runTest {
+        val resolver = resolver(prefs = FakeNavPrefs(stored = null))
 
-        assertEquals(NavVariant.V2, resolver.ensureResolved())
-        // The guard is reset on failure (PushTimingResolver pattern), so a later pass retries.
         resolver.ensureResolved()
-        assertEquals(
-            listOf<Map<String, Any>>(mapOf("nav_arm" to "v2")),
-            analytics.userPropertyCalls,
-            "the retry must land exactly one successful nav_arm set",
-        )
+
+        assertTrue(resolver.isArmAssigned())
     }
 
     // ---------------------------------------------------------------------
-    // Regression guard on the client default
+    // setVariant — the Settings switch
     // ---------------------------------------------------------------------
 
-    /** If someone gives NAV_V2_ARM a non-empty client default, "not assigned" becomes unrepresentable. */
+    /**
+     * The switch must take effect for THIS process, not only after a restart: the cached value is
+     * what the shell reads on the next recomposition.
+     */
     @Test
-    fun clientDefaultForNavArm_staysEmpty() {
-        assertEquals(
-            "",
-            RemoteConfigDefaults.NAV_V2_ARM,
-            "a non-empty client default would enrol every un-fetched user into a real arm",
-        )
+    fun setVariant_updatesCacheAndPersists() = runTest {
+        val prefs = FakeNavPrefs(stored = null)
+        val resolver = resolver(prefs = prefs)
+        resolver.ensureResolved()
+
+        resolver.setVariant(NavVariant.CONTROL)
+
+        assertEquals(NavVariant.CONTROL, resolver.currentArm())
+        assertEquals("control", prefs.stored)
     }
 
-    // --- helpers / test doubles ---
+    @Test
+    fun setVariant_backToV2_persistsV2() = runTest {
+        val prefs = FakeNavPrefs(stored = "control")
+        val resolver = resolver(prefs = prefs)
+        resolver.ensureResolved()
+
+        resolver.setVariant(NavVariant.V2)
+
+        assertEquals(NavVariant.V2, resolver.currentArm())
+        assertEquals("v2", prefs.stored)
+    }
+
+    /**
+     * A failed write must not be reported as applied.
+     *
+     * The cache is what every caller reads back, so advancing it on a failed write would switch the
+     * shell now and lose the setting on the next launch — a change the user made, silently undone.
+     * Dropping it instead keeps `currentArm()` honest, which is how Settings knows to tell them.
+     */
+    @Test
+    fun setVariant_persistFails_doesNotApply() = runTest {
+        val resolver = resolver(prefs = ThrowingNavPrefs())
+        resolver.ensureResolved()
+
+        resolver.setVariant(NavVariant.CONTROL)
+
+        assertEquals(NavVariant.V2, resolver.currentArm())
+    }
+
+    /**
+     * The sticky `nav_arm` user property is written once per process and NOT re-written on toggle.
+     *
+     * A user who flips the switch a few times would otherwise emit a stream of contradictory
+     * property values, and every dashboard reading it would attribute their whole session to
+     * whichever write happened to land last. `Settings.NAV_VARIANT_SELECTED` is the event that
+     * records switches.
+     */
+    @Test
+    fun setVariant_doesNotRewriteStickyUserProperty() = runTest {
+        val analytics = RecordingAnalytics()
+        val resolver = resolver(prefs = FakeNavPrefs(stored = null), analytics = analytics)
+        resolver.ensureResolved()
+        assertEquals(1, analytics.userPropertyCalls.size)
+
+        resolver.setVariant(NavVariant.CONTROL)
+        resolver.setVariant(NavVariant.V2)
+
+        assertEquals(1, analytics.userPropertyCalls.size)
+    }
+
+    // ---------------------------------------------------------------------
+    // clearVariant — the debug screen's "remove override"
+    // ---------------------------------------------------------------------
+
+    /**
+     * Clearing must move BOTH layers, which is the whole reason it exists as a resolver call.
+     *
+     * The debug screen used to clear by writing DataStore itself; that left this cache still reporting
+     * the variant it had just deleted, so the Settings switch (which seeds from `currentArm()`) showed
+     * an override that was no longer stored.
+     */
+    @Test
+    fun clearVariant_clearsStorageAndResetsCacheToDefault() = runTest {
+        val prefs = FakeNavPrefs(stored = "control")
+        val resolver = resolver(prefs = prefs)
+        resolver.ensureResolved()
+        assertEquals(NavVariant.CONTROL, resolver.currentArm())
+
+        resolver.clearVariant()
+
+        assertEquals(NavVariant.V2, resolver.currentArm())
+        // The empty string, not a literal "v2": absence must read back as "never chose" so a later
+        // change of DEFAULT_VARIANT reaches installs that never made a choice.
+        assertEquals("", prefs.stored)
+    }
+
+    /** Same failure contract as setVariant: a write that does not land changes nothing. */
+    @Test
+    fun clearVariant_persistFails_leavesStoredChoiceInEffect() = runTest {
+        val prefs = FakeNavPrefs(stored = "control", writeFails = true)
+        val resolver = resolver(prefs = prefs)
+        resolver.ensureResolved()
+
+        resolver.clearVariant()
+
+        assertEquals(NavVariant.CONTROL, resolver.currentArm())
+        assertEquals("control", prefs.stored)
+    }
+
+    // ---------------------------------------------------------------------
+    // Analytics mirroring
+    // ---------------------------------------------------------------------
+
+    @Test
+    fun ensureResolved_mirrorsVariantIntoUserPropertyOnce() = runTest {
+        val analytics = RecordingAnalytics()
+        val resolver = resolver(prefs = FakeNavPrefs(stored = "control"), analytics = analytics)
+
+        repeat(3) { resolver.ensureResolved() }
+
+        assertEquals(1, analytics.userPropertyCalls.size)
+        assertEquals("control", analytics.userPropertyCalls.single()[AnalyticsParams.NAV_ARM])
+    }
+
+    /**
+     * The tracker may not be initialised on a very early call. A failed mirror must RESET the guard
+     * so a later pass retries — otherwise the property is lost for the whole process.
+     */
+    @Test
+    fun mirror_failsFirstTime_retriesOnNextCall() = runTest {
+        val analytics = RecordingAnalytics(failTimes = 1)
+        val resolver = resolver(prefs = FakeNavPrefs(stored = "v2"), analytics = analytics)
+
+        resolver.ensureResolved()
+        assertTrue(analytics.userPropertyCalls.isEmpty(), "first attempt threw")
+
+        resolver.ensureResolved()
+        assertEquals(1, analytics.userPropertyCalls.size)
+    }
+
+    // ---------------------------------------------------------------------
+    // Helpers
+    // ---------------------------------------------------------------------
 
     private fun resolver(
-        rcValue: String,
-        prefs: NavExperimentPrefsRepository = FakeNavPrefs(),
+        prefs: NavExperimentPrefsRepository,
         analytics: AnalyticsTracker = RecordingAnalytics(),
+        logger: AppLogger = NoOpLogger(),
     ) = NavExperimentResolverImpl(
-        getNavVariant = GetNavVariantUseCase(MutableRemoteConfig(rcValue), NoOpLogger()),
         prefs = prefs,
         analytics = analytics,
-        logger = NoOpLogger(),
+        logger = logger,
     )
 
-    private class MutableRemoteConfig(var value: String) : RemoteConfigProvider {
-        var readCount = 0
-            private set
-
-        override suspend fun fetchAndActivate(): Boolean = true
-        override fun getBoolean(key: String, defaultValue: Boolean): Boolean = defaultValue
-        override fun getLong(key: String, defaultValue: Long): Long = defaultValue
-        override fun getString(key: String, defaultValue: String): String =
-            if (key == RemoteConfigKeys.NAV_V2_ARM) {
-                readCount++
-                value
-            } else {
-                defaultValue
-            }
-    }
-
-    private class FakeNavPrefs(var stored: String? = null) : NavExperimentPrefsRepository {
-        var writeCount = 0
-            private set
+    private class FakeNavPrefs(
+        var stored: String? = null,
+        /** Reads still succeed — the case where a resolved install cannot persist a NEW choice. */
+        private val writeFails: Boolean = false,
+    ) : NavExperimentPrefsRepository {
         var readCount = 0
             private set
 
@@ -294,17 +297,8 @@ class NavExperimentResolverImplTest {
         }
 
         override suspend fun setNavArm(arm: String) {
-            writeCount++
+            if (writeFails) throw IllegalStateException("datastore read-only")
             stored = arm
-        }
-    }
-
-    /** Hand-cranked wall clock — the backoff is measured in real ms, which `runTest` does not move. */
-    private class FakeClock(startAt: Long = 1_000_000L) {
-        private var value = startAt
-        fun now(): Long = value
-        fun advance(byMs: Long) {
-            value += byMs
         }
     }
 
@@ -333,6 +327,19 @@ class NavExperimentResolverImplTest {
         override fun debug(tag: String, message: String) {}
         override fun info(tag: String, message: String) {}
         override fun warning(tag: String, message: String) {}
+        override fun error(tag: String, message: String, throwable: Throwable?) {}
+    }
+
+    /** Only warnings are collected — they are the corruption signal a blank value must not trip. */
+    private class RecordingLogger : AppLogger {
+        val warnings = mutableListOf<String>()
+
+        override fun debug(tag: String, message: String) {}
+        override fun info(tag: String, message: String) {}
+        override fun warning(tag: String, message: String) {
+            warnings += message
+        }
+
         override fun error(tag: String, message: String, throwable: Throwable?) {}
     }
 }

@@ -61,24 +61,11 @@ object RemoteConfigKeys {
     // A/B + plain EmptyState). Remotely toggleable so the whole bundle can be A/B-tested later.
     const val ACTIVATION_BUNDLE_V1 = "activation_bundle_v1"
 
-    // Todoist-style navigation A/B arm: "control" | "v2".
-    //   control — today's shell (drawer + chat dock), byte-identical behaviour.
-    //   v2      — 4-tab shell (Inbox / Calendar / Projects / Overview), chat behind a FAB.
-    //
-    // Empty means "RC has not assigned an arm yet" and is DELIBERATELY distinguishable from
-    // "control" — see RemoteConfigDefaults.NAV_V2_ARM.
-    //
-    // STRING, not Boolean, on purpose: FirebaseRemoteConfigProvider.getBoolean has no absent-key
-    // fallback (Firebase answers `false` for an unknown key and that `false` is returned as a
-    // legitimate value), so a boolean flag cannot express "not assigned". getString does apply
-    // `value.ifEmpty { defaultValue }`.
-    //
-    // Sticky per install: NavExperimentResolver persists the first non-empty arm and never
-    // re-reads RC afterwards, so a mid-session fetchAndActivate() can never swap the shell.
-    // The percent split is assigned in the Firebase RC CLIENT console template, NEVER hardcoded
-    // (PUSH_TIMING_ARM is the cautionary precedent: it exists in no template, so its "experiment"
-    // never actually ran).
-    const val NAV_V2_ARM = "nav_v2_arm"
+    // NOTE: `nav_v2_arm` was removed on 2026-08-04. Which navigation shell renders is a persisted
+    // USER SETTING now (Settings -> "Classic layout"), resolved by NavExperimentResolver, and Remote
+    // Config is not consulted at all — a console value must not be able to override a choice the user
+    // made. The parameter was never created in the Firebase console, so nothing in production depended
+    // on it. See `docs/decisions/2026-08-03-shift-from-ai-first-to-checklist-first.md`.
 }
 
 /**
@@ -155,19 +142,4 @@ object RemoteConfigDefaults {
     // slow-network cold start can never silently flip it off. Set to false in the Console to opt
     // a control cohort back into the legacy static-auto-create flow for the A/B comparison.
     const val ACTIVATION_BUNDLE_V1 = true
-
-    // Todoist-style navigation A/B arm.
-    //
-    // Empty client default is intentional, same rationale as [ONBOARDING] above: any non-empty
-    // value MUST come from Remote Config so we can distinguish "RC successfully returned an arm"
-    // from "fetch failed / experiment not assigned yet". Empty resolves to CONTROL inside
-    // GetNavVariantUseCase but is reported as `assigned = false`, which is what stops the
-    // resolver from PERSISTING the fallback.
-    //
-    // That distinction is load-bearing here in a way it is not for onboarding: SplashViewModel
-    // only awaits fetchAndActivate() for users who have not passed onboarding, so on a cold start
-    // an existing user reaches the shell with RC possibly still un-activated. Persisting the empty
-    // -> CONTROL fallback would pin the entire installed base to control forever and the
-    // experiment would read 100/0.
-    const val NAV_V2_ARM = ""
 }

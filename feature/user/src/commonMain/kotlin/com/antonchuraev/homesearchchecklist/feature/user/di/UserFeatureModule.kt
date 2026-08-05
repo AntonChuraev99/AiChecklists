@@ -9,7 +9,6 @@ import com.antonchuraev.homesearchchecklist.feature.user.domain.experiment.NavEx
 import com.antonchuraev.homesearchchecklist.feature.user.domain.repository.UserDataRepository
 import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.CompleteOnboardingUseCase
 import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.GetFirstChecklistVariantUseCase
-import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.GetNavVariantUseCase
 import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.GetOnboardingVariantUseCase
 import org.koin.core.qualifier.named
 import org.koin.dsl.bind
@@ -41,15 +40,12 @@ val userFeatureModule = module {
     }
     factory { GetFirstChecklistVariantUseCase(remoteConfigProvider = get(), logger = get()) }
 
-    factory { GetNavVariantUseCase(remoteConfigProvider = get(), logger = get()) }
-
     // `single`, not `factory`: the resolver's stickiness lives in per-process @Volatile fields
-    // (cached arm + "user property already mirrored" guard). A factory would hand out a fresh,
-    // amnesiac instance to every caller and re-read Remote Config on each navigation change —
-    // exactly the mid-session shell flip the design forbids.
+    // (cached variant + "user property already mirrored" guard). A factory would hand out a fresh,
+    // amnesiac instance to every caller and re-read DataStore on each navigation change — and, worse,
+    // a variant changed in Settings would not reach the instance the shell is reading.
     single<NavExperimentResolver> {
         NavExperimentResolverImpl(
-            getNavVariant = get(),
             prefs = get(),
             analytics = get(),
             logger = get(),

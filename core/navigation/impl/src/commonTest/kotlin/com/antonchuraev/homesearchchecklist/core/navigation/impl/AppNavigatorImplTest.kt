@@ -184,4 +184,147 @@ class AppNavigatorImplTest {
         assertEquals(55L, top.checklistId)
         assertEquals("item-abc", top.focusItemId)
     }
+
+    // ---------------------------------------------------------------------------
+    // Test 10: clearBackStack collapses onto the v2 root (Inbox), NOT onto Main
+    //
+    // The v2 shell's stack holds no Main at all. The Main-only search this replaced
+    // fell through to the seed branch and rewrote [0] to Main, so creating a
+    // checklist from a template rendered the v1 home screen inside the v2 chrome.
+    // ---------------------------------------------------------------------------
+
+    @Test
+    fun checklistDetail_clearBackStack_v2Stack_collapsesToInbox() {
+        val nav = AppNavigatorImpl()
+        // The stack the v2 shell builds: Inbox root, tab on top, then the create flow.
+        nav.backStack[0] = AppNavRoute.Inbox
+        nav.backStack.add(AppNavRoute.Projects)
+        nav.backStack.add(AppNavRoute.CreateChecklistRoute.Templates)
+        nav.backStack.add(AppNavRoute.CreateChecklistRoute.TemplatePreview("weekly"))
+
+        nav.navigateToChecklistDetail(checklistId = 7L, clearBackStack = true)
+
+        assertEquals(
+            listOf<NavKey>(AppNavRoute.Inbox, AppNavRoute.ChecklistDetail(7L)),
+            nav.backStack.toList(),
+        )
+    }
+
+    // ---------------------------------------------------------------------------
+    // Test 11: the v1 stack still collapses onto Main even with a Calendar entry
+    // above it — Calendar is a v2 tab AND a v1 drawer destination, and only the
+    // FIRST top-level route may win, or v1 would stop clearing to home.
+    // ---------------------------------------------------------------------------
+
+    @Test
+    fun fillDetail_clearBackStack_v1StackWithCalendar_stillCollapsesToMain() {
+        val nav = AppNavigatorImpl()
+        nav.navigateToMainScreen()
+        nav.navigateToCalendar()
+        nav.navigateToTemplatesScreen()
+
+        nav.navigateToFillDetail(fillId = 3L, clearBackStack = true)
+
+        assertEquals(
+            listOf<NavKey>(AppNavRoute.Splash, AppNavRoute.Main, AppNavRoute.FillDetail(3L)),
+            nav.backStack.toList(),
+        )
+    }
+
+    // ---------------------------------------------------------------------------
+    // Test 12: no top-level route in the stack (straight from onboarding) seeds the
+    // declared root — Main until the host declares otherwise, Inbox once it has.
+    // ---------------------------------------------------------------------------
+
+    @Test
+    fun checklistDetail_clearBackStack_noTopLevelRoute_seedsMainByDefault() {
+        val nav = AppNavigatorImpl()
+        nav.navigateToOnboarding()
+
+        nav.navigateToChecklistDetail(checklistId = 9L, clearBackStack = true)
+
+        assertEquals(
+            listOf<NavKey>(AppNavRoute.Main, AppNavRoute.ChecklistDetail(9L)),
+            nav.backStack.toList(),
+        )
+    }
+
+    @Test
+    fun checklistDetail_clearBackStack_noTopLevelRoute_honoursDeclaredRoot() {
+        val nav = AppNavigatorImpl()
+        nav.setDefaultRootRoute(AppNavRoute.Inbox)
+        nav.navigateToOnboarding()
+
+        nav.navigateToChecklistDetail(checklistId = 9L, clearBackStack = true)
+
+        assertEquals(
+            listOf<NavKey>(AppNavRoute.Inbox, AppNavRoute.ChecklistDetail(9L)),
+            nav.backStack.toList(),
+        )
+    }
+
+    // ---------------------------------------------------------------------------
+    // Test 13: the OTHER stack-clearing door — navigateToMainScreen(clearBackStack)
+    // must be root-agnostic too, or it reproduces the popToRootThenPush bug: deleting
+    // a checklist or finishing create/analyze rewrote [0] to Main and dropped the v2
+    // user onto the v1 home screen inside the v2 chrome.
+    // ---------------------------------------------------------------------------
+
+    @Test
+    fun navigateToMainScreen_clearBackStack_v2Stack_collapsesToInbox() {
+        val nav = AppNavigatorImpl()
+        nav.setDefaultRootRoute(AppNavRoute.Inbox)
+        // The stack the v2 shell builds: Inbox root, tab on top, then a pushed detail screen.
+        nav.backStack[0] = AppNavRoute.Inbox
+        nav.backStack.add(AppNavRoute.Projects)
+        nav.backStack.add(AppNavRoute.ChecklistDetail(11L))
+
+        nav.navigateToMainScreen(clearBackStack = true)
+
+        assertEquals(listOf<NavKey>(AppNavRoute.Inbox), nav.backStack.toList())
+    }
+
+    // ---------------------------------------------------------------------------
+    // Test 14: the v1 stack still collapses to exactly [Main] — Splash below it and a
+    // Calendar entry above it both go, because Calendar is a v2 tab AND a v1 drawer
+    // destination and only the FIRST top-level route may win.
+    // ---------------------------------------------------------------------------
+
+    @Test
+    fun navigateToMainScreen_clearBackStack_v1StackWithCalendar_leavesMainOnly() {
+        val nav = AppNavigatorImpl()
+        nav.navigateToMainScreen()
+        nav.navigateToCalendar()
+        nav.navigateToChecklistDetail(checklistId = 4L)
+
+        nav.navigateToMainScreen(clearBackStack = true)
+
+        assertEquals(listOf<NavKey>(AppNavRoute.Main), nav.backStack.toList())
+    }
+
+    // ---------------------------------------------------------------------------
+    // Test 15: rootless stack seeds the declared root. Splash-only is the cold-start
+    // shape (SplashViewModel calls this the moment onboarding is already passed), so
+    // the undeclared case must stay on Main — the arm is not latched that early.
+    // ---------------------------------------------------------------------------
+
+    @Test
+    fun navigateToMainScreen_clearBackStack_splashOnlyStack_landsOnMainByDefault() {
+        val nav = AppNavigatorImpl()
+
+        nav.navigateToMainScreen(clearBackStack = true)
+
+        assertEquals(listOf<NavKey>(AppNavRoute.Main), nav.backStack.toList())
+    }
+
+    @Test
+    fun navigateToMainScreen_clearBackStack_noTopLevelRoute_honoursDeclaredRoot() {
+        val nav = AppNavigatorImpl()
+        nav.setDefaultRootRoute(AppNavRoute.Inbox)
+        nav.navigateToOnboarding()
+
+        nav.navigateToMainScreen(clearBackStack = true)
+
+        assertEquals(listOf<NavKey>(AppNavRoute.Inbox), nav.backStack.toList())
+    }
 }

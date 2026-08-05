@@ -1,6 +1,5 @@
 package com.antonchuraev.homesearchchecklist.csat
 
-import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.datastore.api.AppDatastore
 import kotlinx.coroutines.CoroutineScope
@@ -111,22 +110,6 @@ class CsatManager(
         // the milestone/composite paths have no single source event, so they carry a synthetic label.
         private const val TRIGGER_CHECKLIST_MILESTONE = "checklist_milestone"
         private const val TRIGGER_REMINDER_COMPLETED = "reminder_completed"
-
-        /**
-         * Emits carrying `source = "inbox_tab"` are counted by ANALYTICS but never SCORED here.
-         *
-         * The v2 navigation arm's Inbox tab checks items and completes fills straight from the home
-         * screen, so the same user behaviour produces those events far more cheaply than in control
-         * (where the equivalent action lives one screen deeper). Scoring them would make the survey —
-         * and the Play in-app review that rides on it — fire at different rates in the two arms, so
-         * every CSAT/review number would stop being arm-comparable and the open CSAT dismiss-rate
-         * investigation would be reading a difference the experiment manufactured.
-         *
-         * The events themselves MUST keep flowing: dropping them was the opposite bug (the treatment
-         * arm's checks would be invisible and v2 would read as "users engage less"). So the split is
-         * exactly here — analytics sees them, the scored model does not.
-         */
-        private const val SOURCE_UNSCORED_INBOX_TAB = "inbox_tab"
 
         const val OUTCOME_SUBMITTED = "submitted"
         const val OUTCOME_DISMISSED = "dismissed"
@@ -252,18 +235,18 @@ class CsatManager(
      * event makes the survey due, or null otherwise. `internal` so unit tests drive scoring
      * deterministically without the analytics SharedFlow + a collector dispatcher in the way.
      *
-     * [params] are the emit's own analytics params. They are read for exactly one purpose — skipping
-     * surfaces that must not feed the scored model (see [SOURCE_UNSCORED_INBOX_TAB]). Defaulted to
-     * empty so every existing caller and test keeps its current behaviour verbatim.
+     * Scoring is surface-blind: the same event weighs the same wherever it was performed. Emits
+     * stamped `source = "inbox_tab"` used to be skipped outright, to keep the survey — and the Play
+     * in-app review riding on it — firing at comparable rates in the two navigation A/B arms. The
+     * Inbox is the default home for the whole user base now, so there is no second arm to protect
+     * and the skip only silenced `fill_completed` and the reminder composite on the app's PRIMARY
+     * surface, starving the survey for everyone.
+     *
+     * What keeps a survey from landing mid-capture is not that skip and must stay: no capture event
+     * carries weight. `inbox_quick_added` is not observed at all, and a bare `checklist_created`
+     * scores only at the 3rd/5th milestone — so the survey can still only come due on a completion.
      */
-    internal suspend fun processEvent(
-        eventName: String,
-        params: Map<String, Any> = emptyMap(),
-    ): String? {
-        // Checked BEFORE any scoring branch: an unscored surface must also not arm the reminder
-        // composite, or the next plain check anywhere in the app would inherit its window.
-        if (params[AnalyticsParams.SOURCE] == SOURCE_UNSCORED_INBOX_TAB) return null
-
+    internal suspend fun processEvent(eventName: String): String? {
         val weight = EVENT_WEIGHTS[eventName]
         return when {
             weight != null -> {
@@ -308,8 +291,7 @@ class CsatManager(
         val observable = analyticsTracker as? ObservableAnalyticsTracker ?: return
         scope.launch {
             observable.events.collect { event ->
-                // params are forwarded (not dropped) so processEvent can skip unscored surfaces.
-                val trigger = processEvent(event.name, event.params)
+                val trigger = processEvent(event.name)
                 if (trigger != null) onShouldShow(trigger, decayedScoreToday().roundToInt())
             }
         }

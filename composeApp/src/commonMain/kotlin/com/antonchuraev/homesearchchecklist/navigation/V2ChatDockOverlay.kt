@@ -44,6 +44,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.DockFu
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.GistiGlassChatDock
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiDockColor
 import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.rememberDockFullExpandState
+import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.CancellationException
@@ -233,6 +234,12 @@ fun V2ChatDockOverlay(
             bottomPadding = AppDimens.SpacingSm,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
+                // Capped BEFORE fillMaxWidth (a max after a fixed width is ignored): the dock is one
+                // line of input, and a desktop-class window stretched it across ~1000dp of pane,
+                // which is not a usable text field. Inert on Compact, where the window is narrower
+                // than the cap. The nav-strip sibling above stays full width on purpose — it exists
+                // to keep the whole gesture bar out of the scrim, not to match the dock's width.
+                .adaptiveContentWidth()
                 .fillMaxWidth()
                 .imePadding()
                 .navigationBarsPadding()

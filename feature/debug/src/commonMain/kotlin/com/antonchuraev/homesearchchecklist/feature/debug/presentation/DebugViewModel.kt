@@ -3,6 +3,8 @@ package com.antonchuraev.homesearchchecklist.feature.debug.presentation
 import androidx.lifecycle.viewModelScope
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
+import com.antonchuraev.homesearchchecklist.core.common.api.NavExperimentResolver
+import com.antonchuraev.homesearchchecklist.core.common.api.NavVariant
 import com.antonchuraev.homesearchchecklist.core.datastore.api.NavExperimentPrefsRepository
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
@@ -20,7 +22,9 @@ class DebugViewModel(
     private val appNavigator: AppNavigator,
     private val userDataRepository: UserDataRepository,
     private val checklistRepository: ChecklistRepository,
+    // Read-only here: the row must show what is PERSISTED, while the resolver below owns every write.
     private val navExperimentPrefs: NavExperimentPrefsRepository,
+    private val navVariantResolver: NavExperimentResolver,
     private val logger: AppLogger
 ) : AppViewModel<DebugScreenState, DebugScreenIntent, Nothing>() {
 
@@ -61,30 +65,52 @@ class DebugViewModel(
 
     /** Shows what will apply on the NEXT launch — the current process has already latched its arm. */
     private fun loadNavArm() {
-        viewModelScope.launch {
-            runCatching { navExperimentPrefs.getNavArm() }
-                .onSuccess { arm -> _screenState.value = _screenState.value.copy(navArm = arm) }
-                .onFailure { logger.error(TAG, "failed to read the persisted nav arm: ${it.message}", it) }
-        }
+        viewModelScope.launch { refreshNavArm() }
+    }
+
+    private suspend fun refreshNavArm() {
+        runCatching { navExperimentPrefs.getNavArm() }
+            .onSuccess { arm -> _screenState.value = _screenState.value.copy(navArm = arm) }
+            .onFailure { logger.error(TAG, "failed to read the persisted nav arm: ${it.message}", it) }
     }
 
     /**
-     * Forces the nav A/B arm, or clears the override when [arm] is null.
+     * Forces the navigation variant for this install, or clears the override when [arm] is null.
      *
-     * Writes the value the resolver consults BEFORE Remote Config, which is the only way to reach the
-     * v2 shell while no console parameter exists. The empty string is the repository's absent
-     * sentinel, so it is how the override is removed.
+     * Goes through [NavExperimentResolver] instead of writing DataStore directly. The resolver caches
+     * the variant for the process, so a direct write left the two disagreeing: storage held the forced
+     * value while the cache — which the Settings switch seeds from — still reported the old one. That
+     * also applies to CLEARING, which is why it is a resolver call and not a bare empty-string write.
+     *
+     * The mounted shell still changes on the next start: App.kt latches its shell for the process so
+     * nothing can swap it under a live screen.
      */
     private fun setNavArm(arm: String?) {
         viewModelScope.launch {
-            runCatching { navExperimentPrefs.setNavArm(arm ?: "") }
-                .onSuccess { _screenState.value = _screenState.value.copy(navArm = arm) }
-                .onFailure { logger.error(TAG, "failed to write the nav arm '$arm': ${it.message}", it) }
+            // Persisted wire values, not user-facing copy — these are what the debug rows send (see
+            // DebugScreen). Anything unrecognised clears rather than guessing a variant.
+            val variant = when (arm) {
+                ARM_CONTROL -> NavVariant.CONTROL
+                ARM_V2 -> NavVariant.V2
+                else -> null
+            }
+            // Not wrapped: the resolver never throws and logs its own failures (see its KDoc), and a
+            // runCatching here would swallow coroutine cancellation with them.
+            if (variant == null) {
+                navVariantResolver.clearVariant()
+            } else {
+                navVariantResolver.setVariant(variant)
+            }
+            // Read back instead of echoing the request — the resolver DROPS a write that did not
+            // land, so this row would otherwise show an override that was never stored.
+            refreshNavArm()
         }
     }
 
     private companion object {
         private const val TAG = "DebugViewModel"
+        private const val ARM_CONTROL = "control"
+        private const val ARM_V2 = "v2"
     }
 
     private fun resetOnboarding() {

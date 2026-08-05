@@ -41,6 +41,18 @@ class AppNavigatorImpl : AppNavigator {
     private val _events = MutableSharedFlow<AppNavEvent>(replay = 0, extraBufferCapacity = 1)
     override val events: SharedFlow<AppNavEvent> = _events.asSharedFlow()
 
+    /**
+     * Root the stack-clearing helpers ([popToRootThenPush], [navigateToMainScreen]) rebuild the
+     * stack around when they find no top-level route to collapse onto. Seeded with the control arm's
+     * root so an unset value behaves exactly as this class did before the contract existed; the v2
+     * shell overrides it via [setDefaultRootRoute].
+     */
+    private var defaultRootRoute: AppNavRoute = AppNavRoute.Main
+
+    override fun setDefaultRootRoute(route: AppNavRoute) {
+        defaultRootRoute = route
+    }
+
     override fun showWidgetInstruction() {
         _events.tryEmit(AppNavEvent.ShowWidgetInstruction)
     }
@@ -72,7 +84,18 @@ class AppNavigatorImpl : AppNavigator {
 
     override fun navigateToMainScreen(clearBackStack: Boolean) {
         if (clearBackStack) {
-            replaceStack(AppNavRoute.Main)
+            // "Main screen" means the SHELL'S HOME, not literally [AppNavRoute.Main]: the v2 shell is
+            // rooted at [AppNavRoute.Inbox] and holds no Main at all. Replacing the stack with Main
+            // unconditionally reproduced the bug [popToRootThenPush] was fixed for through a second
+            // door — deleting a checklist, or finishing create/analyze, rewrote `[0]` to the v1 home
+            // screen rendered inside the v2 chrome with the tab state gone. Collapse onto the root the
+            // stack already has instead; the v1 stack still ends up as exactly [Main] because Main is
+            // the only top-level route it ever contains at index 0.
+            //
+            // No top-level route at all (splash/onboarding replaced the stack with their own single
+            // entry) falls back to the host-declared root, which is [AppNavRoute.Main] until the shell
+            // latches its arm — so the cold-start path lands exactly where it did before.
+            replaceStack(currentRootRoute() ?: defaultRootRoute)
         } else {
             backStack.add(AppNavRoute.Main)
         }
@@ -110,7 +133,7 @@ class AppNavigatorImpl : AppNavigator {
     ) {
         val route = AppNavRoute.ChecklistDetail(checklistId, focusItemId)
         if (clearBackStack) {
-            popToMainThenPush(route)
+            popToRootThenPush(route)
         } else {
             backStack.add(route)
         }
@@ -124,7 +147,7 @@ class AppNavigatorImpl : AppNavigator {
     override fun navigateToFillDetail(fillId: Long, clearBackStack: Boolean) {
         val route = AppNavRoute.FillDetail(fillId)
         if (clearBackStack) {
-            popToMainThenPush(route)
+            popToRootThenPush(route)
         } else {
             backStack.add(route)
         }
@@ -139,7 +162,10 @@ class AppNavigatorImpl : AppNavigator {
 
     override fun navigateToSubscriptionStatus(showSuccessMessage: Boolean) {
         backStack.removeAll { it is AppNavRoute.Paywall }
-        if (backStack.isEmpty()) backStack.add(AppNavRoute.Main)
+        // Same reason the other stack-rebuilding paths are root-agnostic: seeding a literal Main here
+        // would put the v1 home screen under the v2 chrome. Degenerate branch (a stack of nothing but
+        // paywalls), kept because NavDisplay crashes on an empty stack.
+        if (backStack.isEmpty()) backStack.add(defaultRootRoute)
         backStack.add(AppNavRoute.SubscriptionStatus(showSuccessMessage))
     }
 
@@ -177,16 +203,51 @@ class AppNavigatorImpl : AppNavigator {
         while (backStack.size > 1) backStack.removeAt(backStack.size - 1)
     }
 
-    private fun popToMainThenPush(route: AppNavRoute) {
-        val mainIdx = backStack.indexOfFirst { it is AppNavRoute.Main }
-        if (mainIdx >= 0) {
-            while (backStack.size > mainIdx + 1) backStack.removeAt(backStack.size - 1)
+    /**
+     * Routes that can be the stack's ROOT: the v1 shell's [AppNavRoute.Main] and the four v2 shell
+     * tabs. Membership, not position — [popToRootThenPush] takes the first match, and in both shells
+     * that first match IS the root (v1 roots at Main, v2 at Inbox, and every other entry here is
+     * pushed on top of one of those).
+     */
+    private fun NavKey.isTopLevelRoot(): Boolean =
+        this is AppNavRoute.Main ||
+            this is AppNavRoute.Inbox ||
+            this is AppNavRoute.Projects ||
+            this is AppNavRoute.Calendar ||
+            this is AppNavRoute.Overview
+
+    /**
+     * The top-level route the stack is currently rooted at, or null when it holds none — e.g. right
+     * after splash/onboarding, which replaced the stack with their own single entry.
+     *
+     * Takes the FIRST match for the same reason [popToRootThenPush] does: [AppNavRoute.Calendar] is a
+     * v2 tab AND a v1 drawer destination, so a later match could be a v1 stack's Calendar sitting on
+     * top of Main. The cast never fails — every branch of [isTopLevelRoot] is an [AppNavRoute].
+     */
+    private fun currentRootRoute(): AppNavRoute? =
+        backStack.firstOrNull { it.isTopLevelRoot() } as? AppNavRoute
+
+    /**
+     * Pop everything above the stack's top-level root, then push [route].
+     *
+     * Matches ANY top-level root, not [AppNavRoute.Main] alone. The v2 shell's stack is rooted at
+     * [AppNavRoute.Inbox] and contains no Main at all, so a Main-only search fell through to the
+     * else-branch and REWROTE `[0]` to Main: creating a checklist from a template dropped the user
+     * onto the v1 home screen rendered inside the v2 chrome, tab state gone, and BACK left them
+     * there. Main is index 0 whenever it is present, so the v1 shell still collapses onto exactly
+     * the entry it did before.
+     */
+    private fun popToRootThenPush(route: AppNavRoute) {
+        val rootIdx = backStack.indexOfFirst { it.isTopLevelRoot() }
+        if (rootIdx >= 0) {
+            while (backStack.size > rootIdx + 1) backStack.removeAt(backStack.size - 1)
         } else {
-            // No Main in the stack — e.g. arriving straight from onboarding/splash, which replaced
-            // the stack with the onboarding route. Seed Main as the ROOT under the pushed route so
-            // back/Up from it lands on home instead of dead-ending: with a single-entry stack onBack
-            // is a no-op (NavDisplay must stay non-empty), which is the "back does nothing" bug.
-            backStack[0] = AppNavRoute.Main
+            // No top-level route in the stack — e.g. arriving straight from onboarding/splash, which
+            // replaced the stack with the onboarding route. Seed the shell's root under the pushed
+            // route so back/Up from it lands on home instead of dead-ending: with a single-entry
+            // stack onBack is a no-op (NavDisplay must stay non-empty), which is the "back does
+            // nothing" bug.
+            backStack[0] = defaultRootRoute
             while (backStack.size > 1) backStack.removeAt(backStack.size - 1)
             backStack.add(route)
             return

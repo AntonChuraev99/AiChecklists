@@ -26,15 +26,22 @@ import org.koin.compose.koinInject
  *
  * ## Why it re-hosts [AppNavigationDrawerContent] instead of reimplementing it
  * The drawer content is already a fully parameterised public composable with no drawer-specific
- * dependency — it only needs callbacks. Copying its ~200 lines would guarantee drift: the next menu
- * item added to the drawer would silently be missing from the Overview tab (or vice versa), and in
- * an A/B test that reads as "the v2 arm lost a feature". Reuse makes that impossible. The file is
- * deliberately NOT modified — the control arm renders the very same composable.
+ * dependency — it only needs callbacks. Copying its ~500 lines would guarantee drift: the next menu
+ * item added to the drawer would silently be missing from the Overview tab (or vice versa), which
+ * reads as "v2 lost a feature". Reuse makes that impossible.
  *
- * Note that its Home row emits [DrawerDestination.Main]; App.kt routes that — and Calendar — through
- * the v2 TAB router rather than the v1 drawer router, because the v1 Main branch only pops to an
- * existing `AppNavRoute.Main` and never pushes (in v2 the stack here is always [Inbox, Overview], so
- * "Home" would silently do nothing). "Home" and "Projects" are the same destination in this arm.
+ * The shared file carries exactly two v2 accommodations, both opt-in and both defaulted to the
+ * classic layout's previous behaviour: `bottomContentPadding` (scroll room under the bottom bar) and
+ * `hiddenDestinationIds` (below). Anything beyond that belongs here, not there.
+ *
+ * ## What this tab deliberately does NOT list
+ * Projects and Calendar. Both are tabs in the bottom bar, so a row here would be a second door to a
+ * room the user is already standing next to — and it made Overview read as a rival navigation
+ * surface. Todoist's Overview links to no other tab either
+ * (`docs/reference/todoist-ui-reference/06-overview-settings-and-projects.png`).
+ *
+ * The rows still exist for the classic layout, where this content IS the navigation; they are
+ * filtered out here, not deleted.
  *
  * @param contentBottomPadding inset reserved for the Compact bottom bar + chat FAB
  *   ([V2ShellMetrics.ContentBottomPadding]); `0.dp` on Medium/Expanded, which have no bottom bar.
@@ -74,6 +81,13 @@ fun OverviewScreen(
                 // would shrink its viewport and leave a dead band instead of letting the footer
                 // scroll clear of the bottom bar and the chat FAB.
                 bottomContentPadding = contentBottomPadding,
+                // Projects and Calendar are one tap away in the bottom bar; repeating them here put
+                // two doors on one room and made this tab read as a second navigation surface
+                // competing with the bar. Todoist's Overview links to no other tab at all.
+                //
+                // The rows are HIDDEN, not removed: the same composable still renders them in the
+                // classic layout, where it IS the navigation.
+                hiddenDestinationIds = setOf(DrawerDestination.Main, DrawerDestination.Calendar),
                 // No drawer item is "current" while the user is standing on the Overview tab —
                 // every row here is a push target, not the screen itself.
                 selectedItemId = "",

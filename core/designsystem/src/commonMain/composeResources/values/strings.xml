@@ -881,6 +881,9 @@
 
     <string name="settings_dynamic_color">Dynamic color</string>
     <string name="settings_dynamic_color_description">Use colors from your wallpaper (Android 12+)</string>
+    <!-- Opt-out back to the pre-2026-08-03 navigation. Names what returns, not just the mode. -->
+    <string name="settings_classic_navigation">Classic layout</string>
+    <string name="settings_classic_navigation_description">Side menu with the chat at the bottom, instead of the navigation tabs</string>
     <string name="settings_back">Back</string>
 
     <!-- Smart Add chip labels (TokenChipPreview) -->
@@ -1176,11 +1179,22 @@
 
     <!-- Today Screen -->
     <string name="today_title">Today</string>
-    <string name="today_empty_state_title">Nothing for today</string>
-    <string name="today_empty_state_description">Enjoy your day or create a new task</string>
-    <string name="today_all_done_title">All done for today</string>
-    <string name="today_all_done_description">Great job! You've completed everything scheduled for today.</string>
+    <!-- Empty states, Todoist's register: short, warm, and they name the next action now that this
+         screen can capture a task itself. Two descriptions because the body is shared by three hosts
+         and only the v2 Calendar tab carries a capture input — the classic shell's Calendar and the
+         standalone Today route have none, so there the wording must promise no input at all. -->
+    <string name="today_empty_state_title">All clear</string>
+    <string name="today_empty_state_description">Nothing is scheduled for today. Add a task below and it lands in your Inbox.</string>
+    <string name="today_empty_state_description_no_capture">Nothing is scheduled for today. Tasks with a reminder show up here.</string>
+    <string name="today_all_done_title">You're all done</string>
+    <string name="today_all_done_description">Everything scheduled for today is complete. Enjoy the rest of it.</string>
     <string name="today_no_checklists_description">Create your first checklist to get started.</string>
+    <!-- Quick capture on Today. The task goes to the Inbox WITHOUT a reminder, so the snackbar has to
+         say where it went — otherwise it would look like it vanished (this screen shows reminders
+         only, so a task with none is invisible here). -->
+    <string name="today_quick_add_placeholder">Add a task</string>
+    <string name="today_task_captured_message">Added to Inbox</string>
+    <string name="today_task_captured_action">Open</string>
     <string name="today_section_past_due">Past due</string>
     <string name="today_section_today">Today</string>
     <string name="today_open_menu">Open menu</string>
@@ -1583,6 +1597,47 @@
     <!-- Failure for the Inbox mutations with no message of their own: InboxViewModel.setTaskChecked
          and .toggleImportant. Without it the row just snaps back and the tap reads as ignored. -->
     <string name="inbox_task_update_failed">Couldn't update the task. Please try again.</string>
+
+    <!-- v2 toolbar. The tab row was removed: the title now names the page the pager is on, the
+         subtitle counts its OPEN tasks (Todoist's pattern), and the two trailing icons are the only
+         actions. App settings deliberately stay in the Overview tab, so this menu is checklist-scoped. -->
+    <plurals name="inbox_task_count">
+        <item quantity="one">%1$d task</item>
+        <item quantity="other">%1$d tasks</item>
+    </plurals>
+    <string name="inbox_display_options">Display options</string>
+    <string name="inbox_list_actions">Checklist actions</string>
+    <string name="inbox_menu_open_checklist">Open checklist</string>
+    <string name="checklist_rename">Rename</string>
+    <string name="checklist_rename_title">Rename checklist</string>
+    <!-- Own key rather than folder_name_placeholder: this dialog renames a checklist, and the folder
+         one has no Russian translation, so reusing it shipped English text to RU users. -->
+    <string name="checklist_name_placeholder">Enter a name</string>
+    <string name="inbox_checklist_deleted_message">Checklist deleted</string>
+    <string name="inbox_checklist_rename_failed">Couldn't rename the checklist. Please try again.</string>
+    <string name="inbox_checklist_delete_failed">Couldn't delete the checklist. Please try again.</string>
+
+    <!-- Display-options sheet. Every option applies on tap and persists; there is no confirm step. -->
+    <string name="inbox_display_title">Display</string>
+    <string name="inbox_display_layout">Layout</string>
+    <string name="inbox_display_layout_cards">Cards</string>
+    <string name="inbox_display_layout_compact">Compact</string>
+    <string name="inbox_display_show_completed">Completed tasks</string>
+    <string name="inbox_display_sort">Sort</string>
+    <string name="inbox_display_sort_manual">Manual</string>
+    <string name="inbox_display_sort_name">Name</string>
+    <string name="inbox_display_sort_priority">Importance</string>
+
+    <!-- Projects tab (v2). Flat list of checklists with the number of tasks left in each. -->
+    <string name="projects_title">Projects</string>
+    <string name="projects_add_checklist">New checklist</string>
+    <string name="projects_complete">All done</string>
+    <plurals name="projects_open_count">
+        <item quantity="one">%1$d left</item>
+        <item quantity="other">%1$d left</item>
+    </plurals>
+    <string name="projects_empty_title">No checklists yet</string>
+    <string name="projects_empty_description">Create one, or capture tasks in your Inbox and sort them into checklists later.</string>
 
     <!-- Debug-only: force the nav A/B arm on device. Writes the persisted arm the resolver reads
          FIRST, so an override survives a restart and does not need a Remote Config parameter. -->

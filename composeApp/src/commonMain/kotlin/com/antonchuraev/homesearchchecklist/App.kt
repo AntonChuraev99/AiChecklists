@@ -52,6 +52,7 @@ import com.antonchuraev.homesearchchecklist.core.common.api.NavVariant
 import com.antonchuraev.homesearchchecklist.desingsystem.adaptive.AppWindowSizeClass
 import com.antonchuraev.homesearchchecklist.desingsystem.adaptive.rememberAppWindowSizeClass
 import com.antonchuraev.homesearchchecklist.feature.home.presentation.inbox.InboxRoute
+import com.antonchuraev.homesearchchecklist.feature.home.presentation.projects.ProjectsRoute
 import com.antonchuraev.homesearchchecklist.navigation.OverviewScreen
 import com.antonchuraev.homesearchchecklist.navigation.V2ChatDockOverlay
 import com.antonchuraev.homesearchchecklist.navigation.V2Destination
@@ -85,6 +86,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -1118,7 +1120,8 @@ fun App() {
             // shell stays mounted (and the tab state alive) under a pushed detail screen.
             val v2AnyTabInStack = navigator.backStack.any { key ->
                 key is AppNavRoute.Inbox || key is AppNavRoute.Calendar ||
-                key is AppNavRoute.Main || key is AppNavRoute.Overview
+                key is AppNavRoute.Projects || key is AppNavRoute.Main ||
+                key is AppNavRoute.Overview
             }
 
             // findLast, not last: on Expanded two-pane a ChecklistDetail sits on top while Main still
@@ -1126,10 +1129,15 @@ fun App() {
             val v2SelectedTab = remember(navigator.backStack.toList()) {
                 val topTab = navigator.backStack.findLast { key ->
                     key is AppNavRoute.Inbox || key is AppNavRoute.Calendar ||
-                    key is AppNavRoute.Main || key is AppNavRoute.Overview
+                    key is AppNavRoute.Projects || key is AppNavRoute.Main ||
+                    key is AppNavRoute.Overview
                 }
                 when (topTab) {
                     is AppNavRoute.Calendar -> V2Destination.Calendar
+                    is AppNavRoute.Projects -> V2Destination.Projects
+                    // Main is still mapped to the Projects tab: a deep link that re-roots the stack
+                    // around Main (gallery link, weekly-checklist create) can land here in v2, and
+                    // leaving it unmatched would highlight "Inbox" while a different screen renders.
                     is AppNavRoute.Main -> V2Destination.Projects
                     is AppNavRoute.Overview -> V2Destination.Overview
                     else -> V2Destination.Inbox
@@ -1140,7 +1148,8 @@ fun App() {
             // must not float over ChecklistDetail / AiChat / Settings pushed on top of a tab.
             val v2BarVisible = navigator.backStack.lastOrNull().let { top ->
                 top is AppNavRoute.Inbox || top is AppNavRoute.Calendar ||
-                top is AppNavRoute.Main || top is AppNavRoute.Overview
+                top is AppNavRoute.Projects || top is AppNavRoute.Main ||
+                top is AppNavRoute.Overview
             }
 
             val showV2Shell = navVariant == NavVariant.V2 && v2AnyTabInStack
@@ -1160,6 +1169,10 @@ fun App() {
             // up — and the shell can only know that if the flag lives above both of them. Passing a
             // one-way "open" signal down instead would leave the "+" FAB floating over its own dock.
             var v2CreateDockOpen by remember { mutableStateOf(false) }
+            // Monotonic "go home" signal for the Inbox tab's pager. A counter rather than a Boolean:
+            // the screen reacts to a CHANGE of key, so a flag would have to be reset by the receiver
+            // and a second tap on the same tab would emit the same value and do nothing.
+            var v2InboxHomeSignal by remember { mutableIntStateOf(0) }
             // Any route change closes both docks — each is anchored to the screen it was opened over,
             // so carrying one onto the next screen leaves a stale context (a chat banner reading
             // "Ask about <list>", or a capture input aimed at a page that is no longer showing).
@@ -1190,11 +1203,11 @@ fun App() {
                 navVariant == NavVariant.V2 &&
                     rememberAppWindowSizeClass() == AppWindowSizeClass.Compact
             val v2FabBandPadding = if (v2IsCompact) V2ShellMetrics.FabBandPadding else 0.dp
-            // The Inbox is the one tab that shows BOTH FABs, so it is the one tab that has to clear a
-            // 132dp stack instead of a 64dp button. Kept as a second value rather than raising the
-            // shared one: applying the taller reserve everywhere would cut 68dp off the bottom of
-            // Calendar, Projects and Overview to clear a button they never render.
-            val v2InboxFabBandPadding =
+            // Inbox and Calendar show BOTH FABs, so they clear a 132dp stack instead of a 64dp button.
+            // Kept as a second value rather than raising the shared one: applying the taller reserve
+            // everywhere would cut 68dp off the bottom of Projects and Overview to clear a button
+            // they never render.
+            val v2FabStackBandPadding =
                 if (v2IsCompact) V2ShellMetrics.FabStackBandPadding else 0.dp
 
             // Re-root the stack at Inbox once per process, the first time a tab route appears.
@@ -1226,6 +1239,14 @@ fun App() {
             }
 
             val v2OnNavigate: (String) -> Unit = { dest ->
+                // Both docks close on a tab tap. LaunchedEffect(currentTopRoute) already does this for
+                // every route CHANGE, but a rail/drawer tab is reachable while a dock is open (the
+                // overlay no longer covers the chrome on Medium/Expanded), and tapping the tab you are
+                // already on changes no route at all — so without this the dock would survive the tap,
+                // anchored to a screen the user has just left.
+                v2ChatDockOpen = false
+                v2CreateDockOpen = false
+
                 // POP to the Inbox root, then push the tab — never a bare push. Every top-level nav
                 // helper in this app is pushLaunchSingleTop, so a bottom bar wired to them would grow
                 // the stack on each tap and Android BACK would walk the tab history instead of
@@ -1233,10 +1254,12 @@ fun App() {
                 // four tabs, and it keeps each tab exactly one entry deep.
                 val inboxIdx = navigator.backStack.indexOfFirst { it is AppNavRoute.Inbox }
                 if (inboxIdx < 0) {
-                    // The v2 root was displaced — navigateToChecklistDetail(clearBackStack = true)
-                    // (gallery deep link, weekly-checklist create) rebuilds the stack around Main via
-                    // popToMainThenPush. Re-root in place rather than trimming to a foreign [0], which
-                    // would leave "Inbox" selected while Main is on screen.
+                    // Recovery branch for a stack whose v2 root was displaced. popToRootThenPush now
+                    // collapses to whichever top-level route the stack already has, so the ordinary
+                    // create/deep-link paths keep Inbox — but a stack seeded before that (process
+                    // death restoring an older back stack, navigateToMainScreen(clearBackStack = true))
+                    // can still arrive here. Re-root in place rather than trimming to a foreign [0],
+                    // which would leave "Inbox" selected while Main is on screen.
                     navigator.backStack[0] = AppNavRoute.Inbox
                     while (navigator.backStack.size > 1) {
                         navigator.backStack.removeAt(navigator.backStack.size - 1)
@@ -1247,9 +1270,13 @@ fun App() {
                     }
                 }
                 when (dest) {
-                    V2Destination.Inbox -> Unit   // the root itself — popping above was the whole job
+                    // The root itself — popping above was most of the job, but the Inbox tab hosts a
+                    // PAGER whose page lives inside the screen and survives the pop. Without this
+                    // signal a tap on the tab named "Inbox" lands on whatever project page was open
+                    // last, and the only way back to the actual inbox is a swipe.
+                    V2Destination.Inbox -> v2InboxHomeSignal++
                     V2Destination.Calendar -> navigator.backStack.add(AppNavRoute.Calendar)
-                    V2Destination.Projects -> navigator.backStack.add(AppNavRoute.Main)
+                    V2Destination.Projects -> navigator.backStack.add(AppNavRoute.Projects)
                     V2Destination.Overview -> navigator.backStack.add(AppNavRoute.Overview)
                 }
                 analyticsTracker.event(
@@ -1277,19 +1304,23 @@ fun App() {
                     navVariant = arm
                     armLatched = true
                     shellEventSent = true
-                    // Three values, not two. A user Remote Config has not assigned an arm to renders
-                    // the CONTROL shell as a fail-safe but is NOT in the experiment — they carry no
-                    // nav_arm user property by design. Filing them under "control" would pad the
-                    // baseline's exposure denominator with non-participants (the rc-activation gap is
-                    // ~35% of new users here), deflating every rate the treatment is measured against.
+                    // Tell the navigator which route to seed when it has to rebuild a stack that holds
+                    // no top-level route at all (arriving straight from splash/onboarding). Without it
+                    // the navigator falls back to Main, i.e. the classic home screen, and a v2 user who
+                    // creates a checklist from onboarding lands in the wrong shell's home.
+                    navigator.setDefaultRootRoute(
+                        if (arm == NavVariant.V2) AppNavRoute.Inbox else AppNavRoute.Main
+                    )
+                    // TWO values since 2026-08-04, not three. The third ("unassigned") described a user
+                    // Remote Config had not assigned an arm to; the resolver no longer reads Remote
+                    // Config at all — ensureResolved() always returns a concrete arm — so that branch
+                    // became unreachable and is gone rather than left to imply a population that no
+                    // longer exists. Analyses filtering on variant="unassigned" will now find nothing,
+                    // which is the truth: everyone is in one of the two shells.
                     analyticsTracker.event(
                         AnalyticsEvents.Nav.SHELL_SHOWN,
                         mapOf(
-                            AnalyticsParams.VARIANT to when {
-                                !navResolver.isArmAssigned() -> "unassigned"
-                                arm == NavVariant.V2 -> "v2"
-                                else -> "control"
-                            }
+                            AnalyticsParams.VARIANT to if (arm == NavVariant.V2) "v2" else "control"
                         ),
                     )
                 }
@@ -1919,6 +1950,35 @@ fun App() {
                     entry<AppNavRoute.Settings> {
                         SettingsScreen(
                             onBackClick = { navigator.onBack() },
+                            // The user switched shells. Re-root immediately rather than waiting for
+                            // a restart: the two shells own DIFFERENT stacks (v2 roots at Inbox, v1
+                            // at Main), so leaving the old one in place would render a shell whose
+                            // routes the other shell's chrome cannot address — and on v2→v1 the
+                            // Inbox entry has no place in the v1 drawer at all.
+                            //
+                            // A root REPLACEMENT, not a push: anything left underneath would be
+                            // reachable by BACK into a shell that no longer exists.
+                            onNavigationVariantChanged = {
+                                val variant = navResolver.currentArm()
+                                navVariant = variant
+                                // The v2 re-root effect is one-shot per process; without this reset
+                                // a v1→v2 switch would leave the stack rooted at Main and the Inbox
+                                // tab unreachable until the next cold start.
+                                v2RootApplied = false
+
+                                // Write [0] FIRST and only then trim, never clear()+add():
+                                // NavDisplay requires a non-empty stack at ALL times, not just at
+                                // first composition (same constraint AppNavigatorImpl.replaceStack
+                                // works around).
+                                navigator.backStack[0] = if (variant == NavVariant.V2) {
+                                    AppNavRoute.Inbox
+                                } else {
+                                    AppNavRoute.Main
+                                }
+                                while (navigator.backStack.size > 1) {
+                                    navigator.backStack.removeAt(navigator.backStack.lastIndex)
+                                }
+                            },
                             drawerState = drawerState,
                         )
                     }
@@ -1967,7 +2027,18 @@ fun App() {
                             drawerState = drawerState,
                             onCreateChecklistClick = { navigator.navigateToCreateChecklistScreen() },
                             // 0.dp in control — Calendar's inner lists keep their current insets there.
-                            contentBottomPadding = v2FabBandPadding,
+                            // The taller stack reserve in v2: this tab now renders the "+" FAB too.
+                            contentBottomPadding = v2FabStackBandPadding,
+                            // Shares ONE flag with the Inbox dock rather than owning a second: only one
+                            // tab is on screen at a time, and two flags would let a dock opened on
+                            // Inbox stay latched open behind the Calendar tab.
+                            captureDockOpen = v2CreateDockOpen,
+                            onCaptureDockDismiss = { v2CreateDockOpen = false },
+                            // Selects the empty-state copy. Only this host renders a "+" FAB, so only
+                            // here may the text tell the user to add a task — the classic shell's
+                            // Calendar and the standalone Today route have no capture affordance and
+                            // get the neutral wording.
+                            captureEnabled = navVariant == NavVariant.V2,
                         )
                     }
 
@@ -1984,7 +2055,7 @@ fun App() {
                         )
                     ) {
                         InboxRoute(
-                            contentBottomPadding = v2InboxFabBandPadding,
+                            contentBottomPadding = v2FabStackBandPadding,
                             // Raised by the shell's "+" FAB, cleared on dismiss. Owned by App so the
                             // shell can hide its FABs while the dock is up (see fabsVisible).
                             createDockOpen = v2CreateDockOpen,
@@ -1995,7 +2066,16 @@ fun App() {
                             // so an always-on handler makes BACK dead instead of dismissing the detail
                             // pane. backStack is a SnapshotStateList, so this re-evaluates on push/pop.
                             swallowRootBack = navigator.backStack.lastOrNull() is AppNavRoute.Inbox,
+                            homeSignal = v2InboxHomeSignal,
                         )
+                    }
+
+                    entry<AppNavRoute.Projects>(
+                        metadata = ListDetailSceneStrategy.listPane(
+                            detailPlaceholder = { EmptyDetailPlaceholder() }
+                        )
+                    ) {
+                        ProjectsRoute(contentBottomPadding = v2FabBandPadding)
                     }
 
                     entry<AppNavRoute.Overview> {
@@ -2101,10 +2181,11 @@ fun App() {
                         v2CreateDockOpen = false
                         v2ChatDockOpen = true
                     },
-                    // The "+" FAB only exists where there is a task list to add to: the Inbox tab and
-                    // its project pages. On Calendar / Overview / Projects it would be an affordance
-                    // with no target — a create button that has to ask "into what?" is a worse
-                    // entry point than no button.
+                    // The "+" FAB exists where a capture has an unambiguous target: the Inbox tab (the
+                    // visible page) and the Calendar tab (the system Inbox, with a snackbar naming
+                    // where it landed). On Overview / Projects it would be an affordance with no
+                    // target — a create button that has to ask "into what?" is a worse entry point
+                    // than no button.
                     //
                     // v2BarVisible is part of the condition, not decoration. v2SelectedTab is computed
                     // with findLast, so it still reads Inbox while a ChecklistDetail or Settings sits
@@ -2113,7 +2194,10 @@ fun App() {
                     // shell hides all chrome on those routes anyway; the rail and the drawer do not,
                     // so there the button rendered, was tapped, and NOTHING happened — no dock, no
                     // message, no log. Feedback on every user action is a project invariant.
-                    showCreateFab = v2SelectedTab == V2Destination.Inbox && v2BarVisible,
+                    showCreateFab = (
+                        v2SelectedTab == V2Destination.Inbox ||
+                            v2SelectedTab == V2Destination.Calendar
+                        ) && v2BarVisible,
                     onOpenCreate = {
                         analyticsTracker.event(
                             AnalyticsEvents.Nav.CREATE_FAB_TAPPED,

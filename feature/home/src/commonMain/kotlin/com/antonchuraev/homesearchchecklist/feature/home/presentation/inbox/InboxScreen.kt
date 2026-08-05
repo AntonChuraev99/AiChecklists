@@ -1,11 +1,26 @@
 package com.antonchuraev.homesearchchecklist.feature.home.presentation.inbox
 
 import aichecklists.core.designsystem.generated.resources.Res
+import aichecklists.core.designsystem.generated.resources.cancel
+import aichecklists.core.designsystem.generated.resources.checklist_delete_message
+import aichecklists.core.designsystem.generated.resources.checklist_delete_title
+import aichecklists.core.designsystem.generated.resources.checklist_name_placeholder
+import aichecklists.core.designsystem.generated.resources.checklist_rename
+import aichecklists.core.designsystem.generated.resources.checklist_rename_title
+import aichecklists.core.designsystem.generated.resources.delete
+import aichecklists.core.designsystem.generated.resources.delete_checklist
+import aichecklists.core.designsystem.generated.resources.inbox_display_options
 import aichecklists.core.designsystem.generated.resources.inbox_empty_description
 import aichecklists.core.designsystem.generated.resources.inbox_empty_title
+import aichecklists.core.designsystem.generated.resources.inbox_list_actions
+import aichecklists.core.designsystem.generated.resources.inbox_menu_open_checklist
 import aichecklists.core.designsystem.generated.resources.inbox_project_empty_description
 import aichecklists.core.designsystem.generated.resources.inbox_quick_add_placeholder
+import aichecklists.core.designsystem.generated.resources.inbox_task_count
 import aichecklists.core.designsystem.generated.resources.inbox_title
+import aichecklists.core.designsystem.generated.resources.save
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -21,30 +36,40 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.ChecklistRtl
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Inbox
+import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.VerticalDivider
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -54,11 +79,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -68,28 +94,31 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsScreens
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
-import com.antonchuraev.homesearchchecklist.desingsystem.components.AddItemInputField
+import com.antonchuraev.homesearchchecklist.core.datastore.api.InboxLayout
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCardDefaults
+import com.antonchuraev.homesearchchecklist.desingsystem.components.AppTextField
 import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
 import com.antonchuraev.homesearchchecklist.desingsystem.components.PlatformBackHandler
-import com.antonchuraev.homesearchchecklist.desingsystem.components.gisti.gistiDockColor
+import com.antonchuraev.homesearchchecklist.desingsystem.components.QuickCaptureDock
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 
 /**
  * The v2 Inbox tab — quick capture first, triage later.
  *
- * Layout, top to bottom: a scrollable tab row (Inbox + every project), a [HorizontalPager] of task
- * lists, and — only while [createDockOpen] — a capture dock over the bottom edge. Because that dock
- * targets whichever page is showing, one control is both "capture into the Inbox" and "quick-add to
- * this project".
+ * Layout, top to bottom: a position indicator ([InboxPagerDots]), a [HorizontalPager] of task lists,
+ * and — only while [createDockOpen] — a capture dock over the bottom edge. Because that dock targets
+ * whichever page is showing, one control is both "capture into the Inbox" and "quick-add to this
+ * project".
  *
- * The tab row is *scrollable* (unlike CalendarScreen's fixed two-tab `PrimaryTabRow`) because the
- * project count is unbounded — a fixed row would squeeze 12 projects into unreadable slivers.
+ * The indicator *scrolls* (unlike CalendarScreen's fixed two-tab `PrimaryTabRow`) because the project
+ * count is unbounded — a fixed row collapses its overflow to zero width instead of shrinking, see
+ * [InboxPagerDots]. The pill row it replaced was scrollable for the same reason.
  *
  * ## Why capture is behind a FAB now
  * The row used to be PINNED — always visible above the bottom bar. It moved behind the shell's "+"
@@ -125,6 +154,7 @@ fun InboxScreen(
     // failure this arm already shipped once on the rail. Make the compiler ask.
     createDockOpen: Boolean,
     onCreateDockDismiss: () -> Unit,
+    homeSignal: Int = 0,
 ) {
     val analyticsTracker: AnalyticsTracker = koinInject()
     LaunchedEffect(Unit) { analyticsTracker.screenView(AnalyticsScreens.INBOX) }
@@ -149,8 +179,35 @@ fun InboxScreen(
 
     val content = state as? InboxScreenState.Content
 
+    // The toolbar names the page the pager is on — this is what replaced the tab row. Read from the
+    // ViewModel's settled index rather than from the pager, because the bar lives OUTSIDE the pager's
+    // composable and hoisting the pager state up here would recompose the whole scaffold on every
+    // frame of a swipe.
+    val currentPage = content?.pages?.getOrNull(content.selectedPage)
+
     AppScaffold(
-        title = stringResource(Res.string.inbox_title),
+        title = currentPage?.title ?: stringResource(Res.string.inbox_title),
+        // Open tasks only, matching Todoist: a count that includes finished ones answers a question
+        // nobody asked ("how much have I ever put here") instead of "how much is left".
+        subtitle = currentPage?.let { page ->
+            pluralStringResource(
+                Res.plurals.inbox_task_count,
+                page.tasks.count { !it.checked },
+                page.tasks.count { !it.checked },
+            )
+        },
+        startAlignedTitle = true,
+        actions = {
+            if (content != null) {
+                InboxToolbarActions(
+                    // The system Inbox has no rename/delete, so it gets no overflow at all rather
+                    // than an overflow of disabled rows.
+                    showListMenu = currentPage?.isInbox == false,
+                    listMenuOpen = content.listMenuOpen,
+                    onIntent = onIntent,
+                )
+            }
+        },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         // The capture dock lives in the bottomBar SLOT, not inside the content.
         //
@@ -168,10 +225,11 @@ fun InboxScreen(
         bottomBar = {
             val pages = content?.pages
             if (createDockOpen && content != null && !pages.isNullOrEmpty()) {
-                InboxCaptureDock(
+                QuickCaptureDock(
                     text = content.quickAddText,
                     onTextChange = { onIntent(InboxIntent.OnQuickAddTextChanged(it)) },
                     onAdd = { onIntent(InboxIntent.OnQuickAddSubmit) },
+                    placeholder = stringResource(Res.string.inbox_quick_add_placeholder),
                 )
             }
         },
@@ -188,11 +246,13 @@ fun InboxScreen(
                 InboxContent(
                     content = content,
                     pages = content.pages,
+                    layout = content.displayOptions.layout,
                     // While the dock is up it occupies the bottomBar slot, so the Scaffold has already
                     // shortened the content by its height — reserving the FAB band on top of that
                     // would strand the list above a gap the size of a stack that is not on screen.
                     contentBottomPadding = if (createDockOpen) 0.dp else contentBottomPadding,
                     onIntent = onIntent,
+                    homeSignal = homeSignal,
                 )
 
                 // Tap-outside-to-dismiss for the capture dock. Deliberately NOT dimmed: the dock is a
@@ -233,15 +293,172 @@ fun InboxScreen(
                 onIntent = onIntent,
             )
         }
+
+        content.renameDraft?.let { draft ->
+            RenameChecklistDialog(
+                draft = draft,
+                onDraftChange = { onIntent(InboxIntent.OnRenameDraftChanged(it)) },
+                onConfirm = { onIntent(InboxIntent.OnConfirmRenameChecklist) },
+                onDismiss = { onIntent(InboxIntent.OnDismissRenameChecklist) },
+            )
+        }
+
+        if (content.deleteConfirmationOpen && page != null) {
+            DeleteChecklistDialog(
+                checklistName = page.title,
+                onConfirm = { onIntent(InboxIntent.OnConfirmDeleteChecklist) },
+                onDismiss = { onIntent(InboxIntent.OnDismissDeleteChecklist) },
+            )
+        }
+
+        if (content.displayOptionsOpen) {
+            InboxDisplayOptionsSheet(options = content.displayOptions, onIntent = onIntent)
+        }
     }
+}
+
+/**
+ * The two trailing toolbar icons, in Todoist's order: display options first, overflow second.
+ *
+ * The overflow anchors its menu on its own [Box] rather than on the app bar, so the popup opens under
+ * the icon instead of at the bar's top-start corner.
+ */
+@Composable
+private fun InboxToolbarActions(
+    showListMenu: Boolean,
+    listMenuOpen: Boolean,
+    onIntent: (InboxIntent) -> Unit,
+) {
+    IconButton(onClick = { onIntent(InboxIntent.OnDisplayOptionsClick) }) {
+        Icon(
+            imageVector = Icons.Outlined.Tune,
+            contentDescription = stringResource(Res.string.inbox_display_options),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+
+    if (showListMenu) {
+        Box {
+            IconButton(onClick = { onIntent(InboxIntent.OnListMenuOpen) }) {
+                Icon(
+                    imageVector = Icons.Default.MoreVert,
+                    contentDescription = stringResource(Res.string.inbox_list_actions),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            DropdownMenu(
+                expanded = listMenuOpen,
+                onDismissRequest = { onIntent(InboxIntent.OnListMenuDismiss) },
+            ) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(Res.string.inbox_menu_open_checklist)) },
+                    leadingIcon = {
+                        Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = null)
+                    },
+                    // The id is resolved by the ViewModel from the settled page, so the menu never
+                    // has to carry one that a swipe could have staled.
+                    onClick = { onIntent(InboxIntent.OnOpenCurrentChecklist) },
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(Res.string.checklist_rename)) },
+                    leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
+                    onClick = { onIntent(InboxIntent.OnRenameChecklistClick) },
+                )
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = stringResource(Res.string.delete_checklist),
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Outlined.Delete,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                        )
+                    },
+                    onClick = { onIntent(InboxIntent.OnDeleteChecklistClick) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RenameChecklistDialog(
+    draft: String,
+    onDraftChange: (String) -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val focusRequester = remember { FocusRequester() }
+    // The dialog exists to edit one field; opening it without the keyboard costs a tap every time.
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(Res.string.checklist_rename_title)) },
+        text = {
+            AppTextField(
+                value = draft,
+                onValueChange = onDraftChange,
+                placeholder = stringResource(Res.string.checklist_name_placeholder),
+                singleLine = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(focusRequester),
+            )
+        },
+        confirmButton = {
+            // Enabled state mirrors the ViewModel's own blank check. Both exist on purpose: this one
+            // stops the user before the fact, the ViewModel's covers a whitespace-only draft that
+            // isBlank() catches and this button (isNotBlank) would too — they agree, so a rename can
+            // never be silently dropped.
+            TextButton(onClick = onConfirm, enabled = draft.isNotBlank()) {
+                Text(stringResource(Res.string.save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(Res.string.cancel)) }
+        },
+    )
+}
+
+@Composable
+private fun DeleteChecklistDialog(
+    checklistName: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(Res.string.checklist_delete_title)) },
+        // Names the checklist: the pager can have moved since the menu was opened, and "are you sure"
+        // with no subject is exactly how the wrong list gets deleted.
+        text = { Text(stringResource(Res.string.checklist_delete_message, checklistName)) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(
+                    text = stringResource(Res.string.delete),
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(Res.string.cancel)) }
+        },
+    )
 }
 
 @Composable
 private fun InboxContent(
     content: InboxScreenState.Content,
     pages: List<InboxPage>,
+    layout: InboxLayout,
     contentBottomPadding: Dp,
     onIntent: (InboxIntent) -> Unit,
+    homeSignal: Int = 0,
 ) {
     val scope = rememberCoroutineScope()
     // pageCount is a lambda, not a snapshot: rememberPagerState re-reads it every composition, so a
@@ -264,6 +481,16 @@ private fun InboxContent(
     LaunchedEffect(pagerState.currentPage) {
         anchorChecklistId = pages.getOrNull(pagerState.currentPage)?.checklistId
         onIntent(InboxIntent.OnPageSelected(pagerState.currentPage))
+    }
+
+    // Tapping the tab named "Inbox" returns to the Inbox page. The pager's page survives the tab's
+    // pop-to-root (it lives in this screen, not in the back stack), so without this the tab lands on
+    // whichever project was last swiped to and the inbox itself is reachable only by swiping back.
+    // The host sends a monotonic counter, so a second tap on an already-selected tab still fires.
+    // Page 0 is the Inbox by construction — InboxViewModel builds `pages` with it first.
+    LaunchedEffect(homeSignal) {
+        if (homeSignal == 0) return@LaunchedEffect
+        pagerState.animateScrollToPage(0)
     }
 
     // The other half of the anchor: when the SET of pages changes, follow the anchored checklist to
@@ -289,8 +516,6 @@ private fun InboxContent(
         }
     }
 
-    val inboxTabLabel = stringResource(Res.string.inbox_title)
-
     // No imePadding here: the keyboard inset is owned by the PINNED ROW (see [PinnedQuickAddRow]).
     // Insetting this Column instead pushes the row out of the visible area entirely, because
     // AppScaffold's content slot already sits inside the resolved window insets.
@@ -308,9 +533,8 @@ private fun InboxContent(
                 )
             }
         } else {
-            InboxTabHeader(
-                projectTitles = remember(pages) { pages.drop(1).map { it.title } },
-                inboxLabel = inboxTabLabel,
+            InboxPagerDots(
+                pageTitles = pages.map { it.title },
                 selectedPage = pagerState.currentPage,
                 onSelectPage = { index -> scope.launch { pagerState.animateScrollToPage(index) } },
             )
@@ -338,33 +562,59 @@ private fun InboxContent(
                         title = page.title,
                         description = stringResource(Res.string.inbox_project_empty_description),
                     )
-                    else -> LazyColumn(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .adaptiveContentWidth()
-                            .padding(horizontal = AppDimens.ScreenPaddingHorizontal),
-                        // 8dp, matching the checklist detail list — the cards are the same object
-                        // there and the two screens must not use two different rhythms for it.
-                        verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm),
-                        // Top padding so the first card does not touch the header's rule; the bottom
-                        // reserve is the shell's FAB band, passed in by the host.
-                        contentPadding = PaddingValues(
-                            top = AppDimens.SpacingSm,
-                            bottom = AppDimens.SpacingXl + contentBottomPadding,
-                        ),
-                    ) {
-                        items(page.tasks, key = { it.fillItemId }) { task ->
-                            InboxTaskRow(
-                                task = task,
-                                onCheckedChange = { checked ->
-                                    onIntent(
-                                        InboxIntent.OnTaskCheckedChanged(task.fillItemId, checked)
+                    else -> {
+                        val compact = layout == InboxLayout.COMPACT
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                // wrapContentWidth sits between the fill and the cap, and it is what
+                                // makes the cap bind at all: fillMaxSize pins minWidth == maxWidth
+                                // to the pane, and a widthIn(max) coerced into a fixed range does
+                                // nothing — on a 1280dp window the rows spanned the whole pane,
+                                // checkbox at one edge and star at the other. This relaxes the
+                                // minimum back to 0 so adaptiveContentWidth can actually cut the
+                                // width, then centres the capped column in the pane it still holds.
+                                .wrapContentWidth(Alignment.CenterHorizontally)
+                                .adaptiveContentWidth()
+                                .padding(horizontal = AppDimens.ScreenPaddingHorizontal),
+                            // Cards: 8dp, matching the checklist detail list — the cards are the same
+                            // object there and the two screens must not use two different rhythms for
+                            // it. Compact: zero, because the rows are separated by a rule instead, and
+                            // a gap on top of a divider reads as a broken card list.
+                            verticalArrangement = if (compact) {
+                                Arrangement.spacedBy(0.dp)
+                            } else {
+                                Arrangement.spacedBy(AppDimens.SpacingSm)
+                            },
+                            // Top padding so the first card does not touch the dots row; the bottom
+                            // reserve is the shell's FAB band, passed in by the host.
+                            contentPadding = PaddingValues(
+                                top = AppDimens.SpacingSm,
+                                bottom = AppDimens.SpacingXl + contentBottomPadding,
+                            ),
+                        ) {
+                            itemsIndexed(page.tasks, key = { _, task -> task.fillItemId }) { index, task ->
+                                InboxTaskRow(
+                                    task = task,
+                                    compact = compact,
+                                    onCheckedChange = { checked ->
+                                        onIntent(
+                                            InboxIntent.OnTaskCheckedChanged(task.fillItemId, checked)
+                                        )
+                                    },
+                                    onDetailsClick = {
+                                        onIntent(InboxIntent.OnTaskDetailsClick(task.fillItemId))
+                                    },
+                                )
+                                // Between rows only — a trailing rule under the last item would read
+                                // as "the list continues below" at the end of a short list.
+                                if (compact && index < page.tasks.lastIndex) {
+                                    HorizontalDivider(
+                                        thickness = AppDimens.DividerThickness,
+                                        color = MaterialTheme.colorScheme.outlineVariant,
                                     )
-                                },
-                                onDetailsClick = {
-                                    onIntent(InboxIntent.OnTaskDetailsClick(task.fillItemId))
-                                },
-                            )
+                                }
+                            }
                         }
                     }
                 }
@@ -377,204 +627,121 @@ private fun InboxContent(
 }
 
 /**
- * The header of the Inbox tab: a PINNED Inbox pill, a vertical rule, then the projects.
+ * Position indicator for the checklist pager — the only thing left where the tab row used to be.
  *
- * ## Why the Inbox is outside the scrolling row
- * It used to be tab index 0 of one `PrimaryScrollableTabRow`, which made it look like a project and —
- * worse — let it scroll off the left edge once the user had five or six projects. The system capture
- * bucket is the one destination that must always be one tap away, so it is pinned and the projects
- * scroll beside it. The vertical rule is what says "these two groups are different kinds of thing".
+ * ## Why the tab row went away
+ * It carried a PINNED Inbox pill plus a scrolling row of project pills, and it lost on both counts:
+ * the pinned pill and the scrolling ones read as one undifferentiated strip, and with five or six
+ * projects the row became a second navigation surface competing with the bottom bar. Todoist has no
+ * such strip — its toolbar simply names the one view you are on, which is where the title and the
+ * open-task count moved.
  *
- * ## Why pills instead of Material tabs for the projects
- * A scrollable `TabRow` brings three defaults that all have to be overridden here — a 52dp start
- * `edgePadding`, its own divider (which would stop short of the pinned pill, leaving a line that
- * covers two thirds of the screen) and an indicator that is always drawn, so on the Inbox page it
- * would falsely underline the first project. Overriding the indicator means the `TabIndicatorScope`
- * API, which is still moving between Compose releases. Pills carry their selection in the container
- * colour, so the Inbox page simply has no highlighted project — nothing to suppress. `Role.Tab` +
- * `selected` keep the accessibility semantics a tab row would have given.
+ * ## Why dots stayed
+ * Todoist can drop the indicator because it has no pager at all: you switch views through Overview,
+ * so "where am I" is never ambiguous. Here the pages ARE swipeable, so with nothing in this slot a
+ * swipe would be an undiscoverable gesture and the page count invisible. Dots are the minimum that
+ * answers both — the title says WHICH page, the dots say WHERE in the run and HOW MANY.
  *
- * @param projectTitles the pages AFTER the Inbox, in page order. Index `i` here is page `i + 1`.
+ * Each dot stays tappable so the row keeps the direct jump the pills used to offer. The target is
+ * 32dp, not the 48dp minimum: a 48dp row under the toolbar would cost more vertical space than the
+ * tab row it replaced. That is acceptable here and only here — tapping a dot is a shortcut, while
+ * swiping is the primary way to change page, so a missed tap costs a retry, not access.
+ *
+ * @param pageTitles one per page, IN PAGER ORDER — a dot is a `Role.Tab` and a tab without a name is
+ *   announced as an anonymous one, so a screen-reader user could no longer tell which checklist a
+ *   dot jumps to (the pill row it replaced carried the title as its label). The title itself is the
+ *   name, exactly as the pills read it: it needs no format string and therefore no new resource.
  */
 @Composable
-private fun InboxTabHeader(
-    projectTitles: List<String>,
-    inboxLabel: String,
+private fun InboxPagerDots(
+    pageTitles: List<String>,
     selectedPage: Int,
     onSelectPage: (Int) -> Unit,
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                // heightIn, not height: both this row and the pills inside it are sized around a
-                // one-line label, and a hard height clips that label in Hindi (taller glyph box) or
-                // at a large system font scale. A minimum keeps the rhythm and still lets the row grow.
-                .heightIn(min = InboxTabRowHeight),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            InboxTabPill(
-                label = inboxLabel,
-                icon = Icons.Outlined.Inbox,
-                selected = selectedPage == 0,
-                onClick = { onSelectPage(0) },
-                modifier = Modifier.padding(start = AppDimens.ScreenPaddingHorizontal),
-            )
+    // One page = no position to report. Rendering a lone dot would be decoration that implies a
+    // second page exists.
+    if (pageTitles.size <= 1) return
 
-            if (projectTitles.isNotEmpty()) {
-                VerticalDivider(
-                    thickness = AppDimens.DividerThickness,
-                    color = MaterialTheme.colorScheme.outlineVariant,
-                    modifier = Modifier
-                        .padding(horizontal = AppDimens.SpacingSm)
-                        .height(InboxTabDividerHeight),
-                )
-                LazyRow(
-                    modifier = Modifier.weight(1f),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs),
-                    // Trailing padding only: the leading gap is the divider's. The last pill bleeds
-                    // past the screen edge while scrolling, which is the row's only scroll cue.
-                    contentPadding = PaddingValues(end = AppDimens.ScreenPaddingHorizontal),
-                ) {
-                    itemsIndexed(projectTitles) { index, title ->
-                        InboxTabPill(
-                            label = title,
-                            icon = null,
-                            selected = selectedPage == index + 1,
-                            onClick = { onSelectPage(index + 1) },
-                        )
-                    }
-                }
-            }
-        }
+    val dotsState = rememberLazyListState()
 
-        // One rule under the WHOLE header (pinned pill included) — a TabRow's built-in divider would
-        // only span the scrolling part and stop dead under the pill.
-        HorizontalDivider(
-            thickness = AppDimens.DividerThickness,
-            color = MaterialTheme.colorScheme.outlineVariant,
+    // Keeps the selected dot on screen once the run overflows: swiping past the last dot that fits
+    // would otherwise leave the highlight beyond the row's edge, which is the same silent lie the
+    // lazy row exists to prevent, just one swipe further out. Centres it rather than merely
+    // revealing it, so the neighbours on both sides stay one tap away. A lazy list clamps at both
+    // ends and cannot scroll at all while everything fits, so a short run is untouched.
+    LaunchedEffect(selectedPage, pageTitles.size) {
+        val layout = dotsState.layoutInfo
+        val viewport = layout.viewportEndOffset - layout.viewportStartOffset
+        val dotWidth = layout.visibleItemsInfo.firstOrNull()?.size ?: 0
+        dotsState.animateScrollToItem(
+            // Coerced, not trusted: this reads a pager index against a list that a delete on another
+            // device can shorten a frame earlier.
+            index = selectedPage.coerceIn(0, pageTitles.lastIndex),
+            scrollOffset = -(viewport - dotWidth) / 2,
         )
     }
-}
 
-/** One header pill. Selection is carried by the container colour, not by an underline. */
-@Composable
-private fun InboxTabPill(
-    label: String,
-    icon: ImageVector?,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        onClick = onClick,
-        // Same token as the AppNavigationBar's selected-item pill, so "selected" reads identically
-        // everywhere in the v2 shell.
-        color = if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
-        contentColor = if (selected) {
-            MaterialTheme.colorScheme.onSecondaryContainer
-        } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
-        },
-        shape = RoundedCornerShape(InboxTabPillHeight / 2),
-        modifier = modifier
-            .heightIn(min = InboxTabPillHeight)
-            .semantics {
-                role = Role.Tab
-                this.selected = selected
-            },
+    // A LAZY row, and the shape is load-bearing rather than a preference. A plain Row measures its
+    // overflowing unweighted children against a remaining maxWidth of 0, so past
+    // windowWidth / InboxDotTouchTarget every further dot renders at zero width — INCLUDING the
+    // selected one. With 12 projects on a 360dp phone (13 pages) the last two dots disappear and
+    // swiping there highlights nothing, i.e. the position indicator silently lies about where the
+    // user is. The project count is unbounded, which is exactly why the tab row this replaced was
+    // scrollable too. Lazy layout measures each dot against its own constraints and lets the surplus
+    // scroll instead of collapsing — do not "simplify" this back to a Row.
+    LazyRow(
+        state = dotsState,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(InboxDotsRowHeight),
+        // A lazy list applies its arrangement only while the whole run fits, so this centres a short
+        // run and a long one simply packs from the start and scrolls.
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = AppDimens.SpacingMd),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(AppDimens.SpacingXs + 2.dp),
-        ) {
-            if (icon != null) {
-                Icon(
-                    imageVector = icon,
-                    // The label right next to it already says what this is; a description here would
-                    // make TalkBack read the destination twice.
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
+        itemsIndexed(pageTitles) { index, title ->
+            val selected = index == selectedPage
+            Box(
+                modifier = Modifier
+                    // Touch target first, mark second: sizing the clickable to the dot itself gives
+                    // an 8dp target, so the jump would be a coin flip.
+                    .size(InboxDotTouchTarget)
+                    .clickable(
+                        // No ripple: a 48dp circular ripple around an 8dp dot looks like a bug.
+                        indication = null,
+                        interactionSource = remember { MutableInteractionSource() },
+                        onClick = { onSelectPage(index) },
+                    )
+                    .semantics {
+                        role = Role.Tab
+                        this.selected = selected
+                        // The dot draws nothing readable, so this is the ONLY thing that identifies
+                        // the page to a screen reader.
+                        contentDescription = title
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(if (selected) InboxDotSizeSelected else InboxDotSize)
+                        .clip(CircleShape)
+                        .background(
+                            if (selected) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.outlineVariant
+                            }
+                        )
                 )
             }
-            Text(
-                text = label,
-                style = MaterialTheme.typography.titleSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                // Without a cap a long project name simply stretches its pill — inside a scrolling
-                // row nothing constrains the width, so `Ellipsis` would never trigger.
-                modifier = Modifier.widthIn(max = InboxTabPillMaxLabelWidth),
-            )
         }
     }
 }
 
-private val InboxTabRowHeight = 48.dp
-private val InboxTabPillHeight = 36.dp
-private val InboxTabDividerHeight = 24.dp
-private val InboxTabPillMaxLabelWidth = 160.dp
-
-/**
- * The capture affordance, raised by the shell's "+" FAB. Kept in its own composable so the per-frame
- * keyboard inset read below re-composes ONLY this row — reading `WindowInsets.ime` up in
- * [InboxContent] would re-run the tab row and the pager on every frame of the keyboard animation.
- *
- * Hosted in AppScaffold's `bottomBar`, which already applies `ime ∪ navigationBars` — so this row must
- * NOT add an inset of its own, and it does not reserve the shell's FAB band either: the host hides
- * both FABs while the dock is up, so reserving for a stack that is not on screen would float the
- * input a FAB-height above the bottom edge.
- *
- * Styled as a raised dock (surface + top hairline + rounded top corners) rather than as a bare row,
- * because it now APPEARS over the list instead of always being part of the layout: without an edge of
- * its own it reads as a task row that suddenly grew an input.
- *
- * The keyboard is raised on appearance and the dock STAYS open after each Add — capture is usually
- * more than one item, and closing after every send would cost a FAB tap per task. Dismissal is
- * explicit: BACK, or a tap on the list behind it.
- */
-@Composable
-private fun InboxCaptureDock(
-    text: String,
-    onTextChange: (String) -> Unit,
-    onAdd: () -> Unit,
-) {
-    val focusRequester = remember { FocusRequester() }
-    // Raise the keyboard as the dock appears. The dock is only composed while it is open, so `Unit`
-    // is the correct key: one focus request per appearance, and none while it is closed.
-    LaunchedEffect(Unit) { focusRequester.requestFocus() }
-
-    Surface(
-        color = gistiDockColor(),
-        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            // Hairline on the TOP edge only — the dock flows into the system-nav strip below it, and
-            // a full border would draw a stray divider across that seam (same rule as
-            // GistiGlassChatDock). A divider as the first child traces exactly that edge.
-            HorizontalDivider(
-                thickness = AppDimens.DividerThickness,
-                color = MaterialTheme.colorScheme.outlineVariant,
-            )
-            AddItemInputField(
-                text = text,
-                onTextChange = onTextChange,
-                onAdd = onAdd,
-                placeholder = stringResource(Res.string.inbox_quick_add_placeholder),
-                focusRequester = focusRequester,
-                modifier = Modifier
-                    .adaptiveContentWidth()
-                    .padding(
-                        horizontal = AppDimens.ScreenPaddingHorizontal,
-                        vertical = AppDimens.SpacingMd,
-                    ),
-            )
-        }
-    }
-}
+private val InboxDotsRowHeight = 32.dp
+private val InboxDotTouchTarget = 32.dp
+private val InboxDotSize = 6.dp
+private val InboxDotSizeSelected = 8.dp
 
 /**
  * One task, with the project-wide 30/70 hit-zone split: the left 30% toggles the checkbox, the right
@@ -594,25 +761,29 @@ private fun InboxCaptureDock(
  * whole surface, which cannot express the 30/70 split. The click handling stays on an INNER overlay
  * Box — moving it onto the Card's own modifier lets the ripple escape the rounded corners (precedent
  * `appcard-onlongclick-ripple-clip`).
+ *
+ * @param compact renders the same row WITHOUT the card: a shorter, flat line whose only separator is
+ *   the divider the list draws between neighbours. The chrome is what costs the vertical space, so
+ *   dropping it — rather than shrinking the type — is what fits more tasks on screen while the text
+ *   stays exactly as readable.
  */
 @Composable
 private fun InboxTaskRow(
     task: InboxTask,
+    compact: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     onDetailsClick: () -> Unit,
 ) {
-    Card(
-        colors = AppCardDefaults.colors(),
-        border = AppCardDefaults.border(),
-        elevation = AppCardDefaults.flatElevation(),
-        shape = MaterialTheme.shapes.medium,
-    ) {
+    // One content block, two containers. Extracting the content into a local lambda keeps the 30/70
+    // hit-zone split and the strike-through logic single-sourced — two copies would drift, and this
+    // row's hit zones are load-bearing enough that a drift here is a silent UX regression.
+    val rowContent: @Composable () -> Unit = {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                // 56dp, not the detail card's 64dp: an Inbox row carries no note or meta chips, so
-                // the extra height would be dead space.
-                .heightIn(min = InboxTaskRowMinHeight),
+                // 56dp for cards (not the detail card's 64dp: an Inbox row carries no note or meta
+                // chips); 44dp compact, which is still a full touch target for the checkbox zone.
+                .heightIn(min = if (compact) InboxTaskRowCompactMinHeight else InboxTaskRowMinHeight),
         ) {
             Row(
                 modifier = Modifier
@@ -689,6 +860,24 @@ private fun InboxTaskRow(
             }
         }
     }
+
+    if (compact) {
+        // No Card, no border, no shape: on the page background this is a plain line, and the list's
+        // own divider is the separator. Wrapping it in a zero-elevation borderless Card instead would
+        // still paint the card's container colour and leave the row looking like a card that lost its
+        // outline.
+        rowContent()
+    } else {
+        Card(
+            colors = AppCardDefaults.colors(),
+            border = AppCardDefaults.border(),
+            elevation = AppCardDefaults.flatElevation(),
+            shape = MaterialTheme.shapes.medium,
+        ) {
+            rowContent()
+        }
+    }
 }
 
 private val InboxTaskRowMinHeight = 56.dp
+private val InboxTaskRowCompactMinHeight = 44.dp

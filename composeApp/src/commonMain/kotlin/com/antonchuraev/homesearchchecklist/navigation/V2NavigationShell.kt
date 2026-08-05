@@ -1,5 +1,6 @@
 package com.antonchuraev.homesearchchecklist.navigation
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +16,8 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Apps
@@ -172,10 +175,14 @@ object V2ShellMetrics {
  * @param fabsVisible false hides BOTH FABs without hiding the bar — used while the chat dock is up,
  *   where they would float over its scrim and invite taps that do nothing. Separate from
  *   [barVisible], which answers a different question (is this route a tab at all).
- * @param overlayContent rendered ABOVE the content, the bar and the FABs, at every window size. This
- *   is where the v2 chat dock lives: hosting it once here is what makes "the AI button opens the chat
- *   right on this screen" true for every route the shell renders, including pushed detail screens,
- *   with no per-screen dock wiring.
+ * @param overlayContent rendered ABOVE the screen at every window size. This is where the v2 chat
+ *   dock lives: hosting it once here is what makes "the AI button opens the chat right on this
+ *   screen" true for every route the shell renders, including pushed detail screens, with no
+ *   per-screen dock wiring. WHERE "above" stops differs by size, deliberately: on Compact it covers
+ *   the bar and the FABs (they float OVER the content, so a dock drawn under them would be poked
+ *   through), while on Medium/Expanded it is confined to the CONTENT pane so the rail / permanent
+ *   drawer stays visible, undimmed and tappable — spanning the whole window there hid the rail's
+ *   lower half behind the dock panel and left its upper half bright above the scrim.
  * @param content the NavDisplay renderer; always receives `null` for the drawer state.
  */
 @Composable
@@ -208,9 +215,11 @@ fun V2NavigationShell(
         onNavigate(destination)
     }
 
-    // One Box around all three variants so [overlayContent] is drawn LAST — above the bar, the rail,
-    // the permanent drawer and both FABs — at every window size, without each variant repeating the
-    // z-order rule.
+    // [overlayContent] is handed to each variant rather than drawn here, over all three: the shell's
+    // outermost Box spans the WHOLE window, and mounting the dock in it covered the rail and the
+    // permanent drawer on Medium/Expanded. Each variant mounts it at the top of the region the dock
+    // may legitimately own — the whole screen on Compact, the content pane beside the chrome on the
+    // other two.
     Box(modifier = Modifier.fillMaxSize()) {
         when (rememberAppWindowSizeClass()) {
             AppWindowSizeClass.Compact -> V2ShellCompactBar(
@@ -221,6 +230,7 @@ fun V2NavigationShell(
                 onOpenCreate = onOpenCreate,
                 barVisible = barVisible,
                 fabsVisible = fabsVisible,
+                overlayContent = overlayContent,
                 content = content,
             )
 
@@ -234,6 +244,7 @@ fun V2NavigationShell(
                 // the one that would float over its own dock — goes away.
                 showCreateFab = showCreateFab && fabsVisible,
                 onOpenCreate = onOpenCreate,
+                overlayContent = overlayContent,
                 content = content,
             )
 
@@ -245,11 +256,10 @@ fun V2NavigationShell(
                 onOpenCreate = onOpenCreate,
                 onOpenSettings = onOpenSettings,
                 onOpenUpdates = onOpenUpdates,
+                overlayContent = overlayContent,
                 content = content,
             )
         }
-
-        overlayContent?.invoke()
     }
 }
 
@@ -274,6 +284,7 @@ private fun V2ShellCompactBar(
     onOpenCreate: () -> Unit,
     barVisible: Boolean,
     fabsVisible: Boolean,
+    overlayContent: (@Composable () -> Unit)?,
     content: @Composable (DrawerState?) -> Unit,
 ) {
     val items = listOf(
@@ -377,15 +388,21 @@ private fun V2ShellCompactBar(
                 }
             }
         }
+
+        // Last child of the same fillMaxSize Box the bar and the FABs live in, so the dock keeps
+        // covering both — on Compact they float OVER the content and a dock drawn under them would
+        // be poked through by taps that do nothing.
+        overlayContent?.invoke()
     }
 }
 
 /**
  * Medium: NavigationRail carrying the same four destinations, chat FAB in the rail header.
  *
- * Structure copied from `AdaptiveShellRail` so the two arms feel identical at this size; only the
- * destination set differs. There is no bottom bar here, which is why App.kt passes `0.dp` as the
- * v2 content bottom padding on anything wider than Compact.
+ * Structure copied from `AdaptiveShellRail` so the two arms feel identical at this size; the
+ * destination set differs, and so does the scroll wrapper — this rail carries two FABs the control
+ * arm's does not and therefore has to survive a short window. There is no bottom bar here, which is
+ * why App.kt passes `0.dp` as the v2 content bottom padding on anything wider than Compact.
  */
 @Composable
 private fun V2ShellRail(
@@ -394,6 +411,7 @@ private fun V2ShellRail(
     onOpenChat: () -> Unit,
     showCreateFab: Boolean,
     onOpenCreate: () -> Unit,
+    overlayContent: (@Composable () -> Unit)?,
     content: @Composable (DrawerState?) -> Unit,
 ) {
     val inboxLabel = stringResource(Res.string.nav_tab_inbox)
@@ -404,60 +422,79 @@ private fun V2ShellRail(
     val createFabDescription = stringResource(Res.string.nav_add_task_fab_content_description)
 
     Row(modifier = Modifier.fillMaxSize()) {
-        NavigationRail(
-            modifier = Modifier.fillMaxHeight(),
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-            header = {
-                FloatingActionButton(
-                    onClick = onOpenChat,
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                ) {
-                    Icon(Icons.Outlined.AutoAwesome, contentDescription = fabDescription)
-                }
-                // Not a Compact-only affordance: the capture row that used to be pinned to the Inbox
-                // was removed on ALL window sizes, so without this button there is no way to add a
-                // task at rail width at all.
-                if (showCreateFab) {
-                    FloatingActionButton(
-                        onClick = onOpenCreate,
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                    ) {
-                        Icon(Icons.Filled.Add, contentDescription = createFabDescription)
-                    }
-                }
-                HorizontalDivider(modifier = Modifier.width(56.dp))
-            },
+        // The rail scrolls, for the same reason AppNavigationDrawerContent does: two 56dp FABs plus
+        // four labelled items need ~400dp, and a Medium window can be ~360dp tall (a small phone in
+        // landscape), which clipped the last destinations with no way to reach them.
+        //
+        // The container colour is painted by THIS Box and not left to the rail's own Surface: the
+        // Surface sits inside the scroll, so it is measured against the content height and would
+        // leave the rest of the rail transparent. Consequence of scrolling: the rail's items are
+        // top-aligned instead of vertically centred, because the rail now wraps its content — an
+        // acceptable trade for chrome that is reachable at every height, and it puts the FABs where
+        // M3 places a rail header anyway.
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .background(MaterialTheme.colorScheme.surfaceContainer)
+                .verticalScroll(rememberScrollState()),
         ) {
-            NavigationRailItem(
-                selected = selectedTab == V2Destination.Inbox,
-                onClick = { onNavigate(V2Destination.Inbox) },
-                icon = { Icon(Icons.Outlined.Inbox, contentDescription = null) },
-                label = { Text(inboxLabel) },
-            )
-            NavigationRailItem(
-                selected = selectedTab == V2Destination.Calendar,
-                onClick = { onNavigate(V2Destination.Calendar) },
-                icon = { Icon(Icons.Outlined.CalendarMonth, contentDescription = null) },
-                label = { Text(calendarLabel) },
-            )
-            NavigationRailItem(
-                selected = selectedTab == V2Destination.Projects,
-                onClick = { onNavigate(V2Destination.Projects) },
-                icon = { Icon(Icons.Outlined.ChecklistRtl, contentDescription = null) },
-                label = { Text(projectsLabel) },
-            )
-            NavigationRailItem(
-                selected = selectedTab == V2Destination.Overview,
-                onClick = { onNavigate(V2Destination.Overview) },
-                icon = { Icon(Icons.Outlined.Apps, contentDescription = null) },
-                label = { Text(overviewLabel) },
-            )
+            NavigationRail(
+                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                header = {
+                    FloatingActionButton(
+                        onClick = onOpenChat,
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    ) {
+                        Icon(Icons.Outlined.AutoAwesome, contentDescription = fabDescription)
+                    }
+                    // Not a Compact-only affordance: the capture row that used to be pinned to the
+                    // Inbox was removed on ALL window sizes, so without this button there is no way
+                    // to add a task at rail width at all.
+                    if (showCreateFab) {
+                        FloatingActionButton(
+                            onClick = onOpenCreate,
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                        ) {
+                            Icon(Icons.Filled.Add, contentDescription = createFabDescription)
+                        }
+                    }
+                    HorizontalDivider(modifier = Modifier.width(56.dp))
+                },
+            ) {
+                NavigationRailItem(
+                    selected = selectedTab == V2Destination.Inbox,
+                    onClick = { onNavigate(V2Destination.Inbox) },
+                    icon = { Icon(Icons.Outlined.Inbox, contentDescription = null) },
+                    label = { Text(inboxLabel) },
+                )
+                NavigationRailItem(
+                    selected = selectedTab == V2Destination.Calendar,
+                    onClick = { onNavigate(V2Destination.Calendar) },
+                    icon = { Icon(Icons.Outlined.CalendarMonth, contentDescription = null) },
+                    label = { Text(calendarLabel) },
+                )
+                NavigationRailItem(
+                    selected = selectedTab == V2Destination.Projects,
+                    onClick = { onNavigate(V2Destination.Projects) },
+                    icon = { Icon(Icons.Outlined.ChecklistRtl, contentDescription = null) },
+                    label = { Text(projectsLabel) },
+                )
+                NavigationRailItem(
+                    selected = selectedTab == V2Destination.Overview,
+                    onClick = { onNavigate(V2Destination.Overview) },
+                    icon = { Icon(Icons.Outlined.Apps, contentDescription = null) },
+                    label = { Text(overviewLabel) },
+                )
+            }
         }
 
         Box(modifier = Modifier.fillMaxSize()) {
             content(null)
+            // Inside the CONTENT box, not beside the rail: the dock and its scrim must stop at the
+            // rail's edge so the navigation stays lit and tappable while the chat is open.
+            overlayContent?.invoke()
         }
     }
 }
@@ -479,6 +516,7 @@ private fun V2ShellPermanent(
     onOpenCreate: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenUpdates: () -> Unit,
+    overlayContent: (@Composable () -> Unit)?,
     content: @Composable (DrawerState?) -> Unit,
 ) {
     val inboxLabel = stringResource(Res.string.nav_tab_inbox)
@@ -500,94 +538,111 @@ private fun V2ShellPermanent(
                 drawerContainerColor = MaterialTheme.colorScheme.surface,
                 modifier = Modifier.widthIn(max = 280.dp),
             ) {
-                ExtendedFloatingActionButton(
-                    onClick = onOpenChat,
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    icon = { Icon(Icons.Outlined.AutoAwesome, contentDescription = null) },
-                    text = { Text(chatLabel) },
-                    modifier = Modifier.padding(
-                        start = AppDimens.SpacingLg,
-                        end = AppDimens.SpacingLg,
-                        top = AppDimens.SpacingMd,
-                        bottom = if (showCreateFab) AppDimens.SpacingSm else AppDimens.SpacingMd,
-                    ),
-                )
-                // Same reasoning as the rail: the pinned capture row is gone at every width, so
-                // desktop-class windows need their own create affordance or the Inbox becomes
-                // read-only there.
-                if (showCreateFab) {
+                // The whole sheet scrolls as one region, exactly as AppNavigationDrawerContent does
+                // in the control arm. Two 56dp ExtendedFABs plus six rows overflow a SHORT Expanded
+                // window — any phone rotated to landscape classifies as Expanded (e.g. 923x411dp),
+                // and a large font scale does it on a real tablet — which clipped the bottom rows.
+                // Updates and Settings are the ones that fall off, and Settings is the only route
+                // back to the classic layout, so the clip made that switch unreachable entirely.
+                Column(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .verticalScroll(rememberScrollState())
+                ) {
                     ExtendedFloatingActionButton(
-                        onClick = onOpenCreate,
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                        icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-                        text = { Text(createLabel) },
+                        onClick = onOpenChat,
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        icon = { Icon(Icons.Outlined.AutoAwesome, contentDescription = null) },
+                        text = { Text(chatLabel) },
                         modifier = Modifier.padding(
                             start = AppDimens.SpacingLg,
                             end = AppDimens.SpacingLg,
-                            bottom = AppDimens.SpacingMd,
+                            top = AppDimens.SpacingMd,
+                            bottom = if (showCreateFab) AppDimens.SpacingSm else AppDimens.SpacingMd,
                         ),
                     )
+                    // Same reasoning as the rail: the pinned capture row is gone at every width, so
+                    // desktop-class windows need their own create affordance or the Inbox becomes
+                    // read-only there.
+                    if (showCreateFab) {
+                        ExtendedFloatingActionButton(
+                            onClick = onOpenCreate,
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                            icon = { Icon(Icons.Filled.Add, contentDescription = null) },
+                            text = { Text(createLabel) },
+                            modifier = Modifier.padding(
+                                start = AppDimens.SpacingLg,
+                                end = AppDimens.SpacingLg,
+                                bottom = AppDimens.SpacingMd,
+                            ),
+                        )
+                    }
+                    NavigationDrawerItem(
+                        label = { Text(inboxLabel) },
+                        icon = { Icon(Icons.Outlined.Inbox, contentDescription = null) },
+                        selected = selectedTab == V2Destination.Inbox,
+                        onClick = { onNavigate(V2Destination.Inbox) },
+                        colors = itemColors,
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
+                    )
+                    NavigationDrawerItem(
+                        label = { Text(calendarLabel) },
+                        icon = { Icon(Icons.Outlined.CalendarMonth, contentDescription = null) },
+                        selected = selectedTab == V2Destination.Calendar,
+                        onClick = { onNavigate(V2Destination.Calendar) },
+                        colors = itemColors,
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
+                    )
+                    NavigationDrawerItem(
+                        label = { Text(projectsLabel) },
+                        icon = { Icon(Icons.Outlined.ChecklistRtl, contentDescription = null) },
+                        selected = selectedTab == V2Destination.Projects,
+                        onClick = { onNavigate(V2Destination.Projects) },
+                        colors = itemColors,
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
+                    )
+                    NavigationDrawerItem(
+                        label = { Text(overviewLabel) },
+                        icon = { Icon(Icons.Outlined.Apps, contentDescription = null) },
+                        selected = selectedTab == V2Destination.Overview,
+                        onClick = { onNavigate(V2Destination.Overview) },
+                        colors = itemColors,
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
+                    )
+
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = AppDimens.SpacingLg)
+                    )
+
+                    NavigationDrawerItem(
+                        label = { Text(updatesLabel) },
+                        icon = { Icon(Icons.Outlined.Campaign, contentDescription = null) },
+                        // Never "selected": these push a detail route on top of the tab, they are not
+                        // tabs themselves, so highlighting one would leave the active tab unmarked.
+                        selected = false,
+                        onClick = onOpenUpdates,
+                        colors = itemColors,
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
+                    )
+                    NavigationDrawerItem(
+                        label = { Text(settingsLabel) },
+                        icon = { Icon(Icons.Outlined.Settings, contentDescription = null) },
+                        selected = false,
+                        onClick = onOpenSettings,
+                        colors = itemColors,
+                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
+                    )
                 }
-                NavigationDrawerItem(
-                    label = { Text(inboxLabel) },
-                    icon = { Icon(Icons.Outlined.Inbox, contentDescription = null) },
-                    selected = selectedTab == V2Destination.Inbox,
-                    onClick = { onNavigate(V2Destination.Inbox) },
-                    colors = itemColors,
-                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
-                )
-                NavigationDrawerItem(
-                    label = { Text(calendarLabel) },
-                    icon = { Icon(Icons.Outlined.CalendarMonth, contentDescription = null) },
-                    selected = selectedTab == V2Destination.Calendar,
-                    onClick = { onNavigate(V2Destination.Calendar) },
-                    colors = itemColors,
-                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
-                )
-                NavigationDrawerItem(
-                    label = { Text(projectsLabel) },
-                    icon = { Icon(Icons.Outlined.ChecklistRtl, contentDescription = null) },
-                    selected = selectedTab == V2Destination.Projects,
-                    onClick = { onNavigate(V2Destination.Projects) },
-                    colors = itemColors,
-                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
-                )
-                NavigationDrawerItem(
-                    label = { Text(overviewLabel) },
-                    icon = { Icon(Icons.Outlined.Apps, contentDescription = null) },
-                    selected = selectedTab == V2Destination.Overview,
-                    onClick = { onNavigate(V2Destination.Overview) },
-                    colors = itemColors,
-                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
-                )
-
-                HorizontalDivider(modifier = Modifier.padding(horizontal = AppDimens.SpacingLg))
-
-                NavigationDrawerItem(
-                    label = { Text(updatesLabel) },
-                    icon = { Icon(Icons.Outlined.Campaign, contentDescription = null) },
-                    // Never "selected": these push a detail route on top of the tab, they are not
-                    // tabs themselves, so highlighting one would leave the active tab unmarked.
-                    selected = false,
-                    onClick = onOpenUpdates,
-                    colors = itemColors,
-                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
-                )
-                NavigationDrawerItem(
-                    label = { Text(settingsLabel) },
-                    icon = { Icon(Icons.Outlined.Settings, contentDescription = null) },
-                    selected = false,
-                    onClick = onOpenSettings,
-                    colors = itemColors,
-                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
-                )
             }
         },
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             content(null)
+            // Inside the CONTENT box, not over the whole window: the permanent drawer must stay lit
+            // and tappable while the chat is open — Settings and Updates live only there.
+            overlayContent?.invoke()
         }
     }
 }

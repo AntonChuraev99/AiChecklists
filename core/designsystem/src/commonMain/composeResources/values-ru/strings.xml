@@ -336,6 +336,23 @@
     <string name="collapse">Свернуть</string>
     <string name="expand">Развернуть</string>
 
+    <!-- Папки (вложенные чек-листы). Здесь только ключи, которые реально читает Kotlin, —
+         остальные из values/ пока не используются ни одним экраном. -->
+    <string name="folder_default_name">Новая папка</string>
+    <string name="folder_create">Новая папка</string>
+    <string name="folder_progress">%1$d/%2$d</string>
+    <string name="folder_reminder">Напоминание</string>
+    <string name="folder_reminder_active">Напоминание установлено</string>
+    <string name="folder_reminder_unavailable">Эта папка больше недоступна.</string>
+    <string name="folder_name_placeholder">Введите название</string>
+    <string name="folder_move">Переместить в…</string>
+    <string name="folder_delete">Удалить папку</string>
+    <string name="folder_delete_title">Удалить папку?</string>
+    <string name="folder_delete_message_empty">Удалить эту папку?</string>
+    <string name="folder_delete_message_one">Будет удалена папка и 1 элемент внутри. Это действие нельзя отменить.</string>
+    <!-- Количество в скобках: строка не plurals, а «%1$d элементов» неверно для 2–4 -->
+    <string name="folder_delete_message_other">Будет удалена папка и элементы внутри (%1$d). Это действие нельзя отменить.</string>
+
     <string name="checklist_fill_delete_title">Удалить заполнение?</string>
     <string name="checklist_fill_delete_message">Удалить «%1$s»? Это действие нельзя отменить.</string>
 
@@ -725,6 +742,8 @@
 
     <string name="settings_dynamic_color">Динамические цвета</string>
     <string name="settings_dynamic_color_description">Использовать цвета из обоев (Android 12+)</string>
+    <string name="settings_classic_navigation">Классический вид</string>
+    <string name="settings_classic_navigation_description">Боковое меню и чат внизу вместо вкладок навигации</string>
     <string name="settings_back">Назад</string>
 
     <!-- Отладочный экран -->
@@ -981,10 +1000,15 @@
 
     <!-- Экран «Сегодня» -->
     <string name="today_title">Сегодня</string>
-    <string name="today_empty_state_title">На сегодня ничего нет</string>
-    <string name="today_empty_state_description">Отдыхайте или создайте новую задачу</string>
-    <string name="today_all_done_title">Всё выполнено на сегодня</string>
-    <string name="today_all_done_description">Отлично! Все задачи на сегодня выполнены.</string>
+    <string name="today_empty_state_title">Всё чисто</string>
+    <string name="today_empty_state_description">На сегодня ничего не запланировано. Добавьте задачу ниже — она попадёт во Входящие.</string>
+    <!-- Вариант для экранов без поля быстрого ввода: не обещает кнопку, которой там нет -->
+    <string name="today_empty_state_description_no_capture">На сегодня ничего не запланировано. Здесь появятся задачи с напоминанием.</string>
+    <string name="today_all_done_title">Всё готово</string>
+    <string name="today_all_done_description">Все задачи на сегодня выполнены. Отдыхайте.</string>
+    <string name="today_quick_add_placeholder">Добавить задачу</string>
+    <string name="today_task_captured_message">Добавлено во Входящие</string>
+    <string name="today_task_captured_action">Открыть</string>
     <string name="today_no_checklists_description">Создайте первый чек-лист, чтобы начать.</string>
     <string name="today_section_past_due">Просрочено</string>
     <string name="today_section_today">Сегодня</string>
@@ -1369,6 +1393,47 @@
     <string name="inbox_task_move_failed">Не удалось перенести задачу. Попробуйте снова.</string>
     <string name="inbox_task_delete_failed">Не удалось удалить задачу. Попробуйте снова.</string>
     <string name="inbox_task_update_failed">Не удалось обновить задачу. Попробуйте снова.</string>
+
+    <!-- v2 toolbar -->
+    <plurals name="inbox_task_count">
+        <item quantity="one">%1$d задача</item>
+        <item quantity="few">%1$d задачи</item>
+        <item quantity="many">%1$d задач</item>
+        <item quantity="other">%1$d задачи</item>
+    </plurals>
+    <string name="inbox_display_options">Отображение</string>
+    <string name="inbox_list_actions">Действия со списком</string>
+    <string name="inbox_menu_open_checklist">Открыть чек-лист</string>
+    <string name="checklist_rename">Переименовать</string>
+    <string name="checklist_rename_title">Переименовать чек-лист</string>
+    <string name="checklist_name_placeholder">Введите название</string>
+    <string name="inbox_checklist_deleted_message">Чек-лист удалён</string>
+    <string name="inbox_checklist_rename_failed">Не удалось переименовать чек-лист. Попробуйте снова.</string>
+    <string name="inbox_checklist_delete_failed">Не удалось удалить чек-лист. Попробуйте снова.</string>
+
+    <!-- Настройки отображения -->
+    <string name="inbox_display_title">Отображение</string>
+    <string name="inbox_display_layout">Раскладка</string>
+    <string name="inbox_display_layout_cards">Карточки</string>
+    <string name="inbox_display_layout_compact">Компактно</string>
+    <string name="inbox_display_show_completed">Выполненные задачи</string>
+    <string name="inbox_display_sort">Сортировка</string>
+    <string name="inbox_display_sort_manual">Вручную</string>
+    <string name="inbox_display_sort_name">По названию</string>
+    <string name="inbox_display_sort_priority">По важности</string>
+
+    <!-- Таб «Проекты» -->
+    <string name="projects_title">Проекты</string>
+    <string name="projects_add_checklist">Новый чек-лист</string>
+    <string name="projects_complete">Всё выполнено</string>
+    <plurals name="projects_open_count">
+        <item quantity="one">осталась %1$d</item>
+        <item quantity="few">осталось %1$d</item>
+        <item quantity="many">осталось %1$d</item>
+        <item quantity="other">осталось %1$d</item>
+    </plurals>
+    <string name="projects_empty_title">Чек-листов пока нет</string>
+    <string name="projects_empty_description">Создайте чек-лист или собирайте задачи во Входящих, а потом разложите их по чек-листам.</string>
 
     <!-- Экран «Обзор» (таб v2, в котором живёт содержимое drawer-навигации control-арма) -->
     <string name="overview_title">Обзор</string>

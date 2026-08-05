@@ -21,7 +21,6 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ItemR
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ReminderRepeatRule
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.TodayReminderInfo
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
-import com.antonchuraev.homesearchchecklist.feature.checklist.domain.usecase.ReconcileInboxForControlArmUseCase
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.LoginResult
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.RestoreResult
 import com.antonchuraev.homesearchchecklist.feature.paywall.domain.model.SubscriptionStatus
@@ -142,26 +141,22 @@ class SplashViewModelTest {
             checklistRepository = fakeChecklist,
             firstChecklistRepository = fakeFirstChecklist,
             activationPrefsRepository = fakeActivationPrefs,
-            // Splash resolves the nav A/B arm before navigating (so the shell can never be swapped
+            // Splash resolves the nav variant before navigating (so the shell can never be swapped
             // under a live screen). These tests are about the paywall-link and onboarding routing, so
-            // the arm is pinned to CONTROL and the rollback runs against the same fake checklist repo
-            // the rest of the test uses — nothing here is flagged, so it is a no-op.
+            // the variant is pinned and never read further.
             navExperimentResolver = ControlArmResolver(),
-            reconcileInboxForControlArm = ReconcileInboxForControlArmUseCase(
-                repository = fakeChecklist,
-                navResolver = ControlArmResolver(),
-                logger = NoOpLogger(),
-            ),
         )
     }
 
     /**
-     * Pins the arm to an ASSIGNED control: Splash's own resolve is then a no-op and the reconcile
-     * use case takes its "assigned control" path, which is the state every one of these tests runs in.
+     * Pins the navigation variant so Splash's own resolve is a no-op. These tests are about
+     * paywall-linking and onboarding routing; the shell they would render is irrelevant to them.
      */
     private class ControlArmResolver : NavExperimentResolver {
         override fun currentArm(): NavVariant = NavVariant.CONTROL
         override suspend fun ensureResolved(): NavVariant = NavVariant.CONTROL
+        override suspend fun setVariant(variant: NavVariant) = Unit
+        override suspend fun clearVariant() = Unit
         override fun isArmAssigned(): Boolean = true
     }
 

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -49,6 +50,7 @@ import aichecklists.core.designsystem.generated.resources.main_create_checklist
 import aichecklists.core.designsystem.generated.resources.today_all_done_description
 import aichecklists.core.designsystem.generated.resources.today_all_done_title
 import aichecklists.core.designsystem.generated.resources.today_empty_state_description
+import aichecklists.core.designsystem.generated.resources.today_empty_state_description_no_capture
 import aichecklists.core.designsystem.generated.resources.today_empty_state_title
 import aichecklists.core.designsystem.generated.resources.today_error_description
 import aichecklists.core.designsystem.generated.resources.today_error_retry
@@ -234,6 +236,12 @@ fun TodayScreen(
  * @param contentBottomPadding extra bottom inset the HOST reserves below the agenda list (v2 shell:
  *   bottom bar + chat FAB). 0.dp — the default, and what the standalone [TodayScreen] and the
  *   control-arm Calendar tab pass — reproduces the previous padding exactly.
+ * @param canCapture whether the HOST offers a quick-capture input for this body. Only the empty
+ *   state reads it, and only to pick its wording: this body has three hosts and just one of them
+ *   (the v2 Calendar tab) has a capture affordance, so the capture-aware copy — which points at an
+ *   input — is a lie on the standalone Today route and on the classic Calendar screen, neither of
+ *   which renders a FAB or a dock. Default false = the neutral wording, i.e. every existing caller
+ *   is correct without a change.
  */
 @Composable
 fun TodayBody(
@@ -243,6 +251,7 @@ fun TodayBody(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
     contentBottomPadding: Dp = 0.dp,
+    canCapture: Boolean = false,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         when (state) {
@@ -251,7 +260,11 @@ fun TodayBody(
             TodayScreenState.Empty -> EmptyState(
                 icon = Icons.Outlined.WbSunny,
                 title = stringResource(Res.string.today_empty_state_title),
-                description = stringResource(Res.string.today_empty_state_description),
+                description = if (canCapture) {
+                    stringResource(Res.string.today_empty_state_description)
+                } else {
+                    stringResource(Res.string.today_empty_state_description_no_capture)
+                },
             )
 
             TodayScreenState.AllDone -> EmptyState(
@@ -320,7 +333,17 @@ private fun TodaySuccessContent(
     contentBottomPadding: Dp = 0.dp,
 ) {
     LazyColumn(
-        modifier = Modifier.fillMaxSize().adaptiveContentWidth(),
+        // wrapContentWidth between the fill and the cap is what makes the cap bind at all:
+        // fillMaxSize pins minWidth == maxWidth to the pane, and Constraints.constrain() coerces a
+        // widthIn(max) back up into that fixed range, so `.fillMaxSize().adaptiveContentWidth()` is
+        // a no-op — on a 1280dp window the rows spanned the whole pane, alarm icon at one edge and
+        // time at the other. This relaxes the minimum back to 0 so the cap can cut the width, then
+        // centres the capped column in the pane it still occupies. Same chain as the Inbox and
+        // Projects tabs.
+        modifier = Modifier
+            .fillMaxSize()
+            .wrapContentWidth(Alignment.CenterHorizontally)
+            .adaptiveContentWidth(),
         // Host reserve ADDED to the existing SpacingXl (0.dp in the control arm → unchanged).
         contentPadding = PaddingValues(bottom = AppDimens.SpacingXl + contentBottomPadding),
     ) {

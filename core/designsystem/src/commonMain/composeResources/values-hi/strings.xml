@@ -881,6 +881,8 @@
 
     <string name="settings_dynamic_color">डायनामिक रंग</string>
     <string name="settings_dynamic_color_description">अपने वॉलपेपर के रंग इस्तेमाल करें (Android 12+)</string>
+    <string name="settings_classic_navigation">क्लासिक लेआउट</string>
+    <string name="settings_classic_navigation_description">नेविगेशन टैब की जगह साइड मेन्यू और नीचे चैट</string>
     <string name="settings_back">वापस</string>
 
     <!-- Smart Add chip labels (TokenChipPreview) -->
@@ -1176,10 +1178,15 @@
 
     <!-- Today Screen -->
     <string name="today_title">आज</string>
-    <string name="today_empty_state_title">आज के लिए कुछ नहीं</string>
-    <string name="today_empty_state_description">अपना दिन एंजॉय करें या नया टास्क बनाएं</string>
-    <string name="today_all_done_title">आज का सब हो गया</string>
-    <string name="today_all_done_description">बढ़िया! आज के लिए तय सब कुछ आपने पूरा कर लिया।</string>
+    <string name="today_empty_state_title">सब साफ़ है</string>
+    <string name="today_empty_state_description">आज के लिए कुछ भी तय नहीं है। नीचे टास्क जोड़ें — यह आपके इनबॉक्स में चला जाएगा।</string>
+    <!-- क्विक-कैप्चर फ़ील्ड के बिना वाली स्क्रीन के लिए: वहां जो इनपुट है ही नहीं, उसका वादा नहीं करता -->
+    <string name="today_empty_state_description_no_capture">आज के लिए कुछ भी तय नहीं है। रिमाइंडर वाले टास्क यहां दिखेंगे।</string>
+    <string name="today_all_done_title">सब हो गया</string>
+    <string name="today_all_done_description">आज के लिए तय सब कुछ पूरा हो गया। बाकी दिन एंजॉय करें।</string>
+    <string name="today_quick_add_placeholder">टास्क जोड़ें</string>
+    <string name="today_task_captured_message">इनबॉक्स में जोड़ा गया</string>
+    <string name="today_task_captured_action">खोलें</string>
     <string name="today_no_checklists_description">शुरू करने के लिए अपनी पहली चेकलिस्ट बनाएं।</string>
     <string name="today_section_past_due">समय बीत चुका</string>
     <string name="today_section_today">आज</string>
@@ -1570,6 +1577,43 @@
     <string name="inbox_task_move_failed">टास्क नहीं ले जाया जा सका। कृपया फिर से आज़माएं।</string>
     <string name="inbox_task_delete_failed">टास्क नहीं हटाया जा सका। कृपया फिर से आज़माएं।</string>
     <string name="inbox_task_update_failed">टास्क अपडेट नहीं हो सका। कृपया फिर से आज़माएं।</string>
+
+    <!-- v2 toolbar -->
+    <plurals name="inbox_task_count">
+        <item quantity="one">%1$d टास्क</item>
+        <item quantity="other">%1$d टास्क</item>
+    </plurals>
+    <string name="inbox_display_options">डिस्प्ले विकल्प</string>
+    <string name="inbox_list_actions">चेकलिस्ट क्रियाएं</string>
+    <string name="inbox_menu_open_checklist">चेकलिस्ट खोलें</string>
+    <string name="checklist_rename">नाम बदलें</string>
+    <string name="checklist_rename_title">चेकलिस्ट का नाम बदलें</string>
+    <string name="checklist_name_placeholder">नाम दर्ज करें</string>
+    <string name="inbox_checklist_deleted_message">चेकलिस्ट हटाई गई</string>
+    <string name="inbox_checklist_rename_failed">चेकलिस्ट का नाम नहीं बदला जा सका। कृपया फिर से आज़माएं।</string>
+    <string name="inbox_checklist_delete_failed">चेकलिस्ट हटाई नहीं जा सकी। कृपया फिर से आज़माएं।</string>
+
+    <!-- डिस्प्ले विकल्प -->
+    <string name="inbox_display_title">डिस्प्ले</string>
+    <string name="inbox_display_layout">लेआउट</string>
+    <string name="inbox_display_layout_cards">कार्ड</string>
+    <string name="inbox_display_layout_compact">कॉम्पैक्ट</string>
+    <string name="inbox_display_show_completed">पूर्ण टास्क</string>
+    <string name="inbox_display_sort">क्रम</string>
+    <string name="inbox_display_sort_manual">मैन्युअल</string>
+    <string name="inbox_display_sort_name">नाम से</string>
+    <string name="inbox_display_sort_priority">महत्व से</string>
+
+    <!-- प्रोजेक्ट्स टैब -->
+    <string name="projects_title">प्रोजेक्ट्स</string>
+    <string name="projects_add_checklist">नई चेकलिस्ट</string>
+    <string name="projects_complete">सब पूरा</string>
+    <plurals name="projects_open_count">
+        <item quantity="one">%1$d बाकी</item>
+        <item quantity="other">%1$d बाकी</item>
+    </plurals>
+    <string name="projects_empty_title">अभी कोई चेकलिस्ट नहीं</string>
+    <string name="projects_empty_description">एक चेकलिस्ट बनाएं, या इनबॉक्स में टास्क जोड़ें और बाद में चेकलिस्ट में बांट दें।</string>
 
     <!-- Overview screen (v2 tab hosting what the navigation drawer holds in control) -->
     <string name="overview_title">ओवरव्यू</string>

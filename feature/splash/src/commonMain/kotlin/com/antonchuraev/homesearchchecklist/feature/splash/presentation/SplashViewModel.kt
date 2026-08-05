@@ -20,7 +20,6 @@ import com.antonchuraev.homesearchchecklist.core.remoteconfig.api.RemoteConfigDe
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistItem
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.repository.ChecklistRepository
-import com.antonchuraev.homesearchchecklist.feature.checklist.domain.usecase.ReconcileInboxForControlArmUseCase
 import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.CompleteOnboardingUseCase
 import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.GetFirstChecklistVariantUseCase
 import com.antonchuraev.homesearchchecklist.feature.user.domain.usecase.GetFirstChecklistVariantUseCase.FirstChecklistVariant
@@ -56,7 +55,6 @@ class SplashViewModel(
     private val firstChecklistRepository: FirstChecklistRepository,
     private val activationPrefsRepository: ActivationPrefsRepository,
     private val navExperimentResolver: NavExperimentResolver,
-    private val reconcileInboxForControlArm: ReconcileInboxForControlArmUseCase,
 ) : ViewModel() {
 
     init {
@@ -139,24 +137,19 @@ class SplashViewModel(
             // user loses scroll position and in-progress edits) and re-roots the back stack
             // mid-task. Deliberately awaited rather than fire-and-forget for the same reason.
             //
-            // For a user whose arm is already persisted this is a DataStore read and costs nothing.
-            // For a user RC has not yet assigned it resolves to CONTROL without persisting, and the
-            // background fetchAndActivate() started in startBackgroundSync() makes the arm available
-            // from the NEXT launch — the assignment lands one launch late instead of mutating the
-            // shell in front of the user.
-            val resolvedArm = navExperimentResolver.ensureResolved()
-            log("nav experiment arm resolved before navigate: $resolvedArm")
+            // A DataStore read, or the v2 default for an install that never opened Settings.
+            val resolvedVariant = navExperimentResolver.ensureResolved()
+            log("nav variant resolved before navigate: $resolvedVariant")
 
-            // Rollback for a CONTROL-arm user who owns a system Inbox row (reinstall that re-synced
-            // the flagged row from Firestore, cleared DataStore, or an experiment wind-down): the row
-            // is hidden from Projects, every picker, the widget and MCP, and the only screen that can
-            // read it — the Inbox tab — does not exist in control, so the tasks inside are otherwise
-            // unreachable. The use case is one-shot, idempotent, and internally gated on an ASSIGNED
-            // control arm, so it can never touch a v2 user's Inbox.
-            //
-            // On appScope and NOT awaited: this must never delay navigate(). A rollback that costs
-            // startup latency would be paid by every launch, including the ~99% with nothing to repair.
-            appScope.launch { reconcileInboxForControlArm() }
+            // NOTE: the v1 Inbox rollback (ReconcileInboxForControlArmUseCase) used to run here and
+            // was REMOVED on 2026-08-03. It cleared `isInbox` whenever the user resolved to v1, which
+            // was correct while the arm was a permanent RC assignment. Now that v1/v2 is a setting the
+            // user can flip back, clearing the flag on every visit to v1 would orphan the Inbox: the
+            // next switch to v2 would auto-create a SECOND one and the captured tasks would sit in an
+            // ordinary checklist nobody looks at. Reachability in v1 is solved where it belongs, in
+            // the screen: MainScreenViewModel lists the unfiltered `checklists` flow, so an Inbox
+            // holding tasks shows up as an ordinary row while KEEPING its flag — which is what makes
+            // the switch reversible.
 
             navigateTo(userData.isOnboardingPassed, rcActivated, rcFetchMs, rcError, rcAttempts, rcRecoveredOnAttempt)
         }

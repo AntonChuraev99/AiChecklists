@@ -17,6 +17,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
@@ -24,6 +26,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.main_menu
+import aichecklists.core.designsystem.generated.resources.settings_classic_navigation
+import aichecklists.core.designsystem.generated.resources.settings_classic_navigation_description
 import aichecklists.core.designsystem.generated.resources.settings_dynamic_color
 import aichecklists.core.designsystem.generated.resources.settings_dynamic_color_description
 import aichecklists.core.designsystem.generated.resources.settings_language
@@ -93,6 +97,17 @@ fun SettingsScreenContent(
     selectedLanguage: AppLanguage,
     onLanguageChange: (AppLanguage) -> Unit,
     onBackClick: () -> Unit,
+    /**
+     * True while the app renders the previous (v1) shell. Defaulted so the Android preview file and
+     * any other caller that predates this switch keeps compiling and renders the new navigation.
+     */
+    classicNavigationEnabled: Boolean = false,
+    onClassicNavigationChange: (Boolean) -> Unit = {},
+    /**
+     * Host for the "couldn't save" message the classic-layout switch shows when its write fails.
+     * Nullable so previews and screenshot tests, which have no route above them, render without one.
+     */
+    snackbarHostState: SnackbarHostState? = null,
     drawerState: DrawerState? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -113,6 +128,9 @@ fun SettingsScreenContent(
         } else null,
         onBackButtonClick = if (drawerState == null) onBackClick else null,
         scrollBehavior = scrollBehavior,
+        snackbarHost = {
+            if (snackbarHostState != null) SnackbarHost(hostState = snackbarHostState)
+        },
     ) {
         Column(
             modifier = modifier
@@ -226,6 +244,22 @@ fun SettingsScreenContent(
                     onToggle = onDynamicColorChange,
                 )
             }
+
+            // ----------------------------------------------------------------
+            // Navigation layout. Last on the screen on purpose: it restructures
+            // the whole app, so it must not sit next to the everyday theme and
+            // language rows where it invites an idle tap.
+            // ----------------------------------------------------------------
+            Spacer(modifier = Modifier.height(AppDimens.SpacingLg))
+
+            ClassicNavigationRow(
+                enabled = classicNavigationEnabled,
+                onToggle = onClassicNavigationChange,
+            )
+
+            // Bottom breathing room: this is the last row of a scrollable column, and without it the
+            // switch sits flush against the navigation bar.
+            Spacer(modifier = Modifier.height(AppDimens.SpacingXl))
         }
     }
 }
@@ -336,6 +370,54 @@ private fun DynamicColorRow(
         supportingContent = {
             Text(
                 text = stringResource(Res.string.settings_dynamic_color_description),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        },
+        trailingContent = {
+            AppSwitch(
+                checked = enabled,
+                // null: row's toggleable modifier owns the click — avoids double-toggle.
+                onCheckedChange = null,
+            )
+        },
+        modifier = modifier
+            .toggleable(
+                value = enabled,
+                onValueChange = onToggle,
+                role = Role.Switch,
+            ),
+    )
+}
+
+/**
+ * Opt-out back to the previous navigation (drawer + bottom chat dock).
+ *
+ * Phrased as one switch rather than a two-option picker because it is not a symmetric choice: v2 is
+ * the product since the 2026-08-03 direction change, and this is the escape hatch that exists while
+ * v2 is unverified on web, tablet and desktop.
+ *
+ * The supporting line names what the user gets back — "drawer, chat at the bottom" — instead of
+ * saying "classic layout" twice. A switch whose only explanation restates its title tells the user
+ * nothing about what will change, and this one restructures the entire app.
+ */
+@Composable
+private fun ClassicNavigationRow(
+    enabled: Boolean,
+    onToggle: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    ListItem(
+        headlineContent = {
+            Text(
+                text = stringResource(Res.string.settings_classic_navigation),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        },
+        supportingContent = {
+            Text(
+                text = stringResource(Res.string.settings_classic_navigation_description),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

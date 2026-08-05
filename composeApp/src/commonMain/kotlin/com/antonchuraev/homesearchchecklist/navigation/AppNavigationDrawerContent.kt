@@ -143,9 +143,25 @@ fun AppNavigationDrawerContent(
     /**
      * Extra scroll room appended AFTER the footer, for hosts that render chrome over the bottom of
      * this content (the v2 Overview tab sits under a bottom bar + chat FAB). Default `0.dp` keeps
-     * the drawer — the control arm's only caller — rendering exactly as before.
+     * the drawer — the classic layout's only caller — rendering exactly as before.
      */
     bottomContentPadding: Dp = 0.dp,
+    /**
+     * [DrawerDestination] ids to omit, for a host that already reaches them another way.
+     *
+     * Exists because this content serves two shells with different navigation. In the classic layout
+     * it IS the navigation, so every row must be present. In v2 the Overview tab renders it under a
+     * bottom bar that already carries Projects and Calendar — listing them again puts two doors on
+     * one room, and Todoist's Overview (the v2 reference,
+     * `docs/reference/todoist-ui-reference/06-overview-settings-and-projects.png`) deliberately links
+     * to no other tab at all.
+     *
+     * A filter rather than a fork of this file: a second copy would silently miss the next row added
+     * here, which is exactly the drift the Overview tab was built to avoid.
+     *
+     * Empty by default — the classic drawer passes nothing and is untouched.
+     */
+    hiddenDestinationIds: Set<String> = emptySet(),
 ) {
     val uriHandler = LocalUriHandler.current
     val logger: AppLogger = koinInject()
@@ -195,28 +211,32 @@ fun AppNavigationDrawerContent(
         Spacer(modifier = Modifier.height(AppDimens.SpacingSm))
 
         DrawerSectionLabel(stringResource(Res.string.drawer_section_navigate))
-        NavigationDrawerItem(
-            label = { Text(stringResource(Res.string.drawer_item_home)) },
-            icon = { Icon(Icons.Outlined.Home, contentDescription = null) },
-            selected = selectedItemId == DrawerDestination.Main,
-            onClick = {
-                onCloseDrawer()
-                onHomeClick()
-            },
-            colors = drawerItemColors,
-            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
-        )
-        NavigationDrawerItem(
-            label = { Text(stringResource(Res.string.calendar_nav_label)) },
-            icon = { Icon(Icons.Outlined.CalendarMonth, contentDescription = null) },
-            selected = selectedItemId == DrawerDestination.Calendar,
-            onClick = {
-                onCloseDrawer()
-                onCalendarClick()
-            },
-            colors = drawerItemColors,
-            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
-        )
+        if (DrawerDestination.Main !in hiddenDestinationIds) {
+            NavigationDrawerItem(
+                label = { Text(stringResource(Res.string.drawer_item_home)) },
+                icon = { Icon(Icons.Outlined.Home, contentDescription = null) },
+                selected = selectedItemId == DrawerDestination.Main,
+                onClick = {
+                    onCloseDrawer()
+                    onHomeClick()
+                },
+                colors = drawerItemColors,
+                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+            )
+        }
+        if (DrawerDestination.Calendar !in hiddenDestinationIds) {
+            NavigationDrawerItem(
+                label = { Text(stringResource(Res.string.calendar_nav_label)) },
+                icon = { Icon(Icons.Outlined.CalendarMonth, contentDescription = null) },
+                selected = selectedItemId == DrawerDestination.Calendar,
+                onClick = {
+                    onCloseDrawer()
+                    onCalendarClick()
+                },
+                colors = drawerItemColors,
+                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+            )
+        }
         NavigationDrawerItem(
             label = { Text(stringResource(Res.string.nav_ai_chat)) },
             icon = { Icon(Icons.Outlined.SmartToy, contentDescription = null) },

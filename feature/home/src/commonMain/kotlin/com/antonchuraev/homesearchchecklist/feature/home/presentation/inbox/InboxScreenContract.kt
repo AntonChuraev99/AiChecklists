@@ -3,6 +3,9 @@ package com.antonchuraev.homesearchchecklist.feature.home.presentation.inbox
 import com.antonchuraev.homesearchchecklist.core.common.api.Intent
 import com.antonchuraev.homesearchchecklist.core.common.api.SideEffect
 import com.antonchuraev.homesearchchecklist.core.common.api.State
+import com.antonchuraev.homesearchchecklist.core.datastore.api.InboxDisplayOptions
+import com.antonchuraev.homesearchchecklist.core.datastore.api.InboxLayout
+import com.antonchuraev.homesearchchecklist.core.datastore.api.InboxSort
 
 /**
  * One task row of the v2 Inbox pager.
@@ -58,6 +61,23 @@ sealed interface InboxScreenState : State {
         val sheetForTaskId: String? = null,
         val movePickerOpen: Boolean = false,
         val moveTargets: List<InboxPage> = emptyList(),
+        /** Overflow menu of the CURRENT page's checklist. Never opened on the system Inbox page. */
+        val listMenuOpen: Boolean = false,
+        /**
+         * Non-null while the rename dialog is up; holds the draft text, seeded with the current title.
+         *
+         * A nullable draft rather than a `renameOpen: Boolean` + `renameDraft: String` pair: two
+         * fields can disagree (dialog closed with a stale draft still in state), and the next open
+         * would then show the previous checklist's name.
+         */
+        val renameDraft: String? = null,
+        val deleteConfirmationOpen: Boolean = false,
+        /**
+         * Already APPLIED to [pages] by the ViewModel — the screen renders the list verbatim and
+         * reads these only to draw the sheet's current selection and to pick the row layout.
+         */
+        val displayOptions: InboxDisplayOptions = InboxDisplayOptions(),
+        val displayOptionsOpen: Boolean = false,
     ) : InboxScreenState
 }
 
@@ -84,6 +104,44 @@ sealed interface InboxIntent : Intent {
 
     /** Opens the full checklist detail screen for [checklistId] (offered on project pages only). */
     data class OnOpenProject(val checklistId: Long) : InboxIntent
+
+    // ─── Toolbar ──────────────────────────────────────────────────────────────
+    /** Leading toolbar icon: opens the display-options sheet. */
+    data object OnDisplayOptionsClick : InboxIntent
+    data object OnDisplayOptionsDismiss : InboxIntent
+
+    /**
+     * Applied immediately, not on a "Done" tap.
+     *
+     * Todoist confirms its sheet with a button; here every option is a single persisted value with
+     * no interdependencies, so applying on tap lets the user SEE the list re-render under the sheet
+     * and undo by tapping the other option. A confirm step would hide that feedback behind a commit.
+     */
+    data class OnLayoutSelected(val layout: InboxLayout) : InboxIntent
+    data class OnSortSelected(val sort: InboxSort) : InboxIntent
+    data class OnShowCompletedChanged(val show: Boolean) : InboxIntent
+
+    data object OnListMenuOpen : InboxIntent
+    data object OnListMenuDismiss : InboxIntent
+
+    /**
+     * Opens the current page's checklist in the detail screen.
+     *
+     * Distinct from [OnOpenProject], which carries an id: this one is raised from the toolbar menu,
+     * where the only meaningful target is whatever page the pager is settled on. Carrying an id
+     * captured when the menu OPENED would let a swipe underneath it navigate to the wrong checklist.
+     */
+    data object OnOpenCurrentChecklist : InboxIntent
+
+    /** Opens the rename dialog seeded with the current page's title. */
+    data object OnRenameChecklistClick : InboxIntent
+    data class OnRenameDraftChanged(val text: String) : InboxIntent
+    data object OnConfirmRenameChecklist : InboxIntent
+    data object OnDismissRenameChecklist : InboxIntent
+
+    data object OnDeleteChecklistClick : InboxIntent
+    data object OnConfirmDeleteChecklist : InboxIntent
+    data object OnDismissDeleteChecklist : InboxIntent
 }
 
 /**

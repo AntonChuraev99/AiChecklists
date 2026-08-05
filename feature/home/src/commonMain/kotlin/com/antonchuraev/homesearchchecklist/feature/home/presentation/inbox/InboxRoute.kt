@@ -33,6 +33,10 @@ import org.koin.compose.viewmodel.koinViewModel
  *   up — a flag private to this screen would leave the "+" FAB floating over its own dock.
  * @param onCreateDockDismiss fired when the user dismisses the dock (BACK, scrim tap). The host
  *   clears [createDockOpen]; this screen never hides the dock on its own.
+ * @param homeSignal monotonic counter the shell increments every time the Inbox TAB is tapped. The
+ *   pager page lives in the screen and survives the tab's pop-to-root, so without this signal the tab
+ *   named "Inbox" reopens whatever project page was last swiped to. A counter rather than a Boolean:
+ *   a repeated tap on the already-selected tab must still return home.
  */
 @Composable
 fun InboxRoute(
@@ -42,6 +46,7 @@ fun InboxRoute(
     // silent compiler, which is how the rail shipped one.
     createDockOpen: Boolean,
     onCreateDockDismiss: () -> Unit,
+    homeSignal: Int = 0,
     viewModel: InboxViewModel = koinViewModel(),
 ) {
     val state by viewModel.screenState.collectAsStateWithLifecycle()
@@ -65,5 +70,6 @@ fun InboxRoute(
         swallowRootBack = swallowRootBack,
         createDockOpen = createDockOpen,
         onCreateDockDismiss = onCreateDockDismiss,
+        homeSignal = homeSignal,
     )
 }

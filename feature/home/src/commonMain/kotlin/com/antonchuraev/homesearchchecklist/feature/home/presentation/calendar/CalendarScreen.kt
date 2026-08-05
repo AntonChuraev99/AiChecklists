@@ -2,6 +2,7 @@ package com.antonchuraev.homesearchchecklist.feature.home.presentation.calendar
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -42,6 +44,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.animation.animateColorAsState
@@ -60,6 +64,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -82,11 +87,14 @@ import aichecklists.core.designsystem.generated.resources.calendar_next_week
 import aichecklists.core.designsystem.generated.resources.calendar_prev_week
 import aichecklists.core.designsystem.generated.resources.calendar_title
 import aichecklists.core.designsystem.generated.resources.today_open_menu
+import aichecklists.core.designsystem.generated.resources.today_quick_add_placeholder
 import androidx.compose.material3.TopAppBarDefaults
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButton
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppButtonText
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
 import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
+import com.antonchuraev.homesearchchecklist.desingsystem.components.PlatformBackHandler
+import com.antonchuraev.homesearchchecklist.desingsystem.components.QuickCaptureDock
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
 import com.antonchuraev.homesearchchecklist.desingsystem.theme.AppDimens
@@ -149,10 +157,55 @@ fun CalendarScreen(
      * control arm passes) keeps the previous padding exactly.
      */
     contentBottomPadding: Dp = 0.dp,
+    /**
+     * Quick-capture, mirroring the Inbox tab's dock. Defaults make every existing caller (control
+     * arm, previews, tests) render exactly as before: no dock, no snackbar host of its own.
+     *
+     * The dock is hoisted to the HOST for the same reason the Inbox one is — the v2 shell's FABs are
+     * drawn above this screen and must hide while it is up.
+     */
+    quickAddText: String = "",
+    captureDockOpen: Boolean = false,
+    /**
+     * Whether this HOST offers a capture affordance at all — NOT whether the dock is currently up
+     * ([captureDockOpen]), which is false most of the time on a host that can still open it.
+     *
+     * Only the Today body's empty-state copy reads it, to choose between naming the capture input
+     * and staying neutral. Default false = the classic layout's wording, which has neither FAB nor
+     * dock, so that arm needs no call-site change.
+     */
+    captureEnabled: Boolean = false,
+    onCaptureDockDismiss: () -> Unit = {},
+    onQuickAddTextChange: (String) -> Unit = {},
+    onQuickAddSubmit: () -> Unit = {},
+    snackbarHostState: SnackbarHostState? = null,
 ) {
     val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState(initialPage = 0, pageCount = { 2 })
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+
+    // Capture is offered on BOTH pages of this tab, deliberately.
+    //
+    // It used to be gated on the Today page, and that turned the shell's "+" into a DEAD BUTTON on
+    // the week grid: the shell computes FAB visibility from the OUTER tab, so the button rendered
+    // there, tapping it raised this flag — which hides both FABs — and no dock ever appeared. BACK
+    // was not intercepted either (it is gated on the same value), so the only way out of that state
+    // was leaving the tab. Auto-closing the dock when the page leaves 0 does not fix it: tapping "+"
+    // on the week page would still do nothing visible, which is the same dead button one frame
+    // shorter.
+    //
+    // The gate had no product basis to preserve. A capture ALWAYS lands in the system Inbox (see
+    // TodayViewModel.captureTask) — never on the page under it, not even on Today — so the visible
+    // page carries no ambiguity to resolve, and the snackbar names where the task went either way.
+    val captureVisible = captureDockOpen
+
+    // While the dock is up it occupies the bottomBar slot, so the Scaffold has already shortened the
+    // content by its height; reserving the FAB band on top of that strands the list above a blank
+    // band the height of a button stack that is not on screen. Mirrors InboxScreen.
+    val bodyBottomPadding = if (captureVisible) 0.dp else contentBottomPadding
+
+    // BACK closes the dock before anything else — the user is escaping the keyboard, not the screen.
+    PlatformBackHandler(enabled = captureVisible) { onCaptureDockDismiss() }
 
     AppScaffold(
         title = stringResource(Res.string.calendar_title),
@@ -168,6 +221,22 @@ fun CalendarScreen(
             }
         } else null,
         scrollBehavior = scrollBehavior,
+        snackbarHost = {
+            if (snackbarHostState != null) SnackbarHost(hostState = snackbarHostState)
+        },
+        // bottomBar, not inside the content: this slot is the only one AppScaffold lifts above the
+        // keyboard (it applies ime ∪ navigationBars). Hosting the dock in the content forced a manual
+        // imePadding() on the Inbox tab and slid the input off-screen — same trap, same fix.
+        bottomBar = {
+            if (captureVisible) {
+                QuickCaptureDock(
+                    text = quickAddText,
+                    onTextChange = onQuickAddTextChange,
+                    onAdd = onQuickAddSubmit,
+                    placeholder = stringResource(Res.string.today_quick_add_placeholder),
+                )
+            }
+        },
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             PrimaryTabRow(
@@ -187,7 +256,36 @@ fun CalendarScreen(
             }
             HorizontalPager(
                 state = pagerState,
-                modifier = Modifier.fillMaxSize(),
+                // Tap-outside-to-dismiss for the capture dock. Without it BACK is the ONLY way out
+                // — and on wasmJs `PlatformBackHandler` is an empty actual, so web users were left
+                // with a raised keyboard, no FABs and no exit but a tab switch.
+                //
+                // It rides the PAGER'S OWN modifier chain rather than a full-bleed overlay Box, and
+                // both halves of that matter:
+                //  - Scoped to the pager, the tab row above stays live. An overlay sized to the
+                //    whole Column covered the tabs too, so while the dock was up the first tap on
+                //    Today/Calendar only dismissed and switching pages cost two taps.
+                //  - In the chain rather than over it, the pages keep scrolling while capturing.
+                //    An overlay cannot be "tapped through": hit-testing stops at the topmost
+                //    sibling that hits, and a sibling below is reached only if the one above opts
+                //    into `sharePointerInputWithSiblings()`, which `pointerInput` does not
+                //    (PointerInputModifierNode defaults it to false). Consumption is beside the
+                //    point — `detectTapGestures` consumes the down as well.
+                //    As an ANCESTOR it is dispatched after its children on the Main pass, so a
+                //    vertical scroll or a page swipe consumes the movement first and cancels the
+                //    tap, and a row's own `clickable` consumes the down, so tapping a reminder
+                //    opens it instead of being spent on dismissing the dock.
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(
+                        if (captureVisible) {
+                            Modifier.pointerInput(Unit) {
+                                detectTapGestures(onTap = { onCaptureDockDismiss() })
+                            }
+                        } else {
+                            Modifier
+                        }
+                    ),
             ) { page ->
                 when (page) {
                     0 -> TodayBody(
@@ -195,12 +293,13 @@ fun CalendarScreen(
                         onReminderClick = onTodayReminderClick,
                         onCreateChecklistClick = onTodayCreateChecklistClick,
                         onRetry = onTodayRetry,
-                        contentBottomPadding = contentBottomPadding,
+                        contentBottomPadding = bodyBottomPadding,
+                        canCapture = captureEnabled,
                     )
                     1 -> CalendarTabBody(
                         state = calendarState,
                         onIntent = onCalendarIntent,
-                        contentBottomPadding = contentBottomPadding,
+                        contentBottomPadding = bodyBottomPadding,
                     )
                 }
             }
@@ -307,7 +406,21 @@ private fun CalendarContent(
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    // The readable-width cap sits HERE rather than on the agenda list, so the week grid and the
+    // agenda under it share one column edge — capping only the list left a full-bleed 1280dp grid
+    // of 175dp squares above a 720dp list.
+    //
+    // wrapContentWidth between the fill and the cap is what makes the cap bind at all: fillMaxSize
+    // pins minWidth == maxWidth to the pane, and Constraints.constrain() coerces a widthIn(max)
+    // back up into that fixed range, so `.fillMaxSize().adaptiveContentWidth()` is a no-op. This
+    // relaxes the minimum back to 0 so the cap can cut the width, then centres the capped column in
+    // the pane the wrapper still occupies. Same chain as the Inbox and Projects tabs.
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .wrapContentWidth(Alignment.CenterHorizontally)
+            .adaptiveContentWidth(),
+    ) {
 
         // ---- Top banner: week grid (free for everyone — monetization TBD) ----
         WeekGridContent(
@@ -375,7 +488,9 @@ private fun AgendaListContent(
 ) {
     LazyColumn(
         state = listState,
-        modifier = modifier.fillMaxSize().adaptiveContentWidth(),
+        // No width cap here — CalendarContent already caps the column this list lives in, and a
+        // second widthIn(max) inside an already-narrower parent would be dead weight.
+        modifier = modifier.fillMaxSize(),
         // The host reserve is ADDED to the existing SpacingXl, never substituted for it: 0.dp in the
         // control arm reproduces the original padding exactly.
         contentPadding = PaddingValues(bottom = AppDimens.SpacingXl + contentBottomPadding),

@@ -2,8 +2,13 @@ package com.antonchuraev.homesearchchecklist.feature.home.presentation.inbox
 
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.error_create_checklist_failed
+import aichecklists.core.designsystem.generated.resources.error_save_failed
 import aichecklists.core.designsystem.generated.resources.inbox_task_update_failed
 import aichecklists.core.designsystem.generated.resources.inbox_checklist_name
+import aichecklists.core.designsystem.generated.resources.fill_error_name_required
+import aichecklists.core.designsystem.generated.resources.inbox_checklist_delete_failed
+import aichecklists.core.designsystem.generated.resources.inbox_checklist_deleted_message
+import aichecklists.core.designsystem.generated.resources.inbox_checklist_rename_failed
 import aichecklists.core.designsystem.generated.resources.inbox_task_add_failed
 import aichecklists.core.designsystem.generated.resources.inbox_task_delete_failed
 import aichecklists.core.designsystem.generated.resources.inbox_task_deleted_message
@@ -16,6 +21,9 @@ import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsParams
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
 import com.antonchuraev.homesearchchecklist.core.common.api.AppLogger
 import com.antonchuraev.homesearchchecklist.core.common.api.AppViewModel
+import com.antonchuraev.homesearchchecklist.core.datastore.api.InboxDisplayOptions
+import com.antonchuraev.homesearchchecklist.core.datastore.api.InboxDisplayPrefsRepository
+import com.antonchuraev.homesearchchecklist.core.datastore.api.InboxSort
 import com.antonchuraev.homesearchchecklist.core.navigation.api.AppNavigator
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.Checklist
 import com.antonchuraev.homesearchchecklist.feature.checklist.domain.model.ChecklistFill
@@ -37,6 +45,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.isoDayNumber
@@ -69,6 +78,7 @@ class InboxViewModel(
     // Checking a task must cancel that task's alarm here exactly as it does on the detail screen —
     // otherwise a reminder still fires for a task the user completed in the Inbox.
     private val reminderScheduler: ChecklistReminderScheduler,
+    private val displayPrefs: InboxDisplayPrefsRepository,
     private val navigator: AppNavigator,
     private val analytics: AnalyticsTracker,
     private val logger: AppLogger,
@@ -84,16 +94,51 @@ class InboxViewModel(
     private val _sheetForTaskId = MutableStateFlow<String?>(null)
     private val _movePickerOpen = MutableStateFlow(false)
 
+    /**
+     * The toolbar overflow's three mutually-exclusive surfaces, held as ONE value.
+     *
+     * Grouped rather than kept as three sibling flows for two reasons. Kotlin's typed `combine` tops
+     * out at five sources, and — more importantly — these three can never be open at once: the menu
+     * closes when it launches a dialog. Three independent booleans make the illegal state
+     * ("menu and delete dialog both up") representable and reachable through any missed transition.
+     */
+    private data class ListMenuState(
+        val menuOpen: Boolean = false,
+        val renameDraft: String? = null,
+        val deleteConfirmationOpen: Boolean = false,
+    )
+
+    private val _listMenu = MutableStateFlow(ListMenuState())
+    private val _displayOptionsOpen = MutableStateFlow(false)
+
     private val _sideEffect = MutableSharedFlow<InboxSideEffect>(extraBufferCapacity = 16)
     val sideEffect: Flow<InboxSideEffect> = _sideEffect.asSharedFlow()
 
+    /**
+     * Display options applied to the pager's pages, plus the open/closed state of the sheet that
+     * edits them. Combined here so the sorted/filtered pages and the sheet share one source.
+     */
+    private val displayState = combine(
+        displayPrefs.observeDisplayOptions(),
+        _displayOptionsOpen,
+    ) { options, sheetOpen -> options to sheetOpen }
+
     override val screenState: StateFlow<InboxScreenState> = combine(
-        _pages,
+        // Pages arrive from the repository in TEMPLATE order; the display options are applied here,
+        // at the edge, so every consumer downstream (the count in the toolbar, the task sheet, the
+        // move targets) sees exactly what the list shows. Sorting inside the list composable instead
+        // would make the toolbar count disagree with the visible rows whenever completed tasks are
+        // hidden.
+        combine(_pages, displayState) { pages, (options, sheetOpen) ->
+            Triple(pages?.map { it.applyDisplayOptions(options) }, options, sheetOpen)
+        },
         _selectedPage,
         _quickAddText,
-        _sheetForTaskId,
-        _movePickerOpen,
-    ) { pages, selected, quickAddText, sheetForTaskId, movePickerOpen ->
+        // Paired so the whole state still fits typed `combine`'s five-source ceiling; the task sheet
+        // and its move picker belong to one interaction, so pairing them costs no clarity.
+        combine(_sheetForTaskId, _movePickerOpen) { sheet, picker -> sheet to picker },
+        _listMenu,
+    ) { (pages, displayOptions, displayOptionsOpen), selected, quickAddText, (sheetForTaskId, movePickerOpen), listMenu ->
         if (pages == null) {
             InboxScreenState.Loading
         } else {
@@ -109,6 +154,15 @@ class InboxViewModel(
                 sheetForTaskId = sheetForTaskId,
                 movePickerOpen = movePickerOpen,
                 moveTargets = pages.filter { !it.isInbox && it.checklistId != current?.checklistId },
+                // Forced shut on the Inbox page. The system Inbox cannot be renamed or deleted, so
+                // every entry of this menu would be inert there — and the page can change under an
+                // OPEN menu (a swipe, or a project deleted on another device shifting the pager),
+                // which would otherwise leave a live "Delete checklist" pointed at the Inbox.
+                listMenuOpen = listMenu.menuOpen && current?.isInbox == false,
+                renameDraft = listMenu.renameDraft.takeIf { current?.isInbox == false },
+                deleteConfirmationOpen = listMenu.deleteConfirmationOpen && current?.isInbox == false,
+                displayOptions = displayOptions,
+                displayOptionsOpen = displayOptionsOpen,
             )
         }
     }.defaultStateIn(InboxScreenState.Loading)
@@ -190,12 +244,114 @@ class InboxViewModel(
             InboxIntent.OnDeleteTask -> deleteTask()
             is InboxIntent.OnOpenProject -> {
                 closeSheets()
+                _listMenu.value = ListMenuState()
                 navigator.navigateToChecklistDetail(intent.checklistId)
             }
+
+            InboxIntent.OnDisplayOptionsClick -> _displayOptionsOpen.value = true
+            InboxIntent.OnDisplayOptionsDismiss -> _displayOptionsOpen.value = false
+
+            // Each write goes straight to DataStore and comes back through observeDisplayOptions —
+            // the sheet has no local copy to fall out of sync with, and the list re-renders under the
+            // open sheet so the change is visible while choosing.
+            is InboxIntent.OnLayoutSelected -> persistDisplayOption("layout=${intent.layout}") {
+                displayPrefs.setLayout(intent.layout)
+            }
+
+            is InboxIntent.OnSortSelected -> persistDisplayOption("sort=${intent.sort}") {
+                displayPrefs.setSort(intent.sort)
+            }
+
+            is InboxIntent.OnShowCompletedChanged -> persistDisplayOption("showCompleted=${intent.show}") {
+                displayPrefs.setShowCompleted(intent.show)
+            }
+
+            InboxIntent.OnListMenuOpen -> _listMenu.value = ListMenuState(menuOpen = true)
+            InboxIntent.OnListMenuDismiss -> _listMenu.value = ListMenuState()
+
+            InboxIntent.OnOpenCurrentChecklist -> {
+                val page = currentPage()
+                if (page == null) {
+                    // Cannot happen while the menu is reachable (it only renders over a page), but a
+                    // silent return here would be a dead menu row — log it rather than swallow it.
+                    logger.warning(TAG, "open-current skipped: no settled page")
+                } else {
+                    closeSheets()
+                    _listMenu.value = ListMenuState()
+                    navigator.navigateToChecklistDetail(page.checklistId)
+                }
+            }
+
+            // Seeded from the CURRENT page rather than from an empty string: renaming is almost
+            // always an edit of the existing name, and an empty field would make the user retype it.
+            InboxIntent.OnRenameChecklistClick -> _listMenu.value = ListMenuState(
+                renameDraft = currentPage()?.title.orEmpty(),
+            )
+
+            is InboxIntent.OnRenameDraftChanged -> _listMenu.update { it.copy(renameDraft = intent.text) }
+            InboxIntent.OnConfirmRenameChecklist -> renameChecklist()
+            InboxIntent.OnDismissRenameChecklist -> _listMenu.value = ListMenuState()
+
+            InboxIntent.OnDeleteChecklistClick ->
+                _listMenu.value = ListMenuState(deleteConfirmationOpen = true)
+
+            InboxIntent.OnConfirmDeleteChecklist -> deleteChecklist()
+            InboxIntent.OnDismissDeleteChecklist -> _listMenu.value = ListMenuState()
         }
     }
 
+    /**
+     * Projects one page through the display options: hide completed, then reorder.
+     *
+     * A projection only — nothing here writes back. [InboxSort.MANUAL] returns the list untouched
+     * BECAUSE that is already the stored template order; re-sorting by anything else and persisting
+     * it would rewrite the order the detail screen, the widget and MCP all read.
+     *
+     * `sortedBy`/`sortedByDescending` are stable in Kotlin, so ties inside NAME and PRIORITY keep
+     * manual order rather than shuffling between emissions.
+     */
+    private fun InboxPage.applyDisplayOptions(options: InboxDisplayOptions): InboxPage {
+        val visible = if (options.showCompleted) tasks else tasks.filterNot { it.checked }
+        val ordered = when (options.sort) {
+            InboxSort.MANUAL -> visible
+            // Case-insensitive: an A/a split reads as a broken sort, not as a rule.
+            InboxSort.NAME -> visible.sortedBy { it.text.lowercase() }
+            InboxSort.PRIORITY -> visible.sortedByDescending { it.priority }
+        }
+        return copy(tasks = ordered)
+    }
+
+    /** The page the pager is settled on, clamped exactly as [screenState] clamps it. */
+    private fun currentPage(): InboxPage? {
+        val pages = _pages.value ?: return null
+        return pages.getOrNull(_selectedPage.value.coerceIn(0, (pages.size - 1).coerceAtLeast(0)))
+    }
+
     // ── Writes ───────────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Persists one display option, wrapped exactly like every other write in this class.
+     *
+     * Not a bare `viewModelScope.launch { … }`: [InboxDisplayPrefsRepository] delegates straight to
+     * DataStore's `edit {}`, which catches nothing, so an IOException (full disk, corrupted
+     * preferences file, OPFS quota on web) escapes into the scope and — on Android — reaches the
+     * platform's uncaught handler. Crashing the app on a settings tap is not an acceptable failure
+     * mode for a display preference.
+     *
+     * The message is not optional either: the sheet renders the STORED value, so a write that failed
+     * shows up as the radio button snapping back with no explanation.
+     *
+     * @param description what was being written, for the log line only — never user-facing.
+     */
+    private fun persistDisplayOption(description: String, write: suspend () -> Unit) {
+        viewModelScope.launch {
+            runCatching { write() }.onFailure { e ->
+                if (e is CancellationException) throw e
+                logger.error(TAG, "display option write failed ($description): ${e.message}", e)
+                emitMessage(Res.string.error_save_failed)
+            }
+        }
+    }
 
     /**
      * Appends the trimmed quick-add text to the CURRENTLY VISIBLE page's checklist.
@@ -505,6 +661,120 @@ class InboxViewModel(
         }
     }
 
+    // ── Toolbar overflow: whole-checklist actions ────────────────────────────────────────────
+
+    /**
+     * Renames the CURRENT page's checklist.
+     *
+     * Guarded against the system Inbox at three layers — the menu is not offered there
+     * ([screenState] forces it shut), and [decideRename] re-checks — because the page under an open
+     * dialog can change: a sync deleting the project the user is renaming shifts the pager, and
+     * without the re-read the confirm would rename whatever slid into the slot.
+     *
+     * Each outcome of [decideRename] gets its OWN reaction. One branch covering both a blank draft
+     * and a vanished target is what told the user "Enter a name" about a name they had entered.
+     */
+    private fun renameChecklist() {
+        val page = currentPage()
+        when (val decision = decideRename(_listMenu.value.renameDraft, page)) {
+            RenameDecision.BlankName -> {
+                // Blank input is a user action like any other: closing the dialog with no word about
+                // it reads as "the app ate my rename". The message names the reason.
+                _listMenu.value = ListMenuState()
+                emitMessage(Res.string.fill_error_name_required)
+            }
+
+            RenameDecision.InvalidTarget -> {
+                // Nothing else records this one: the write never starts, so there is no failed
+                // repository call to log later, and the user is only told the rename did not happen.
+                logger.warning(
+                    TAG,
+                    "rename skipped: page=${page?.checklistId} isInbox=${page?.isInbox}",
+                )
+                _listMenu.value = ListMenuState()
+                emitMessage(Res.string.inbox_checklist_rename_failed)
+            }
+
+            // Nothing to write and nothing went wrong — just close the dialog.
+            RenameDecision.Unchanged -> _listMenu.value = ListMenuState()
+
+            is RenameDecision.Rename -> viewModelScope.launch {
+                runCatching {
+                    val checklist = repository.getChecklistById(decision.checklistId)
+                        ?: error("Checklist ${decision.checklistId} not found")
+                    // updateChecklist, not updateChecklistTemplate: the name lives on the checklist
+                    // ROW, and the template writer only carries the item list — it would drop the
+                    // rename.
+                    repository.updateChecklist(checklist.copy(name = decision.name))
+                }.onSuccess {
+                    _listMenu.value = ListMenuState()
+                    // No snackbar: the toolbar title is the confirmation, and it updates in the same
+                    // frame. A message on top of a visible change is noise.
+                }.onFailure { e ->
+                    if (e is CancellationException) throw e
+                    logger.error(
+                        TAG,
+                        "rename of checklist ${decision.checklistId} failed: ${e.message}",
+                        e,
+                    )
+                    _listMenu.value = ListMenuState()
+                    emitMessage(Res.string.inbox_checklist_rename_failed)
+                }
+            }
+        }
+    }
+
+    /**
+     * Deletes the CURRENT page's checklist, alarms first.
+     *
+     * The two `cancel*` calls are not optional bookkeeping: alarms are held by the platform
+     * scheduler keyed on the checklist id, so deleting the row without cancelling leaves a reminder
+     * that still fires and deep-links into a checklist that no longer exists. Same order as
+     * `ChecklistDetailViewModel.deleteChecklist`.
+     *
+     * No navigation afterwards — unlike the detail screen, the user is standing on a pager that
+     * simply loses a page; [screenState] clamps the index and the anchor in the UI re-anchors.
+     */
+    private fun deleteChecklist() {
+        val page = currentPage()
+        if (page == null || page.isInbox) {
+            logger.warning(TAG, "checklist delete skipped: page=${page?.checklistId} isInbox=${page?.isInbox}")
+            _listMenu.value = ListMenuState()
+            // The user has already confirmed a destructive action in a dialog; closing it with
+            // nothing deleted and nothing said reads as "it worked" until they notice the checklist
+            // is still there.
+            emitMessage(Res.string.inbox_checklist_delete_failed)
+            return
+        }
+
+        viewModelScope.launch {
+            runCatching {
+                val checklist = repository.getChecklistById(page.checklistId)
+                    ?: error("Checklist ${page.checklistId} not found")
+                reminderScheduler.cancelReminder(checklist.id)
+                reminderScheduler.cancelRepeat(checklist.id)
+                repository.deleteChecklist(checklist)
+                checklist
+            }.onSuccess { checklist ->
+                _listMenu.value = ListMenuState()
+                analytics.event(
+                    AnalyticsEvents.Checklist.DELETED,
+                    mapOf(
+                        AnalyticsParams.CHECKLIST_ID to checklist.id.toString(),
+                        AnalyticsParams.ITEM_COUNT to page.tasks.size.toString(),
+                        AnalyticsParams.SOURCE to "inbox_overflow",
+                    ),
+                )
+                emitMessage(Res.string.inbox_checklist_deleted_message)
+            }.onFailure { e ->
+                if (e is CancellationException) throw e
+                logger.error(TAG, "delete of checklist ${page.checklistId} failed: ${e.message}", e)
+                _listMenu.value = ListMenuState()
+                emitMessage(Res.string.inbox_checklist_delete_failed)
+            }
+        }
+    }
+
     /**
      * Importance uses [ChecklistRepository.togglePriority], which already dual-writes fill+template
      * atomically — re-implementing the pair here would be a second, divergent copy of that logic.
@@ -636,4 +906,41 @@ class InboxViewModel(
          */
         const val SOURCE_INBOX_TAB = "inbox_tab"
     }
+}
+
+/**
+ * What confirming the rename dialog should do. One value per outcome, because the three ways it can
+ * fail need three different reactions and merging any two of them lies to the user — the shipped
+ * version reported "Enter a name" when the name was fine and the TARGET had gone.
+ *
+ * Extracted from [InboxViewModel] rather than inlined so the distinction is pinned by a test: the
+ * ViewModel itself cannot be built on a JVM host (its `init` resolves the Inbox title through
+ * Compose Resources), so a guard left inside it is unreachable from `commonTest`.
+ */
+internal sealed interface RenameDecision {
+    /** The user's own input is empty or whitespace — actionable, and their doing. */
+    data object BlankName : RenameDecision
+
+    /**
+     * The input was fine and there is nothing to apply it to: no settled page, or the system Inbox
+     * (which has no rename) slid into the slot while the dialog was open — a sync deleting the
+     * project being renamed shifts the whole pager.
+     */
+    data object InvalidTarget : RenameDecision
+
+    /** Same name as before. Not a failure: close the dialog and write nothing. */
+    data object Unchanged : RenameDecision
+
+    /** @param name already trimmed — the stored name must not carry the user's stray spaces. */
+    data class Rename(val checklistId: Long, val name: String) : RenameDecision
+}
+
+internal fun decideRename(draft: String?, page: InboxPage?): RenameDecision {
+    val trimmed = draft?.trim()
+    // Blank first: with no name to apply, WHICH page is selected cannot matter, and "Enter a name"
+    // is the one message the user can act on.
+    if (trimmed.isNullOrEmpty()) return RenameDecision.BlankName
+    if (page == null || page.isInbox) return RenameDecision.InvalidTarget
+    if (trimmed == page.title) return RenameDecision.Unchanged
+    return RenameDecision.Rename(checklistId = page.checklistId, name = trimmed)
 }

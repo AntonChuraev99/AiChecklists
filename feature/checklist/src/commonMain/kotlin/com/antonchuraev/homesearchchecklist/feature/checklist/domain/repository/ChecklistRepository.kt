@@ -18,12 +18,17 @@ interface ChecklistRepository {
     /**
      * [checklists] minus the auto-created system Inbox — the user-visible "projects".
      *
-     * This, not [checklists], is what every list / picker / free-tier counter must read: the Inbox
-     * is an implementation detail of the v2 nav arm's quick-capture zone, and letting it surface
-     * would both confuse the user and consume one of the 5 free checklist slots — a monetisation
-     * difference between the A/B arms rather than a cosmetic bug.
+     * This, not [checklists], is what every picker and every free-tier / analytics counter must read:
+     * the Inbox is the v2 shell's quick-capture zone, and letting it surface there would both confuse
+     * the user and consume one of the 5 free checklist slots — a monetisation difference between the
+     * two shells rather than a cosmetic bug.
      *
-     * In the control arm no row is ever flagged, so this is identical to [checklists].
+     * The one deliberate exception is the v1 (Classic layout) home LIST, which reads [checklists]:
+     * that shell has no Inbox surface of its own, so filtering there would strand every captured task
+     * behind a settings toggle. See `MainScreenViewModel.checklistsWithProgress`.
+     *
+     * For a user who has never opened the v2 shell no row is flagged, so this is identical to
+     * [checklists].
      *
      * Has a default body (like [deleteCompletedItems] / [setReminderFullScreen]) purely so the many
      * inline test fakes of this interface keep compiling; the real
@@ -56,23 +61,27 @@ interface ChecklistRepository {
      * exists, so it becomes an ordinary project again. Returns true when a row was actually
      * de-flagged, false when there was nothing to do.
      *
-     * ## Why this has to exist
-     * A flagged row is invisible to [projects], to every picker, to the widget's DAO query, to the
-     * free-tier count and to MCP — and the ONLY screen that can read it is the v2 arm's Inbox tab.
-     * A user who ends up on CONTROL while owning a flagged row therefore loses access to every task
-     * captured in it: the row still exists and still syncs, but nothing in the control app can list,
-     * open or delete it. That happens for real — a reinstall re-syncs the flagged row from Firestore
-     * before Remote Config has assigned an arm, a cleared DataStore drops the sticky assignment, and
-     * an experiment wind-down leaves the console on "control". This is the rollback path for the
-     * experiment's lifecycle, not a cosmetic filter.
+     * ## ⚠️ Currently UNCALLED — kept as a repair tool, not as a code path
+     * A flagged row is invisible to [projects], and through it to every picker, to the widget's DAO
+     * query, to the free-tier count and to MCP. Two screens can still read it: the v2 Inbox tab, and
+     * the v1 home list — which reads the unfiltered [checklists] flow precisely so that a flagged row
+     * carrying tasks is never stranded when the user turns "Classic layout" on
+     * (`MainScreenViewModel.checklistsWithProgress`).
+     *
+     * This used to run automatically on every launch that resolved to v1
+     * (`ReconcileInboxForControlArmUseCase`, deleted 2026-08-03 together with its call site in
+     * `SplashViewModel`). That was right while the shell was a permanent Remote Config assignment.
+     * It is WRONG now that v1/v2 is a user setting the user can flip back: clearing the flag on
+     * every visit to v1 orphans the Inbox, and the next switch to v2 auto-creates a second one, so
+     * the captured tasks end up in an ordinary checklist nobody opens. Keeping the flag and listing
+     * the row instead is what makes the switch reversible.
      *
      * Preserves the row's name, items, fills and cloudId — nothing is deleted, the row is only
      * demoted — and marks it dirty so the cleared flag propagates to the user's other devices.
      *
-     * Callers MUST gate this on a *definitively assigned* CONTROL arm; see
-     * [com.antonchuraev.homesearchchecklist.feature.checklist.domain.usecase.ReconcileInboxForControlArmUseCase],
-     * which is the only intended caller. Never call it from a screen: for a v2 user this would
-     * dissolve their Inbox into the Projects list.
+     * Never call it from a screen: for a user on v2 this dissolves their Inbox into the Projects
+     * list. If a repair path is ever needed again, it must be one-shot and explicitly triggered,
+     * not launch-scoped.
      *
      * Default body returns false so inline test fakes keep compiling.
      */
