@@ -5,9 +5,12 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -42,6 +45,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.padding
@@ -61,6 +66,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.DriveFileMove
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandLess
@@ -71,6 +77,7 @@ import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.ChecklistRtl
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.CreateNewFolder
@@ -102,6 +109,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.TopAppBarDefaults
@@ -162,6 +170,8 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
@@ -197,6 +207,7 @@ import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCard
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppCardDefaults
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppItemMetaChip
 import com.antonchuraev.homesearchchecklist.desingsystem.components.AppTextField
+import com.antonchuraev.homesearchchecklist.desingsystem.components.EmptyState
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AdaptiveSheetOrDialog
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.AppScaffold
 import com.antonchuraev.homesearchchecklist.desingsystem.containers.adaptiveContentWidth
@@ -226,6 +237,7 @@ import com.antonchuraev.homesearchchecklist.feature.checklist.ui.reminder.format
 import aichecklists.core.designsystem.generated.resources.Res
 import aichecklists.core.designsystem.generated.resources.*
 import org.jetbrains.compose.resources.getString
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsScreens
 import com.antonchuraev.homesearchchecklist.core.common.api.AnalyticsTracker
@@ -242,6 +254,19 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
+
+/**
+ * Material 3 `FabPrimaryContainerHeight`. Not a design token in [AppDimens] because it is the
+ * component's own size, not spacing — but it has to be named here because the list's bottom padding
+ * and the snackbar host both have to reserve exactly the band the FAB floats in.
+ */
+private val DetailFabSize = 56.dp
+
+/**
+ * Vertical space the FAB occupies over the list: its own height plus the gap it keeps from the
+ * bottom edge. Anything that must not end up underneath the FAB reserves this.
+ */
+private val DetailFabBand = DetailFabSize + AppDimens.SpacingLg
 
 @Composable
 fun ChecklistDetailScreen(
@@ -883,10 +908,99 @@ private fun ChecklistDetailContent(
     )
     var contentTopPx by remember { mutableStateOf(0f) }
 
+    // ── Level counters — ONE source for the bar subtitle, the progress line, the empty state and the
+    // list itself ──────────────────────────────────────────────────────────────────────────────────
+    // Hoisted above AppScaffold because the top bar (a scaffold slot) and the list content live in
+    // two different lambdas that cannot see each other's locals. A second, mirrored count in the bar
+    // would drift from the list the moment either side changed.
+    //
+    // visibleFillItemIds is null when folders are off (flat list) → no filtering, so this is exactly
+    // the set of leaves the Standard list renders at the current drill-down level.
+    val visibleFillItems = remember(state.defaultFill?.items, state.visibleFillItemIds) {
+        val items = state.defaultFill?.items.orEmpty()
+        val ids = state.visibleFillItemIds
+        if (ids == null) items else items.filter { it.id in ids }
+    }
+
+    // A level is leaves PLUS folders, and the counters have to agree with what the list draws.
+    //
+    // visibleFillItemIds carries LEAVES ONLY — the ViewModel routes a folder child into levelNodes as
+    // LevelNode.Folder and never into visibleIds — while the list renders from levelNodes, folders
+    // included. Counting leaves alone therefore reported "0 tasks" and an empty level on the root of
+    // any checklist whose items live in folders, which is the normal shape of the folders feature:
+    // "No tasks yet" printed directly above the folder cards, with the progress line hidden next to
+    // folders showing "3 / 7" of their own.
+    //
+    // FolderUiModel.checked/total are already the aggregate over the folder's whole subtree
+    // (ChecklistTree.folderProgress), so folding them in counts each descendant exactly once — the
+    // leaves at this level and the subtrees hanging off it are disjoint sets.
+    //
+    // levelNodes is only populated in folder mode, so with folders off this filter is empty and the
+    // numbers are the plain leaf counts they always were.
+    val folderNodes = remember(state.levelNodes) {
+        state.levelNodes.filterIsInstance<LevelNode.Folder>()
+    }
+    val checkedCount = visibleFillItems.count { it.checked } + folderNodes.sumOf { it.model.checked }
+    val totalCount = visibleFillItems.size + folderNodes.sumOf { it.model.total }
+    val progressFraction = if (totalCount > 0) checkedCount.toFloat() / totalCount else 0f
+    val isComplete = totalCount > 0 && checkedCount == totalCount
+    // Empty means "nothing to show", not "no leaves": a level holding only folders is not empty.
+    val isLevelEmpty = visibleFillItems.isEmpty() && folderNodes.isEmpty()
+    // Weekly has no folder levels and shows the whole week in one pane, so its subtitle counts the
+    // whole fill; Standard counts the level the user is actually looking at, folder subtrees included.
+    val openTaskCount = if (state.checklist.viewMode == ChecklistViewMode.Weekly) {
+        state.defaultFill?.items.orEmpty().count { !it.checked }
+    } else {
+        totalCount - checkedCount
+    }
+
+    // ── v2 FAB visibility — a LAMBDA, not a value ─────────────────────────────────────────────────
+    // THREE consumers need the same answer: the FAB itself, the list's bottom contentPadding (so the
+    // last card — and its right-70% "open details" zone — is not trapped under the FAB) and the
+    // snackbar host, which is a scaffold slot and cannot see the content scope at all.
+    //
+    // Hoisting the ANSWER would have meant reading WindowInsets.ime in this function's body, and the
+    // IME inset animates frame by frame: the whole screen — top bar, actions, snackbar host and
+    // content — would become one recomposition scope invalidated on every frame the keyboard moves.
+    // Worse, it would do so in BOTH arms, and this change must leave the classic view untouched.
+    // A lambda moves each read into its CALLER's scope, so only that slot re-runs.
+    //
+    // The arm/mode/edit tests come FIRST so v1 short-circuits and never reads an inset at all.
+    //
+    // The IME check is a plain comparison rather than the derivedStateOf used further down for the
+    // dock: derivedStateOf over two already-read Dp values never invalidates (it reads no state
+    // inside), which would freeze the FAB visible over the keyboard.
+    val fabShown: @Composable () -> Boolean = {
+        if (!useInlineAddRow ||
+            state.checklist.viewMode != ChecklistViewMode.Standard ||
+            isEditMode
+        ) {
+            false
+        } else {
+            val fabImeBottom = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
+            val fabNavBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+            fabImeBottom <= fabNavBottom + AppDimens.SpacingSm
+        }
+    }
+
     // Root Box wraps the AppScaffold so the top-bar scrim can be a sibling ABOVE the scaffold chrome.
     // Bottom sheets / dialogs stay OUTSIDE this Box (below) so they are never dimmed and float on top.
     Box(modifier = Modifier.fillMaxSize()) {
     AppScaffold(
+        // v2: the name (of the checklist, or of the FOLDER while drilled in) moves out of the in-list
+        // ProgressHeader and into the bar, with the open-task count as its subtitle — the same
+        // anatomy the other v2 screens use. v1 keeps title = null, so its bar is untouched.
+        title = if (useInlineAddRow) {
+            state.currentFolderTitle ?: state.checklist.name
+        } else {
+            null
+        },
+        subtitle = if (useInlineAddRow) {
+            pluralStringResource(Res.plurals.inbox_task_count, openTaskCount, openTaskCount)
+        } else {
+            null
+        },
+        startAlignedTitle = useInlineAddRow,
         onBackButtonClick = {
             if (isEditMode) {
                 isEditMode = false
@@ -905,12 +1019,18 @@ private fun ChecklistDetailContent(
             val dockShown = chatDockContent != null && !isEditMode
             SnackbarHost(
                 hostState = snackbarHostState,
-                modifier = if (dockShown) {
-                    Modifier.padding(
+                modifier = when {
+                    dockShown -> Modifier.padding(
                         bottom = with(LocalDensity.current) { dockHeightPx.toDp() } + AppDimens.SpacingSm
                     )
-                } else {
-                    Modifier.imePadding()
+                    // v2 has no dock, so it would fall into the plain-imePadding branch below — but
+                    // contentExtendsBehindNavBar means nothing insets this host from the navigation
+                    // bar, and the FAB now occupies the bottom-end corner. The undo-delete snackbar
+                    // is this screen's most frequent message; it has to clear both.
+                    useInlineAddRow -> Modifier
+                        .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))
+                        .padding(bottom = if (fabShown()) DetailFabBand else 0.dp)
+                    else -> Modifier.imePadding()
                 },
             )
         },
@@ -931,8 +1051,14 @@ private fun ChecklistDetailContent(
                 // below is the reverse: share, add, notifications, overflow(settings).
                 // Fill + Edit no longer live here — they are rows inside the settings sheet
                 // (OverflowMenuSheet) opened by the overflow icon.
-                IconButton(onClick = { onIntent(ChecklistDetailIntent.OnShareClick) }) {
-                    Icon(Icons.Outlined.Share, contentDescription = stringResource(Res.string.share))
+                //
+                // v2 trims the bar to three: chat · reminder · overflow. Share moves INTO the
+                // overflow sheet (see its onShareClick) and "+" becomes the FAB — neither action is
+                // dropped, they change carrier.
+                if (!useInlineAddRow) {
+                    IconButton(onClick = { onIntent(ChecklistDetailIntent.OnShareClick) }) {
+                        Icon(Icons.Outlined.Share, contentDescription = stringResource(Res.string.share))
+                    }
                 }
                 // v2 only: the chat FAB is hidden on non-tab routes and the dock is gone, so this is
                 // the detail screen's chat entry point. Null in the control arm → nothing rendered,
@@ -951,13 +1077,17 @@ private fun ChecklistDetailContent(
                         Icon(
                             Icons.Outlined.AutoAwesome,
                             contentDescription = stringResource(Res.string.detail_open_chat_action),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
                 // Toolbar "+" only in Standard view. In Weekly view items are added via the
                 // per-day section "+" (inline WeeklyAddItemRow), which already targets the correct
                 // weekday — a toolbar "+" there would need a day to land in and is redundant.
-                if (state.checklist.viewMode != ChecklistViewMode.Weekly) {
+                //
+                // v2 moves this action to the FAB below (search "v2 FAB"); its onClick is this
+                // button's former inline-row branch, moved verbatim, so fast add is not lost.
+                if (state.checklist.viewMode != ChecklistViewMode.Weekly && !useInlineAddRow) {
                     IconButton(
                         onClick = {
                             // Enter item-create mode in the shared chat dock. FIFO ordering: the mode flag
@@ -969,30 +1099,8 @@ private fun ChecklistDetailContent(
                             if (!state.itemCreateMode) {
                                 onIntent(ChecklistDetailIntent.OnDockItemCreateOpened(null))
                             }
-                            if (useInlineAddRow) {
-                                // v2: no dock to expand — the equivalent affordance is scrolling the
-                                // inline row into view and putting the caret in it. Scroll FIRST so
-                                // the row is composed (and its FocusRequester attached) by the time
-                                // the row's own effect reacts to the bumped signal.
-                                //
-                                // Targets the inline row's OWN index, not totalItemsCount - 1. The
-                                // list is [header(s)][active rows][inline_add_item][completed_header]
-                                // [completed rows], so with separateCompleted on and a screenful of
-                                // completed items the last index scrolls PAST the inline row — it
-                                // leaves the composition, its LaunchedEffect never runs, and the tap
-                                // becomes a silent no-op (only a warning in the log).
-                                inlineAddFocusSignal++
-                                dockScope.launch {
-                                    val total = listState.layoutInfo.totalItemsCount
-                                    if (total > 0) {
-                                        val target = inlineAddRowIndex().coerceIn(0, total - 1)
-                                        listState.animateScrollToItem(target)
-                                    }
-                                }
-                            } else {
-                                dockScope.launch {
-                                    if (!dockState.offset.isNaN()) dockState.animateTo(DockAnchor.Expanded)
-                                }
+                            dockScope.launch {
+                                if (!dockState.offset.isNaN()) dockState.animateTo(DockAnchor.Expanded)
                             }
                         }
                     ) {
@@ -1074,7 +1182,10 @@ private fun ChecklistDetailContent(
                 // too would double-count and push the last item too far up.
                 imeVisible -> AppDimens.SpacingSm
                 showDock -> dockHeight + AppDimens.SpacingXxl
-                else -> navBottom + AppDimens.SpacingLg
+                // v2 always lands here (no dock). The FAB floats OVER the list, so without its band
+                // the last card sits under it — and with it the right-70% zone that opens the item
+                // details sheet, which would read as a dead card rather than a covered one.
+                else -> navBottom + AppDimens.SpacingLg + (if (fabShown()) DetailFabBand else 0.dp)
             }
             // FIX B: answer cap (status bar → keyboard top), computed HERE at the host where the ime
             // inset is reliable. Unspecified when the keyboard is down (use the design cap).
@@ -1133,12 +1244,10 @@ private fun ChecklistDetailContent(
                     }
                 }
                 ChecklistViewMode.Standard -> {
-            // Folder mode: show only the leaf items of the current folder level. visibleFillItemIds
-            // is null when folders are off (flat list) → no filtering, identical to before.
-            val visibleFillItems = remember(defaultFill.items, state.visibleFillItemIds) {
-                val ids = state.visibleFillItemIds
-                if (ids == null) defaultFill.items else defaultFill.items.filter { it.id in ids }
-            }
+            // Folder mode: show only the leaf items of the current folder level. [visibleFillItems]
+            // is hoisted to the top of this composable (the bar subtitle and the progress line read
+            // the same list) — visibleFillItemIds is null when folders are off, so with folders off
+            // it is the unfiltered fill, identical to before.
             val completedItems by remember(visibleFillItems, state.separateCompleted) {
                 derivedStateOf {
                     if (state.separateCompleted) visibleFillItems.filter { it.checked }
@@ -1196,10 +1305,46 @@ private fun ChecklistDetailContent(
                 }
             }
 
+            Column(modifier = Modifier.fillMaxSize()) {
+            // v2 progress line — chrome, not a card: full-bleed under the app bar, Material's own
+            // 4dp height, no clip. The name and the "3 / 7" counter it used to sit under now live in
+            // the bar, so the bare line is all that is left of ProgressHeader here.
+            //
+            // Hidden on an empty level (a 0% line under an empty screen is noise) and, by living in
+            // the Standard branch, never rendered in Weekly at all.
+            if (useInlineAddRow) {
+                val progressDescription = stringResource(
+                    Res.string.detail_progress_content_description,
+                    checkedCount,
+                    totalCount,
+                )
+                AnimatedVisibility(
+                    visible = !isLevelEmpty,
+                    enter = expandVertically(animationSpec = tween(durationMillis = 200)) +
+                        fadeIn(animationSpec = tween(durationMillis = 200)),
+                    exit = shrinkVertically(animationSpec = tween(durationMillis = 200)) +
+                        fadeOut(animationSpec = tween(durationMillis = 200)),
+                ) {
+                    AppLinearProgressIndicator(
+                        progress = { progressFraction },
+                        // The visible ratio is gone from the screen, so without this a screen reader
+                        // would announce a bare percentage with nothing to anchor it.
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .semantics { contentDescription = progressDescription },
+                        color = if (isComplete) {
+                            MaterialTheme.colorScheme.tertiary
+                        } else {
+                            MaterialTheme.colorScheme.primary
+                        },
+                    )
+                }
+            }
             LazyColumn(
                 state = listState,
                 modifier = Modifier
-                    .fillMaxSize()
+                    .fillMaxWidth()
+                    .weight(1f)
                     // Shrink the list above the keyboard. Under enableEdgeToEdge the window no longer
                     // resizes on IME, so without this the keyboard overlaps the last item and the
                     // inline add-input (the regression after the chat-dock floating-overlay rework).
@@ -1218,11 +1363,38 @@ private fun ChecklistDetailContent(
                     // ProgressHeader + the retention recurring nudge share ONE LazyColumn slot so the
                     // deeplink auto-scroll index math (slot 0 = ProgressHeader) stays valid whether or
                     // not the nudge is showing.
+                    //
+                    // The slot itself is UNCONDITIONAL in both arms even when v2 leaves it empty:
+                    // inlineAddRowIndex(), the focus-item auto-scroll and the reorder offset all
+                    // count it as header slot 0. Dropping it would send the FAB scroll and every
+                    // drag-and-drop write one row off.
                     Column(verticalArrangement = Arrangement.spacedBy(AppDimens.SpacingSm)) {
-                        ProgressHeader(
-                            items = visibleFillItems,
-                            name = state.currentFolderTitle ?: state.checklist.name,
-                        )
+                        if (useInlineAddRow) {
+                            // v2: the name and the "3 / 7" counter moved to the bar and the progress
+                            // bar to the chrome above the list, so what is left of ProgressHeader
+                            // here is the celebration banner — plus an empty state, which the old
+                            // header never had (an empty level used to render as a bare 0% bar).
+                            AnimatedVisibility(
+                                visible = isComplete,
+                                enter = fadeIn() + expandVertically(),
+                                exit = fadeOut() + shrinkVertically(),
+                            ) {
+                                CompletionBanner()
+                            }
+                            if (isLevelEmpty) {
+                                EmptyState(
+                                    icon = Icons.Outlined.ChecklistRtl,
+                                    title = stringResource(Res.string.detail_empty_title),
+                                    description = stringResource(Res.string.detail_empty_description),
+                                    modifier = Modifier.padding(top = AppDimens.SpacingXxl),
+                                )
+                            }
+                        } else {
+                            ProgressHeader(
+                                items = visibleFillItems,
+                                name = state.currentFolderTitle ?: state.checklist.name,
+                            )
+                        }
                         if (state.showRecurringNudge) {
                             RecurringNudgeCard(
                                 onAccept = { onIntent(ChecklistDetailIntent.OnRecurringNudgeAccepted) },
@@ -1465,9 +1637,64 @@ private fun ChecklistDetailContent(
                 }
 
             }
+            } // end Column (v2 progress line + list)
                 } // end Standard ->
                 } // end when (state.checklist.viewMode)
               } // end hazeSource Box (live backdrop captured by the dock)
+
+              // v2 FAB — the toolbar "+" in a new carrier, bottom-end where Todoist puts it. A
+              // sibling of the haze source rather than an AppScaffold slot: AppScaffold has no FAB
+              // slot and core/designsystem is out of scope here. Hidden with the keyboard up (the
+              // inline add row already owns that moment) and in edit mode (drag/delete, not create).
+              AnimatedVisibility(
+                  visible = fabShown(),
+                  enter = scaleIn(tween(durationMillis = 200, easing = FastOutSlowInEasing)) + fadeIn(),
+                  exit = scaleOut(tween(durationMillis = 150)) + fadeOut(),
+                  modifier = Modifier
+                      .align(Alignment.BottomEnd)
+                      .navigationBarsPadding()
+                      .padding(
+                          end = AppDimens.ScreenPaddingHorizontal,
+                          bottom = AppDimens.SpacingLg,
+                      ),
+              ) {
+                  FloatingActionButton(
+                      onClick = {
+                          // Verbatim the toolbar "+"'s v2 branch — same intent, same focus signal,
+                          // same scroll target. Re-tap guard: if item-create is already open, do NOT
+                          // re-open it (that would wipe in-progress text), just re-focus and scroll.
+                          if (!state.itemCreateMode) {
+                              onIntent(ChecklistDetailIntent.OnDockItemCreateOpened(null))
+                          }
+                          // Bump BEFORE the scroll: the row focuses itself when it composes, and the
+                          // scroll is what composes it.
+                          //
+                          // Targets the inline row's OWN index, not totalItemsCount - 1. The list is
+                          // [header(s)][active rows][inline_add_item][completed_header][completed
+                          // rows], so with separateCompleted on and a screenful of completed items
+                          // the last index scrolls PAST the inline row — it leaves the composition,
+                          // its LaunchedEffect never runs, and the tap becomes a silent no-op.
+                          inlineAddFocusSignal++
+                          dockScope.launch {
+                              val total = listState.layoutInfo.totalItemsCount
+                              if (total > 0) {
+                                  val target = inlineAddRowIndex().coerceIn(0, total - 1)
+                                  listState.animateScrollToItem(target)
+                              }
+                          }
+                      },
+                      containerColor = MaterialTheme.colorScheme.primary,
+                      contentColor = MaterialTheme.colorScheme.onPrimary,
+                  ) {
+                      Icon(
+                          imageVector = Icons.Filled.Add,
+                          // NOT add_item: the inline add row's send button already uses it, and in v2
+                          // both are on screen at once — two nodes with the same description are
+                          // indistinguishable to a screen reader (and ambiguous to UI tests).
+                          contentDescription = stringResource(Res.string.detail_add_task_fab),
+                      )
+                  }
+              }
 
               // Item-create CONTENT scrim — dims the list while item-create mode is active. A sibling
               // drawn AFTER the list content but BEFORE the navbar strip + dock below: it covers the
@@ -2019,6 +2246,18 @@ private fun ChecklistDetailContent(
                 // Fill moved here from the toolbar — close this sheet, then open the Fill options sheet.
                 onIntent(ChecklistDetailIntent.OnDismissOverflowSheet)
                 showFillSheet = true
+            },
+            // v2 only: Share left the toolbar to keep the bar at three icons. Null in control, where
+            // the toolbar button is still there.
+            onShareClick = if (useInlineAddRow) {
+                {
+                    // Dismiss first, like Edit and Fill: OnShareClick navigates away, and a sheet
+                    // left open behind the navigation is still there on the way back.
+                    onIntent(ChecklistDetailIntent.OnDismissOverflowSheet)
+                    onIntent(ChecklistDetailIntent.OnShareClick)
+                }
+            } else {
+                null
             },
             onCreateFolder = {
                 onIntent(ChecklistDetailIntent.OnDismissOverflowSheet)
@@ -3744,6 +3983,12 @@ private fun OverflowMenuSheet(
     isWeeklyMode: Boolean,
     onEditClick: () -> Unit,
     onFillClick: () -> Unit,
+    /**
+     * Share the checklist. Non-null only in the v2 arm, where the toolbar was trimmed to three icons
+     * and Share moved in here; null in control leaves the sheet exactly as it was (Share still has
+     * its own toolbar button there, so a row would be a duplicate).
+     */
+    onShareClick: (() -> Unit)? = null,
     onCreateFolder: () -> Unit,
     onToggleFoldersEnabled: () -> Unit,
     onDeleteCompletedItems: () -> Unit,
@@ -3811,6 +4056,33 @@ private fun OverflowMenuSheet(
             }
 
             HorizontalDivider()
+
+            // Share — v2 only (see [onShareClick]). Third, right after the two other "do something
+            // with this whole checklist" rows and above the structural toggles.
+            if (onShareClick != null) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onShareClick() }
+                        .padding(vertical = AppDimens.SpacingMd),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Share,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(AppDimens.SpacingMd))
+                    Text(
+                        text = stringResource(Res.string.share),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+
+                HorizontalDivider()
+            }
 
             // Folders master toggle. Mutually exclusive with Weekly view: disabled (greyed, with a
             // hint) while the checklist is in Weekly mode, since both are alternative groupings of

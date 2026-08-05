@@ -31,11 +31,13 @@ import org.junit.Test
  *  - Folders toggle:   text "Folders" (a clickable Row, NOT the AppSwitch thumb)
  *  - New Folder menu:   text "New Folder" (folder_create) while the overflow sheet is open
  *  - FolderCard:        text = folder name (the card renders the name as its label)
- *  - Folder header:     text = folder name (ProgressHeader headlineSmall, shown after drill-down)
+ *  - Folder title:      text = folder name — now the TOP APP BAR title after drill-down (it used to
+ *                       be the in-list ProgressHeader; the v2 detail screen moved the name into the
+ *                       bar and left only a progress line in its place). Same text, new carrier.
  *  - Top-bar up:        contentDescription "Back"
- *  - Smart Add commit:  IME Done on the "Add new item..." field (avoids the duplicate
- *                       "Add item" contentDescription shared by the toolbar "+" and the
- *                       inline input's commit button).
+ *  - Smart Add commit:  IME Done on the "Add a task" field (detail_inline_add_placeholder). NOT the
+ *                       "Add item" contentDescription: the FAB and the inline row's send button
+ *                       share it, so it matches two nodes.
  *
  * The default folder name AND the "New Folder" menu item share the same string ("New Folder"),
  * so the helpers are careful about WHEN each is on screen: the menu item is only present while the
@@ -119,25 +121,25 @@ class FolderFlowTest : BaseUiTest() {
 
     /**
      * Add an item inside the current (folder) level via Smart Add.
-     * Opens the toolbar "+", types into the "Add new item..." field, and commits with IME Done.
+     * Types into the always-present inline add row ("Add a task") and commits with IME Done.
+     *
+     * No "+" tap first: the inline row is a PERMANENT affordance at the end of the v2 list, so the
+     * FAB only scrolls to it and focuses it — it is a convenience, not the way in. Tapping it here
+     * would also be ambiguous, because the FAB and the row's own send button share the "Add item"
+     * contentDescription.
      */
     private fun smartAddItem(text: String) {
-        // Toolbar "+" — at this moment the only "Add item" node is the toolbar action.
-        composeTestRule
-            .onNode(hasContentDescription("Add item"))
-            .performClick()
-        waitForIdle()
-        // Inline add-item input appears with placeholder "Add new item...".
+        // Inline add row, placeholder "Add a task" (detail_inline_add_placeholder).
         waitUntil(3000) {
-            composeTestRule.onAllNodesWithText("Add new item...")
+            composeTestRule.onAllNodesWithText("Add a task")
                 .fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule
-            .onNode(hasText("Add new item..."))
+            .onNode(hasText("Add a task"))
             .performTextInput(text)
         waitForIdle()
         // Commit via IME Done (InlineAddItemInput.keyboardActions.onDone) — avoids the duplicate
-        // "Add item" contentDescription shared by the toolbar button and the input's commit button.
+        // "Add item" contentDescription shared by the FAB and the input's commit button.
         composeTestRule
             .onNode(hasText(text))
             .performImeAction()
@@ -192,7 +194,9 @@ class FolderFlowTest : BaseUiTest() {
         composeTestRule.onNodeWithText(folderDefaultName).performClick()
         waitForIdle()
 
-        // Inside the folder: the folder name is the on-screen header (ProgressHeader).
+        // Inside the folder: the folder name is the TOP APP BAR title (it moved out of the in-list
+        // ProgressHeader when the detail screen was reshaped; the assertion is unchanged because
+        // the text and its uniqueness at this level are unchanged).
         waitUntil(5000) {
             composeTestRule.onAllNodesWithText(folderDefaultName)
                 .fetchSemanticsNodes().isNotEmpty()
