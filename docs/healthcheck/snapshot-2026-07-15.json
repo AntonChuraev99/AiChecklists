@@ -1,0 +1,105 @@
+{
+  "run_date": "2026-07-15",
+  "window": "3d",
+  "report_url": "https://claude.ai/code/artifact/7d659450-d640-479b-9496-bce69c27dc6b",
+  "bot_filter": "products_load_failed = 0",
+  "notes": [
+    "Первый запуск — дельта не считалась, baseline создан этим прогоном.",
+    "gp:userRole в 786722 не существует → внутренние тестеры неотделимы во ВСЕХ числах.",
+    "Ловушка Amplitude: interval:30 снапается к началу месяца и затягивает данные ДО окна. Все числа считаны с interval:1."
+  ],
+
+  "events": {
+    "session_start":            { "d3": 1129, "d3_raw": 1672, "d30": 3733, "d30_raw": 5328 },
+    "dau_per_day":              { "d3": [87, 91, 85], "d3_raw": [116, 121, 113], "june_mid": "9-30 cleaned" },
+    "checklist_created":        { "d3": 8, "d3_raw": 15, "d30": 44, "d30_raw": 91 },
+    "ai_analyze_started":       { "d3": 8, "d3_raw": 21, "d30": 64, "d30_raw": 144 },
+    "ai_analyze_completed":     { "d3": 6, "d3_raw": 11, "d30": 43, "d30_raw": 82 },
+    "ai_analyze_failed":        { "d3": 2, "d3_raw": 10, "d30": 20, "d30_raw": 58 },
+    "ai_chat_message_sent":     { "d3": 53, "d3_raw": 73, "d30": 303, "d30_raw": 500 },
+    "ai_chat_response_received":{ "d3": 61, "d3_raw": 82, "d30": 354, "d30_raw": 566 },
+    "ai_chat_thumbs_down":      { "d3": 0, "d30": 16, "d30_raw": 24, "rate_d30": "4.5%" }
+  },
+
+  "event_props": {
+    "checklist_created.source":  { "ai": 6, "manual": 2, "gallery": null },
+    "ai_analyze_failed.failure_reason": { "(none)": 18, "user_not_ready": 1, "network": 1, "_note": "cleaned 30d; user_not_ready на 90% боты" },
+    "csat_shown.version":        { "1.17.5": 1, "1.17.13": 1, "1.17.15": 7, "1.17.16": 2, "1.17.17": 2 },
+    "ai_chat_thumbs_down.version": { "1.17.13": 7, "1.17.10": 6, "1.17.0": 3, "1.17.5": 3, "1.17.8": 3, "1.17.4": 2, "1.17.15+": 0 }
+  },
+
+  "bot_contamination": {
+    "session_start": "-32%", "ai_chat_message_sent": "-27%", "csat_shown": "-33%",
+    "checklist_created": "-47%", "ai_analyze_started": "-62%", "ai_analyze_failed": "-80%",
+    "_verdict": "26-80% сырого объёма; доля стабильна между окнами = норма для проекта"
+  },
+
+  "crashes": {
+    "7ddb0bb0": { "title": "AndroidFirestoreSyncDataSource.checklistRef — Invalid document reference", "events_3d": 1, "events_30d": 1, "users_30d": 1, "versions": ["1.17.16"], "verdict": "our-bug", "confidence": "high" },
+    "422524":   { "title": "DNS GaiException EAI_NODATA", "events_3d": 78, "events_30d": 353, "users_3d": 41, "versions": ["1.14.5-1.17.16"], "verdict": "network", "note": "аптик x2.2 — не проверена разбивка по стране" },
+    "5d81c6":   { "title": "UnknownHost cloudfunctions.net", "events_3d": 62, "events_30d": 245, "users_3d": 32, "verdict": "network" },
+    "2d7f7a1d": { "title": "LeftCompositionCancellationException", "events_3d": 5, "events_30d": 161, "verdict": "compose-noise", "note": "резко спал" },
+    "9775ecb7": { "title": "libsqliteJni.so UnsatisfiedLinkError", "events_3d": 0, "events_30d": 33, "devices": ["Pixel 6 Pro", "Pixel 7a"], "os": ["Android 12"], "verdict": "device-side", "spread_check": "не расширился — критерий пересмотра НЕ выполнен" },
+    "f037e7c0": { "title": "framework-internal IncompatibleClassChangeError", "events_3d": 0, "events_30d": 4, "verdict": "device-side", "note": "затух" }
+  },
+  "crashes_summary": { "fatal_3d": 0, "anr_3d": 5, "nonfatal_3d": 237, "total_3d": 242, "total_30d": 1375 },
+
+  "rollout": {
+    "production": { "version": "1.17.17", "code": 67, "status": "inProgress", "user_fraction": 0.2 },
+    "previous":   { "version": "1.17.16", "code": 66, "status": "completed" },
+    "vc67_verdict": "НЕДОСТАТОЧНО ДАННЫХ",
+    "vc67_detail": "Версии НЕТ в Crashlytics topVersions вообще (нет ингеста, не ноль крашей). Amplitude: 2.8 avg DAU = версия живая. ~4-6 user-days накоплено, нужно ~300 чтобы поймать 1% crash rate."
+  },
+
+  "csat": {
+    "shown_d3": 6, "shown_d3_raw": 9, "shown_d30": 12, "shown_d30_raw": 13,
+    "opened_d30": 9, "opened_on_1_17_15plus": 0,
+    "rating_selected_d3": 8, "chip_toggled": 0, "submitted_d30": 0, "submitted_d30_raw": 2,
+    "triggers_fired": 3, "triggers_total": 6,
+    "verdict": "гипотеза ПОДТВЕРЖДЕНА — 11 показов на пост-фикс сборках против baseline 1-2 за 2 месяца",
+    "new_finding": "csat_opened=0 на 1.17.15+ при 11 показах; тождество dismissed=shown+opened вырождается в dismissed≈shown"
+  },
+
+  "chat_feedback": {
+    "thumbs_down_d3": 0, "thumbs_down_d30": 16, "rate_d30": "4.5% от 354 ответов",
+    "on_post_fix_builds": 0, "responses_on_post_fix": 76,
+    "verdict": "P(0)≈2% при базовой ставке, но выборка кластеризована (7 в один день = вероятно один юзер) → НЕ вывод. Нужно ~2 недели."
+  },
+
+  "backend": {
+    "_window": "2026-07-12T00:00Z..2026-07-15T04:09Z",
+    "_total": { "invocations": 2238, "errors": 10, "error_rate": 0.004 },
+    "chat-agent":           { "invocations_3d": 57,   "errors_3d": 6, "error_rate": 0.105, "signatures": { "ClientError400_missing_thought_signature@main.py:3245": { "count_3d": 6, "verdict": "our-bug", "freshness": "СВЕЖИЙ — отсутствует в baseline 07-13" } } },
+    "classify-chat-intent": { "invocations_3d": 49,   "errors_3d": 3, "error_rate": 0.041, "signatures": { "ServerError503_UNAVAILABLE@main.py:737": { "count_3d": 2, "verdict": "transient-upstream" }, "create_error_response_400": { "count_3d": 1, "verdict": "client-induced" } } },
+    "generate-checklist":   { "invocations_3d": 16,   "errors_3d": 1, "error_rate": 0.063, "signatures": { "ServerError503_UNAVAILABLE@main.py:794": { "count_3d": 1, "verdict": "transient-upstream" } } },
+    "register-push-token":  { "invocations_3d": 1917, "errors_3d": 0, "error_rate": 0 },
+    "register-user":        { "invocations_3d": 185,  "errors_3d": 0, "error_rate": 0 },
+    "analyze-and-fill-checklist": { "invocations_3d": 0, "errors_3d": 0, "note": "нет трафика с 07-10" },
+    "workers": { "gisti-landing": 1544, "gisti-mcp": 993, "checklists": 589, "errors": 0 },
+    "deploy_drift": { "on_rc_event_created": "задеплоен 2026-05-17, рантайм импортирует EOL google.generativeai; локальный main.py уже на google.genai" }
+  },
+
+  "ab": {
+    "_layers": "client RC (не менялся с 06-18) | server RC (все percentage-условия) | Firestore remote_config/current",
+    "paywall_variant":      { "layer": "client", "experiment": "PaywallsV1 #2", "age_days": 66, "objective": "total_revenue", "status": "RUNNING — не сойдётся никогда" },
+    "paywall_config":       { "layer": "client", "experiment": "CurrentOfferTrialVSNoTrial #6", "age_days": 30, "objective": "total_revenue", "status": "RUNNING — не сойдётся" },
+    "activation_bundle_v1": { "layer": "client", "experiment": "#7", "age_days": 27, "objective": "total_revenue", "status": "RUNNING — решение готово с 07-09, не принято" },
+    "onboarding":           { "layer": "client", "experiment": "OnboardingABC #8", "age_days": 21, "objective": "purchase_revenue", "status": "RUNNING — не сойдётся" },
+    "ai_model_arm":         { "layer": "server", "variants": ["control", "variant_b"], "split": "50/50", "status": "LIVE — НЕВАЛИДЕН, variant_b ломает tool-loop" },
+    "push_ab_arm":          { "layer": "server", "split": "33/33/34", "status": "LIVE — делит 0 открытий на 3 арма" },
+    "push_timing_arm":      { "layer": "none", "status": "ТЕСТА НЕ СУЩЕСТВУЕТ — нет ни в одном шаблоне, 100% на дефолте behavioral; архитектурно недостижим (PushTimingResolver читает client-неймспейс)" }
+  },
+
+  "push": {
+    "sent_3d_raw": 15, "received_3d_reengagement": 4, "opened_3d_reengagement": 0,
+    "received_3d_overdue": 61, "received_3d_digest": 16, "opened_3d_overdue": 2,
+    "d30": "52 sent → 17 received (33%) → 0 opened — не сдвинулось"
+  },
+
+  "todos_ripe": ["2026-07-09-verify-p0-fixes-metrics.md"],
+  "todos_not_ripe": [
+    "2026-07-14-promote-vc67-rollout.md — нет телеметрии vc67",
+    "2026-07-10-verify-csat-scored-metrics.md — n=12, качество не читается",
+    "2026-07-13-aichat-layer1-thumbsdown-backlog.md — 0 thumbs-down на новых сборках, база не провернулась"
+  ]
+}

@@ -1,0 +1,213 @@
+{
+  "run_date": "2026-07-16",
+  "prev_run": "2026-07-15",
+  "window": "3d + 7d + 30d",
+  "report_url": "https://claude.ai/code/artifact/7d659450-d640-479b-9496-bce69c27dc6b",
+  "bot_filter": "products_load_failed = 0",
+  "notes": [
+    "gp:userRole в 786722 не существует → внутренние тестеры неотделимы во ВСЕХ числах.",
+    "Ловушка Amplitude: interval:30 снапается к началу месяца и затягивает данные ДО окна. Все числа считаны с interval:1.",
+    "ИСПРАВЛЕНО имя события: ai_chat_thumbs_down НЕ существует; реальное — ai_chat_thumb_down (ед. число).",
+    "ИСПРАВЛЕНО окно прошлого снапшота: d3 был [07-12..07-14], не [07-13..07-15]. Восстановлено сверкой сумм.",
+    "07-16 исключён из всех выводов: DAU raw(12) < cleaned(20) — арифметически невозможно ⇒ артефакт партиции.",
+    "ЛОВУШКА Crashlytics API: topVersions с фильтром issueId возвращает ВСЕ НУЛИ — артефакт, не данные. Для per-issue счётчиков использовать topAndroidDevices/topOperatingSystems. topIssues не принимает issueId (400); get_issue с 8-символьным id даёт 500 — резолвить через versionDisplayNames-фильтр.",
+    "ЛОВУШКА кластеризации бека: file:line рвётся на КАЖДОМ деплое (classify 737→2318, generate 794→1422, chat_agent 3245→3350). Якорить на ExceptionType+status+имя функции."
+  ],
+
+  "events": {
+    "session_start":            { "d3": 1182, "d3_raw": 1771, "d30": 4131, "d30_raw": 5926 },
+    "dau_per_day":              { "d3": [93, 92, 89], "d3_raw": [127, 123, 124], "days": ["2026-07-13", "2026-07-14", "2026-07-15"] },
+    "checklist_created":        { "d3": 9, "d3_raw": 22, "d30": 47, "d30_raw": 103 },
+    "ai_analyze_started":       { "d3": 8, "d3_raw": 15, "d30": 66, "d30_raw": 149 },
+    "ai_analyze_completed":     { "d3": 7, "d3_raw": 9,  "d30": 45, "d30_raw": 85 },
+    "ai_analyze_failed":        { "d3": 1, "d3_raw": 6,  "d30": 20, "d30_raw": 60 },
+    "ai_chat_message_sent":     { "d3": 29, "d3_raw": 55, "d30": 320, "d30_raw": 527,
+                                  "daily_cleaned_0711_0715": [25, 40, 3, 9, 17],
+                                  "_note": "3d-падение vs вчера = выпадение пика 07-12 из окна, НЕ обвал. Тренд 07-13→07-15 растёт 3→9→17" },
+    "ai_chat_response_received":{ "d3": 30, "d3_raw": 56, "d30": 370, "d30_raw": 592 },
+    "ai_chat_opened":           { "daily_cleaned_0713_0715": [9, 11, 23] },
+    "ai_chat_thumb_down":       { "d3": 0, "d7_raw": 7, "d30": 16, "d30_raw": 24, "rate_d30": "4.3%", "last_fired": "2026-07-11" },
+    "ai_chat_thumb_up":         { "d30_raw": 37, "last_fired": "2026-07-14" },
+    "ai_chat_feedback":         { "d30_raw": 12 }
+  },
+
+  "event_props": {
+    "checklist_created.source":        { "ai": 37, "manual": 9, "gallery": 1, "chat": 0, "template": 0, "weekly": 0, "attachment": 0, "_basis": "cleaned 30d" },
+    "checklist_created.source_raw":    { "ai": 84, "manual": 18, "gallery": 1 },
+    "checklist_created.platform_raw":  { "Android": 102, "Web": 1 },
+    "checklist_created.template_slug": { "(none)": 102, "5-day-paris-packing-list": 1 },
+    "csat_shown.version":              { "1.17.15": 7, "1.17.16": 5, "1.17.17": 2, "1.17.13": 1, "1.17.5": 1 },
+    "ai_chat_thumb_down.version":      { "1.17.13": 7, "1.17.10": 6, "1.17.0": 3, "1.17.5": 3, "1.17.8": 3, "1.17.4": 2, "1.17.15+": 0 },
+    "ai_chat_thumb_down.routed_layer": { "unknown": 22, "FullChat": 2, "_note": "92% не атрибутировано — кластеризация по слою НЕВОЗМОЖНА" },
+    "push_sent.push_type":             { "reengagement": 64 },
+    "push_received.push_type":         { "overdue": 202, "digest": 27, "reengagement": 18 },
+    "push_opened.push_type":           { "overdue": 6, "reengagement": 0 }
+  },
+
+  "dead_instrumentation": {
+    "mcp_*":              { "exists": false, "zero_kind": "не меряется", "severity": "high", "note": "worker 0.4.0 / 16 tools live / in-app 1.17.15@100% / MCP Registry — ноль событий. Нужен код" },
+    "folder_deleted":     { "exists": false, "zero_kind": "не меряется", "note": "PR#12 783820c1 не в проде — ожидаемо" },
+    "template_used":      { "exists": false, "zero_kind": "не меряется" },
+    "template_previewed": { "exists": false, "zero_kind": "не меряется" },
+    "attachment_added":   { "exists": false, "zero_kind": "не меряется", "note": "есть только attachment_load_failed — меряем провал, не успех" }
+  },
+
+  "web_deploy_signal": {
+    "verdict": "инструментация подтверждена end-to-end; продуктовый вывод НЕВОЗМОЖЕН (n=1)",
+    "gallery_source":          { "count": 1,  "date": "2026-07-15", "platform": "Web", "uniques": 1 },
+    "gallery_deeplink_opened": { "count": 5,  "date": "2026-07-15", "platform": "Web", "uniques": 1 },
+    "weekly_item_added":       { "count": 16, "date": "2026-07-15", "platform": "Android", "uniques": 1 },
+    "interpretation": "все три — 1 uniq юзер в день деплоя = почти наверняка smoke разработчика, не органика",
+    "attribution_chain": "source=gallery + template_slug=5-day-paris-packing-list — цепочка целая",
+    "still_zero": ["chat", "template", "weekly", "attachment"],
+    "formal_deadline": "2026-07-18"
+  },
+
+  "crashes": {
+    "52217411": { "title": "ChatScreen — NoClassDefFoundError java.time.ZoneOffset (kotlinx-datetime, minSdk 24, БЕЗ coreLibraryDesugaring)", "events_7d": 1, "events_30d": 1, "users_30d": 1, "versions": ["1.17.13"], "os": ["Android 7.0"], "devices": ["samsung SM-G935W8"], "verdict": "our-bug", "confidence": "high", "note": "НОВЫЙ. FATAL на флагманском AI Chat для ВСЕХ API 24-25. Проверено вручную: minSdk=24, desugaring 0 вхождений в репо, ChatScreen.kt:133 = TimeZone.currentSystemDefault(). kotlinx.datetime импортируют 25 файлов (вкл. App.kt) — почему всего 1 событие = ОТКРЫТЫЙ вопрос. НЕ регрессия vc67 (живёт с 1.17.13, уже 100% через vc66)", "todo": "docs/todos/2026-07-16-kotlinx-datetime-desugaring-api24-fatal.md" },
+    "422524":   { "title": "DNS GaiException EAI_NODATA", "events_3d": 90, "events_7d": 188, "events_30d": 395, "users_7d": 68, "users_30d": 114, "versions": ["1.14.5-1.17.17"], "verdict": "network", "confidence": "high", "note": "+42 к 30d. Страна = НЕ МЕРЯЕТСЯ (нет country-дименшна в Reports API). OS размазана, девайсы плоский хвост (макс 13/188) ⇒ не наш баг" },
+    "5d81c6":   { "title": "UnknownHost cloudfunctions.net", "events_3d": 68, "events_7d": 152, "events_30d": 281, "users_30d": 68, "versions": ["1.17.10-1.17.17"], "verdict": "network", "confidence": "high" },
+    "591e5f2e": { "title": "SocketException — Software caused connection abort", "events_7d": 63, "events_30d": 89, "users_30d": 41, "versions": ["1.17.4-1.17.16"], "verdict": "network", "confidence": "medium", "note": "не было в снапшоте 07-15" },
+    "7528252422": { "title": "Ktor HttpRequestTimeout chat_completion 60s", "events_7d": 30, "events_30d": 49, "users_30d": 19, "verdict": "server-or-network", "confidence": "medium", "note": "не было в снапшоте 07-15" },
+    "ddc8be1f": { "title": "NoTransformationFoundException registerPushToken", "events_7d": 13, "events_30d": 23, "users_30d": 4, "verdict": "possibly-our-bug", "confidence": "low", "note": "Ktor ждёт DTO, получил SourceByteReadChannel — вероятно необработанный error-body" },
+    "2d7f7a1d": { "title": "LeftCompositionCancellationException", "events_7d": 9, "events_30d": 146, "users_30d": 23, "verdict": "compose-noise", "confidence": "high", "note": "затухает 161→146" },
+    "9775ecb7": { "title": "libsqliteJni.so UnsatisfiedLinkError", "events_7d": 2, "events_30d": 33, "users_30d": 7, "devices": ["Pixel 6 Pro", "Pixel 7a"], "os": ["Android 12"], "verdict": "device-side", "confidence": "high", "spread_check": "НЕ расширился (те же 2 девайса, та же 1 OS) — Δ30d = 0, критерий пересмотра НЕ выполнен" },
+    "f037e7c0": { "title": "framework-internal IncompatibleClassChangeError", "events_7d": 0, "events_30d": 4, "users_30d": 1, "devices": ["samsung SM-G998N"], "versions": ["1.17.10"], "verdict": "device-side", "confidence": "high", "zero_kind": "реальный ноль (7d)", "spread_check": "НЕ расширился" },
+    "7ddb0bb0": { "title": "AndroidFirestoreSyncDataSource.checklistRef — Invalid document reference", "events_7d": 0, "events_30d": 1, "users_30d": 1, "versions": ["1.17.16"], "verdict": "our-bug", "confidence": "high", "zero_kind": "реальный ноль", "note": "Δ0. Фикс a1bb89bd ждёт Android-релиза" },
+    "new_anrs": { "2fc5a253": "PaywallFeatureModule (1ev/1u, 1.17.10)", "f3380cbf": "Firebase ComponentMonitor (1ev/1u)", "4f94d288": "ReminderReceiver.createNotificationChannel (1ev/1u)", "712fbb2f": "GistiApplication.<init> (1ev/1u)", "confidence": "medium-not-systemic" }
+  },
+  "crashes_summary": {
+    "fatal_7d": 3, "anr_7d": 10, "nonfatal_3d": 262, "total_3d": 268, "total_7d": 615, "total_30d": 1505,
+    "crash_free_users_pct": "не меряется (Reports API отдаёт только events/users, знаменатель неизвестен)",
+    "play_vitals_crash_rate": "не меряется в принципе (ниже порога анонимизации Google, ~470 активных)"
+  },
+
+  "rollout": {
+    "production": { "version": "1.17.17", "code": 67, "status": "inProgress", "user_fraction": 0.2, "changed_since_prev": false },
+    "previous":   { "version": "1.17.16", "code": 66, "status": "completed" },
+    "other_tracks": { "beta": "1.5 (vc6) completed", "alpha": "1.17.10 (vc60) completed", "internal": "1.17.10 (vc60) completed" },
+    "vc67_verdict": "ИНГЕСТ ПОЯВИЛСЯ (9 ev, ~6 users, 0 FATAL / 0 ANR, всё NON_FATAL сетевое). Блокер 'телеметрии нет' СНЯТ; блокер 'мало данных' остался (~6 из ~300 user-days). Красных флагов нет",
+    "read_method": "edits.insert → tracks.list → edits.delete, БЕЗ commit; probe-edit'ы удалены"
+  },
+
+  "csat": {
+    "shown_d30": 9, "shown_d30_raw": 16,
+    "opened_d30": 4, "opened_d30_raw": 9,
+    "rating_selected_d30": 5, "rating_selected_d30_raw": 13,
+    "chip_toggled": 0, "chip_toggled_raw": 0,
+    "submitted_d30": 0, "submitted_d30_raw": 3,
+    "dismissed_d30": 13, "dismissed_d30_raw": 24,
+    "review_tapped_d30": 2, "review_completed_d30": 2,
+    "shown_on_postfix_builds_raw": 14,
+    "delta_vs_prev": "13→16 показов (+3, версия 1.17.16 2→5)",
+    "verdict": "гипотеза ПОДТВЕРЖДЕНА ещё 07-15 (baseline 1-2 показа за 2 месяца) — не перерешивать, только Δ",
+    "note_submitted": "raw=3 доказывает достижимость ветки submit; cleaned=0 = все реальные юзеры уходят LoveIt → review. By design, как chip_toggled"
+  },
+
+  "chat_feedback": {
+    "thumb_down_d7_raw": 7, "thumb_down_d30": 16, "thumb_down_d30_raw": 24,
+    "rate_d30": "4.3% от 370 cleaned-ответов (raw 4.1% от 592)",
+    "on_post_fix_builds": 0, "cleaned_responses_since_0710": 119,
+    "last_thumb_down": "2026-07-11", "days_at_zero": 5,
+    "thumb_up_d30_raw": 37, "positive_ratio_raw": "61% (37 up / 24 down)",
+    "layer_clustering": "НЕВОЗМОЖНА — routed_layer unknown 22/24. Решение по Этапу 2 (отключение L1) неопровергаемо и неподтверждаемо данными"
+  },
+
+  "backend": {
+    "_window": "2026-07-13T00:00Z..2026-07-16T03:35Z",
+    "_prev_window_reconciled": true,
+    "_total": { "invocations": 2581, "errors": 11, "error_rate": 0.0043 },
+    "_total_excl_self_probe": { "invocations": 2557, "errors": 7, "error_rate": 0.0027 },
+    "_deploy": {
+      "thought_signature_fix": "chat-agent-00013-vus @ 2026-07-15T05:04:03Z (f075f7a7, committed 05:13:27Z — деплой ОПЕРЕЖАЕТ коммит)",
+      "allowlist_fix": "chat-agent-00015-qox @ 2026-07-15T09:26:47Z (f3de4686)",
+      "deployed_source_equals_local_HEAD": true
+    },
+    "chat-agent": {
+      "invocations": 70, "errors": 6, "error_rate": 0.086,
+      "post_fix_real_users": { "invocations_ktor": 16, "thought_signature_errors": 0, "p_false_allclear_at_prior_rate": 0.17, "verdict": "склоняется к 'починено', НЕ доказано — формальная сверка 2026-07-22" },
+      "signatures": {
+        "ClientError400_INVALID_ARGUMENT@main.py:3245": { "count": 2, "last_seen": "2026-07-14T10:10:26Z", "window": "PRE-fix", "verdict": "our-bug" },
+        "ClientError404_NOT_FOUND@main.py:3350": { "count": 4, "window": "POST-fix", "user_agent": "Python-urllib/3.12", "verdict": "self-inflicted (probe, породивший f3de4686)" }
+      }
+    },
+    "classify-chat-intent": { "invocations": 41, "errors": 2, "error_rate": 0.049, "signatures": { "ServerError503_UNAVAILABLE@main.py:2318": { "count": 2, "verdict": "transient-upstream" } } },
+    "generate-checklist":   { "invocations": 15, "errors": 2, "error_rate": 0.133, "signatures": { "ServerError503_UNAVAILABLE@main.py:1422": { "count": 1, "verdict": "transient-upstream" }, "HTTP429_rate_limit": { "count": 1, "verdict": "by-design (кредитный лимит)" } } },
+    "transcribe-audio": { "invocations": 4, "errors": 1, "error_rate": 0.25, "signatures": { "ServerError503_UNAVAILABLE@main.py:2450": { "count": 1, "verdict": "transient-upstream", "note": "клиент отретраил → 200 за 13с; n=4, rate не читается" } } },
+    "analyze-and-fill-checklist": { "invocations": 0, "zero_kind": "реальный ноль", "last_real_request": "2026-07-10T08:14:01Z", "days_silent": 6, "confidence": "high",
+      "РАЗВЕДЕНО": "AnalyzeRepositoryImpl.kt:47 — targetChecklist != null → analyze_and_fill_checklist, иначе → generate_checklist. Ноль = никто не заполняет СУЩЕСТВУЮЩИЙ чек-лист через AI; создание нового идёт в generate_checklist и трафик имеет. Amplitude ai_analyze_started=66/30д подтверждает: путь жив, идёт другой веткой. НЕ баг, кандидат в продуктовый вопрос" },
+    "register-push-token": { "invocations": 2113, "errors": 0 },
+    "register-user": { "invocations": 322, "errors": 0 },
+    "link-google-account": { "invocations": 7, "errors": 0 },
+    "send-promotions-batch": { "invocations": 3, "errors": 0 },
+    "refill-premium-credits": { "invocations": 3, "errors": 0 },
+    "on-rc-event-created": { "invocations": 2, "errors": 0 },
+    "chat-completion": { "invocations": 0, "zero_kind": "реальный ноль", "note": "known dead code — подтверждено логами" },
+    "_not_services": { "note": "reserve_credits/refund_credits/increment_usage НЕ задеплоены как функции — внутренние в main.py. Убрать из списка эндпоинтов скилла" },
+    "workers": {
+      "gisti-mcp": 3151, "gisti-landing": 1529, "checklists": 1038, "errors": 0,
+      "gisti-mcp_delta": { "prev": 993, "now": 3151, "factor": 3.2, "verdict": "НЕ абьюз — плато 03-15 UTC = 10-22 Бангкок (часы владельца), clientDisconnected 1183 ~1:1 к success = SSE-реконнекты, errors=0, OAuth-gated; частично self-inflicted (healthcheck-сессии)", "confidence": "medium" }
+    },
+    "deploy_drift": { "on_rc_event_created": "БЕЗ ИЗМЕНЕНИЙ: задеплоен 2026-05-17, рантайм импортирует EOL google.generativeai (main.py:27); 2 вызова 07-15, оба 200", "chat_agent": "дрейфа НЕТ" },
+    "watch": { "gemini_2_5_EOL": "2026-10-16 — control-арм gemini-2.5-flash требует миграции, 3 месяца" }
+  },
+
+  "ab": {
+    "_layers": "client RC v20 (06-18) | server RC v2 (07-03) | Firestore remote_config/current (07-09) — ВСЕ ТРИ байт-в-байт как 07-15",
+    "_delta_vs_prev": "none",
+    "paywall_variant":      { "layer": "client", "experiment": "PaywallsV1 #2", "age_days": 67, "objective": "total_revenue", "split": "1:1:1", "status": "RUNNING — оставлен осознанно (ADR 2026-07-15)" },
+    "paywall_config":       { "layer": "client", "experiment": "CurrentOfferTrialVSNoTrial #6", "age_days": 31, "objective": "total_revenue", "split": "1:1", "status": "RUNNING — оставлен осознанно (ADR)" },
+    "activation_bundle_v1": { "layer": "client", "experiment": "#7", "age_days": 28, "objective": "total_revenue", "split": "1:1 baseline=false/true", "status": "RUNNING — оставлен осознанно (ADR); код-дефолт true ≠ консольный false" },
+    "onboarding":           { "layer": "client", "experiment": "OnboardingABC #8", "age_days": 22, "objective": "purchase_revenue", "split": "1:1:1 baseline/none/ai_welcome", "status": "RUNNING — оставлен осознанно (ADR); ai_welcome Android-only, на web → DEFAULT" },
+    "ai_model_arm":         { "layer": "server", "variants": ["control", "variant_b"], "split": "50/50", "seed": "expmodel1", "status": "LIVE — сервер починен 07-15 (f075f7a7), RC не трогали. ⚠️ ДАННЫЕ ДО 2026-07-15 КОНТАМИНИРОВАНЫ (variant_b ломал tool-loop); окно анализа считать ОТ 07-15. Дата нигде не зафиксирована" },
+    "push_ab_arm":          { "layer": "server", "split": "33/33/34", "seed": "gisti_push_copy", "status": "LIVE — делит 0 открытий на 3 арма" },
+    "push_timing_arm":      { "layer": "none", "status": "ТЕСТА НЕ СУЩЕСТВУЕТ — 100% на дефолте behavioral" },
+    "first_checklist_variant": { "layer": "client", "status": "ТЕСТА НЕ СУЩЕСТВУЕТ — ключ в RC, условия нет, 100% auto_create" },
+    "max_weekly_checklists_free":    { "layer": "none", "status": "читается кодом (GetUserLimitsUseCase.kt:33), нет ни в одном шаблоне — не крутится удалённо" },
+    "max_attachments_per_item_free": { "layer": "none", "status": "читается кодом (GetUserLimitsUseCase.kt:43), нет ни в одном шаблоне" },
+    "_api_limit": "objective REST-API НЕ отдаёт (objectiveMetrics: null на всех) — значения перенесены из снапшота 07-15, живьём не подтверждены. Сверка целей — только консоль"
+  },
+
+  "push": {
+    "sent_3d_raw": 24, "sent_d30_raw": 64,
+    "received_3d_reengagement": 5, "received_3d_overdue": 77, "received_d30_raw": 247,
+    "opened_d30_raw": 6,
+    "d30_reengagement": "64 sent → 18 received (28%) → 0 opened",
+    "prev_d30_reengagement": "52 sent → 17 received (33%) → 0 opened",
+    "delta": "+12 sent (все 07-15), +1 received, opened = реальный ноль",
+    "_note": "overdue: 6 открытий на 202 доставленных — мало, но не ноль. Причина 0 у reengagement НЕ диагностирована"
+  },
+
+  "bot_contamination": {
+    "method": "сегмент products_load_failed = 0 (rolling 30d)",
+    "session_start_d30": "30%", "dau_0715": "28%", "checklist_created": "54%",
+    "ai_analyze_started": "56%", "ai_analyze_failed": "67%", "ai_chat_message_sent": "39%",
+    "ai_chat_thumb_down": "33%", "csat_shown": "44%", "csat_submitted": "100% (0/3)",
+    "observation": "AI-пути загрязнены вдвое сильнее сессий (54-67% vs 30%) — боты непропорционально бьют в AI-фичи; ai_analyze_failed самый грязный (67%), согласуется с закрытой ложной тревогой user_not_ready",
+    "_verdict": "доля стабильна между окнами = норма для проекта, не наплыв"
+  },
+
+  "verification_records": {
+    "_source": "docs/active/prod-fixes-verification-2026-07-15.md",
+    "_result_this_run": "ни одна не проверяема: 4 blocked (ждут Android-релиза), 4 too-early (earliest 07-18 / 07-22). Ноль refuted, ноль confirmed",
+    "thought-signature-fixed":     { "status": "too-early", "earliest": "2026-07-22", "early_signal": "0 ошибок из 16 вызовов реальных юзеров за 39ч; P(ложное 'чисто')=17%" },
+    "allowlist-dead-models":       { "status": "too-early", "earliest": "2026-07-22", "early_signal": "0 из 0 — гейт не звали после деплоя = нет данных" },
+    "gallery-source-tracking-web": { "status": "too-early", "earliest": "2026-07-18", "early_signal": "событие ПОЯВИЛОСЬ (1 ev, Web, цепочка целая), но n=1 в день деплоя" },
+    "play-referrer-attribution":   { "status": "too-early", "earliest": "2026-07-22" },
+    "gallery-source-tracking-android": { "status": "blocked", "blocked_by": "Android release" },
+    "sync-reminder-fullscreen":    { "status": "blocked", "blocked_by": "Android release", "check_via": "manual" },
+    "sync-legacy-cloudid":         { "status": "blocked", "blocked_by": "Android release" },
+    "csat-contamination-watch":    { "status": "blocked", "blocked_by": "Android release" }
+  },
+
+  "todos_ripe": [],
+  "todos_not_ripe": [
+    "2026-07-14-promote-vc67-rollout.md — БЛОКЕР СМЕНИЛСЯ: телеметрия пошла (9ev/~6u/0 FATAL), но ~6 из ~300 user-days",
+    "2026-07-10-verify-csat-scored-metrics.md — n=16 raw; цель уже достигнута, качество воронки не читается",
+    "2026-07-13-aichat-layer1-thumbsdown-backlog.md — 0 thumbs-down на новых сборках, база не провернулась",
+    "2026-07-09-verify-p0-fixes-metrics.md — формально созрело, но перекрыто записями verification: с earliest 07-22"
+  ],
+  "todos_created_this_run": [
+    "2026-07-16-kotlinx-datetime-desugaring-api24-fatal.md"
+  ]
+}

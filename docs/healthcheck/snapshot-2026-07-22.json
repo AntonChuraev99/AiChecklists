@@ -1,0 +1,155 @@
+{
+  "run_date": "2026-07-22",
+  "prev_run": "2026-07-20",
+  "window": "7d + 30d",
+  "report_url": "https://claude.ai/code/artifact/7d659450-d640-479b-9496-bce69c27dc6b",
+  "bot_filter": "products_load_failed <= 0 (event, behavioral 'did NOT perform'); gp:userRole NOT existing in 786722 → testers unseparable",
+  "headline": "vc70/1.18.1 (Hindi) раскатан на 100% и реально serving (rollout схлопнулся с 75%). 0 новых крашей любого типа. Оба созревших фикса (thought_signature, allowlist) ПОДТВЕРЖДЕНЫ. Сервер чист. НО: реальная (cleaned) активность создания+AI сжимается ~20-36% MoM (30d) при sessions +9% — падение в реальных юзерах. Флагманский мультиязычный запуск (Hindi UI + Chat All-Languages) зашиплен без единого продуктового события. Owner-флаг: push_permission_state фаерится каждую сессию (over-instrument). A/B байт-в-байт.",
+  "notes": [
+    "gcloud --account=churaevanton@gmail.com на дефолтном CLOUDSDK_CONFIG даёт валидный токен; CFA не воспроизвелась.",
+    "Cloudflare Workers СНЯТЫ этот прогон (re-auth churaevanton@gmail.com сработал, 4-й прогон — первый успешный): gisti-mcp 5563/0err (+77%), gisti-landing 1933/0, checklists 1708/0. checklists задеплоен 07-21 (новее 07-20 COOP/NPE — вероятно ручной follow-up).",
+    "ЛОВУШКА Crashlytics topVersions+issueId = все нули (артефакт) — per-issue/spread через topAndroidDevices/topOperatingSystems. Подтверждено снова.",
+    "Play vitals 0 строк (ниже порога анонимизации ~470) — числовой crash%/ANR% недоступен by design.",
+    "reserve_credits/refund_credits/increment_usage НЕ существуют как отдельные CF (кредит-логика inline). get_credits_info/get_usage_stats задеплоены, 0 инвокаций.",
+    "RevenueCat MCP-ключ scoped на проект Swapify (proja4ff8273) — Gisti RC (com.antonchuraev.aichecklists) ВНЕ scope. RC cross-check по юзеру невозможен без ключа Gisti-проекта.",
+    "Метрики: prev-snapshot d7-clean числа имели method-inconsistency (implied 8% бот vs 27% d30) → 7d дельты раздуты; вешу 30d cleaned."
+  ],
+
+  "rollout": {
+    "production": { "version": "1.18.1", "code": 70, "status": "completed", "user_fraction": 1.0, "changed_since_prev": true, "changed_from": "0.75 vc68/1.18 inProgress (07-20) → 100% vc70/1.18.1 completed (07-22)", "serving_confirmed": "Crashlytics ингестит реальные события с vc70 (9 NON_FATAL, 0 FATAL) → live, не 'в review'" },
+    "collapse": "staged-rollout collapse: vc68@75% + vc67 completed → схлопнулись в единственный vc70@100%. Ожидаемо.",
+    "read_method": "edits.insert → tracks.list → edits.delete, БЕЗ commit; tracks[production].releases=[{name:1.18.1, versionCodes:[70], status:completed}]",
+    "vc70_verdict": "1.18.1 на 100% completed, serving. Экспозиция ~1 день → 0 FATAL/ANR = НЕТ ДАННЫХ, не 'доказано чисто'. Промоут уже случился сам (не по скиллу, между прогонами) — раскатывать нечего.",
+    "decision_open": null
+  },
+
+  "events": {
+    "session_start":            { "d30": 6449, "d30_raw": 8813, "d7": 2672, "d7_raw": 3516, "delta_vs_prev": "cleaned +9% (5893→6449); бот 27%" },
+    "checklist_created":        { "d30": 45, "d30_raw": 112, "d7": 7, "d7_raw": 31, "delta": "cleaned -20% (56→45); 7d -42%" },
+    "ai_analyze_started":       { "d30": 57, "d30_raw": 147, "d7": 5, "d7_raw": 24, "delta": "cleaned -30%" },
+    "ai_analyze_completed":     { "d30": 37, "d30_raw": 83, "d7": 5, "d7_raw": 20, "delta": "cleaned -36%" },
+    "ai_analyze_failed":        { "d30": 19, "d30_raw": 60, "delta": "-14%; transient 503 + боты" },
+    "ai_chat_message_sent":     { "d30": 311, "d30_raw": 536, "d7": 31, "d7_raw": 67, "delta": "cleaned -11%" },
+    "ai_chat_response_received":{ "d30": 363, "d30_raw": 607, "d7": 36, "d7_raw": 77, "delta": "cleaned -11%" },
+    "ai_chat_thumb_down":       { "d30": 14, "d30_raw": 21, "d7": 0, "d7_raw": 2, "rate_d30": "3.9% cleaned / 3.5% raw", "delta": "rate DOWN from 6.1%/5.0%; все негативы pre-1.18, 0 на 1.18.x" },
+    "ai_chat_thumb_up":         { "d30": 24, "d30_raw": 38 },
+    "gallery_deeplink_opened":  { "d30": 5, "note": "flat 5 все на 07-15, 0 новых; d7=5 только по краю окна" },
+    "mcp_session_started":      { "exists": true, "d30": 5, "d7": 5, "delta": "1→5 (пошли данные, вероятно владелец)" },
+    "mcp_tool_called":          { "exists": true, "d30": 10, "d7": 10, "delta": "smoke→10" },
+    "weekly_item_added":        { "d30_raw": 16, "d30": 0, "note": "100% бот — реальный 0" }
+  },
+
+  "event_props": {
+    "checklist_created.source": { "ai": 82, "manual": 27, "template": 2, "gallery": 1, "chat": 0, "weekly": 0, "attachment": 0, "_basis": "30d raw", "delta": "template 1→2; manual 32→27; chat/weekly/attachment всё ещё 0 (не-исполнены-ИЛИ-не-нужны)" },
+    "csat_shown.version":       { "1.17.15": 7, "1.17.16": 7, "1.17.17": 7, "1.18.1": 2, "1.18": 1, "1.17.13": 1, "1.17.5": 1, "_basis": "30d raw=26/clean=14", "delta": "1.18.1 теперь даёт показы (2, было 1.18=1)" },
+    "csat_shown.trigger_event": { "ai_analyze_completed": 9, "ai_chat_preview_confirmed": 9, "fill_completed": 4, "(none)": 2, "checklist_milestone": 1, "share_checklist": 1 },
+    "ai_chat_thumb_down.version":{ "1.17.13": 7, "1.17.10": 6, "1.17.5": 3, "1.17.8": 3, "1.17.17": 2, "1.18": 0, "1.18.1": 0, "note": "100% на superseded ≤1.17.17; 0 на 1.18.x → атрибуция слоя невозможна" },
+    "ai_chat_thumb_down.routed_layer": { "unknown": 18, "FullChat": 3, "_note": "86% не атрибутировано (было 81%); кластеризация по слою НЕВОЗМОЖНА" }
+  },
+
+  "dead_instrumentation": {
+    "language_selected": { "exists": false, "zero_kind": "не меряется", "note": "🆕 GAP — Hindi UI (vc70) + Chat All-Languages picker (07-20) без единого события. Adoption языка неизмерим. Auto-prop language = OS-locale, не in-app выбор. Нужен код: language_selected{language,surface}" },
+    "push_permission_state": { "exists": true, "zero_kind": "over-instrument-noise", "note": "🆕 OWNER-ФЛАГ 07-22 — фаерится на КАЖДЫЙ Start Session (1/сессия) = шум по объёму. Состояние = user-property, не per-session event. Лучше: user-property push_permission + событие on-change. Разбор кода (эмиттер + push-retention консьюмер) — ОТДЕЛЬНАЯ ЗАДАЧА (заведена в этой сессии после healthcheck)" },
+    "mcp_tool_failed":     { "exists": false, "zero_kind": "не меряется" },
+    "folder_deleted":      { "exists": false, "zero_kind": "не меряется" },
+    "template_used":       { "exists": false, "zero_kind": "не меряется", "note": "прокси source=template есть" },
+    "template_previewed":  { "exists": false, "zero_kind": "не меряется" },
+    "attachment_added":    { "exists": false, "zero_kind": "не меряется" },
+    "routed_layer_populated": { "state": "86% thumb-down без слоя", "note": "структурный gap — чинить проп для будущего feedback-fixer" }
+  },
+
+  "crashes": {
+    "_1_18_1_ingest": "ДА — vc70/1.18.1 в ингесте (9 NON_FATAL, 0 FATAL, 0 ANR). Экспозиция ~1 день, читаемо но не финально.",
+    "fatal_new": 0, "our_bug_new": 0, "rework_crash_new": 0, "new_any_type": 0,
+    "_new_verdict": "Ни одного issue с firstSeenVersion >= 1.18. Раскатка 1.18→1.18.1 не внесла новых крашей.",
+    "2018d810": { "title": "SyncRepository.pushPendingChanges Not authenticated", "events_7d": 19, "users": 5, "delta": "7→19ev, 1→5users, теперь на 1.18.1 (РАСШИРИЛСЯ)", "verdict": "our-code log-noise (НЕ краш)", "mechanism_confirmed_by_code": "SyncRepositoryImpl.kt:108 currentUserId ?: Error('Not authenticated') → MainScreenViewModel.kt:116 logger.error(...,throwable) → Crashlytics recordException. KDoc: intentionally NOT fatal, self-healing (next emission retries)", "root_cause": "sync-push стартует до готовности auth; рост = экспозиция 100%, не регрессия", "fix": "понизить лог-левел error→warning для ветки 'Not authenticated'", "route": "@compose-feature-expert/@kotlin-expert commonMain sync↔VM", "severity": "low (benign, пачкает non-fatal-метрики)" },
+    "9775ecb7": { "title": "libsqliteJni FATAL", "events_30d": 29, "delta": "33→29 (вниз)", "verdict": "device-side", "spread_check": "НЕ расширился (Pixel6Pro17+Pixel7a12, OS Android12 only)" },
+    "ddc8be1f": { "title": "registerPushToken NoTransformation", "events_7d": 6, "delta": "12→6 вниз", "verdict": "our-bug" },
+    "8695b359": { "title": "registerUser NoTransformation", "events_7d": 2, "delta": "4→2", "verdict": "our-bug" },
+    "52217411": { "title": "FATAL ZoneOffset (desugaring)", "events_30d": 1, "on_ge_1_18": 0, "verdict": "our-bug, fix vc68 держит (low N, API24-25-only)" },
+    "7ddb0bb0": { "title": "Firestore Invalid doc ref", "absent": true, "verdict": "our-bug, fix держит (замкнут на 1.17.16, 0 на 1.17.17/1.18/1.18.1)" },
+    "f037e7c0": { "title": "IncompatibleClassChange FATAL", "events_30d": 4, "verdict": "device-side", "spread_check": "НЕ расширился (1 девайс SM-G998N, всё 1.17.10)" },
+    "422524_cluster": { "title": "DNS Gai + UnknownHost + SocketException", "events_7d": "~192+165+56", "verdict": "network benign" },
+    "cold_start_anr_cluster": { "verdict": "our-startup low", "note": "Firebase/GMS init на main thread; все firstSeen ≤1.17.11, 0 на 1.18.x; deferred-кандидат (вынести init с main thread)" }
+  },
+  "crashes_summary": { "fatal_new": 0, "our_bug_new": 0, "new_any_type": 0, "play_vitals": "0 строк = не меряется (ниже порога)" },
+
+  "backend": {
+    "_window": "2026-07-15..2026-07-22",
+    "verdict": "Сервер чист. 8 пятисоток всего/7д, все шум. Active chat-agent 00018-zoc (response_language) — 0 новых сигнатур. chat-agent rate 4.24%→3.47% (вниз).",
+    "chat_agent": { "invocations": 144, "errors": 5, "error_rate": 0.0347, "active_revision": "chat-agent-00018-zoc (response_language/Chat All-Languages deploy 07-20)", "live_rate_excl_probe": 0.0071,
+      "signatures": {
+        "dead_model_404@chat_agent": { "count_7d": 4, "all_on": "00014-zug probe 07-15 09:20-09:21 (superseded)", "verdict": "aging noise, выпадет 07-23" },
+        "ValueError_empty_gemini@chat_agent": { "count_7d": 1, "on": "00015-qox 07-16 pre-rework", "verdict": "our-bug HIGH латентный, ФИКС ОТКРЫТ — пустой candidate→500 вместо graceful retry/refund" }
+      }
+    },
+    "classify_chat_intent": { "invocations": 63, "errors": 3, "error_rate": 0.0476, "signatures": { "client_400": 3 }, "new_signal": "🆕 Memory limit 244 MiB exceeded @00017-zef (07-18), infra/config, без 5xx, low" },
+    "generate_checklist":   { "invocations": 25, "errors": 2, "error_rate": 0.08, "signatures": { "503_UNAVAILABLE": 2, "429_by_design": 1 }, "verdict": "transient-upstream noise" },
+    "transcribe_audio":     { "invocations": 8, "errors": 1, "signatures": { "503_UNAVAILABLE": 1 }, "verdict": "transient noise" },
+    "register_push_token":  { "invocations": 4263, "errors": 0 },
+    "register_user":        { "invocations": 363, "errors": 0 },
+    "refill_premium_credits": { "invocations": 7, "errors": 0, "note": "cron 11:00 жив" },
+    "send_promotions_batch": { "invocations": 8, "errors": 0, "note": "cron 09:00; 0 opens = delivery, не серверная ошибка" },
+    "on_rc_event_created":  { "invocations": 7, "errors": 0, "note": "FutureWarning google.generativeai support ended всё ещё печатается (rev 00002-kam, не передеплоена с 05-17); gemini-2.5 EOL 2026-10-16 → мигрировать на google-genai" },
+    "chat_completion_dead": { "invocations": 16, "errors": 0, "note": "redeploy 07-20, dead-code, органики нет" },
+    "workers": { "gisti_mcp": { "req_7d": 5563, "errors": 0, "delta": "+77% vs 3151" }, "gisti_landing": { "req_7d": 1933, "errors": 0 }, "checklists": { "req_7d": 1708, "errors": 0, "deployed": "2026-07-21 (новее 07-20 COOP/NPE — ручной follow-up?)" } },
+    "abuse": "нет подтверждённых; gisti-mcp +77% консистентно с ростом MCP-событий, не single-IP spike",
+    "watch": { "gemini_2_5_EOL": "2026-10-16", "classify_memory_244mib": "07-18 low" }
+  },
+
+  "ab": {
+    "_delta_vs_prev": "NONE. 3 слоя байт-в-байт (client RC v20 06-18 / server RC v2 07-03 / Firestore 07-09). Hindi+Chat All-Languages новых RC-ключей НЕ дали (response_language = client DataStore pref).",
+    "running": { "PaywallsV1_#2": "73д revenue", "CurrentOfferTrial_#6": "37д revenue", "activation_bundle_v1_#7": "34д revenue", "OnboardingABC_#8": "28д purchase_revenue", "ai_model_arm": "server 50/50 (variant_b gemini-3.1-flash-lite, control gemini-2.5-* EOL 10-16)", "push_ab_arm": "server 33/33/34 (доставка сломана, неизмерим)" },
+    "forgotten_intentional": "4 revenue/purchase-objective эксперимента — ADR 2026-07-15, НЕ перерешивать",
+    "code_only_keys": ["max_weekly_checklists_free", "max_attachments_per_item_free", "push_timing_arm", "first_checklist_variant"],
+    "dead_config": ["update_feed_json", "feature_paywall_enabled", "templates_json"],
+    "doc_lag": "ab-tests-overview §4.1 всё ещё 'код 4 vs live 5' — устарело (код 5), low"
+  },
+
+  "csat": {
+    "shown_d30": 14, "shown_d30_raw": 26, "shown_d7": 6, "shown_d7_raw": 14,
+    "rating_selected_d30": 6, "submitted_d30": 1, "chip_toggled": 0,
+    "weekly_raw": "≤07-05 ~1 → 07-06 8 → 07-13 15(пик) → 07-20 2(partial)",
+    "funnel_clean_30d": "shown 14 → rating_selected 6 (43%) → {submitted 1 | review_completed 2}; ~57% показов без рейтинга (грубо)",
+    "verdict": "гипотеза ×4-8 ДЕРЖИТСЯ (не перерешивать); 1.18.1 даёт показы (2). contamination-watch earliest 07-24 (too-early). chip_toggled 0 by design.",
+    "owner_task_2026_07_22": "изучить silent-dismiss rate — БЛОКЕР: csat_dismissed без source (auto vs manual) → dismissed/shown naive 131-183%. Нужен код (проп source). → docs/todos/2026-07-22-csat-dismiss-rate-and-show-logic-tuning.md"
+  },
+
+  "chat_feedback": {
+    "thumb_down_d30": 14, "thumb_down_d30_raw": 21, "thumb_down_d7": 0, "rate_d30": "3.9% cleaned / 3.5% raw (DOWN from 6.1%/5.0%)",
+    "by_version": "100% на ≤1.17.17; 0 на 1.18/1.18.1",
+    "routed_layer": "unknown 18/21 (86%) — кластеризация невозможна",
+    "verdict_fixer": "заход /ai-chat-feedback-fixer НЕ оправдан — жалобы на переработанный код + 86% без слоя. Layer1 лексикон НЕ расширять (ADR). Пересмотр когда 1.18.x накопит свой негатив"
+  },
+
+  "verification_records": {
+    "_source": "docs/active/prod-fixes-verification-2026-07-15.md",
+    "_result_this_run": "2 CONFIRMED (thought-signature, allowlist), 0 refuted. 5 too-early/manual обновлены датой 07-22.",
+    "thought-signature-fixed":         { "status": "confirmed", "result": "0 thought_signature-400/7д (baseline 6); live error-rate 0.71%; active rev 00018-zoc чист" },
+    "allowlist-dead-models":           { "status": "confirmed", "result": "0 на живых ревизиях; 4 остаточных = superseded probe 00014-zug, выпадут 07-23" },
+    "sync-legacy-cloudid":             { "status": "too-early", "earliest": "2026-07-31", "result": "7ddb0bb0 замкнут на 1.17.16, 0 на 1.17.17/1.18/1.18.1. Держит" },
+    "gallery-source-tracking-android": { "status": "too-early", "earliest": "2026-07-27", "result": "template 1→2; weekly/chat/gallery real-0 (низкочастотные пути, не экспозиция)" },
+    "csat-contamination-watch":        { "status": "too-early", "earliest": "2026-07-24", "result": "shown 14 clean; 1.18.1=2; отделить нельзя (2д)" },
+    "play-referrer-attribution":       { "status": "too-early", "earliest": "owner-GCS", "result": "earliest наступил, но Play GCS owner-only; 0 органических визитов галереи → атрибутировать нечего. Hands" },
+    "sync-reminder-fullscreen":        { "status": "pending", "check_via": "manual", "result": "vc70 несёт a1bb89bd, 2-девайсная проверка возможна → hands" }
+  },
+
+  "owner_tasks_queued": [
+    "csat-dismiss-rate + show-logic tuning — docs/todos/2026-07-22-csat-dismiss-rate-and-show-logic-tuning.md (блокер: source-проп на csat_dismissed)",
+    "push_permission_state over-instrumentation — фаерится каждую сессию; перевести в user-property + on-change событие; разбор кода эмиттера + push-retention консьюмера (в работе после healthcheck)"
+  ],
+
+  "todos_ripe": [],
+  "todos_status": [
+    "2026-07-16-kotlinx-datetime-desugaring-api24-fatal.md — 52217411 fix vc68 держит, 0 на ≥1.18, low N, пересверка 07-31 через sync-legacy",
+    "on-rc google-genai миграция — FutureWarning печатается, gemini-2.5 EOL 2026-10-16",
+    "cold-start ANR cluster — deferred-кандидат (init с main thread)"
+  ],
+
+  "deltas_this_run": {
+    "fix_confirmed": ["thought-signature-fixed", "allowlist-dead-models"],
+    "shifted": ["rollout 75%→100% collapse (vc70 serving)", "2018d810 sync-not-authed 1→5 users (benign, tracks rollout)", "engagement cleaned -20-36% MoM (30d) при sessions +9%", "chat thumb-down rate 6.1%→3.9%", "workers снялись впервые за 4 прогона"],
+    "new": ["language instrumentation gap (Hindi+Chat All-Lang без событий)", "push_permission_state over-instrument (owner-флаг)", "classify memory-limit 244MiB (low)"],
+    "unchanged": ["A/B 3 слоя байт-в-байт", "0 новых крашей", "сервер чист"]
+  }
+}

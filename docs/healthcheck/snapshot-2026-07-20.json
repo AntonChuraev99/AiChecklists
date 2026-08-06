@@ -1,0 +1,187 @@
+{
+  "run_date": "2026-07-20",
+  "prev_run": "2026-07-17",
+  "window": "7d + 30d",
+  "report_url": "https://claude.ai/code/artifact/7d659450-d640-479b-9496-bce69c27dc6b",
+  "bot_filter": "products_load_failed = 0 (event, not user-prop; behavioral 'did NOT perform products_load_failed'; no saved cohort)",
+  "headline": "1.18 ВОШЛА в ингест Crashlytics (07-17 её не было) — снят третий-нуль с desugaring+rework, но экспозиция тонкая (9 non-fatal all-network, 0 FATAL, 0 ANR). Rollout уехал 20%→75% МЕЖДУ прогонами (не по скиллу). 0 новых FATAL / 0 our-bug / 0 rework-крашей. gallery-source-web ИНСТРУМЕНТАЦИЯ confirmed, но органика галереи=0 после дедлайна 07-18 (продуктовый провал deep-link). A/B байт-в-байт. Сервер чист.",
+  "notes": [
+    "gcloud: --account=churaevanton@gmail.com даёт валидный токен на дефолтном CLOUDSDK_CONFIG; переопределять CLOUDSDK_CONFIG в scratchpad НЕ надо (свежая папка без gmail-кред → пустой токен → 401). CFA не воспроизвелась этот прогон.",
+    "gp:userRole в 786722 не существует → внутренние тестеры неотделимы во ВСЕХ числах.",
+    "Amplitude interval:30 снапается к началу месяца — числа с interval:1.",
+    "ЛОВУШКА Crashlytics: topVersions+issueId = все нули (артефакт). Для per-issue/spread — topAndroidDevices/topOperatingSystems.",
+    "ЛОВУШКА бек-кластеризации: file:line рвётся на КАЖДОМ деплое — якорить на ExceptionType+status+имя функции.",
+    "Cloudflare Workers НЕ снимались (3-й прогон подряд): wrangler на <other-org-account> (нет зоны/воркеров), observability MCP требует OAuth. Нужен re-auth churaevanton@gmail.com ИЛИ CLOUDFLARE_API_TOKEN — в «сделай руками».",
+    "MEMORY.md ACTIVE TASKS пишет 'rollout staged 20%' — прод читает 0.75. Промоут не по скиллу, намеренность НЕ подтверждена — в память как 'intended' НЕ занесено, вынесено на подтверждение владельцу."
+  ],
+
+  "rollout": {
+    "production": { "version": "1.18", "code": 68, "status": "inProgress", "user_fraction": 0.75, "changed_since_prev": true, "changed_from": "0.20 (07-17) → 0.75 (07-20)" },
+    "previous":   { "version": "1.17.17", "code": 67, "status": "completed", "note": "обслуживает остаток ~25%" },
+    "read_method": "edits.insert → tracks.list → edits.delete, БЕЗ commit, HTTP 204; SA-ключ ~/.play-secrets/gisti-play-sa.json",
+    "vc68_verdict": "1.18 на 75% inProgress. Ингест Crashlytics появился, но тонкий (9 non-fatal, 0 FATAL). Промоут до 100% ОПЕРЕЖАЕТ crash-verify (desugaring ~07-23+, thought_signature/allowlist formal ~07-22). РЕШЕНИЕ владельца: пауза на 75% до ~07-23 vs промоут сейчас. Скилл не промоутит.",
+    "decision_open": "promote-100-or-hold-75-until-crash-verify"
+  },
+
+  "events": {
+    "session_start":            { "d30": 5893, "d30_raw": 8115, "d7": 3564, "d7_raw": 3885, "delta_vs_prev": "cleaned +26.6% (4656→5893), raw +20.8%", "note": "вовлечённость растёт, бот 27%" },
+    "checklist_created":        { "d30": 56, "d30_raw": 115, "d7": 12, "d7_raw": 32, "delta": "d7 cleaned -25% (16→12); ступенька источников (не рост)" },
+    "ai_analyze_started":       { "d30": 81, "d30_raw": 161, "d7": 11, "d7_raw": 25 },
+    "ai_analyze_completed":     { "d30": 58, "d30_raw": 96, "d7": 10, "d7_raw": 19 },
+    "ai_analyze_failed":        { "d30": 22, "d30_raw": 61, "delta": "~плоско vs 20/60 07-16; transient 503 (бот 64%)" },
+    "ai_chat_message_sent":     { "d30": 351, "d30_raw": 565, "d7": 43, "d7_raw": 87, "delta": "cleaned +8%" },
+    "ai_chat_response_received":{ "d30": 408, "d30_raw": 641, "d7": 50, "d7_raw": 99, "delta": "cleaned +8%" },
+    "ai_chat_thumb_down":       { "d30": 25, "d30_raw": 32, "d7": 0, "d7_raw": 2, "rate_d30": "5.0% raw / 6.1% cleaned", "note": "7d cleaned=0; d30-рост = аккумуляция старых событий в окне, не свежий негатив" },
+    "ai_chat_thumb_up":         { "d30": 44, "d7": 4 },
+    "ai_chat_feedback":         { "d30": 16, "d7": 2 },
+    "mcp_session_started":      { "exists": true, "d30": 1, "note": "смок Δ0 vs 07-17" },
+    "mcp_tool_called":          { "exists": true, "d30": 1, "note": "смок, роста нет" },
+    "weekly_item_added":        { "d30_raw": 16, "d30": 0, "note": "100% бот — реальный 0" }
+  },
+
+  "event_props": {
+    "checklist_created.source_platform": { "Android_ai": 81, "Android_manual": 32, "Android_template": 1, "Web_gallery": 1, "chat": 0, "weekly": 0, "attachment": 0, "_basis": "30d raw", "delta": "template ПОЯВИЛСЯ на Android 1.18 (0→1); gallery на Web=1 (07-15 смок). Ступенька трекинга 19ea4c7b" },
+    "csat_shown.version":           { "1.17.15": 7, "1.17.16": 7, "1.17.17": 7, "1.17.13": 1, "1.17.5": 1, "1.18": 1, "_basis": "30d raw=24/clean=14", "note": "1.18 стартует n=1" },
+    "csat_shown.trigger_event":     { "ai_chat_preview_confirmed": 9, "ai_analyze_completed": 7, "fill_completed": 4, "checklist_milestone": 1, "share_checklist": 1, "(none)": 2 },
+    "ai_chat_thumb_down.version":   { "1.17.13": 7, "1.17.10": 6, "1.16.5": 6, "1.17.0": 3, "1.17.5": 3, "1.17.8": 3, "1.17.4": 2, "1.17.17": 2, "1.18": 0, "note": "доминируют до-фикс сборки; 1.18=0 → атрибуция слоя невозможна" },
+    "ai_chat_thumb_down.routed_layer": { "unknown": 26, "FullChat": 6, "_note": "81% не атрибутировано (было 83%). Кластеризация по слою НЕВОЗМОЖНА; 1.18 не дал негатива" }
+  },
+
+  "dead_instrumentation": {
+    "mcp_session_started": { "exists": true, "zero_kind": "смок" },
+    "mcp_tool_called":     { "exists": true, "zero_kind": "смок" },
+    "mcp_tool_failed":     { "exists": false, "zero_kind": "не меряется", "note": "провала не было" },
+    "folder_deleted":      { "exists": false, "zero_kind": "не меряется", "note": "PR#12 не в прод-сборке" },
+    "template_used":       { "exists": false, "zero_kind": "не меряется" },
+    "template_previewed":  { "exists": false, "zero_kind": "не меряется" },
+    "attachment_added":    { "exists": false, "zero_kind": "не меряется", "note": "есть только attachment_load_failed" }
+  },
+
+  "web_deploy_signal": {
+    "verdict": "ОРГАНИКА ГАЛЕРЕИ = 0 после дедлайна 07-18 — ДИАГНОЗ найден (см. seo блок). Инфра готова, индексация ЗДОРОВА (live 4/4 en+hi; агрегат «1/124» устарел). Причина нуля = РАНЖИРОВАНИЕ (поз 71.7) + нулевой авторитет, НЕ индексация, НЕ битый путь, НЕ провал контента.",
+    "gallery_deeplink_opened": { "d30": 5, "all_on": "2026-07-15", "since": "0 (07-16..07-20)" },
+    "still_zero": ["chat", "weekly", "attachment", "gallery-organic"]
+  },
+
+  "seo": {
+    "_checked": "2026-07-20 (GSC via Chrome владельца = авторитетно + curl-инфра via subagent)",
+    "conclusion": "Инфра готова, индексация ЗДОРОВА (live URL Inspection 07-20: 4/4 en+hi проиндексированы). Нулевая органика = РАНЖИРОВАНИЕ (поз 71.7) + нулевой авторитет (0 бэклинков, страницам ~6 дней), НЕ индексация и НЕ контент. ПОПРАВКА к раннему выводу: агрегат «1/124» устарел (данные 10.07).",
+    "gsc": {
+      "property": "URL-prefix https://gisti-ai.com/ + 07-20 domain-property gisti-ai.com ВЕРИФИЦИРОВАН (Cloudflare DNS provider, owner завершил OAuth) — покрывает www+поддомены+http. Новый ресурс: данные копятся вперёд, историю GSC не бэкфиллит",
+      "sitemap": "/sitemap.xml подан 14.07, обработан 19.07 успешно, 124 URL (61 hi + 63 en)",
+      "indexed": "АГРЕГАТ Page-Indexing: 1/124 (данные 10.07, УСТАРЕЛ). LIVE URL Inspection 07-20: apex + /checklists/ + EN-спок first-apartment-essentials + HI-спок — ВСЕ 4 проиндексированы → индексация растёт пост-sitemap (en и hi). Агрегат обновится вверх.",
+      "performance_3mo": "0 кликов / 80 показов / ср.позиция 71.7 / 51 запрос",
+      "top_pages_impr": "first-apartment-essentials 20, apex 15, startup-checklist 7, deep-cleaning 6, birthday-party 4, /mcp 3 — галерея выходит в выдаче (on-target)",
+      "top_queries": "startup launch checklist, wedding checklist, college packing list, deep house cleaning — англ. long-tail, все 0 кликов (поз ~72)",
+      "hindi_in_top": "0 hi-страниц в топе показов → Hindi не ранжируется пока",
+      "app_subdomain": "0 в индексе (правильно SEO-0)"
+    },
+    "infra_live_curl": {
+      "robots_txt": "200 (Allow:/, Content-Signal search=yes, строка Sitemap: есть)",
+      "sitemap_xml": "200 (124 loc, hreflang, lastmod 07-14)",
+      "indexnow_key": "200 (97ad0db790d29b918031ba2a7e974886.txt)",
+      "apex_static": "200 (реальный HTML title/H1/FAQ, НЕ canvas)",
+      "www_redirect": "301 → apex",
+      "hreflang": "взаимные en↔hi + x-default, JSON-LD @graph — textbook i18n"
+    },
+    "hindi": "61 hi (50 detail + 10 hub + 1 index) зеркалит 61 en; путь /hi/checklists/{cat}/{slug}/; hreflang корректен, lang=hi, Devanagari meta; НЕ ранжируется пока (0 в топе показов)",
+    "phases": "0 LIVE, 1 LIVE, 2 LIVE +Hindi (124 vs плановых 63 в доке), 3 Pinterest deferred, 4 GEO partial (Tier-1 citation done, MCP-directory deferred)",
+    "memory_stale": "MEMORY/план 'нет robots/sitemap/IndexNow' УСТАРЕЛО (это Part-A аудит плана 07-14, перекрыт его же Phase 0 DONE). План Part-C пишет 63 URL — прод 124.",
+    "metric_nuance": "gallery_deeplink_opened real 0, но ненадёжный прокси так рано: web-путь жив (может стрелять сегодня → 0=нет визитёров), Android App-Links auto-verify только на v1.18-раскатке → Android-атрибуция структурно невозможна. Читать 'нет охвата', не 'контент провалился'.",
+    "actions_done_2026_07_20": ["IndexNow re-ping ВЫПОЛНЕН: 200 OK for 124 URLs (вкл. 61 hi)", "wrangler re-auth ПОДТВЕРЖДЁН (churaevanton@gmail.com, acct 2c9dfaadbca94b44f59f13dbf70519d7, есть workers_tail read)", "GSC domain-property gisti-ai.com ВЕРИФИЦИРОВАН (Cloudflare DNS provider, owner завершил OAuth) — покрывает www+поддомены, данные вперёд", "request-index НЕ делался — 4/4 sampled (en+hi) уже в индексе, квоту не жёг"],
+    "owner_gaps": ["АВТОРИТЕТ (главный рычаг): internal links + Pinterest(Ph3) + backlinks — ранжирование поз 72 из-за 0 бэклинков, НЕ из-за индексации", "мониторить GSC Coverage (агрегат обновится 1→N ~07-27) + новый domain-property (данные с 07-20 вперёд)", "бренд-дизамбигуация Gisti vs Gist/gisti.ai"],
+    "not_snapped": "Cloudflare gisti-landing worker analytics (wrangler <other-org>, нужен re-auth); GSC клики/показы сняты через Chrome владельца этот прогон = авторитетно (обычно owner-OAuth-only)"
+  },
+
+  "crashes": {
+    "_1_18_ingest": "ДА — 1.18/vc68 в ингесте по всем типам (07-17 не было). NON_FATAL=9 (все network), FATAL=0 (рано, тонко), ANR=0 (рано, тонко). Ранние сигналы читаемы, не финальны.",
+    "fatal_new": 0, "our_bug_new": 0, "rework_crash_new": 0,
+    "52217411": { "title": "FATAL ZoneOffset (desugaring)", "events_30d": 1, "versions": ["1.17.13"], "on_1_18": 0, "verdict": "our-bug", "note": "Фикс vc68 5d51edca. 0 на 1.18, но баг API24-25-only и редкий — ТОНКАЯ база не доказывает. Пересверка ~07-23+" },
+    "59c77d83": { "title": "NON_FATAL ChatClassifier ZoneOffset", "events_30d": 1, "on_1_18": 0, "verdict": "our-bug", "note": "близнец 52217411, тот же фикс" },
+    "8695b359": { "title": "registerUser NoTransformationFoundException", "events_30d": 4, "verdict": "our-bug", "note": "не-JSON тело; связан с ddc8be1f. Не на 1.18. Объединить в тикет" },
+    "ddc8be1f": { "title": "registerPushToken NoTransformationFoundException", "events_30d": 12, "verdict": "our-bug", "note": "пара к 8695b359" },
+    "2018d810": { "title": "SyncRepository.pushPendingChanges Not authenticated", "events_30d": 7, "users_30d": 1, "versions": ["1.17.17"], "on_1_18": 0, "verdict": "our-bug", "note": "синк стартует без auth — тихо гардировать" },
+    "7ddb0bb0": { "title": "Firestore checklistRef Invalid document reference", "events_30d": 1, "versions": ["1.17.16"], "on_gt_1_17_16": 0, "verdict": "our-bug", "note": "sync-legacy-cloudid цель (a1bb89bd в vc68). НЕ на 1.17.17/1.18. Держит" },
+    "9775ecb7": { "title": "libsqliteJni FATAL", "events_30d": 29, "delta": "33→29 (вниз)", "verdict": "device-side", "spread_check": "НЕ расширился (OS 100% Android 12; Pixel6Pro+Pixel7a, 2 девайса)" },
+    "f037e7c0": { "title": "IncompatibleClassChange FATAL", "events_30d": 4, "d7": 0, "verdict": "device-side", "spread_check": "НЕ расширился (1 девайс SM-G998N, всё 1.17.10)" },
+    "422524":   { "title": "DNS GaiException", "events_30d": 457, "delta": "+62", "verdict": "network" },
+    "5d81c6":   { "title": "UnknownHost CF", "verdict": "network" },
+    "591e5f2e": { "title": "SocketException abort", "verdict": "network" },
+    "cold_start_anr_cluster": { "verdict": "our-startup", "delta": "РАСШИРИЛСЯ +11b8a2d2 WorkManager, +2fc5a253 Koin PaywallModule, +4f94d288 ReminderReceiver channel, +b6445e25, +ef64f18, +f3380cbf", "note": "Firebase/GMS-init на main thread. Каждый 1-2ev, все до-1.18, low. Кандидат в deferred (вынести init с main thread)" }
+  },
+  "crashes_summary": {
+    "fatal_new": 0, "our_bug_new": 0, "rework_crash_new": 0,
+    "crash_free_users_pct": "не меряется (Reports API знаменатель неизвестен)",
+    "play_vitals_crash_rate": "не меряется (ниже порога анонимизации, ~470 активных)"
+  },
+
+  "backend": {
+    "_window": "2026-07-13..2026-07-20",
+    "verdict": "Сервер чист, baseline держит. chat-agent rate 5.45%→4.24% (вниз).",
+    "chat_agent": {
+      "invocations": 165, "errors": 7, "error_rate": 0.0424,
+      "active_revision": "chat-agent-00017-pux (rework); 9 инвокаций/2.6сут все 200",
+      "rework_regression": "НЕ обнаружена (0 новых сигнатур), но n=9 слабо — L3-трафик придёт с расширением rollout 1.18. Confidence medium",
+      "signatures": {
+        "ValueError_empty_gemini@chat_agent": { "count_window": 1, "on": "07-16 00015-qox (pre-rework)", "post_rework": 0, "verdict": "our-bug HIGH — латентная, ФИКС ОТКРЫТ. Пустой candidate → 500 вместо graceful retry/refund. НЕ повторилась на 00016/00017 но переживает смену ревизий" },
+        "thought_signature_400@chat_agent": { "count_window": 2, "all_on": "00012-pob pre-fix (07-13/14 хроника)", "post_fix": 0, "verdict": "ПОФИКШЕНО (00013), держит" },
+        "dead_model_404@chat_agent": { "count_window": 4, "all_on": "00014-zug probe (07-15, 2мин)", "post_fix": 0, "verdict": "ПОФИКШЕНО (00015), держит" }
+      }
+    },
+    "classify_chat_intent": { "invocations": 80, "errors": 4, "error_rate": 0.05, "signatures": { "503_UNAVAILABLE": 2, "client_400": 2 } },
+    "generate_checklist":   { "invocations": 25, "errors": 2, "error_rate": 0.08, "signatures": { "503_UNAVAILABLE": 1, "429_by_design": 1 } },
+    "transcribe_audio":     { "invocations": 10, "errors": 1, "error_rate": 0.10, "signatures": { "503_UNAVAILABLE": 1 } },
+    "register_push_token":  { "invocations": "4344 (capped read; 0×5xx весь 7д)", "errors": 0 },
+    "register_user":        { "invocations": "524 (capped; 0×5xx весь 7д)", "errors": 0 },
+    "refill_premium_credits": { "invocations": 7, "errors": 0, "note": "cron 11:00 жив" },
+    "send_promotions_batch": { "invocations": 7, "errors": 0, "note": "cron 09:00; 0 opens = delivery-проблема, НЕ серверная ошибка" },
+    "on_rc_event_created":  { "invocations": 7, "errors": 0, "note": "ДВИЖЕНИЕ: FutureWarning 'google.generativeai support ended' теперь ПЕЧАТАЕТСЯ на cold-start (07-18/19). Пакет мёртв, ревизия 00002-kam не передеплоена с 05-17. Хард-дедлайн модель gemini-2.5 EOL 2026-10-16. Мигрировать на google-genai" },
+    "chat_completion_dead": { "invocations": 8, "errors": 0, "note": "burst тест-инвокаций 07-16, dead-code, органики нет" },
+    "workers": { "verdict": "НЕ снято (wrangler <other-org>). Последнее известное: gisti-mcp 3151, gisti-landing 1529, checklists 1038, errors 0. checklists после CI-rework 07-17 всё ещё не верифицирован" },
+    "watch": { "gemini_2_5_EOL": "2026-10-16" }
+  },
+
+  "ab": {
+    "_delta_vs_prev": "NONE. 3 слоя байт-в-байт (client RC v20 06-18 / server RC v2 07-03 / Firestore 07-09). vc68 конфиг не тронул.",
+    "max_checklists_free": "ДРЕЙФ УСТРАНЁН — код-дефолт 5 = RC 5",
+    "running": { "PaywallsV1_#2": "71д revenue", "CurrentOfferTrial_#6": "35д revenue", "activation_bundle_v1_#7": "32д revenue", "OnboardingABC_#8": "26д purchase_revenue", "ai_model_arm": "server 50/50 (control gemini-2.5-* EOL 10-16)", "push_ab_arm": "server 33/33/34 (доставка сломана, неизмерим)" },
+    "not_tests": ["push_timing_arm", "first_checklist_variant", "max_weekly_checklists_free", "max_attachments_per_item_free"],
+    "dead_config": ["update_feed_json (0 чтений)", "feature_paywall_enabled (0 чтений)"],
+    "doc_lag": "ab-tests-overview §3/§4 всё ещё 'код=4 vs live=5' — устарело (код 5). Low, убрать при ревизии",
+    "kept_running_ADR": "docs/decisions/2026-07-15-keep-revenue-objective-experiments-running.md"
+  },
+
+  "csat": {
+    "shown_d30": 14, "shown_d30_raw": 24, "shown_d7": 8, "shown_d7_raw": 15,
+    "opened_d30": 6, "rating_selected_d30": 7, "chip_toggled": 0, "submitted_d30": 1,
+    "verdict": "гипотеза ×4-8 ПОДТВЕРЖДЕНА 07-15 — не перерешивать. 1.18=1 показ (старт). chip_toggled/submitted≈0 = by design. contamination-watch too-early до 07-24"
+  },
+
+  "chat_feedback": {
+    "thumb_down_d30": 25, "thumb_down_d30_raw": 32, "thumb_down_d7": 0, "rate_d30": "5.0% raw / 6.1% cleaned",
+    "by_version": "доминируют до-фикс сборки; 1.18=0 негатива",
+    "routed_layer": "unknown 26/32 (81%) — кластеризация по слою НЕВОЗМОЖНА",
+    "verdict_fixer": "заход /ai-chat-feedback-fixer ОТЛОЖИТЬ — выборка мала/устарела/слабо тегирована. Ждать пост-1.18 объём. Layer1 лексикон НЕ расширять (ADR)"
+  },
+
+  "verification_records": {
+    "_source": "docs/active/prod-fixes-verification-2026-07-15.md",
+    "_result_this_run": "1 CONFIRMED (gallery-source-web инструментация), 0 refuted. Остальные too-early/pending обновлены датой 07-20.",
+    "gallery-source-tracking-web":     { "status": "confirmed", "note": "инструментация работает (gallery на Web + template на Android); органика=0 трекать через play-referrer" },
+    "gallery-source-tracking-android": { "status": "too-early", "earliest": "2026-07-20", "note": "template ✓ на 1.18 n=1; weekly/chat ждут экспозиции, пересверка ~07-24+" },
+    "thought-signature-fixed":         { "status": "too-early", "earliest": "2026-07-22", "early": "0 post-fix держит" },
+    "allowlist-dead-models":           { "status": "too-early", "earliest": "2026-07-22", "early": "0 post-fix держит" },
+    "sync-legacy-cloudid":             { "status": "too-early", "earliest": "2026-07-31", "early": "7ddb0bb0 не на >1.17.16" },
+    "csat-contamination-watch":        { "status": "too-early", "earliest": "2026-07-24", "early": "shown 14" },
+    "play-referrer-attribution":       { "status": "too-early", "earliest": "2026-07-22", "note": "owner/GCS; косвенно 0 органических визитов" },
+    "sync-reminder-fullscreen":        { "status": "pending", "check_via": "manual", "note": "2-девайсная проверка → сделай руками" }
+  },
+
+  "todos_ripe": [],
+  "todos_status": [
+    "2026-07-14-promote-vc67-rollout.md — УСТАРЕЛА: vc68 на prod (0.75), вопрос vc67 снят. Новый decision: promote-1.18-100-or-hold-75",
+    "2026-07-16-kotlinx-datetime-desugaring-api24-fatal.md — фикс vc68 (5d51edca), 0 на 1.18 но тонко, пересверка ~07-23+",
+    "2026-07-13-aichat-layer1-thumbsdown-backlog.md — ждёт ротации базы; 1.18=0 негатива, кластеризация невозможна",
+    "on-rc-event-created google-genai миграция — FutureWarning печатается, хард-дедлайн gemini-2.5 EOL 2026-10-16 (кандидат в deferred/todo)"
+  ]
+}
